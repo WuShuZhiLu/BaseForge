@@ -12,6 +12,162 @@
 
 <!-- ADD_NEW_HERE -->
 
+## v1.4.16 - 2026-08-19
+
+### 🐛 修复
+
+- **笔记切换**: 阻止旧富文本回执抢回激活笔记 (20bbee8)
+- **视频**: 首次打开笔记前准备附件签名 (33f39ad)
+- **视频**: 局域网附件授权改用原生 HTTP (ac25076)
+- 优化代码块全选快捷键逻辑 (fc47cc3)
+- 重新清理历史 Markdown 块标记 (c9dd1d0)
+
+### ✅ 测试
+
+- **笔记切换**: 覆盖提交后的迟到保存回执 (dd1931a)
+- **视频**: 覆盖 Android 局域网附件授权 (7330555)
+- **视频**: 覆盖首次打开前附件授权准备 (e8ded10)
+
+### 📌 杂项
+
+- 补充 SignPath 测试签名配置回归测试 (414272c)
+- 完善 SignPath 测试签名配置 (4d2c2eb)
+- 补充 SignPath OSS 水印限制回归测试 (7a1016e)
+- 同步修复 Lite SignPath OSS Artifact Configuration (be46cfe)
+- 修复 SignPath OSS Artifact Configuration 水印限制 (c2447c0)
+- 纳入 SignPath 发布链路回归测试 (a237006)
+- 迁移 SignPath 代码签名公开政策 (8616da5)
+- 补充 SignPath Artifact Configuration 回归测试 (415199f)
+- 更新 SignPath 正式发布链路契约测试 (83ccfb8)
+- 补充 Windows SignPath 签名验证回归测试 (4e8ea92)
+- 补充 SignPath 正式发布配置回归测试 (3bcf305)
+- 强制正式 Release 汇总 SignPath 已签名 Windows 产物 (1f41b90)
+- 迁移 SignPath Windows 正式签名流水线 (8fcef19)
+- 接入 Lite SignPath Windows 发布者动态注入 (a7fdcda)
+- 接入 SignPath Windows 发布者动态注入 (c02a4fd)
+- 迁移本地 Windows 发布守门入口 (ea35bdb)
+- 迁移本地未签名 Windows 发布守门规则 (0b53b58)
+- 迁移 Windows 签名后更新元数据刷新入口 (bd101d0)
+- 迁移签名后 Windows 更新元数据重建逻辑 (6cf9a58)
+- 迁移 Windows 签名验证入口 (ef03283)
+- 迁移 Windows 签名信息导出脚本 (acb2724)
+- 迁移 Windows Authenticode 严格校验器 (6e2bc2e)
+- 迁移 SignPath 发布配置检查入口 (fcb3beb)
+- 迁移 SignPath 正式发布配置校验 (8f5d29a)
+- 迁移 SignPath Windows Lite 产物配置 (504938b)
+- 迁移 SignPath Windows Full 产物配置 (67fe3d2)
+- 更新 SignPath 手动测试签名契约 (67dec7a)
+- 确保手动构建始终执行 SignPath 测试签名 (837978e)
+- 补充 SignPath 测试签名工作流契约 (56fc631)
+- 接入 SignPath Windows 测试签名链路 (6fa6441)
+- 补充 macOS 双架构压缩包发布校验 (ae7cbc0)
+- 兼容 macOS 双架构手动下载包校验 (1afc0da)
+- 补充 macOS 手动下载压缩包识别 (5d7b164)
+- 补充桌面平台 Release 说明回归测试 (528268d)
+- 在 Release 说明中明确桌面平台矩阵 (886c3e2)
+- 将发版发布者契约纳入更新发布测试 (a79f7b1)
+- 补充 macOS 发版完整性回归测试 (cb2baca)
+- 强化 macOS 发版产物完整性门禁 (60ac8e6)
+- 修复完整桌面发版漏传 macOS 产物 (2e656e6)
+- 新增 macOS 发版产物完整性校验 (b63e715)
+- 补充 Markdown 选区符号包裹回归测试 (#726) (3e7eb95)
+- 优化 Markdown 选区符号包裹输入链路 (#726) (769ede8)
+- 补充分享管理剪贴板兼容性回归测试 (f3f2a43)
+- 修复 Edge 分享链接复制兼容性 (a26cf31)
+
+## v1.4.15 - 2026-08-18
+
+### 🐛 修复
+
+- **回收站**: 点击已删除笔记时提示先恢复 (c55cfa9)
+- **回收站**: 隐藏已删除笔记设置图标入口 (da26e07)
+- **回收站**: 阻止已删除笔记进入正常加载链路 (9f36f30)
+- **回收站**: 启用已删除笔记生命周期守卫 (159adb0)
+- **回收站**: 避免 API 包装器类型收窄 (f1647cc)
+- **回收站**: 收敛生命周期守卫 DOM 监听 (2588550)
+- **回收站**: 阻止已删除笔记进入正常编辑链路 (785f15c)
+
+### ♻️ 重构
+
+- **回收站**: 删除失效的 DOM 生命周期守卫 (3621d16)
+- **回收站**: 移除失效的 DOM 生命周期守卫 (8869e3c)
+
+### 📝 文档
+
+- **readme**: update v1.4.14 release documentation (e298b83)
+- **readme**: 更新 v1.4.14 发版文档 (b5a8a40)
+
+### 📌 杂项
+
+- 测试(发布)：覆盖 CI macOS 产物汇总流程 (ec42206)
+- 修复(发布)：统一由本地脚本汇总 CI 的 macOS 产物 (92b73de)
+- 测试(发布)：锁定单一 Release 发布者契约 (1794c93)
+- 修复(Windows CI)：使用 PowerShell 解压 Node ZIP (d3f5509)
+- 修复(发布)：移除 Actions 的 Release 发布职责 (84c9e4c)
+- 测试(回收站)：锁定知识树恢复失败态链路 (0986b74)
+- 整理(笔记加载)：保持原有类型声明顺序 (08fe721)
+- 测试(笔记加载)：覆盖失败后被新导航清理 (7b0f3de)
+- 修复(知识树)：挂载笔记失败态恢复桥 (fd004fb)
+- 修复(知识树)：导航时清理遗留的笔记失败态 (9e03d94)
+- 修复(笔记加载)：允许后续导航清理失败状态 (f77d83e)
+- 测试(权限)：覆盖笔记投影失效后的自动恢复 (3172f7a)
+- 修复(笔记加载)：允许失败后直接退出错误遮罩 (ce57bc6)
+- 修复(权限)：访问前自愈失效的知识树投影 (82a2a6e)
+- 修复(权限)：增加知识树资源投影自愈 (bd8cfbf)
+
+## v1.4.14 - 2026-08-18
+
+### ✨ 新增
+
+- **移动端**: 折叠文件详情辅助信息 (9f6a2ba)
+- **移动端图片**: 挂载图片剪贴操作桥 (6dd100b)
+- **移动端图片**: 增加复制剪切粘贴桥 (a1dae47)
+- **图片**: 增加富文本图片节点剪贴事务 (966d5d2)
+- **markdown**: 选中文字支持语法符号自动包裹 (#726) (55a78c5)
+
+### 🐛 修复
+
+- **备份**: 修复流式恢复 TypeScript this 类型 (b603421)
+- **移动端**: 修正文件类型摘要映射 (357a8bd)
+- **图片**: 剪切未选目标时保持待移动状态 (2ce8ae2)
+- **视频**: 签名刷新后自动恢复播放器 (268ab6e)
+- **视频**: 跟随附件签名地址刷新播放源 (aaf59c9)
+- **图片菜单**: 滚动时保持工具栏锚定图片 (0b164ad)
+- **图片**: 旋转后保持编辑菜单选中状态 (cb78ef8)
+- **备份**: 增加流式恢复启动守卫 (2a7d554)
+- **备份**: 校验大归档流式恢复启动 (84ac455)
+- **export**: include team root documents in note selection (9b7e4f2)
+- **mobile**: prevent note list text selection on long press (37726ea)
+- **mobile**: keep context menu inside viewport (171ddf4)
+- **android**: restore native text selection actions (787964e)
+- **notes**: preserve source note while target is loading (3670460)
+- **notes**: narrow stale activation guard to commit race (8af8074)
+- **notes**: prevent stale save ack from restoring previous note (52168b2)
+- **notes**: add active-note switch intent guard (95d30bc)
+- **export**: rasterize Mermaid before image capture (#728) (3846119)
+- **export**: render Mermaid diagrams in image exports (#728) (2c0c144)
+- **mobile**: 修复权限分享与公共空间导航 (00e41fc)
+- **浏览器插件**: 增加登录会话自动续期 (a242997)
+- enable streaming full backup restore (5775560)
+- stream large full backup restores (8835262)
+
+### ✅ 测试
+
+- **图片**: 覆盖移动端图片复制剪切粘贴 (11def44)
+- **视频**: 修正播放器重建后的断言 (2bbcd0a)
+- **视频**: 覆盖签名地址晚到后的播放源恢复 (fb98237)
+- **图片**: 覆盖旋转后保持节点选中 (92ad393)
+- **备份**: 锁定大归档恢复生产入口 (cdb23ec)
+- **export**: cover team root document markdown zip (792cf2e)
+- **notes**: cover source-note save during switch (2b37639)
+- **notes**: cover stale activation guard (527dbe5)
+- guard streaming large backup restore (4cb010d)
+
+### 📌 杂项
+
+- 修复(移动端)：确保展开工具栏可完整滚动 (63d2383)
+- 修复(移动端)：输入法弹出时保持顶部工具栏布局 (2783ba7)
+
 ## v1.4.13 - 2026-08-14
 
 ### ✨ 新增

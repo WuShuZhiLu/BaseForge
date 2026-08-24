@@ -20,9 +20,10 @@ export interface CacheFirstNoteLoadOptions {
   fetchRemote: () => Promise<Note>;
   onRevalidated?: (remote: Note, cached: CachedNote) => void | Promise<void>;
   /**
-   * Optional override for runtime prerequisites before a cached note becomes visible.
-   * The default prepares signed attachment access for persisted `/api/attachments/<id>` refs.
-   * Failures are non-fatal so offline cached-note opening keeps working.
+   * Optional override for runtime prerequisites before a note becomes visible.
+   * The historical name is retained for compatibility, but this hook now runs for both cached
+   * and first-load remote notes. The default prepares signed attachment access for persisted
+   * `/api/attachments/<id>` refs. Failures stay non-fatal so offline cached-note opening works.
    */
   beforeUseCached?: (cached: CachedNote) => void | Promise<void>;
 }
@@ -62,24 +63,31 @@ async function persistDetail(note: Note): Promise<void> {
   }
 }
 
-async function prepareCachedNoteRuntime(cached: CachedNote): Promise<void> {
-  if (!hasPersistentNoteAttachmentReference(cached.content)) return;
-  await primeNoteAttachmentAccess(cached.id, getBaseUrl());
+async function prepareNoteRuntime(note: CachedNote): Promise<void> {
+  if (!hasPersistentNoteAttachmentReference(note.content)) return;
+  await primeNoteAttachmentAccess(note.id, getBaseUrl());
 }
 
 export async function loadNoteCacheFirst({
   noteId,
   fetchRemote,
   onRevalidated,
-  beforeUseCached = prepareCachedNoteRuntime,
+  beforeUseCached = prepareNoteRuntime,
 }: CacheFirstNoteLoadOptions): Promise<Note> {
   const cached = await getCachedNote(noteId);
   if (cached && isNoteDetailCached(cached)) {
-    // Start freshness revalidation immediately, but do not let cache-first rendering race runtime
-    // prerequisites that the remote request normally prepares (attachment access is the P1 case).
+    // Start freshness revalidation immediately, but never publish the remote replacement before
+    // its media/runtime prerequisites are ready. This matters on Android LAN HTTP where the note
+    // body can arrive through CapacitorHttp while attachment signed-URL exchange needs its own
+    // native transport.
     void fetchRemote()
       .then(async (remote) => {
         await persistDetail(remote);
+        try {
+          await beforeUseCached(remote);
+        } catch (error) {
+          console.warn("[noteLoadSource] revalidated-note preparation failed:", error);
+        }
         await onRevalidated?.(remote, cached);
       })
       .catch((error) => {
@@ -98,5 +106,13 @@ export async function loadNoteCacheFirst({
 
   const remote = await fetchRemote();
   await persistDetail(remote);
+  try {
+    // First-load notes used to skip attachment priming entirely. On Android this allowed the
+    // editor/video NodeView to mount with an unsigned /api/attachments/<id> source and fail before
+    // the access map existed. Prepare the same runtime contract as the cache-first path.
+    await beforeUseCached(remote);
+  } catch (error) {
+    console.warn("[noteLoadSource] remote-note preparation failed:", error);
+  }
   return remote;
 }

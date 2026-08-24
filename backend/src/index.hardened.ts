@@ -31,6 +31,11 @@ import "./runtime/block-link-redirect.js";
 // Add an atomic Tiptap block patch endpoint while preserving all existing single-block routes.
 import "./runtime/block-patch.js";
 import "./runtime/auto-full-backup.js";
+// Full ZIP restore must stream from disk before /api/backups exposes restore endpoints; otherwise
+// multi-GB archives hit Node's readFileSync/Buffer ceiling during dry-run before recovery even starts.
+import "./runtime/backup-restore-large-archive.js";
+// Fail closed if production bootstrap ever stops installing the streaming restore wrapper.
+import "./runtime/backup-restore-large-archive-guard.js";
 // Mount encrypted WebDAV backup configuration and upload routes before /api/backups is registered.
 import "./runtime/backup-webdav.js";
 import "./runtime/notebook-publication.js";

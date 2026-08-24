@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/confirm";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
+import { copyText } from "@/lib/clipboard";
 import {
   buildPublicWebUrl,
   getPublicWebOriginSourceLabel,
@@ -174,10 +175,10 @@ function PublicOriginRiskControl({
 
   const copyOrigin = async () => {
     if (!publicOrigin.origin) return;
-    try {
-      await navigator.clipboard.writeText(publicOrigin.origin);
+    const ok = await copyText(publicOrigin.origin);
+    if (ok) {
       toast.success("公开分享地址已复制");
-    } catch {
+    } else {
       toast.error("复制失败，请手动复制");
     }
   };
@@ -401,10 +402,10 @@ export default function ShareManagementPage() {
   const shareUrl = (item: ShareManagementItem) => buildPublicWebUrl(`/share/${item.shareToken}`, originOptions);
 
   const copyLink = async (item: ShareManagementItem) => {
-    try {
-      await navigator.clipboard.writeText(shareUrl(item));
+    const ok = await copyText(shareUrl(item));
+    if (ok) {
       toast.success("分享链接已复制");
-    } catch {
+    } else {
       toast.error("复制失败，请手动复制");
     }
   };

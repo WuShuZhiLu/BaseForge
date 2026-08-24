@@ -317,7 +317,10 @@ export default function LazyNoteListRuntime() {
     : null;
 
   return (
-    <div ref={shellRef} className="h-full w-full min-h-0">
+    <div
+      ref={shellRef}
+      className="h-full w-full min-h-0 max-md:select-none max-md:[-webkit-touch-callout:none]"
+    >
       <Suspense fallback={<LazyWorkspaceFallback label="正在加载笔记列表…" />}>
         <LazyNoteList />
       </Suspense>

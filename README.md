@@ -7,7 +7,8 @@
   </p>
   <p>
     <a href="./README.en.md">English</a> ·
-    <a href="http://nowen.cn/">官方网站</a> ·
+    <a href="https://cropflre.github.io/">官方网站 / 帮助中心</a> ·
+    <a href="http://nowen.cn/">nowen.cn（维护中）</a> ·
     <a href="http://note.nowen.cn/">在线体验</a> ·
     <a href="https://github.com/cropflre/nowen-note/releases">下载客户端</a> ·
     <a href="./docs/tutorials/README.md">教程中心</a> ·
@@ -30,18 +31,18 @@
 
 > **NAS 远程连接登录**：支持部署到 **绿联 NAS（UGOS / UGOS Pro）** 和 **飞牛 NAS（fnOS）**。部署完成后，可在 Web、桌面端或 Android 客户端中，通过局域网 IP、IPv6 地址或已配置 HTTPS 的公网域名远程连接并登录。
 
-## v1.4.12 已发布
+## v1.4.16 已发布
 
-v1.4.12 聚焦 **AI 问答体验、完整备份稳定性、团队空间导出、富文本粘贴与桌面端使用体验**，继续把 Nowen Note 做得更适合长期运行在 NAS / 服务器和桌面环境中。
+v1.4.16 聚焦 **笔记切换稳定性、视频附件授权、Markdown / 代码块编辑体验与桌面发布链路**，继续提升 Nowen Note 在多端编辑、局域网媒体访问和桌面客户端分发场景下的可靠性。
 
-- **AI 问答体验升级**：优化历史会话侧栏、知识库范围选择与上下文诊断展示，支持侧栏宽度拖拽与记忆，并修复打开 AI 问答后主内容被横向挤出的问题。
-- **完整备份更适合大数据量**：全量备份改为后台任务，ZIP 打包与 SHA256 校验采用流式处理，并通过临时下载令牌触发浏览器原生下载，降低大附件场景下的超时和内存峰值。
-- **团队空间单篇导出修复**：Markdown / 附件 ZIP 导出会使用笔记真实的工作区范围，团队成员在拥有下载权限时可正常导出，不再被误判为个人空间文档。
-- **富文本粘贴更准确**：钉钉等来源同时提供 HTML 与纯文本时，优先保留有效富文本 HTML，减少数字列表等内容被误识别为 Markdown 的情况。
-- **桌面端记住窗口状态**：Electron 会记住主窗口位置、尺寸和最大化状态；显示器变化后也会自动保证窗口重新回到可见区域。
-- 同步完成根项目、后端与 Android 的 **v1.4.12** 版本元数据，并更新本版本更新日志。
+- **笔记切换更稳定**：阻止旧富文本保存回执在快速切换后重新抢回激活笔记，并补充“提交后迟到回执”回归覆盖。
+- **视频首次打开更可靠**：首次进入包含视频的笔记前会提前准备附件签名，减少播放器先启动、授权尚未就绪导致的首次加载失败。
+- **Android / 局域网视频授权修复**：局域网附件授权改用原生 HTTP 链路，改善 Android 客户端访问 NAS / 局域网服务时的视频加载稳定性。
+- **编辑器细节修复**：优化代码块全选快捷键逻辑，并重新清理历史 Markdown 块标记，减少旧内容残留标记对编辑体验的影响。
+- **桌面发布链路增强**：完善 Windows SignPath 测试 / 正式签名、Authenticode 严格校验、签名后更新元数据，以及 macOS 双架构产物完整性检查。
+- **分享兼容性**：修复 Edge 浏览器分享链接复制兼容性，并补充剪贴板回归测试。
 
-查看：[v1.4.12 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.12) · [完整更新日志](./CHANGELOG.md)
+查看：[v1.4.16 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.16) · [完整更新日志](./CHANGELOG.md)
 
 ## 为什么选择 Nowen Note
 
@@ -92,35 +93,33 @@ Nowen Note 支持 MCP Server，可让 Claude Code、Cursor、VS Code 等 AI 客�
 
 当前正式可用方式为源码构建：安装 Node.js 20+，构建 `packages/nowen-mcp`，在 Nowen Note 创建 restricted Personal API Token，再把 `packages/nowen-mcp/bin/nowen-mcp.mjs` 的绝对路径配置到客户端。`dist/scoped-entry.js` 是启动器加载的内部构建入口，不应直接配置给客户端。
 
-## v1.4.12 重点更新
+## v1.4.16 重点更新
 
-### AI 问答
+### 笔记切换与编辑稳定性
 
-- 重构历史会话侧栏，支持搜索、拖拽调整宽度、宽度记忆，并优化长标题、重命名和删除操作。
-- 新增更清晰的知识库范围选择器，可在全部知识库与指定笔记本之间快速切换。
-- 优化上下文来源、索引状态与检索诊断展示，让 RAG 问答使用了哪些内容更容易理解和排查。
-- 修复 AI 问答打开后主内容区域被侧栏横向挤出的问题，桌面窄窗口下的布局更加稳定。
+- 快速切换笔记后，旧富文本保存回执不会再把上一条笔记重新设为当前激活笔记。
+- 新增“提交后迟到保存回执”回归测试，继续收紧笔记切换竞态边界。
+- 优化代码块全选快捷键逻辑，减少代码块与整篇文档选择行为冲突。
+- 重新清理历史 Markdown 块标记，降低旧数据残留标记对当前编辑与渲染的影响。
 
-### 备份与恢复
+### 视频、Android 与局域网访问
 
-- 完整备份改为后台任务，前端通过状态轮询获取进度，避免长时间 HTTP 请求被浏览器、WebView 或反向代理提前中断。
-- ZIP 归档和 SHA256 校验改为流式处理，降低大附件、大备份场景中的内存峰值与资源占用。
-- 完整备份生成后使用短生命周期能力令牌触发浏览器原生下载，避免前端 `response.blob()` 再复制一份大文件到内存。
-- 保留 SQLite 在线快照、附件、字体、插件和密钥等完整恢复内容，继续以可恢复性而不是单纯“导出成功”作为全量备份目标。
+- 首次打开包含视频附件的笔记前会先准备附件签名，避免播放器早于授权信息初始化。
+- Android / 局域网附件授权改用原生 HTTP 链路，提升 NAS、局域网 IP 等场景的视频访问稳定性。
+- 为“首次打开前附件授权准备”和“Android 局域网附件授权”补充回归测试。
 
-### 团队空间与导出
+### 桌面客户端发布与分发
 
-- 修复团队空间单篇 Markdown / 附件 ZIP 导出失败：导出任务现在会根据笔记真实 `workspaceId` 选择正确权限范围。
-- 个人空间仍保持原有导出行为；旧后端缺少工作区字段时保留兼容回退。
-- 团队成员只要拥有对应下载权限，就不会再因为不是笔记创建者而被错误拒绝。
+- Windows 正式发布链路接入并强化 SignPath 签名，包括测试签名、正式签名配置校验和 Authenticode 严格验证。
+- 补充签名后 Windows 更新元数据重建 / 刷新流程，确保发布产物与自动更新元数据一致。
+- 强化 macOS 发版产物完整性门禁，并兼容双架构压缩包的发布与校验。
+- Release 说明进一步明确桌面平台矩阵，降低不同系统下载与安装时的歧义。
 
-### 编辑器与桌面端
+### 分享兼容性
 
-- 修复钉钉等富文本来源的粘贴路由：剪贴板存在有效 HTML 时优先走富文本解析，避免数字列表等内容被误判为 Markdown。
-- Electron 新增窗口状态持久化，记住主窗口位置、大小和最大化状态。
-- 多显示器环境变化或副屏断开后，会自动把不可见窗口调整回可用显示区域。
+- 修复 Edge 浏览器分享链接复制兼容性，并增加剪贴板兼容性回归测试。
 
-完整记录请查看 [CHANGELOG.md](./CHANGELOG.md) 和 [v1.4.12 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.12)。
+完整记录请查看 [CHANGELOG.md](./CHANGELOG.md) 和 [v1.4.16 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.16)。
 
 ## 截图
 
@@ -138,10 +137,13 @@ Nowen Note 支持 MCP Server，可让 Claude Code、Cursor、VS Code 等 AI 客�
 
 ## 官网与在线体验
 
-- 官方网站：<http://nowen.cn/>
+- 当前官方网站 / 帮助中心：<https://cropflre.github.io/>
+- 后续官网：<http://nowen.cn/>（维护中）
 - 在线体验：<http://note.nowen.cn/>
 - 账号：`demo`
 - 密码：`demo123456`
+
+> `nowen.cn` 仍在维护中。当前请以 <https://cropflre.github.io/> 作为 Nowen 官方帮助与使用文档入口。
 
 > 演示账号仅用于体验，数据可能被定期重置。请勿存放敏感或重要内容。
 
@@ -199,10 +201,10 @@ docker compose up -d
 需要固定当前稳定版本时：
 
 ```bash
-NOWEN_IMAGE_TAG=v1.4.12 docker compose up -d
+NOWEN_IMAGE_TAG=v1.4.16 docker compose up -d
 ```
 
-> v1.4.12 重点改善 AI 问答、完整备份、团队空间单篇导出、富文本粘贴和 Electron 窗口状态。升级后建议重点检查 AI 会话与知识库范围、完整 ZIP 备份/下载、团队空间 Markdown + 附件 ZIP 导出、钉钉等富文本粘贴，以及桌面端窗口位置/最大化状态恢复。镜像回滚不等于数据库回滚，生产环境必须保留独立备份。
+> v1.4.16 重点改善笔记切换稳定性、视频首次打开与 Android / 局域网附件授权、Markdown / 代码块编辑细节，以及桌面客户端签名与发布完整性。升级后建议重点检查快速切换笔记、首次视频播放、Android 连接 NAS / 局域网视频、代码块全选和分享链接复制。镜像回滚不等于数据库回滚，生产环境必须保留独立备份。
 
 ### Docker 在线升级（可选）
 
@@ -211,7 +213,7 @@ NOWEN_IMAGE_TAG=v1.4.12 docker compose up -d
 ```bash
 cp .env.example .env
 printf '\nNOWEN_UPDATER_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
-NOWEN_IMAGE_TAG=v1.4.12 docker compose --profile updater up -d
+NOWEN_IMAGE_TAG=v1.4.16 docker compose --profile updater up -d
 ```
 
 启用后，管理员可在「设置 → 关于 → 版本信息」执行升级前检查、完整备份、升级、健康验证和失败回滚。
@@ -227,7 +229,7 @@ docker run -d \
   -p 3001:3001 \
   -e TZ=Asia/Shanghai \
   -v /opt/nowen-note/data:/app/data \
-  cropflre/nowen-note:v1.4.12
+  cropflre/nowen-note:v1.4.16
 ```
 
 ## 数据、备份与配置
@@ -360,7 +362,8 @@ nowen-note/
 
 ## 文档导航
 
-- [教程与帮助中心](./docs/tutorials/README.md)
+- [Nowen 官方帮助中心](https://cropflre.github.io/#/note)
+- [仓库内教程索引](./docs/tutorials/README.md)
 - [MCP Server 安装与使用](./docs/tutorials/mcp.md)
 - [完整部署指南](./docs/deployment.md)
 - [Docker 在线升级与恢复](./docs/docker-online-update.md)

@@ -555,21 +555,30 @@ export default function ContextMenu({
 
   useEffect(() => {
     if (!isOpen) return;
-    requestAnimationFrame(() => {
+    const frame = requestAnimationFrame(() => {
       const el = internalRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      let newX = x;
-      let newY = y;
-      if (newX + rect.width > vw - 8) newX = vw - rect.width - 8;
-      if (newY + rect.height > vh - 8) newY = vh - rect.height - 8;
-      if (newX < 8) newX = 8;
-      if (newY < 8) newY = 8;
-      if (newX !== x || newY !== y) setAdjustedPos({ x: newX, y: newY });
+      const viewport = window.visualViewport;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const gap = 8;
+      const minX = viewportLeft + gap;
+      const minY = viewportTop + gap;
+      const maxX = Math.max(minX, viewportLeft + viewportWidth - rect.width - gap);
+      const maxY = Math.max(minY, viewportTop + viewportHeight - rect.height - gap);
+      const newX = Math.min(Math.max(x, minX), maxX);
+      const newY = Math.min(Math.max(y, minY), maxY);
+      setAdjustedPos((current) => (
+        current.x === newX && current.y === newY
+          ? current
+          : { x: newX, y: newY }
+      ));
     });
-  }, [isOpen, x, y, displayItems]);
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, x, y, displayItems, mobileMenuPath]);
 
   useEffect(() => {
     setAdjustedPos({ x, y });

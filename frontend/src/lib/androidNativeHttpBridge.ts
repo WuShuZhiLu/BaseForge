@@ -67,8 +67,9 @@ function normalizeResponseHeaders(headers: unknown): Headers {
 }
 
 function nativeResponseBody(data: unknown): string {
-  if (data === undefined || data === null) return "";
-  return typeof data === "string" ? data : JSON.stringify(data);
+  if (data === undefined) return "";
+  if (typeof data === "string") return data;
+  return JSON.stringify(data) ?? "";
 }
 
 function createBridgeError(message: string, name: string): Error {

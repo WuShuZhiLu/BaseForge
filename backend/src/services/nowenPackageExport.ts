@@ -135,6 +135,7 @@ interface PackageAttachmentMeta {
 }
 
 const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__nowen_root_documents__:";
 
 function sanitizeSegment(value: string, fallback = "未命名"): string {
   let out = String(value || "")
@@ -214,6 +215,35 @@ function queryScopeNotebooks(userId: string, workspaceId: string | null | undefi
      WHERE userId = ? AND workspaceId IS NULL AND (isDeleted IS NULL OR isDeleted = 0)
      ORDER BY parentId, sortOrder, createdAt, id
   `).all(userId) as ExportNotebook[];
+}
+
+/**
+ * Root-level knowledge-tree documents live in a hidden physical notebook whose row is deliberately
+ * soft-deleted after the document is detached to the logical tree root. Normal scope discovery must
+ * continue to ignore deleted notebooks, but an explicit note selection still has to see that
+ * infrastructure container or the selected note is incorrectly rejected as outside the export scope.
+ */
+function querySelectedRootDocumentNotebooks(
+  userId: string,
+  workspaceId: string | null | undefined,
+  noteIds: string[] | undefined,
+): ExportNotebook[] {
+  if (!noteIds?.length) return [];
+  const db = getDb();
+  const placeholders = noteIds.map(() => "?").join(",");
+  const scopeSql = workspaceId
+    ? "n.workspaceId = ?"
+    : "n.userId = ? AND n.workspaceId IS NULL";
+  const rows = db.prepare(`
+    SELECT DISTINCT nb.id, nb.userId, nb.workspaceId, nb.parentId, nb.name,
+           nb.description, nb.icon, nb.color, nb.sortOrder, nb.isExpanded,
+           nb.createdAt, nb.updatedAt
+      FROM notes n
+      JOIN notebooks nb ON nb.id = n.notebookId
+     WHERE n.id IN (${placeholders})
+       AND ${scopeSql}
+  `).all(...noteIds, workspaceId || userId) as ExportNotebook[];
+  return rows.filter((notebook) => notebook.id.startsWith(ROOT_DOCUMENT_NOTEBOOK_PREFIX));
 }
 
 function collectDescendants(rootId: string, byParent: Map<string | null, ExportNotebook[]>): Set<string> {
@@ -441,6 +471,12 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
   assertWorkspaceReadable(userId, workspaceId);
   const warnings: ExportWarning[] = [];
   const allScopeNotebooks = queryScopeNotebooks(userId, workspaceId);
+  const knownScopeNotebookIds = new Set(allScopeNotebooks.map((item) => item.id));
+  for (const rootNotebook of querySelectedRootDocumentNotebooks(userId, workspaceId, noteIds)) {
+    if (knownScopeNotebookIds.has(rootNotebook.id)) continue;
+    knownScopeNotebookIds.add(rootNotebook.id);
+    allScopeNotebooks.push(rootNotebook);
+  }
   const allScopeNotebookIds = new Set(allScopeNotebooks.map((item) => item.id));
 
   const trashedSql = includeTrashed ? "" : "AND isTrashed = 0";

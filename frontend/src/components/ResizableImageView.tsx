@@ -174,6 +174,32 @@ export function ResizableImageView(props: NodeViewProps) {
     dragStateRef.current = null;
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
+  // 图片操作菜单使用 fixed 视口坐标，TiptapEditor 会在 selectionUpdate 时根据
+  // 当前图片 DOMRect 重新计算位置。滚动不会改变 ProseMirror selection，因此
+  // 选中图片后继续滚动时原菜单会停留在旧坐标。仅在图片处于选中态时监听滚动/
+  // resize，并用 rAF 合并高频事件，复用现有 selectionUpdate 定位链路重新锚定。
+  useEffect(() => {
+    if (!selected || !editable || !editor || editor.isDestroyed) return;
+
+    let frame = 0;
+    const scheduleToolbarReposition = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        if (editor.isDestroyed) return;
+        editor.emit("selectionUpdate", { editor, transaction: editor.state.tr });
+      });
+    };
+
+    window.addEventListener("scroll", scheduleToolbarReposition, true);
+    window.addEventListener("resize", scheduleToolbarReposition);
+    return () => {
+      window.removeEventListener("scroll", scheduleToolbarReposition, true);
+      window.removeEventListener("resize", scheduleToolbarReposition);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [editable, editor, selected]);
+
   const imageRender = useAttachmentImageRenderSource(src, { enabled: shouldRenderHeavyContent });
   const finalSrc = imageRender.renderSrc;
   const imgError = !!imageRender.error;

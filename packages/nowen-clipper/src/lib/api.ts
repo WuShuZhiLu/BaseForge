@@ -1,4 +1,4 @@
-import { normalizeBaseUrl, type NowenClipperConfig } from "./storage";
+import { normalizeBaseUrl, setConfig, type NowenClipperConfig } from "./storage";
 
 export interface ImportNotePayload {
   title: string;
@@ -24,6 +24,7 @@ export interface ImportResponse {
 
 export interface LoginResponse {
   token: string;
+  refreshToken?: string;
   user: {
     id: string;
     username: string;
@@ -105,15 +106,66 @@ async function requestJson<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const base = normalizeBaseUrl(cfg.serverUrl);
-  const res = await fetch(`${base}/api${path}`, {
+  const send = () => fetch(`${base}/api${path}`, {
     ...init,
     headers: {
       ...authHeaders(cfg),
       ...(init.headers || {}),
     },
   });
+
+  let res = await send();
+  if (res.status === 401 && cfg.refreshToken) {
+    await refreshAccessToken(cfg);
+    res = await send();
+  }
   if (!res.ok) throw await parseErr(res);
   return (await res.json()) as T;
+}
+
+const refreshInFlight = new Map<string, Promise<string>>();
+
+async function refreshAccessToken(cfg: NowenClipperConfig): Promise<string> {
+  const base = normalizeBaseUrl(cfg.serverUrl);
+  const key = `${base}\n${cfg.refreshToken}`;
+  let pending = refreshInFlight.get(key);
+
+  if (!pending) {
+    pending = (async () => {
+      const res = await fetch(`${base}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: cfg.refreshToken }),
+      });
+      if (!res.ok) {
+        const error = await parseErr(res);
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          (error as NowenApiError & { terminal?: boolean }).terminal = true;
+          await setConfig({ token: "", refreshToken: "" });
+        }
+        throw error;
+      }
+
+      const payload = (await res.json()) as { token?: string };
+      if (!payload.token) throw new Error("登录续期响应缺少访问令牌");
+      cfg.token = payload.token;
+      await setConfig({ token: payload.token });
+      return payload.token;
+    })().finally(() => refreshInFlight.delete(key));
+    refreshInFlight.set(key, pending);
+  }
+
+  try {
+    const token = await pending;
+    cfg.token = token;
+    return token;
+  } catch (error) {
+    if ((error as { terminal?: boolean })?.terminal) {
+      cfg.token = "";
+      cfg.refreshToken = "";
+    }
+    throw error;
+  }
 }
 
 export async function login(

@@ -5,6 +5,7 @@ import { NOTEBOOKS_INVALIDATED_EVENT } from "@/lib/notebookInvalidation";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import { recordPhaseAPerfEvent } from "@/lib/phaseAPerfDiagnostics";
 import type { NoteLoadBeginPayload, NoteLoadSummary } from "@/lib/noteLoadCoordinator";
+import { NoteActivationGuard } from "@/lib/noteActivationGuard";
 import {
   mergeAuthoritativeNotebooks,
   replaceOptimisticNotebook,
@@ -463,7 +464,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const noteActivationGuard = useMemo(() => new NoteActivationGuard(), []);
   const profiledDispatch = useCallback<React.Dispatch<Action>>((action) => {
+    if (action.type === "BEGIN_NOTE_LOAD") {
+      noteActivationGuard.begin(action.payload, stateRef.current.activeNote?.id ?? null);
+    } else if (action.type === "FAIL_NOTE_LOAD") {
+      noteActivationGuard.fail(action.payload.requestId);
+    } else if (action.type === "FINISH_NOTE_LOAD") {
+      noteActivationGuard.finish(action.payload);
+    }
+
+    if (
+      action.type === "SET_ACTIVE_NOTE"
+      && !noteActivationGuard.allowActiveNote(action.payload?.id ?? null)
+    ) {
+      recordPhaseAPerfEvent({
+        type: "app-context-dispatch",
+        detail: { action: action.type, changedFields: "blocked-stale-note-activation" },
+      });
+      return;
+    }
+
     const current = stateRef.current;
     let changedFields = "";
     if (action.type === "SET_ACTIVE_NOTE") {
@@ -482,7 +503,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       detail: { action: action.type, changedFields },
     });
     dispatch(action);
-  }, []);
+  }, [noteActivationGuard]);
+
+  useEffect(() => {
+    noteActivationGuard.commit(state.activeNote?.id ?? null);
+  }, [noteActivationGuard, state.activeNote?.id]);
 
   useEffect(() => {
     let refreshTimer: number | null = null;

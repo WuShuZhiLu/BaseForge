@@ -15,6 +15,7 @@ import NoteIconBridge from "./components/NoteIconBridge";
 import EmbedPasswordBridge from "./components/EmbedPasswordBridge";
 import MediaExperienceBridge from "./components/MediaExperienceBridge";
 import EditorImageTransformBridge from "./components/EditorImageTransformBridge";
+import ImageClipboardBridge from "./components/ImageClipboardBridge";
 import MarkdownMobileViewControlsBridge from "./components/MarkdownMobileViewControlsBridge";
 import DesktopUpdateCenter from "./components/DesktopUpdateCenter";
 import DockerUpdateCenter from "./components/DockerUpdateCenter";
@@ -46,6 +47,7 @@ import { installNoteSyncSafety } from "./lib/noteSyncSafety";
 import { installNoteUpdateResponseGuard } from "./lib/noteUpdateResponseGuard";
 import { installNoteUpdateSerialQueue } from "./lib/noteUpdateSerialQueue";
 import { installKnowledgeTreeTitleSyncBridge } from "./lib/knowledgeTreeTitleSyncBridge";
+import { installKnowledgeTreeNoteLoadRecovery } from "./lib/knowledgeTreeNoteLoadRecovery";
 import { installTaskAttachmentExportFallback } from "./lib/taskAttachmentExportFallback";
 import { installTwoFactorLoginChallengeBridge } from "./lib/twoFactorLoginChallenge";
 import { installTaskUpdateSafetyBridge } from "./lib/taskUpdateSafetyBridge";
@@ -101,6 +103,7 @@ installNoteSyncSafety();
 installNoteUpdateResponseGuard();
 installNoteUpdateSerialQueue();
 installKnowledgeTreeTitleSyncBridge();
+installKnowledgeTreeNoteLoadRecovery();
 installTaskAttachmentExportFallback();
 installTaskUpdateSafetyBridge();
 installReliableExportDownloadBridge();
@@ -157,6 +160,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <EmbedPasswordBridge />
             <MediaExperienceBridge />
             <EditorImageTransformBridge />
+            <ImageClipboardBridge />
             <MarkdownMobileViewControlsBridge />
             <DesktopUpdateCenter />
             <DockerUpdateCenter />

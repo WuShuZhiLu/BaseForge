@@ -78,6 +78,23 @@ describe("androidNativeHttpBridge", () => {
     expect(browserFetch).not.toHaveBeenCalled();
   });
 
+  it("preserves JSON null responses from CapacitorHttp", async () => {
+    capacitorState.request.mockResolvedValueOnce({
+      status: 200,
+      headers: { "content-type": "application/json" },
+      data: null,
+    });
+    cleanup = installAndroidNativeHttpBridge();
+
+    const response = await fetch("https://note.example.com/api/notebooks/nb-1/share-link", {
+      headers: { "Content-Type": "application/json" },
+    });
+
+    await expect(response.json()).resolves.toBeNull();
+    expect(capacitorState.request).toHaveBeenCalledTimes(1);
+    expect(browserFetch).not.toHaveBeenCalled();
+  });
+
   it("falls back to WebView fetch when the native request fails", async () => {
     capacitorState.request.mockRejectedValueOnce(new Error("native network failed"));
     browserFetch.mockResolvedValueOnce(new Response(JSON.stringify([{ id: "n1" }]), {

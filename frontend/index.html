@@ -51,6 +51,46 @@
       [data-radix-scroll-area-viewport] { overflow-x: hidden !important; }
       .nowen-md-editor-status { min-height: 28px; white-space: nowrap; overflow: hidden; }
 
+      /* 移动端键盘打开时保持文档顶部布局稳定。
+         键盘高度仍由 --keyboard-height 负责正文避让；这里只撤销旧的 compact Header
+         视觉折叠，避免小屏设备在输入法弹出时把标题栏/格式工具栏挤成另一套布局。 */
+      @media (max-width: 767px) {
+        html[data-keyboard="open"] header[data-mobile-editor-compact="true"] > div:first-of-type {
+          display: flex !important;
+        }
+        html[data-keyboard="open"] header[data-mobile-editor-compact="true"] > div:nth-of-type(2) {
+          padding: 0.125rem 0.75rem 0.5rem !important;
+        }
+        html[data-keyboard="open"] header[data-mobile-editor-compact="true"] > div:nth-of-type(2) > button:first-child {
+          display: none !important;
+        }
+        html[data-keyboard="open"] header[data-mobile-editor-compact="true"] > div:nth-of-type(2) > button.hidden {
+          display: inline-flex !important;
+        }
+
+        /* 展开的格式工具栏本身会换行并纵向溢出，但组件基础类带有 touch-pan-x，
+           会阻止手机端纵向拖动。展开态统一交回纵向滚动，同时禁止 flex 把面板
+           压到内容高度以下，确保被 max-height 收起的按钮仍可通过滚动访问。 */
+        [data-mobile-editor-toolbar="expanded"],
+        [data-markdown-mobile-toolbar="expanded"] {
+          flex-shrink: 0 !important;
+          touch-action: pan-y !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          align-content: flex-start;
+        }
+
+        /* adjustNothing + Keyboard.resize:none 下 CSS 视口仍是全屏高度，因此键盘打开时
+           不能继续只用 vh 判断展开面板。减去原生上报的键盘高度和顶部区域预算，
+           让面板始终停留在输入法上方；空间不足时由面板自身纵向滚动。 */
+        html[data-keyboard="open"] [data-mobile-editor-toolbar="expanded"],
+        html[data-keyboard="open"] [data-markdown-mobile-toolbar="expanded"] {
+          max-height: max(8rem, calc(100dvh - var(--keyboard-height, 0px) - var(--safe-area-top, 0px) - 10rem)) !important;
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+        }
+      }
+
       @keyframes appBootSpin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .app-boot-spinner { animation: none; } .app-boot-splash { transition: none; } }
       @media (prefers-color-scheme: dark) { html, body { background: #0f172a; } .app-boot-splash { background: radial-gradient(circle at 50% 30%, rgba(99, 102, 241, 0.16), transparent 34%), #0f172a; color: #e5e7eb; } .app-boot-card { border-color: rgba(148, 163, 184, 0.22); background: rgba(15, 23, 42, 0.78); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28); } .app-boot-subtitle { color: #94a3b8; } }

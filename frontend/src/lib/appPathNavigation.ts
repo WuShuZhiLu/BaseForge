@@ -6,14 +6,24 @@ function normalizeAppPath(rawPath: string): string {
   return value.startsWith("/") ? value : `/${value}`;
 }
 
+function isNativeCapacitorRuntime(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return Boolean((window as any).Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
+}
+
 export function buildAppPathUrl(
   appPath: string,
   currentHref: string = window.location.href,
+  nativeCapacitor: boolean = isNativeCapacitorRuntime(),
 ): string {
   const normalizedPath = normalizeAppPath(appPath);
   const currentUrl = new URL(currentHref);
 
-  if (currentUrl.protocol !== "file:") {
+  if (currentUrl.protocol !== "file:" && !nativeCapacitor) {
     return normalizedPath;
   }
 
@@ -32,14 +42,17 @@ export function navigateToAppPath(appPath: string): void {
 
 export function resolveCurrentAppPathname(
   currentHref: string = window.location.href,
+  nativeCapacitor: boolean = isNativeCapacitorRuntime(),
 ): string {
   const currentUrl = new URL(currentHref);
-  if (currentUrl.protocol !== "file:") {
+  if (currentUrl.protocol !== "file:" && !nativeCapacitor) {
     return currentUrl.pathname;
   }
 
   const appPath = currentUrl.searchParams.get(FILE_ROUTE_QUERY_KEY);
-  if (!appPath) return "/";
+  if (!appPath) {
+    return currentUrl.protocol === "file:" ? "/" : currentUrl.pathname;
+  }
 
   try {
     return new URL(normalizeAppPath(appPath), "https://nowen.local").pathname;

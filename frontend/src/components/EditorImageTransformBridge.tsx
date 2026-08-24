@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { NodeSelection } from "@tiptap/pm/state";
 import { FlipHorizontal, RotateCcw, RotateCw, Scan } from "lucide-react";
 import {
   getPersistentImageTransform,
@@ -262,10 +263,24 @@ export function updateImageAttributesAt(
 ): boolean {
   const node = editor.state.doc.nodeAt(pos);
   if (node?.type?.name !== "image") return false;
-  const transaction = editor.state.tr.setNodeMarkup(pos, undefined, {
+
+  const selection = editor.state.selection;
+  const keepNodeSelection = selection?.node?.type?.name === "image"
+    && Number(selection.from) === pos;
+
+  let transaction = editor.state.tr.setNodeMarkup(pos, undefined, {
     ...node.attrs,
     ...attrs,
   });
+
+  if (keepNodeSelection) {
+    const mappedPos = transaction.mapping.map(pos);
+    const updatedNode = transaction.doc.nodeAt(mappedPos);
+    if (updatedNode?.type?.name === "image") {
+      transaction = transaction.setSelection(NodeSelection.create(transaction.doc, mappedPos));
+    }
+  }
+
   editor.view.dispatch(transaction);
   return true;
 }

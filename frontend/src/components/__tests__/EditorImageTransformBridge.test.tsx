@@ -1,6 +1,7 @@
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
+import { NodeSelection } from "@tiptap/pm/state";
 import { afterEach, describe, expect, it } from "vitest";
 import "@/lib/imageNodeTransformBootstrap";
 import {
@@ -122,7 +123,7 @@ describe("EditorImageTransformBridge", () => {
     });
   });
 
-  it("updates a selected inline image without dispatching a focus transaction", () => {
+  it("updates a selected inline image without dispatching focus and keeps its NodeSelection", () => {
     const editor = new Editor({
       extensions: [StarterKit, Image.configure({ inline: true })],
       content: {
@@ -137,9 +138,17 @@ describe("EditorImageTransformBridge", () => {
       },
     });
 
+    editor.view.dispatch(
+      editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, 1)),
+    );
+    expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+
     expect(updateImageAttributesAt(editor, 1, { rotation: 90 })).toBe(true);
     expect(editor.state.doc.nodeAt(1)?.attrs.rotation).toBe(90);
     expect(editor.state.doc.nodeAt(1)?.attrs.src).toBe("/image.png");
+    expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+    expect(editor.state.selection.from).toBe(1);
+    expect((editor.state.selection as NodeSelection).node.attrs.rotation).toBe(90);
     editor.destroy();
   });
 });

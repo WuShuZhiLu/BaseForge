@@ -1,6 +1,14 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const capacitorHttp = vi.hoisted(() => ({
+  request: vi.fn(),
+}));
+
+vi.mock("@capacitor/core", () => ({
+  CapacitorHttp: { request: capacitorHttp.request },
+}));
 
 vi.mock("@/lib/toast", () => ({
   toast: { error: vi.fn() },
@@ -26,7 +34,14 @@ describe("noteAttachmentAccessPriming", () => {
   beforeEach(() => {
     resetAttachmentAccessStateForTests();
     localStorage.clear();
+    capacitorHttp.request.mockReset();
+    delete (window as any).Capacitor;
     window.history.replaceState({}, "", "/notes/test");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (window as any).Capacitor;
   });
 
   it("Case 1/5: detects persisted attachment references in Tiptap, Markdown and legacy absolute URLs", () => {
@@ -68,6 +83,42 @@ describe("noteAttachmentAccessPriming", () => {
     expect(resolved.searchParams.get("sig")).toBe("signed-a");
     // The note body stays stable; only the runtime request URL is signed.
     expect(persistentSrc).toBe(`/api/attachments/${ATTACHMENT_A}`);
+  });
+
+  it("uses CapacitorHttp first for an Android clear-text LAN server", async () => {
+    (window as any).Capacitor = { isNativePlatform: () => true };
+    const webFetch = vi.fn(async () => {
+      throw new Error("WebView fetch should not be used for LAN priming");
+    });
+    vi.stubGlobal("fetch", webFetch);
+    capacitorHttp.request.mockResolvedValue({
+      status: 200,
+      data: {
+        noteId: "note-lan",
+        urls: { [ATTACHMENT_A]: signedUrl(ATTACHMENT_A, "signed-lan") },
+      },
+      headers: {},
+      url: "http://192.168.1.20:3001/api/attachments/access/urls?noteId=note-lan",
+    });
+
+    const registered = await primeNoteAttachmentAccess(
+      "note-lan",
+      "http://192.168.1.20:3001/api",
+      { token: "jwt-token" },
+    );
+
+    expect(registered).toBe(1);
+    expect(webFetch).not.toHaveBeenCalled();
+    expect(capacitorHttp.request).toHaveBeenCalledWith(expect.objectContaining({
+      url: "http://192.168.1.20:3001/api/attachments/access/urls?noteId=note-lan",
+      method: "GET",
+      headers: { Authorization: "Bearer jwt-token" },
+      responseType: "json",
+    }));
+
+    const resolved = new URL(resolveAttachmentAccessUrl(`/api/attachments/${ATTACHMENT_A}`));
+    expect(resolved.origin).toBe("http://192.168.1.20:3001");
+    expect(resolved.searchParams.get("sig")).toBe("signed-lan");
   });
 
   it("Case 3: primes all images in a note without converting their persisted references", async () => {

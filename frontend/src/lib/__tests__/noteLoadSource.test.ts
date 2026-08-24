@@ -202,7 +202,7 @@ describe("loadNoteCacheFirst", () => {
     warn.mockRestore();
   });
 
-  it("uses and persists the remote body when no detailed cache exists", async () => {
+  it("uses and persists the remote body and prepares its runtime when no detailed cache exists", async () => {
     localStore.getNote.mockResolvedValue(null);
     const remote = makeNote({ version: 5 });
     const beforeUseCached = vi.fn();
@@ -213,7 +213,37 @@ describe("loadNoteCacheFirst", () => {
       beforeUseCached,
     })).resolves.toBe(remote);
 
-    expect(beforeUseCached).not.toHaveBeenCalled();
+    expect(beforeUseCached).toHaveBeenCalledTimes(1);
+    expect(beforeUseCached).toHaveBeenCalledWith(remote);
     expect(localStore.putNote).toHaveBeenCalledWith({ ...remote, __detailCached: true });
+  });
+
+  it("waits for remote attachment priming before the first editor render", async () => {
+    localStore.getNote.mockResolvedValue(null);
+    const remote = makeNote({
+      version: 5,
+      content: '{"type":"doc","content":[{"type":"video","attrs":{"src":"/api/attachments/123e4567-e89b-42d3-a456-426614174216"}}]}',
+    });
+    const primeGate = deferred<number>();
+    attachmentRuntime.primeNoteAttachmentAccess.mockImplementationOnce(() => primeGate.promise);
+    let settled = false;
+
+    const loadPromise = loadNoteCacheFirst({
+      noteId: remote.id,
+      fetchRemote: async () => remote,
+    }).then((value) => {
+      settled = true;
+      return value;
+    });
+
+    await vi.waitFor(() => expect(attachmentRuntime.primeNoteAttachmentAccess).toHaveBeenCalledWith(
+      remote.id,
+      "https://notes.example.com/api",
+    ));
+    expect(settled).toBe(false);
+
+    primeGate.resolve(1);
+    await expect(loadPromise).resolves.toBe(remote);
+    expect(settled).toBe(true);
   });
 });

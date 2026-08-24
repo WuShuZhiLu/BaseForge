@@ -23,6 +23,9 @@ import {
   findOverflowingExportTables,
   normalizeExportTables,
 } from "@/lib/noteImageExportTables";
+import { isMermaidLang, renderMermaid } from "@/lib/mermaidRenderer";
+import { sanitizeSvg } from "@/lib/sanitizeHtml";
+import { rasterizeMermaidSvgForExport } from "@/lib/mermaidExportRaster";
 
 const EXPORT_WIDTH = 794;
 const EXPORT_HORIZONTAL_PADDING = 56;
@@ -211,12 +214,83 @@ function hastToHtml(node: any): string {
   return `<${tag}${classAttr}>${(node.children || []).map(hastToHtml).join("")}</${tag}>`;
 }
 
+function codeBlockLanguage(element: HTMLElement): string {
+  const languageClass = Array.from(element.classList).find(
+    (name) => name.startsWith("language-") || name.startsWith("lang-"),
+  );
+  if (languageClass?.startsWith("language-")) return languageClass.slice("language-".length);
+  if (languageClass?.startsWith("lang-")) return languageClass.slice("lang-".length);
+  return element.parentElement?.getAttribute("data-language") || "";
+}
+
+/**
+ * The editor renders Mermaid at runtime, but image export starts from serialized note HTML.
+ * Materialize Mermaid code blocks into browser-rasterized PNG data images before syntax
+ * highlighting and before html2canvas clones the export DOM. Invalid diagrams keep their
+ * original source so one bad block never aborts the whole note export.
+ */
+async function renderMermaidCodeBlocks(root: ParentNode): Promise<void> {
+  const blocks = Array.from(root.querySelectorAll("pre > code")) as HTMLElement[];
+
+  // Render serially because Mermaid owns process-wide render/config state.
+  for (const element of blocks) {
+    if (!isMermaidLang(codeBlockLanguage(element))) continue;
+
+    const source = element.textContent || "";
+    if (!source.trim()) continue;
+
+    const pre = element.parentElement;
+    if (!pre) continue;
+
+    const result = await renderMermaid(source);
+    if (!result.svg) {
+      console.warn(
+        "[note-image-export] Mermaid render failed; keeping source code in exported image.",
+        result.error,
+      );
+      continue;
+    }
+
+    const svg = sanitizeSvg(result.svg);
+    if (!/<svg\b/i.test(svg)) {
+      console.warn(
+        "[note-image-export] Mermaid SVG was empty after sanitization; keeping source code.",
+      );
+      continue;
+    }
+
+    let raster;
+    try {
+      raster = await rasterizeMermaidSvgForExport(svg, EXPORT_CONTENT_WIDTH);
+    } catch (error) {
+      console.warn(
+        "[note-image-export] Mermaid SVG rasterization failed; keeping source code in exported image.",
+        error,
+      );
+      continue;
+    }
+
+    const figure = document.createElement("figure");
+    figure.className = "nowen-note-image-export-mermaid";
+    figure.setAttribute("data-nowen-mermaid-export", "rendered");
+
+    const image = document.createElement("img");
+    image.src = raster.dataUri;
+    image.alt = "Mermaid diagram";
+    image.width = Math.max(1, Math.round(raster.width));
+    image.height = Math.max(1, Math.round(raster.height));
+    image.setAttribute("data-nowen-mermaid-export-image", "true");
+    figure.appendChild(image);
+
+    pre.replaceWith(figure);
+  }
+}
+
 function highlightCodeBlocks(root: ParentNode): void {
   const lowlight = createLowlight(common);
   root.querySelectorAll("pre > code").forEach((code) => {
     const element = code as HTMLElement;
-    const languageClass = Array.from(element.classList).find((name) => name.startsWith("language-"));
-    const language = languageClass?.slice("language-".length) || "";
+    const language = codeBlockLanguage(element);
     const source = element.textContent || "";
     const alreadyHighlighted = !!element.querySelector("[class^='hljs-'], [class*=' hljs-']");
 
@@ -303,6 +377,8 @@ function buildStyle(theme: "light" | "dark", fontFamily: string, lineHeight: str
     .nowen-note-image-export-body img[align="right"], .nowen-note-image-export-body img[data-align="right"] { margin-left: auto; margin-right: 0; }
     .nowen-note-image-export-body figure { margin: 16px 0; }
     .nowen-note-image-export-body figcaption { margin-top: 6px; color: ${muted}; font-size: 12px; text-align: center; }
+    .nowen-note-image-export-body .nowen-note-image-export-mermaid { margin: 18px 0; break-inside: avoid; page-break-inside: avoid; }
+    .nowen-note-image-export-body .nowen-note-image-export-mermaid img { width: auto; max-width: 100%; margin: 0 auto; border-radius: 0; }
     .nowen-note-image-export-body code { padding: 2px 5px; border-radius: 4px; background: ${soft}; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .91em; }
     .nowen-note-image-export-body pre { position: relative; margin: 16px 0; padding: 18px 18px 16px; overflow: hidden; border-radius: 10px; background: ${codeBg}; color: #e6edf3; white-space: pre-wrap; overflow-wrap: anywhere; }
     .nowen-note-image-export-body pre[data-language] { padding-top: 32px; }
@@ -424,6 +500,7 @@ async function prepareHost(
   body.className = "nowen-note-image-export-body";
   body.innerHTML = bodyHtml || "";
   normalizeExportTables(body, EXPORT_CONTENT_WIDTH);
+  await renderMermaidCodeBlocks(body);
   highlightCodeBlocks(body);
   article.appendChild(body);
   host.appendChild(article);
@@ -455,6 +532,7 @@ function collectBlockBottoms(article: HTMLElement): number[] {
   const articleRect = article.getBoundingClientRect();
   const selector = [
     ":scope > *", "h1", "h2", "h3", "p", "li", "pre", "table", "blockquote", "figure", "img", "hr",
+    ".nowen-note-image-export-mermaid",
   ].join(",");
   return Array.from(article.querySelectorAll(selector))
     .map((element) => Math.ceil((element as HTMLElement).getBoundingClientRect().bottom - articleRect.top))
