@@ -93,10 +93,13 @@ export function ensureWorkspaceDependencies(workspaceDir, label) {
 
   console.log(`\n[dev] 检测到${label}依赖未同步：${formatDependencyList(initial)}`)
   console.log(`[dev] 正在自动执行 npm install：${workspaceDir}`)
+  // Windows 上 npm 是 npm.cmd，Node 18.20.2+ / 20.12.2+ 起禁止在不带 shell 的情况下
+  // 直接 spawn .cmd/.bat（安全策略），否则抛 spawnSync npm.cmd EINVAL。这里显式开启 shell。
   const result = spawnSync(installCommand, ["install", "--no-audit", "--no-fund"], {
     cwd: workspaceDir,
     stdio: "inherit",
     windowsHide: false,
+    shell: process.platform === "win32",
   })
   if (result.error || result.status !== 0) {
     throw new Error(
