@@ -27,26 +27,26 @@ module.exports = {
   win,
   nsis: {
     ...(base.nsis || {}),
-    artifactName: "Nowen-Note-Lite-${version}-setup.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-setup.${ext}",
   },
   portable: {
     ...(base.portable || {}),
-    artifactName: "Nowen-Note-Lite-${version}-portable.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-portable.${ext}",
   },
   mac: {
     ...(base.mac || {}),
-    artifactName: "Nowen-Note-Lite-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
   },
   dmg: {
     ...(base.dmg || {}),
-    artifactName: "Nowen-Note-Lite-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
   },
   linux: {
     ...(base.linux || {}),
-    artifactName: "Nowen-Note-Lite-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
   },
   appImage: {
     ...(base.appImage || {}),
-    artifactName: "Nowen-Note-Lite-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
   },
 };

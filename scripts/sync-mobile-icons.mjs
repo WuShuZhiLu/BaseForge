@@ -28,7 +28,9 @@ const IOS_ICON = path.join(
   "AppIcon-512@2x.png",
 );
 
-const BACKGROUND = "#FFFFFF";
+// 与图标本身的圆角外底色一致（品牌靛蓝）。若用白色，legacy ic_launcher.png 的
+// 圆角外区域会露出白色方块边角（浅色桌面看不见，深色壁纸下很突兀）。
+const BACKGROUND = "#352D49";
 const DENSITIES = [
   { dir: "mipmap-mdpi", size: 48 },
   { dir: "mipmap-hdpi", size: 72 },

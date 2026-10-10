@@ -1,32 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <!-- 自适应深浅主题的 favicon
-       浅色主题：品牌蓝
-       深色主题：浅白灰
-       通过 prefers-color-scheme 控制
-  -->
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024">
+  <!-- Base Notes 自适应深浅主题 favicon（32）· 由 build/icon-source.svg 派生，请勿手改；改图标请改母图后重跑本脚本 -->
   <style>
-    .fg  { fill: #2563EB; }
-    .bg  { fill: #FFFFFF; }
-    .hl  { fill: #F59E0B; }
+    .tile  { fill: #352D49; }
+    .letter{ fill: #F3E3C4; }
+    .base  { fill: #C59348; }
+    .facet { fill: #90989E; }
     @media (prefers-color-scheme: dark) {
-      .fg { fill: #93C5FD; }
-      .bg { fill: #0F172A; }
-      .hl { fill: #FBBF24; }
+      .tile  { fill: #CFC9E6; }
+      .letter{ fill: #241F3D; }
+      .base  { fill: #D89A38; }
+      .facet { fill: #AEB6BC; }
     }
   </style>
+<rect width="1024" height="1024" rx="228" ry="228" class="tile"/>
+  <g transform="translate(512,512) scale(0.6911) translate(-516,-575.5)">
 
-  <!-- 笔记卡片（外描边 + 内填充） -->
-  <path class="fg"
-        d="M6 3h14l6 6v18a2 2 0 0 1-2 2h-18a2 2 0 0 1-2-2v-22a2 2 0 0 1 2-2z"/>
-  <path class="bg"
-        d="M7.5 4.5h12l5 5v17a1 1 0 0 1-1 1h-16a1 1 0 0 1-1-1v-21a1 1 0 0 1 1-1z"/>
-  <!-- 折角 -->
-  <path class="fg" d="M19.5 4.5v5h5z"/>
+    <polygon points="102,889 930,889 930,1019 102,1019" class="base"/>
 
-  <!-- 字母 N -->
-  <path class="fg"
-        d="M9 24V13h2.4l6.2 7V13H20v11h-2.4l-6.2-7v7z"/>
+    <polygon points="186,132 711,132 860,299 860,888 186,888" class="letter"/>
 
-  <!-- 橙色高光 -->
-  <circle class="hl" cx="23" cy="23.5" r="1.6"/>
+    <polygon points="379,130 512,263 513,440 393,500 577,680 386,888 379,888" class="base"/>
+
+    <polygon points="699,132 711,132 860,299 860,888 654,888 662,880 771,770 771,588 624,480 513,438 699,382" class="facet"/>
+  </g>
 </svg>

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    Base Notes 应用图标 · 设计母图（1024）· 全端图标的唯一源
+    结构：由「一块一块」的平面体块搭成 —— 米白主块（竖干 + 上下两碗）／琥珀内楔（中脊）
+          ／冷灰蓝右侧块 ／琥珀贴底基座。立体主义式平涂块面拼合。
+    语义：字母 B（Base 首字母，名字直接入画）立于基座之上。
+    比例：整组（B + 基座）占画幅高度约 60%（scale 0.6911），四周留出靛蓝呼吸区。
+    色板：靛蓝底 #352D49 / 米白 #F3E3C4 / 琥珀 #C59348 / 冷灰蓝 #90989E
+    改动本文件后请重跑：node scripts/build-icon.mjs && node scripts/build-brand-assets.mjs
+                        && node scripts/build-splash-assets.mjs && node scripts/sync-mobile-icons.mjs
+  -->
+  <rect width="1024" height="1024" rx="228" ry="228" fill="#352D49"/>
+  <g transform="translate(512,512) scale(0.6911) translate(-516,-575.5)">
+    <!-- 贴底基座 -->
+    <polygon points="102,889 930,889 930,1019 102,1019" fill="#C59348"/>
+    <!-- 主块（竖干 + 上碗 + 下碗 的合并轮廓，右上角斜切） -->
+    <polygon points="186,132 711,132 860,299 860,888 186,888" fill="#F3E3C4"/>
+    <!-- 琥珀内楔（中脊） -->
+    <polygon points="379,130 512,263 513,440 393,500 577,680 386,888 379,888" fill="#C59348"/>
+    <!-- 冷灰蓝右侧块 -->
+    <polygon points="699,132 711,132 860,299 860,888 654,888 662,880 771,770 771,588 624,480 513,438 699,382" fill="#90989E"/>
+  </g>
+</svg>

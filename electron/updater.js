@@ -1,6 +1,6 @@
 // electron/updater.js
 //
-// Nowen Note 桌面端应用更新状态机：
+// Base Notes 桌面端应用更新状态机：
 //   Windows/Linux: idle -> checking -> available -> downloading -> downloaded -> installing
 //   macOS:         idle -> checking -> available -> browser manual download
 //

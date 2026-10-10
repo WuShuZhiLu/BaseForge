@@ -2,9 +2,9 @@
   "modelVersion": "6.1.1",
   "name": "nowen-harmony",
   "version": "1.0.0",
-  "description": "Nowen Note HarmonyOS App",
+  "description": "Base Notes HarmonyOS App",
   "main": "",
-  "author": "Nowen",
+  "author": "Base Notes",
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {

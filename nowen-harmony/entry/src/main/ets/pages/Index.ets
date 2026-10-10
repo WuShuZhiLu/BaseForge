@@ -5,7 +5,7 @@ import { PREF_KEY_SERVER_URL } from '../utils/Constants';
 @Entry
 @Component
 struct Index {
-  @State msg: string = 'Nowen Note';
+  @State msg: string = 'Base Notes';
 
   aboutToAppear(): void {
     this.go();
@@ -24,7 +24,7 @@ struct Index {
 
   build() {
     Column() {
-      Text('Nowen Note').fontSize(20).fontColor('#374151')
+      Text('Base Notes').fontSize(20).fontColor('#374151')
     }
     .width('100%').height('100%').justifyContent(FlexAlign.Center).backgroundColor('#F5F3EE')
   }

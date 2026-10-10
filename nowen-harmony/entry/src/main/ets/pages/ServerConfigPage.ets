@@ -74,7 +74,7 @@ struct ServerConfigPage {
 
       Column() {
         Text('\ud83d\udcdd').fontSize(56).margin({ bottom: 16 })
-        Text('Nowen Note').fontSize(26).fontWeight(FontWeight.Bold).fontColor('#111827')
+        Text('Base Notes').fontSize(26).fontWeight(FontWeight.Bold).fontColor('#111827')
         Text('Connect to your server').fontSize(14).fontColor('#6B7280').margin({ top: 8 })
       }
       .margin({ top: 36, bottom: 44 })
@@ -120,7 +120,7 @@ struct ServerConfigPage {
 
       Blank()
 
-      Text('Nowen Note for HarmonyOS')
+      Text('Base Notes for HarmonyOS')
         .fontSize(12).fontColor('#D1D5DB').margin({ bottom: 48 })
     }
     .width('100%').height('100%').backgroundColor('#FFFFFF')

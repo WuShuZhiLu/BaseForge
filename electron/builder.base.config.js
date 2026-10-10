@@ -369,7 +369,7 @@ function buildBackendNodeModulesFilter() {
 
 module.exports = {
   appId: "com.nowen.note",
-  productName: "Nowen Note",
+  productName: "Base Notes",
   // 打包前自动校验原生模块，避免漏跑 rebuild:native 导致安装后崩溃
   beforeBuild() {
     checkNativeModule();
@@ -413,7 +413,7 @@ module.exports = {
     // node_modules/**/* 已删除：electron-builder 会自动从 package.json 的 dependencies
     // 收集运行时依赖，无需手动指定整个 node_modules 目录
   ],
-  // ==== 文件关联：双击 .md / .markdown / .txt 用 Nowen Note 打开 ====
+  // ==== 文件关联：双击 .md / .markdown / .txt 用 Base Notes 打开 ====
   // 注意：AppImage 构建器不支持 ext 为数组，必须拆成多个独立条目
   fileAssociations: [
     {
@@ -492,10 +492,10 @@ module.exports = {
     deleteAppDataOnUninstall: false,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "Nowen Note",
+    shortcutName: "Base Notes",
   },
   portable: {
-    artifactName: "${productName}-${version}-portable.${ext}",
+    artifactName: "Base-Notes-${version}-portable.${ext}",
   },
   mac: {
     // ==== mac 架构选择 ====
@@ -518,7 +518,7 @@ module.exports = {
     ],
     // 两个 mac 架构分两次构建，文件名必须带 ${arch}，否则后一次会覆盖前一次，
     // Release 资产看似有 Intel/Apple Silicon，实际可能指向同一份错架构包。
-    artifactName: "${productName}-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-${version}-${arch}.${ext}",
     icon: "electron/icon.png",
     category: "public.app-category.productivity",
     // ==== macOS 代码签名 + 公证 ====
@@ -540,7 +540,7 @@ module.exports = {
     // FreeDesktop 规范分类：https://specifications.freedesktop.org/menu-spec/latest/apa.html
     // Office 是顶级分类；笔记类一般还加 TextTools / Utility
     category: "Office",
-    // Linux mimeType 绑定：系统双击 .md 时会优先提示用 Nowen Note 打开
+    // Linux mimeType 绑定：系统双击 .md 时会优先提示用 Base Notes 打开
     mimeTypes: ["text/markdown", "text/plain"],
     // deb 需要 maintainer；AppImage 也会读 vendor 写进 metadata
     // 可通过环境变量 NOWEN_LINUX_MAINTAINER / NOWEN_LINUX_VENDOR / NOWEN_LINUX_HOMEPAGE 覆盖
@@ -548,16 +548,16 @@ module.exports = {
     vendor: LINUX_VENDOR,
     synopsis: "Modern note-taking application",
     description:
-      "Nowen Note — 一个现代化的笔记应用，支持 Markdown、全文搜索、跨设备局域网同步。",
+      "Base Notes — 一个现代化的笔记应用，支持 Markdown、全文搜索、跨设备局域网同步。",
     // 桌面文件额外字段
     desktop: {
       entry: {
-        StartupWMClass: "Nowen Note",
+        StartupWMClass: "Base Notes",
         Keywords: "note;markdown;editor;nowen;",
       },
     },
     // Linux x64 / arm64 会分两次构建；文件名必须带架构，避免互相覆盖。
-    artifactName: "${productName}-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-${version}-${arch}.${ext}",
   },
   // deb 专属字段（maintainer/description 已在上面 linux 里兜底，这里补 priority / section）
   deb: {

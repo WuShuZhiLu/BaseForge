@@ -38,7 +38,7 @@ childProcess.spawn = function patchedSpawn(command, args, options) {
 
 const originalShowErrorBox = electron.dialog.showErrorBox.bind(electron.dialog);
 electron.dialog.showErrorBox = function patchedShowErrorBox(title, content) {
-  if (!/Nowen Note 启动失败/.test(String(title)) || recentBackendOutput.length === 0) {
+  if (!/Base Notes 启动失败/.test(String(title)) || recentBackendOutput.length === 0) {
     return originalShowErrorBox(title, content);
   }
 

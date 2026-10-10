@@ -1,6 +1,6 @@
-﻿# Nowen Note - HarmonyOS App
+﻿# Base Notes - HarmonyOS App
 
-鸿蒙版 Nowen Note，基于 ArkTS + ArkWeb (WebView) 实现。
+鸿蒙版 Base Notes，基于 ArkTS + ArkWeb (WebView) 实现。
 
 ## 架构方案
 

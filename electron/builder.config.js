@@ -61,11 +61,11 @@ module.exports = {
   },
   nsis: {
     ...(base.nsis || {}),
-    artifactName: "Nowen-Note-${version}-setup.${ext}",
+    artifactName: "Base-Notes-${version}-setup.${ext}",
   },
   portable: {
     ...(base.portable || {}),
-    artifactName: "Nowen-Note-${version}-portable.${ext}",
+    artifactName: "Base-Notes-${version}-portable.${ext}",
     // Portable EXE 必须先解压整个应用再启动 Electron。ZIP 解压明显快于默认 LZMA，
     // 以少量体积增长换取 Windows 端更短的双击等待时间。
     useZip: true,
@@ -74,10 +74,10 @@ module.exports = {
   },
   mac: {
     ...(base.mac || {}),
-    artifactName: "Nowen-Note-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-${version}-${arch}.${ext}",
   },
   linux: {
     ...(base.linux || {}),
-    artifactName: "Nowen-Note-${version}-${arch}.${ext}",
+    artifactName: "Base-Notes-${version}-${arch}.${ext}",
   },
 };

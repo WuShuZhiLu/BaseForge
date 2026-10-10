@@ -11,7 +11,7 @@ struct WebViewPage {
   @State serverUrl: string = '';
   @State isLoading: boolean = true;
   @State loadProgress: number = 0;
-  @State pageTitle: string = 'Nowen Note';
+  @State pageTitle: string = 'Base Notes';
   @State canGoBack: boolean = false;
   @State showMenu: boolean = false;
   @State hasError: boolean = false;
