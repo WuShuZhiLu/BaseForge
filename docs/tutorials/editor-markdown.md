@@ -6,7 +6,7 @@
 
 ## 切换到 Markdown 模式
 
-nowen-note 支持两种编辑器模式：富文本（Tiptap）和 Markdown（CodeMirror 6）。
+Base Notes 支持两种编辑器模式：富文本（Tiptap）和 Markdown（CodeMirror 6）。
 
 切换方法：
 

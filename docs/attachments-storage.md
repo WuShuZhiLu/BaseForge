@@ -1,6 +1,6 @@
 # Attachment Storage
 
-Nowen Note stores user-uploaded files (images, documents, etc.) as attachments. Metadata lives in SQLite; file bytes are stored either on the local filesystem or in an S3-compatible object storage bucket.
+Base Notes stores user-uploaded files (images, documents, etc.) as attachments. Metadata lives in SQLite; file bytes are stored either on the local filesystem or in an S3-compatible object storage bucket.
 
 This document covers the storage layout, database schema, thumbnail generation, orphan cleanup, and backup recommendations.
 
@@ -173,7 +173,7 @@ Once a physical file is deleted by the orphan cleanup (or any other process), it
 
 ## 5. Backup Recommendations
 
-A complete backup of Nowen Note's attachment data requires three components:
+A complete backup of Base Notes's attachment data requires three components:
 
 ### 5.1 SQLite Database
 
@@ -217,7 +217,7 @@ See [object-storage.md](./object-storage.md) for details.
 
 ## 6. Object Storage
 
-For deployments where local disk is insufficient or where multi-server scaling is needed, Nowen Note supports storing attachment bytes in any S3-compatible object storage service.
+For deployments where local disk is insufficient or where multi-server scaling is needed, Base Notes supports storing attachment bytes in any S3-compatible object storage service.
 
 ### Supported Backends
 

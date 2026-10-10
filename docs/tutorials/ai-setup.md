@@ -6,7 +6,7 @@
 
 ## 支持的 AI 服务商
 
-nowen-note 支持 6 个 AI 服务商：
+Base Notes 支持 6 个 AI 服务商：
 
 | 服务商 | 模型示例 | 需要 API Key | 国内访问 |
 |---|---|---|---|
@@ -63,14 +63,14 @@ nowen-note 支持 6 个 AI 服务商：
 
 1. 访问 [阿里云百炼平台](https://bailian.console.aliyun.com/)
 2. 在「API-KEY 管理」中创建 API Key
-3. 在 nowen-note 中选择「通义千问」，粘贴 Key
+3. 在 Base Notes 中选择「通义千问」，粘贴 Key
 4. 推荐模型：`qwen-plus`（性价比高）
 
 ### OpenAI
 
 1. 访问 [OpenAI Platform](https://platform.openai.com/)
 2. 在 API Keys 中创建 Key
-3. 在 nowen-note 中选择「OpenAI」，粘贴 Key
+3. 在 Base Notes 中选择「OpenAI」，粘贴 Key
 4. 推荐模型：`gpt-4o`
 
 > ⚠️ 国内需要代理。可在「API 地址」中填入代理地址。

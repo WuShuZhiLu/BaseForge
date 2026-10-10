@@ -1,6 +1,6 @@
 # Docker 在线升级
 
-Nowen Note 的 Docker 在线升级只面向官方 `docker-compose.yml` 部署。该能力默认关闭，主应用容器永远不会挂载 Docker Socket。
+Base Notes 的 Docker 在线升级只面向官方 `docker-compose.yml` 部署。该能力默认关闭，主应用容器永远不会挂载 Docker Socket。
 
 ## 架构
 

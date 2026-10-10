@@ -1,6 +1,6 @@
 # Docker 一键部署
 
-> 使用官方 Docker 镜像与 Docker Compose 部署 nowen-note。
+> 使用官方 Docker 镜像与 Docker Compose 部署 Base Notes。
 
 ---
 

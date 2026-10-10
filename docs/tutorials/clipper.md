@@ -1,12 +1,12 @@
 # 浏览器剪藏扩展
 
-> 用浏览器扩展一键保存网页内容到 nowen-note。
+> 用浏览器扩展一键保存网页内容到 Base Notes。
 
 ---
 
 ## 什么是剪藏？
 
-剪藏扩展可以把你正在浏览的网页内容直接保存到 nowen-note 中作为一篇笔记。支持 Chrome 和 Edge 浏览器。
+剪藏扩展可以把你正在浏览的网页内容直接保存到 Base Notes 中作为一篇笔记。支持 Chrome 和 Edge 浏览器。
 
 ---
 
@@ -19,7 +19,7 @@
 
 ### Edge
 
-1. 在 Edge 扩展商店搜索 nowen-note
+1. 在 Edge 扩展商店搜索 Base Notes
 2. 或从 Chrome Web Store 安装（Edge 兼容 Chrome 扩展）
 
 ---
@@ -31,7 +31,7 @@
 1. 点击工具栏上的 Nowen 图标
 2. 弹出「未配置」提示 → 打开设置
 3. 填写服务器地址：`https://note.example.com` 或 `http://localhost:3001`
-4. 填写 API Token（在 nowen-note 设置 → API Token 中创建）
+4. 填写 API Token（在 Base Notes 设置 → API Token 中创建）
 5. 点击「测试连接」，看到 ✅ 即可
 
 ---
@@ -47,7 +47,7 @@
 ### 方法二：右键菜单
 
 1. 在网页上右键
-2. 选择「剪藏到 nowen-note」
+2. 选择「剪藏到 Base Notes」
 
 ### 方法三：快捷键
 
@@ -84,7 +84,7 @@
 | 重点高亮 | AI 标记重要内容 |
 | 翻译 | AI 翻译为其他语言 |
 
-AI 增强使用 nowen-note 服务器配置的 AI 服务，扩展本身不持有 API Key。
+AI 增强使用 Base Notes 服务器配置的 AI 服务，扩展本身不持有 API Key。
 
 ---
 

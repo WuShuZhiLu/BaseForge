@@ -1,6 +1,6 @@
 # 部署指南
 
-本文档汇总 nowen-note 各种环境下的安装与部署方式，包括本地开发、Docker、桌面端 / 移动端、以及主流 NAS 平台。
+本文档汇总 Base Notes 各种环境下的安装与部署方式，包括本地开发、Docker、桌面端 / 移动端、以及主流 NAS 平台。
 
 > 默认管理员账号：`admin` / `admin123`，首次登录后请立即修改密码。
 
@@ -167,7 +167,7 @@ keyAlias=你的别名
 storeFile=你的keystore路径
 ```
 
-移动端首次启动需配置服务器地址（IP:端口 或域名），通过 HTTP 连接到已部署的 nowen-note 后端。
+移动端首次启动需配置服务器地址（IP:端口 或域名），通过 HTTP 连接到已部署的 Base Notes 后端。
 
 **Android 图标：** 移动端 App 图标与桌面端 Electron 图标保持一致，统一由 `electron/icon.png` 生成；如需重新同步，运行 `npm run build:mobile-icons`。支持 Android 自适应图标（Adaptive Icon）。
 

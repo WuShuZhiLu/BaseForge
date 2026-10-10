@@ -1,4 +1,4 @@
-# 📚 Nowen Note 教程与帮助中心
+# 📚 Base Notes 教程与帮助中心
 
 > 面向普通用户、NAS 用户、团队管理员和开发者的统一文档入口。
 
@@ -6,7 +6,7 @@
 
 ## MCP 快速入口
 
-需要让 Claude Code、Cursor、VS Code 等 AI 客户端访问 Nowen Note？直接阅读：
+需要让 Claude Code、Cursor、VS Code 等 AI 客户端访问 Base Notes？直接阅读：
 
 - [MCP Server 安装与使用教程](./mcp.md)
 - [MCP Server installation guide](./mcp.en.md)
@@ -20,9 +20,9 @@
 
 | 帮助中心 | 地址 | 适合内容 |
 |---|---|---|
-| **功能与使用教程** | [Nowen Note 功能介绍](http://nowen.cn/docs/nowen-note-features) | 笔记、编辑器、任务、AI、知识图谱、协作和多端使用 |
-| **安装与问题解答** | [Nowen Note 安装与问题解答](http://nowen.cn/docs/nowen-note-help) | Docker、NAS、升级、备份、网络和故障排查 |
-| **API 与开发者文档** | [Nowen Note API](http://nowen.cn/docs/nowen-note-api) | OpenAPI、Token、SDK、CLI、MCP 和自动化接入 |
+| **功能与使用教程** | [Base Notes 功能介绍](http://nowen.cn/docs/nowen-note-features) | 笔记、编辑器、任务、AI、知识图谱、协作和多端使用 |
+| **安装与问题解答** | [Base Notes 安装与问题解答](http://nowen.cn/docs/nowen-note-help) | Docker、NAS、升级、备份、网络和故障排查 |
+| **API 与开发者文档** | [Base Notes API](http://nowen.cn/docs/nowen-note-api) | OpenAPI、Token、SDK、CLI、MCP 和自动化接入 |
 
 仓库中的 `docs/` 更适合离线阅读、提交修改和跟随源码审查；官网帮助中心更适合最终用户使用。两边会同步维护。
 
@@ -104,7 +104,7 @@ AI 配置按用户保存。管理员和普通用户可以使用各自的模型�
 | [实时协作](./realtime-collab.md) | Yjs 协同编辑、多端同步和冲突处理 |
 | [分享与权限](./sharing.md) | 查看、评论、编辑、登录限制、密码和有效期 |
 
-Nowen Note 还支持把笔记本发布为公开知识空间，并按目录继承或覆盖查看、评论和管理权限。公开地址应配置正确的 `PUBLIC_WEB_ORIGIN`。
+Base Notes 还支持把笔记本发布为公开知识空间，并按目录继承或覆盖查看、评论和管理权限。公开地址应配置正确的 `PUBLIC_WEB_ORIGIN`。
 
 ## 7. 多端客户端
 
@@ -138,7 +138,7 @@ Nowen Note 还支持把笔记本发布为公开知识空间，并按目录继承
 |---|---|
 | [MCP Server（中文）](./mcp.md) / [English](./mcp.en.md) | Claude Code、Cursor、VS Code 等客户端的完整安装、配置、验证与排障 |
 | [OpenAPI](./api.md) | REST API、鉴权和接口调试 |
-| [TypeScript SDK](./sdk.md) | 在 Node.js / TypeScript 中调用 Nowen Note |
+| [TypeScript SDK](./sdk.md) | 在 Node.js / TypeScript 中调用 Base Notes |
 | [CLI](./cli.md) | 命令行管理笔记、附件和其他资源 |
 | [Webhook](./webhook.md) | 事件通知和外部工作流 |
 | [浏览器剪藏](./clipper.md) | 从 Chrome / Edge 保存网页内容 |

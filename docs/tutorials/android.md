@@ -1,6 +1,6 @@
 # Android 移动端使用指南
 
-> 在 Android 手机或平板上使用 nowen-note。
+> 在 Android 手机或平板上使用 Base Notes。
 
 ---
 
@@ -19,7 +19,7 @@
 
 ## 连接服务器
 
-1. 打开 nowen-note App
+1. 打开 Base Notes App
 2. 输入服务器地址
 3. 登录账号
 
@@ -59,7 +59,7 @@
 
 1. 在笔记列表中**长按**笔记，弹出操作菜单
 2. 选择 **导出 > 图片 PNG** 或 **图片 JPG**
-3. 图片渲染完成后自动保存到系统相册的 **Pictures/Nowen Note** 目录
+3. 图片渲染完成后自动保存到系统相册的 **Pictures/Base Notes** 目录
 4. 保存成功后屏幕底部会提示「已保存到相册」
 
 PNG 格式无损、适合存档；JPG 格式体积更小、适合分享。超长笔记（高度超过 20000px）会弹出确认提示，避免生成过大的图片。
@@ -104,7 +104,7 @@ PNG 格式无损、适合存档；JPG 格式体积更小、适合分享。超长
 
 ## Capacitor 技术
 
-nowen-note 的 Android 端基于 Capacitor 构建：
+Base Notes 的 Android 端基于 Capacitor 构建：
 
 - 核心代码和 Web 端共享
 - 通过 Capacitor 桥接原生功能
@@ -161,16 +161,16 @@ npx cap run android
 
 ### Q：保存图片后在相册里找不到？
 
-图片保存在系统相册的 **Pictures/Nowen Note** 目录下。不同手机品牌的相册应用显示方式不同：
+图片保存在系统相册的 **Pictures/Base Notes** 目录下。不同手机品牌的相册应用显示方式不同：
 
 | 手机品牌 | 查找路径 |
 |---|---|
-| 小米 / Redmi | 相册 > 相册标签 > 其他相册 > Nowen Note |
-| 华为 / 荣耀 | 图库 > 相册 > 其他 > Nowen Note |
-| OPPO / realme | 相册 > 图集 > Nowen Note |
-| vivo / iQOO | 相册 > 相册页 > Nowen Note |
-| 三星 | 相册 > 相册 > Pictures > Nowen Note |
-| Google Pixel | 照片 > 库 > Pictures > Nowen Note |
+| 小米 / Redmi | 相册 > 相册标签 > 其他相册 > Base Notes |
+| 华为 / 荣耀 | 图库 > 相册 > 其他 > Base Notes |
+| OPPO / realme | 相册 > 图集 > Base Notes |
+| vivo / iQOO | 相册 > 相册页 > Base Notes |
+| 三星 | 相册 > 相册 > Pictures > Base Notes |
+| Google Pixel | 照片 > 库 > Pictures > Base Notes |
 
 如果在相册中刷新后仍看不到，请检查：
 - 存储空间是否充足
@@ -180,7 +180,7 @@ npx cap run android
 
 | 对比项 | Web 浏览器下载 | Android 相册保存 |
 |---|---|---|
-| 保存位置 | 浏览器下载文件夹 | 系统相册 Pictures/Nowen Note |
+| 保存位置 | 浏览器下载文件夹 | 系统相册 Pictures/Base Notes |
 | 是否可在相册查看 | 否（在文件管理器中） | 是 |
 | 保存方式 | 浏览器 `saveAs` 触发下载 | Capacitor MediaStore API 直接写入 |
 | 所需权限 | 无特殊要求 | Android 10+ 无需额外权限 |
@@ -194,7 +194,7 @@ APK 覆盖安装后可能出现以下情况：
 
 **图片保存失败**
 - 原因：旧版本的 Capacitor 插件缓存与新版本不兼容
-- 解决：进入手机 **设置 > 应用 > Nowen Note > 存储**，点击「清除缓存」（不要点「清除数据」，否则会丢失登录状态）
+- 解决：进入手机 **设置 > 应用 > Base Notes > 存储**，点击「清除缓存」（不要点「清除数据」，否则会丢失登录状态）
 
 **启动白屏**
 - 原因：WebView 的 localStorage 中存储了旧版本的登录 token 或服务器地址，新版本的 Capacitor androidScheme 变更导致 origin 不同，旧数据无法读取
@@ -205,7 +205,7 @@ APK 覆盖安装后可能出现以下情况：
 
 **权限问题**
 - Android 系统会保留已授予的权限，一般不会因更新丢失
-- 如果出现权限异常，进入 **设置 > 应用 > Nowen Note > 权限** 手动重新授权
+- 如果出现权限异常，进入 **设置 > 应用 > Base Notes > 权限** 手动重新授权
 
 ---
 

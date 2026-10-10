@@ -1,12 +1,12 @@
 # Web 端使用指南
 
-> 在浏览器中直接使用 Nowen Note，无需安装桌面或移动客户端。
+> 在浏览器中直接使用 Base Notes，无需安装桌面或移动客户端。
 
 [官方网站](http://nowen.cn/) · [在线体验](http://note.nowen.cn/) · [教程中心](./README.md)
 
 ## 访问方式
 
-在浏览器中打开你的 Nowen Note 服务地址：
+在浏览器中打开你的 Base Notes 服务地址：
 
 - 局域网自部署：`http://<服务器或 NAS 的 IP>:3001`
 - 反向代理：使用管理员配置的域名

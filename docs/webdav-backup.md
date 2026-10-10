@@ -1,6 +1,6 @@
 # WebDAV 远程备份
 
-Nowen Note 支持将已经生成完成的本地备份上传到 WebDAV。该能力面向容灾归档，不会把运行中的数据库直接放到 WebDAV，也不会改变现有的本地备份和恢复流程。
+Base Notes 支持将已经生成完成的本地备份上传到 WebDAV。该能力面向容灾归档，不会把运行中的数据库直接放到 WebDAV，也不会改变现有的本地备份和恢复流程。
 
 ## 功能边界
 
@@ -16,7 +16,7 @@ Nowen Note 支持将已经生成完成的本地备份上传到 WebDAV。该能�
 
 - 将 WebDAV 作为实时笔记同步后端；
 - 将 WebDAV 作为附件在线存储后端；
-- 让 Nowen Note 对外提供 WebDAV 服务端接口；
+- 让 Base Notes 对外提供 WebDAV 服务端接口；
 - 将 `nowen-note.db` 放在 WebDAV、davfs 或其他网络文件系统上直接运行；
 - 自动删除或轮转 WebDAV 中的历史备份。
 
@@ -46,7 +46,7 @@ Nowen Note 支持将已经生成完成的本地备份上传到 WebDAV。该能�
 
 ## 上传安全策略
 
-Nowen Note 始终先在本地生成数据库一致性快照或完整 ZIP。只有本地备份成功后，才启动远端上传。
+Base Notes 始终先在本地生成数据库一致性快照或完整 ZIP。只有本地备份成功后，才启动远端上传。
 
 远端写入优先采用以下流程：
 
@@ -109,7 +109,7 @@ https://user:password@example.com/dav/
 WebDAV 当前只负责保存备份文件。需要恢复时：
 
 1. 从 WebDAV 下载 `.bak` 或 `.zip`；
-2. 进入 Nowen Note 的备份页面；
+2. 进入 Base Notes 的备份页面；
 3. 选择“导入外部备份”；
 4. 导入成功后执行 dry-run 预检；
 5. 确认数据和附件数量后再正式恢复。

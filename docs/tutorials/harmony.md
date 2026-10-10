@@ -1,16 +1,16 @@
 # 鸿蒙端使用指南
 
-> 在鸿蒙设备上使用 nowen-note。
+> 在鸿蒙设备上使用 Base Notes。
 
 ---
 
 ## 项目状态
 
-nowen-note 的鸿蒙端基于 ArkWeb（WebView）实现，项目位于 `nowen-harmony/` 目录。
+Base Notes 的鸿蒙端基于 ArkWeb（WebView）实现，项目位于 `nowen-harmony/` 目录。
 
 ### 技术方案
 
-- 使用鸿蒙原生 WebView 加载 nowen-note Web 端
+- 使用鸿蒙原生 WebView 加载 Base Notes Web 端
 - 通过 ArkWeb 与原生代码的桥接实现原生功能集成
 - 复用 Web 端核心代码
 
