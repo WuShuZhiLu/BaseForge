@@ -1,8 +1,8 @@
 {
   "name": "nowen-note",
-  "version": "1.4.16",
-  "description": "Nowen Note - A modern note-taking application",
-  "author": "Nowen",
+  "version": "1.0.0-preview.1",
+  "description": "Base Notes - A modern note-taking application",
+  "author": "Base Notes Team",
   "private": true,
   "main": "electron/main-bootstrap.js",
   "scripts": {

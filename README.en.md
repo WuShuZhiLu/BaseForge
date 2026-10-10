@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="./electron/icon.png" alt="Nowen Note" width="104" />
-  <h1>Nowen Note</h1>
+  <img src="./electron/icon.png" alt="Base Notes" width="104" />
+  <h1>Base Notes</h1>
   <p><strong>An open-source, self-hosted knowledge base, collaborative note app, and task workspace</strong></p>
   <p>
     Unified knowledge tree · Rich text / Markdown editors · AI knowledge Q&A · Real-time collaboration · Tasks and mind maps · Cross-platform clients
@@ -27,34 +27,27 @@
 
 </div>
 
-> Nowen Note is more than an editor. It is designed as user-controlled knowledge infrastructure that can run long-term on a NAS or server and remain accessible from the web, desktop, and mobile clients.
+> Base Notes is more than an editor. It is designed as user-controlled knowledge infrastructure that can run long-term on a NAS or server and remain accessible from the web, desktop, and mobile clients.
 
-> **Remote NAS connection and sign-in:** Nowen Note supports deployment on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. After deployment, connect and sign in from the web, desktop, or Android client using a LAN IP address, an IPv6 address, or a public domain secured with HTTPS.
+> **Remote NAS connection and sign-in:** Base Notes supports deployment on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. After deployment, connect and sign in from the web, desktop, or Android client using a LAN IP address, an IPv6 address, or a public domain secured with HTTPS.
 
-## v1.4.16 is available
+## Development preview
 
-v1.4.16 focuses on **safer note switching, video attachment authorization, Markdown/code-block editing, and desktop release reliability**, improving multi-client editing, LAN media access, and desktop distribution.
+Base Notes is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain Base Notes' own design.
 
-- **Safer note switching:** stale rich-text save acknowledgements can no longer reclaim the active note after a rapid switch, with regression coverage for late acknowledgements after commit.
-- **More reliable first video open:** attachment signatures are prepared before opening notes with video so playback does not start before authorization is ready.
-- **Android / LAN video authorization fix:** LAN attachment authorization now uses the native HTTP path, improving video access when Android connects to NAS or LAN-hosted services.
-- **Editor fixes:** code-block select-all shortcut handling is refined and historical Markdown block markers are cleaned again to reduce legacy marker interference.
-- **Desktop release hardening:** Windows SignPath test/production signing, strict Authenticode verification, post-sign update metadata, and macOS dual-architecture artifact integrity checks are strengthened.
-- **Sharing compatibility:** Edge share-link copying is fixed with clipboard regression coverage.
+> See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
-See the [v1.4.16 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.16) and the [full changelog](./CHANGELOG.md).
+## Connect AI clients to Base Notes
 
-## Connect AI clients to Nowen Note
-
-Nowen Note includes a supported MCP Server. Claude Code, Cursor, VS Code, and other compatible AI clients can search, read, create, and update notes within the permissions granted by your account and token.
+Base Notes includes a supported MCP Server. Claude Code, Cursor, VS Code, and other compatible AI clients can search, read, create, and update notes within the permissions granted by your account and token.
 
 - [MCP Server installation guide](./docs/tutorials/mcp.en.md)
 - [中文安装教程](./docs/tutorials/mcp.md)
 - [Standalone nowen-mcp package README](./packages/nowen-mcp/README.md)
 
-The currently supported distribution is a source build: install Node.js 20+, build `packages/nowen-mcp`, create a restricted Personal API Token in Nowen Note, and configure the absolute path to `packages/nowen-mcp/bin/nowen-mcp.mjs` in your client. `dist/scoped-entry.js` is an internal build entry used by the launcher and should not be configured directly. The guide covers Windows, macOS, Linux/WSL, NAS addresses, Claude Code, Cursor, VS Code, verification, updates, and troubleshooting.
+The currently supported distribution is a source build: install Node.js 20+, build `packages/nowen-mcp`, create a restricted Personal API Token in Base Notes, and configure the absolute path to `packages/nowen-mcp/bin/nowen-mcp.mjs` in your client. `dist/scoped-entry.js` is an internal build entry used by the launcher and should not be configured directly. The guide covers Windows, macOS, Linux/WSL, NAS addresses, Claude Code, Cursor, VS Code, verification, updates, and troubleshooting.
 
-## Why Nowen Note
+## Why Base Notes
 
 | | |
 | --- | --- |
@@ -86,7 +79,7 @@ The currently supported distribution is a source build: install Node.js 20+, bui
 
 ## Recent highlights
 
-### v1.4.16 · 2026-08-19
+### 1.0.0-preview.1 · 2026-10-10
 
 #### Note switching and editor stability
 
@@ -112,7 +105,7 @@ The currently supported distribution is a source build: install Node.js 20+, bui
 
 - Edge share-link copying compatibility is fixed with clipboard regression coverage.
 
-See [CHANGELOG.md](./CHANGELOG.md) and the [v1.4.16 Release](https://github.com/cropflre/nowen-note/releases/tag/v1.4.16) for complete details.
+See [CHANGELOG.md](./CHANGELOG.md) for complete details.
 
 ## Screenshots
 
@@ -165,7 +158,7 @@ Password: admin123
 
 ### UGREEN NAS / Feiniu NAS remote connection and sign-in
 
-Nowen Note can be deployed on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. Use the corresponding `.upk` or `.fpk` package from Releases, or deploy with Docker Compose.
+Base Notes can be deployed on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. Use the corresponding `.upk` or `.fpk` package from Releases, or deploy with Docker Compose.
 
 After the service starts:
 
@@ -415,7 +408,7 @@ Feedback channels:
 
 ## Support the project
 
-If Nowen Note helps you, sponsorship supports continued maintenance and development.
+If Base Notes helps you, sponsorship supports continued maintenance and development.
 
 <table align="center">
   <tr>
@@ -432,7 +425,9 @@ Read the [author's note](./AUTHOR_STORY.md).
 
 ## License
 
-Nowen Note is licensed under the [GNU General Public License v3.0](./LICENSE).
+This project is a downstream fork of the upstream open-source project [nowen-note](https://github.com/cropflre/nowen-note) and is released under the [GNU General Public License v3.0](./LICENSE).
+
+**Origin and attribution**: Base Notes is a fork of upstream nowen-note. Copyright for the code and documentation remains primarily with the upstream author; this project only applies rebranding and further development on top of it. Upstream historical records ([CHANGELOG.md](./CHANGELOG.md), [author's note](./AUTHOR_STORY.md), `docs/superpowers/`) are preserved as-is.
 
 <!-- CHANGELOG:BEGIN -->
 <!-- Detailed release history lives in CHANGELOG.md. Keep the README focused on stable capabilities and recent highlights. -->
