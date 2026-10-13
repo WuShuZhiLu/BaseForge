@@ -109,7 +109,7 @@ import {
   Type, Palette, Eraser, Paintbrush, ChevronDown, ChevronUp, Search, Upload, FolderSearch, ClipboardPlus,
   MoreHorizontal, Plus,
   // 表格气泡菜单图标
-  Rows3, Columns3, Merge, Split, Heading, Network,
+  Rows3, Columns3, Merge, Split, Heading, BrainCircuit,
   Lock,
 } from "lucide-react";
 import { downloadAttachment } from "@/lib/downloadFile";
@@ -5928,7 +5928,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-mindmap-insert"))}
           title={t('tiptap.insertMindMap')}
         >
-          <Network size={iconSize} />
+          <BrainCircuit size={iconSize} />
         </ToolbarButton>
         <ToolbarButton onClick={insertMath} title={t('tiptap.insertMath')}>
           <Sigma size={iconSize} />
