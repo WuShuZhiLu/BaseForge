@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2 } from "lucide-react";
+import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit } from "lucide-react";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -33,6 +33,7 @@ const CREATE_MENU_WIDTH = 232;
 const CREATE_ITEMS = [
   { kind: "note", label: "富文本文档", icon: FileText },
   { kind: "markdown", label: "Markdown 文档", icon: FileCode },
+{ kind: "mindmap", label: "思维导图", icon: BrainCircuit },
 ] as const;
 const FOLDER_CREATE_ITEM = { kind: "folder", label: "文件夹" } as const;
 

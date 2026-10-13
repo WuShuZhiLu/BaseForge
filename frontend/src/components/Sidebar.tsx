@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronRight, PanelLeft, Tags, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, PanelLeft, Tags, Trash2, X , PanelTopOpen, PanelTopClose, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import KnowledgeTreePanel, {
@@ -10,6 +10,9 @@ import KnowledgeTreePanel, {
 import MobileKnowledgeTreePanel from "@/components/MobileKnowledgeTreePanel";
 import { OPEN_KNOWLEDGE_TREE_EVENT } from "@/components/KnowledgeTreeDrawer";
 import TagColorPopover from "@/components/TagColorPopover";
+import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
+import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
+import { useMobileSidebarControlsCollapsed } from "@/hooks/useMobileSidebarControlsCollapsed";
 import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
 import { useRailMode, nextRailMode } from "@/hooks/useRailMode";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -80,6 +83,10 @@ export const KNOWLEDGE_TREE_SCROLLBAR_CSS = `
  * 桌面端默认保留递归目录树，并可按本地偏好切换为快捷浏览；移动端默认使用快捷浏览。
  */
 export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | "mobile" } = {}) {
+  const [mobileControlsCollapsed, setMobileControlsCollapsed] = useMobileSidebarControlsCollapsed();
+  const [mobileRailHidden, setMobileRailHidden] = useMobileRailHidden();
+  const [sidebarTextStyle] = useSidebarTextStyle();
+  const classicText = sidebarTextStyle === "classic";
   const { state } = useApp();
   const actions = useAppActions();
   const { t } = useTranslation();
@@ -229,7 +236,44 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
         className="flex shrink-0 items-center justify-between border-b border-app-border px-4 py-3"
         style={{ paddingTop: "calc(var(--safe-area-top) + 12px)" }}
       >
-        <span className="min-w-0 truncate text-sm font-semibold">{siteConfig.title || "nowen-note"}</span>
+        {variant === "mobile" && (
+          <button
+            type="button"
+            onClick={() => setMobileControlsCollapsed(!mobileControlsCollapsed)}
+            title={t(mobileControlsCollapsed ? "sidebar.expandMobileControls" : "sidebar.collapseMobileControls")}
+            aria-label={t(mobileControlsCollapsed ? "sidebar.expandMobileControls" : "sidebar.collapseMobileControls")}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+          >
+            {mobileControlsCollapsed ? <PanelTopOpen size={16} /> : <PanelTopClose size={16} />}
+          </button>
+        )}
+        <span className={cn("min-w-0 truncate font-semibold", classicText ? "text-[13px]" : "text-sm")}>{siteConfig.title || "nowen-note"}</span>
+        {variant === "mobile" && mobileRailHidden && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              data-mobile-rail-show=""
+              onClick={() => setMobileRailHidden(false)}
+              title={t("sidebar.showMobileRail")}
+              aria-label={t("sidebar.showMobileRail")}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+            >
+              <PanelLeft size={16} />
+            </button>
+            <button
+              type="button"
+              data-mobile-sidebar-settings=""
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("nowen:open-settings"));
+              }}
+              title={t("settings.title", { defaultValue: "设置" })}
+              aria-label={t("settings.title", { defaultValue: "设置" })}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+            >
+              <Settings size={16} />
+            </button>
+          </div>
+        )}
         {variant === "desktop" && (
           <button
             type="button"
@@ -241,11 +285,15 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
             <PanelLeft size={16} />
           </button>
         )}
-      </header>
+      </header>{(variant !== "mobile" || !mobileControlsCollapsed) && (
+  
+  
+        <div className="shrink-0 px-3 py-2">
+          <WorkspaceSwitcher />
+        </div>
 
-      <div className="shrink-0 px-3 py-2">
-        <WorkspaceSwitcher />
-      </div>
+
+      )}
 
       <section className="flex min-h-0 flex-1 flex-col border-t border-app-border/60">
         {variant === "desktop" && (

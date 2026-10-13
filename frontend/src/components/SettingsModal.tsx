@@ -16,6 +16,7 @@ import SyncSettingsTab from "@/components/settings/SyncSettingsTab";
 import BackupCenterTab from "@/components/settings/BackupCenterTab";
 import ShortcutSettingsPanel from "@/components/settings/ShortcutSettingsPanel";
 import AISettingsPanel from "@/components/AISettingsPanel";
+import SidebarDisplaySettings from "@/components/settings/SidebarDisplaySettings";
 import PluginSettingsTab from "@/components/settings/plugins/PluginSettingsTab";
 import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
 import AutomationCenter from "@/components/automation/AutomationCenter";
@@ -1317,6 +1318,8 @@ function AppearancePanel() {
           <ThemeToggle />
         </div>
 
+
+<SidebarDisplaySettings />
         {/* 编辑器字体 - 可交互 */}
         <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 space-y-4">
           <div className="flex items-center justify-between">

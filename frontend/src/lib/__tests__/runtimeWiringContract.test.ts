@@ -1,0 +1,107 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const read = (relative: string) => readFileSync(path.resolve(__dirname, relative), "utf8");
+
+/**
+ * 接线契约：1.5.1 里那些"文件搬了、但没有任何地方调用"的基础设施。
+ *
+ * 这些点在 tsc 与功能测试里都不会报错 —— 模块存在、类型正确，只是没人 import / 没人调：
+ *   1) runtimePrelude（原始运行时垫片）必须在 runtimeCompatibility 之前执行；
+ *   2) runtimeCompatibility 负责外观运行时引导 + 两个外观 CSS + 旧外观中和 + 字体守卫；
+ *   3) HtmlPreviewPane 的样式表要跟着组件一起加载；
+ *   4) 树面板用 isActiveKnowledgeTreeDocument 判定激活态（含导图节点）。
+ * 一旦被摘掉，界面表现是"功能看不见/样式不对"，排查代价极高，故用契约锁住。
+ */
+describe("1.5.1 runtime wiring contract", () => {
+  it("boots the runtime prelude before the compatibility graph", () => {
+    const main = read("../../main.tsx").trimStart();
+    expect(main.startsWith('import "./lib/runtimePrelude";')).toBe(true);
+    expect(main.indexOf('import "./lib/runtimeCompatibility";')).toBeGreaterThan(
+      main.indexOf('import "./lib/runtimePrelude";'),
+    );
+  });
+
+  it("keeps the app appearance bootstrap chain wired in runtimeCompatibility", () => {
+    const runtime = read("../runtimeCompatibility.ts");
+    expect(runtime).toContain('import "../app-appearance.css";');
+    expect(runtime).toContain('import "../app-appearance-neutral-compat.css";');
+    expect(runtime).toContain("installRuntimePrelude();");
+    expect(runtime).toContain("bootstrapAppAppearanceRuntime();");
+    expect(runtime).toContain("installLegacyNoteAppearanceNeutralizer();");
+    expect(runtime).toContain("installEditorFontAppearanceGuard();");
+  });
+
+  it("loads the HTML preview stylesheet with the component", () => {
+    expect(read("../../components/HtmlPreviewPane.tsx")).toContain('import "./HtmlPreviewPane.css";');
+  });
+
+  it("marks tree nodes active through the shared model (notes and mind maps)", () => {
+    for (const file of [
+      "../../components/KnowledgeTreePanel.tsx",
+      "../../components/MobileKnowledgeTreePanel.tsx",
+    ]) {
+      const source = read(file);
+      expect(source).toContain("isActiveKnowledgeTreeDocument");
+      expect(source).toContain("getCurrentMindMapAppId");
+    }
+  });
+
+  it("opens mind map nodes from the knowledge tree", () => {
+    for (const file of [
+      "../../components/KnowledgeTreePanel.tsx",
+      "../../components/MobileKnowledgeTreePanel.tsx",
+    ]) {
+      expect(read(file)).toContain("pushMindMapAppPath(node.resourceId)");
+    }
+  });
+});
+
+describe("additive 1.5.1 feature wiring (user-approved)", () => {
+  it("offers mind map creation in the tree create menu and opens it after create", () => {
+    const menu = read("../../components/KnowledgeTreeCreateMenuRuntime.tsx");
+    expect(menu).toContain('kind: "mindmap"');
+    // 轻量表格本就有独立的菜单项（onCreateSheet：弹标题→建节点→跳 /sheets/:id），
+    // 不得再往 CREATE_ITEMS 里加第二个（回归：曾因此出现重复菜单项）。
+    expect(menu.split("<span>轻量表格</span>").length - 1).toBe(1);
+    expect(menu).toContain("onCreateSheet");
+    for (const file of [
+      "../../components/KnowledgeTreePanel.tsx",
+      "../../components/MobileKnowledgeTreePanel.tsx",
+    ]) {
+      const source = read(file);
+      expect(source).toContain('snapshot.kind === "mindmap"');
+      expect(source).toContain("pushMindMapAppPath(created.resourceId)");
+    }
+  });
+
+  it("wires the mobile rail hide/restore loop", () => {
+    expect(read("../../components/NavRail.tsx")).toContain('data-mobile-rail-hide=""');
+    expect(read("../../App.tsx")).toContain("!mobileRailHidden && <NavRail variant=\"mobile\"");
+    const sidebar = read("../../components/Sidebar.tsx");
+    expect(sidebar).toContain('data-mobile-rail-show=""');
+    expect(sidebar).toContain("useMobileRailHidden");
+  });
+
+  it("wires the mobile sidebar controls collapse", () => {
+    const sidebar = read("../../components/Sidebar.tsx");
+    expect(sidebar).toContain("setMobileControlsCollapsed(!mobileControlsCollapsed)");
+    expect(sidebar).toContain('(variant !== "mobile" || !mobileControlsCollapsed)');
+    expect(read("../../components/KnowledgeTreePanel.tsx")).toContain('controlsCollapsed && "hidden"');
+  });
+
+  it("wires the sidebar text style setting end to end", () => {
+    expect(read("../../components/settings/SidebarDisplaySettings.tsx")).toContain("setSidebarTextStyle");
+    expect(read("../../components/SettingsModal.tsx")).toContain("<SidebarDisplaySettings />");
+    for (const file of [
+      "../../components/Sidebar.tsx",
+      "../../components/NavRail.tsx",
+      "../../components/KnowledgeTreePanel.tsx",
+      "../../components/MobileKnowledgeTreePanel.tsx",
+      "../../components/NoteList.tsx",
+    ]) {
+      expect(read(file)).toContain("classicText");
+    }
+  });
+});

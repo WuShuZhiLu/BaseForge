@@ -27,6 +27,7 @@ import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
 import { Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import "./HtmlPreviewPane.css";
 import type { NoteEditorHandle, NoteEditorProps } from "@/components/editors/types";
 import { getBaseUrl, resolveAttachmentUrl } from "@/lib/api"
 import { getAccessToken } from "@/lib/authSession";

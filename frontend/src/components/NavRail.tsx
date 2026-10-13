@@ -20,6 +20,8 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
+import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
+import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { useTranslation } from "react-i18next";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api, broadcastLogout, clearServerUrl, getCurrentWorkspace, getServerUrl } from "@/lib/api";
@@ -76,6 +78,9 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
   const effectiveMode: RailMode = variant === "mobile" && railMode === "hidden" ? "icon" : railMode;
   const showLabel = effectiveMode === "label";
   const isMobile = variant === "mobile";
+  const [, setMobileRailHidden] = useMobileRailHidden();
+  const [sidebarTextStyle] = useSidebarTextStyle();
+  const classicText = sidebarTextStyle === "classic";
 
   const [features, setFeatures] = useState<WorkspaceFeatures | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -220,7 +225,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
       >
         {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-accent-primary" aria-hidden />}
         {item.icon}
-        {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{label}</span>}
+        {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{label}</span>}
       </button>
     );
   };
@@ -245,7 +250,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
             {notificationCount > 99 ? "99+" : notificationCount}
           </span>
         )}
-        {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{label}</span>}
+        {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{label}</span>}
       </button>
     );
   };
@@ -272,6 +277,15 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
             className="w-10 h-10 rounded-lg flex items-center justify-center text-tx-tertiary hover:bg-app-hover hover:text-tx-primary transition-colors"
           >
             <X size={16} />
+          </button>
+          <button
+            data-mobile-rail-hide=""
+            onClick={() => setMobileRailHidden(true)}
+            title={t("sidebar.hideMobileRail")}
+            aria-label={t("sidebar.hideMobileRail")}
+            className="w-10 h-10 rounded-lg flex items-center justify-center text-tx-tertiary hover:bg-app-hover hover:text-tx-primary transition-colors"
+          >
+            <PanelLeftClose size={16} />
           </button>
           <button
             data-mobile-drawer-rail-item=""
@@ -321,7 +335,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
         className={cn(itemBaseClass, "text-tx-tertiary hover:bg-app-hover hover:text-tx-primary")}
       >
         <Settings size={16} />
-        {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{t("sidebar.settings")}</span>}
+        {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{t("sidebar.settings")}</span>}
       </button>
 
       {isAccountLoginHistorySupported() && (
@@ -333,7 +347,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
           className={cn(itemBaseClass, "text-tx-tertiary hover:bg-app-hover hover:text-accent-primary")}
         >
           <UsersRound size={16} />
-          {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{t("auth.loginHistory.shortTitle")}</span>}
+          {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{t("auth.loginHistory.shortTitle")}</span>}
         </button>
       )}
 
@@ -346,7 +360,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
           className={cn(itemBaseClass, "text-tx-tertiary hover:bg-app-hover hover:text-accent-primary")}
         >
           <CloudOff size={16} />
-          {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{t("sidebar.switchToLocalShort", "本地")}</span>}
+          {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{t("sidebar.switchToLocalShort", "本地")}</span>}
         </button>
       )}
 
@@ -358,7 +372,7 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
         className={cn(itemBaseClass, "text-tx-tertiary hover:text-accent-danger hover:bg-accent-danger/10")}
       >
         <LogOut size={16} />
-        {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{t("sidebar.logout")}</span>}
+        {showLabel && <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>{t("sidebar.logout")}</span>}
       </button>
 
       <AnimatePresence>{showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}</AnimatePresence>

@@ -17,6 +17,7 @@ import { api, broadcastLogout, getBaseUrl, getCurrentWorkspace, getServerUrl, is
 import { NoteListItem, Notebook } from "@/types";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
+import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
 import { haptic } from "@/hooks/useCapacitor";
 import CreateNoteMenu, { type NoteType } from "@/components/CreateNoteMenu";
 import YuqueImport from "@/components/YuqueImport";
@@ -1044,6 +1045,7 @@ const NoteCard = React.memo(function NoteCard({
   const isSearchResult = !!searchQuery;
   const { t } = useTranslation();
   const colorMarkHex = getNoteColorMarkHex(note.colorMark);
+  const classicText = useSidebarTextStyle()[0] === "classic";
   const preview = (
     isSearchResult
       ? (note.snippetHtml || note.contentText || "")
@@ -1134,7 +1136,8 @@ const NoteCard = React.memo(function NoteCard({
             // 和 CJK/英文/空格混排都稳定，并自带省略号。
             // break-all：兜底——遇到极长不可断词（连续超长英文/无空格 URL）也强制裁断，
             // 不让一行的"内容宽度"超过容器，导致 flex 容器再被撑变形。
-            "note-card-title text-sm font-medium line-clamp-1 break-all flex-1 min-w-0",
+            "note-card-title font-medium line-clamp-1 break-all flex-1 min-w-0",
+            classicText ? "text-[13px]" : "text-sm",
             isActive ? "text-tx-primary" : "text-tx-secondary group-hover:text-tx-primary"
           )}>
             {searchQuery && note.titleHtml ? (
@@ -1182,7 +1185,7 @@ const NoteCard = React.memo(function NoteCard({
               <p className="note-card-preview text-xs text-tx-tertiary line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: sanitizeSearchHtml(preview) }} />
             </div>
           ) : (
-            <p className="text-xs text-tx-tertiary mt-1.5 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">{preview}</p>
+            <p className={cn("text-xs text-tx-tertiary mt-1.5 line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]", classicText && "text-[11px] leading-snug")}>{preview}</p>
           )
         )}
 

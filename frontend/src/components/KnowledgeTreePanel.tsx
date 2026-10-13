@@ -48,6 +48,9 @@ import { choose, confirm, prompt } from "@/components/ui/confirm";
 import { useContextMenu } from "@/hooks/useContextMenu";
 import { api } from "@/lib/api";
 import { affectedKnowledgeNoteIds } from "@/lib/knowledgeTreeDeleteReconcile";
+import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
+import { isActiveKnowledgeTreeDocument } from "@/lib/knowledgeTreeModel";
+import { useMobileSidebarControlsCollapsed } from "@/hooks/useMobileSidebarControlsCollapsed";
 import {
   knowledgeTreeRangeSelection,
   topLevelSelectedKnowledgeNodes,
@@ -69,7 +72,7 @@ import {
 } from "@/lib/knowledgeTreeApi";
 import { loadKnowledgeTreeOnEntry } from "@/lib/knowledgeTreeInitialLoad";
 import { noteTemplatesApi } from "@/lib/noteTemplatesApi";
-import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
+import { getCurrentMindMapAppId, pushMindMapAppPath, subscribeMindMapAppPath } from "@/lib/mindMapDeepLink";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   getKnowledgeTreeExpansionScope,
@@ -323,6 +326,13 @@ export function KnowledgeTreePanel({
   const handledTemplateCreateRequestRef = useRef<number | null>(null);
   const mobileActionsButtonRef = useRef<HTMLButtonElement>(null);
   const [nodes, setNodes] = useState<KnowledgeTreeNode[]>([]);
+  // 当前打开的导图（用于树里的激活态判定，见 isActiveKnowledgeTreeDocument）。
+  const activeMindMapId = useSyncExternalStore(subscribeMindMapAppPath, getCurrentMindMapAppId, () => null);
+  // 移动端侧栏控件折叠（与 Sidebar 的折叠按钮联动）。
+  const mobileControlsCollapsed = useMobileSidebarControlsCollapsed()[0];
+  const controlsCollapsed = variant === "mobile" && mobileControlsCollapsed;
+  const [sidebarTextStyle] = useSidebarTextStyle();
+  const classicText = sidebarTextStyle === "classic";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharedLoadError, setSharedLoadError] = useState<string | null>(null);
@@ -929,6 +939,15 @@ export function KnowledgeTreePanel({
       toast.success("已创建文件夹");
       return;
     }
+    // 建完自动打开：导图/表格走各自深链（上游同款行为）。
+    if (snapshot.kind === "mindmap") {
+      pushMindMapAppPath(created.resourceId);
+      return;
+    }
+    if (snapshot.kind === "sheet") {
+      pushSheetAppPath(created.resourceId);
+      return;
+    }
 
     try {
       activateNote(await api.getNote(created.resourceId), snapshot.parentId);
@@ -1181,7 +1200,7 @@ export function KnowledgeTreePanel({
     const hasChildren = childNodes.length > 0 || node.childCount > 0 || draft?.parentId === node.id;
     const isExpanded = effectiveExpanded.has(node.id);
     const active = (
-      (node.resourceType === "note" && state.activeNote?.id === node.resourceId)
+      isActiveKnowledgeTreeDocument(node, state.viewMode, state.activeNote?.id, activeMindMapId)
       || (
         threeColumnFolderNavigation
         && node.resourceType === "notebook"
@@ -1295,7 +1314,7 @@ export function KnowledgeTreePanel({
               </span>
             )}
           {nodeIcon(node)}
-          <span className="min-w-0 flex-1 truncate">{node.title}</span>
+          <span className={cn("min-w-0 flex-1 truncate", classicText && "text-xs")}>{node.title}</span>
             {node.nodeType === "folder" && node.isPasswordProtected === 1 && (
               <LockKeyhole size={11} className="shrink-0 text-tx-tertiary" aria-label="密码保护" />
             )}
@@ -1452,6 +1471,7 @@ export function KnowledgeTreePanel({
     >
       <div className={cn(
         "flex",
+        controlsCollapsed && "hidden",
         variant === "mobile"
           ? "flex-col items-stretch gap-0.5 px-3 pb-1.5 pt-2"
           : compactToolbar

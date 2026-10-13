@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowLeft,
   ArrowUpDown,
@@ -69,7 +69,7 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { loadKnowledgeTreeOnEntry } from "@/lib/knowledgeTreeInitialLoad";
-import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
+import { getCurrentMindMapAppId, pushMindMapAppPath, subscribeMindMapAppPath } from "@/lib/mindMapDeepLink";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   forgetUnlockedFolder,
@@ -102,6 +102,8 @@ import {
   type MobileKnowledgeTreeSortMode,
 } from "@/lib/mobileKnowledgeTree";
 import { detectNoteWorkspaceSurface } from "@/lib/noteWorkspaceLayout";
+import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
+import { isActiveKnowledgeTreeDocument } from "@/lib/knowledgeTreeModel";
 import { isSharedRoot } from "@/lib/sharedKnowledgeTree";
 import { toast } from "@/lib/toast";
 import NoteColorMarkBar from "@/components/NoteColorMarkBar";
@@ -263,6 +265,10 @@ export default function MobileKnowledgeTreePanel({
   const mobileActionsButtonRef = useRef<HTMLButtonElement>(null);
   const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   const [nodes, setNodes] = useState<KnowledgeTreeNode[]>([]);
+  // 当前打开的导图（用于树里的激活态判定，见 isActiveKnowledgeTreeDocument）。
+  const activeMindMapId = useSyncExternalStore(subscribeMindMapAppPath, getCurrentMindMapAppId, () => null);
+  const [sidebarTextStyle] = useSidebarTextStyle();
+  const classicText = sidebarTextStyle === "classic";
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharedLoadError, setSharedLoadError] = useState<string | null>(null);
@@ -665,7 +671,20 @@ export default function MobileKnowledgeTreePanel({
         toast.success("已创建文件夹");
         return;
       }
-      rememberOpened(created.id);
+      // 建完自动打开：导图/表格走各自深链（上游同款行为）。
+      if (snapshot.kind === "mindmap") {
+        rememberOpened(created.id);
+        pushMindMapAppPath(created.resourceId);
+        if (variant === "mobile") actions.setMobileSidebar(false);
+        return;
+      }
+      if (snapshot.kind === "sheet") {
+        rememberOpened(created.id);
+        pushSheetAppPath(created.resourceId);
+        if (variant === "mobile") actions.setMobileSidebar(false);
+        return;
+      }
+rememberOpened(created.id);
       activateNote(await api.getNote(created.resourceId), snapshot.parentId);
     } catch (requestError: any) {
       setDraft((current) => current ? {
@@ -981,7 +1000,7 @@ export default function MobileKnowledgeTreePanel({
   };
 
   const renderNode = (node: KnowledgeTreeNode, showPath = false, depth = 0) => {
-    const active = node.resourceType === "note" && state.activeNote?.id === node.resourceId;
+  const active = isActiveKnowledgeTreeDocument(node, state.viewMode, state.activeNote?.id, activeMindMapId);
     const selected = selectedNodeIds.has(node.id);
     const hasChildren = node.childCount > 0 || nodes.some((candidate) => candidate.parentId === node.id);
     const path = showPath ? buildMobileKnowledgeTreePath(node, nodes) : "";
@@ -1032,7 +1051,7 @@ export default function MobileKnowledgeTreePanel({
           {nodeIcon(node)}
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn("min-w-0 flex-1 truncate", variant === "mobile" ? "text-sm" : "text-xs")}>{node.title}</span>
+              <span className={cn("min-w-0 flex-1 truncate", variant === "mobile" || classicText ? "text-xs" : "text-sm")}>{node.title}</span>
               {variant === "mobile" && firstLevelNoteCount !== null && (
                 <span
                   className="shrink-0 text-[10px] tabular-nums text-tx-tertiary"

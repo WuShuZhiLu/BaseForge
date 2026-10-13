@@ -32,6 +32,7 @@ import { AppProvider, useApp, useAppActions, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDT
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { UserPreferencesProvider, useUserPreferences } from "@/hooks/useUserPreferences";
+import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Toaster from "@/components/Toaster";
 import { User } from "@/types";
@@ -395,6 +396,7 @@ function AppLayout() {
   const actions = useAppActions();
   const { t } = useTranslation();
   const { prefs: userPrefs } = useUserPreferences();
+  const [mobileRailHidden] = useMobileRailHidden();
   // v16 P3 后续：Rail 视觉模式三档（icon / label / hidden）。
   // 约束：主侧栏折叠时强制显示 Rail（即便偏好是 hidden），
   // 否则用户会陷入"既无 Rail 又无主侧栏"的死局，找不到任何导航入口。
@@ -835,7 +837,7 @@ function AppLayout() {
               // （桌面端两者也复用，写在子组件里更通用）。
               style={{ paddingBottom: 'var(--safe-area-bottom)' }}
             >
-              <NavRail variant="mobile" notificationCount={notificationCount} />
+              {!mobileRailHidden && <NavRail variant="mobile" notificationCount={notificationCount} />}
               <div className="flex-1 min-w-0 overflow-hidden">
                 <Sidebar />
               </div>

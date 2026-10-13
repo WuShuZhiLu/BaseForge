@@ -5678,6 +5678,15 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           <ToolbarButton compact onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive("bold")} title={t('tiptap.bold')}>
             <Bold size={16} />
           </ToolbarButton>
+          <ToolbarButton
+            compact
+            onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
+            isActive={editor.isActive("paragraph", { firstLineIndent: 2 })}
+            disabled={!editor.isActive("paragraph")}
+            title={t("tiptap.firstLineIndent2", { defaultValue: "首行缩进 2 字符" })}
+          >
+            <span className="text-[10px] font-semibold leading-none">首2</span>
+          </ToolbarButton>
           <ToolbarButton compact onClick={() => toggleBulletListSmart(editor)} isActive={activeListType === "bulletList"} title={t('tiptap.bulletList')}>
             <List size={16} />
           </ToolbarButton>
@@ -5970,10 +5979,21 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
             }
             (editor.chain().focus() as any).changeIndent(-1).run();
           }}
-          title={t('tiptap.outdent')}
-        >
-          <Outdent size={iconSize} />
-        </ToolbarButton>
+            title={t('tiptap.outdent')}
+          >
+            <Outdent size={iconSize} />
+          </ToolbarButton>
+          {/* 首行缩进 2 字符：扩展（FirstLineIndentExtension）本就随 TextStyleKit 注册，
+              之前只差这个工具栏入口，导致该功能"看不到"。 */}
+          <ToolbarButton
+            className="max-md:hidden"
+            onClick={() => editor.chain().focus().toggleFirstLineIndent().run()}
+            isActive={editor.isActive("paragraph", { firstLineIndent: 2 })}
+            disabled={!editor.isActive("paragraph")}
+            title={t("tiptap.firstLineIndent2", { defaultValue: "首行缩进 2 字符" })}
+          >
+            <span className="text-[10px] font-semibold leading-none">首2</span>
+          </ToolbarButton>
 
         <ToolbarDivider />
 

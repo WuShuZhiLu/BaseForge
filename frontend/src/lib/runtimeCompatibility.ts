@@ -1,3 +1,9 @@
+import { installRuntimePrelude } from "./runtimePrelude";
+import "../app-appearance.css";
+import "../app-appearance-neutral-compat.css";
+import { bootstrapAppAppearanceRuntime } from "./appAppearance";
+import { installEditorFontAppearanceGuard } from "./editorFontAppearanceGuard";
+import { installLegacyNoteAppearanceNeutralizer } from "./legacyNoteAppearanceNeutralizer";
 import { migrateUnifiedTreeOnlyLayout } from "./unifiedTreeOnlyLayout";
 
 type FindLastPredicate<T> = (
@@ -48,6 +54,12 @@ const findLastPolyfill: FindLastMethod = function findLast<T>(
 };
 
 export function installRuntimeCompatibility(): void {
+  // 与上游一致：外观运行时引导 + 旧外观中和 + 编辑器字体外观守卫。
+  // 这几步在本仓此前从未被调用 —— 应用外观（皮肤）运行时根本没起来。
+  installRuntimePrelude();
+  bootstrapAppAppearanceRuntime();
+  installLegacyNoteAppearanceNeutralizer();
+  installEditorFontAppearanceGuard();
   migrateUnifiedTreeOnlyLayout();
 
   if (typeof Array === "undefined") return;
