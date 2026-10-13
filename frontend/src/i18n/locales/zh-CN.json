@@ -2310,6 +2310,7 @@
     "shortcutEdit": "编辑节点",
     "shortcutDelete": "删除节点",
     "shortcutCollapse": "展开/折叠",
+    "shortcutExit": "退出导图",
     "dragToMove": "拖拽画布移动 · 滚轮缩放",
     "downloadPNG": "下载为 PNG",
     "downloadSVG": "下载为 SVG",

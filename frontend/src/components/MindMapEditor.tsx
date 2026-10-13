@@ -2880,6 +2880,39 @@ export default function MindMapCenter({
     onRequestClose();
   }, [isSaving, onRequestClose]);
 
+  // Esc 快速返回（快捷键提示登记在 lib/shortcuts/commands 的 exit-mindmap-view）：
+  // 导图内若有自己的临时状态，Esc 先归它们处理（清选中 / 关搜索 / 退全屏 / 提交节点编辑），
+  // 都空着时才退出思维导图模块，等价于右上角关闭按钮。
+  useEffect(() => {
+    if (!onRequestClose) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (isEditableTarget(event.target)) return;
+      if (
+        showSearch
+        || showTemplates
+        || isFullscreen
+        || editingNodeId
+        || selectedNodeId
+        || selectedNodeIds.length > 0
+      ) {
+        return;
+      }
+      requestEmbeddedClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [
+    editingNodeId,
+    isFullscreen,
+    onRequestClose,
+    requestEmbeddedClose,
+    selectedNodeId,
+    selectedNodeIds.length,
+    showSearch,
+    showTemplates,
+  ]);
+
   return (
     <div className={cn(
       isFullscreen
@@ -3516,6 +3549,9 @@ export default function MindMapCenter({
               <span><kbd className="px-1 py-0.5 rounded border border-app-border bg-app-bg text-[10px]">Space</kbd> {t("mindMap.shortcutCollapse")}</span>
                 <span><kbd className="px-1 py-0.5 rounded border border-app-border bg-app-bg text-[10px]">Ctrl+Z</kbd> {t("mindMap.undo")}</span>
                 <span><kbd className="px-1 py-0.5 rounded border border-app-border bg-app-bg text-[10px]">Ctrl+Y</kbd> {t("mindMap.redo")}</span>
+                {onRequestClose && (
+                  <span><kbd className="px-1 py-0.5 rounded border border-app-border bg-app-bg text-[10px]">Esc</kbd> {t("mindMap.shortcutExit")}</span>
+                )}
               <span>{t("mindMap.dragToMove")}</span>
             </div>
             )}

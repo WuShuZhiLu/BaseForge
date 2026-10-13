@@ -1837,10 +1837,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   const toolbarExpandedRef = useRef(false);
 
 
-  // 工具栏按钮容器在"单行模式"下是否溢出（scrollWidth > clientWidth）。
-  // 仅溢出时显示折叠/展开按钮。
-  // 展开态也持续测量：临时强制 nowrap 取内容真实宽度，窗口够宽时自动收起并隐藏按钮。
-  const [toolbarHasOverflow, setToolbarHasOverflow] = useState(false);
+  // 工具栏按钮容器在"单行模式"下是否溢出（scrollWidth > clientWidth），只用来决定
+  // 是否需要把展开态自动收起——展开/折叠按钮本身常驻在工具栏右端，不再受该测量影响。
+  // 展开态也持续测量：临时强制 nowrap 取内容真实宽度，窗口够宽时自动收起。
   useEffect(() => {
     const el = toolbarButtonsRef.current;
     if (!el) return;
@@ -1857,7 +1856,6 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       // 恢复原始样式（CSS class 会重新接管）
       if (wasWrapped) el.style.flexWrap = prevFlexWrap; else el.style.flexWrap = '';
       if (wasOverflow) el.style.overflow = prevOverflow; else el.style.overflow = '';
-      setToolbarHasOverflow(overflowing);
       // 窗口已够宽、不再溢出 → 自动收起展开态
       if (!overflowing && toolbarExpandedRef.current) {
         setToolbarExpanded(false);
@@ -1865,8 +1863,15 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     };
     const observer = new ResizeObserver(measure);
     observer.observe(el);
+    // 按钮会随编辑器就绪 / 权限 / 访客态后置挂载，容器自身宽度不变，
+    // 所以还要盯子节点变化，否则溢出状态会一直停在首次测量结果上。
+    const mutations = new MutationObserver(measure);
+    mutations.observe(el, { childList: true, subtree: false });
     measure();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
+    };
   }, []);
   useEffect(() => {
     toolbarExpandedRef.current = toolbarExpanded;
@@ -5853,6 +5858,18 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         >
           <Quote size={iconSize} />
         </ToolbarButton>
+        {/* 加密内容入口（桌面）：紧跟在「引用」右侧。 */}
+        {!isGuest && !note.isTrashed && (
+          <ToolbarButton
+            compact
+            className="shrink-0 hidden md:flex"
+            onClick={insertEncryptedRegion}
+            disabled={!editable}
+            title="插入加密内容"
+          >
+            <Lock size={iconSize} />
+          </ToolbarButton>
+        )}
 
         <ToolbarButton
           onClick={() => editor.chain().focus().setHorizontalRule().run()}
@@ -6046,31 +6063,19 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
 
         </div>
 
-        {/* 加密内容入口（桌面固定区）：不参与按钮容器的裁剪，任何宽度下都可见。
-            之前放在格式区中部（字号/颜色之后），被单行 overflow-hidden 裁掉后几乎看不到。 */}
-        {!isGuest && !note.isTrashed && (
-          <ToolbarButton
-            compact
-            className="ml-auto shrink-0 self-start hidden md:flex"
-            onClick={insertEncryptedRegion}
-            disabled={!editable}
-            title="插入加密内容"
-          >
-            <Lock size={iconSize} />
-          </ToolbarButton>
-        )}
-        {/* 折叠按钮（桌面）：仅当工具栏按钮容器溢出（scrollWidth > clientWidth）时显示。
-            宽度足够容纳所有按钮时自动隐藏，不需要折叠功能。 */}
-        {toolbarHasOverflow && (
-          <ToolbarButton
-            compact
-            className="ml-auto shrink-0 self-start hidden md:flex"
-            onClick={() => setToolbarExpanded((v) => !v)}
-            title={toolbarExpanded ? "折叠工具栏" : "展开工具栏"}
-          >
-            {toolbarExpanded ? <ChevronUp size={iconSize} /> : <ChevronDown size={iconSize} />}
-          </ToolbarButton>
-        )}
+        {/* 折叠/展开按钮（桌面）：常驻在工具栏右端（不再只在溢出时才出现——
+            用户反馈"折叠展开按钮没了"，而且它本来就是右端唯一的控件）。
+            工具栏按钮容器单行放不下时点它换成两行换行展示；窗口够宽时
+            容器内的自动收起逻辑会把展开态复位。 */}
+        <ToolbarButton
+          compact
+          className="ml-auto shrink-0 self-start hidden md:flex"
+          onClick={() => setToolbarExpanded((v) => !v)}
+          title={toolbarExpanded ? "折叠工具栏" : "展开工具栏"}
+          isActive={toolbarExpanded}
+        >
+          {toolbarExpanded ? <ChevronUp size={iconSize} /> : <ChevronDown size={iconSize} />}
+        </ToolbarButton>
       </div>
 
       {/* 折叠态已移除：改为同容器内 flex-nowrap/flex-wrap 切换 */}

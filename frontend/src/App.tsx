@@ -43,6 +43,13 @@ import { useAdaptiveWindowLayout } from "@/hooks/useAdaptiveWindowLayout";
 import { resolveMediumNoteListWidth } from "@/lib/adaptiveWindowLayout";
 import { APP_PATH_CHANGED_EVENT, replaceAppPathState, resolveCurrentAppPathname } from "@/lib/appPathNavigation";
 import { getCurrentSheetAppRoute, parseSheetAppPath, type SheetAppRoute } from "@/lib/sheetDeepLink";
+import {
+  getCurrentMindMapAppRoute,
+  isMindMapId,
+  parseMindMapAppPath,
+  replaceMindMapAppPath,
+  type MindMapAppRoute,
+} from "@/lib/mindMapDeepLink";
 import { bootstrap as syncBootstrap, teardown as syncTeardown, syncNow } from "@/lib/syncEngine";
 import { realtime } from "@/lib/realtime";
 import { deleteNotes as deleteLocalNotes } from "@/lib/localStore";
@@ -396,14 +403,26 @@ function AppLayout() {
   // 轻量表格深链：/sheets/:id → SheetEditor 视图。App 只订阅 URL 变化，
   // 打开动作由 push/replaceAppPathState 触发（新建菜单 / 知识树节点点击）。
   const [sheetRoute, setSheetRoute] = useState<SheetAppRoute>(() => getCurrentSheetAppRoute());
+  // 思维导图深链：/mindmaps 与 /mindmaps/:id → 切到思维导图模块，并由 MindMapEditor
+  // 按 routeMindMapId 选中对应导图。与 sheet 一样，App 只订阅 URL 变化；
+  // 打开动作由 pushMindMapAppPath / replaceMindMapAppPath 触发。
+  const [mindMapRoute, setMindMapRoute] = useState<MindMapAppRoute>(() => getCurrentMindMapAppRoute());
   useEffect(() => {
     const applyRoute = () => {
-      const next = parseSheetAppPath(resolveCurrentAppPathname());
+      const pathname = resolveCurrentAppPathname();
+      const next = parseSheetAppPath(pathname);
       setSheetRoute(next);
+      const nextMindMapRoute = parseMindMapAppPath(pathname);
+      setMindMapRoute(nextMindMapRoute);
       if (next.matched && next.sheetId) {
         actions.setViewMode("all");
         actions.setActiveNote(null);
         actions.setMobileView("editor");
+        return;
+      }
+      // sheet 优先于导图：两者路径互斥，这里只是把优先级写清楚。
+      if (nextMindMapRoute.matched) {
+        actions.setViewMode("mindmaps");
       }
     };
     applyRoute();
@@ -414,6 +433,22 @@ function AppLayout() {
       window.removeEventListener(APP_PATH_CHANGED_EVENT, applyRoute);
     };
   }, [actions]);
+  // 视图 → URL 的单向同步：
+  //   1) 在导图模块内但 URL 没跟上（例如从侧栏/导航栏直接切进来）→ 补上 /mindmaps(/ :id)；
+  //   2) 离开导图模块时 URL 仍停在 /mindmaps/:id → 清回 "/"，否则刷新会被旧 URL 拽回导图，
+  //      且下一次点同一张思维导图时 pushAppPathState 因 URL 相同被去重、事件不派发而进不去。
+  useEffect(() => {
+    if (state.viewMode === "mindmaps") {
+      if (!mindMapRoute.matched) {
+        const pendingId = sessionStorage.getItem("pendingOpenMindMapId");
+        replaceMindMapAppPath(isMindMapId(pendingId) ? pendingId : null);
+      }
+      return;
+    }
+    if (mindMapRoute.matched) {
+      replaceAppPathState("/");
+    }
+  }, [state.viewMode, mindMapRoute.matched]);
   // 离开 sheet 时必须把 /sheets/:id 从 URL 清掉。否则 URL 与视图长期不一致：
   // 点别的文档后 URL 仍停在 sheet（刷新后又占满主区），再点回该 sheet 时
   // pushAppPathState 因 URL 相同被 commitAppPathState 去重、不派发事件而进不去。
@@ -854,7 +889,11 @@ function AppLayout() {
       ) : isMindMapView ? (
         <div className="flex-1 flex flex-col">
           <MobileTopBar />
-          <MindMapCenter />
+          <MindMapCenter
+            documentMode={mindMapRoute.matched && mindMapRoute.mindMapId !== null}
+            routeMindMapId={mindMapRoute.matched ? mindMapRoute.mindMapId : undefined}
+            onRequestClose={() => actions.setViewMode("all")}
+          />
         </div>
       ) : isAIChatView ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

@@ -108,6 +108,7 @@ import {
   Film,
   FolderSearch,
   ClipboardPlus,
+  Lock,
 } from "lucide-react";
 import { MarkdownPreview } from "./MarkdownPreview";
 import AttachmentLibraryPicker from "@/components/AttachmentLibraryPicker";
@@ -2060,11 +2061,6 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       data-markdown-mobile-editing-compact={compactMobileEditing ? "true" : "false"}
       className="relative flex flex-col h-full overflow-hidden"
     >
-      {editable && !isGuest && !note.isTrashed && (
-        <button type="button" className="border-b border-app-border px-3 py-1 text-left text-xs text-tx-secondary" onClick={openEncryptedRegion}>
-          {tr("editor.encryptedBlock.insert") || "插入加密内容"}
-        </button>
-      )}
       {encryptedRegion && (
         <EncryptedBlockDialog
           source={encryptedRegion.source}
@@ -2277,12 +2273,21 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
           >
             <Quote size={iconSize} />
           </ToolbarButton>
+        <ToolbarButton
+          onClick={() => withView((v) => toggleCodeBlock(v))}
+          title={tr("tiptap.codeBlock") || "代码块"}
+        >
+          <FileCode size={iconSize} />
+        </ToolbarButton>
+        {/* 加密内容入口：放在「代码块」右侧（原来是一条独立的顶部横幅，脱离工具栏）。 */}
+        {editable && !isGuest && !note.isTrashed && (
           <ToolbarButton
-            onClick={() => withView((v) => toggleCodeBlock(v))}
-            title={tr("tiptap.codeBlock") || "�����"}
+            onClick={openEncryptedRegion}
+            title={tr("encryptedBlock.insert") || "插入加密内容"}
           >
-            <FileCode size={iconSize} />
+            <Lock size={iconSize} />
           </ToolbarButton>
+        )}
           <ToolbarButton
             onClick={() => withView((v) => insertHorizontalRule(v))}
             title={tr("tiptap.horizontalRule") || "�ָ���"}

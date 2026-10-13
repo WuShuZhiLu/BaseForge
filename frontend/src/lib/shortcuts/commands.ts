@@ -119,6 +119,17 @@ export const SHORTCUT_COMMANDS: readonly ShortcutCommand[] = [
     availableIn: ["web", "desktop"],
   },
   {
+    id: "exit-mindmap-view",
+    label: "退出思维导图",
+    description: "从思维导图模块返回笔记视图（导图内无临时状态时生效，等价于右上角关闭按钮）",
+    category: "navigation",
+    scope: "noneditable",
+    customizable: false,
+    defaultKeys: allPlatforms(["Escape"]),
+    availableIn: ["web", "desktop"],
+    tooltipAliases: ["退出思维导图", "关闭思维导图", "Exit mind map"],
+  },
+  {
     id: "undo",
     label: "撤销",
     description: "撤销上一步编辑",
