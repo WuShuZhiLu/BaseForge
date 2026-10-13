@@ -69,6 +69,7 @@ import {
 } from "@/lib/knowledgeTreeApi";
 import { loadKnowledgeTreeOnEntry } from "@/lib/knowledgeTreeInitialLoad";
 import { noteTemplatesApi } from "@/lib/noteTemplatesApi";
+import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   getKnowledgeTreeExpansionScope,
@@ -633,6 +634,12 @@ export function KnowledgeTreePanel({
     }
     if (node.noteType === "sheet") {
       pushSheetAppPath(node.resourceId);
+      return;
+    }
+    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
+    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
+    if (node.resourceType === "mindmap") {
+      pushMindMapAppPath(node.resourceId);
       return;
     }
     if (node.resourceType !== "note") return;
@@ -1287,7 +1294,7 @@ export function KnowledgeTreePanel({
                 {selected && <Check size={11} />}
               </span>
             )}
-          {nodeIcon(node)}
+          {nodeIcon(node)}
           <span className="min-w-0 flex-1 truncate">{node.title}</span>
             {node.nodeType === "folder" && node.isPasswordProtected === 1 && (
               <LockKeyhole size={11} className="shrink-0 text-tx-tertiary" aria-label="密码保护" />

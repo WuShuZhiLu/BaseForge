@@ -69,6 +69,7 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { loadKnowledgeTreeOnEntry } from "@/lib/knowledgeTreeInitialLoad";
+import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   forgetUnlockedFolder,
@@ -556,6 +557,13 @@ export default function MobileKnowledgeTreePanel({
     }
     if (node.noteType === "sheet") {
       pushSheetAppPath(node.resourceId);
+      if (variant === "mobile") actions.setMobileSidebar(false);
+      return;
+    }
+    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
+    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
+    if (node.resourceType === "mindmap") {
+      pushMindMapAppPath(node.resourceId);
       if (variant === "mobile") actions.setMobileSidebar(false);
       return;
     }
