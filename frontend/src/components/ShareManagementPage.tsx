@@ -7,6 +7,7 @@ import {
   KeyRound,
   Link2,
   Loader2,
+  MessageSquareText,
   Pencil,
   Power,
   PowerOff,
@@ -23,6 +24,7 @@ import { confirm } from "@/components/ui/confirm";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
+import { openCommentCenter } from "@/lib/noteCommentNavigation";
 import {
   buildPublicWebUrl,
   getPublicWebOriginSourceLabel,
@@ -515,6 +517,10 @@ export default function ShareManagementPage() {
                 variant="badge"
               />
             )}
+            <Button variant="outline" onClick={openCommentCenter}>
+              <MessageSquareText size={15} className="mr-2" />
+              评论管理
+            </Button>
             <Button variant="outline" onClick={() => void load(true)} disabled={refreshing}>
               {refreshing ? <Loader2 size={15} className="mr-2 animate-spin" /> : <RefreshCw size={15} className="mr-2" />}
               刷新

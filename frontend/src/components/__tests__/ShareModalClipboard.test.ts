@@ -8,7 +8,7 @@ describe("ShareModal clipboard fallback", () => {
   it("uses the shared clipboard helper instead of the Edge-sensitive direct API", () => {
     expect(source).toContain('import { copyText } from "@/lib/clipboard";');
     expect(source).toContain("const ok = await copyText(value);");
-    expect(source).toContain('toast.error("复制失败，请手动复制")');
+    expect(source).toContain('t("shareUi.copyFailed")');
     expect(source).not.toContain("navigator.clipboard.writeText(value)");
   });
 

@@ -22,7 +22,7 @@ public class NativePrintPlugin extends Plugin {
     @PluginMethod
     public void printNote(PluginCall call) {
         String html = call.getString("html");
-        String jobName = call.getString("jobName", "Nowen Note");
+        String jobName = call.getString("jobName", "Base Notes");
         if (html == null || html.trim().isEmpty()) {
             call.reject("html is required");
             return;

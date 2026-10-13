@@ -109,9 +109,9 @@ emailRouter.post("/smtp/test", async (c) => {
 
   const result = await sendMail({
     to,
-    subject: "[nowen-note] SMTP 测试邮件",
+    subject: "[Base Notes] SMTP 测试邮件",
     text:
-      "这是一封来自 nowen-note 的 SMTP 测试邮件。\n\n" +
+      "这是一封来自 Base Notes 的 SMTP 测试邮件。\n\n" +
       "如果你能看到这条消息，说明 SMTP 配置正常，可以用于后续的「备份文件发送到邮箱」等自动化场景。\n\n" +
       `发送时间：${new Date().toLocaleString()}`,
   });

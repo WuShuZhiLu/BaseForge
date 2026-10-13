@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { NodeViewWrapper, NodeViewProps } from "@tiptap/react";
+import { NodeViewWrapper, NodeViewProps, ReactNodeViewRenderer } from "@tiptap/react";
+import type { NodeViewRendererProps } from "@tiptap/core";
 import {
   getPersistentImageTransform,
   normalizeImageFlipX,
@@ -7,6 +8,8 @@ import {
 } from "@/lib/imageNodeTransformBootstrap";
 import { useAttachmentImageRenderSource } from "@/hooks/useAttachmentImageRenderSource";
 import { useLazyNodeView } from "@/hooks/useLazyNodeView";
+import { MotionPhotoOverlay } from "./MotionPhotoOverlay";
+import { downloadAttachment } from "@/lib/downloadFile";
 
 /**
  * Tiptap Image 扩展的自定义 NodeView。
@@ -18,6 +21,16 @@ type Corner = "nw" | "ne" | "sw" | "se";
 
 const MIN_WIDTH = 40;
 const MAX_WIDTH = 4000;
+
+export function createResizableImageNodeView() {
+  const render = ReactNodeViewRenderer(ResizableImageView);
+  return (props: NodeViewRendererProps) => {
+    const view = render(props);
+    // Before EditorContent mounts, Tiptap returns an empty view and ProseMirror falls back to
+    // <img src="/api/attachments/...">. Keep a placeholder until React owns the signed source.
+    return view.dom ? view : { dom: document.createElement(props.node.isInline ? "span" : "div") };
+  };
+}
 
 export function ResizableImageView(props: NodeViewProps) {
   const { node, updateAttributes, selected, editor } = props;
@@ -253,7 +266,7 @@ export function ResizableImageView(props: NodeViewProps) {
         <img
           key={imageRender.renderKey}
           ref={imgRef}
-          src={finalSrc}
+          src={finalSrc || undefined}
           alt={alt ?? ""}
           title={title ?? undefined}
           loading="lazy"
@@ -295,6 +308,7 @@ export function ResizableImageView(props: NodeViewProps) {
         </span>
       )}
 
+      {shouldRenderHeavyContent && !imgError && !!finalSrc && <MotionPhotoOverlay source={src || ""} />}
       {shouldRenderHeavyContent && imgError && (
         <span
           contentEditable={false}
@@ -315,7 +329,7 @@ export function ResizableImageView(props: NodeViewProps) {
         >
           图片加载失败
           <br />
-          <span style={{ fontSize: 10, opacity: 0.7 }}>{imageRender.resolvedSrc.slice(0, 80)}</span>
+          <button type="button" onClick={(event) => { event.stopPropagation(); void downloadAttachment(src || "", alt || "photo"); }} style={{ lineHeight: 1.5, textDecoration: "underline" }}>下载原件</button>
         </span>
       )}
 

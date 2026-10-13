@@ -139,7 +139,7 @@ function mapInjectionError(url: string | undefined, error: unknown): ContentScri
   if (url?.startsWith("file:")) {
     return new ContentScriptBridgeError(
       "FILE_ACCESS_REQUIRED",
-      "当前是本地文件。请在扩展管理页为 Nowen Note Web Clipper 开启“允许访问文件网址”后重试。",
+      "当前是本地文件。请在扩展管理页为 Base Notes Web Clipper 开启“允许访问文件网址”后重试。",
       detail,
     );
   }

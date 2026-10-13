@@ -570,7 +570,7 @@ backupsRouter.post("/:filename/send-email", async (c) => {
   const note = (body.note || "").toString().slice(0, 500); // 限制附加备注长度，防滥用
   const sizeMB = (stat.size / 1024 / 1024).toFixed(2);
   const lines = [
-    `这是一封由 nowen-note 自动发送的数据备份邮件。`,
+    `这是一封由 Base Notes 自动发送的数据备份邮件。`,
     ``,
     `备份文件：${filename}`,
     `大小：${sizeMB} MB`,
@@ -589,7 +589,7 @@ backupsRouter.post("/:filename/send-email", async (c) => {
 
   const result = await sendMail({
     to,
-    subject: `[nowen-note] 数据备份 ${filename}`,
+    subject: `[Base Notes] 数据备份 ${filename}`,
     text: lines.join("\n"),
     attachments: [{ filename, content, contentType }],
   });

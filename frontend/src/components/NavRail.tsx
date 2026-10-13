@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Bell,
   BrainCircuit,
   CloudOff,
   Columns2,
@@ -37,6 +38,7 @@ import {
 import { clearLocalIdMap, clearQueue, getQueueLength } from "@/lib/offlineQueue";
 import { AccountLoginHistoryDialog } from "@/components/AccountLoginHistory";
 import { isAccountLoginHistorySupported } from "@/lib/accountLoginHistory";
+import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/workspaceIssueNavigation";
 
 type NavGroup = "workspace" | "modules" | "tools";
 
@@ -66,7 +68,7 @@ const NAV_CONFIG: NavConfigItem[] = [
   { icon: <Link2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.shareManagement", mode: "shares", group: "tools" },
 ];
 
-export default function NavRail({ variant = "desktop" }: { variant?: "desktop" | "mobile" } = {}) {
+export default function NavRail({ variant = "desktop", notificationCount = 0 }: { variant?: "desktop" | "mobile"; notificationCount?: number } = {}) {
   const { t } = useTranslation();
   const { state } = useApp();
   const actions = useAppActions();
@@ -223,6 +225,31 @@ export default function NavRail({ variant = "desktop" }: { variant?: "desktop" |
     );
   };
 
+  const renderNotificationItem = () => {
+    const label = t("sidebar.notifications", { defaultValue: "通知" });
+    return (
+      <button
+        key="notifications"
+        data-mobile-drawer-rail-item=""
+        onClick={() => {
+          actions.setMobileSidebar(false);
+          window.dispatchEvent(new Event(OPEN_NOTIFICATIONS_EVENT));
+        }}
+        aria-label={label}
+        title={showLabel ? undefined : label}
+        className={cn(itemBaseClass, "relative text-tx-tertiary hover:bg-app-hover hover:text-tx-primary")}
+      >
+        <Bell size={16} />
+        {notificationCount > 0 && (
+          <span className="absolute right-0 top-0 rounded-full bg-accent-primary px-1 text-[9px] text-white">
+            {notificationCount > 99 ? "99+" : notificationCount}
+          </span>
+        )}
+        {showLabel && <span className="text-[10px] leading-none mt-0.5 max-w-full truncate px-1">{label}</span>}
+      </button>
+    );
+  };
+
   const groups: NavGroup[] = ["workspace", "modules", "tools"];
   const mobileNextMode: RailMode = effectiveMode === "label" ? "icon" : "label";
   const MobileSwitchIcon = effectiveMode === "label" ? Columns2 : Columns3;
@@ -281,6 +308,7 @@ export default function NavRail({ variant = "desktop" }: { variant?: "desktop" |
             </React.Fragment>
           );
         })}
+        {renderNotificationItem()}
       </div>
 
       <div className={cn("my-2 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />

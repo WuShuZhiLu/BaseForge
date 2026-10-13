@@ -130,7 +130,7 @@ export async function downloadRemoteImage(rawUrl: string): Promise<DownloadedRem
         signal: controller.signal,
         headers: {
           Accept: "image/avif,image/webp,image/png,image/jpeg,image/gif,image/bmp,image/x-icon;q=0.9,*/*;q=0.1",
-          "User-Agent": "Nowen-Note-Remote-Image/1.0",
+          "User-Agent": "Base-Notes-Remote-Image/1.0",
         },
       });
 

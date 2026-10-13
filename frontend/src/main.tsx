@@ -13,6 +13,8 @@ import { ConfirmProvider } from "./components/ui/confirm";
 import Toaster from "./components/Toaster";
 import NoteIconBridge from "./components/NoteIconBridge";
 import EmbedPasswordBridge from "./components/EmbedPasswordBridge";
+import CameraCaptureBridge from "./components/CameraCaptureBridge";
+import { initializeMobileLocalFirstRuntime } from "./lib/mobileLocalFirstRuntime";
 import MediaExperienceBridge from "./components/MediaExperienceBridge";
 import EditorImageTransformBridge from "./components/EditorImageTransformBridge";
 import ImageClipboardBridge from "./components/ImageClipboardBridge";
@@ -24,6 +26,7 @@ import AndroidShareImportCenter from "./components/AndroidShareImportCenter";
 import DeferredGlobalFeatureCentersMount from "./components/DeferredGlobalFeatureCentersMount";
 import SiyuanRichTextCalloutBridge from "./components/SiyuanRichTextCalloutBridge";
 import InlineCommentBridge from "./components/InlineCommentBridge";
+import VoiceRecorderSheet from "./components/VoiceRecorderSheet";
 import "./index.css";
 import "./editor-list-markers.css";
 import "./code-block-wrap.css";
@@ -42,6 +45,9 @@ import { installDesktopNativeHttpBridge } from "./lib/desktopNativeHttpBridge";
 import { installMobileStartupBridge } from "./lib/mobileStartupBridge";
 import { installMobileWebStartupBridge } from "./lib/mobileWebStartupBridge";
 import { installNoteAttachmentAccessBridge } from "./lib/noteAttachmentAccessBridge";
+import { installAttachmentUploadPolicyBridge } from "./lib/attachmentUploadPolicyBridge";
+import { captureAttachmentAccessUpstreamFetch } from "./lib/attachmentAccessUpstreamFetch";
+import { installNonBlockingNoteFetch } from "./lib/nonBlockingNoteFetch";
 import { installReliableExportDownloadBridge } from "./lib/reliableExportDownloadBridge";
 import { installNoteSyncSafety } from "./lib/noteSyncSafety";
 import { installNoteUpdateResponseGuard } from "./lib/noteUpdateResponseGuard";
@@ -97,7 +103,13 @@ installAndroidNativeHttpBridge();
 installDesktopNativeHttpBridge();
 installMobileStartupBridge();
 installMobileWebStartupBridge();
+// 附件上传统一边界：服务端策略在运行时拉取，改大小上限不需要前端重新构建；
+// 必须在任何编辑器开始上传附件之前安装。
+installAttachmentUploadPolicyBridge();
+// 先捕获上传链路（在有附件的 note 详情等待逻辑之前），让正文先渲染、签名媒体访问在后台准备。
+captureAttachmentAccessUpstreamFetch();
 installNoteAttachmentAccessBridge();
+installNonBlockingNoteFetch();
 installTwoFactorLoginChallengeBridge();
 installNoteSyncSafety();
 installNoteUpdateResponseGuard();
@@ -142,7 +154,8 @@ function resolvePublicNotebookRoute(): { matched: boolean; token?: string } {
 
 const publicRoute = resolvePublicNotebookRoute();
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+function renderApplication(): void {
+  ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <SiteSettingsProvider>
       <ConfirmProvider>
@@ -158,6 +171,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <>
             <NoteIconBridge />
             <EmbedPasswordBridge />
+            <CameraCaptureBridge />
             <MediaExperienceBridge />
             <EditorImageTransformBridge />
             <ImageClipboardBridge />
@@ -169,6 +183,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <DeferredGlobalFeatureCentersMount />
             <SiyuanRichTextCalloutBridge />
             <InlineCommentBridge />
+            {/* 语音备忘录制面板：全局单例，监听 "nowen:voice-record" 事件弹出 */}
+            <VoiceRecorderSheet />
             <React.Suspense fallback={<MainRouteFallback />}>
               <App />
             </React.Suspense>
@@ -177,4 +193,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </ConfirmProvider>
     </SiteSettingsProvider>
   </React.StrictMode>,
-);
+  );
+}
+
+// 移动端本地优先运行时是增强能力：原生桥不可用（纯 Web/桌面）时必须照常渲染。
+Promise.resolve()
+  .then(() => initializeMobileLocalFirstRuntime())
+  .then(renderApplication, () => renderApplication());

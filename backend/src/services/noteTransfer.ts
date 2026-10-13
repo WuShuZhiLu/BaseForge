@@ -170,6 +170,13 @@ export class NoteTransferError extends Error {
   readonly status: number;
   readonly details?: Record<string, unknown>;
 
+  // tsx/ESM 双实例下 instanceof 会假阴性（服务端与测试各自加载一份类），
+  // 用鸭子类型兜底：name + code 都匹配即视为 NoteTransferError。
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return value instanceof Error && (value as Error).name === "NoteTransferError"
+      && typeof (value as { code?: unknown }).code === "string";
+  }
+
   constructor(code: string, message: string, status = 400, details?: Record<string, unknown>) {
     super(message);
     this.name = "NoteTransferError";

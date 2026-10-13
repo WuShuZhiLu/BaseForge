@@ -10,7 +10,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 const config: CapacitorConfig = {
   appId: "com.nowen.note",
-  appName: "Nowen Note",
+  appName: "Base Notes",
   webDir: "dist",
   server: {
     // 允许 HTTP 明文（连接局域网 IP / HTTP 服务器需要）

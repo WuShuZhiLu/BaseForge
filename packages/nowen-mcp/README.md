@@ -1,6 +1,6 @@
 # nowen-mcp
 
-Nowen Note 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI 客户端在授权范围内搜索、读取和维护笔记。
+Base Notes 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI 客户端在授权范围内搜索、读取和维护笔记。
 
 > 完整用户教程：[中文安装指南](../../docs/tutorials/mcp.md) · [English guide](../../docs/tutorials/mcp.en.md)
 
@@ -8,7 +8,7 @@ Nowen Note 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI 
 
 - Node.js 20+
 - npm
-- 一个可以从当前电脑访问的 Nowen Note 服务
+- 一个可以从当前电脑访问的 Base Notes 服务
 - 推荐使用 restricted Personal API Token
 
 ## 从仓库安装
@@ -135,7 +135,7 @@ claude mcp list
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `NOWEN_URL` | Nowen Note 服务地址 | `http://localhost:3001` |
+| `NOWEN_URL` | Base Notes 服务地址 | `http://localhost:3001` |
 | `NOWEN_API_TOKEN` | Personal API Token | — |
 | `NOWEN_USERNAME` | 旧版用户名认证 | `admin` |
 | `NOWEN_PASSWORD` | 旧版密码认证 | `admin123` |
@@ -184,4 +184,4 @@ npm run build
 
 ## 发行说明
 
-当前仓库保证的是源码构建方式。除非 Nowen Note 的 Release 或官方文档明确宣布 npm / DXT 包，避免假设 `npx nowen-mcp` 或一键 DXT 已经可用。
+当前仓库保证的是源码构建方式。除非 Base Notes 的 Release 或官方文档明确宣布 npm / DXT 包，避免假设 `npx nowen-mcp` 或一键 DXT 已经可用。

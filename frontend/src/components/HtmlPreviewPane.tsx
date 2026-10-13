@@ -21,13 +21,17 @@ import React, {
   useEffect,
   useImperativeHandle,
   useRef,
+  useSyncExternalStore,
 } from "react";
 import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
 import { Eye } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { NoteEditorHandle, NoteEditorProps } from "@/components/editors/types";
-import { resolveAttachmentUrl } from "@/lib/api";
+import { getBaseUrl, resolveAttachmentUrl } from "@/lib/api"
+import { getAccessToken } from "@/lib/authSession";
+import { getAttachmentAccessSnapshot, subscribeAttachmentAccess } from "@/lib/noteAttachmentAccessBridge";
+import { hasPersistentNoteAttachmentReference, primeNoteAttachmentAccess } from "@/lib/noteAttachmentAccessPriming";;
 import { resolveHtmlPreviewAssetUrls } from "@/lib/htmlPreviewAssets";
 import {
   scrollToHtmlPreviewHeading,
@@ -152,6 +156,20 @@ const HtmlPreviewPane = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function HtmlPreviewPane({ note, onUpdate, onHeadingsChange, onEditorReady }, ref) {
     const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
+
+  // 文本/HTML 可能先于它引用的附件签名 URL 出现。在不改写已存 HTML、也不阻塞阅读的
+  // 前提下，对迟到的授权做出响应（订阅访问状态变化 + 主动预取 note 级附件签名）。
+  useSyncExternalStore(
+    subscribeAttachmentAccess,
+    getAttachmentAccessSnapshot,
+    getAttachmentAccessSnapshot,
+  );
+  useEffect(() => {
+    if (!hasPersistentNoteAttachmentReference(note.content) || !getAccessToken()) return;
+    void primeNoteAttachmentAccess(note.id, getBaseUrl()).catch((error) => {
+      console.warn("[HtmlPreviewPane] attachment access preparation failed:", error);
+    });
+  }, [note.id, note.content]);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const isFullDoc = isFullHtmlDocument(note.content);
@@ -220,7 +238,7 @@ const HtmlPreviewPane = forwardRef<NoteEditorHandle, NoteEditorProps>(
     // 不再套 ScrollArea，避免出现双重滚动条。
     if (isFullDoc) {
       const iframeSrc = prepareIframeHtml(
-        resolveHtmlPreviewAssetUrls(note.content, resolveAttachmentUrl, { fullDocument: true }),
+        resolveHtmlPreviewAssetUrls(note.content, resolveAttachmentUrl, { fullDocument: true, deferUnsignedAttachments: true }),
       );
       return (
         <div className="flex flex-col h-full overflow-hidden">
@@ -244,11 +262,16 @@ const HtmlPreviewPane = forwardRef<NoteEditorHandle, NoteEditorProps>(
     }
 
     // ── HTML 片段模式：dangerouslySetInnerHTML 渲染 ──
-    const cleanHtml = resolveHtmlPreviewAssetUrls(sanitize(note.content), resolveAttachmentUrl);
+    // 先中和外链图片地址再做净化：未签名的附件图先不发请求（避免 401 噪声），
+    // 等访问签名就绪后由下一次渲染补上。
+    const cleanHtml = resolveHtmlPreviewAssetUrls(note.content, resolveAttachmentUrl, {
+      deferUnsignedAttachments: true,
+      sanitizeHtml: sanitize,
+    });
 
     return (
-      <ScrollArea className="h-full">
-        <div className="max-w-4xl mx-auto px-6 py-8 md:px-10">
+      <ScrollArea className="h-full min-w-0">
+        <div className="w-full min-w-0 max-w-4xl mx-auto px-3 py-6 sm:px-6 sm:py-8 md:px-10">
           {/* 提示条 */}
           <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300">
             <Eye size={14} className="shrink-0" />

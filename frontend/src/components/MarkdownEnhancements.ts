@@ -277,7 +277,7 @@ export function isInternalProseMirrorHtml(html: string): boolean {
 }
 
 /**
- * Nowen Note 内部复制时，ProseMirror 会在 text/html 通道写入 data-pm-slice。
+ * Base Notes 内部复制时，ProseMirror 会在 text/html 通道写入 data-pm-slice。
  * TiptapEditor 的自定义 handlePaste 会优先用 text/plain 猜 Markdown / 代码，
  * 因而整篇 A → B 复制时可能在真正的 HTML 富文本分支之前 return，造成格式丢失。
  *

@@ -116,7 +116,11 @@ import { useUserPreferences, type MarkdownViewMode } from "@/hooks/useUserPrefer
 import { Note, Tag, type FileItem } from "@/types";
 import TagInput from "@/components/TagInput";
 import AIWritingAssistant from "@/components/AIWritingAssistant";
+import { commitMarkdownEncryptedRegion, prepareMarkdownEncryptedRegionEdit, prepareMarkdownSelectionEncryption } from "@/lib/encryptedNotes/blockAuthoring";
+import { markdownEncryptedBlocks } from "@/lib/encryptedNotes/blockDocument";
+import EncryptedBlockDialog from "./EncryptedBlockDialog";
 import { toast } from "@/lib/toast";
+
 import { copyText } from "@/lib/clipboard";
 import { openTaskQuickCapture } from "@/lib/taskInboxApi";
 import { findTextAction, type TextAction } from "@/lib/textActions";
@@ -143,6 +147,7 @@ import { NoteLinkMenu, type NoteSearchResult, type NoteLinkBlockItem, type NoteL
 import { buildWikiNoteLink, detectActiveWikiNoteQuery } from "@/lib/noteLinkSyntax";
 import { getMarkdownDailyRecordSlashCommands } from "@/components/daily-records/markdownDailyRecordSlashCommands";
 import { consumeBlockNavigation, subscribeBlockNavigation } from "@/lib/blockNavigation";
+import { requestVoiceMemo, voiceMemoHtml } from "@/lib/voiceMemo";
 import {
   toggleWrap,
   toggleHeading,
@@ -726,10 +731,43 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
    */
   const lastEmittedContentRef = useRef<string | null>(null);
 
-  // �����л��õ� Compartment
+  // 笔记切换用的 Compartment
   const themeCompartmentRef = useRef(new Compartment());
   const editableCompartmentRef = useRef(new Compartment());
   const searchPhraseCompartmentRef = useRef(new Compartment());
+  // 加密选区写入期间需要临时摘掉 history()，避免把中间态写入撤销栈
+  const historyCompartmentRef = useRef(new Compartment());
+  const collabUndoManagerRef = useRef<Y.UndoManager | null>(null);
+  const [encryptedRegion, setEncryptedRegion] = useState<{ source?: string; initialContent?: { plaintext: string; format: "markdown" }; commit: (source: string) => void } | null>(null);
+  useEffect(() => { setEncryptedRegion(null); }, [note.id]);
+  const openEncryptedRegion = () => {
+    const view = viewRef.current;
+    if (!view || !editable || isGuest || note.isTrashed) return;
+    const snapshot = view.state.doc; const noteId = note.id; const selection = view.state.selection.main;
+    try {
+      const block = markdownEncryptedBlocks(snapshot.toString()).find((item) => selection.from >= item.from && selection.to <= item.to);
+      if (!block && !selection.empty) {
+        const selected = prepareMarkdownSelectionEncryption(view, historyCompartmentRef.current);
+        setEncryptedRegion({ initialContent: selected, commit: (source) => {
+          if (noteRef.current.id !== noteId || viewRef.current !== view || noteRef.current.isTrashed) throw new Error("Encrypted selection changed");
+          selected.commit(source);
+          collabUndoManagerRef.current?.clear();
+        } });
+        return;
+      }
+      // 新区域必须从独立空行开始，绝不能落在已有代码围栏里。
+      const syntax = syntaxTree(view.state).resolveInner(selection.from, -1);
+      let insideFence = false;
+      for (let parent: typeof syntax | null = syntax; parent; parent = parent.parent) if (parent.name === "FencedCode" || parent.name === "CodeBlock") insideFence = true;
+      if (!block && (view.state.doc.lineAt(selection.from).text.trim() || insideFence)) {
+        toast.error("请在普通正文的空白行插入加密区域"); return;
+      }
+      setEncryptedRegion({ source: block?.source, commit: (source) => {
+        if (noteRef.current.id !== noteId || viewRef.current !== view || !view.state.facet(EditorView.editable) || view.state.doc !== snapshot) throw new Error("Encrypted region changed");
+        commitMarkdownEncryptedRegion(view, snapshot, { from: block?.from ?? selection.from, to: block?.to ?? selection.to, prefix: block?.prefix }, source);
+      } });
+    } catch { toast.error(selection.empty ? "加密区域格式无效，请保留原始密文" : "请选择普通文本，暂不支持图片、附件、链接或代码块内的选区。"); }
+  };
 
   // ���һ�δ��� pointer ʱ���������"ѡ�����ݴ������� Android ϵͳ���Ʋ˵�"�߼�
   const lastTouchAtRef = useRef<number>(0);
@@ -903,6 +941,25 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
     toast.success(tr("tiptap.attachmentLinkInserted", { defaultValue: "附件链接已插入" }));
   }, [closeAttachmentLibrary, tr]);
 
+  // 语音备忘：打开全局录音面板，录音完成后把 Markdown 音频片段插入当前选区。
+  const openVoiceRecorder = useCallback(() => {
+    const view = viewRef.current;
+    if (!view || !editable || isGuest || noteRef.current.isTrashed) return;
+    const noteId = noteRef.current.id;
+    const anchor = { from: view.state.selection.main.from, to: view.state.selection.main.to };
+    requestVoiceMemo({
+      noteId,
+      release: () => {},
+      insert: (attachment) => {
+        const current = viewRef.current;
+        if (noteRef.current.id !== noteId || noteRef.current.isTrashed || current !== view || !view.state.facet(EditorView.editable)) return false;
+        const snippet = `\n\n${voiceMemoHtml(attachment)}\n\n`;
+        view.dispatch({ changes: { from: anchor.from, to: anchor.to, insert: snippet }, selection: { anchor: anchor.from + snippet.length } });
+        return true;
+      },
+    });
+  }, [editable, isGuest]);
+
   // slash 菜单项：基础 Markdown、附件、AI 与日期日记命令共享同一个 CodeMirror 菜单。
   const slashItems: MdSlashItem[] = useMemo(
     () => [
@@ -911,12 +968,13 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
           triggerImagePicker();
         },
         onAttachmentLibrary: openAttachmentLibrary,
+        onVoiceRecord: editable && !isGuest && !note.isTrashed ? openVoiceRecorder : undefined,
         onAIAssistant: isGuest ? undefined : openAIAssistant,
       }),
       ...getMarkdownDailyRecordSlashCommands(),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tr, isGuest, openAIAssistant, openAttachmentLibrary],
+    [tr, isGuest, editable, note.isTrashed, openAIAssistant, openAttachmentLibrary, openVoiceRecorder],
   );
 
   // ---------- ͼƬ�ϴ����㹤����/б��/��ק/ճ���� ----------
@@ -1194,6 +1252,22 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         };
       },
       isReady: () => !!viewRef.current,
+      insertMarkdownAtCursor: (md: string) => {
+        const view = viewRef.current;
+        if (!view) return false;
+        try {
+          const selection = view.state.selection.main;
+          const from = selection.from;
+          const to = selection.to;
+          view.dispatch({
+            changes: { from, to, insert: md },
+            selection: { anchor: from + md.length },
+            scrollIntoView: true,
+          });
+          view.focus();
+          return true;
+        } catch { return false; }
+      },
       appendMarkdown: (md: string) => {
         const view = viewRef.current;
         if (!view) return false;
@@ -1255,7 +1329,9 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       });
       setWordStats(computeStats(text));
       onHeadingsChangeRef.current?.(extractHeadings(update.view));
-      if (!collabEnabledRef.current) {
+      // 协同态下不 REST 保存（避免与 CRDT 重复写）；但含密文标记的笔记必须走 REST——
+      // 这类笔记的 CRDT 已被禁用，若继续跳过保存，密文改动会丢。
+      if (!collabEnabledRef.current || /nowen-encrypted/i.test(text)) {
         scheduleSave();
       }
 
@@ -1334,22 +1410,24 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
     const state = EditorState.create({
       doc: initialDoc,
       extensions: [
-        // Phase 3: CRDT Эͬ��չ�������ã�
-        // yCollab ������ڿ�ǰ��λ�ã������ȴ��� doc ���
-        // P3-#14����ʽ���� UndoManager �ó������Ȱ�����ϲ���350ms window��
+        // Phase 3: CRDT 协同扩展（条件启用）
+        // yCollab 必须放在靠前的位置，否则等待存在 doc 之后
+        // P3-#14：显式创建 UndoManager 并调长撤销合并窗口到 350ms
         ...(collabEnabled && yDoc && awareness
           ? [yCollab(yDoc.getText("content"), awareness, {
-            undoManager: new Y.UndoManager(yDoc.getText("content"), { captureTimeout: 350 }),
+            undoManager: (collabUndoManagerRef.current = new Y.UndoManager(yDoc.getText("content"), { captureTimeout: 350 })),
           })]
           : []),
 
-        // �����༭����
+        // 基础编辑扩展
         lineNumbers({
-          // Ĭ�������кţ������� gutter������δ��װ��
+          // 默认不显示行号，仅保留 gutter（如需启用需另行安装）
           formatNumber: () => "",
         }),
         highlightActiveLineGutter(),
-        history(),
+        // history 走 compartment：加密选区写入期间需要临时禁用撤销记录，
+        // 避免把"中间态密文替换"写进撤销栈。
+        historyCompartmentRef.current.of(history()),
         drawSelection(),
         dropCursor(),
         EditorState.allowMultipleSelections.of(true),
@@ -1878,6 +1956,14 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
     setPreviewMarkdown(nextMarkdown);
   }, [editable]);
 
+  const handlePreviewCodeBlockFormat = useCallback(async (source: string, offset: number) => {
+    const view = viewRef.current;
+    if (!view || !editable) return;
+    const { formatMarkdownCodeBlock } = await import("@/lib/markdownCodeBlockFormatting");
+    await formatMarkdownCodeBlock(view, source, offset);
+    setPreviewMarkdown(view.state.doc.toString());
+  }, [editable]);
+
   // ---------- ��ǩ�仯 ----------
 
   const noteTags = useMemo(() => note.tags || [], [note.tags]);
@@ -1974,6 +2060,19 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       data-markdown-mobile-editing-compact={compactMobileEditing ? "true" : "false"}
       className="relative flex flex-col h-full overflow-hidden"
     >
+      {editable && !isGuest && !note.isTrashed && (
+        <button type="button" className="border-b border-app-border px-3 py-1 text-left text-xs text-tx-secondary" onClick={openEncryptedRegion}>
+          {tr("editor.encryptedBlock.insert") || "插入加密内容"}
+        </button>
+      )}
+      {encryptedRegion && (
+        <EncryptedBlockDialog
+          source={encryptedRegion.source}
+          initialContent={encryptedRegion.initialContent}
+          onCommit={encryptedRegion.commit}
+          onClose={() => setEncryptedRegion(null)}
+        />
+      )}
       {noteLinkMenu.open && (
         <NoteLinkMenu
           position={noteLinkMenu.position}
@@ -2366,6 +2465,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
               compact={viewMode === "split"}
               containerRef={previewRootRef}
               onTaskCheckboxChange={editable ? handlePreviewTaskCheckboxChange : undefined}
+              onFormatCodeBlock={editable ? handlePreviewCodeBlockFormat : undefined}
             />
           </div>
         )}

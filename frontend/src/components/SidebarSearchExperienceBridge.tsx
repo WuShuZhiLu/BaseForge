@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import KnowledgeTreePanel from "@/components/KnowledgeTreeCreateMenuRuntime";
 import KnowledgeTreeSortButton from "@/components/KnowledgeTreeSortButton";
+import NoteAppearanceBridge from "@/components/NoteAppearanceBridge";
 import TaskQuickCaptureBridge from "@/components/tasks/TaskQuickCaptureBridge";
 import {
   applySidebarSearchExperience,
@@ -314,6 +315,7 @@ export default function SidebarSearchExperienceBridge() {
   return (
     <>
       <style data-mobile-markdown-keyboard-layout="">{MOBILE_MARKDOWN_KEYBOARD_LAYOUT_CSS}</style>
+      <NoteAppearanceBridge />
       <TaskQuickCaptureBridge />
       {sortSlots.map((slot) => createPortal(
         <KnowledgeTreeSortButton />,

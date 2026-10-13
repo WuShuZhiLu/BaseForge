@@ -1,5 +1,5 @@
 /**
- * Nowen Note 数据备份与恢复系统
+ * Base Notes 数据备份与恢复系统
  *
  * 设计原则（P0/P1 重构后）：
  *  1. **真·全量备份**：full 备份是 zip 包，内容含
@@ -23,14 +23,30 @@
  */
 
 import fs from "fs";
+import { markSyncNeedsReconcile } from "../sync/bootstrap";
 import path from "path";
 import crypto from "crypto";
 import os from "os";
 import JSZip from "jszip";
 import Database from "better-sqlite3";
 import { closeDb, getDb, getDbSchemaVersion } from "../db/schema.js";
+import { requireSqliteVecForStoredTables } from "../db/sqlite-vec-extension.js";
 import { noteVersionsRepository } from "../repositories";
-import { createBackupFilename, createFullBackupArchive, hashFileSha256 } from "./backup-archive.js";
+import {
+  createBackupFilename,
+  createFullBackupArchive,
+  hashFileSha256,
+  scrubPluginStudioProjectsFromBackup,
+} from "./backup-archive.js";
+import {
+  auditAttachmentBackup,
+  replaceDirectoriesFromStagingSafe,
+  verifyStagedAttachmentStats,
+  type AttachmentRestoreAudit,
+} from "./backup-restore-integrity.js";
+import { probeAttachmentStorage } from "./attachment-storage.js";
+import { quarantineRestoredPlugins } from "../plugins/pluginService.js";
+import { quarantineRestoredAutomations } from "../automation/recovery.js";
 
 // ===== 常量 =====
 
@@ -269,6 +285,18 @@ export interface RestoreResult {
     tables: { name: string; willClear: number; willInsert: number }[];
     files: { attachments: number; fonts: number; plugins: number };
     schemaVersion: number;
+    backupType?: "full" | "db-only" | "legacy";
+    attachmentAudit?: {
+      metaCount: number | null;
+      metaBytes: number | null;
+      archiveCount: number;
+      stagedCount?: number;
+      stagedBytes?: number;
+      dbRows: number;
+      dbDistinctPaths: number;
+      missingDbPaths: string[];
+      objectStorageEnabled: boolean;
+    };
   };
 }
 
@@ -363,6 +391,7 @@ function checkSqliteIntegrity(dbPath: string, label: string): void {
   let db: Database.Database | null = null;
   try {
     db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    requireSqliteVecForStoredTables(db, label);
     const row = db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     if (row.integrity_check !== "ok") {
       throw new Error(`${label}完整性检查失败: ${row.integrity_check}`);
@@ -387,7 +416,25 @@ function verifyCurrentDbUsable(curDbPath: string): void {
   if (integrity !== "ok") {
     throw new Error(`恢复后完整性检查失败: ${integrity}`);
   }
-  // getDb() 会打开 WAL；验证完成后关闭并清理，避免失败路径残留旧 sidecar。
+
+  // A readable SQLite file is not enough: attachment upload also needs a writable DB.
+  // Use a SAVEPOINT-backed write probe so permissions/read-only mounts fail before restore
+  // is committed, while the probe leaves no persistent row behind.
+  try {
+    cur.exec("SAVEPOINT nowen_restore_write_probe");
+    cur.prepare(
+      `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)`,
+    ).run("backup:restore-write-probe", String(Date.now()));
+    cur.exec("ROLLBACK TO nowen_restore_write_probe");
+    cur.exec("RELEASE nowen_restore_write_probe");
+  } catch (error) {
+    try { cur.exec("ROLLBACK TO nowen_restore_write_probe"); } catch { /* ignore */ }
+    try { cur.exec("RELEASE nowen_restore_write_probe"); } catch { /* ignore */ }
+    throw new Error(
+      "恢复后数据库写入检查失败: " + (error instanceof Error ? error.message : String(error)),
+    );
+  }
+
   closeDb();
   cleanupWalShm(curDbPath);
 }
@@ -846,6 +893,7 @@ export class BackupManager {
       if (type === "db-only") {
         // SQLite 在线 backup —— 事务一致
         await db.backup(backupPath);
+        scrubPluginStudioProjectsFromBackup(backupPath);
       } else {
         await this.createFullBackup(backupPath, db, options.description);
       }
@@ -927,10 +975,15 @@ export class BackupManager {
     const tmpDb = path.join(os.tmpdir(), `nowen-fullbk-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`);
     try {
       await db.backup(tmpDb);
+      scrubPluginStudioProjectsFromBackup(tmpDb);
       // 2) 表行数（动态枚举，不再写死）
       const tables = listAllTables(db);
       const tableRowCounts: Record<string, number> = {};
       for (const t of tables) {
+        if (t.startsWith("plugin_studio_")) {
+          tableRowCounts[t] = 0;
+          continue;
+        }
         try {
           tableRowCounts[t] = (db.prepare(`SELECT COUNT(*) as c FROM ${t}`).get() as { c: number }).c;
         } catch {
@@ -1121,11 +1174,11 @@ export class BackupManager {
       const zip = await JSZip.loadAsync(bytes);
       const metaFile = zip.file("meta.json");
       if (!metaFile) {
-        throw new Error(".zip 内缺少 meta.json，非 nowen-note 全量备份格式");
+        throw new Error(".zip 内缺少 meta.json，非 Base Notes 全量备份格式");
       }
       const dbFile = zip.file("db.sqlite");
       if (!dbFile) {
-        throw new Error(".zip 内缺少 db.sqlite，非 nowen-note 全量备份格式");
+        throw new Error(".zip 内缺少 db.sqlite，非 Base Notes 全量备份格式");
       }
       let meta: {
         formatVersion?: number;
@@ -1144,7 +1197,7 @@ export class BackupManager {
           `无法导入：备份格式版本太高。`,
           `  备份调用的格式版本：${meta.formatVersion}`,
           `  当前程序支持的最高格式版本：${BACKUP_FORMAT_VERSION}`,
-          `  请升级 nowen-note 到该备份产生时的版本（或更新）后再导入。`,
+          `  请升级 Base Notes 到该备份产生时的版本（或更新）后再导入。`,
         ].join("\n"),
       );
     }
@@ -1204,21 +1257,52 @@ export class BackupManager {
     const isZip = buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b;
 
     try {
+      let result: RestoreResult;
       if (isZip) {
-        return await this.restoreFromZip(buf, !!opts.dryRun);
-      }
-      // 嗅探 JSON 全量备份（旧格式）
-      try {
-        const text = buf.toString("utf-8");
-        const obj = JSON.parse(text);
-        if (obj && obj.data && obj.version) {
-          return await this.restoreFromLegacyJson(obj, !!opts.dryRun);
+        result = await this.restoreFromZip(buf, !!opts.dryRun);
+      } else {
+        // 嗅探 JSON 全量备份（旧格式）
+        let legacy: RestoreResult | null = null;
+        try {
+          const text = buf.toString("utf-8");
+          const obj = JSON.parse(text);
+          if (obj && obj.data && obj.version) {
+            legacy = await this.restoreFromLegacyJson(obj, !!opts.dryRun);
+          }
+        } catch {
+          /* 不是 JSON，落到 db-only */
         }
-      } catch {
-        /* 不是 JSON，落到 db-only */
+        // 否则视为 db-only 快照：替换 DB 文件
+        result = legacy ?? await this.restoreFromDbOnly(filePath, !!opts.dryRun);
       }
-      // 否则视为 db-only 快照：替换 DB 文件
-      return await this.restoreFromDbOnly(filePath, !!opts.dryRun);
+
+      // 阶段 N：恢复成功后同步游标不再可信。
+      //
+      // 备份里的 sync_state 记录的是"备份那一刻已拉到哪个序号"。
+      // 恢复之后本地内容退回到过去，但服务端序号仍在前进 ——
+      // 沿用旧游标会让引擎认为"备份后到现在的远端变更都已应用"，
+      // 从而永久丢失这段时间其他设备的所有修改。
+      //
+      // 因此强制回到 needs_reconcile，下次同步走完整 Bootstrap 对账。
+      // 对账会逐实体比对而不是盲目覆盖，因此恢复旧备份**不会**把
+      // 服务端的新数据冲掉（第二十条）。
+      if (result.success && !opts.dryRun) {
+        // 恢复包中的第三方代码永不自动启用：迁入 quarantine，并清空所有授权。
+        quarantineRestoredPlugins();
+        quarantineRestoredAutomations();
+        try {
+          markSyncNeedsReconcile();
+        } catch (error) {
+          // 标记失败不能让恢复被判为失败 —— 数据已经恢复好了。
+          // 但要留下明确警告，否则用户可能在游标错误的状态下继续同步。
+          console.warn(
+            "[backup] 恢复成功但同步状态标记失败，请手动重置同步对账:",
+            (error as Error)?.message || error,
+          );
+        }
+      }
+
+      return result;
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -1238,7 +1322,7 @@ export class BackupManager {
           `无法恢复：备份格式版本高于当前程序。`,
           `  备份格式版本：${meta.formatVersion}（备份产生时间 ${meta.createdAt || "unknown"}）`,
           `  当前程序支持的最高格式版本：${BACKUP_FORMAT_VERSION}`,
-          `  请升级 nowen-note 到该备份产生时的版本或更新后再恢复；`,
+          `  请升级 Base Notes 到该备份产生时的版本或更新后再恢复；`,
           `  若仅需从该备份拼选数据，可在 https://github.com/ 查看项目 Releases 页获取对应版本。`,
         ].join("\n"),
       );
@@ -1257,8 +1341,8 @@ export class BackupManager {
           `  当前程序支持的最高 schema 版本：${codeMaxSchema}`,
           `  备份产生时间：${meta.createdAt || "unknown"}`,
           ``,
-          `原因：该备份是从更新版本的 nowen-note 产生的，错误地被灌到了旧程序。`,
-          `解决方案：升级 nowen-note 到与该备份同版或更新后再试。`,
+          `原因：该备份是从更新版本的 Base Notes 产生的，错误地被灌到了旧程序。`,
+          `解决方案：升级 Base Notes 到与该备份同版或更新后再试。`,
           `提示：不要手动修改 meta.json 来绕过此检查，将造成数据不一致。`,
         ].join("\n"),
       );
@@ -1266,6 +1350,10 @@ export class BackupManager {
 
     const dbFile = zip.file("db.sqlite");
     if (!dbFile) throw new Error("zip 备份缺少 db.sqlite");
+    const attachmentArchivePaths = Object.keys(zip.files)
+      .filter((name) => name.startsWith("attachments/") && !zip.files[name].dir)
+      .map((name) => name.slice("attachments/".length))
+      .filter((name) => name && name !== ".keep");
 
     if (dryRun) {
       // 干跑：从 zip 内 .db 临时打开，统计每张表 N 行
@@ -1287,10 +1375,12 @@ export class BackupManager {
       try {
         // 用 better-sqlite3 直接打开（独立连接）
         const Database = (await import("better-sqlite3")).default;
-        let tmp: InstanceType<typeof Database>;
+        let tmp: InstanceType<typeof Database> | null = null;
         try {
           tmp = new Database(tmpDb, { readonly: true });
+          requireSqliteVecForStoredTables(tmp, "备份预览");
         } catch (e) {
+          try { tmp?.close(); } catch { /* ignore */ }
           // 透传 SQLite 错误 + 临时路径，管理员可凭此定位 AV / 权限 / 路径问题
           throw new Error(
             `预览恢复失败：无法打开 zip 内的数据库快照（tmp=${tmpDb}）：${
@@ -1298,6 +1388,12 @@ export class BackupManager {
             }`,
           );
         }
+        if (!tmp) throw new Error("预览恢复失败：未能打开备份数据库");
+        const attachmentAudit = auditAttachmentBackup(
+          tmpDb,
+          attachmentArchivePaths,
+          meta.files?.attachments,
+        );
         const tables = listAllTables(tmp as unknown as ReturnType<typeof getDb>);
         const cur = getDb();
         const list = tables.map((name) => {
@@ -1321,6 +1417,8 @@ export class BackupManager {
               plugins: meta.files?.plugins?.count ?? 0,
             },
             schemaVersion: meta.schemaVersion ?? 1,
+            backupType: "full",
+            attachmentAudit,
           },
         };
       } finally {
@@ -1350,16 +1448,23 @@ export class BackupManager {
     );
     fs.writeFileSync(tmpDb, await dbFile.async("nodebuffer"));
     checkSqliteIntegrity(tmpDb, "备份文件");
+    let attachmentAudit: AttachmentRestoreAudit = auditAttachmentBackup(
+      tmpDb,
+      attachmentArchivePaths,
+      meta.files?.attachments,
+    );
 
     const stagingRoot = path.join(this.dataDir, `.nowen-restore-staging-${restoreId}`);
     const stagedAttDir = path.join(stagingRoot, "attachments");
     const stagedFontsDir = path.join(stagingRoot, "fonts");
-    const stagedPluginsDir = path.join(stagingRoot, "plugins");
+    const hasInstalledLayout = Object.keys(zip.files).some((name) => name.startsWith("plugins/installed/"));
+    const stagedPluginsDir = path.join(stagingRoot, hasInstalledLayout ? "plugins-installed" : "plugins-legacy");
 
     // 先解压到 staging，避免失败时直接清空正式附件/字体/插件目录。
     const attCount = await extractDirFromZip(zip, "attachments", stagedAttDir);
     const fntCount = await extractDirFromZip(zip, "fonts", stagedFontsDir);
-    const plgCount = await extractDirFromZip(zip, "plugins", stagedPluginsDir);
+    const plgCount = await extractDirFromZip(zip, hasInstalledLayout ? "plugins/installed" : "plugins", stagedPluginsDir);
+    attachmentAudit = verifyStagedAttachmentStats(stagedAttDir, attachmentAudit);
 
     const curDbPath = getDbPath();
     const safetyBak = curDbPath + `.before-restore.${Date.now()}.bak`;
@@ -1376,11 +1481,19 @@ export class BackupManager {
       verifyCurrentDbUsable(curDbPath);
 
       // DB 已验证可用后，再安全替换文件目录；任一步失败都回滚 DB。
-      replaceDirectoriesFromStaging([
+      await replaceDirectoriesFromStagingSafe([
         { stagedDir: stagedAttDir, destDir: path.join(this.dataDir, "attachments") },
         { stagedDir: stagedFontsDir, destDir: path.join(this.dataDir, "fonts") },
-        { stagedDir: stagedPluginsDir, destDir: path.join(this.dataDir, "plugins") },
-      ], restoreId);
+        { stagedDir: stagedPluginsDir, destDir: hasInstalledLayout ? path.join(this.dataDir, "plugins", "installed") : path.join(this.dataDir, "plugins") },
+      ], restoreId, async () => {
+        const health = await probeAttachmentStorage();
+        if (!health.ok) {
+          throw new Error(
+            "附件存储健康检查失败 [" + (health.code || "ATTACHMENT_STORAGE_NOT_WRITABLE") + "]: "
+            + (health.error || "unknown storage error"),
+          );
+        }
+      });
     } catch (e) {
       rollbackDb(curDbPath, safetyBak, e);
     } finally {
@@ -1404,10 +1517,23 @@ export class BackupManager {
       }
     }
 
+    const pluginSecretKeyEntry = zip.file(".plugin_secret_key");
+    if (pluginSecretKeyEntry) {
+      const pluginSecretKeyPath = path.join(this.dataDir, ".plugin_secret_key");
+      fs.writeFileSync(pluginSecretKeyPath, await pluginSecretKeyEntry.async("nodebuffer"));
+      try { fs.chmodSync(pluginSecretKeyPath, 0o600); } catch { /* Windows */ }
+    } else {
+      // 没有配套密钥的密文不可恢复；显式清空，避免误用当前机器的另一把密钥。
+      try { getDb().prepare("DELETE FROM plugin_secrets").run(); } catch { /* 老备份没有插件表 */ }
+    }
+
     const stats: Record<string, number> = {
       attachments: attCount,
       fonts: fntCount,
       plugins: plgCount,
+      attachmentDbRows: attachmentAudit.dbRows,
+      attachmentDistinctPaths: attachmentAudit.dbDistinctPaths,
+      attachmentBytes: attachmentAudit.stagedBytes ?? 0,
     };
     for (const [t, n] of Object.entries(meta.tables ?? {})) {
       stats[t] = typeof n === "number" ? n : -1;
@@ -1477,6 +1603,12 @@ export class BackupManager {
       // 用 readonly 临时打开备份 DB，统计行数
       const Database = (await import("better-sqlite3")).default;
       const tmp = new Database(filePath, { readonly: true });
+      try {
+        requireSqliteVecForStoredTables(tmp, "备份预览");
+      } catch (error) {
+        tmp.close();
+        throw error;
+      }
       const tables = listAllTables(tmp as unknown as ReturnType<typeof getDb>);
       const cur = getDb();
       const list = tables.map((name) => {
@@ -1496,6 +1628,7 @@ export class BackupManager {
           tables: list,
           files: { attachments: 0, fonts: 0, plugins: 0 },
           schemaVersion: 1,
+          backupType: "db-only",
         },
       };
     }
@@ -1674,7 +1807,7 @@ export class BackupManager {
     const tooLarge = stat.size > EMAIL_ATTACHMENT_LIMIT;
 
     const lines = [
-      `这是一封由 nowen-note 自动发送的备份完成通知。`,
+      `这是一封由 Base Notes 自动发送的备份完成通知。`,
       ``,
       `备份文件：${filename}`,
       `大小：${sizeMB} MB`,
@@ -1697,7 +1830,7 @@ export class BackupManager {
 
     const result = await sendMail({
       to,
-      subject: `[nowen-note] 自动备份 ${filename}`,
+      subject: `[Base Notes] 自动备份 ${filename}`,
       text: lines.join("\n"),
       attachments,
     });
@@ -1822,7 +1955,7 @@ export class BackupManager {
         return;
       }
       const lines = [
-        `nowen-note 备份链路连续失败 ${this.health.consecutiveFailures} 次，已进入降级状态。`,
+        `Base Notes 备份链路连续失败 ${this.health.consecutiveFailures} 次，已进入降级状态。`,
         ``,
         `最近失败时间：${this.health.lastFailureAt || new Date().toISOString()}`,
         `失败原因：${reason}`,
@@ -1833,7 +1966,7 @@ export class BackupManager {
       ];
       const result = await sendMail({
         to: cfg.emailTo,
-        subject: `[nowen-note] 备份连续失败告警（${this.health.consecutiveFailures} 次）`,
+        subject: `[Base Notes] 备份连续失败告警（${this.health.consecutiveFailures} 次）`,
         text: lines.join("\n"),
       });
       if (result.success) {

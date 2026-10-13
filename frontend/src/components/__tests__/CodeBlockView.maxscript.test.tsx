@@ -2,6 +2,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCodeBlockLowlight } from "@/lib/codeBlockLowlight";
+import i18n from "@/i18n";
 
 vi.mock("@tiptap/react", () => ({
   NodeViewWrapper: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
@@ -13,6 +14,11 @@ vi.mock("@/components/MermaidView", () => ({
 }));
 
 import { CodeBlockView } from "@/components/CodeBlockView";
+
+  beforeEach(async () => {
+    // 本文件的 DOM 定位依赖中文 title（切换语言），需固定 i18n 语言
+    await i18n.changeLanguage("zh-CN");
+  });
 
 describe("CodeBlockView MAXScript language picker", () => {
   const roots: Array<ReturnType<typeof createRoot>> = [];

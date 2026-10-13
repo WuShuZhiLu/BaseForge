@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, FileCode, FileType2, CloudDownload } from "lucide-react";
+import { FileText, FileCode, FileType2, CloudDownload, Lock, Table2 } from "lucide-react";
 import {
   cancelNewNoteTitleFocus,
   requestNewNoteTitleFocus,
 } from "@/lib/noteTitleFocus";
+import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
 
 export type NoteType = "normal" | "markdown" | "word" | "yuque";
 
@@ -12,6 +13,10 @@ export interface CreateNoteMenuProps {
   onPick: (type: NoteType) => void | Promise<void>;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLElement | null>;
+  /** 加密笔记归属的知识树父节点；为空表示建在根级。 */
+  encryptedParentId?: string | null;
+  /** 新建轻量表格：由调用方负责创建知识树 sheet 节点并跳转。 */
+  onCreateSheet?: () => void | Promise<void>;
 }
 
 /**
@@ -23,8 +28,9 @@ export interface CreateNoteMenuProps {
  *   - 新建 Markdown 笔记（原生 Markdown 编辑器）
  *   - 导入 Word 文档（.docx 转可编辑笔记）
  */
-export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNoteMenuProps) {
+export default function CreateNoteMenu({ onPick, onClose, anchorRef, encryptedParentId = null, onCreateSheet }: CreateNoteMenuProps) {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [encryptedParent, setEncryptedParent] = useState<{ parentId: string | null } | null>(null);
 
   useEffect(() => {
     const compute = () => {
@@ -52,7 +58,7 @@ export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNot
 
   if (!pos) return null;
 
-  const items = [
+  const items: Array<{ id: NoteType | "encrypted" | "sheet"; label: string; desc: string; icon: React.ReactNode }> = [
     {
       id: "normal" as NoteType,
       label: "新建笔记",
@@ -66,6 +72,12 @@ export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNot
       icon: <FileCode size={14} />,
     },
     {
+      id: "sheet" as const,
+      label: "新建轻量表格",
+      desc: "类电子表格，支持行列 / 筛选 / 导入导出",
+      icon: <Table2 size={14} />,
+    },
+    {
       id: "word" as NoteType,
       label: "导入 Word 文档",
       desc: "选择 .docx 转为可编辑笔记",
@@ -77,9 +89,17 @@ export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNot
       desc: "通过 Token 批量导入云端文档",
       icon: <CloudDownload size={14} />,
     },
+    {
+      id: "encrypted",
+      label: "新建加密笔记",
+      desc: "设置密码，服务端零知识加密",
+      icon: <Lock size={14} />,
+    },
   ];
 
-  return createPortal(
+  return (
+    <>
+      {createPortal(
     <div
       onMouseDown={(e) => { if (e.target === e.currentTarget) { e.preventDefault(); onClose(); } }}
       onContextMenu={(e) => { e.preventDefault(); onClose(); }}
@@ -102,6 +122,18 @@ export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNot
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              if (it.id === "sheet") {
+                onClose();
+                void Promise.resolve(onCreateSheet?.()).catch((err) => {
+                  console.error("Failed to create sheet:", err);
+                });
+                return;
+              }
+              if (it.id === "encrypted") {
+                onClose();
+                setEncryptedParent({ parentId: encryptedParentId ?? null });
+                return;
+              }
               const focusRequestId =
                 it.id === "word" || it.id === "yuque" ? null : requestNewNoteTitleFocus();
               onClose();
@@ -122,5 +154,10 @@ export default function CreateNoteMenu({ onPick, onClose, anchorRef }: CreateNot
       </div>
     </div>,
     document.body,
+      )}
+      {encryptedParent && (
+        <EncryptedNoteCreateDialog parentId={encryptedParent.parentId} onClose={() => setEncryptedParent(null)} />
+      )}
+    </>
   );
 }

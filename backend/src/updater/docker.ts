@@ -277,7 +277,7 @@ export async function findManagedContainer(): Promise<DockerContainerInspect> {
         ? runningMatches[0]
         : null;
   if (!selected) {
-    throw new Error(`受管 Nowen Note 活动容器无法唯一确定：候选 ${list.length} 个`);
+    throw new Error(`受管 Base Notes 活动容器无法唯一确定：候选 ${list.length} 个`);
   }
   const container = await inspectContainer(selected.Id);
   assertManagedContainer(container);
@@ -291,7 +291,7 @@ export function assertManagedContainer(container: DockerContainerInspect): void 
     labels["com.nowen-note.role"] === "app" &&
     labels["com.nowen-note.project"] === "nowen-note" &&
     labels["com.nowen-note.instance"] === MANAGED_INSTANCE;
-  if (!valid) throw new Error("目标容器缺少 Nowen Note 受管标签，已拒绝操作");
+  if (!valid) throw new Error("目标容器缺少 Base Notes 受管标签，已拒绝操作");
 
   const configuredImage = container.Config.Image || "";
   if (!configuredImage.startsWith(`${OFFICIAL_IMAGE_REPOSITORY}:`) && !configuredImage.startsWith(`${OFFICIAL_IMAGE_REPOSITORY}@`)) {

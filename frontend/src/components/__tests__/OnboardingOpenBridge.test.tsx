@@ -63,9 +63,9 @@ beforeEach(() => {
     id: onboardingWelcomeNoteId(user.id),
     userId: user.id,
     notebookId: `onboarding-v1-${user.id}-zh`,
-    title: "欢迎使用 Nowen Note",
-    content: "# 欢迎使用 Nowen Note",
-    contentText: "欢迎使用 Nowen Note",
+    title: "欢迎使用 Base Notes",
+    content: "# 欢迎使用 Base Notes",
+    contentText: "欢迎使用 Base Notes",
     contentFormat: "markdown",
     version: 1,
     createdAt: "2026-08-01T00:00:00.000Z",
@@ -94,7 +94,7 @@ describe("OnboardingOpenBridge", () => {
       expect(mocks.api.getNoteSlim).toHaveBeenCalledWith(expectedId);
       expect(mocks.api.getNote).toHaveBeenCalledWith(expectedId);
       expect(mocks.actions.setActiveNote).toHaveBeenCalledWith(
-        expect.objectContaining({ id: expectedId, title: "欢迎使用 Nowen Note" }),
+        expect.objectContaining({ id: expectedId, title: "欢迎使用 Base Notes" }),
       );
       expect(mocks.actions.setSelectedNotebook).toHaveBeenCalledWith(
         "onboarding-v1-user-1-zh",

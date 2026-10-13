@@ -2,6 +2,7 @@ import {
   reportTransientNoteImageSource,
   stabilizeNoteContentForPersistence,
 } from "@/lib/noteContentPersistence";
+import { assertConversionAttachments, convertedNoteVersion } from "./encryptedNotes/conversionBarrier";
 
 const DRAFT_KEY_PREFIX = "nowen-draft-";
 const DRAFT_INDEX_KEY = "nowen-draft-index";
@@ -131,6 +132,8 @@ function removeDraftNow(noteId: string): void {
 
 export function saveDraft(draft: NoteDraft): void {
   if (!draft.noteId || draft.noteId.startsWith("local-")) return;
+  // Ordinary drafts must never resurrect a confirmed converted body.
+  assertConversionAttachments(draft.noteId);
   let stableDraft = draft;
   try {
     const content = stabilizeNoteContentForPersistence(
@@ -172,6 +175,7 @@ export function markDraftAcknowledged(input: DraftAcknowledgement): void {
 
 export function loadDraft(noteId: string): NoteDraft | null {
   if (!noteId) return null;
+  if (convertedNoteVersion(noteId) !== null) return null;
   const draft = readRawDraft(noteId);
   if (!draft) return null;
   if (Date.now() - draft.savedAt > MAX_AGE_MS) {
@@ -227,6 +231,26 @@ export function clearDraft(noteId: string): boolean {
 /** Explicit user/system discard path. Never use this for an asynchronous save response. */
 export function forceClearDraft(noteId: string): void {
   removeDraftNow(noteId);
+}
+
+/** 仅用于转换流程的丢弃：存储失败需抛出，并清掉内存中的 ACK。 */
+export function clearDraftForEncryptionConversion(noteId: string): void {
+  const ids = inspectDraftIndexForEncryptionConversion();
+  cancelPendingClear(noteId);
+  acknowledgements.delete(noteId);
+  localStorage.removeItem(keyOf(noteId));
+  const remaining = ids.filter((id) => id !== noteId);
+  if (remaining.length) localStorage.setItem(DRAFT_INDEX_KEY, JSON.stringify(remaining));
+  else localStorage.removeItem(DRAFT_INDEX_KEY);
+  if (localStorage.getItem(keyOf(noteId)) !== null || inspectDraftIndexForEncryptionConversion().includes(noteId)) throw new Error("DRAFT_CLEANUP_FAILED");
+}
+
+/** 删除任何存储前先校验；与 getIndex 不同，索引损坏视为错误。 */
+export function inspectDraftIndexForEncryptionConversion(): string[] {
+  const raw = localStorage.getItem(DRAFT_INDEX_KEY);
+  const ids: unknown = raw === null ? [] : JSON.parse(raw);
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string")) throw new Error("INVALID_DRAFT_INDEX");
+  return ids;
 }
 
 function pruneOldest(): void {

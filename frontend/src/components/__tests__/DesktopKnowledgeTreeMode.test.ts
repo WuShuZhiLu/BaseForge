@@ -50,13 +50,13 @@ describe("desktop knowledge tree browsing mode", () => {
   });
 
   it("shows the Ctrl+K search hint only in desktop quick browse", () => {
-    expect(quickPanelSource).toContain('variant === "desktop" && (');
+    expect(quickPanelSource).toContain('variant === "desktop" && !compactToolbar && (');
     expect(quickPanelSource).toContain('aria-label="快捷键 Ctrl+K"');
     expect(quickPanelSource).toContain("Ctrl K");
   });
 
   it("reveals quick-browse row actions only on hover outside mobile", () => {
-    expect(quickPanelSource).toContain('const actionVisibility = variant === "mobile" ? "flex" : "hidden group-hover:flex";');
+    expect(quickPanelSource).toContain('const actionVisibility = multiSelectMode ? "hidden" : variant === "mobile" ? "flex" : "hidden group-hover:flex";');
     expect(quickPanelSource.match(/actionVisibility/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
@@ -72,15 +72,15 @@ describe("desktop knowledge tree browsing mode", () => {
   it("shows the current workspace notebook count in both desktop tree modes", () => {
     expect(treePanelSource).toContain('data-knowledge-tree-notebook-count=""');
     expect(quickPanelSource).toContain('data-mobile-knowledge-tree-notebook-count=""');
-    expect(treePanelSource).toContain('aria-label={`当前空间共 ${ownedNotebookCount} 个笔记本`}');
-    expect(quickPanelSource).toContain('aria-label={`当前空间共 ${ownedNotebookCount} 个笔记本`}');
+    expect(treePanelSource).toContain('aria-label={`当前空间共 ${ownedNoteCount} 条笔记`}');
+    expect(quickPanelSource).toContain('aria-label={`当前空间共 ${ownedNoteCount} 条笔记`}');
   });
 
   it("shows descendant note counts on first-level directory rows", () => {
     expect(treePanelSource).toContain('data-knowledge-tree-first-level-note-count=""');
     expect(quickPanelSource).toContain('data-mobile-knowledge-tree-first-level-note-count=""');
-    expect(treePanelSource).toContain("buildFirstLevelNoteCounts(nodes)");
-    expect(quickPanelSource).toContain("buildFirstLevelNoteCounts(nodes)");
+    expect(treePanelSource).toContain("buildFirstLevelNoteCounts(visibleNodes)");
+    expect(quickPanelSource).toContain("buildFirstLevelNoteCounts(visibleNodes)");
   });
 
   it("hides first-level note counts on mouse hover only", () => {

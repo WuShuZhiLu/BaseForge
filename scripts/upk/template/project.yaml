@@ -30,12 +30,12 @@ parameters:
         description: 用于存储数据库、附件、备份的持久化目录（例如 /volume1/AppData/nowen-note）
 i18n:
   en-US:
-    name: Nowen Note
+    name: Base Notes
     description: Self-hosted, privacy-first markdown notes with AI assistance, attachments, full-text search and one-click backup.
-    author: Nowen Note
+    author: Base Notes
     official: https://github.com/nowen-note/nowen-note
     help: https://github.com/nowen-note/nowen-note/blob/main/README.en.md
-    publisher: Nowen Note
+    publisher: Base Notes
     publisher_link: https://github.com/nowen-note/nowen-note
   zh-CN:
     name: 弄文笔记

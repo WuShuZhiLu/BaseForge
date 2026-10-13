@@ -6,12 +6,18 @@ import { setRuntimePublicWebOrigin } from "@/lib/publicWebOrigin";
 export interface SiteConfig {
   title: string;
   favicon: string;
+  /** 分享页底部标识文字；空串表示使用默认标识。 */
+  shareFooterText: string;
   /** ICP 备案号；由 Docker/运行时环境变量 NOWEN_ICP_BEIAN 提供。 */
   icpBeian: string;
   /** 公开分享最终使用的 Web 根地址；空串表示继续走构建变量/当前 origin 兜底。 */
   publicWebOrigin: string;
   /** settings / environment / current，用于分享弹窗解释地址来源。 */
   publicWebOriginSource: string;
+  /** 文件/图床复制直链专用地址；空串表示继承 publicWebOrigin。 */
+  filePublicOrigin: string;
+  /** settings / environment / inherit。 */
+  filePublicOriginSource: string;
   editorFontFamily: string; // 空串=默认(Inter), 自定义字体 id, 或内置字体名
   // 注：v6 起，"个人空间导出/导入"不再是站点级全站开关；它已下沉为 users 表
   // 的 personalExportEnabled / personalImportEnabled 两列，由管理员在
@@ -22,9 +28,12 @@ export interface SiteConfig {
 const DEFAULT_CONFIG: SiteConfig = {
   title: "nowen-note",
   favicon: "",
+  shareFooterText: "",
   icpBeian: "",
   publicWebOrigin: "",
   publicWebOriginSource: "current",
+  filePublicOrigin: "",
+  filePublicOriginSource: "inherit",
   editorFontFamily: "",
 };
 
@@ -43,8 +52,9 @@ export function getBuiltinFontName(font: typeof BUILTIN_FONTS[number]): string {
 
 interface SiteSettingsContextValue {
   siteConfig: SiteConfig;
-  updateSiteConfig: (title: string, favicon: string) => Promise<void>;
+  updateSiteConfig: (title: string, favicon: string, shareFooterText?: string) => Promise<void>;
   updatePublicWebOrigin: (origin: string) => Promise<void>;
+  updateFilePublicOrigin: (origin: string) => Promise<void>;
   updateEditorFont: (fontId: string) => Promise<void>;
   isLoaded: boolean;
 }
@@ -53,6 +63,7 @@ const SiteSettingsContext = createContext<SiteSettingsContextValue>({
   siteConfig: DEFAULT_CONFIG,
   updateSiteConfig: async () => {},
   updatePublicWebOrigin: async () => {},
+  updateFilePublicOrigin: async () => {},
   updateEditorFont: async () => {},
   isLoaded: false,
 });
@@ -122,9 +133,12 @@ function toSiteConfig(data: any, previous: SiteConfig = DEFAULT_CONFIG): SiteCon
   return {
     title: data?.site_title || "nowen-note",
     favicon: data?.site_favicon || "",
+    shareFooterText: data?.site_share_footer_text || "",
     icpBeian: data?.site_icp_beian || previous.icpBeian || "",
     publicWebOrigin: data?.site_public_web_origin || "",
     publicWebOriginSource: data?.site_public_web_origin_source || "current",
+    filePublicOrigin: data?.site_file_public_origin || "",
+    filePublicOriginSource: data?.site_file_public_origin_source || "inherit",
     editorFontFamily: data?.editor_font_family || previous.editorFontFamily || "",
   };
 }
@@ -175,10 +189,11 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener(SERVER_URL_CHANGED_EVENT, handleServerUrlChanged);
   }, [loadSiteSettings]);
 
-  const updateSiteConfig = useCallback(async (title: string, favicon: string) => {
+  const updateSiteConfig = useCallback(async (title: string, favicon: string, shareFooterText?: string) => {
     const data = await api.updateSiteSettings({
       site_title: title,
       site_favicon: favicon,
+      site_share_footer_text: shareFooterText,
     });
     const config = toSiteConfig(data, siteConfig);
     applyRuntimePublicOrigin(config);
@@ -195,6 +210,13 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
       applyRuntimePublicOrigin(config);
       return config;
     });
+  }, []);
+
+  const updateFilePublicOrigin = useCallback(async (origin: string) => {
+    const data = await api.updateSiteSettings({
+      site_file_public_origin: origin,
+    } as any);
+    setSiteConfig((previous) => toSiteConfig(data, previous));
   }, []);
 
   const updateEditorFont = useCallback(async (fontId: string) => {
@@ -220,7 +242,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
   }, [siteConfig]);
 
   return (
-    <SiteSettingsContext.Provider value={{ siteConfig, updateSiteConfig, updatePublicWebOrigin, updateEditorFont, isLoaded }}>
+    <SiteSettingsContext.Provider value={{ siteConfig, updateSiteConfig, updatePublicWebOrigin, updateFilePublicOrigin, updateEditorFont, isLoaded }}>
       {children}
     </SiteSettingsContext.Provider>
   );

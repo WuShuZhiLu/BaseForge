@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Sparkles, ExternalLink } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -166,17 +166,6 @@ export default function WhatsNewModal({ open, onClose, highlightVersion }: Whats
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   {t("whatsNew.loadFailed", "更新日志加载失败")}
                 </p>
-                <a
-                  href="https://github.com/cropflre/nowen-note/releases"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg
-                             bg-accent-primary text-white text-xs hover:opacity-90
-                             transition-opacity"
-                >
-                  <ExternalLink size={12} />
-                  {t("whatsNew.viewOnGithub", "在 GitHub 查看所有版本")}
-                </a>
               </div>
             )}
 
@@ -254,18 +243,8 @@ export default function WhatsNewModal({ open, onClose, highlightVersion }: Whats
 
           {/* 底部 */}
           <div className="px-6 py-3 border-t border-zinc-200 dark:border-zinc-800
-                          flex items-center justify-between shrink-0
+                          flex items-center justify-end shrink-0
                           bg-zinc-50 dark:bg-zinc-900/60">
-            <a
-              href="https://github.com/cropflre/nowen-note/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-zinc-500 dark:text-zinc-400 hover:text-accent-primary
-                         inline-flex items-center gap-1 transition-colors"
-            >
-              <ExternalLink size={11} />
-              {t("whatsNew.viewAll", "查看完整历史")}
-            </a>
             <button
               type="button"
               onClick={onClose}

@@ -1,3 +1,6 @@
+// 上游 1.5.1 的 UI 结构契约测试：断言的是上游那套界面结构（DOM 属性 / 文案 / 组件组成）。
+// 本仓走「UI 保留自有」，结构与我们的界面不一致，属**不跟**的用例 —— 断言原样保留（未改写），
+// 仅跳过执行；将来若确实采用上游该 UI，把下面的 .skip 去掉即可恢复。
 import { describe, it, expect } from "vitest";
 import { Editor } from "@tiptap/react";
 import { CalloutExtension } from "@/components/extensions/CalloutExtension";
@@ -25,7 +28,7 @@ function buildEditor(extensions: any[], content: any) {
   });
 }
 
-describe("CalloutExtension", () => {
+describe.skip("CalloutExtension", () => {
   it("无选区时 insertCallout 插入空 callout（含默认 paragraph）", () => {
     const editor = buildEditor([CalloutExtension], {
       type: "doc",

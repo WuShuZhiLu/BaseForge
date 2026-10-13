@@ -68,6 +68,8 @@ import { useApp, useAppActions } from "@/store/AppContext";
 import { toast } from "@/lib/toast";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
 import { copyText } from "@/lib/clipboard";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { buildPublicAttachmentUrl } from "@/lib/publicAttachmentUrl";
 import { downloadAttachment } from "@/lib/downloadFile";
 import {
   formatImageHostSnippet,
@@ -882,11 +884,17 @@ export default function FileManager() {
   // 实际复制走 lib/clipboard.copyText（含 secureContext + textarea 双路降级），
   // 比之前直接 navigator.clipboard.writeText 兼容性更好。
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { siteConfig } = useSiteSettings();
+  // 分享链接应指向公开文件源（若已配置），否则回退到当前 API 源——避免把内网/临时地址发出去。
+  const publicAttachmentOptions = useMemo(() => ({
+    filePublicOrigin: siteConfig.filePublicOrigin,
+    publicWebOrigin: siteConfig.publicWebOrigin,
+  }), [siteConfig.filePublicOrigin, siteConfig.publicWebOrigin]);
 
   /** 把附件信息按指定格式（URL / Markdown / HTML）复制到剪贴板。 */
   const copySnippet = useCallback(
     async (item: { id: string; filename: string; url: string }, format: ImageHostFormat = "url") => {
-      const full = resolveAttachmentUrl(item.url);
+      const full = buildPublicAttachmentUrl(resolveAttachmentUrl(item.url), publicAttachmentOptions);
       const snippet = formatImageHostSnippet(format, full, item.filename);
       const ok = await copyText(snippet);
       if (ok) {
@@ -897,7 +905,7 @@ export default function FileManager() {
         toast.error("复制失败，请检查浏览器剪贴板权限");
       }
     },
-    [],
+    [publicAttachmentOptions],
   );
 
   /** 旧 API 兼容：默认复制纯 URL（GridCard 主按钮 / ListView 都还在用这个名字）。 */

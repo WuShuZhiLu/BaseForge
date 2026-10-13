@@ -324,7 +324,7 @@ done
 if [ "$TARGETS_EXPLICIT" = "0" ] && [ "$BUILD_ONLY" = "0" ] && [ "$ASSUME_YES" = "0" ]; then
     echo
     echo "${C_BOLD}${C_CYAN}╔════════════════════════════════════════╗${C_RESET}"
-    echo "${C_BOLD}${C_CYAN}║     Nowen Note 发布向导               ║${C_RESET}"
+    echo "${C_BOLD}${C_CYAN}║     Base Notes 发布向导               ║${C_RESET}"
     echo "${C_BOLD}${C_CYAN}╚════════════════════════════════════════╝${C_RESET}"
 
     # ======== 第 1 步：选择发布目标 ========
@@ -2221,7 +2221,7 @@ if [ "$HAS_ANDROID" = "1" ]; then
     if [ "$DRY_RUN" != "1" ]; then
         APK_SRC="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/app-release.apk"
         if [ -f "$APK_SRC" ]; then
-            APK_OUT="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/Nowen-Note-${VERSION}.apk"
+            APK_OUT="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/Base-Notes-${VERSION}.apk"
             cp -f "$APK_SRC" "$APK_OUT"
             ANDROID_ARTIFACTS+=( "$APK_OUT" )
             info "APK: $APK_OUT"

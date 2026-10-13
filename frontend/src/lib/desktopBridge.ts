@@ -78,12 +78,30 @@ export interface UpdaterPayload {
   message?: string;
 }
 
+/** Lite → full 本地化迁移进度。 */
+export interface LiteMigrationProgress {
+  stage: "pending" | "auth_required" | "preparing" | "downloading" | "applying" | "attachments" | "verifying" | "switching" | "complete" | "failed";
+  downloaded?: number;
+  applied?: number;
+  attachmentsDone?: number;
+  attachmentsPending?: number;
+  error?: string | null;
+}
+
+export interface LiteMigrationResult {
+  ok: boolean;
+  status?: number;
+  progress?: LiteMigrationProgress;
+  error?: string;
+}
+
 export interface AppInfo {
   version: string;
   name: string;
   platform: string;
   arch: string;
   mode?: "full" | "lite";
+  runtime?: "local" | "remote";
   hideMenuBar?: boolean;
   // SEC-ELECTRON-01-C: 敏感字段可选，由 getDiagnosticsInfo 获取
   userData?: string;
@@ -332,6 +350,8 @@ interface NowenDesktopAPI {
   getLocalAuth?: () => Promise<{ token: string; refreshToken?: string; user: unknown } | null>;
   clearLocalAuth?: () => Promise<{ ok: boolean }>;
   resetLocalAuth?: () => Promise<{ ok: boolean; token?: string; refreshToken?: string; user?: unknown; error?: string }>;
+  startLiteMigration?: (serverUrl: string, token: string) => Promise<LiteMigrationResult>;
+  getLiteMigrationProgress?: () => Promise<LiteMigrationResult>;
   isDesktop: true;
   platform: string;
   /**
@@ -427,6 +447,12 @@ export function onFormatMenu(
   return bridge.on("menu:format", (p) => handler((p as FormatMenuPayload) ?? {}));
 }
 
+/** 订阅原生窗口失焦/后台触发的加密区域自动锁定事件 */
+export function onEncryptedAutoLock(handler: () => void): () => void {
+  const bridge = getBridge();
+  return bridge ? bridge.on("security:auto-lock", handler) : () => {};
+}
+
 /** 订阅自动更新事件 */
 export function onUpdaterStatus(
   handler: (payload: UpdaterPayload) => void
@@ -493,6 +519,20 @@ export async function changeDesktopServer(): Promise<{ ok: boolean; reason?: str
   const bridge = getBridge();
   if (!bridge?.mode?.changeServer) return { ok: false, reason: "not-supported" };
   return bridge.mode.changeServer();
+}
+
+/** 启动 lite → full 的数据本地化迁移（旧版本桌面端 preload 可能不提供）。 */
+export async function startLiteMigration(serverUrl: string, token: string): Promise<LiteMigrationResult> {
+  const bridge = getBridge();
+  if (!bridge?.startLiteMigration) return { ok: false, error: "当前桌面端不支持数据本地化迁移" };
+  return bridge.startLiteMigration(serverUrl, token);
+}
+
+/** 查询数据本地化迁移进度。 */
+export async function getLiteMigrationProgress(): Promise<LiteMigrationResult> {
+  const bridge = getBridge();
+  if (!bridge?.getLiteMigrationProgress) return { ok: false, error: "当前桌面端不支持数据本地化迁移" };
+  return bridge.getLiteMigrationProgress();
 }
 
 /** 订阅文件关联：双击 .md 时触发 */

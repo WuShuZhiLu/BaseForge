@@ -28,4 +28,10 @@ describe("note link syntax", () => {
     expect(html).toContain("data-nowen-block-embed");
     expect(html).toContain(`\`\`\`md\n[[note:${ID}]]`);
   });
+  it("converts mind map embeds to block-embed placeholders, including fenced code", () => {
+    const md = `前文\n\n![[mindmap:${ID}]]\n\n\`\`\`md\n![[mindmap:${ID}]]\n\`\`\``;
+    const html = preprocessInternalNoteLinks(md);
+    expect(html).toContain(`<div data-nowen-block-embed="mindmap:${ID}"></div>`);
+    expect(html).toContain(`\`\`\`md\n![[mindmap:${ID}]]`);
+  });
 });

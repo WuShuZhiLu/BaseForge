@@ -104,7 +104,7 @@ export function getDb(): Database.Database {
           `修复指引：\n` +
           `  1) 立即停止服务，避免进一步写入；\n` +
           `  2) 备份当前文件（含 -wal/-shm）到只读介质；\n` +
-          `  3) 优先使用 nowen-note 的备份恢复功能（POST /api/backups/<file>/restore?dryRun=1 预览）；\n` +
+          `  3) 优先使用 Base Notes 的备份恢复功能（POST /api/backups/<file>/restore?dryRun=1 预览）；\n` +
           `  4) 若无可用备份，可尝试：\n` +
           `       sqlite3 ${path.basename(DB_PATH)} ".recover" | sqlite3 recovered.db\n` +
           `     再用 recovered.db 替换原文件。`

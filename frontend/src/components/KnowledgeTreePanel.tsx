@@ -20,6 +20,7 @@ import {
   SplitSquareHorizontal,
   SplitSquareVertical,
   Star,
+  Table2,
   Trash2,
   TreePine,
   X,
@@ -65,7 +66,9 @@ import {
   knowledgeTreeApi,
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
+import { loadKnowledgeTreeOnEntry } from "@/lib/knowledgeTreeInitialLoad";
 import { noteTemplatesApi } from "@/lib/noteTemplatesApi";
+import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   getKnowledgeTreeExpansionScope,
   getKnowledgeTreeExpansionSnapshot,
@@ -146,6 +149,7 @@ function nodeIcon(node: KnowledgeTreeNode) {
       : <Folder size={15} className="text-amber-500" />;
   }
   if (node.nodeType === "markdown") return <FileCode size={15} className="text-emerald-500" />;
+  if (node.noteType === "sheet") return <Table2 size={15} className="text-sky-500" />;
   return <FileText size={15} className="text-accent-primary" />;
 }
 
@@ -363,16 +367,20 @@ export function KnowledgeTreePanel({
     saveKnowledgeTreeExpansion(expansionScope, next);
   }, [expansionScope]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (onEntry = false) => {
     const requestExpansionScope = getKnowledgeTreeExpansionScope();
     setLoading(true);
     setError(null);
     try {
-      const [ownedResult, sharedResult] = await Promise.allSettled([
-        knowledgeTreeApi.list(),
-        knowledgeTreeApi.listShared(),
-      ]);
-      if (ownedResult.status === "rejected") throw ownedResult.reason;
+      const load = async () => {
+        const [ownedResult, sharedResult] = await Promise.allSettled([
+          knowledgeTreeApi.list(),
+          knowledgeTreeApi.listShared(),
+        ]);
+        if (ownedResult.status === "rejected") throw ownedResult.reason;
+        return [ownedResult.value, sharedResult] as const;
+      };
+      const [owned, sharedResult] = onEntry ? await loadKnowledgeTreeOnEntry(load) : await load();
       const shared = sharedResult.status === "fulfilled" ? sharedResult.value.nodes : [];
       setSharedLoadError(
         sharedResult.status === "rejected"
@@ -380,7 +388,7 @@ export function KnowledgeTreePanel({
           : null,
       );
       const merged = Array.from(
-        new Map([...ownedResult.value.nodes, ...shared].map((node) => [node.id, node])).values(),
+        new Map([...owned.nodes, ...shared].map((node) => [node.id, node])).values(),
       );
       if (requestExpansionScope !== getKnowledgeTreeExpansionScope()) return;
       const expandableNodeIds = new Set(
@@ -403,7 +411,7 @@ export function KnowledgeTreePanel({
   }, []);
 
   useEffect(() => {
-    if (surfaceActive) void reload();
+    if (surfaceActive) void reload(true);
   }, [reload, surfaceActive]);
 
   useEffect(() => {
@@ -620,6 +628,10 @@ export function KnowledgeTreePanel({
       }
       if (threeColumnFolderNavigation) selectFolder(node);
       else await toggle(node);
+      return;
+    }
+    if (node.noteType === "sheet") {
+      pushSheetAppPath(node.resourceId);
       return;
     }
     if (node.resourceType !== "note") return;

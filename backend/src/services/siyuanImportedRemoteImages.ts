@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { getDb } from "../db/schema";
-import { syncNoteBlocks } from "../lib/noteBlocks";
 import { scanRemoteImages } from "../lib/remote-image-localization";
 import {
     downloadRemoteImage,
@@ -111,9 +110,9 @@ async function runWithConcurrency<T>(
  * normalized source rather than the pre-index import text.
  */
 function normalizeImportedMarkdownNote(noteId: string): NoteRow | undefined {
-    const current = readNote(noteId);
-    if (!current || current.contentFormat !== "markdown") return current;
-    syncNoteBlocks(getDb(), current.id, current.content || "", current.contentFormat);
+    // 上游 1.5.1 起不再在导入阶段物化块 ID：syncNoteBlocks() 会把 ^blk_ 重新写回
+    // notes.content，导致刚剥掉的思源块 ID 又出现在导入结果里。块 ID 留到笔记
+    // 首次保存/加载时再生成即可（routes/notes.ts 的保存路径会同步）。
     return readNote(noteId);
 }
 

@@ -146,8 +146,13 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet";
   title: string;
+  /** 加密笔记：只透传密文信封，服务端不解释正文。 */
+  encryptedContent?: string;
+  encryptedNoteId?: string;
+  /** 轻量表格：可选的初始表格数据，缺省时由核心层生成默认空表。 */
+  sheetData?: unknown;
   db?: Database.Database;
 }): KnowledgeTreeNode {
   if (input.parentId !== null) {

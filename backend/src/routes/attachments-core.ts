@@ -40,6 +40,7 @@
  *   - 工作区笔记的附件访问默认也通过"id 不可枚举"保护；由于附件行里
  *     记录了 noteId + userId，后续需要审计哪位用户上传的附件也可追溯。
  */
+import { isEncryptedNoteFormat } from "../lib/encryptedNotes.js";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { getDb } from "../db/schema";
@@ -602,6 +603,10 @@ app.post("/", async (c) => {
   );
   if (!hasPermission(permission, "write")) {
     return c.json({ error: "无权向该笔记上传附件", code: "FORBIDDEN" }, 403);
+  }
+  const noteFormat = db.prepare("SELECT contentFormat FROM notes WHERE id = ?").get(noteId) as { contentFormat: string } | undefined;
+  if (isEncryptedNoteFormat(noteFormat?.contentFormat)) {
+    return c.json({ error: "加密文本笔记暂不支持附件", code: "ENCRYPTED_NOTE_ATTACHMENT_FORBIDDEN" }, 400);
   }
 
   // 大小 / MIME 校验

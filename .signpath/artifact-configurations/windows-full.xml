@@ -5,14 +5,14 @@
   </parameters>
   <zip-file>
     <pe-file
-      path="Nowen-Note-${version}-setup.exe"
-      product-name="Nowen Note"
+      path="Base-Notes-${version}-setup.exe"
+      product-name="Base Notes"
       product-version="${version}">
       <authenticode-sign hash-algorithm="sha256" />
     </pe-file>
     <pe-file
-      path="Nowen-Note-${version}-portable.exe"
-      product-name="Nowen Note"
+      path="Base-Notes-${version}-portable.exe"
+      product-name="Base Notes"
       product-version="${version}">
       <authenticode-sign hash-algorithm="sha256" />
     </pe-file>

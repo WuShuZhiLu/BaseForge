@@ -345,9 +345,9 @@ export async function attemptQuickLogin(): Promise<QuickLoginAttemptResult> {
 
   try {
     await bio.BiometricAuth.authenticate({
-      reason: "解锁 Nowen Note",
+      reason: "解锁 Base Notes",
       cancelTitle: "改用密码登录",
-      androidTitle: "Nowen Note 快速登录",
+      androidTitle: "Base Notes 快速登录",
       androidSubtitle: "请验证你的指纹 / 人脸 / 锁屏密码",
       androidConfirmationRequired: false,
       allowDeviceCredential: true,

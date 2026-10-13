@@ -7,6 +7,9 @@
  * payload for diagnostics/export.
  */
 
+import { assertConversionMutation } from "./encryptedNotes/conversionBarrier";
+import { CONVERSION_REPLAY_LOCK, ConversionCleanupError } from "./encryptedNotes/conversionCoordination";
+
 export type OfflineMutationType = "createNote" | "updateNote" | "deleteNote";
 
 export interface OfflineQueueItem {
@@ -116,6 +119,9 @@ export function getOfflineQueueStorageKey(): string {
   return `${STORAGE_KEY_PREFIX}:${normalizeScopePart(getServerScope())}:${normalizeScopePart(decodeUserIdFromToken(token))}`;
 }
 
+/** 转换流程不得在 flush 进行中丢弃/重放已捕获队列。 */
+export function isOfflineQueueFlushing(): boolean { return flushPromise !== null; }
+
 function getLocalIdMapStorageKey(): string {
   const queueScope = getOfflineQueueStorageKey().slice(STORAGE_KEY_PREFIX.length + 1);
   return `${LOCAL_ID_MAP_KEY_PREFIX}:${queueScope}`;
@@ -196,6 +202,7 @@ function clearFailureState(item: OfflineQueueItem): OfflineQueueItem {
 }
 
 export function enqueue(item: Omit<OfflineQueueItem, "id" | "enqueuedAt" | "retryCount">): void {
+  assertConversionMutation(item.noteId, item.body);
   const queue = getQueue();
   const newItem: OfflineQueueItem = {
     ...item,
@@ -486,10 +493,21 @@ let flushPromise: Promise<FlushResult> | null = null;
 
 async function flushQueueInternal(fetchFn: OfflineQueueFetch): Promise<FlushResult> {
   const result: FlushResult = { success: 0, failed: 0, remaining: 0 };
+  const scope = getOfflineQueueStorageKey();
+  const assertScope = () => {
+    if (scope !== getOfflineQueueStorageKey()) throw new ConversionCleanupError("scope_changed");
+  };
   try {
     const queue = getQueue();
     for (const item of queue) {
+      assertScope();
       if (item.conflict || item.blocked || item.errorCode === "VERSION_CONFLICT") continue;
+      try { assertConversionMutation(item.noteId, item.body, scope); }
+      catch {
+        markBlockedFailure(item, "CONVERTED_NOTE", "笔记已转换或无法确认转换状态，已暂停旧操作，请手动处理本地副本。", { retryable: false });
+        result.failed += 1;
+        continue;
+      }
 
       if (Date.now() - item.enqueuedAt >= MAX_AGE_MS) {
         markBlockedFailure(item, "QUEUE_ITEM_EXPIRED", "该操作已等待超过 7 天，已保留本地副本，请手动重试或导出诊断。", {
@@ -515,6 +533,7 @@ async function flushQueueInternal(fetchFn: OfflineQueueFetch): Promise<FlushResu
           idempotencyKey: item.id,
           item,
         });
+        assertScope();
 
         if (response.ok) {
           if (item.type === "createNote" && item.noteId.startsWith("local-") && response.data?.id) {
@@ -580,6 +599,7 @@ async function flushQueueInternal(fetchFn: OfflineQueueFetch): Promise<FlushResu
         result.failed += 1;
         break;
       } catch (error) {
+        assertScope();
         const retryCount = item.retryCount + 1;
         const message = error instanceof Error ? error.message : String(error || "Network error");
         updateItem(item.id, {
@@ -605,7 +625,10 @@ async function flushQueueInternal(fetchFn: OfflineQueueFetch): Promise<FlushResu
 
 export function flushQueue(fetchFn: OfflineQueueFetch): Promise<FlushResult> {
   if (flushPromise) return flushPromise;
-  flushPromise = flushQueueInternal(fetchFn).finally(() => {
+  const replay = typeof navigator !== "undefined" && navigator.locks?.request
+    ? navigator.locks.request(CONVERSION_REPLAY_LOCK, { mode: "shared" }, () => flushQueueInternal(fetchFn))
+    : flushQueueInternal(fetchFn);
+  flushPromise = replay.finally(() => {
     flushPromise = null;
   });
   return flushPromise;

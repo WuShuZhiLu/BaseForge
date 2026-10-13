@@ -902,7 +902,7 @@ function SessionsSection() {
         : /Mac OS/.test(ua) ? "macOS"
         : /Linux/.test(ua) ? "Linux"
         : "";
-      return os ? `Nowen Note · ${os}` : "Nowen Note";
+      return os ? `Base Notes · ${os}` : "Base Notes";
     }
     // 粗略提取浏览器+OS，足够识别场景
     const os = /Windows/.test(ua) ? "Windows"

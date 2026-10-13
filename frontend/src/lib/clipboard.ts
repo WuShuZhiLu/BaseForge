@@ -1,3 +1,5 @@
+import { stabilizeClipboardAttachmentLinks } from "@/lib/fileShareClipboard";
+
 /**
  * 统一的剪贴板复制工具
  * ---------------------------------------------------------------------------
@@ -19,7 +21,15 @@
  */
 export async function copyText(text: string): Promise<boolean> {
   if (text == null) return false;
-  const value = String(text);
+
+  let value: string;
+  try {
+    value = await stabilizeClipboardAttachmentLinks(String(text));
+  } catch (error) {
+    // 稳定分享创建失败时宁可复制失败，也不能回退泄漏一个看起来成功、实际会过期的 URL。
+    console.error("[clipboard] stable attachment share failed:", error);
+    return false;
+  }
 
   // Path 1: 现代异步 API（secureContext / https / localhost）
   try {

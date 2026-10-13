@@ -11,9 +11,11 @@ import {
   Quote, FileCode, Minus, ImagePlus, Sparkles,
   Bold, Italic, Highlighter, Table2, ChevronDown,
   Strikethrough, Code, Link as LinkIcon, Workflow, Sigma, BookOpen, Film, FolderSearch,
-  Columns2, Info, Type, Trash2, Copy, ClipboardPaste, Scissors, Plus, Repeat, ChevronRight, ArrowLeft
+  Columns2, Info, Type, Trash2, Copy, ClipboardPaste, Scissors, Plus, Repeat, ChevronRight, ArrowLeft,
+  BrainCircuit, Network
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { useTranslation } from "react-i18next";
 import {
   convertBlock, deleteBlock, cutBlock, copyBlock, pasteBlock, addBelowBlock,
@@ -541,8 +543,10 @@ export function getDefaultSlashCommands(
   onImageUpload?: () => void,
   onAIAssistant?: () => void,
   onAttachmentLibrary?: () => void,
+  onVoiceRecord?: () => void,
 ): SlashCommandItem[] {
   return [
+    ...(onVoiceRecord ? [{ id: "voice", label: t("voice.record"), description: t("voice.description"), icon: <span>🎙</span>, category: t("slash.catInsert"), keywords: ["voice", "audio", "录音", "语音"], action: onVoiceRecord }] : []),
     ...getDailyRecordSlashCommands(),
     // 标题
     {
@@ -937,6 +941,39 @@ export function getDefaultSlashCommands(
       categoryKey: "insert",
       keywords: ["image", "picture", "photo", "图片", "插图"],
       action: () => onImageUpload?.(),
+    },
+    {
+      // 思维导图：打开插入对话框（选择已有脑图或新建后插入）。
+      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出 MindMapEmbedInsertDialog。
+      id: "mindmap",
+      label: t("slash.mindmap") || "思维导图",
+      description: t("slash.mindmapDesc") || "选择已有脑图或新建后插入",
+      icon: <BrainCircuit size={16} />,
+      category: t("slash.catInsert"),
+      categoryKey: "insert",
+      keywords: ["mindmap", "mind map", "脑图", "思维导图", "导图", "插入脑图"],
+      action: () => {
+        window.dispatchEvent(new CustomEvent("nowen:open-mindmap-insert"));
+      },
+    },
+    {
+      // Mermaid 脑图（代码块）：与上面的原生导图命令分开——
+      // 这里插入的是可编辑的 Mermaid mindmap 源码模板，不关联原生导图数据。
+      id: "mermaidMindMap",
+      label: t("slash.mermaidMindMap") || "Mermaid 脑图（代码块）",
+      description: t("slash.mermaidMindMapDesc") || "插入可编辑的 Mermaid 脑图模板，不关联原生导图",
+      icon: <Network size={16} />,
+      category: t("slash.catFormat"),
+      categoryKey: "format",
+      keywords: ["mermaid", "mindmap", "脑图代码", "Mermaid 脑图"],
+      action: (editor) => {
+        insertContentPreservingBlockEmbed(editor, {
+          type: "codeBlock",
+          attrs: { language: "mermaid" },
+          content: [{ type: "text", text: "mindmap\n  root((中心主题))\n    主题一\n      子主题一\n      子主题二\n    主题二" }],
+        });
+      },
+      addBelowType: "mermaid",
     },
     {
       id: "attachmentLibrary",

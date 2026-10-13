@@ -74,7 +74,7 @@ async function ensureTaskReminderChannel(): Promise<void> {
   await LocalNotifications.createChannel({
     id: TASK_REMINDER_CHANNEL_ID,
     name: "任务提醒",
-    description: "Nowen Note 任务到期与提前提醒",
+    description: "Base Notes 任务到期与提前提醒",
     importance: 4,
     visibility: 1,
     vibration: true,

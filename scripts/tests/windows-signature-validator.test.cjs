@@ -28,27 +28,27 @@ function validate(records, requiredChannels = ["full"]) {
 
 test("accepts valid SignPath records and requires Full/Lite setup packages", () => {
   const result = validate([
-    validRecord("Nowen-Note-1.4.16-setup.exe"),
-    validRecord("Nowen-Note-1.4.16-portable.exe"),
-    validRecord("Nowen-Note-Lite-1.4.16-setup.exe"),
+    validRecord("Base-Notes-1.4.16-setup.exe"),
+    validRecord("Base-Notes-1.4.16-portable.exe"),
+    validRecord("Base-Notes-Lite-1.4.16-setup.exe"),
   ], ["full", "lite"]);
   assert.equal(result.setupCounts.full, 1);
   assert.equal(result.setupCounts.lite, 1);
 });
 
 test("rejects non-valid Authenticode status and wrong publisher", () => {
-  assert.throws(() => validate([validRecord("Nowen-Note-1.4.16-setup.exe", { status: "NotSigned" })]), /status is NotSigned/);
-  assert.throws(() => validate([validRecord("Nowen-Note-1.4.16-setup.exe", { signerCommonName: "Other" })]), /does not exactly match/);
+  assert.throws(() => validate([validRecord("Base-Notes-1.4.16-setup.exe", { status: "NotSigned" })]), /status is NotSigned/);
+  assert.throws(() => validate([validRecord("Base-Notes-1.4.16-setup.exe", { signerCommonName: "Other" })]), /does not exactly match/);
 });
 
 test("rejects missing required Full or Lite setup", () => {
-  assert.throws(() => validate([validRecord("Nowen-Note-Lite-1.4.16-setup.exe")], ["full", "lite"]), /missing required full/);
-  assert.throws(() => validate([validRecord("Nowen-Note-1.4.16-setup.exe")], ["full", "lite"]), /missing required lite/);
+  assert.throws(() => validate([validRecord("Base-Notes-Lite-1.4.16-setup.exe")], ["full", "lite"]), /missing required full/);
+  assert.throws(() => validate([validRecord("Base-Notes-1.4.16-setup.exe")], ["full", "lite"]), /missing required lite/);
 });
 
 test("expired signer without timestamp is rejected", () => {
   assert.throws(() => validate([
-    validRecord("Nowen-Note-1.4.16-setup.exe", {
+    validRecord("Base-Notes-1.4.16-setup.exe", {
       signerNotBefore: "2024-01-01T00:00:00.000Z",
       signerNotAfter: "2025-01-01T00:00:00.000Z",
       timestampPresent: false,

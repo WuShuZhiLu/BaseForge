@@ -16,10 +16,10 @@ const GUIDE_NOTES: GuideNote[] = [
   {
     key: "welcome",
     language: "zh",
-    title: "欢迎使用 Nowen Note",
-    content: `# 欢迎使用 Nowen Note
+    title: "欢迎使用 Base Notes",
+    content: `# 欢迎使用 Base Notes
 
-Nowen Note 是一个**开源、自托管、数据由你掌控**的知识库、协作笔记与任务工作台。
+Base Notes 是一个**开源、自托管、数据由你掌控**的知识库、协作笔记与任务工作台。
 
 ## 从这里开始
 
@@ -39,7 +39,7 @@ Nowen Note 是一个**开源、自托管、数据由你掌控**的知识库、�
 
 > 这些教程都是普通笔记，可以自由编辑、移动或删除。删除后系统不会重新创建。
 `,
-    contentText: "欢迎使用 Nowen Note。Nowen Note 是一个开源、自托管、数据由你掌控的知识库、协作笔记与任务工作台。",
+    contentText: "欢迎使用 Base Notes。Base Notes 是一个开源、自托管、数据由你掌控的知识库、协作笔记与任务工作台。",
   },
   {
     key: "quick-start",
@@ -76,7 +76,7 @@ Nowen Note 是一个**开源、自托管、数据由你掌控**的知识库、�
     title: "富文本与 Markdown",
     content: `# 富文本与 Markdown
 
-Nowen Note 同时提供两种编辑体验。
+Base Notes 同时提供两种编辑体验。
 
 ## 富文本编辑器
 
@@ -182,7 +182,7 @@ AI 生成内容可能存在错误。重要结论请结合引用来源和原始�
     title: "数据安全、备份与自托管",
     content: `# 数据安全、备份与自托管
 
-Nowen Note 支持自托管，数据可以保存在自己的电脑、服务器或 NAS 中。
+Base Notes 支持自托管，数据可以保存在自己的电脑、服务器或 NAS 中。
 
 ## 建议
 
@@ -194,15 +194,15 @@ Nowen Note 支持自托管，数据可以保存在自己的电脑、服务器或
 
 掌控数据也意味着需要认真对待备份和恢复。
 `,
-    contentText: "Nowen Note 支持自托管。请同时备份数据库和附件目录，远程访问使用 HTTPS 和强密码，升级前先创建可恢复备份。",
+    contentText: "Base Notes 支持自托管。请同时备份数据库和附件目录，远程访问使用 HTTPS 和强密码，升级前先创建可恢复备份。",
   },
   {
     key: "welcome",
     language: "en",
-    title: "Welcome to Nowen Note",
-    content: `# Welcome to Nowen Note
+    title: "Welcome to Base Notes",
+    content: `# Welcome to Base Notes
 
-Nowen Note is an **open-source, self-hosted knowledge base, collaborative notebook, and task workspace** that keeps your data under your control.
+Base Notes is an **open-source, self-hosted knowledge base, collaborative notebook, and task workspace** that keeps your data under your control.
 
 ## Start here
 
@@ -222,7 +222,7 @@ Nowen Note is an **open-source, self-hosted knowledge base, collaborative notebo
 
 > These guides are normal notes. You can edit, move, or delete them, and they will not be recreated after deletion.
 `,
-    contentText: "Welcome to Nowen Note, an open-source, self-hosted knowledge base, collaborative notebook, and task workspace that keeps your data under your control.",
+    contentText: "Welcome to Base Notes, an open-source, self-hosted knowledge base, collaborative notebook, and task workspace that keeps your data under your control.",
   },
   {
     key: "quick-start",
@@ -259,7 +259,7 @@ Try Tasks, AI Knowledge Q&A, Moments, Mind Maps, and collaboration when you need
     title: "Rich Text and Markdown",
     content: `# Rich Text and Markdown
 
-Nowen Note supports two editing experiences.
+Base Notes supports two editing experiences.
 
 ## Rich-text editor
 
@@ -365,7 +365,7 @@ Use the same data from the web, desktop, and mobile clients. Offline synchroniza
     title: "Data Safety, Backups, and Self-Hosting",
     content: `# Data Safety, Backups, and Self-Hosting
 
-Nowen Note can be self-hosted on your computer, server, or NAS.
+Base Notes can be self-hosted on your computer, server, or NAS.
 
 ## Recommendations
 
@@ -377,7 +377,7 @@ Nowen Note can be self-hosted on your computer, server, or NAS.
 
 Owning your data also means taking backups and recovery seriously.
 `,
-    contentText: "Self-host Nowen Note on your own computer, server, or NAS. Back up the database and attachments, use HTTPS and strong passwords, and create backups before upgrades.",
+    contentText: "Self-host Base Notes on your own computer, server, or NAS. Back up the database and attachments, use HTTPS and strong passwords, and create backups before upgrades.",
   },
 ];
 
@@ -405,7 +405,7 @@ function notebookInsert(params: {
       NEW.id,
       ${parent},
       ${sqlString(params.name)},
-      ${sqlString("Nowen Note onboarding guide / 新用户使用指南")},
+      ${sqlString("Base Notes onboarding guide / 新用户使用指南")},
       ${sqlString(params.icon)},
       ${params.sortOrder},
       1
@@ -454,7 +454,7 @@ export const newUserOnboardingMigration: Migration = {
       BEGIN
         ${notebookInsert({
           suffix: "root",
-          name: "Nowen Note 使用指南 / Guide",
+          name: "Base Notes 使用指南 / Guide",
           icon: "📘",
           sortOrder: -1000,
         })}

@@ -1,10 +1,15 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
+import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
+import EncryptedConversionEditorGuard from "@/components/EncryptedConversionEditorGuard";
+import EncryptedNotePane from "@/components/EncryptedNotePane";
+import { isEncryptedNoteFormat } from "@/lib/encryptedNotes/noteDocument";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import type { NoteEditorHeading, NoteEditorUpdatePayload } from "@/components/editors/types";
 import MarkdownEditor from "@/components/MarkdownEditor";
@@ -23,6 +28,9 @@ import {
 } from "@/lib/editorSplitMirror";
 import { Tag, Notebook, MindMapData, MindMapNode, type Note } from "@/types";
 import { useTranslation } from "react-i18next";
+import NoteColorMarkPicker from "@/components/NoteColorMarkPicker";
+import NoteThemeMenuSelect from "@/components/NoteThemeMenuSelect";
+import type { NoteColorMark } from "@/types";
 import { haptic } from "@/hooks/useCapacitor";
 import { toast } from "@/lib/toast";
 import { exportNoteAsImage, exportSingleNote, exportSingleNoteAsPDF, printNote } from "@/lib/exportService";
@@ -123,7 +131,7 @@ interface EditorPaneProps {
   onSplitDocument?: () => void;
 }
 
-export default function EditorPane({
+function EditorPaneCore({
   canSplitDocument = false,
   onSplitDocument,
 }: EditorPaneProps) {
@@ -286,7 +294,15 @@ export default function EditorPane({
   // 纯 HTML 预览模式：当
   // 笔记内容被保存为 HTML 格式（如 clipper 导入）时自动进入只读预览，
   // 用户需要手动切换到 Tiptap 编辑器（会有格式丢失风险）。
-  const [htmlPreviewMode, setHtmlPreviewMode] = useState(false);
+  const [htmlPreviewMode, setHtmlPreviewMode] = useState(
+    // 首帧即判定：HTML 笔记第一帧就渲染预览，避免先挂载 Tiptap 触发未授权 <img> 请求
+    () => !!activeNote && detectFormat(activeNote.content) === "html",
+  );
+  // 切换笔记的第一帧：内容尚未被切换效果归位，此期间 HTML 笔记仍按预览渲染
+  const previewInitializedNoteIdRef = useRef(activeNote?.id);
+  const isPendingHtmlNoteSwitch = previewInitializedNoteIdRef.current !== activeNote?.id
+    && !!activeNote && detectFormat(activeNote.content) === "html";
+  const shouldRenderHtmlPreview = htmlPreviewMode || isPendingHtmlNoteSwitch;
   const [showHtmlEditWarning, setShowHtmlEditWarning] = useState(false);
   // 记住当前笔记的原始格式是否为 HTML。
   // 切换到编辑模式后，内容会被 normalize 为 Markdown，此时 detectFormat 返回 "md"。
@@ -1333,7 +1349,8 @@ export default function EditorPane({
    * ע�����˳�����Ҳ���á�������ֻһ�� client��y-collab �൱�ڿղ������������
    * ����������־û��������������Զ��ϲ���
    */
-  const collabReady = !!(activeNote && !activeNote.isLocked && selfUser && editorMode === "md");
+  const collabReady = !!(activeNote && !activeNote.isLocked && selfUser && editorMode === "md"
+    && !/nowen-encrypted/i.test(activeNote.content || ""));
   const { doc: collabYDoc, provider: collabProvider, synced: collabSynced } = useYDoc({
     noteId: collabReady ? (activeNote?.id ?? null) : null,
     user: selfUser,
@@ -1388,6 +1405,7 @@ export default function EditorPane({
   // ����ʼ����ݸ�ʽΪ "html"���Զ����� HTML Ԥ����������˵�����༭����
   useEffect(() => {
     if (!activeNote) return;
+    previewInitializedNoteIdRef.current = activeNote.id;
     const fmt = detectFormat(activeNote.content);
     const isHtml = fmt === "html";
     const isFullDoc = isHtml && isFullHtmlDocument(activeNote.content);
@@ -1728,6 +1746,17 @@ export default function EditorPane({
         });
       }
 
+      // 附件插入后必须由正文真正落库来确认：上传成功只是中间态，
+      // 这里把"确认已保存"回传给媒体面板，避免"上传成功但正文没这段"的假成功。
+      if (updated && typeof data.content === "string") {
+        const committedContent = typeof updated.content === "string" ? updated.content : data.content;
+        confirmMediaNotePersistence(
+          currentNote.id,
+          committedContent,
+          (updated as Note & { __offlineQueued?: boolean }).__offlineQueued ? "queued" : "saved",
+        );
+      }
+
       // ���ڱ���ıʼ����ǵ�ǰ����ʼ�ʱ����״̬����ֹ�����л�ʱ���Ǵ���ʼǣ�
       if (activeNoteRef.current?.id === updated.id) {
         // �ؼ�������Ѹձ���� content / contentText Ҳ��� activeNote��
@@ -1939,6 +1968,20 @@ export default function EditorPane({
     const updated = await api.updateNote(activeNote.id, { isPinned: activeNote.isPinned ? 0 : 1 } as any);
     actions.setActiveNote(updated);
     actions.updateNoteInList({ id: updated.id, isPinned: updated.isPinned });
+  }, [activeNote, actions]);
+
+  // 笔记色标：写入后同步列表/Tab/知识树三处视图。
+  const setNoteColorMark = useCallback(async (colorMark: NoteColorMark | null) => {
+    if (!activeNote || activeNote.isTrashed || !canWriteNote(activeNote)) return;
+    haptic.light();
+    const updated = await api.updateNote(activeNote.id, { colorMark });
+    const nextColor = updated.colorMark ?? colorMark;
+    actions.setActiveNote({ ...updated, colorMark: nextColor });
+    actions.updateNoteInList({ id: updated.id, colorMark: nextColor });
+    actions.updateNoteTab({ id: updated.id, colorMark: nextColor } as unknown as { id: string });
+    try {
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "note-color-mark-changed" } }));
+    } catch { /* 通知失败不阻断编辑。 */ }
   }, [activeNote, actions]);
 
   const toggleLock = useCallback(async () => {
@@ -2384,6 +2427,13 @@ const moveToTrash = useCallback(async () => {
   const [aiMermaidResult, setAiMermaidResult] = useState("");
   const [aiMermaidType, setAiMermaidType] = useState<"mermaid_mindmap" | "mermaid_flowchart">("mermaid_mindmap");
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
+  const [showMindMapInsertDialog, setShowMindMapInsertDialog] = useState(false);
+
+  useEffect(() => {
+    const openMindMapInsert = () => setShowMindMapInsertDialog(true);
+    window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
+    return () => window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
+  }, []);
 
   const handleAIMermaid = useCallback(async (type: "mermaid_mindmap" | "mermaid_flowchart") => {
     if (!activeNote || aiMermaidLoading) return;
@@ -2588,8 +2638,9 @@ const moveToTrash = useCallback(async () => {
             ���� activeNote ʱ��ĻһƬ�հף��û��Ҳ����ص��б�����ڣ�ϵͳ���ؼ�
             ��Ȼ�ܴ��� onBackToList���������û�/���Ƶ��������²���ֱ�ۣ���������
             ����"��ʼ�û��Ӧ"�����ﲹһ���ƶ��˿ɼ��ķ���������İ�����Ϊ���ס� */}
-        <header className="flex items-center gap-2 px-3 py-2 border-b border-app-border bg-app-surface/50 md:hidden" style={{ paddingTop: 'calc(var(--safe-area-top) + 8px)' }}>
+        <header data-adaptive-editor-empty-header className="flex items-center gap-2 px-3 py-2 border-b border-app-border bg-app-surface/50 md:hidden" style={{ paddingTop: 'calc(var(--safe-area-top) + 8px)' }}>
           <button
+            data-adaptive-editor-back
             onClick={() => actions.setMobileView("list")}
             className="flex items-center text-accent-primary py-1.5 px-1.5 -ml-1.5 rounded-lg active:bg-app-hover"
           >
@@ -2683,6 +2734,7 @@ const moveToTrash = useCallback(async () => {
         {/* �� 1 �У����� + ���м + ͬ�� */}
         <div className={cn("flex min-w-0 items-center gap-2 px-3 pt-2 pb-1", compactMobileEditing && "hidden")}>
           <button
+            data-adaptive-editor-back
             onClick={() => actions.setMobileView("list")}
             className="flex items-center text-accent-primary py-1 px-1 -ml-1 rounded-lg active:bg-app-hover shrink-0"
             aria-label={t('editor.back')}
@@ -2723,6 +2775,7 @@ const moveToTrash = useCallback(async () => {
         <div className={cn("flex items-center gap-1", compactMobileEditing ? "px-2 py-1" : "px-3 pb-2 pt-0.5")}>
           {compactMobileEditing && (
             <button
+              data-adaptive-editor-back
               onClick={() => actions.setMobileView("list")}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent-primary active:bg-app-hover"
               aria-label={t('editor.back')}
@@ -3527,6 +3580,16 @@ const moveToTrash = useCallback(async () => {
                     </div>
                   </div>
 
+                  {/* 外观：笔记主题 + 色标（原头部内联控件已删除，入口移到此处） */}
+                  <div className="h-px bg-app-border mx-2 my-0.5" />
+                  <NoteThemeMenuSelect noteId={activeNote.id} disabled={!canWriteNote(activeNote)} />
+                  <NoteColorMarkPicker
+                    inline
+                    value={activeNote.colorMark}
+                    disabled={effectiveLocked || activeNote.isTrashed === 1 || !canWriteNote(activeNote)}
+                    onChange={setNoteColorMark}
+                  />
+
                   <div className="h-px bg-app-border mx-2 my-0.5" />
                   <button
                     onClick={() => { setShowVersionHistory(true); setShowDesktopMoreMenu(false); }}
@@ -3733,7 +3796,7 @@ const moveToTrash = useCallback(async () => {
               yDoc={collabYDoc}
               awareness={collabProvider?.awareness ?? null}
             />
-          ) : htmlPreviewMode ? (
+          ) : shouldRenderHtmlPreview ? (
             <HtmlPreviewPane
               key={`html-${activeNote.id}`}
               ref={editorHandleRef}
@@ -4133,6 +4196,24 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
       {/* HTML Ԥ�� �� �༭ģʽ�л�ȷ�ϵ��� */}
+      {/* 思维导图插入对话框 */}
+      <MindMapEmbedInsertDialog
+        open={showMindMapInsertDialog && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
+        workspaceId={activeNote?.workspaceId ?? null}
+        onClose={() => setShowMindMapInsertDialog(false)}
+        onInsert={(id) => {
+          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
+          const markdown = `\n\n![[mindmap:${id}]]\n\n`;
+          const editorHandle = editorHandleRef.current;
+          const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
+          const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
+          if (inserted) {
+            editorHandle?.flushSave?.();
+            toast.success("已插入思维导图");
+          }
+          return inserted;
+        }}
+      />
       <AnimatePresence>
         {showHtmlEditWarning && (
           <motion.div
@@ -4499,5 +4580,22 @@ function SyncIndicator({
         )}
       </span>
     </button>
+  );
+}
+
+/**
+ * 加密笔记走独立编辑器（服务端零知识，客户端 Worker 加解密）；
+ * 普通笔记保持原有编辑链路，仅在转换闸门包裹下渲染。
+ */
+export default function EditorPane(props: EditorPaneProps) {
+  const { state } = useApp();
+  const activeNote = state.activeNote;
+  if (activeNote && isEncryptedNoteFormat(activeNote.contentFormat)) {
+    return <EncryptedNotePane key={activeNote.id} note={activeNote} />;
+  }
+  return (
+    <EncryptedConversionEditorGuard noteId={activeNote?.id ?? null}>
+      <EditorPaneCore {...props} />
+    </EncryptedConversionEditorGuard>
   );
 }

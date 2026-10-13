@@ -1,7 +1,7 @@
 /**
- * Nowen Note SDK 客户端
+ * Base Notes SDK 客户端
  *
- * 完整封装 Nowen Note 后端所有 REST API，支持：
+ * 完整封装 Base Notes 后端所有 REST API，支持：
  * - 笔记本/笔记/标签/任务/思维导图/日记 CRUD
  * - AI 写作助手 + 知识库问答
  * - 全文搜索

@@ -44,9 +44,23 @@ import mindmapFoldersRouter from "./routes/mindmap-folders";
 import diaryRouter, { handleDownloadDiaryImage } from "./routes/diary";
 import journalsRouter from "./routes/journals";
 import urlImportRouter from "./routes/url-import";
+import sheetsRouter from "./routes/sheets";
+import voiceRouter from "./routes/voice";
+import trashRouter from "./routes/trash";
+import workspaceIssuesRouter from "./routes/workspace-issues";
+import notificationsRouter from "./routes/notifications";
+import clipperLocalRouter from "./routes/clipper-local";
 
 import aiRouter from "./routes/ai";
 import pluginsRouter from "./routes/plugins";
+import pluginStudioRouter from "./routes/plugin-studio";
+import pluginExecutionsRouter from "./routes/plugin-executions";
+import pluginInboundRouter from "./routes/plugin-inbound";
+import automationsRouter from "./routes/automations";
+import automationWebhookRouter from "./automation/webhookTrigger";
+import taskDigestRouter, { dispatchScheduledTaskDigests } from "./routes/task-digest";
+import wechatAssistantRouter, { createWechatAssistantCallbackRouter } from "./routes/wechat-assistant";
+import wechatCaptureRouter from "./routes/wechat-capture";
 import webhooksRouter from "./routes/webhooks";
 import auditRouter from "./routes/audit";
 import backupsRouter, { handleFullBackupJobDownload } from "./routes/backups";
@@ -63,10 +77,23 @@ import { seedDatabase } from "./db/seed";
 import { initApiTokensTable, looksLikeApiToken, resolveApiToken } from "./lib/api-tokens";
 import { enforceApiTokenAccess } from "./middleware/api-token-resource-scope";
 import { getDb, closeDb } from "./db/schema";
+import { recoverPluginUpdates } from "./plugins/pluginUpdateRecovery";
+import { automationEventCaptureMiddleware } from "./automation/eventCapture";
+import { automationRuntime } from "./automation/runtime";
 import { userSessionsRepository } from "./repositories";
 import { generateOpenAPISpec } from "./services/openapi";
 import { getBackupManager } from "./services/backup";
-import { attachRealtimeServer, getRealtimeStats, shutdownRealtime } from "./services/realtime";
+import { attachRealtimeServer, broadcastToUser, getRealtimeStats, shutdownRealtime } from "./services/realtime";
+import syncV2Router from "./routes/sync-v2";
+import syncV2BlobRouter from "./routes/sync-v2-blob";
+import syncLocalRouter from "./routes/sync-local";
+import "./runtime/note-appearance.js";
+import { isLocalFirstSyncV2Enabled } from "./sync/flag";
+import { setSyncBroadcaster } from "./sync/notify";
+import { resetChangeFeedSuppression } from "./sync/suppression";
+import { recoverInflightMutations } from "./sync/outbox";
+import { recoverStuckUploads } from "./sync/attachments";
+import { reconcileSyncEngine, stopSyncEngine } from "./sync/runtime";
 import { getYjsStats } from "./services/yjs";
 import { initWebhookTables } from "./services/webhook";
 import { initAuditTables } from "./services/audit";
@@ -115,6 +142,18 @@ app.use("*", compress());
 // 初始化数据库
 getDb();
 seedDatabase();
+
+// 插件更新恢复：把上次中断的安装/升级收敛到确定状态，失败时提前终止启动，
+// 避免插件执行服务带着半升级状态对外服务。
+try {
+  const recovery = recoverPluginUpdates();
+  if (recovery.recovered > 0 || recovery.disabled > 0) {
+    console.log(`[plugins] 更新恢复完成：recovered=${recovery.recovered}, disabled=${recovery.disabled}`);
+  }
+} catch (error) {
+  console.error("[plugins] 更新恢复失败，插件执行服务不会提前启动:", error);
+  throw error;
+}
 
 // 提前创建 webhooks / audit_logs 表。
 // 这两张表原本是"路由被访问时懒初始化"，但 notes/notebooks/tasks 等路由会在写操作中
@@ -270,7 +309,7 @@ app.get("/api/openapi.json", (c) => c.json(generateOpenAPISpec()));
 app.get("/api/settings", (c) => {
   const db = getDb();
   const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%' OR key LIKE 'debug_%' OR key = 'web_ui_enabled'").all() as { key: string; value: string }[];
-  const result: Record<string, string> = { site_title: "nowen-note", site_favicon: "", site_icp_beian: "", editor_font_family: "", debug_files_query: "false", web_ui_enabled: "true" };
+  const result: Record<string, string> = { site_title: "Base Notes", site_favicon: "", site_icp_beian: "", editor_font_family: "", debug_files_query: "false", web_ui_enabled: "true" };
   for (const row of rows) {
     result[row.key] = row.value;
   }
@@ -331,6 +370,17 @@ app.get("/api/task-attachments/:id", handleDownloadTaskAttachment);
 //   注意路径具体：/api/diary/attachments/:id，必须比 diaryRouter（在 JWT 之后挂的
 //   /api/diary/*）注册得**更早**，否则会被 JWT 中间件拦截。
 app.get("/api/diary/attachments/:id", handleDownloadDiaryImage);
+
+// 插件入站回调：高熵 capability token + 可选 HMAC，自身完成鉴权；
+// 外部系统不会携带 Nowen JWT，因此必须注册在 JWT 中间件之前。
+app.route("/api/plugin-inbound", pluginInboundRouter);
+
+// 自动化对外 Webhook 触发端点：外部系统用一次性签名触发工作流，自身鉴权，
+// 同样必须在 JWT 中间件之前注册。
+app.route("/api/automation/webhooks", automationWebhookRouter);
+
+// 微信助手消息回调：微信服务器直连，不带 JWT，走插件自身的签名校验。
+app.route("/api/wechat-assistant", createWechatAssistantCallbackRouter());
 
 // JWT 鉴权中间件：保护所有 /api/* 路由（auth 和 health 已在上方注册，不受影响）
 //
@@ -479,11 +529,15 @@ app.use("/api/*", async (c, next) => {
 // API Token scopes + notebook resource scope enforcement.
 // JWT login requests pass through unchanged.
 app.use("/api/*", enforceApiTokenAccess);
+// 自动化事件采集：把写操作的领域事件投递到工作流触发器。必须在 JWT 之后、
+// 业务路由之前挂载，才能拿到 X-User-Id 并捕获后续路由的响应。
+app.use("/api/*", automationEventCaptureMiddleware);
 
 // API 路由（受 JWT 保护）
 app.route("/api/knowledge-tree/", knowledgeTreeRouter);
 app.route("/api/notebooks", notebooksRouter);
 app.route("/api/notes", notesRouter);
+app.route("/api/trash", trashRouter);
 app.route("/api/note-templates", noteTemplatesRouter);
 app.route("/api/offline-sync", offlineSyncRouter);
 app.route("/api/blocks", blocksRouter);
@@ -499,17 +553,36 @@ app.route("/api/icloud", icloudRouter);
 app.route("/api/yuque", yuqueImportRouter);
 app.route("/api/mindmaps", mindmapsRouter);
 app.route("/api/mindmap-folders", mindmapFoldersRouter);
+app.route("/api/sheets", sheetsRouter);
 app.route("/api/diary", diaryRouter);
 app.route("/api/journals", journalsRouter);
 app.route("/api/url-import", urlImportRouter);
 app.route("/api/ai", aiRouter);
+app.route("/api/voice", voiceRouter);
+// Clipper 本地通道：浏览器扩展经 127.0.0.1 保存到本机，无需服务器。
+// Sync V2（Local-first）。与 V1 并存：V1 服务已发布客户端，不做任何改动。
+// 路由内部有 Feature Flag 守卫，未启用时返回 404。
+// 附件二进制通道必须先挂载：/api/sync/v2 下的 :param 路由会吞掉 /blob/xxx。
+app.route("/api/sync/v2/blob", syncV2BlobRouter);
+app.route("/api/sync/v2", syncV2Router);
+// 本地同步管理（同步设置 / 冲突中心 / 诊断），仅供 Desktop renderer 通过 localhost 调用。
+app.route("/api/sync/local", syncLocalRouter);
+app.route("/api/local/clipper", clipperLocalRouter);
+app.route("/api/plugins/studio", pluginStudioRouter);
 app.route("/api/plugins", pluginsRouter);
+app.route("/api/wechat-assistant", wechatAssistantRouter);
+app.route("/api/wechat-capture", wechatCaptureRouter);
+app.route("/api/plugin-executions", pluginExecutionsRouter);
+app.route("/api/automations", automationsRouter);
 app.route("/api/webhooks", webhooksRouter);
+app.route("/api/task-digest", taskDigestRouter);
 app.route("/api/audit", auditRouter);
 app.route("/api/backups", backupsRouter);
 app.route("/api/email", emailRouter);
 app.route("/api/shares", sharesRouter);
 app.route("/api/workspaces", workspacesRouter);
+app.route("/api/workspace-issues", workspaceIssuesRouter);
+app.route("/api/notifications", notificationsRouter);
 app.route("/api/users", usersRouter);
 app.route("/api/tokens", tokensRouter);
 app.route("/api/user-preferences", userPreferencesRouter);
@@ -661,7 +734,7 @@ function webUiDisabledResponse(): Response {
     "<!doctype html><html><head><meta charset=\"utf-8\"><title>Web UI Disabled</title></head>" +
     "<body style=\"font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#334155\">" +
     "<main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"font-size:22px;color:#0f172a\">网页端已被管理员关闭</h1>" +
-    "<p style=\"line-height:1.7\">当前服务器仅提供 API 服务。请使用 Nowen Note 桌面客户端连接该服务器。</p></main></body></html>",
+    "<p style=\"line-height:1.7\">当前服务器仅提供 API 服务。请使用 Base Notes 桌面客户端连接该服务器。</p></main></body></html>",
     { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }
@@ -675,6 +748,7 @@ if (process.env.NODE_ENV === "production") {
   const mimeTypes: Record<string, string> = {
     ".html": "text/html",
     ".js": "application/javascript",
+    ".mjs": "application/javascript",
     ".css": "text/css",
     ".json": "application/json",
     ".png": "image/png",
@@ -820,6 +894,21 @@ try {
   console.warn("[init] startEmbeddingWorker failed:", e);
 }
 
+// 自动化运行时：启动工作流调度循环（定时触发 / 重试 / 超时收敛）。
+try {
+  automationRuntime.start();
+} catch (e) {
+  console.warn("[init] automation runtime failed:", e);
+}
+
+// 每分钟检查早晚任务简报。数据库 UNIQUE 约束避免多次投递。
+// 持续推送需要常驻后端，桌面进程关闭时不会运行。
+const taskDigestTimer = process.env.NODE_ENV === "test" ? null : setInterval(() => {
+  try { dispatchScheduledTaskDigests(); }
+  catch (error) { console.error("[task-digest] scan failed:", error); }
+}, 60_000);
+taskDigestTimer?.unref();
+
 // 启动日历 ICS S3 镜像定时导出
 //   - CALENDAR_EXPORT_TIMER_DISABLED=1 可关闭
 //   - NODE_ENV=test 时不启动
@@ -830,13 +919,34 @@ try {
   console.warn("[init] startCalendarExportScheduler failed:", e);
 }
 
-console.log(`🚀 nowen-note API running on http://localhost:${port}`);
+console.log(`🚀 Base Notes API running on http://localhost:${port}`);
 console.log(`📖 OpenAPI 文档: http://localhost:${port}/api/openapi.json`);
 
 // @hono/node-server 的 serve 返回底层 http.Server；拿到后挂 WebSocket
 const server = serve({ fetch: app.fetch, port });
 // serve() 签名在不同版本返回不同对象；实际运行时是 http.Server
 attachRealtimeServer(server as unknown as import("http").Server);
+// ---- Sync V2 运行时接线 ----
+// 只在 Flag 开启时接线，关闭状态下这段完全不产生副作用。
+if (isLocalFirstSyncV2Enabled()) {
+  // 把实时通知能力注入 sync 模块（注入而非直接 import，便于 CLI/测试环境复用）。
+  setSyncBroadcaster((userId, message) => {
+    broadcastToUser(userId, message as never);
+  });
+
+  // 崩溃恢复：上次进程若在抑制窗口或上传中途被强杀，开关会卡在 1、
+  // 附件会卡在 uploading，之后永远不再同步。启动复位是唯一可靠的兜底。
+  try {
+    const db = getDb();
+    resetChangeFeedSuppression(db);
+    recoverInflightMutations(db);
+    recoverStuckUploads(db);
+    // 放在崩溃恢复之后：否则引擎可能先取到仍标记为 inflight 的条目。
+    reconcileSyncEngine(db);
+  } catch (error) {
+    console.warn("[sync-v2] startup recovery skipped:", (error as Error)?.message || error);
+  }
+}
 console.log(`🛰  WebSocket endpoint: ws://localhost:${port}/ws`);
 
 // mDNS 广播：让同局域网内的桌面/移动客户端免输入发现本实例。
@@ -866,6 +976,11 @@ async function gracefulShutdown(signal: string) {
     process.exit(1);
   }, 3000);
   try {
+    automationRuntime.stop();
+    if (taskDigestTimer) clearInterval(taskDigestTimer);
+    // 先停同步引擎：它可能正在 push，避免它再排下一轮把关停拖长。
+    // 已标记 inflight 的条目由下次启动的 recoverInflightMutations 复位。
+    try { stopSyncEngine(); } catch { /* ignore */ }
     await shutdownRealtime();
   } catch (e) {
     console.warn("[shutdown] failed:", e);

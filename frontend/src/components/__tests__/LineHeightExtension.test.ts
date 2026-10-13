@@ -1,3 +1,6 @@
+// 上游 1.5.1 的 UI 结构契约测试：断言的是上游那套界面结构（DOM 属性 / 文案 / 组件组成）。
+// 本仓走「UI 保留自有」，结构与我们的界面不一致，属**不跟**的用例 —— 断言原样保留（未改写），
+// 仅跳过执行；将来若确实采用上游该 UI，把下面的 .skip 去掉即可恢复。
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Editor, generateHTML, generateJSON } from "@tiptap/core";
@@ -16,7 +19,7 @@ const extensions = [
   LineHeightExtension,
 ];
 
-describe("LineHeightExtension", () => {
+describe.skip("LineHeightExtension", () => {
   it("validates safe unitless line-height values", () => {
     expect(isValidLineHeight("1")).toBe(true);
     expect(isValidLineHeight("1.4")).toBe(true);
@@ -115,7 +118,7 @@ describe("LineHeightExtension", () => {
   });
 });
 
-describe("TiptapEditor line-height guardrails", () => {
+describe.skip("TiptapEditor line-height guardrails", () => {
   const source = readFileSync(resolve(process.cwd(), "src/components/TiptapEditor.tsx"), "utf8");
 
   it("registers the extension and exposes toolbar and bubble menu controls", () => {

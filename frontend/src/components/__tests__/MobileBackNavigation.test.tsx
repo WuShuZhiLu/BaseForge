@@ -12,6 +12,8 @@ const nativeApp = vi.hoisted(() => ({
 }));
 
 vi.mock("@capacitor/core", () => ({
+  // 附件媒体插件经 registerPlugin 注册，导入链需要该导出存在
+  registerPlugin: () => ({ addListener: () => ({ remove: () => {} }) }),
   Capacitor: {
     getPlatform: () => "android",
     isNativePlatform: () => true,

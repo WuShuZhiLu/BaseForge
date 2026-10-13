@@ -11,6 +11,7 @@ import {
   testServerConnection,
 } from "@/lib/api";
 import { buildServerUrl, parseServerUrl, type ServerAddressParts } from "@/lib/serverUrl";
+import { safeLoginRequestTarget } from "@/lib/loginRequestDiagnostics";
 import ServerAddressInput from "@/components/ServerAddressInput";
 import LanDiscoveryPanel from "@/components/LanDiscoveryPanel";
 import { useKeyboardLayout } from "@/hooks/useCapacitor";
@@ -425,7 +426,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
       onLogin(data.token, data.user);
     } catch (err: any) {
       const message = err?.message || String(err || t("auth.networkError"));
-      console.error("[login] request failed", { url: loginUrl || "(resolveBaseUrl)", error: message });
+      console.error("[login] request failed", { url: safeLoginRequestTarget(loginUrl || "(resolveBaseUrl)"), error: message });
       setError(`${message}（请检查服务器地址、CORS/CSP、证书或 /api 反代）`);
     } finally {
       setIsLoading(false);

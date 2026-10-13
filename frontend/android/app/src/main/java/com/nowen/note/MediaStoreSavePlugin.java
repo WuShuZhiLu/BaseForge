@@ -82,7 +82,7 @@ public class MediaStoreSavePlugin extends Plugin {
         String mimeType = call.getString("mimeType", "image/png");
         String relativePath = call.getString(
                 "relativePath",
-                Environment.DIRECTORY_PICTURES + "/Nowen Note"
+                Environment.DIRECTORY_PICTURES + "/Base Notes"
         );
         Uri uri = null;
 
@@ -251,7 +251,7 @@ public class MediaStoreSavePlugin extends Plugin {
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
             ClipData clipData = new ClipData(
-                    "Nowen Note export",
+                    "Base Notes export",
                     new String[] { commonMime == null ? "*/*" : commonMime },
                     new ClipData.Item(uris.get(0))
             );
@@ -260,7 +260,7 @@ public class MediaStoreSavePlugin extends Plugin {
             }
             shareIntent.setClipData(clipData);
 
-            String title = call.getString("title", "分享 Nowen Note 导出");
+            String title = call.getString("title", "分享 Base Notes 导出");
             getActivity().startActivity(Intent.createChooser(shareIntent, title));
 
             JSObject result = new JSObject();

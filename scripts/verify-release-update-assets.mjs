@@ -56,7 +56,7 @@ function run(command, args, options = {}) {
 const SAFE_ASSET_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 function isDesktopUpdaterAsset(name) {
-  return /^Nowen-Note(?:-Lite)?-.*\.(?:exe|zip|AppImage)$/i.test(name) && !/portable/i.test(name);
+  return /^Base-Notes(?:-Lite)?-.*\.(?:exe|zip|AppImage)$/i.test(name) && !/portable/i.test(name);
 }
 
 function assertSafeRemoteAssetName(name) {
@@ -85,7 +85,7 @@ function verifyRemoteRelease({ repo, tag, version }) {
     return { metadataFiles: [], assets: [] };
   }
 
-  // A standard Nowen Note desktop release publishes the stable Windows and Linux
+  // A standard Base Notes desktop release publishes the stable Windows and Linux
   // updater channels together. When both are present, macOS is part of the same
   // supported desktop matrix and must never silently disappear from the Release.
   // This catches the v1.4.15 failure mode where Windows/Linux metadata was valid

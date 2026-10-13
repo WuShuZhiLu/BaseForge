@@ -12,8 +12,16 @@ import TaskCenter from "@/components/TaskCenter";
 import MindMapCenter from "@/components/MindMapEditor";
 import AIChatPanel from "@/components/AIChatPanel";
 import DiaryCenter from "@/components/DiaryCenter";
+import SheetEditor from "@/components/SheetEditor";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
+import TrashPage from "@/features/trash/TrashPage";
+import WorkspaceIssues from "@/components/issues/WorkspaceIssues";
+import NotificationCenter from "@/components/issues/NotificationCenter";
+import CommentManagementCenter from "@/components/CommentManagementCenter";
+import { openNoteComment } from "@/lib/noteCommentNavigation";
+import { openWorkspaceIssue } from "@/lib/workspaceIssueNavigation";
+import WechatClipboardBridge from "@/components/WechatClipboardBridge";
 import SharedNoteView from "@/components/SharedNoteView";
 import NotebookShareJoinView from "@/components/NotebookShareJoinView";
 import LoginPage from "@/components/LoginPage";
@@ -31,6 +39,10 @@ import { getServerUrl, setServerUrl, clearServerUrl, broadcastLogout, initialize
 import { TASK_VIEW_SHELL_CLASS } from "@/lib/taskLayout";
 import { useReminderNotifier } from "@/components/tasks/useReminderNotifier";
 import { resolveEditorFocusLayout } from "@/lib/editorFocusLayout";
+import { useAdaptiveWindowLayout } from "@/hooks/useAdaptiveWindowLayout";
+import { resolveMediumNoteListWidth } from "@/lib/adaptiveWindowLayout";
+import { APP_PATH_CHANGED_EVENT, replaceAppPathState, resolveCurrentAppPathname } from "@/lib/appPathNavigation";
+import { getCurrentSheetAppRoute, parseSheetAppPath, type SheetAppRoute } from "@/lib/sheetDeepLink";
 import { bootstrap as syncBootstrap, teardown as syncTeardown, syncNow } from "@/lib/syncEngine";
 import { realtime } from "@/lib/realtime";
 import { deleteNotes as deleteLocalNotes } from "@/lib/localStore";
@@ -43,6 +55,8 @@ import {
   shortcutMatchesEvent,
 } from "@/lib/shortcutRegistry";
 import CommandPalette from "@/components/common/CommandPalette";
+import FloatingLayerHost from "@/components/FloatingLayerHost";
+import NoteDeepLinkBridge from "@/components/NoteDeepLinkBridge";
 import OfflineSyncRuntime from "@/components/OfflineSyncRuntime";
 import UpdateNotifier from "@/components/common/UpdateNotifier";
 import FolderSyncScheduler from "@/components/FolderSyncScheduler";
@@ -182,7 +196,7 @@ function WebUiDisabledPage() {
       <main className="max-w-lg rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-zinc-900 mb-3">网页端已被管理员关闭</h1>
         <p className="text-sm leading-7">
-          当前服务器仅提供 API 服务。请使用 Nowen Note 桌面客户端连接该服务器。
+          当前服务器仅提供 API 服务。请使用 Base Notes 桌面客户端连接该服务器。
         </p>
       </main>
     </div>
@@ -379,6 +393,43 @@ function AppLayout() {
   // 否则用户会陷入"既无 Rail 又无主侧栏"的死局，找不到任何导航入口。
   const [railMode] = useRailMode();
   const railVisible = railMode !== "hidden" || state.sidebarCollapsed;
+  // 轻量表格深链：/sheets/:id → SheetEditor 视图。App 只订阅 URL 变化，
+  // 打开动作由 push/replaceAppPathState 触发（新建菜单 / 知识树节点点击）。
+  const [sheetRoute, setSheetRoute] = useState<SheetAppRoute>(() => getCurrentSheetAppRoute());
+  useEffect(() => {
+    const applyRoute = () => {
+      const next = parseSheetAppPath(resolveCurrentAppPathname());
+      setSheetRoute(next);
+      if (next.matched && next.sheetId) {
+        actions.setViewMode("all");
+        actions.setActiveNote(null);
+        actions.setMobileView("editor");
+      }
+    };
+    applyRoute();
+    window.addEventListener("popstate", applyRoute);
+    window.addEventListener(APP_PATH_CHANGED_EVENT, applyRoute);
+    return () => {
+      window.removeEventListener("popstate", applyRoute);
+      window.removeEventListener(APP_PATH_CHANGED_EVENT, applyRoute);
+    };
+  }, [actions]);
+  // 离开 sheet 时必须把 /sheets/:id 从 URL 清掉。否则 URL 与视图长期不一致：
+  // 点别的文档后 URL 仍停在 sheet（刷新后又占满主区），再点回该 sheet 时
+  // pushAppPathState 因 URL 相同被 commitAppPathState 去重、不派发事件而进不去。
+  useEffect(() => {
+    if (!sheetRoute.matched) return;
+    if (state.activeNote || state.viewMode !== "all") {
+      replaceAppPathState("/");
+    }
+  }, [sheetRoute.matched, state.activeNote, state.viewMode]);
+  // 只有「URL 命中 sheet」且「当前没有打开别的文档 / 没切到其它视图」时才占满主区。
+  // 否则点知识树里的其它笔记/切视图时会被表格视图锁死（URL 仍是 /sheets/:id）。
+  const isSheetView =
+    sheetRoute.matched &&
+    sheetRoute.sheetId !== null &&
+    state.viewMode === "all" &&
+    !state.activeNote;
   const isTaskView = state.viewMode === "tasks";
   const isMindMapView = state.viewMode === "mindmaps";
   const isAIChatView = state.viewMode === "ai-chat";
@@ -394,6 +445,14 @@ function AppLayout() {
   const showRail = editorFocusLayout.showRail;
   const showSidebar = editorFocusLayout.showSidebar;
   const showDesktopNoteList = editorFocusLayout.showNoteList;
+  const adaptiveWindow = useAdaptiveWindowLayout();
+  const mediumNoteWorkspace = adaptiveWindow.windowClass === "medium"
+    && !state.editorFullscreen
+    && !state.editorSplit;
+  const persistentNoteList = showDesktopNoteList || mediumNoteWorkspace;
+  const noteListWidth = mediumNoteWorkspace
+    ? resolveMediumNoteListWidth(adaptiveWindow.width)
+    : state.noteListWidth;
   const sidebarBackdropPointerStart = useRef<{ x: number; y: number } | null>(null);
 
   const handleSidebarBackdropPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -427,6 +486,18 @@ function AppLayout() {
    * 统一从外部事件驱动 setOpen(true)，组件只负责展示 + Esc 关闭。
    */
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  // 未读通知计数：由 NotificationCenter 通过 onUnreadChange 回写，驱动 NavRail 的铃铛角标。
+  const [notificationCount, setNotificationCount] = useState(0);
+  // 通知中心 / 评论中心内点击某条评论 → 打开对应笔记并定位到该评论。
+  const handleOpenComment = useCallback(
+    (noteId: string, commentId: string) =>
+      openNoteComment(noteId, commentId, (note) => {
+        actions.setActiveNote(note);
+        actions.setViewMode("all");
+        actions.setMobileView("editor");
+      }),
+    [actions],
+  );
   useEffect(() => {
     const onOpen = () => setCommandPaletteOpen(true);
     window.addEventListener("nowen:open-command-palette", onOpen);
@@ -729,7 +800,7 @@ function AppLayout() {
               // （桌面端两者也复用，写在子组件里更通用）。
               style={{ paddingBottom: 'var(--safe-area-bottom)' }}
             >
-              <NavRail variant="mobile" />
+              <NavRail variant="mobile" notificationCount={notificationCount} />
               <div className="flex-1 min-w-0 overflow-hidden">
                 <Sidebar />
               </div>
@@ -744,7 +815,7 @@ function AppLayout() {
           但 Rail 仍在，模块切换永远 1 次点击可达。
           v16 P3 后续：Rail 三档模式（icon=48px 纯图标 / label=64px 图标+文字 / hidden=完全隐藏）；
           hidden 模式下若主侧栏也折叠，强制保留 Rail（避免完全无侧栏入口）。 */}
-      {showRail && <PhaseAPerfProfiler id="NavRail"><NavRail /></PhaseAPerfProfiler>}
+      {showRail && <PhaseAPerfProfiler id="NavRail"><NavRail notificationCount={notificationCount} /></PhaseAPerfProfiler>}
       {showSidebar && (
         <div
           className="hidden md:flex shrink-0"
@@ -756,7 +827,25 @@ function AppLayout() {
       {showSidebar && <SidebarResizeHandle />}
 
       {/* ===== 主内容区 ===== */}
-      {isTaskView ? (
+      {isSheetView ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <MobileTopBar />
+          <SheetEditor
+            noteId={sheetRoute.sheetId!}
+            onRequestClose={() => replaceAppPathState("/")}
+          />
+        </div>
+      ) : state.viewMode === "trash" ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <MobileTopBar />
+          <TrashPage />
+        </div>
+      ) : state.viewMode === "issues" ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <MobileTopBar />
+          <WorkspaceIssues issueId={null} />
+        </div>
+      ) : isTaskView ? (
         <div className={TASK_VIEW_SHELL_CLASS}>
           {/* 移动端顶栏 */}
           <MobileTopBar />
@@ -803,30 +892,42 @@ function AppLayout() {
           <ShareManagementPage />
         </div>
       ) : (
-        <div className="flex-1 flex relative overflow-hidden">
+        <div
+          className="flex-1 flex relative overflow-hidden"
+          data-note-workspace-window={adaptiveWindow.windowClass}
+          data-note-workspace-two-pane={mediumNoteWorkspace ? "true" : "false"}
+          data-note-workspace-width={adaptiveWindow.width}
+          data-note-workspace-height={adaptiveWindow.height}
+        >
           {/*
             移动端与桌面端共用同一个 NoteList 实例。仅靠 CSS 隐藏两个独立实例会让
             隐藏列表也执行数据请求，导致一次 refreshNotes 产生重复的 /api/notes 调用。
           */}
-          {(state.mobileView === "list" || showDesktopNoteList) && (
+          {(state.mobileView === "list" || persistentNoteList) && (
             <div
               className={`
-                flex-col shrink-0 h-full w-full md:w-[var(--note-list-width)]
-                ${state.mobileView === "list" ? "flex" : "hidden"}
-                ${showDesktopNoteList ? "md:flex" : "md:hidden"}
+                flex-col shrink-0 h-full
+                ${mediumNoteWorkspace ? "flex border-r border-app-border" : "w-full md:w-[var(--note-list-width)]"}
+                ${mediumNoteWorkspace || state.mobileView === "list" ? "flex" : "hidden"}
+                ${mediumNoteWorkspace ? "" : showDesktopNoteList ? "md:flex" : "md:hidden"}
               `}
-              style={{ "--note-list-width": `${state.noteListWidth}px` } as React.CSSProperties}
+              style={mediumNoteWorkspace
+                ? { width: `${noteListWidth}px` }
+                : { "--note-list-width": `${noteListWidth}px` } as React.CSSProperties}
             >
               <PhaseAPerfProfiler id="NoteList"><NoteList /></PhaseAPerfProfiler>
             </div>
           )}
 
-          {showDesktopNoteList && <NoteListResizeHandle />}
+          {showDesktopNoteList && !mediumNoteWorkspace && <NoteListResizeHandle />}
 
           {/* 编辑器 — 移动端全屏覆盖 */}
           <div className={`
-            absolute inset-0 z-20 md:static md:z-auto md:flex-1 flex flex-col min-w-0
-            ${state.mobileView === "editor" ? "flex" : "hidden md:flex"}
+            flex flex-col min-w-0
+            ${mediumNoteWorkspace
+              ? "relative z-auto flex-1"
+              : "absolute inset-0 z-20 md:static md:z-auto md:flex-1"}
+            ${mediumNoteWorkspace || state.mobileView === "editor" ? "flex" : "hidden md:flex"}
           `}>
             <PhaseAPerfProfiler id="EditorPane">
               {state.editorSplit ? <EditorSplitView /> : <EditorPane />}
@@ -840,6 +941,28 @@ function AppLayout() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
+
+      {/* 插件 UI 贡献的浮动层宿主：把插件注册的悬浮入口/面板渲染到全局层 */}
+      <FloatingLayerHost />
+
+      {/* 笔记深链桥：处理 nowen://note/... 协议跳转与站内深链 */}
+      <NoteDeepLinkBridge />
+
+      {/* 微信剪贴板桥：桌面端监听系统剪贴板中的公众号文章链接，一键剪藏 */}
+      <WechatClipboardBridge />
+
+      {/* 通知中心（由 NavRail 铃铛的 OPEN_NOTIFICATIONS_EVENT 打开，自管理显隐） */}
+      <NotificationCenter
+        onUnreadChange={setNotificationCount}
+        onOpenComment={handleOpenComment}
+        onOpenIssue={(issueId, workspaceId) => {
+          openWorkspaceIssue(issueId, workspaceId);
+          actions.setViewMode("issues");
+          actions.setMobileSidebar(false);
+        }}
+      />
+      {/* 评论中心（由 OPEN_COMMENT_CENTER_EVENT 打开，自管理显隐） */}
+      <CommentManagementCenter onOpenComment={handleOpenComment} />
 
       {/* 无 UI 的网络探活、离线队列重放与同步后数据刷新 */}
       <OfflineSyncRuntime />

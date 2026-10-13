@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload } from "lucide-react";
+import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2 } from "lucide-react";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
+import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
+import { createSheetInKnowledgeTree } from "@/components/knowledgeTreeCreateExtras";
 import KnowledgeTreePanelBase, {
   FOCUS_KNOWLEDGE_TREE_EVENT,
   KNOWLEDGE_TREE_CHANGED_EVENT,
@@ -53,6 +55,10 @@ interface KnowledgeTreeCreateDropdownProps {
   onCreate: (parentId: string | null, kind: KnowledgeTreeInlineCreateKind) => void;
   onCreateFromTemplate: (parentId: string | null) => void;
   onImport: (parentId: string | null, kind: KnowledgeTreeImportRequest["kind"]) => void;
+  /** 新建轻量表格：由调用方建 sheet 节点并跳转。 */
+  onCreateSheet?: (parentId: string | null) => void;
+  /** 新建加密笔记：由调用方弹出密码设置对话框。 */
+  onCreateEncrypted?: (parentId: string | null) => void;
 }
 
 function markCreateButtons(root: HTMLElement): void {
@@ -198,6 +204,8 @@ export function KnowledgeTreeCreateDropdown({
   onCreate,
   onCreateFromTemplate,
   onImport,
+  onCreateSheet,
+  onCreateEncrypted,
 }: KnowledgeTreeCreateDropdownProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<React.CSSProperties | null>(null);
@@ -280,6 +288,28 @@ export function KnowledgeTreeCreateDropdown({
         <Folder size={15} className="text-amber-500" />
         <span>{FOLDER_CREATE_ITEM.label}</span>
       </button>
+      {onCreateSheet && (
+        <button
+          type="button"
+          role="menuitem"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          onClick={() => onCreateSheet(menu.parentId)}
+        >
+          <Table2 size={15} className="text-sky-500" />
+          <span>轻量表格</span>
+        </button>
+      )}
+      {onCreateEncrypted && (
+        <button
+          type="button"
+          role="menuitem"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          onClick={() => onCreateEncrypted(menu.parentId)}
+        >
+          <Lock size={15} className="text-accent-primary" />
+          <span>加密笔记</span>
+        </button>
+      )}
       <div className="my-1 border-t border-app-border" />
       {IMPORT_ITEMS.map((item) => {
         const Icon = item.icon;
@@ -322,6 +352,7 @@ export function KnowledgeTreePanel(props: KnowledgeTreePanelProps) {
   const [importRequest, setImportRequest] = useState<KnowledgeTreeImportRequest | undefined>();
   const [templateCreateRequest, setTemplateCreateRequest] = useState<KnowledgeTreeTemplateCreateRequest | undefined>();
   const [templatePicker, setTemplatePicker] = useState<{ parentId: string | null } | null>(null);
+  const [encryptedParent, setEncryptedParent] = useState<{ parentId: string | null } | null>(null);
   const [allNotesHost, setAllNotesHost] = useState<HTMLElement | null>(null);
   const [layoutMode, setLayoutMode] = useState<NoteWorkspaceLayoutMode>(() =>
     loadNoteWorkspaceLayoutMode(state.noteListCollapsed),
@@ -455,12 +486,26 @@ export function KnowledgeTreePanel(props: KnowledgeTreePanelProps) {
         onCreate={requestInlineCreate}
         onCreateFromTemplate={openTemplatePicker}
         onImport={requestImport}
+        onCreateSheet={(parentId) => {
+          setCreateMenu(null);
+          void createSheetInKnowledgeTree(parentId);
+        }}
+        onCreateEncrypted={(parentId) => {
+          setCreateMenu(null);
+          setEncryptedParent({ parentId });
+        }}
       />
       <NoteTemplatePickerDialog
         open={Boolean(templatePicker)}
         onClose={() => setTemplatePicker(null)}
         onCreate={requestTemplateCreate}
       />
+      {encryptedParent && (
+        <EncryptedNoteCreateDialog
+          parentId={encryptedParent.parentId}
+          onClose={() => setEncryptedParent(null)}
+        />
+      )}
     </>
   );
 }

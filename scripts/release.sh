@@ -144,23 +144,23 @@ TAG="v${VERSION}"
 
 required_mac_asset_names() {
   cat <<EOF
-Nowen-Note-${VERSION}-x64.dmg
-Nowen-Note-${VERSION}-arm64.dmg
-Nowen-Note-${VERSION}-x64.zip
-Nowen-Note-${VERSION}-arm64.zip
+Base-Notes-${VERSION}-x64.dmg
+Base-Notes-${VERSION}-arm64.dmg
+Base-Notes-${VERSION}-x64.zip
+Base-Notes-${VERSION}-arm64.zip
 latest-mac.yml
 EOF
 }
 
 required_windows_asset_names() {
   cat <<EOF
-Nowen-Note-${VERSION}-setup.exe
-Nowen-Note-${VERSION}-portable.exe
-Nowen-Note-${VERSION}-setup.exe.blockmap
+Base-Notes-${VERSION}-setup.exe
+Base-Notes-${VERSION}-portable.exe
+Base-Notes-${VERSION}-setup.exe.blockmap
 latest.yml
-Nowen-Note-Lite-${VERSION}-setup.exe
-Nowen-Note-Lite-${VERSION}-portable.exe
-Nowen-Note-Lite-${VERSION}-setup.exe.blockmap
+Base-Notes-Lite-${VERSION}-setup.exe
+Base-Notes-Lite-${VERSION}-portable.exe
+Base-Notes-Lite-${VERSION}-setup.exe.blockmap
 latest-lite.yml
 EOF
 }
@@ -178,7 +178,7 @@ release_has_complete_mac_assets() {
 
 release_contains_windows_candidates() {
   gh release view "$TAG" --repo "$GITHUB_REPO_SLUG" --json assets --jq '.assets[].name' 2>/dev/null \
-    | grep -Eq "^Nowen-Note(-Lite)?-${VERSION}-(setup|portable)\\.exe$"
+    | grep -Eq "^Base-Notes(-Lite)?-${VERSION}-(setup|portable)\\.exe$"
 }
 
 ensure_desktop_platform_notes() {
@@ -278,10 +278,10 @@ collect_ci_signed_windows_assets() {
   local windows_assets=()
   while IFS= read -r file; do windows_assets+=("$file"); done < <(
     find "$temp_dir" -type f \( \
-      -name "Nowen-Note-${VERSION}-*.exe" -o \
-      -name "Nowen-Note-${VERSION}-*.exe.blockmap" -o \
-      -name "Nowen-Note-Lite-${VERSION}-*.exe" -o \
-      -name "Nowen-Note-Lite-${VERSION}-*.exe.blockmap" -o \
+      -name "Base-Notes-${VERSION}-*.exe" -o \
+      -name "Base-Notes-${VERSION}-*.exe.blockmap" -o \
+      -name "Base-Notes-Lite-${VERSION}-*.exe" -o \
+      -name "Base-Notes-Lite-${VERSION}-*.exe.blockmap" -o \
       -name "latest.yml" -o \
       -name "latest-lite.yml" \
     \) -print | sort
@@ -320,10 +320,10 @@ collect_ci_mac_assets() {
   local mac_assets=()
   while IFS= read -r file; do mac_assets+=("$file"); done < <(
     find "$CI_ARTIFACT_DIR" -type f \( \
-      -name "Nowen-Note-${VERSION}-*.dmg" -o \
-      -name "Nowen-Note-${VERSION}-*.dmg.blockmap" -o \
-      -name "Nowen-Note-${VERSION}-*.zip" -o \
-      -name "Nowen-Note-${VERSION}-*.zip.blockmap" -o \
+      -name "Base-Notes-${VERSION}-*.dmg" -o \
+      -name "Base-Notes-${VERSION}-*.dmg.blockmap" -o \
+      -name "Base-Notes-${VERSION}-*.zip" -o \
+      -name "Base-Notes-${VERSION}-*.zip.blockmap" -o \
       -name "latest-mac.yml" \
     \) -print | sort
   )

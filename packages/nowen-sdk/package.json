@@ -1,7 +1,7 @@
 {
   "name": "@nowen/sdk",
   "version": "1.0.0",
-  "description": "Nowen Note TypeScript SDK - 完整封装所有 REST API",
+  "description": "Base Notes TypeScript SDK - 完整封装所有 REST API",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

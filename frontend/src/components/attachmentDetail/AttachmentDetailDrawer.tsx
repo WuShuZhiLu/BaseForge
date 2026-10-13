@@ -36,6 +36,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
 import { copyText } from "@/lib/clipboard";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { buildPublicAttachmentUrl } from "@/lib/publicAttachmentUrl";
 import { downloadAttachment } from "@/lib/downloadFile";
 import {
   formatImageHostSnippet,
@@ -111,6 +113,7 @@ export default function AttachmentDetailDrawer({
   renderPreview,
 }: AttachmentDetailDrawerProps) {
   const { t } = useTranslation();
+  const { siteConfig } = useSiteSettings();
   const [detail, setDetail] = useState<FileDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const reqIdRef = useRef(0);
@@ -208,7 +211,10 @@ export default function AttachmentDetailDrawer({
   const copySnippet = useCallback(
     async (format: ImageHostFormat) => {
       if (!detail) return;
-      const full = resolveAttachmentUrl(detail.url);
+      const full = buildPublicAttachmentUrl(resolveAttachmentUrl(detail.url), {
+        filePublicOrigin: siteConfig.filePublicOrigin,
+        publicWebOrigin: siteConfig.publicWebOrigin,
+      });
       const snippet = formatImageHostSnippet(format, full, detail.filename);
       const ok = await copyText(snippet);
       if (ok) {
@@ -217,7 +223,7 @@ export default function AttachmentDetailDrawer({
         toast.error(t("attachmentDetail.copyFailed"));
       }
     },
-    [detail, t],
+    [detail, siteConfig.filePublicOrigin, siteConfig.publicWebOrigin, t],
   );
 
   const [downloading, setDownloading] = useState(false);
@@ -477,7 +483,10 @@ export default function AttachmentDetailDrawer({
               )}
 
               {(() => {
-                const fullUrl = resolveAttachmentUrl(detail.url);
+                const fullUrl = buildPublicAttachmentUrl(resolveAttachmentUrl(detail.url), {
+                  filePublicOrigin: siteConfig.filePublicOrigin,
+                  publicWebOrigin: siteConfig.publicWebOrigin,
+                });
                 if (isMobile) {
                   return (
                     <div

@@ -106,10 +106,10 @@ test("macOS 发版资产必须同时包含 Intel、Apple Silicon 与更新元数
   const version = "1.4.16";
   const required = requiredMacReleaseAssets(version);
   assert.deepEqual(required, [
-    "Nowen-Note-1.4.16-x64.dmg",
-    "Nowen-Note-1.4.16-arm64.dmg",
-    "Nowen-Note-1.4.16-x64.zip",
-    "Nowen-Note-1.4.16-arm64.zip",
+    "Base-Notes-1.4.16-x64.dmg",
+    "Base-Notes-1.4.16-arm64.dmg",
+    "Base-Notes-1.4.16-x64.zip",
+    "Base-Notes-1.4.16-arm64.zip",
     "latest-mac.yml",
   ]);
   assert.deepEqual(findMissingMacReleaseAssets(required, version), []);
@@ -117,9 +117,9 @@ test("macOS 发版资产必须同时包含 Intel、Apple Silicon 与更新元数
 });
 
 test("macOS 双架构 ZIP 按手动下载资产处理", () => {
-  assert.equal(isMacManualDownloadZip("Nowen-Note-1.4.16-x64.zip"), true);
-  assert.equal(isMacManualDownloadZip("Nowen-Note-1.4.16-arm64.zip"), true);
-  assert.equal(isMacManualDownloadZip("Nowen-Note-1.4.16-setup.exe"), false);
+  assert.equal(isMacManualDownloadZip("Base-Notes-1.4.16-x64.zip"), true);
+  assert.equal(isMacManualDownloadZip("Base-Notes-1.4.16-arm64.zip"), true);
+  assert.equal(isMacManualDownloadZip("Base-Notes-1.4.16-setup.exe"), false);
 });
 
 test("Windows Node ZIP 使用 PowerShell Expand-Archive 解压", async () => {

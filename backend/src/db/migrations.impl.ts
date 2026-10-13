@@ -2159,7 +2159,7 @@ export function runMigrations(db: Database.Database): number {
     //     - 拒绝降级没有误伤：用户要么升级程序、要么回滚 DB（从备份恢复）。
     //
     //   用户可采取的措施（日志里直接给出，减少排查时间）：
-    //     1) 升级 nowen-note 到能识别 schema v${cur} 的版本（查 CHANGELOG）；
+    //     1) 升级 Base Notes 到能识别 schema v${cur} 的版本（查 CHANGELOG）；
     //     2) 或从 /userData/backups/ 选一份 schema v${CURRENT_SCHEMA_VERSION}
     //        及以下的备份执行恢复（后端启动会通过，但需注意数据会回滚）；
     //     3) 若确认当前 DB 没有新版独占的数据（例如刚升级一次立刻回滚），
@@ -2170,7 +2170,7 @@ export function runMigrations(db: Database.Database): number {
       `[migrations] 数据库版本 ${cur} 高于当前程序支持的 ${CURRENT_SCHEMA_VERSION}。\n` +
       `这通常是"用旧版程序打开新版数据库"造成的。为防止旧程序破坏数据，启动已被拒绝。\n` +
       `处理建议：\n` +
-      `  1) 升级 nowen-note 到能识别 schema v${cur} 的版本；\n` +
+      `  1) 升级 Base Notes 到能识别 schema v${cur} 的版本；\n` +
       `  2) 或从备份恢复一份 schema 版本 <= ${CURRENT_SCHEMA_VERSION} 的数据库；\n` +
       `  3) 确认新库无独占数据时，可手动回滚 schema_migrations 表（有损，慎用）。`,
     );

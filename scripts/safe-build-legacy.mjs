@@ -3,15 +3,15 @@
  * 安全打包脚本 —— 规避 Windows 下 electron-builder 常见的 rcedit/文件锁问题。
  *
  * 背景：
- *   Windows 平台打包 Electron 应用时，`rcedit-x64.exe` 要改 `Nowen Note.exe` 的
+ *   Windows 平台打包 Electron 应用时，`rcedit-x64.exe` 要改 `Base Notes.exe` 的
  *   版本号/图标元信息。这个步骤经常因为以下原因报 `Unable to commit changes`：
- *     1. 之前开发/调试残留的 `Nowen Note.exe` 进程还握着文件句柄；
+ *     1. 之前开发/调试残留的 `Base Notes.exe` 进程还握着文件句柄；
  *     2. 企业 EDR / Defender / 腾讯电脑管家 对新生成的 PE 做实时扫描，扫描瞬间独占文件；
  *     3. IDE（CodeBuddy / VSCode）对工作区内文件有文件监听/只读句柄；
  *     4. `dist-electron/` 目录里残留上次产物，只读属性或 Everything 索引挂着。
  *
  * 本脚本串联三件事：
- *   - `taskkill` 结束所有 `Nowen Note.exe` 残留进程；
+ *   - `taskkill` 结束所有 `Base Notes.exe` 残留进程；
  *   - 设 `NOWEN_BUILD_OUT=1`，让 builder.config.js 把产物输出改到 `%TEMP%\nowen-note-build`，
  *     彻底脱离工作区，避免 IDE 监听；
  *   - 清理临时输出目录，再起 electron-builder 子进程。
@@ -43,9 +43,9 @@ function assertFileExists(filePath, label) {
 
 // Step 1: 杀残留进程（Windows only）
 if (isWin) {
-  log("killing leftover 'Nowen Note.exe' processes (if any)...");
+  log("killing leftover 'Base Notes.exe' processes (if any)...");
   // /F 强制，/IM 按映像名；没进程时 taskkill 会返回非零，忽略即可
-  const result = spawnSync("taskkill", ["/F", "/IM", "Nowen Note.exe"], {
+  const result = spawnSync("taskkill", ["/F", "/IM", "Base Notes.exe"], {
     shell: false,
     stdio: "pipe",
     encoding: "utf8",
@@ -81,7 +81,7 @@ if (existsSync(tmpOut)) {
 // 企业杀软（Defender/EDR/电脑管家）会拦截 rcedit 的 MoveFileEx，造成日志里一堆红字
 //   ⨯ cannot execute  cause=exit status 1
 //     errorOut=Fatal error: Unable to commit changes
-//     command='...\rcedit-x64.exe' '...\Nowen Note.exe' --set-version-string ...
+//     command='...\rcedit-x64.exe' '...\Base Notes.exe' --set-version-string ...
 //   • Above command failed, retrying 3 more times
 // 但实际上版本号最终还是写进去了（打包完自检 FileVersion=1.0.2 就是证据）。
 // 所以把这几行折叠成一条黄色提示，避免误导用户以为"打包失败"。
@@ -224,10 +224,10 @@ try {
   // 造成日志报错，但 rcedit 的修改其实**大多数时候仍然持久化**了。
   // 所以日志里看到的红叉是"假阳性" —— 真实结果要看最终 exe 的版本信息。
   //
-  // 这里我们读一下 `win-unpacked/Nowen Note.exe` 的 FileVersion，
+  // 这里我们读一下 `win-unpacked/Base Notes.exe` 的 FileVersion，
   // 显式告诉用户：版本号写进去了没有。
   if (isWin) {
-    const exePath = join(tmpOut, "win-unpacked", "Nowen Note.exe");
+    const exePath = join(tmpOut, "win-unpacked", "Base Notes.exe");
     if (existsSync(exePath)) {
       const resourcesPath = join(tmpOut, "win-unpacked", "resources");
       assertFileExists(

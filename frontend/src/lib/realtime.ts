@@ -15,6 +15,8 @@
 
 import { clearAuthTokens } from "@/lib/authSession";
 import { inferBrowserServerBaseUrl, normalizeServerBaseUrl } from "@/lib/serverUrl";
+import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
+import { isMobileSyncEnabled, MOBILE_SYNC_SETTINGS_CHANGED_EVENT } from "@/lib/mobileSyncStatus";
 
 type Listener = (payload: any) => void;
 
@@ -49,10 +51,14 @@ class RealtimeClient {
 
   /**
    * 解析 WebSocket URL：
-   *   - 优先用自定义 server URL（nowen-server-url）
+   *   - Android 设备本地模式：明确禁用实时协作网络层；即使保留了账号 token，
+   *     也不能因为旧 token 仍在 localStorage 就偷偷连回服务器。
+   *   - 其他模式优先用自定义 server URL（nowen-server-url）
    *   - 否则根据当前页面 origin 推断
    */
   private resolveWsUrl(): string | null {
+    if (isMobileLocalMode()) return null;
+    if (isAndroidNativeRuntime() && !isMobileSyncEnabled()) return null;
     const token = localStorage.getItem("nowen-token");
     if (!token) return null;
 
@@ -161,7 +167,7 @@ class RealtimeClient {
     }
   }
 
-  disconnect() {
+  disconnect(preserveSubscriptions = false) {
     this.manualClosed = true;
     this.stopHeartbeat();
     if (this.reconnectTimer) {
@@ -172,8 +178,10 @@ class RealtimeClient {
       try { this.ws.close(); } catch {}
       this.ws = null;
     }
-    this.subscribedRooms.clear();
-    this.pendingSubs.clear();
+    if (!preserveSubscriptions) {
+      this.subscribedRooms.clear();
+      this.pendingSubs.clear();
+    }
   }
 
   private scheduleReconnect() {
@@ -358,6 +366,16 @@ class RealtimeClient {
 
 // 单例
 export const realtime = new RealtimeClient();
+
+// Android 端同步开关变化时，实时连接必须跟着开关走：
+// 关 → 断开；开 → 重连（订阅在重连时恢复）。
+if (typeof window !== "undefined") {
+  window.addEventListener(MOBILE_SYNC_SETTINGS_CHANGED_EVENT, () => {
+    if (!isAndroidNativeRuntime()) return;
+    if (isMobileSyncEnabled()) realtime.connect();
+    else realtime.disconnect(true);
+  });
+}
 
 // 页面卸载时主动关闭，避免后端堆积连接
 if (typeof window !== "undefined") {

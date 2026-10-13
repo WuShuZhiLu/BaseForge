@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
+import i18n from "i18next";
+import type { TFunction } from "i18next";
 import {
   ArrowLeftRight,
   Copy,
@@ -21,6 +23,8 @@ import {
   PinOff,
   Plus,
   Printer,
+  Search,
+  SearchX,
   ShieldCheck,
   Share2,
   SplitSquareHorizontal,
@@ -33,6 +37,13 @@ import {
 } from "lucide-react";
 
 import ContextMenu, { type ContextMenuItem } from "@/components/ContextMenu";
+import {
+  excludeNotebookFromSearch,
+  includeNotebookInSearch,
+  listSearchNotebookExclusions,
+  resolveSearchNotebookExclusionStatus,
+  type SearchNotebookExclusionStatus,
+} from "@/lib/searchNotebookExclusions";
 import { buildNoteContextMenuLayout } from "@/components/noteContextMenuLayout";
 import EmojiIconPicker from "@/components/EmojiPicker";
 import NotebookShareDialog from "@/components/NotebookShareDialog";
@@ -124,6 +135,8 @@ function importChildren(): ContextMenuItem[] {
 export function buildKnowledgeTreeNodeMenuItems(
   node: KnowledgeTreeNode,
   note: LoadedNote | null,
+  searchExclusionStatus: SearchNotebookExclusionStatus | null = null,
+  t: TFunction = i18n.t,
 ): ContextMenuItem[] {
   const capabilities = node.access.capabilities;
   const isDocument = node.resourceType === "note";
@@ -216,7 +229,7 @@ export function buildKnowledgeTreeNodeMenuItems(
         danger: true,
         disabled: !note || note.isLocked === 1,
       } : undefined,
-    });
+    }, t);
   }
 
   const items: ContextMenuItem[] = [];
@@ -249,6 +262,38 @@ export function buildKnowledgeTreeNodeMenuItems(
   if (capabilities.canManageMembers) {
     management.push({ id: "permissions", label: "成员与权限", icon: <ShieldCheck size={14} /> });
   }
+  // 搜索范围是"每个用户自己的偏好"，不是内容变更：任何能看到该笔记本的用户
+  // （包括只读共享成员）都可以把它从自己的全局搜索里排除。
+  if (isNotebook) {
+    if (!searchExclusionStatus) {
+      management.push({
+        id: "search_scope_loading",
+        label: "正在读取搜索范围…",
+        icon: <Search size={14} />,
+        disabled: true,
+      });
+    } else if (searchExclusionStatus.kind === "direct") {
+      management.push({
+        id: "search_include",
+        label: "重新纳入全局搜索",
+        icon: <Search size={14} />,
+      });
+    } else if (searchExclusionStatus.kind === "inherited") {
+      management.push({
+        id: "search_scope_inherited",
+        label: "已被上级目录排除",
+        icon: <SearchX size={14} />,
+        disabled: true,
+      });
+    } else {
+      management.push({
+        id: "search_exclude",
+        label: "从全局搜索中排除",
+        icon: <SearchX size={14} />,
+      });
+    }
+  }
+
   if (management.length) {
     if (items.length) items.push(separator("sep-manage"));
     items.push(...management);
@@ -337,9 +382,34 @@ export default function KnowledgeTreeNodeMenu({
     return () => { cancelled = true; };
   }, [menu.isOpen, node?.id, node?.resourceId, node?.resourceType]);
 
+  // 全局搜索排除状态：按当前节点加载，菜单打开时读取一次即可。
+  const [searchExclusionStatus, setSearchExclusionStatus] = useState<SearchNotebookExclusionStatus | null>(null);
+  useEffect(() => {
+    if (!menu.isOpen || node?.resourceType !== "notebook") {
+      setSearchExclusionStatus(null);
+      return;
+    }
+    let cancelled = false;
+    setSearchExclusionStatus(null);
+    listSearchNotebookExclusions()
+      .then((response) => {
+        if (cancelled) return;
+        setSearchExclusionStatus(resolveSearchNotebookExclusionStatus(
+          node.resourceId,
+          response.direct,
+          state.notebooks,
+        ));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.warn("[KnowledgeTreeNodeMenu] failed to load search exclusion status", error);
+      });
+    return () => { cancelled = true; };
+  }, [menu.isOpen, node?.id, node?.resourceId, node?.resourceType, state.notebooks]);
+
   const items = useMemo(
-    () => node ? buildKnowledgeTreeNodeMenuItems(node, note) : [],
-    [node, note],
+    () => node ? buildKnowledgeTreeNodeMenuItems(node, note, searchExclusionStatus) : [],
+    [node, note, searchExclusionStatus],
   );
 
   const openLoadedNote = (value: LoadedNote) => {
@@ -626,6 +696,25 @@ export default function KnowledgeTreeNodeMenu({
         case "delete": await onDelete(node); break;
         case "share": setShareNotebook(await getNotebook()); break;
         case "share_note": setShareNote({ id: node.resourceId, title: node.title }); break;
+        case "search_exclude":
+          if (node.resourceType === "notebook") {
+            await excludeNotebookFromSearch(node.resourceId);
+            setSearchExclusionStatus({ kind: "direct", sourceNotebookId: node.resourceId });
+            toast.success(`“${node.title}”已从全局搜索中排除`);
+          }
+          break;
+        case "search_include":
+          if (node.resourceType === "notebook") {
+            await includeNotebookInSearch(node.resourceId);
+            const response = await listSearchNotebookExclusions();
+            setSearchExclusionStatus(resolveSearchNotebookExclusionStatus(
+              node.resourceId,
+              response.direct,
+              state.notebooks,
+            ));
+            toast.success(`“${node.title}”已重新纳入全局搜索`);
+          }
+          break;
         case "change_icon": {
           const notebook = await getNotebook();
           setIconPicker({ notebook, top: menu.y, left: menu.x });

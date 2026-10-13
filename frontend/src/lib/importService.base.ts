@@ -17,6 +17,7 @@ import { IndentExtension } from "@/lib/codeBlockIndent";
 import { common, createLowlight } from "lowlight";
 import { TextStyleKit } from "@/components/FontSizeExtension";
 import { Video as VideoExtension } from "@/components/VideoExtension";
+import { VoiceMemo } from "@/components/VoiceMemoExtension";
 import { MathInline, MathBlock } from "@/components/MathExtensions";
 import { FootnoteReference, FootnoteDefinition } from "@/components/FootnoteExtensions";
 import { BlockEmbedExtension } from "@/components/BlockEmbedExtension";
@@ -95,6 +96,8 @@ export const tiptapExtensions = [
   ...TextStyleKit,
   // 视频节点：与编辑器保持一致，否则导入/修复阶段 video 节点会被吃
   VideoExtension,
+  // 语音备忘录节点：同上，缺它则导入的音频会被 schema 静默丢弃。
+  VoiceMemo,
   BlockEmbedExtension,
   // 数学公式（行内 / 块级）：必须与 TiptapEditor 对齐。
   // 缺这两个时，含 LaTeX 公式的笔记走 repairTiptapJson → generateHTML 会因
@@ -628,6 +631,9 @@ const IMAGE_MIME_MAP: Record<string, string> = {
   ico: "image/x-icon",
 };
 
+// 语音备忘录等音频与图片一样以 ./assets/<file> 形式随 md 导出，导入时必须一起还原。
+const AUDIO_MIME_MAP: Record<string, string> = { m4a: "audio/mp4", mp4: "audio/mp4", webm: "audio/webm", ogg: "audio/ogg", oga: "audio/ogg", mp3: "audio/mpeg", wav: "audio/wav" };
+
 function isImageFile(name: string): boolean {
   const lower = name.toLowerCase();
   const ext = lower.split(".").pop() || "";
@@ -774,15 +780,16 @@ export async function readMarkdownFromZipWithMeta(
   const rawZipBase = (file.name || "archive.zip").replace(/\.zip$/i, "");
   const outerFolderName = sanitizeSegment(rawZipBase) || "导入的笔记";
 
-  // 第一轮：扫描所有图片文件，构建路径 → base64 的映射
+  // 第一轮：扫描所有图片与音频文件，构建路径 → base64 的映射
   const imageMap: Record<string, string> = {};
   for (const [path, zipEntry] of Object.entries(zip.files)) {
     if (zipEntry.dir) continue;
     if (path.includes("__MACOSX") || path.startsWith(".")) continue;
-    if (!isImageFile(path)) continue;
+    const audioMime = AUDIO_MIME_MAP[path.toLowerCase().split(".").pop() || ""];
+    if (!isImageFile(path) && !audioMime) continue;
     try {
       const base64 = await zipEntry.async("base64");
-      const mime = getImageMime(path);
+      const mime = audioMime || getImageMime(path);
       const dataUri = `data:${mime};base64,${base64}`;
       // 同时用完整路径和文件名做 key，提升相对路径匹配命中率
       imageMap[path] = dataUri;

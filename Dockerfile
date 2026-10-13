@@ -37,7 +37,10 @@ RUN apk add --no-cache --virtual .build-deps python3 make g++ linux-headers
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY backend/ .
-RUN npx tsc
+# 插件子进程入口是 .mjs（不参与 tsc 编译），必须显式拷进 dist/plugins/，
+# 否则容器内插件执行会找不到 runner/sandbox 子进程入口。
+RUN npx tsc \
+    && cp src/plugins/runner-child.mjs src/plugins/sandbox-child.mjs dist/plugins/
 RUN apk del .build-deps
 
 # ---------- Stage 3: 运行时镜像 ----------
@@ -69,7 +72,7 @@ ARG APP_VERSION=""
 ARG VCS_REF=""
 ENV NOWEN_BUILD_TIME=${BUILD_DATE}
 ENV NOWEN_APP_VERSION=${APP_VERSION}
-LABEL org.opencontainers.image.title="Nowen Note" \
+LABEL org.opencontainers.image.title="Base Notes" \
       org.opencontainers.image.description="Self-hosted note and knowledge management" \
       org.opencontainers.image.source="https://github.com/cropflre/nowen-note" \
       org.opencontainers.image.version=${APP_VERSION} \

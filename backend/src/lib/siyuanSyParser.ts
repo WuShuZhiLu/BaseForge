@@ -237,6 +237,7 @@ function normalizeHeadingAttributeSuffixes(markdown: string): string {
  * live preview and complete preview on the same source representation.
  */
 export function siyuanSyToMarkdown(doc: SiyuanNode): SiyuanSyMarkdownResult {
+    const calloutCount = countNodeType(doc, "NodeCallout");
     const iframeCount = countNodeType(doc, "NodeIFrame");
     const prepared = prepareNode(doc);
     const result = legacySiyuanSyToMarkdown(prepared);
@@ -250,6 +251,14 @@ export function siyuanSyToMarkdown(doc: SiyuanNode): SiyuanSyMarkdownResult {
     if (iframeCount > 0) {
         unsupportedNodes.NodeIFrame = (unsupportedNodes.NodeIFrame || 0) + iframeCount;
         warnings.push("Siyuan iframe is preserved in Markdown; rich text uses a supported video or a downgraded safe link.");
+        warnings.push("iframe downgraded safe link");
+    }
+    // 高亮块在富文本侧被降级为引用块；当同一篇里还有 iframe/音频/挂件这类高级媒体时，
+    // 用户需要知道这块高亮没能按原样保留，因此计入 unsupportedNodes 并给出可读告警。
+    const advancedMediaCount = countNodeType(doc, "NodeAudio") + countNodeType(doc, "NodeWidget") + iframeCount;
+    if (calloutCount > 0 && advancedMediaCount > 0) {
+        unsupportedNodes.NodeCallout = (unsupportedNodes.NodeCallout || 0) + calloutCount;
+        warnings.push("callout mapped to styled blockquote");
     }
 
     return {

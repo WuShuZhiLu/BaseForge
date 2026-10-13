@@ -174,7 +174,7 @@ function ModalShell({
       <section
         role="dialog"
         aria-modal="true"
-        aria-label="Nowen Note 应用更新"
+        aria-label="Base Notes 应用更新"
         className="relative w-full max-w-[520px] overflow-hidden rounded-2xl border border-app-border bg-app-elevated shadow-2xl"
       >
         {dismissible && onClose && (

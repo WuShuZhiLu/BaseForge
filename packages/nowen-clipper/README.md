@@ -1,6 +1,6 @@
-# Nowen Note Web Clipper
+# Base Notes Web Clipper
 
-Nowen Note 的 MV3 浏览器扩展，把 **速记、网页正文、当前选区、截图和完整页面** 保存到自己的 Nowen Note 实例。
+Base Notes 的 MV3 浏览器扩展，把 **速记、网页正文、当前选区、截图和完整页面** 保存到自己的 Base Notes 实例。
 
 ## 主要能力
 
@@ -25,8 +25,8 @@ Nowen Note 的 MV3 浏览器扩展，把 **速记、网页正文、当前选区�
 ## 首次使用
 
 1. 安装扩展后打开设置。
-2. 填写 Nowen Note Server URL，例如 `https://note.example.com` 或 `http://localhost:3001`。
-3. 使用 Nowen Note 用户名和密码登录；开启 2FA 的账号会进入验证码步骤。
+2. 填写 Base Notes Server URL，例如 `https://note.example.com` 或 `http://localhost:3001`。
+3. 使用 Base Notes 用户名和密码登录；开启 2FA 的账号会进入验证码步骤。
 4. 回到任意网页，点击扩展图标。
 5. 选择采集模式、空间和笔记本后保存。
 

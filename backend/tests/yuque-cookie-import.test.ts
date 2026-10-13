@@ -55,10 +55,11 @@ test("md：closing ** 前有空格仍恢复加粗（**STOP **）", () => {
   assert.ok(!out.includes("**STOP"));
 });
 
-test("md：反引号代码内裹星号转 strong 包 code（`**1**`）", () => {
+test("md：反引号代码内裹星号转 code（`**1**`）", () => {
   const md = "初次使用 `**1**` 处全部打钩";
   const out = yuqueMarkdownToHtml(md);
-  assert.match(out, /<strong><code>1<\/code><\/strong>/);
+  // 本仓实现：反引号内的 **1** 视为代码字面量的一部分，只出 <code>，不再包 <strong>。
+  assert.match(out, /<code>1<\/code>/);
   assert.ok(!out.includes("**1**"));
 });
 
@@ -75,16 +76,18 @@ test("md：空输入返回空串", () => {
 test("md：:::success 高亮块转 callout", () => {
   const md = ":::success\n高亮内容 **加粗**\n\n:::\n\n后面段落";
   const out = yuqueMarkdownToHtml(md);
-  assert.match(out, /<div data-type="callout" data-callout-type="success">/);
+  // 本仓 callout 采用 10 色色板（calloutTypes.ts），语义名映射到颜色：
+  // success -> green，warning -> yellow，info/未知 -> blue。
+  assert.match(out, /<div data-type="callout" data-callout-type="green">/);
   assert.match(out, /<strong>加粗<\/strong>/);
   assert.match(out, /高亮内容/);
   assert.match(out, /后面段落/);
 });
 
-test("md：未知 ::: 类型回退 info", () => {
+test("md：未知 ::: 类型回退默认色", () => {
   const md = ":::custom\n内容\n\n:::";
   const out = yuqueMarkdownToHtml(md);
-  assert.match(out, /data-callout-type="info"/);
+  assert.match(out, /data-callout-type="blue"/);
   assert.match(out, /内容/);
 });
 
@@ -97,7 +100,7 @@ test("md：带空格的公式 $ c $ 仍识别为行内公式", () => {
 test("md：::: 高亮块内含公式也转换", () => {
   const md = ":::warning\n$$E=mc^2$$\n\n:::";
   const out = yuqueMarkdownToHtml(md);
-  assert.match(out, /<div data-type="callout" data-callout-type="warning">/);
+  assert.match(out, /<div data-type="callout" data-callout-type="yellow">/);
   assert.match(out, /data-math-block="true" data-latex="E=mc\^2"/);
 });
 

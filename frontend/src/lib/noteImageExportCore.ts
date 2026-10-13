@@ -26,6 +26,7 @@ import {
 import { isMermaidLang, renderMermaid } from "@/lib/mermaidRenderer";
 import { sanitizeSvg } from "@/lib/sanitizeHtml";
 import { rasterizeMermaidSvgForExport } from "@/lib/mermaidExportRaster";
+import { hydrateMindMapEmbedsForExport } from "@/lib/documentMindMapExport";
 
 const EXPORT_WIDTH = 794;
 const EXPORT_HORIZONTAL_PADDING = 56;
@@ -434,6 +435,8 @@ async function prepareHost(
   progress?.({ phase: "prepare", current: 0, total: 1, message: "正在生成最终预览…" });
 
   let bodyHtml = noteContentToExportHtml(note.content || "", note.contentText || "", note.contentFormat);
+  // #790：图片/SVG 导出也必须冻结实时脑图引用，不能依赖导出后的应用运行时。
+  bodyHtml = await hydrateMindMapEmbedsForExport(bodyHtml);
   const attachmentStats: ImgStats = { ok: 0, failed: 0, failures: [] };
   bodyHtml = await inlineRemoteImages(bodyHtml, attachmentStats, { noteId: note.id, noteTitle: note.title });
 
@@ -672,7 +675,7 @@ function createSvgBlob(prepared: PreparedHost): Blob {
 async function zipFiles(files: NoteImageExportFile[], baseName: string): Promise<{ blob: Blob; name: string }> {
   const zip = new JSZip();
   for (const file of files) zip.file(file.fileName, file.blob);
-  zip.file("README.txt", "该压缩包由 Nowen Note 分页图片导出生成。按文件名序号从上到下阅读。\n");
+  zip.file("README.txt", "该压缩包由 Base Notes 分页图片导出生成。按文件名序号从上到下阅读。\n");
   return {
     blob: await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }),
     name: `${baseName}-pages.zip`,
@@ -694,7 +697,7 @@ async function saveFiles(
       file.displayPath = saved.displayPath;
     }
     return {
-      displayPath: files.length === 1 ? files[0].displayPath : `Pictures/Nowen Note（${files.length} 张）`,
+      displayPath: files.length === 1 ? files[0].displayPath : `Pictures/Base Notes（${files.length} 张）`,
       openUri: files[0]?.uri,
       files,
     };

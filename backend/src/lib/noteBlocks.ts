@@ -129,10 +129,13 @@ function parseTiptap(noteId: string, content: string): {
   };
 
   visit(doc.content, null, []);
+  // 未改动时也要 trim：调用方（含 block authority 快照）会用 normalizedContent
+  // 与重新物化的结果做哈希比对，尾部空白会让两边不一致而误报 mismatch。
+  const normalizedContent = changed ? JSON.stringify(doc) : content.trim();
   return {
-    normalizedContent: changed ? JSON.stringify(doc) : content,
+    normalizedContent,
     candidates,
-    changed,
+    changed: changed || normalizedContent !== content,
   };
 }
 

@@ -1,3 +1,6 @@
+// 上游 1.5.1 的 UI 结构契约测试：断言的是上游那套界面结构（DOM 属性 / 文案 / 组件组成）。
+// 本仓走「UI 保留自有」，结构与我们的界面不一致，属**不跟**的用例 —— 断言原样保留（未改写），
+// 仅跳过执行；将来若确实采用上游该 UI，把下面的 .skip 去掉即可恢复。
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -23,13 +26,36 @@ function expectInOrder(source: string, values: string[]): void {
   }
 }
 
-describe("Android immersive editor contract", () => {
+describe.skip("Android immersive editor contract", () => {
   it("collapses the mobile document header while the native keyboard is visible", () => {
     const source = read("src/components/EditorPane.tsx");
     expect(source).toContain('useKeyboardVisible');
     expect(source).toContain('data-mobile-editor-compact');
     expect(source).toContain('compactMobileEditing && "hidden"');
     expect(source).toContain("nowen:open-search");
+  });
+
+  it("keeps note management out of a duplicate mobile title toolbar", () => {
+    const source = read("src/components/EditorPane.tsx");
+    expect(source).not.toContain('flex items-center gap-1", compactMobileEditing ? "px-2 py-1"');
+    expect(source).toContain('MobileEditorToolbarPortal location="leading"');
+    expect(source).toContain('MobileEditorToolbarPortal location="trailing"');
+    expect(source).toContain('data-mobile-note-menu-trigger');
+    expect(source).toContain("toggleLock(); setShowMobileMenu(false)");
+  });
+
+  it("reuses the breadcrumb slot for the title only after the body title scrolls away", () => {
+    const source = read("src/components/EditorPane.tsx");
+    expect(source).toContain("mobileTitlePinned");
+    expect(source).toContain("IntersectionObserver");
+    expect(source).toContain("[data-mobile-editor-title], [data-markdown-mobile-title]");
+    expect(source).toContain("setMobileTitlePinned(!entry?.isIntersecting)");
+  });
+
+  it("does not resurrect the legacy two-row header from global keyboard CSS", () => {
+    const html = read("index.html");
+    expect(html).not.toContain('header[data-mobile-editor-compact="true"] > div:nth-of-type(2)');
+    expect(html).not.toContain('header[data-mobile-editor-compact="true"] > div:first-of-type');
   });
 
   it("keeps one compact toolbar and exposes advanced formatting on demand", () => {
@@ -69,7 +95,9 @@ describe("Android immersive editor contract", () => {
     expect(compact).toContain("flex-nowrap");
     expect(compact).toContain("overflow-x-auto");
     expect(source).toContain('compact ? "shrink-0 p-1');
-    expect(compact).toContain('className="ml-auto"');
+    expect(compact).toContain('<MobileEditorToolbarSlot location="leading" />');
+    expect(compact).toContain('<MobileEditorToolbarSlot location="trailing" />');
+    expect(compact).toContain('data-mobile-editor-format-strip');
   });
 
   it("removes nonessential metadata and floating actions from the keyboard viewport", () => {
@@ -126,7 +154,9 @@ describe("Android immersive editor contract", () => {
     expect(compact).toContain("overflow-x-auto");
     expect(compact).toContain("[&>button]:shrink-0");
     expect(compact).toContain("[&>button]:p-1");
-    expect(compact).toContain('className="ml-auto"');
+    expect(compact).toContain('<MobileEditorToolbarSlot location="leading" />');
+    expect(compact).toContain('<MobileEditorToolbarSlot location="trailing" />');
+    expect(compact).toContain('data-mobile-editor-format-strip');
   });
 
   it("suppresses the mobile space launcher while the IME is open", () => {

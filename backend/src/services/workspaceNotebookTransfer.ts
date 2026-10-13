@@ -424,6 +424,12 @@ export function copyPersonalNotebookToWorkspace(input: CopyPersonalNotebookInput
             let targetTag = targetWorkspaceId
               ? (selectTargetTag.get(actorUserId, tag.name, targetWorkspaceId) as TagRow | undefined)
               : (selectPersonalTargetTag.get(actorUserId, tag.name) as TagRow | undefined);
+            // 目标工作区没有同名标签时，先回退复用本人已有的全局（个人）标签：
+            // tags 表有全局唯一约束，直接新建会撞名，导致复制出来的笔记丢标签。
+            if (!targetTag && targetWorkspaceId) {
+              targetTag = selectPersonalTargetTag.get(actorUserId, tag.name) as TagRow | undefined;
+              if (targetTag) warnings.push(`tag_reused_due_unique_constraint:${tag.name}`);
+            }
             if (!targetTag) {
               const newTagId = uuid();
               try {

@@ -64,6 +64,7 @@ import { CellSelection } from "@tiptap/pm/tables";
 import { markdownToSimpleHtml } from "@/lib/importService";
 import { repairTiptapJson } from "@/lib/tiptapSchemaRepair";
 import { markdownToHtml as mdToFullHtml, detectFormat as detectContentFormat, tiptapJsonToMarkdown } from "@/lib/contentFormat";
+import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { findInternalMarkdownMarkerRanges } from "@/lib/markdownUserContent";
 import { shouldEmitTitleUpdate, shouldSkipTitleChange, shouldSyncTitleValue } from "@/lib/titleIme";
 import { resolveEditorLifecycleSave } from "@/lib/editorLifecycleSafety";
@@ -72,6 +73,7 @@ import { uploadAndInsertImage } from "@/lib/imageUploadService";
 import {
   isInlineImageAttachment,
   isInlineVideoAttachment,
+  isInlineAudioAttachment,
 } from "@/lib/existingAttachmentInsert";
 import {
   buildEditedImageAttrs,
@@ -99,7 +101,7 @@ import { shouldHandleAsMarkdownPaste } from "@/lib/pasteRouting";
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   List, ListOrdered, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6,
-  Quote, ImagePlus, Film, Paperclip, CheckSquare, Highlighter, Minus, Undo, Redo,
+  Quote, ImagePlus, Film, Paperclip, Mic, CheckSquare, Highlighter, Minus, Undo, Redo,
   Code, FileCode, Sparkles, X,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, Trash2,
   FileType, Check, AlertCircle, Info, ArrowUp, Copy, Link as LinkIcon,
@@ -108,8 +110,12 @@ import {
   MoreHorizontal, Plus,
   // 表格气泡菜单图标
   Rows3, Columns3, Merge, Split, Heading, Network,
+  Lock,
 } from "lucide-react";
 import { downloadAttachment } from "@/lib/downloadFile";
+import EncryptedBlockDialog from "@/components/EncryptedBlockDialog";
+import { ENCRYPTED_BLOCK_LANGUAGE } from "@/lib/encryptedNotes/blockDocument";
+import { prepareTiptapSelectionEncryption } from "@/lib/encryptedNotes/tiptapBlockAuthoring";
 import { saveImageToGallery, isAndroidNative } from "@/lib/nativeImageSave";
 import { cn } from "@/lib/utils";
 import {
@@ -153,6 +159,9 @@ import CodeBlockView from "@/components/CodeBlockView";
 import { IndentExtension } from "@/lib/codeBlockIndent";
 import { SearchReplacePanel, createSearchReplaceExtension, searchReplacePluginKey } from "@/components/SearchReplacePanel";
 import { Video as VideoExtension, createVideoFileAttrs } from "@/components/VideoExtension";
+import { VoiceMemo } from "@/components/VoiceMemoExtension";
+import VoiceMemoBlock from "@/components/VoiceMemoBlock";
+import { requestVoiceMemo } from "@/lib/voiceMemo";
 import { serializeProseMirrorPlainText } from "@/lib/proseMirrorPlainText";
 import { createTiptapAnalysisController, type TiptapAnalysisController } from "@/lib/tiptapAnalysisClient";
 import type { TiptapAnalysisResult, TiptapJsonNode } from "@/lib/tiptapAnalysis";
@@ -1755,7 +1764,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     const next = getActiveListType(currentEditor);
     if (activeListTypeRef.current === next) return;
     activeListTypeRef.current = next;
-    setActiveListType(next);
+    // Tiptap 的 create/transaction 回调是同步触发的，包括 React 正在提交
+    // 编辑器 NodeView 期间。把 React 状态更新推迟到当前提交结束之后再执行，
+    // 并且只发布最新一次的选择状态、绝不去更新已销毁编辑器的工具栏。
+    queueMicrotask(() => {
+      if (currentEditor?.isDestroyed || activeListTypeRef.current !== next) return;
+      setActiveListType(next);
+    });
   }, []);
   const [showAI, setShowAI] = useState(false);
   const [aiSelectedText, setAiSelectedText] = useState("");
@@ -2086,6 +2101,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   const initialEditorContent = initialEditorContentRef.current.content;
 
   const editor: Editor | null = useEditor({
+    // 首挂载必须延后初始化：在 React render 期间同步构造编辑器会触发
+    // flushSync 警告，并让首屏初始化卡在渲染流水线里。
+    immediatelyRender: false,
     shouldRerenderOnTransaction: false,
     extensions: [
       keyboardExtension.current,
@@ -2256,6 +2274,8 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       // atom + block + draggable，NodeView 用透明遮罩防 iframe 抢焦点。
       // parseHTML 同时识别 <iframe> / <video>，让剪藏过来的视频内容也能落到此节点。
       VideoExtension,
+      // 语音备忘节点：音频内联播放器，NodeView 复用 VoiceMemoBlock。
+      VoiceMemo.extend({ addNodeView() { return ReactNodeViewRenderer(VoiceMemoBlock); } }),
       BlockEmbedExtension,
       // —— 以下为 Tiptap v3 免费开源 Pro 拓展（2025-06 起 MIT）——
       // 折叠块（<details> 语义）：Details 容器 + DetailsSummary 标题 + DetailsContent 正文
@@ -3509,6 +3529,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         pendingSaveAckRef.current = ack;
       },
       isReady: () => !!editor && !editor.isDestroyed,
+      insertMarkdownAtCursor: (md: string) => {
+        if (!editor || editor.isDestroyed) return false;
+        try {
+          const html = mdToFullHtml(md);
+          return insertContentPreservingBlockEmbed(editor, html);
+        } catch { return false; }
+      },
       appendMarkdown: (md: string) => {
         if (!editor || editor.isDestroyed) return false;
         try {
@@ -4106,6 +4133,31 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       publishEditorEditable(editor);
     }
   }, [editor, editable]);
+
+  // 加密区域（局部加密块）：选中文字 → 就地加密替换；空段落 → 在该处插入加密块。
+  const [encryptedRegion, setEncryptedRegion] = useState<{ initialContent?: { plaintext: string; format: "tiptap-json" }; commit: (source: string) => void } | null>(null);
+  useEffect(() => { setEncryptedRegion(null); }, [note.id]);
+  const insertEncryptedRegion = () => {
+    if (!editor || !editable || isGuest || note.isTrashed) return;
+    const { selection, doc } = editor.state; const noteId = note.id;
+    if (!selection.empty) {
+      try {
+        const selected = prepareTiptapSelectionEncryption(editor);
+        setEncryptedRegion({ initialContent: selected, commit: (source) => {
+          if (noteRef.current.id !== noteId || noteRef.current.isTrashed) throw new Error("Encrypted selection changed");
+          selected.commit(source);
+        } });
+      } catch { showPasteToast("error", "请选择普通文本，暂不支持图片、附件、链接或代码块内的选区。"); }
+      return;
+    }
+    if (selection.$from.depth !== 1 || selection.$from.parent.type.name !== "paragraph") {
+      showPasteToast("error", "请在普通段落点击「插入加密内容」输入新内容。"); return;
+    }
+    setEncryptedRegion({ commit: (source) => {
+      if (noteRef.current.id !== noteId || !editor.isEditable || editor.state.doc !== doc) throw new Error("Encrypted region changed");
+      if (!editor.commands.insertContentAt(selection.from, { type: "codeBlock", attrs: { language: ENCRYPTED_BLOCK_LANGUAGE }, content: [{ type: "text", text: source }] })) throw new Error("Encrypted region write failed");
+    } });
+  };
 
   // 工具栏最左侧 "+"：直接打开「在下方添加」二级菜单（mode="insert" 跳过主菜单，
   // 直接进 addBelow 子面板，分类展示可插入块类型）。
@@ -4839,6 +4891,22 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     setAttachmentLibraryOpen(true);
   }, [captureEditorInsertAnchor, editor, releaseEditorInsertAnchor]);
 
+  // 语音备忘：打开全局录音面板（VoiceRecorderSheet），录音完成后把 voiceMemo 节点
+  // 插入到触发时的光标位置。位置锚点在面板打开期间被「钉住」，避免用户切走后再回来丢失。
+  const openVoiceRecorder = useCallback(() => {
+    if (!editor || !editor.isEditable || isGuest || noteRef.current.isTrashed) return;
+    const noteId = noteRef.current.id;
+    const anchor = captureEditorInsertAnchor();
+    requestVoiceMemo({
+      noteId,
+      release: () => releaseEditorInsertAnchor(anchor),
+      insert: (attachment) => {
+        if (noteRef.current.id !== noteId || noteRef.current.isTrashed || !editor.isEditable || editor.isDestroyed || !restoreEditorInsertAnchor(anchor)) return false;
+        return editor.chain().focus().insertContent({ type: "voiceMemo", attrs: attachment }).run();
+      },
+    });
+  }, [captureEditorInsertAnchor, editor, isGuest, releaseEditorInsertAnchor, restoreEditorInsertAnchor]);
+
   const insertExistingAttachment = useCallback((item: FileItem) => {
     const anchor = attachmentLibraryAnchorRef.current;
     if (!editor || !restoreEditorInsertAnchor(anchor)) {
@@ -4849,6 +4917,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
 
     const inlineImage = isInlineImageAttachment(item);
     const inlineVideo = !inlineImage && isInlineVideoAttachment(item);
+    const inlineAudio = !inlineImage && !inlineVideo && isInlineAudioAttachment(item);
     const chain = editor.chain().focus();
     if (inlineImage) {
       chain.setImage({
@@ -4856,6 +4925,8 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         alt: item.filename,
         title: item.filename,
       }).run();
+    } else if (inlineAudio) {
+      chain.insertContent({ type: "voiceMemo", attrs: { attachmentId: item.id, src: `/api/attachments/${item.id}`, filename: item.filename, mimeType: item.mimeType, size: item.size, durationMs: 0 } }).run();
     } else if (inlineVideo) {
       chain.setVideoFile({
         previewUrl: toInlineAttachmentUrl(item.url),
@@ -4874,9 +4945,11 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     closeAttachmentLibrary();
     toast.success(inlineImage
       ? t("tiptap.imageInsertedFromFileManager", { defaultValue: "图片已插入" })
-      : inlineVideo
-        ? t("tiptap.videoInsertedFromFileManager", { defaultValue: "视频已插入" })
-        : t("tiptap.attachmentLinkInserted", { defaultValue: "附件链接已插入" }));
+      : inlineAudio
+        ? t("voice.inserted", { defaultValue: "语音已插入" })
+        : inlineVideo
+          ? t("tiptap.videoInsertedFromFileManager", { defaultValue: "视频已插入" })
+          : t("tiptap.attachmentLinkInserted", { defaultValue: "附件链接已插入" }));
   }, [closeAttachmentLibrary, editor, restoreEditorInsertAnchor, t]);
 
   const handleImageUpload = useCallback(() => {
@@ -5522,6 +5595,8 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       })
       .run();
   };
+  // 保留的原生模板插入实现：工具栏脑图按钮已改为打开原生选择器
+  // （nowen:open-mindmap-insert），此模板入口迁移到斜杠命令 mermaidMindMap。
   const insertMindMap = () => {
     editor
       .chain()
@@ -5560,6 +5635,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         formatPainterArmed && "[&_.ProseMirror]:cursor-crosshair",
       )}
     >
+      {encryptedRegion && (
+        <EncryptedBlockDialog
+          initialContent={encryptedRegion.initialContent}
+          onCommit={encryptedRegion.commit}
+          onClose={() => setEncryptedRegion(null)}
+        />
+      )}
       {/* Toolbar
           v2026-05-18：取消「键盘弹起时隐藏 + 浮动工具栏顶替」方案，改为始终保留
           单一顶部工具栏并 sticky 在容器顶端：
@@ -5802,6 +5884,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         >
           <FolderSearch size={iconSize} />
         </ToolbarButton>
+        <ToolbarButton
+          onClick={openVoiceRecorder}
+          title={t("voice.record", { defaultValue: "录音" })}
+          disabled={!editable || isGuest || !!note.isTrashed}
+        >
+          <Mic size={iconSize} />
+        </ToolbarButton>
         <TableGridPicker iconSize={iconSize} onPick={insertTable} />
 
         <ToolbarDivider />
@@ -5809,7 +5898,10 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         <ToolbarButton onClick={insertMermaid} title={t('tiptap.insertMermaid')}>
           <Workflow size={iconSize} />
         </ToolbarButton>
-        <ToolbarButton onClick={insertMindMap} title={t('tiptap.insertMindMap')}>
+        <ToolbarButton
+          onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-mindmap-insert"))}
+          title={t('tiptap.insertMindMap')}
+        >
           <Network size={iconSize} />
         </ToolbarButton>
         <ToolbarButton onClick={insertMath} title={t('tiptap.insertMath')}>
@@ -5954,6 +6046,19 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
 
         </div>
 
+        {/* 加密内容入口（桌面固定区）：不参与按钮容器的裁剪，任何宽度下都可见。
+            之前放在格式区中部（字号/颜色之后），被单行 overflow-hidden 裁掉后几乎看不到。 */}
+        {!isGuest && !note.isTrashed && (
+          <ToolbarButton
+            compact
+            className="ml-auto shrink-0 self-start hidden md:flex"
+            onClick={insertEncryptedRegion}
+            disabled={!editable}
+            title="插入加密内容"
+          >
+            <Lock size={iconSize} />
+          </ToolbarButton>
+        )}
         {/* 折叠按钮（桌面）：仅当工具栏按钮容器溢出（scrollWidth > clientWidth）时显示。
             宽度足够容纳所有按钮时自动隐藏，不需要折叠功能。 */}
         {toolbarHasOverflow && (
@@ -6046,6 +6151,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           >
             <ArrowUp size={14} />
           </ToolbarButton>
+          {/* 加密选中文字：选中内容后出现的第二个加密入口（与工具栏锁按钮一致），
+              对齐上游 1.5.1 的选区气泡行为，提升入口可发现性。 */}
+          {!isGuest && !note.isTrashed && (
+            <ToolbarButton onClick={insertEncryptedRegion} title="加密选中文字">
+              <Lock size={14} />
+            </ToolbarButton>
+          )}
           <ToolbarButton
             onClick={toggleFormatPainter}
             isActive={formatPainterArmed}
@@ -7070,7 +7182,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       {/* 斜杠命令菜单 */}
       <SlashCommandsMenu
         editor={editor}
-        items={getDefaultSlashCommands(t, handleImageUpload, openAIAssistant, openAttachmentLibrary)}
+        items={getDefaultSlashCommands(t, handleImageUpload, openAIAssistant, openAttachmentLibrary, editable && !isGuest && !note.isTrashed ? openVoiceRecorder : undefined)}
       />
 
       <AttachmentLibraryPicker

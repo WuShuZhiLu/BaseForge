@@ -304,6 +304,59 @@ export async function putNoteListItems(items: NoteListItem[]): Promise<void> {
   }, undefined, "putNoteListItems");
 }
 
+/** 只审计已初始化的缓存：不创建数据库、不掩盖读错误。 */
+export async function inspectCachedNotePresence(id: string, userId: string): Promise<boolean | null> {
+  const pending = dbPromise;
+  if (!pending || !currentCacheIdentity || currentUserId !== userId) return null;
+  const connection = await pending;
+  const present = (await connection.getKey("notes", id)) !== undefined;
+  return pending === dbPromise ? present : null;
+}
+
+/** 严格的转换清理，仅作用于已初始化的账号缓存。 */
+export async function clearCachedNoteForEncryptionConversion(id: string, userId: string, assertScope: () => void): Promise<void> {
+  const pending = dbPromise;
+  const identity = currentCacheIdentity;
+  const check = () => {
+    assertScope();
+    if (!pending || pending !== dbPromise || !identity || identity !== currentCacheIdentity || currentUserId !== userId) {
+      throw new Error("CACHE_SCOPE_UNAVAILABLE");
+    }
+  };
+  check();
+  const db = await pending!;
+  check();
+  const stores = ["notes", "offlineAttachments", "offlineAttachmentJobs"] as const;
+  const transaction = db.transaction(stores, "readwrite");
+  try {
+    for (const name of ["offlineAttachments", "offlineAttachmentJobs"] as const) {
+      const store = transaction.objectStore(name);
+      for (const key of await store.index("by-note").getAllKeys(id)) {
+        check();
+        await store.delete(key);
+      }
+    }
+    check();
+    await transaction.objectStore("notes").delete(id);
+    check();
+    await transaction.done;
+  } catch (error) {
+    try { transaction.abort(); } catch { /* already settled */ }
+    await transaction.done.catch(() => {});
+    throw error;
+  }
+  check();
+  const verify = db.transaction(stores, "readonly");
+  const remaining = await Promise.all([
+    verify.objectStore("notes").getKey(id),
+    verify.objectStore("offlineAttachments").index("by-note").count(id),
+    verify.objectStore("offlineAttachmentJobs").index("by-note").count(id),
+  ]);
+  await verify.done;
+  check();
+  if (remaining[0] !== undefined || remaining[1] || remaining[2]) throw new Error("CACHE_CLEANUP_FAILED");
+}
+
 export async function getNote(id: string): Promise<CachedNote | undefined> {
   const connection = getDb();
   if (!connection) return undefined;

@@ -12,8 +12,8 @@ function parseDate(value, label, fileName) {
 
 function channelForSetup(fileName) {
   const name = path.basename(String(fileName || ""));
-  if (/^Nowen-Note-Lite-.+-setup\.exe$/.test(name)) return "lite";
-  if (/^Nowen-Note-.+-setup\.exe$/.test(name) && !/^Nowen-Note-Lite-/.test(name)) return "full";
+  if (/^Base-Notes-Lite-.+-setup\.exe$/.test(name)) return "lite";
+  if (/^Base-Notes-.+-setup\.exe$/.test(name) && !/^Base-Notes-Lite-/.test(name)) return "full";
   return null;
 }
 

@@ -1,6 +1,9 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
+import { isEncryptedBlockLanguage } from "@/lib/encryptedNotes/blockDocument";
+import EncryptedBlockCard from "@/components/EncryptedBlockCard";
 import { Copy, Check, ChevronDown, ChevronRight, ChevronUp, Eye, Code2, FileText, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -13,6 +16,9 @@ import MermaidView from "@/components/MermaidView";
 import { isMermaidLang } from "@/lib/mermaidRenderer";
 import { replaceCodeBlockWithPlainText } from "@/lib/tiptapEditorCommands";
 import { canUseCodeBlockToolbarAction } from "@/lib/codeBlockPermissions";
+import { CodeBlockFormatButton } from "@/components/CodeBlockFormatButton";
+import { HtmlCodeBlockRunButton } from "@/components/HtmlCodeBlockRunButton";
+import { formatTiptapCodeBlock } from "@/lib/tiptapCodeBlockFormatting";
 import { formatCodeBlockLanguageLabel } from "@/lib/codeBlockLowlight";
 import { copyText } from "@/lib/clipboard";
 import { recordPhaseAPerfEvent } from "@/lib/phaseAPerfDiagnostics";
@@ -49,6 +55,35 @@ export function normalizeCodeBlockIndent(value: unknown): number {
 }
 
 export function CodeBlockView(props: NodeViewProps) {
+  if (isEncryptedBlockLanguage(props.node.attrs.language)) return <EncryptedCodeBlockView {...props} />;
+  return <OrdinaryCodeBlockView {...props} />;
+}
+
+function EncryptedCodeBlockView({ node, editor, getPos }: NodeViewProps) {
+  const editable = useSyncExternalStore(
+    (listener) => subscribeEditorEditable(editor, listener),
+    () => getEditorEditableSnapshot(editor),
+    () => false,
+  );
+  const source = node.textContent;
+  return (
+    <NodeViewWrapper contentEditable={false}>
+      <EncryptedBlockCard
+        language={node.attrs.language}
+        source={source}
+        onCommit={editable ? (next) => {
+          const position = getPos();
+          const current = typeof position === "number" ? editor.state.doc.nodeAt(position) : null;
+          if (typeof position !== "number" || !editor.isEditable || !current?.eq(node)) throw new Error("Encrypted region changed");
+          if (!editor.commands.insertContentAt({ from: position, to: position + node.nodeSize }, { type: "codeBlock", attrs: node.attrs, content: [{ type: "text", text: next }] })) throw new Error("Encrypted region write failed");
+        } : undefined}
+      />
+    </NodeViewWrapper>
+  );
+}
+
+function OrdinaryCodeBlockView(props: NodeViewProps) {
+  const { t } = useTranslation();
   const { node, updateAttributes, extension, editor, getPos } = props;
   const lowlight = (extension.options as any)?.lowlight;
   const perfBlockId = String(node.attrs.blockId || node.attrs.language || "code-block");
@@ -407,7 +442,7 @@ export function CodeBlockView(props: NodeViewProps) {
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             className="code-block-tool-btn shrink-0 p-0.5 rounded transition-colors text-[var(--code-muted)] hover:text-[var(--code-muted-strong)]"
-            title={collapsed ? "展开代码" : "折叠代码"}
+            title={collapsed ? t("codeToolbar.expandCode") : t("codeToolbar.collapseCode")}
           >
             {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
           </button>
@@ -425,7 +460,7 @@ export function CodeBlockView(props: NodeViewProps) {
               commitTitle();
               setTitleEditing(false);
             }}
-            placeholder="请输入代码块名称"
+            placeholder={t("richText.codeBlockTitle")}
             className="code-block-title-input bg-transparent border-none outline-none text-[12px] text-[var(--code-muted-strong)] placeholder:text-[var(--code-muted)] min-w-[100px] max-w-[200px]"
           />
 
@@ -447,7 +482,7 @@ export function CodeBlockView(props: NodeViewProps) {
                 "code-block-tool-btn flex items-center gap-0.5 px-2 py-0.5 rounded text-[12px] font-medium transition-colors",
                 !canChangeLanguage && "opacity-40 cursor-not-allowed",
               )}
-              title={canChangeLanguage ? "切换语言" : "笔记本已锁定，不能修改代码语言"}
+              title={canChangeLanguage ? t("codeToolbar.switchLanguage") : t("codeToolbar.languageLocked")}
             >
               <span>{formatCodeBlockLanguageLabel(currentLang)}</span>
               <ChevronDown size={11} />
@@ -472,12 +507,12 @@ export function CodeBlockView(props: NodeViewProps) {
                   autoFocus
                   value={langFilter}
                   onChange={(e) => setLangFilter(e.target.value)}
-                  placeholder="搜索语言..."
+                  placeholder={t("codeToolbar.searchLanguage")}
                   className="code-block-popup-input w-full px-2 py-1.5 border-b text-[11px] focus:outline-none"
                 />
                 <div className="max-h-56 overflow-auto py-1">
                   {filteredLanguages.length === 0 ? (
-                    <div className="code-block-popup-empty px-2 py-1.5 text-[11px]">无匹配</div>
+                    <div className="code-block-popup-empty px-2 py-1.5 text-[11px]">{t("codeToolbar.noMatches")}</div>
                   ) : (
                     filteredLanguages.map((lang) => (
                       <button
@@ -511,7 +546,7 @@ export function CodeBlockView(props: NodeViewProps) {
                 setShowMoreMenu(false);
               }}
               className="code-block-tool-btn flex items-center gap-0.5 px-2 py-0.5 rounded text-[12px] font-medium transition-colors"
-              title="切换代码块主题"
+              title={t("codeToolbar.switchTheme")}
             >
               <span>{CODE_BLOCK_THEMES.find(t => t.id === activeTheme)?.label || activeTheme}</span>
               <ChevronDown size={11} />
@@ -568,6 +603,13 @@ export function CodeBlockView(props: NodeViewProps) {
 
         {/* 右侧：复制 + 更多菜单 */}
         <div className="flex items-center gap-0.5 shrink-0">
+          <CodeBlockFormatButton
+            language={currentLang}
+            disabled={!canUseCodeBlockToolbarAction("format", editor)}
+            onFormat={() => formatTiptapCodeBlock(editor, getPos)}
+            className="code-block-tool-btn flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          />
+          <HtmlCodeBlockRunButton language={currentLang} source={node.textContent} />
           <button
             type="button"
             onClick={handleCopy}
@@ -575,7 +617,7 @@ export function CodeBlockView(props: NodeViewProps) {
               "code-block-tool-btn flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors",
               copied && "is-copied",
             )}
-            title={copied ? "已复制" : "复制代码"}
+            title={copied ? t("codeToolbar.copied") : t("codeToolbar.copyCode")}
           >
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
@@ -590,7 +632,7 @@ export function CodeBlockView(props: NodeViewProps) {
                 setShowThemePicker(false);
               }}
               className="code-block-tool-btn flex items-center px-1.5 py-0.5 rounded text-[12px] font-medium transition-colors"
-              title="更多操作"
+              title={t("codeToolbar.more")}
             >
               <MoreHorizontal size={14} />
             </button>
@@ -616,7 +658,7 @@ export function CodeBlockView(props: NodeViewProps) {
                     className="code-block-popup-item w-full text-left px-3 py-1.5 text-[12px] transition-colors flex items-center gap-2"
                   >
                     {mermaidPreview ? <Code2 size={13} /> : <Eye size={13} />}
-                    <span>{mermaidPreview ? "切换到源码" : "切换到预览"}</span>
+                    <span>{mermaidPreview ? t("codeToolbar.switchToSource") : t("codeToolbar.switchToPreview")}</span>
                   </button>
                 )}
                 <button
@@ -630,7 +672,7 @@ export function CodeBlockView(props: NodeViewProps) {
                   )}
                 >
                   <FileText size={13} />
-                  <span>解散为文本</span>
+                  <span>{t("codeToolbar.dissolve")}</span>
                 </button>
               </div>,
               document.body,
@@ -648,7 +690,7 @@ export function CodeBlockView(props: NodeViewProps) {
             type="button"
             onClick={() => setToolbarHidden(false)}
             className="absolute top-2 right-2 z-10 code-block-tool-btn p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="显示工具栏"
+            title={t("codeToolbar.showToolbar")}
           >
             <ChevronUp size={14} />
           </button>
@@ -660,7 +702,7 @@ export function CodeBlockView(props: NodeViewProps) {
             type="button"
             onClick={() => setToolbarHidden(true)}
             className="absolute top-2 right-2 z-10 code-block-tool-btn p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            title="隐藏工具栏"
+            title={t("codeToolbar.hideToolbar")}
           >
             <ChevronDown size={14} />
           </button>
@@ -675,7 +717,7 @@ export function CodeBlockView(props: NodeViewProps) {
                 e.stopPropagation();
                 setMermaidPreview(false);
               }}
-              title="双击进入源码编辑"
+              title={t("codeToolbar.sourceDoubleClick")}
             >
               <MermaidView source={node.textContent} debounceMs={250} />
             </div>

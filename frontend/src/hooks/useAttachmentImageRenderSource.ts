@@ -1,14 +1,21 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Capacitor } from "@capacitor/core";
 
-import { resolveAttachmentUrl } from "@/lib/api";
+import { getBaseUrl, resolveAttachmentUrl } from "@/lib/api";
+import { extractNoteIdFromSignedAttachmentUrl } from "@/lib/attachmentSignedUrlRecovery";
 import {
   acquireAttachmentRenderUrl,
   getAttachmentAccessSnapshot,
   getAttachmentRenderSource,
   invalidateOfflineAttachmentRenderUrl,
+  requiresVerifiedAttachmentAccess,
   subscribeAttachmentAccess,
 } from "@/lib/noteAttachmentAccessBridge";
+import { primeNoteAttachmentAccess } from "@/lib/noteAttachmentAccessPriming";
+import { getAccessToken } from "@/lib/authSession";
+
+// Each editor/preview supplies its own note, including when two notes are open side by side.
+export const AttachmentNoteContext = createContext<string | null>(null);
 
 type ImageLoadState = {
   requestKey: string;
@@ -31,6 +38,10 @@ export type AttachmentImageRenderSource = {
   onError: () => void;
 };
 
+function refreshSignedAccess(noteId: string): Promise<number> {
+  return primeNoteAttachmentAccess(noteId, getBaseUrl(), { timeoutMs: 2_500 });
+}
+
 /**
  * 图片渲染边界统一使用的运行时地址解析。
  *
@@ -42,6 +53,7 @@ export function useAttachmentImageRenderSource(
   options: { enabled?: boolean } = {},
 ): AttachmentImageRenderSource {
   const enabled = options.enabled !== false;
+  const noteId = useContext(AttachmentNoteContext);
   useSyncExternalStore(
     subscribeAttachmentAccess,
     getAttachmentAccessSnapshot,
@@ -49,7 +61,16 @@ export function useAttachmentImageRenderSource(
   );
 
   const source = getAttachmentRenderSource(rawSrc);
-  const resolvedSrc = rawSrc ? resolveAttachmentUrl(source.persistentSrc) : "";
+  // Resolve from the original node source, not the persistence-normalized path.
+  // This keeps runtime-only query parameters (for example thumbnail width) intact and,
+  // more importantly, lets the attachment access bridge atomically replace a raw/stale
+  // attachment URL with the latest signed/offline render URL as soon as that mapping arrives.
+  // The persisted document still stays stable through source.persistentSrc.
+  const resolvedSrc = !rawSrc
+    ? ""
+    : rawSrc.startsWith("//") ? rawSrc : resolveAttachmentUrl(rawSrc);
+  const unsignedAttachment = enabled && requiresVerifiedAttachmentAccess(resolvedSrc);
+  const needsSignedAccess = unsignedAttachment && !!noteId && !!getAccessToken();
   const needsAndroidBlob = enabled
     && Capacitor.getPlatform() === "android"
     && !!source.attachmentId
@@ -57,6 +78,7 @@ export function useAttachmentImageRenderSource(
   const requestKey = [
     enabled ? "enabled" : "disabled",
     rawSrc || "",
+    noteId || "",
     source.attachmentId || "",
     resolvedSrc,
   ].join("\n");
@@ -68,6 +90,11 @@ export function useAttachmentImageRenderSource(
     preparingAndroidBlob: false,
     imageLoaded: false,
   });
+  const signedRetryAttemptedRef = useRef(false);
+
+  useEffect(() => {
+    signedRetryAttemptedRef.current = false;
+  }, [rawSrc, noteId]);
 
   useEffect(() => {
     const releaseRenderUrl = enabled && resolvedSrc
@@ -79,14 +106,40 @@ export function useAttachmentImageRenderSource(
 
     setState({
       requestKey,
-      renderSrc: enabled ? resolvedSrc : "",
+      renderSrc: enabled && !unsignedAttachment ? resolvedSrc : "",
       loading: enabled && !!resolvedSrc,
       error: null,
       preparingAndroidBlob: needsAndroidBlob,
       imageLoaded: false,
     });
 
-    if (needsAndroidBlob) {
+    if (unsignedAttachment && !needsSignedAccess) {
+      setState((current) => current.requestKey === requestKey ? {
+        ...current,
+        loading: false,
+        error: new Error("未获取到图片授权，请重新打开笔记"),
+        preparingAndroidBlob: false,
+      } : current);
+    } else if (needsSignedAccess) {
+      const prepare = async () => {
+        try { await refreshSignedAccess(noteId!); }
+        catch (error) {
+          const status = (error as { status?: number })?.status;
+          // Retry transient failures once; permission denial and missing resources stay explicit.
+          if (cancelled || (status && status < 500 && status !== 408 && status !== 429)) throw error;
+          await refreshSignedAccess(noteId!);
+        }
+        if (cancelled) return;
+        if (!getAttachmentRenderSource(rawSrc).signedUrlPresent) throw new Error("未获取到图片访问地址");
+      };
+      void prepare().catch((error: unknown) => {
+        if (cancelled) return;
+        setState((current) => current.requestKey === requestKey ? {
+          ...current, loading: false, preparingAndroidBlob: false,
+          error: error instanceof Error ? error : new Error("图片授权失败"),
+        } : current);
+      });
+    } else if (needsAndroidBlob) {
       fetch(resolvedSrc, abortController ? { signal: abortController.signal } : undefined)
         .then((response) => {
           if (!response.ok) throw new Error(`fetch image failed: ${response.status}`);
@@ -138,13 +191,13 @@ export function useAttachmentImageRenderSource(
       releaseRenderUrl();
       if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
     };
-  }, [enabled, needsAndroidBlob, requestKey, resolvedSrc, source.attachmentId, rawSrc]);
+  }, [enabled, needsAndroidBlob, needsSignedAccess, unsignedAttachment, noteId, requestKey, resolvedSrc, source.attachmentId, rawSrc]);
 
   const activeState = state.requestKey === requestKey
     ? state
     : {
         requestKey,
-        renderSrc: enabled ? resolvedSrc : "",
+        renderSrc: enabled && !unsignedAttachment ? resolvedSrc : "",
         loading: enabled && !!resolvedSrc,
         error: null,
         preparingAndroidBlob: needsAndroidBlob,
@@ -153,6 +206,7 @@ export function useAttachmentImageRenderSource(
   const activeRenderSrc = activeState.renderSrc;
 
   const onLoad = useCallback(() => {
+    signedRetryAttemptedRef.current = false;
     setState((current) => (
       current.requestKey === requestKey && current.renderSrc === activeRenderSrc
         ? { ...current, loading: false, error: null, imageLoaded: true }
@@ -168,6 +222,49 @@ export function useAttachmentImageRenderSource(
         : current);
       return;
     }
+
+    // A signed URL can become invalid during a long editing session or after a server-side
+    // permission/signing rotation. Refresh the note-scoped access map once, shared by every image
+    // in that note, then let the bridge subscription re-resolve this persistent attachment node.
+    // The server remains authoritative: extracting noteId from scope only selects the endpoint;
+    // `/attachments/access/urls` still performs the real ACL check.
+    const signedNoteId = noteId || extractNoteIdFromSignedAttachmentUrl(activeRenderSrc);
+    if (
+      source.attachmentId
+      && signedNoteId
+      && !signedRetryAttemptedRef.current
+      && !activeState.preparingAndroidBlob
+    ) {
+      signedRetryAttemptedRef.current = true;
+      setState((current) => current.requestKey === requestKey
+        ? { ...current, loading: true, error: null, imageLoaded: false }
+        : current);
+      void refreshSignedAccess(signedNoteId)
+        .then((registered) => {
+          if (registered > 0) {
+            // A changed signed URL triggers the access-store subscription and a new requestKey.
+            // If the server returned the exact same URL, do not leave this image spinning forever.
+            setState((current) => current.requestKey === requestKey
+              ? {
+                  ...current,
+                  loading: false,
+                  error: new Error("图片访问已刷新，但资源仍无法加载"),
+                  imageLoaded: false,
+                }
+              : current);
+            return;
+          }
+          throw new Error("未获取到新的图片访问地址");
+        })
+        .catch((error: unknown) => {
+          const normalized = error instanceof Error ? error : new Error("图片访问续签失败");
+          setState((current) => current.requestKey === requestKey
+            ? { ...current, loading: false, error: normalized, imageLoaded: false }
+            : current);
+        });
+      return;
+    }
+
     setState((current) => {
       if (current.requestKey !== requestKey || current.renderSrc !== activeRenderSrc) return current;
       // Android 的远程地址可能先触发 mixed-content 错误；blob fetch 尚在进行时不提前宣告失败。
@@ -179,7 +276,7 @@ export function useAttachmentImageRenderSource(
         imageLoaded: false,
       };
     });
-  }, [activeRenderSrc, requestKey]);
+  }, [activeRenderSrc, activeState.preparingAndroidBlob, noteId, requestKey, source.attachmentId]);
 
   return {
     attachmentId: source.attachmentId,

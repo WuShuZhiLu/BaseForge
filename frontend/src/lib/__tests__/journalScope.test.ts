@@ -7,6 +7,8 @@ import {
   scopedJournalToastMessage,
 } from "@/lib/journalScope";
 
+// 上游 1.5.1 自身不一致：journalScope 实现的 label 是「工作区日志」，其测试却期望「工作区日记」
+// （对上游同为红）。按「测试跟实现走」口径，这里对齐实现用词。
 describe("journal scope", () => {
   it("maps personal and workspace storage values to explicit scopes", () => {
     expect(resolveJournalScope("personal")).toEqual({
@@ -19,7 +21,7 @@ describe("journal scope", () => {
       kind: "workspace",
       workspaceId: "workspace-one",
       key: "workspace:workspace-one",
-      label: "工作区日记",
+      label: "工作区日志",
     });
   });
 

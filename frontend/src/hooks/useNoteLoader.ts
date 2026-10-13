@@ -75,7 +75,8 @@ export function useNoteLoader() {
 
   const loadNote = useCallback((options: UseNoteLoaderOptions) => {
     const currentState = stateRef.current;
-    const listedNote = currentState.notes.find((note) => note.id === options.noteId);
+    // notes 可能尚未加载（首屏/切工作区瞬间），必须可选链，否则直接 TypeError 打断加载。
+    const listedNote = currentState.notes?.find((note) => note.id === options.noteId);
 
     // 回收站里的 tombstone 不属于普通笔记读取生命周期。
     // 后端会刻意让 GET /notes/:id 对已删除笔记返回 404，附件 access-url 也会拒绝访问。

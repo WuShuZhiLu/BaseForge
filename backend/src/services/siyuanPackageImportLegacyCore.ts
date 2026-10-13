@@ -711,6 +711,8 @@ export async function importSiyuanPackageFromZipFile(
             const rewritten = rewriteAssetRefs(markdown, urlMap);
             const finalContent = targetContentFormat === "markdown"
                 ? rewriteMarkdownAttachmentRender(rewritten, urlMimeMap)
+                    // 思源自带的块 ID 标记对本产品无意义，导入后统一剥掉，保持正文干净。
+                    .replace(/\s+\^blk_[A-Za-z0-9_-]{6,}/g, "")
                 : siyuanSyToTiptapJson(doc.ast, { resolveAssetUrl: (raw) => resolveAssetUrl(urlMap, raw) });
             notePlans.push({
                 id: noteId,

@@ -112,7 +112,7 @@ export function validateRuntimeConfig(options = {}) {
       `NOWEN_URL 不是有效 URL: ${rawTargetUrl}`,
       {
         exitCode: EXIT_CODES.CONFIG,
-        suggestion: "设置为可访问的 http:// 或 https:// Nowen Note 地址",
+        suggestion: "设置为可访问的 http:// 或 https:// Base Notes 地址",
         cause: error,
       },
     );

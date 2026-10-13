@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, Heart, Sparkles, RefreshCw, ZoomIn, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, CloudDownload, Mail } from "lucide-react";
+import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Puzzle, Users, Info, ExternalLink, Heart, Sparkles, RefreshCw, ZoomIn, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, CloudDownload, Mail, Mic, Workflow, CalendarClock, Archive } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import wechatSponsorQr from "@/assets/sponsor/weixin.jpg";
 import alipaySponsorQr from "@/assets/sponsor/zhifubao.png";
@@ -12,9 +12,17 @@ import SecuritySettings from "@/components/SecuritySettings";
 import TokenManagement from "@/components/TokenManagement";
 import DataManager from "@/components/DataManager";
 import FolderSyncSettings from "@/components/settings/FolderSyncSettings";
-import OfflineSyncSettings from "@/components/settings/OfflineSyncSettings";
+import SyncSettingsTab from "@/components/settings/SyncSettingsTab";
+import BackupCenterTab from "@/components/settings/BackupCenterTab";
 import ShortcutSettingsPanel from "@/components/settings/ShortcutSettingsPanel";
 import AISettingsPanel from "@/components/AISettingsPanel";
+import PluginSettingsTab from "@/components/settings/plugins/PluginSettingsTab";
+import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
+import AutomationCenter from "@/components/automation/AutomationCenter";
+import TaskDigestSettings from "@/components/automation/TaskDigestSettings";
+import JournalPrivacySettingsCard from "@/components/settings/JournalPrivacySettingsCard";
+import MobileAccountSettings from "@/components/settings/MobileAccountSettings";
+import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
 import UserManagement from "@/components/UserManagement";
 import WorkspaceManagement from "@/components/WorkspaceManagement";
 import WhatsNewModal from "@/components/WhatsNewModal";
@@ -44,7 +52,7 @@ import {
   type MobileKnowledgeTreeViewMode,
 } from "@/lib/mobileKnowledgeTreeViewMode";
 
-type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "security" | "tokens" | "data" | "offlineSync" | "folderSync" | "users" | "workspaces" | "download" | "about";
+type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "plugins" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "offlineSync" | "folderSync" | "users" | "workspaces" | "download" | "about";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -398,7 +406,7 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClo
 function AboutPanel() {
   const { t } = useTranslation();
   const feedbackEmail = "nowenlab@qq.com";
-  const feedbackMailto = `mailto:${feedbackEmail}?subject=${encodeURIComponent("[Nowen Note 反馈]")}`;
+  const feedbackMailto = `mailto:${feedbackEmail}?subject=${encodeURIComponent("[Base Notes 反馈]")}`;
   const feedbackQqGroupNumber = "1093473044";
   const [showSponsor, setShowSponsor] = useState(false);
   const [sponsorMethod, setSponsorMethod] = useState<"wechat" | "alipay">("wechat");
@@ -1032,6 +1040,8 @@ function SwitchesPanel() {
           </label>
         )}
       </div>
+
+      <JournalPrivacySettingsCard />
     </div>
   );
 }
@@ -1508,12 +1518,12 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
   const { siteConfig } = useSiteSettings();
   const shortcutSurface = detectShortcutSurface();
-  const [currentUser, setCurrentUser] = useState<{ id: string; role?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role?: string; displayName?: string; username?: string } | null>(null);
 
   const fetchCurrentUser = useCallback(() => {
     let cancelled = false;
     api.getMe()
-      .then((u) => { if (!cancelled) setCurrentUser({ id: u.id, role: (u as any).role }); })
+      .then((u) => { if (!cancelled) setCurrentUser({ id: u.id, role: (u as any).role, displayName: (u as any).displayName, username: (u as any).username }); })
       .catch(() => { if (!cancelled) setCurrentUser(null); });
     return () => { cancelled = true; };
   }, []);
@@ -1543,6 +1553,9 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     { id: "switches" as const, label: t('settings.switches'), icon: ToggleLeft },
     ...(shortcutSurface !== "android" ? [{ id: "shortcuts" as const, label: "快捷键", icon: Keyboard }] : []),
     { id: "ai" as const, label: t('settings.ai'), icon: Bot },
+    { id: "plugins" as const, label: t('plugins.title', { defaultValue: '插件' }), icon: Puzzle },
+    { id: "voice" as const, label: t('speech.title', { defaultValue: '语音转写' }), icon: Mic },
+    { id: "automation" as const, label: t('automation.title', { defaultValue: '自动化' }), icon: Workflow },
     { id: "security" as const, label: t('settings.security'), icon: Shield },
     // 【个人访问令牌】任意登录用户都可管理自己的 token；与 security 同为"账号安全"类别，
     // 不需要 isAdmin 判定。
@@ -1557,7 +1570,8 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     //     （personalExport/Import Enabled），由管理员集中控制。
     //   组件内部也做了一层防御性闸门，防止用户从深链绕过这里直达 admin-only 区域。
     { id: "data" as const, label: t('settings.dataManagement'), icon: Database },
-    { id: "offlineSync" as const, label: "离线同步", icon: CloudDownload },
+    { id: "backup" as const, label: "备份中心", icon: Archive },
+    { id: "sync" as const, label: "同步", icon: RefreshCw },
     // 「文件夹同步」：桌面端专属，Phase B 只做配置 CRUD
     ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
     // 「下载客户端」面板：面向所有用户（含未登录、本地、云端）。需求背景：
@@ -1738,14 +1752,26 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
             {activeTab === "switches" && <SwitchesPanel />}
             {activeTab === "shortcuts" && shortcutSurface !== "android" && <ShortcutSettingsPanel />}
             {activeTab === "ai" && <AISettingsPanel />}
-            {activeTab === "security" && <SecuritySettings />}
+            {activeTab === "plugins" && <PluginSettingsTab isAdmin={isAdmin} />}
+            {activeTab === "voice" && <SpeechSettingsPanel />}
+            {activeTab === "automation" && (
+              <div className="space-y-6">
+                <TaskDigestSettings />
+                <AutomationCenter />
+              </div>
+            )}
+            {activeTab === "security" && <div className="space-y-6">
+              {isAndroidNativeRuntime() && <MobileAccountSettings accountLabel={currentUser?.displayName || currentUser?.username} />}
+              {!isMobileLocalMode() && <SecuritySettings />}
+            </div>}
             {activeTab === "tokens" && <TokenManagement />}
                   {activeTab === "users" && isAdmin && <UserManagement currentUserId={currentUser?.id ?? null} />}
                   {activeTab === "workspaces" && isAdmin && <WorkspaceManagement />}
                   {/* data tab 对所有用户可见：DataManager 内部会按 isAdmin 自动分流
                        —— 管理员看到完整三 scope；普通用户只看"个人空间"的导出/导入。 */}
                   {activeTab === "data" && <DataManager />}
-                  {activeTab === "offlineSync" && <OfflineSyncSettings />}
+                  {activeTab === "backup" && <BackupCenterTab />}
+                  {activeTab === "sync" && <SyncSettingsTab />}
                   {activeTab === "folderSync" && <FolderSyncSettings />}
                   {activeTab === "download" && <DownloadPanel />}
                   {activeTab === "about" && <AboutPanel />}

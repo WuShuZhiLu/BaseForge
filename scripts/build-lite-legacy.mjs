@@ -15,8 +15,8 @@
  *
  * 产物（Windows x64 示例）：
  *   dist-electron-lite/
- *     Nowen Note Lite-1.0.31-lite-setup.exe
- *     Nowen Note Lite-1.0.31-lite-portable.exe
+ *     Base Notes Lite-1.0.31-lite-setup.exe
+ *     Base Notes Lite-1.0.31-lite-portable.exe
  *     win-unpacked/
  *
  * 与 full 版的互不干扰：
@@ -42,11 +42,11 @@ function log(msg) {
 }
 
 // ========== Step 1: safe 模式下结束 lite 残留进程（仅 Windows） ==========
-// full 版和 lite 版的 exe 名不同，所以 taskkill 只杀 "Nowen Note Lite.exe"，
+// full 版和 lite 版的 exe 名不同，所以 taskkill 只杀 "Base Notes Lite.exe"，
 // 不影响正常开发/调试中的 full 版。
 if (isWin && SAFE_MODE) {
-  log("safe mode: killing leftover 'Nowen Note Lite.exe' processes (if any)...");
-  const result = spawnSync("taskkill", ["/F", "/IM", "Nowen Note Lite.exe"], {
+  log("safe mode: killing leftover 'Base Notes Lite.exe' processes (if any)...");
+  const result = spawnSync("taskkill", ["/F", "/IM", "Base Notes Lite.exe"], {
     shell: false,
     stdio: "pipe",
     encoding: "utf8",
@@ -102,7 +102,7 @@ const RESET = "\x1b[0m";
 // Windows 杀软会拦截 rcedit 的 MoveFileEx，导致：
 //   ⨯ cannot execute  cause=exit status 1
 //                     errorOut=Fatal error: Unable to commit changes
-//                     command='...\rcedit-x64.exe' 'Nowen Note Lite.exe' ...
+//                     command='...\rcedit-x64.exe' 'Base Notes Lite.exe' ...
 //   • Above command failed, retrying 3 more times
 // 但版本号通常仍写入成功，属日志假阳性。
 let rceditFalsePositives = 0;
@@ -183,7 +183,7 @@ try {
   // 只检查 exe 是否正确生成 + 版本号是否写入。不跑 full 版那套复杂的 PowerShell 查询，
   // lite 版体量小、跑一次快，用户只需知道产物在哪就够了。
   if (isWin) {
-    const exePath = join(finalOut, "win-unpacked", "Nowen Note Lite.exe");
+    const exePath = join(finalOut, "win-unpacked", "Base Notes Lite.exe");
     if (existsSync(exePath)) {
       log(`exe path:          ${exePath}`);
       if (rceditFalsePositives > 0) {

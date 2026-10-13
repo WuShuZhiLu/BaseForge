@@ -115,7 +115,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
   };
 
   const currentWs = workspaces.find((w) => w.id === current);
-  const displayName = current === "personal" ? "我的笔记" : currentWs?.name || "我的笔记";
+  const displayName = current === "personal" ? "个人空间" : currentWs?.name || "个人空间";
   const displayIcon = current === "personal" ? "🏠" : currentWs?.icon || DEFAULT_WORKSPACE_ICON;
 
   // 在入口按钮（展开/收起态）上右键当前工作区时，直接弹出对应右键菜单。
@@ -289,7 +289,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
                 {/* 个人空间 */}
                 <WorkspaceItem
                   icon="🏠"
-                  name="我的笔记"
+                  name="个人空间"
                   subtitle="个人内容"
                   active={current === "personal"}
                   onClick={() => switchTo("personal")}
@@ -686,7 +686,7 @@ function DeleteWorkspaceDialog({
           <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
             {t(
               "workspaceManagement.deleteConfirmHintNoOwner",
-              "删除后该团队空间下的笔记本将归还到所有者的我的笔记，邀请码、成员关系会被清除，此操作不可撤销。",
+              "删除后该团队空间下的笔记本将归还到所有者的个人空间，邀请码、成员关系会被清除，此操作不可撤销。",
             )}
           </p>
         </div>

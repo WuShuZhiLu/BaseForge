@@ -73,6 +73,10 @@ function commitWholeNoteContent(args: {
     const synced = syncNoteBlocks(db, current.id, args.nextContent, args.contentFormat);
     committedContent = synced.content;
     committedText = synced.contentText;
+    // 块索引可能在写入时给正文补上 ^blk_ 标记。若它没有改动正文，乐观锁仍按
+    // 调用方看到的原文比对，否则会拿"补过 ID 的新正文"去比对库里的旧正文而误冲突；
+    // 若确实改动了正文，则按新正文比对（说明库里的内容已过期，冲突是正确的）。
+    const contentAtUpdate = synced.changed ? committedContent : args.expectedContent;
 
     noteVersionsRepository.create({
       id: uuid(),
@@ -91,7 +95,7 @@ function commitWholeNoteContent(args: {
       UPDATE notes
          SET content = ?, contentText = ?, version = version + 1, updatedAt = datetime('now')
        WHERE id = ? AND version = ? AND content = ?
-    `).run(committedContent, committedText, current.id, args.expectedVersion, args.expectedContent);
+    `).run(committedContent, committedText, current.id, args.expectedVersion, contentAtUpdate);
     if (Number(updated.changes || 0) !== 1) throw new WholeNoteMutationConflict("optimistic update failed");
 
     syncAttachmentReferences(db, current.id, committedContent);

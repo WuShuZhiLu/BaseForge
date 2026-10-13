@@ -16,8 +16,8 @@ function normalizeVersion(value) {
 
 function stableSetupName(channel, version) {
   return channel === "lite"
-    ? `Nowen-Note-Lite-${version}-setup.exe`
-    : `Nowen-Note-${version}-setup.exe`;
+    ? `Base-Notes-Lite-${version}-setup.exe`
+    : `Base-Notes-${version}-setup.exe`;
 }
 
 function expectedMetadataName(channel) {
@@ -30,8 +30,8 @@ function listChannelSetupCandidates(assetDir, channel) {
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((name) => {
-      if (channel === "lite") return /^Nowen-Note-Lite-.+-setup\.exe$/.test(name);
-      return /^Nowen-Note-.+-setup\.exe$/.test(name) && !/^Nowen-Note-Lite-/.test(name);
+      if (channel === "lite") return /^Base-Notes-Lite-.+-setup\.exe$/.test(name);
+      return /^Base-Notes-.+-setup\.exe$/.test(name) && !/^Base-Notes-Lite-/.test(name);
     })
     .sort();
 }
