@@ -14,7 +14,12 @@
  */
 
 import { clearAuthTokens } from "@/lib/authSession";
-import { inferBrowserServerBaseUrl, normalizeServerBaseUrl } from "@/lib/serverUrl";
+import {
+  getResolvedWebSocketUrl,
+  inferBrowserServerBaseUrl,
+  normalizeServerBaseUrl,
+} from "@/lib/serverUrl";
+import { SERVER_ENDPOINT_CHANGED_EVENT } from "@/lib/serverEndpointState";
 import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
 import { isMobileSyncEnabled, MOBILE_SYNC_SETTINGS_CHANGED_EVENT } from "@/lib/mobileSyncStatus";
 
@@ -72,8 +77,9 @@ class RealtimeClient {
     } else {
       return null;
     }
-    const wsOrigin = origin.replace(/^http/, "ws");
-    return `${wsOrigin}${WS_PATH}?token=${encodeURIComponent(token)}`;
+    const resolvedWebSocketUrl = getResolvedWebSocketUrl(origin)
+      || `${origin.replace(/^http/, "ws")}${WS_PATH}`;
+    return `${resolvedWebSocketUrl}?token=${encodeURIComponent(token)}`;
   }
 
   connect() {
@@ -165,6 +171,22 @@ class RealtimeClient {
       this.connecting = false;
       this.scheduleReconnect();
     }
+  }
+
+  // 服务器地址变更（设置里换服务器 / 端点迁移）时，立刻按新地址重建连接；
+  // 保留房间和 presence，连接打开后沿用已有重放机制。
+  reconnectForEndpoint() {
+    if (this.manualClosed || (!this.ws && !this.reconnectTimer && !this.connecting)) return;
+    const old = this.ws;
+    this.ws = null;
+    this.connecting = false;
+    this.connectionId = null;
+    this.stopHeartbeat();
+    if (this.reconnectTimer) window.clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    try { old?.close(); } catch { /* ignore */ }
+    this.emit("close", {});
+    this.connect();
   }
 
   disconnect(preserveSubscriptions = false) {
@@ -379,6 +401,11 @@ if (typeof window !== "undefined") {
 
 // 页面卸载时主动关闭，避免后端堆积连接
 if (typeof window !== "undefined") {
+  // 服务器地址变更（换服务器 / 端点迁移）→ 按新地址重连实时通道（上游同款）。
+  window.addEventListener(SERVER_ENDPOINT_CHANGED_EVENT, (event) => {
+    const server = normalizeServerBaseUrl(localStorage.getItem("nowen-server-url"));
+    if ((event as CustomEvent<{ serverUrl: string }>).detail.serverUrl === server) realtime.reconnectForEndpoint();
+  });
   window.addEventListener("beforeunload", () => {
     realtime.disconnect();
   });

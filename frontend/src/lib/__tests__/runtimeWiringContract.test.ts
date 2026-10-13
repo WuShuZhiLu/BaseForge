@@ -105,3 +105,29 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
     }
   });
 });
+
+describe("sync domain wiring contract (runtime audit 2026-10-13)", () => {
+  const be = (relative: string) =>
+    readFileSync(path.resolve(__dirname, "../../../../backend/src/" + relative), "utf8");
+
+  it("guards yjs collaboration for encrypted notes and blocks", () => {
+    for (const file of ["services/yjs.ts", "services/yjs-subdocuments.ts"]) {
+      const source = be(file);
+      expect(source).toContain("assertEncryptedBlockCollaborationAllowed");
+      expect(source).toContain("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+    }
+  });
+
+  it("accepts the proxy-compatible websocket aliases and the probe frame", () => {
+    const realtime = be("services/realtime.ts");
+    expect(realtime).toContain('"/public/ws"');
+    expect(realtime).toContain('url.searchParams.get("probe") === "1"');
+  });
+
+  it("reconnects the realtime channel when the server endpoint changes", () => {
+    const source = read("../../lib/realtime.ts");
+    expect(source).toContain("getResolvedWebSocketUrl");
+    expect(source).toContain("SERVER_ENDPOINT_CHANGED_EVENT");
+    expect(source).toContain("reconnectForEndpoint");
+  });
+});
