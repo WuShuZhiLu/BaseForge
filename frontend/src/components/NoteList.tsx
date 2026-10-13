@@ -1,10 +1,11 @@
 import React, { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pin, PinOff, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck } from "lucide-react";
+import { Plus, Pin, PinOff, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
+import { NOTE_COLOR_MARK_OPTIONS, getNoteColorMarkHex, isNoteColorMark } from "@/lib/noteColorMark";
 import KnowledgeTreePermissionsDialog from "@/components/KnowledgeTreePermissionsDialog";
 import ShareModal from "@/components/ShareModal";
 import { buildNoteContextMenuLayout } from "@/components/noteContextMenuLayout";
@@ -1042,6 +1043,7 @@ const NoteCard = React.memo(function NoteCard({
   // （短标题时不明显，因为预览整体行数少；长标题挤占空间后尤为严重）。
   const isSearchResult = !!searchQuery;
   const { t } = useTranslation();
+  const colorMarkHex = getNoteColorMarkHex(note.colorMark);
   const preview = (
     isSearchResult
       ? (note.snippetHtml || note.contentText || "")
@@ -1092,19 +1094,22 @@ const NoteCard = React.memo(function NoteCard({
         isDragOver && "border-accent-primary/50 bg-accent-primary/5"
       )}
     >
-      {/* 左侧彩色指示条 */}
-      <div className={cn(
-        "absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg transition-colors",
-        isSelected
-          ? "bg-accent-primary"
-          : isActive
-          ? "bg-accent-primary"
-          : note.isFavorite === 1
-          ? "bg-amber-400"
-          : note.isPinned === 1
-          ? "bg-accent-primary/50"
-          : "bg-transparent group-hover:bg-app-border"
-      )} />
+              {/* 左侧彩色指示条：选中/激活优先，其次是笔记色标（用户显式选的颜色最该被看到），
+                  再次是收藏/置顶。色标条比小圆点显眼得多，避免"改了颜色看不出来"。 */}
+              <div className={cn(
+                "absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg transition-colors",
+                isSelected
+                  ? "bg-accent-primary"
+                  : isActive
+                  ? "bg-accent-primary"
+                  : colorMarkHex
+                  ? ""
+                  : note.isFavorite === 1
+                  ? "bg-amber-400"
+                  : note.isPinned === 1
+                  ? "bg-accent-primary/50"
+                  : "bg-transparent group-hover:bg-app-border"
+              )} style={!isSelected && !isActive && colorMarkHex ? { backgroundColor: colorMarkHex } : undefined} />
 
       <div className="pl-3.5 pr-3 py-2.5 min-w-0">
         {/* 标题行 + 状态图标 */}
@@ -2244,6 +2249,7 @@ export default function NoteList() {
         updatedAt: note.updatedAt,
         createdAt: note.createdAt,
         contentFormat: note.contentFormat,
+        colorMark: note.colorMark ?? null,
       } as NoteListItem);
       actions.setMobileView("editor");
       revealCreatedKnowledgeTreeNote(selectedKnowledgeTreeParentId);
@@ -2568,18 +2574,30 @@ export default function NoteList() {
         { id: "new_markdown", label: "Markdown 文档", icon: <FileCode size={14} /> },
         { id: "new_folder", label: "文件夹", icon: <Folder size={14} /> },
       ],
-      flags: [
-        {
-          id: "toggle_pin",
-          label: targetNote.isPinned === 1 ? t('noteList.unpin') : t('noteList.pin'),
-          icon: targetNote.isPinned === 1 ? <PinOff size={14} /> : <Pin size={14} />,
-        },
-        {
-          id: "toggle_fav",
-          label: targetNote.isFavorite === 1 ? t('noteList.unfavorite') : t('noteList.favorite'),
-          icon: targetNote.isFavorite === 1 ? <StarOff size={14} /> : <Star size={14} />,
-        },
-      ],
+    flags: [
+      {
+        id: "color_mark",
+        label: t("note.colorMark.action"),
+        icon: <Palette size={14} />,
+        children: NOTE_COLOR_MARK_OPTIONS.map((option) => ({
+          id: `color_mark_${option.value || "none"}`,
+          label: t(option.labelKey),
+          icon: option.value
+            ? <span className="h-3 w-3 rounded-full ring-1 ring-black/10 dark:ring-white/15" style={{ backgroundColor: option.hex }} />
+            : <X size={13} />,
+        })),
+      },
+      {
+        id: "toggle_pin",
+        label: targetNote.isPinned === 1 ? t('noteList.unpin') : t('noteList.pin'),
+        icon: targetNote.isPinned === 1 ? <PinOff size={14} /> : <Pin size={14} />,
+      },
+      {
+        id: "toggle_fav",
+        label: targetNote.isFavorite === 1 ? t('noteList.unfavorite') : t('noteList.favorite'),
+        icon: targetNote.isFavorite === 1 ? <StarOff size={14} /> : <Star size={14} />,
+      },
+    ],
       management: [
         { id: "rename_note", label: "重命名", icon: <Pencil size={14} />, disabled: targetNote.isLocked === 1 },
         { id: "move", label: t('noteList.moveTo'), icon: <FolderInput size={14} />, disabled: targetNote.isLocked === 1 },
@@ -2731,6 +2749,21 @@ export default function NoteList() {
     const targetNote = state.notes.find((n) => n.id === targetId);
     if (!targetNote) return;
 
+    // 笔记色标：右键菜单直接改色，写回列表/标签/当前笔记并通知知识树刷新。
+    if (actionId.startsWith("color_mark_")) {
+      const raw = actionId.slice("color_mark_".length);
+      const nextColor = raw === "none" ? null : (isNoteColorMark(raw) ? raw : null);
+      haptic.light();
+      const updated = await api.updateNote(targetId, { colorMark: nextColor });
+      actions.updateNoteInList({ id: targetId, colorMark: updated.colorMark ?? nextColor });
+      actions.updateNoteTab({ id: targetId, colorMark: updated.colorMark ?? nextColor } as unknown as Partial<import("@/store/AppContext").OpenNoteTab> & { id: string });
+      if (state.activeNote?.id === targetId) {
+        actions.setActiveNote({ ...state.activeNote, colorMark: updated.colorMark ?? nextColor });
+      }
+      emitKnowledgeTreeRefresh("note-color-mark-changed");
+      return;
+    }
+
     switch (actionId) {
       case "open": {
         await handleSelectNote(targetId);
@@ -2809,6 +2842,7 @@ export default function NoteList() {
             updatedAt: duplicated.updatedAt,
             createdAt: duplicated.createdAt,
             contentFormat: duplicated.contentFormat,
+            colorMark: duplicated.colorMark ?? null,
           } as NoteListItem);
           if (userPrefs.prefs.enableNoteTabs) {
             actions.openNoteTab({
@@ -3299,6 +3333,7 @@ export default function NoteList() {
           updatedAt: note.updatedAt,
           createdAt: note.createdAt,
           contentFormat: note.contentFormat,
+          colorMark: note.colorMark ?? null,
         } as NoteListItem);
         okCount++;
       } catch (err: any) {

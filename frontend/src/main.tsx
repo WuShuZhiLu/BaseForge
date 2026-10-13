@@ -39,6 +39,7 @@ import "./siyuan-rich-text-callout.css";
 import "./knowledge-tree-markdown-drop.css";
 import "./inline-comments.css";
 import "./loading-experience.css";
+import "./note-appearance.css";
 import { initCodeBlockTheme } from "./lib/codeBlockTheme";
 import { installAndroidNativeHttpBridge } from "./lib/androidNativeHttpBridge";
 import { installDesktopNativeHttpBridge } from "./lib/desktopNativeHttpBridge";

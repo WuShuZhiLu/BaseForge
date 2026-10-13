@@ -103,6 +103,7 @@ import {
 import { detectNoteWorkspaceSurface } from "@/lib/noteWorkspaceLayout";
 import { isSharedRoot } from "@/lib/sharedKnowledgeTree";
 import { toast } from "@/lib/toast";
+import NoteColorMarkBar from "@/components/NoteColorMarkBar";
 import { cn } from "@/lib/utils";
 import { useApp, useAppActions } from "@/store/AppContext";
 
@@ -1002,6 +1003,7 @@ export default function MobileKnowledgeTreePanel({
         data-knowledge-tree-select-id={node.id}
         aria-selected={selected}
       >
+        <NoteColorMarkBar value={node.colorMark} />
         <button
           type="button"
           onClick={(event) => handleNodeSelection(event, node)}

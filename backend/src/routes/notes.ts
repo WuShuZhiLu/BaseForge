@@ -47,6 +47,7 @@ import {
   synchronizeLegacyNotebookHierarchy,
 } from "../services/legacyKnowledgeHierarchy";
 import { syncAutomaticNoteLinkTitles } from "../lib/noteLinkTitles";
+import { isValidNoteColorMarkInput, normalizeNoteColorMark } from "../lib/noteColorMark";
 import { noteLinksRepository, noteTagsRepository, noteVersionsRepository, favoritesRepository, noteYsnapshotsRepository, noteYupdatesRepository } from "../repositories";
 import { rebuildYjsSubdocumentsIfEnabled } from "../services/yjs-subdocuments";
 import { reclaimSpace } from "../lib/reclaimSpace";
@@ -152,7 +153,7 @@ app.get("/", (c) => {
     CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
     notes.isLocked, notes.isArchived, notes.isTrashed, notes.version, notes.sortOrder,
     notes.createdAt, notes.updatedAt,
-    notes.contentFormat,
+    notes.contentFormat, notes.colorMark,
     (SELECT tree.parentId
        FROM knowledge_tree_nodes tree
       WHERE tree.resourceType = 'note' AND tree.resourceId = notes.id AND tree.isDeleted = 0
@@ -545,9 +546,9 @@ app.get("/:id", (c) => {
   const favExpr = `CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite`;
   const selectCols = slim
     ? `id, userId, notebookId, workspaceId, title, isPinned, ${favExpr}, isLocked,
-       isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat`
+       isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark`
     : `id, userId, notebookId, workspaceId, title, content, contentText, isPinned, ${favExpr},
-       isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat`;
+       isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark`;
   const note = db.prepare(`SELECT ${selectCols} FROM notes WHERE id = ?`).get(userId, id) as any;
   if (!note) return c.json({ error: "Note not found" }, 404);
 
@@ -680,6 +681,10 @@ app.post("/", async (c) => {
     id = uuid();
   }
   // contentText 由服务端从正文派生，客户端提交值不再作为索引真源。
+  if (body.colorMark !== undefined && !isValidNoteColorMarkInput(body.colorMark)) {
+    return c.json({ error: "无效的笔记颜色标记", code: "INVALID_NOTE_COLOR_MARK" }, 400);
+  }
+  const initialColorMark = body.colorMark === undefined ? null : normalizeNoteColorMark(body.colorMark);
   const contentFormat = body.contentFormat === "markdown" ? "markdown"
     : body.contentFormat === "html" ? "html"
     : "tiptap-json";
@@ -698,12 +703,12 @@ app.post("/", async (c) => {
 
   const legacyNoteCreateTx = db.transaction(() => {
     db.prepare(`
-      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat, colorMark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, userId, inheritedWorkspaceId, body.notebookId,
       body.title || "无标题笔记", initialContent,
-      extractSearchableText(initialContent, contentFormat), contentFormat,
+      extractSearchableText(initialContent, contentFormat), contentFormat, initialColorMark,
     );
     synchronizeLegacyNoteHierarchy({
       db,
@@ -788,7 +793,7 @@ app.post("/", async (c) => {
   const note = db.prepare(`
     SELECT id, userId, notebookId, workspaceId, title, content, contentText, isPinned,
       CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
-      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat
+      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark
     FROM notes WHERE id = ?
   `).get(userId, id);
   logAudit(userId, "note", "create", { noteId: id, title: body.title }, { targetType: "note", targetId: id });
@@ -815,10 +820,13 @@ app.put("/:id", async (c) => {
 
   // 根据变更字段决定所需权限
   const writeFields = ["title", "content", "contentText", "contentFormat", "notebookId", "isPinned", "isFavorite",
-                       "isArchived", "isTrashed", "sortOrder"];
+                       "isArchived", "isTrashed", "sortOrder", "colorMark"];
   const manageFields = ["isLocked"]; // 锁定需要 manage 权限
   const needsManage = manageFields.some((f) => body[f] !== undefined);
   const needsWrite = writeFields.some((f) => body[f] !== undefined);
+  if (body.colorMark !== undefined && !isValidNoteColorMarkInput(body.colorMark)) {
+    return c.json({ error: "无效的笔记颜色标记", code: "INVALID_NOTE_COLOR_MARK" }, 400);
+  }
 
   if (needsManage && !hasPermission(permission, "manage")) {
     return c.json({ error: "需要 manage 权限", code: "FORBIDDEN" }, 403);
@@ -1101,6 +1109,7 @@ app.put("/:id", async (c) => {
     fields.push("workspaceId = ?"); params.push(newWorkspaceId ?? null);
   }
   if (body.isPinned !== undefined) { fields.push("isPinned = ?"); params.push(body.isPinned); }
+  if (body.colorMark !== undefined) { fields.push("colorMark = ?"); params.push(normalizeNoteColorMark(body.colorMark)); }
   // Y1: isFavorite 不再写 notes 列，改为操作 favorites 表（per-user 语义）。
   // 权限检查已在上面的 writeFields 里做过（仍需 write 权限才能切换自己的收藏）。
   // 幂等：truthy → INSERT OR IGNORE；falsy → DELETE。
@@ -1298,7 +1307,7 @@ app.put("/:id", async (c) => {
   const note = db.prepare(`
     SELECT id, userId, notebookId, workspaceId, title, content, contentText, isPinned,
       CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
-      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat
+      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark
     FROM notes WHERE id = ?
   `).get(userId, id);
 

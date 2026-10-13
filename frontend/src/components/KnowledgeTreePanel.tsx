@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 
 import FolderPasswordDialog from "@/components/FolderPasswordDialog";
+import NoteColorMarkBar from "@/components/NoteColorMarkBar";
 import {
   KnowledgeTreeBatchMovePanel,
   KnowledgeTreeBatchToolbar,
@@ -1257,6 +1258,7 @@ export function KnowledgeTreePanel({
           data-knowledge-tree-drop-placement={treeDropTarget?.nodeId === node.id ? treeDropTarget.placement : undefined}
           aria-selected={selected}
         >
+          <NoteColorMarkBar value={node.colorMark} />
           <button
             type="button"
             onClick={() => hasChildren && void toggleDisclosure(node)}
@@ -1285,8 +1287,8 @@ export function KnowledgeTreePanel({
                 {selected && <Check size={11} />}
               </span>
             )}
-            {nodeIcon(node)}
-            <span className="min-w-0 flex-1 truncate">{node.title}</span>
+          {nodeIcon(node)}
+          <span className="min-w-0 flex-1 truncate">{node.title}</span>
             {node.nodeType === "folder" && node.isPasswordProtected === 1 && (
               <LockKeyhole size={11} className="shrink-0 text-tx-tertiary" aria-label="密码保护" />
             )}

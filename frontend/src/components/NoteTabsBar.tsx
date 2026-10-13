@@ -11,7 +11,7 @@ import { useNoteLoader } from "@/hooks/useNoteLoader";
 import type { Notebook, NoteListItem } from "@/types";
 import { EditorToolbarExpandSlot } from "@/components/CollapsibleEditorToolbar";
 import { buildNoteDeepLinkUrl } from "@/lib/noteDeepLink";
-import NoteColorMarkDot from "@/components/NoteColorMarkDot";
+import NoteColorMarkBar from "@/components/NoteColorMarkBar";
 
 type TabContextMenuState = {
   tabId: string;
@@ -135,7 +135,7 @@ function NoteTabVisual({
 }) {
   return (
     <>
-      <NoteColorMarkDot value={colorMark} />
+      <NoteColorMarkBar value={colorMark} inline className="h-3" />
       {tab.pinned && <Pin size={11} className="shrink-0 text-accent-primary fill-accent-primary/20" />}
       {tab.isLocked ? (
         <Lock size={12} className="shrink-0 text-orange-500" />

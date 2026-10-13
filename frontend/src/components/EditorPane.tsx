@@ -3733,9 +3733,9 @@ const moveToTrash = useCallback(async () => {
 
       {userPrefs.enableNoteTabs && !state.editorSplit && <NoteTabsBar />}
 
-      {/* Editor (HTML Ԥ�� / MD / Tiptap ��ģʽ����) + Outline */}
+      {/* Editor (HTML 预览 / MD / Tiptap 三模式共用) + Outline */}
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-hidden relative">
+        <div className="note-theme-surface flex-1 overflow-hidden relative" data-note-id={activeNote.id}>
           {/* Phase 2: ʵʱЭ����������� / Զ�̸��� / Զ��ɾ�������� absolute ���㣬��ռ�ĵ���������ҳ�涶�� */}
           {false && pendingDraft ? (
             <div
