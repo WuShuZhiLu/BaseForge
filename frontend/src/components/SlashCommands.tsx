@@ -957,6 +957,20 @@ export function getDefaultSlashCommands(
       },
     },
     {
+      // 轻量表格嵌入：与脑图嵌入同管线（![[sheet:id]] wiki 引用）。
+      // EditorPane 监听 nowen:open-sheet-embed-picker 事件后弹出选择对话框。
+      id: "sheetEmbed",
+      label: t("slash.sheetEmbed") || "嵌入轻量表格",
+      description: t("slash.sheetEmbedDesc") || "把已有表格文档嵌入当前笔记",
+      icon: <Table2 size={16} />,
+      category: t("slash.catInsert"),
+      categoryKey: "insert",
+      keywords: ["sheet", "表格", "轻量表格", "嵌入表格", "excel"],
+      action: () => {
+        window.dispatchEvent(new CustomEvent("nowen:open-sheet-embed-picker"));
+      },
+    },
+    {
       // Mermaid 脑图（代码块）：与上面的原生导图命令分开——
       // 这里插入的是可编辑的 Mermaid mindmap 源码模板，不关联原生导图数据。
       id: "mermaidMindMap",

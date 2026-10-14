@@ -722,7 +722,9 @@
     "mermaidDownloadSvg": "Download SVG",
     "mermaidSyntaxError": "Mermaid syntax error",
     "mermaidCopySourceOnError": "Copy source",
-    "blockMenu": "Block actions"
+    "blockMenu": "Block actions",
+    "sheetEmbed": "Embed sheet",
+    "sheetEmbedDesc": "Embed an existing sheet document into this note"
   },
   "settings": {
     "title": "Settings",

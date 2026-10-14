@@ -6,10 +6,11 @@ import { api } from "@/lib/api";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
 import { useLazyNodeView } from "@/hooks/useLazyNodeView";
 import MindMapEmbedCard, { parseMindMapEmbedHref } from "@/components/MindMapEmbedCard";
+import SheetEmbedCard, { parseSheetEmbedHref } from "@/components/SheetEmbedCard";
 
 // A stable reference to an independent mind map is stored in the same atom infrastructure as
 // existing note blocks. No mindmap JSON is copied into the note, and deleting the atom is safe.
-const EMBED_RE = /!\[\[((?:note:[0-9a-f-]{36}#blk:[A-Za-z0-9_-]+|mindmap:[0-9a-f-]{36}))\]\]\s$/i;
+const EMBED_RE = /!\[\[((?:note:[0-9a-f-]{36}#blk:[A-Za-z0-9_-]+|mindmap:[0-9a-f-]{36}|sheet:[0-9a-f-]{36}))\]\]\s$/i;
 
 function BlockEmbedCard({ href }: { href: string }) {
   const [state, setState] = useState<{ loading: boolean; data: any; error: boolean }>({ loading: true, data: null, error: false });
@@ -45,6 +46,7 @@ function BlockEmbedNodeView({ node, selected }: any) {
     manualInLightweight: true,
   });
   const mindMapId = parseMindMapEmbedHref(node.attrs.href || "");
+  const sheetId = parseSheetEmbedHref(node.attrs.href || "");
   return (
     <NodeViewWrapper
       ref={observeRef}
@@ -59,6 +61,8 @@ function BlockEmbedNodeView({ node, selected }: any) {
     >
       {shouldRenderHeavyContent ? (mindMapId
         ? <MindMapEmbedCard href={`mindmap:${mindMapId}`} />
+        : sheetId
+        ? <SheetEmbedCard href={`sheet:${sheetId}`} />
         : <BlockEmbedCard href={node.attrs.href} />
       ) : (
         <button
@@ -89,7 +93,7 @@ export const BlockEmbedExtension = Node.create({
     return [{ tag: "div[data-nowen-block-embed]", getAttrs: (node) => ({ href: (node as HTMLElement).getAttribute("data-nowen-block-embed") || "" }) }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-nowen-block-embed": HTMLAttributes.href }), parseMindMapEmbedHref(HTMLAttributes.href || "") ? "思维导图" : "引用块"];
+    return ["div", mergeAttributes(HTMLAttributes, { "data-nowen-block-embed": HTMLAttributes.href }), parseMindMapEmbedHref(HTMLAttributes.href || "") ? "思维导图" : parseSheetEmbedHref(HTMLAttributes.href || "") ? "轻量表格" : "引用块"];
   },
   addNodeView() { return ReactNodeViewRenderer(BlockEmbedNodeView); },
   addInputRules() {

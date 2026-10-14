@@ -737,7 +737,9 @@
     },
     "mermaidMindMap": "Mermaid 脑图（代码块）",
     "mermaidMindMapDesc": "插入可编辑的 Mermaid 脑图模板，不关联原生导图",
-    "blockMenu": "块操作"
+    "blockMenu": "块操作",
+    "sheetEmbed": "嵌入轻量表格",
+    "sheetEmbedDesc": "把已有表格文档嵌入当前笔记"
   },
   "settings": {
     "title": "设置",

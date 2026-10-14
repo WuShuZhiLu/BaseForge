@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import SheetEmbedInsertDialog from "@/components/SheetEmbedInsertDialog";
 import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
@@ -2428,11 +2429,18 @@ const moveToTrash = useCallback(async () => {
   const [aiMermaidType, setAiMermaidType] = useState<"mermaid_mindmap" | "mermaid_flowchart">("mermaid_mindmap");
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
   const [showMindMapInsertDialog, setShowMindMapInsertDialog] = useState(false);
+  const [showSheetEmbedPicker, setShowSheetEmbedPicker] = useState(false);
 
   useEffect(() => {
     const openMindMapInsert = () => setShowMindMapInsertDialog(true);
     window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
     return () => window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
+  }, []);
+
+  useEffect(() => {
+    const openSheetEmbedPicker = () => setShowSheetEmbedPicker(true);
+    window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
+    return () => window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
   }, []);
 
   const handleAIMermaid = useCallback(async (type: "mermaid_mindmap" | "mermaid_flowchart") => {
@@ -4210,6 +4218,23 @@ const moveToTrash = useCallback(async () => {
           if (inserted) {
             editorHandle?.flushSave?.();
             toast.success("已插入思维导图");
+          }
+          return inserted;
+        }}
+      />
+      {/* 轻量表格嵌入选择对话框（斜杠命令「嵌入轻量表格」触发） */}
+      <SheetEmbedInsertDialog
+        open={showSheetEmbedPicker && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
+        onClose={() => setShowSheetEmbedPicker(false)}
+        onInsert={(sheetId, sheetTitle) => {
+          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
+          const markdown = `\n\n![[sheet:${sheetId}]]\n\n`;
+          const editorHandle = editorHandleRef.current;
+          const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
+          const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
+          if (inserted) {
+            editorHandle?.flushSave?.();
+            toast.success("已嵌入轻量表格");
           }
           return inserted;
         }}
