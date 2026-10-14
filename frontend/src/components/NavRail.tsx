@@ -60,12 +60,13 @@ const RAIL_ICON_SIZE = 18;
  * "All Notes" directory/list entry is intentionally retired.
  */
 const NAV_CONFIG: NavConfigItem[] = [
+  // 注意：mindmaps（脑图中心）已于 2026-10-14 从主导航移除——导图是树内文档，
+  // 树里可直接建/打开；viewMode "mindmaps" 路由保留（直连仍可用）。
   { icon: <Star size={RAIL_ICON_SIZE} />, labelKey: "sidebar.favorites", mode: "favorites", feature: "favorites", group: "workspace" },
   { icon: <FolderOpen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.fileManager", mode: "files", feature: "files", group: "workspace" },
   { icon: <Trash2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.trash", mode: "trash", group: "workspace" },
   { icon: <NotebookPen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.diary", mode: "diary", feature: "diaries", group: "modules" },
   { icon: <ListTodo size={RAIL_ICON_SIZE} />, labelKey: "sidebar.tasks", mode: "tasks", feature: "tasks", group: "modules" },
-  { icon: <BrainCircuit size={RAIL_ICON_SIZE} />, labelKey: "sidebar.mindMaps", mode: "mindmaps", feature: "mindmaps", group: "modules" },
   { icon: <Sparkles size={RAIL_ICON_SIZE} />, labelKey: "sidebar.aiChat", mode: "ai-chat", group: "tools" },
   { icon: <Link2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.shareManagement", mode: "shares", group: "tools" },
 ];
