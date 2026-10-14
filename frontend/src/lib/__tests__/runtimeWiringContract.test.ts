@@ -66,6 +66,8 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
     // 不得再往 CREATE_ITEMS 里加第二个（回归：曾因此出现重复菜单项）。
     expect(menu.split("<span>轻量表格</span>").length - 1).toBe(1);
     expect(menu).toContain("onCreateSheet");
+
+    // 导图建完自动打开（另一条已锁行为，勿在此项改动时丢失）。
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
@@ -73,6 +75,17 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
       const source = read(file);
       expect(source).toContain('snapshot.kind === "mindmap"');
       expect(source).toContain("pushMindMapAppPath(created.resourceId)");
+    }
+
+    // 表格数据 → Markdown 笔记导入（1.0.0：完善现有功能）。
+    expect(menu).toContain('kind: "spreadsheet"');
+    for (const file of [
+      "../../components/KnowledgeTreePanel.tsx",
+      "../../components/MobileKnowledgeTreePanel.tsx",
+    ]) {
+      const source = read(file);
+      expect(source).toContain('importSpreadsheetIntoKnowledgeTree');
+      expect(source).toContain('"spreadsheet"');
     }
   });
 

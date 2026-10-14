@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit } from "lucide-react";
+import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , FileSpreadsheet } from "lucide-react";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -43,6 +43,7 @@ const IMPORT_ITEMS = [
   { kind: "word", label: "导入 Word 文档", icon: FileType2 },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },
+{ kind: "spreadsheet", label: "导入 Excel/CSV 为 Markdown 表格", icon: FileSpreadsheet },
 ] as const;
 
 export interface KnowledgeTreeCreateMenuState {

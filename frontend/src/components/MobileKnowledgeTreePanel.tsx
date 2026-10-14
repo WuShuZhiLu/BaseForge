@@ -46,6 +46,7 @@ import {
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
+  importSpreadsheetIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
@@ -710,7 +711,7 @@ rememberOpened(created.id);
 
   const importIntoTree = useCallback(async (
     targetParentId: string | null,
-    kind: "markdown" | "markdown-zip" | "word" | "wechat" | "yuque",
+    kind: "markdown" | "markdown-zip" | "word" | "wechat" | "yuque" | "spreadsheet",
   ) => {
     setCreateMenu(null);
     const parent = targetParentId ? nodes.find((node) => node.id === targetParentId) || null : null;
@@ -738,7 +739,9 @@ rememberOpened(created.id);
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : kind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : await importWeChatArticleIntoKnowledgeTree(options);
+            : kind === "wechat"
+ ? await importWeChatArticleIntoKnowledgeTree(options)
+ : await importSpreadsheetIntoKnowledgeTree(options);
       if (!imported) return;
       activateNote(imported, parent?.id || null);
       emitTreeChanged("node-imported-quick-browse");

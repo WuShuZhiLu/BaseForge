@@ -178,3 +178,28 @@ export async function importWeChatArticleIntoKnowledgeTree(
     throw error;
   }
 }
+
+export async function importSpreadsheetIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<null> {
+  const { pickSpreadsheetFile, importSpreadsheetFileAsSheets } = await import("@/lib/spreadsheetImport");
+  const { revealCreatedKnowledgeTreeNote } = await import("@/lib/knowledgeTreeCreateVisibility");
+  const { emitKnowledgeTreeRefresh } = await import("@/lib/workspaceRefreshBridge");
+  const { pushSheetAppPath } = await import("@/lib/sheetDeepLink");
+  const file = await pickSpreadsheetFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入表格…", 0);
+  try {
+    const result = await importSpreadsheetFileAsSheets(file, options.parent?.id ?? null);
+    revealCreatedKnowledgeTreeNote(options.parent?.id || null);
+    emitKnowledgeTreeRefresh("spreadsheet-imported");
+    toast.dismiss(toastId);
+    if (result.note) toast.info(result.note, 6000);
+    toast.success(`已导入 ${result.created.length} 个表格文档`);
+    pushSheetAppPath(result.created[0].resourceId);
+    return null; // 表格文档不是 note：面板对 null 提前返回，跳转已在上面完成
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
