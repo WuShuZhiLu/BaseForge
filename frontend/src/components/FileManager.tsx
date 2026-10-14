@@ -1094,7 +1094,7 @@ export default function FileManager() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-semibold text-tx-primary whitespace-nowrap">
-                {isImageHostMode ? "图床" : "文件管理"}
+                {isImageHostMode ? "图床" : "附件"}
               </h2>
               {storageBadge && (
                 <div
@@ -1330,7 +1330,7 @@ export default function FileManager() {
                 tab.key === "unreferenced"
                   ? "没有被任何笔记引用的附件（刚上传 24 小时内的不算）"
                   : tab.key === "myUploads"
-                    ? "你从文件管理页直接上传的文件（不含编辑器粘贴的）"
+                    ? "你从附件页直接上传的文件（不含编辑器粘贴的）"
                     : undefined
               }
             >
