@@ -147,7 +147,10 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
     && (usingDesktopLiteMode || !isLoopbackUrl(serverUrl) || (!!currentOrigin && normalizeUrl(serverUrl) !== normalizeUrl(currentOrigin)));
   const canSwitchBackToLocal = isDesktopApp() && (usingRemoteServer || usingDesktopLiteMode);
 
-  const items = features ? NAV_CONFIG.filter((item) => !item.feature || features[item.feature] !== false) : NAV_CONFIG;
+  const items = (features ? NAV_CONFIG.filter((item) => !item.feature || features[item.feature] !== false) : NAV_CONFIG)
+    // 桌面端：tools 组（任务/小记/AI/分享）收进侧栏底部工具条，Rail 只留知识本体与系统入口；
+    // 移动端抽屉空间有限，Rail 保留全部入口（触屏可达性优先）。
+    .filter((item) => !(variant === "desktop" && item.group === "tools"));
 
   const handleClick = useCallback((mode: ViewMode) => {
     actions.setViewMode(mode);

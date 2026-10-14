@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronRight, PanelLeft, Tags, Trash2, X , PanelTopOpen, PanelTopClose, Settings } from "lucide-react";
+import { ChevronDown, ChevronRight, PanelLeft, Tags, Trash2, X , PanelTopOpen, PanelTopClose, Settings, ListTodo, NotebookPen, Sparkles, Link2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import KnowledgeTreePanel, {
@@ -463,6 +463,45 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
           </div>
         )}
       </AnimatePresence>
+
+      {/* 桌面端底部工具条：任务 / 小记 / AI / 分享。
+          Rail 桌面端不再平铺这些工具（知识库优先 IA），入口收敛到侧栏底部；
+          移动端仍走抽屉 Rail（触屏可达性优先）。 */}
+      {variant === "desktop" && (
+        <section
+          data-sidebar-toolbar=""
+          className="shrink-0 border-t border-app-border px-2 py-1.5"
+        >
+          <div className="flex items-center gap-1">
+            {([
+              { mode: "tasks" as const, labelKey: "sidebar.tasks", icon: <ListTodo size={15} /> },
+              { mode: "diary" as const, labelKey: "sidebar.diary", icon: <NotebookPen size={15} /> },
+              { mode: "ai-chat" as const, labelKey: "sidebar.aiChat", icon: <Sparkles size={15} /> },
+              { mode: "shares" as const, labelKey: "sidebar.shareManagement", icon: <Link2 size={15} /> },
+            ]).map((item) => (
+              <button
+                key={item.mode}
+                type="button"
+                data-sidebar-tool={item.mode}
+                onClick={() => actions.setViewMode(item.mode)}
+                title={t(item.labelKey)}
+                aria-label={t(item.labelKey)}
+                className={cn(
+                  "flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md transition-colors",
+                  state.viewMode === item.mode
+                    ? "bg-app-hover text-accent-primary"
+                    : "text-tx-tertiary hover:bg-app-hover hover:text-tx-primary",
+                )}
+              >
+                {item.icon}
+                {classicText && (
+                  <span className="truncate text-[10px]">{t(item.labelKey)}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {tagColorPopover && (
         <TagColorPopover

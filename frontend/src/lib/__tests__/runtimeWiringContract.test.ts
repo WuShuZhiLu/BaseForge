@@ -144,3 +144,26 @@ describe("sync domain wiring contract (runtime audit 2026-10-13)", () => {
     expect(source).toContain("reconnectForEndpoint");
   });
 });
+
+describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
+  it("侧栏主体是知识树面板（桌面/移动各自变体）", () => {
+    const sidebar = read("../../components/Sidebar.tsx");
+    expect(sidebar).toContain("<KnowledgeTreePanel");
+    expect(sidebar).toContain("<MobileKnowledgeTreePanel");
+  });
+
+  it("脑图中心不再出现在主导航（导图是树内文档）", () => {
+    const rail = read("../../components/NavRail.tsx");
+    expect(rail).not.toContain('mode: "mindmaps"');
+  });
+
+  it("桌面端 Rail 收敛工具组，工具入口在侧栏底部工具条", () => {
+    const rail = read("../../components/NavRail.tsx");
+    expect(rail).toContain('variant === "desktop" && item.group === "tools"');
+    const sidebar = read("../../components/Sidebar.tsx");
+    expect(sidebar).toContain('data-sidebar-toolbar=""');
+    for (const mode of ["tasks", "diary", "ai-chat", "shares"]) {
+      expect(sidebar).toContain(`mode: "${mode}" as const`);
+    }
+  });
+});
