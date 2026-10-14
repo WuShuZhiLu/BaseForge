@@ -51,6 +51,35 @@ export function locateBlock(
 ): LocatedBlock | null {
   const { state } = editor;
   if (from < 0 || from > state.doc.content.size) return null;
+
+  // 情形C（原子块级）：拖拽柄对 image / mathBlock / horizontalRule 等叶子块返回
+  // pos = 节点 before，调用方传 from = before + 1。原子块没有 content：
+  //   - resolve(from) 落在原子块之后（下一块内部或文档末尾），
+  //   - 文本块回溯会返回 null（文档末尾）或错误命中下一块，
+  // 导致对这些块的删除/复制/剪切静默失败。
+  // 这里先检查 from-1 恰为某个块级叶子节点起点（resolve(from-1).nodeAfter
+  // 非 null 即起点恰好在此），是则直接定位该叶子块。
+  if (from >= 2) {
+    const $prev = state.doc.resolve(from - 1);
+    const leaf = $prev.nodeAfter;
+    if (leaf && leaf.type.isLeaf && !leaf.isText && !leaf.isInline) {
+      const inColumnLeaf = (() => {
+        for (let d = $prev.depth; d >= 1; d--) {
+          if ($prev.node(d).type.name === "column") return true;
+        }
+        return false;
+      })();
+      return {
+        node: leaf,
+        start: from - 1,
+        end: from - 1 + leaf.nodeSize,
+        depth: $prev.depth,
+        typeName: leaf.type.name,
+        inColumn: inColumnLeaf,
+      };
+    }
+  }
+
   const $pos = state.doc.resolve(from);
 
   // 优先找最内层的 textblock（段落/标题/代码块等）
