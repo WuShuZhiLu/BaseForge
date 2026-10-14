@@ -214,7 +214,19 @@
     "hideMobileRail": "Hide navigation rail",
     "expandMobileControls": "Expand sidebar controls",
     "collapseMobileControls": "Collapse sidebar controls",
-    "loginAndSync": "Sign in and sync"
+    "loginAndSync": "Sign in and sync",
+    "panelTree": "Document tree",
+    "panelTags": "Tags",
+    "panelFav": "Favorites",
+    "panelTrash": "Trash",
+    "panelFiles": "Attachments",
+    "panelOpenFailed": "Failed to open, please retry",
+    "openFullFavorites": "Open full favorites page",
+    "openFullTrash": "Open full trash page",
+    "openFullAttachments": "Open attachment manager",
+    "noFavorites": "No favorites yet",
+    "noAttachments": "No attachments yet",
+    "trashEmpty": "Trash is empty"
   },
   "noteList": {
     "moveTo": "Move to...",
@@ -3303,5 +3315,20 @@
     "pasteFailed": "Paste failed. Check clipboard permissions or retry.",
     "codeBlockTitle": "Code block title",
     "convertUnsupported": "This block cannot be converted without losing content."
+  },
+  "account": {
+    "personalSpace": "Personal space",
+    "owner": "Owner",
+    "member": "Member",
+    "memberCount": "{{count}} members",
+    "switchWorkspace": "Switch workspace",
+    "members": "Members & permissions",
+    "appearance": "Appearance / theme",
+    "shortcuts": "Keyboard shortcuts",
+    "fullPages": "Full pages",
+    "localFirst": "Local-first · your data stays yours"
+  },
+  "trash": {
+    "restore": "Restore"
   }
 }

@@ -8,6 +8,12 @@ import KnowledgeTreePanel, {
   KNOWLEDGE_TREE_CHANGED_EVENT,
 } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import MobileKnowledgeTreePanel from "@/components/MobileKnowledgeTreePanel";
+import SidebarTagsPanel from "@/components/SidebarTagsPanel";
+import {
+  SidebarAttachmentsPanel,
+  SidebarFavoritesPanel,
+  SidebarTrashPanel,
+} from "@/components/SidebarAuxPanels";
 import { OPEN_KNOWLEDGE_TREE_EVENT } from "@/components/KnowledgeTreeDrawer";
 import TagColorPopover from "@/components/TagColorPopover";
 import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
@@ -296,124 +302,63 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
       )}
 
       <section className="flex min-h-0 flex-1 flex-col border-t border-app-border/60">
-        {variant === "desktop" && (
+        {variant === "desktop" && state.sidebarPanel === "tree" && (
           <div className="shrink-0 px-4 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
             内容
           </div>
         )}
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {variant === "mobile" ? (
-            <MobileKnowledgeTreePanel />
-          ) : desktopKnowledgeTreeMode === "quick" ? (
-            <MobileKnowledgeTreePanel variant="desktop" />
-          ) : (
-            <KnowledgeTreePanel variant="desktop" />
-          )}
-        </div>
+        {state.sidebarPanel === "fav" && variant !== "mobile" ? (
+          <SidebarFavoritesPanel />
+        ) : state.sidebarPanel === "trash" && variant !== "mobile" ? (
+          <SidebarTrashPanel />
+        ) : state.sidebarPanel === "files" && variant !== "mobile" ? (
+          <SidebarAttachmentsPanel />
+        ) : state.sidebarPanel === "tags" && variant !== "mobile" ? (
+          <SidebarTagsPanel
+            tags={state.tags}
+            selectedTagIds={state.selectedTagIds}
+            onTagClick={handleTagClick}
+            onTagContextMenu={openTagColor}
+            onRequestDelete={(tag) =>
+              setDeleteTagTarget({ id: tag.id, name: tag.name, color: tag.color })
+            }
+            onLongPressFired={() => {
+              tagLongPressFired.current = false;
+            }}
+            onLongPressStart={(cb) => {
+              if (tagLongPressTimer.current) clearTimeout(tagLongPressTimer.current);
+              tagLongPressTimer.current = setTimeout(() => {
+                tagLongPressFired.current = true;
+                cb();
+              }, 500);
+            }}
+            onLongPressCancel={() => {
+              if (!tagLongPressTimer.current) return;
+              clearTimeout(tagLongPressTimer.current);
+              tagLongPressTimer.current = null;
+            }}
+            onLongPressEnd={() => {
+              if (!tagLongPressTimer.current) return;
+              clearTimeout(tagLongPressTimer.current);
+              tagLongPressTimer.current = null;
+            }}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {variant === "mobile" ? (
+              <MobileKnowledgeTreePanel />
+            ) : desktopKnowledgeTreeMode === "quick" ? (
+              <MobileKnowledgeTreePanel variant="desktop" />
+            ) : (
+              <KnowledgeTreePanel variant="desktop" />
+            )}
+          </div>
+        )}
       </section>
 
-      <section className="shrink-0 border-t border-app-border">
-        <button
-          type="button"
-          onClick={toggleTagsExpanded}
-          className="flex w-full items-center gap-2 px-4 py-2 text-xs font-medium text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          aria-expanded={tagsExpanded}
-        >
-          {tagsExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          <Tags size={13} />
-          <span>{t("sidebar.tags")}</span>
-          <span className="ml-auto tabular-nums">{state.tags.length}</span>
-        </button>
+      {/* 标签已升级为侧栏面板（State: sidebarPanel === "tags"），原底部折叠行已移除。 */}
 
-        <AnimatePresence initial={false}>
-          {tagsExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.16 }}
-              className="overflow-hidden"
-            >
-              <div className="max-h-[min(35vh,260px)] space-y-0.5 overflow-y-auto px-2 pb-2">
-                {state.tags.length === 0 ? (
-                  <p className="px-2 py-1 text-[10px] text-tx-tertiary">{t("sidebar.noTags")}</p>
-                ) : state.tags.map((tag) => {
-                  const active = state.selectedTagIds.includes(tag.id);
-                  return (
-                    <div
-                      key={tag.id}
-                      onClick={() => handleTagClick(tag.id)}
-                      onContextMenu={(event) => {
-                        event.preventDefault();
-                        openTagColor({
-                          tagId: tag.id,
-                          tagName: tag.name,
-                          color: tag.color,
-                          x: event.clientX,
-                          y: event.clientY,
-                        });
-                      }}
-                      onTouchStart={(event) => {
-                        const touch = event.touches[0];
-                        if (!touch) return;
-                        tagLongPressFired.current = false;
-                        if (tagLongPressTimer.current) clearTimeout(tagLongPressTimer.current);
-                        tagLongPressTimer.current = setTimeout(() => {
-                          tagLongPressFired.current = true;
-                          openTagColor({
-                            tagId: tag.id,
-                            tagName: tag.name,
-                            color: tag.color,
-                            x: touch.clientX,
-                            y: touch.clientY,
-                          });
-                        }, 500);
-                      }}
-                      onTouchMove={() => {
-                        if (!tagLongPressTimer.current) return;
-                        clearTimeout(tagLongPressTimer.current);
-                        tagLongPressTimer.current = null;
-                      }}
-                      onTouchEnd={() => {
-                        if (!tagLongPressTimer.current) return;
-                        clearTimeout(tagLongPressTimer.current);
-                        tagLongPressTimer.current = null;
-                      }}
-                      className={cn(
-                        "group/tag flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors",
-                        active
-                          ? "bg-app-active text-tx-primary"
-                          : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-                      )}
-                    >
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: tag.color }} />
-                      <span className="min-w-0 flex-1 truncate" title={tag.name}>{tag.name}</span>
-                      <span className="relative flex h-4 w-5 shrink-0 items-center justify-center">
-                        {tag.noteCount !== undefined && tag.noteCount > 0 && (
-                          <span className="absolute inset-0 flex items-center justify-center text-[10px] tabular-nums text-tx-tertiary transition-opacity [@media(hover:hover)]:group-hover/tag:opacity-0">
-                            {tag.noteCount}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeleteTagTarget({ id: tag.id, name: tag.name, color: tag.color });
-                          }}
-                          title={t("common.delete")}
-                          className="absolute inset-0 hidden items-center justify-center text-tx-tertiary transition-colors hover:text-accent-danger [@media(hover:hover)]:group-hover/tag:flex"
-                        >
-                          <X size={12} />
-                        </button>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
+      {/* 标签面板已移至侧栏面板区（见上方 sidebarPanel === "tags" 分支） */}
 
       <AnimatePresence>
         {deleteTagTarget && (

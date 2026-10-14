@@ -166,4 +166,34 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
       expect(sidebar).toContain(`mode: "${mode}" as const`);
     }
   });
+
+  /**
+   * 方案 B（B1）：Rail 只切侧栏面板，不替换主区。
+   * 注意：侧栏底部工具条在 B2（主区页签 + 顶栏工具菜单）完成前必须保留，
+   * 否则桌面端待办/小记/AI 会失去入口 —— 上面那条断言因此仍然有效。
+   */
+  it("方案 B·B1：五个侧栏面板 + 账号菜单集中账号级入口", () => {
+    const rail = read("../../components/NavRail.tsx");
+    expect(rail).toContain("RAIL_SIDEBAR_PANELS");
+    expect(rail).toContain("actions.setSidebarPanel(panel.id)");
+    for (const panel of ['id: "tree"', 'id: "tags"', 'id: "fav"', 'id: "trash"', 'id: "files"']) {
+      expect(rail).toContain(panel);
+    }
+
+    const sidebar = read("../../components/Sidebar.tsx");
+    expect(sidebar).toContain('state.sidebarPanel === "tags"');
+    expect(sidebar).toContain("<SidebarTagsPanel");
+    expect(sidebar).toContain("<SidebarFavoritesPanel");
+    expect(sidebar).toContain("<SidebarTrashPanel");
+    expect(sidebar).toContain("<SidebarAttachmentsPanel");
+
+    const account = read("../../components/RailUserMenu.tsx");
+    expect(account).toContain("OPEN_WORKSPACE_SWITCHER_EVENT");
+    expect(account).toContain("OPEN_SHORTCUT_HELP_EVENT");
+    // 收藏/回收站/附件已升为 Rail 面板，不再走账号菜单的整页入口；分享待 B2 页签接管。
+    expect(account).not.toContain('openFullPage("favorites")');
+    expect(account).not.toContain('openFullPage("trash")');
+    expect(account).not.toContain('openFullPage("files")');
+    expect(account).toContain('openFullPage("shares")');
+  });
 });

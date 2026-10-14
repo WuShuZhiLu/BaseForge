@@ -32,6 +32,7 @@ import MembersPanel from "@/components/MembersPanel";
 import WorkspaceIconField, { DEFAULT_WORKSPACE_ICON } from "@/components/WorkspaceIconField";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
 import { useContextMenu } from "@/hooks/useContextMenu";
+import { OPEN_WORKSPACE_SWITCHER_EVENT } from "@/components/RailUserMenu";
 
 interface WorkspaceSwitcherProps {
   /** 切换后父组件触发的回调，通常是 reload 数据 */
@@ -41,6 +42,13 @@ interface WorkspaceSwitcherProps {
 
 export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: WorkspaceSwitcherProps) {
   const { t } = useTranslation();
+
+  // 账号菜单「切换工作空间」唤起本下拉（方案 B · B1a）。
+  useEffect(() => {
+    const openSwitcher = () => setOpen(true);
+    window.addEventListener(OPEN_WORKSPACE_SWITCHER_EVENT, openSwitcher);
+    return () => window.removeEventListener(OPEN_WORKSPACE_SWITCHER_EVENT, openSwitcher);
+  }, []);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [current, setCurrent] = useState<string>(getCurrentWorkspace());
   const [open, setOpen] = useState(false);

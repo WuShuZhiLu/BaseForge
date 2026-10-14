@@ -221,7 +221,19 @@
     "collapseMobileControls": "收起侧栏控件",
     "taskCount": "{{count}} 个任务",
     "taskCount_plural": "{{count}} 个任务",
-    "loginAndSync": "登录并同步"
+    "loginAndSync": "登录并同步",
+    "panelTree": "文档树",
+    "panelTags": "标签",
+    "panelFav": "收藏",
+    "panelTrash": "回收站",
+    "panelFiles": "附件",
+    "panelOpenFailed": "打开失败，请重试",
+    "openFullFavorites": "打开完整收藏页",
+    "openFullTrash": "打开完整回收站",
+    "openFullAttachments": "打开附件管理",
+    "noFavorites": "还没有收藏的内容",
+    "noAttachments": "还没有附件",
+    "trashEmpty": "回收站是空的"
   },
   "noteList": {
     "moveTo": "移动到...",
@@ -3310,5 +3322,20 @@
     "pasteFailed": "粘贴失败，请检查剪贴板权限或重试",
     "codeBlockTitle": "代码块标题",
     "convertUnsupported": "此块暂不支持该转换，原内容已保留"
+  },
+  "account": {
+    "personalSpace": "个人空间",
+    "owner": "所有者",
+    "member": "成员",
+    "memberCount": "{{count}} 位成员",
+    "switchWorkspace": "切换工作空间",
+    "members": "成员与权限",
+    "appearance": "外观 / 主题",
+    "shortcuts": "快捷键",
+    "fullPages": "完整页面",
+    "localFirst": "本地优先 · 数据在你手里"
+  },
+  "trash": {
+    "restore": "恢复"
   }
 }

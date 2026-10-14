@@ -19,10 +19,12 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { Files, Tags, Paperclip } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
 import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { useTranslation } from "react-i18next";
+import RailUserMenu from "@/components/RailUserMenu";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api, broadcastLogout, clearServerUrl, getCurrentWorkspace, getServerUrl } from "@/lib/api";
 import { ViewMode, WorkspaceFeatures } from "@/types";
@@ -59,6 +61,15 @@ const RAIL_ICON_SIZE = 18;
  * therefore contains only cross-tree filters and independent modules; the old
  * "All Notes" directory/list entry is intentionally retired.
  */
+/** 桌面端侧栏面板（方案 B）：点图标切侧栏面板，主区永远保持当前内容。 */
+const RAIL_SIDEBAR_PANELS = [
+  { id: "tree", labelKey: "sidebar.panelTree", icon: "tree" },
+  { id: "tags", labelKey: "sidebar.panelTags", icon: "tags" },
+  { id: "fav", labelKey: "sidebar.panelFav", icon: "fav" },
+  { id: "trash", labelKey: "sidebar.panelTrash", icon: "trash" },
+  { id: "files", labelKey: "sidebar.panelFiles", icon: "files" },
+] as const;
+
 const NAV_CONFIG: NavConfigItem[] = [
   // 注意：mindmaps（脑图中心）已于 2026-10-14 从主导航移除——导图是树内文档，
   // 树里可直接建/打开；viewMode "mindmaps" 路由保留（直连仍可用）。
@@ -234,6 +245,44 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
     );
   };
 
+  const renderPanelItem = (panel: (typeof RAIL_SIDEBAR_PANELS)[number]) => {
+    const active = state.sidebarPanel === panel.id;
+    const label = t(panel.labelKey);
+    return (
+      <button
+        key={panel.id}
+        data-rail-panel={panel.id}
+        data-mobile-drawer-rail-item=""
+        onClick={() => actions.setSidebarPanel(panel.id)}
+        title={showLabel ? undefined : label}
+        aria-label={label}
+        aria-pressed={active}
+        className={cn(
+          itemBaseClass,
+          active ? "bg-accent-primary/12 text-accent-primary" : "text-tx-tertiary hover:bg-app-hover hover:text-tx-primary",
+        )}
+      >
+        {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full bg-accent-primary" aria-hidden />}
+        {panel.id === "tree" ? (
+          <Files size={RAIL_ICON_SIZE} />
+        ) : panel.id === "trash" ? (
+          <Trash2 size={RAIL_ICON_SIZE} />
+        ) : panel.id === "files" ? (
+          <Paperclip size={RAIL_ICON_SIZE} />
+        ) : panel.id === "fav" ? (
+          <Star size={RAIL_ICON_SIZE} />
+        ) : (
+          <Tags size={RAIL_ICON_SIZE} />
+        )}
+        {showLabel && (
+          <span className={cn("text-[10px] leading-none mt-0.5 max-w-full truncate px-1", classicText && "text-tx-tertiary")}>
+            {label}
+          </span>
+        )}
+      </button>
+    );
+  };
+
   const renderNotificationItem = () => {
     const label = t("sidebar.notifications", { defaultValue: "通知" });
     return (
@@ -271,6 +320,19 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
       )}
       style={{ paddingTop: "calc(var(--safe-area-top) + 4px)", paddingBottom: "8px" }}
     >
+      {/* 桌面端（方案 B · B1a）：顶部放账号头像菜单——工作空间切换 / 通知 / 成员权限 /
+          设置 / 外观 / 快捷键 / 完整页面（过渡）/ 退出登录，账号级入口集中一处。 */}
+      {!isMobile && (
+        <>
+          <RailUserMenu
+            onOpenSettings={() => setShowSettings(true)}
+            onLogout={handleLogout}
+            notificationCount={notificationCount}
+            showLabel={showLabel}
+          />
+          <div className={cn("my-2 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />
+        </>
+      )}
       {isMobile ? (
         <>
           <button
@@ -316,17 +378,24 @@ export default function NavRail({ variant = "desktop", notificationCount = 0 }: 
       <div className={cn("my-2 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />
 
       <div className="flex-1 min-h-0 w-full overflow-y-auto no-scrollbar flex flex-col items-center gap-1 px-1">
-        {groups.map((group, index) => {
-          const groupItems = items.filter((item) => item.group === group);
-          if (groupItems.length === 0) return null;
-          return (
-            <React.Fragment key={group}>
-              {index > 0 && <div className={cn("my-1 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />}
-              {groupItems.map(renderItem)}
-            </React.Fragment>
-          );
-        })}
-        {renderNotificationItem()}
+        {isMobile ? (
+          <>
+            {groups.map((group, index) => {
+              const groupItems = items.filter((item) => item.group === group);
+              if (groupItems.length === 0) return null;
+              return (
+                <React.Fragment key={group}>
+                  {index > 0 && <div className={cn("my-1 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />}
+                  {groupItems.map(renderItem)}
+                </React.Fragment>
+              );
+            })}
+            {renderNotificationItem()}
+          </>
+        ) : (
+          /* 桌面端（方案 B · B1a）：Rail 只切换侧栏面板，不替换主区内容。 */
+          <>{RAIL_SIDEBAR_PANELS.map((panel) => renderPanelItem(panel))}</>
+        )}
       </div>
 
       <div className={cn("my-2 border-t border-app-border/60", showLabel ? "w-8" : "w-6")} aria-hidden />

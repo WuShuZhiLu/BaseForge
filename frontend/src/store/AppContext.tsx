@@ -45,6 +45,9 @@ export interface EditorSplitState {
   direction: EditorSplitDirection;
 }
 
+/** 左侧栏面板 id（方案 B）。 */
+export type SidebarPanelId = "tree" | "tags" | "fav" | "trash" | "files";
+
 interface AppState {
   notebooks: Notebook[];
   notes: NoteListItem[];
@@ -56,6 +59,9 @@ interface AppState {
   selectedTagId: string | null;          // 已废弃，保留兼容；优先使用 selectedTagIds
   selectedTagIds: string[];              // TAG-FILTER-MULTI-01: 多标签联合筛选
   viewMode: ViewMode;
+  /** 左侧栏当前面板（方案 B：Rail 只切面板，不替换主区）。
+   *  B1a 上线 tree/tags；B1b 扩到 fav/trash/files。 */
+  sidebarPanel: SidebarPanelId;
   searchQuery: string;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
@@ -99,6 +105,7 @@ type Action =
   | { type: "TOGGLE_SELECTED_TAG"; payload: string }        // TAG-FILTER-MULTI-01
   | { type: "CLEAR_SELECTED_TAGS" }                         // TAG-FILTER-MULTI-01
   | { type: "SET_VIEW_MODE"; payload: ViewMode }
+  | { type: "SET_SIDEBAR_PANEL"; payload: SidebarPanelId }
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "SET_SIDEBAR_WIDTH"; payload: number }
@@ -208,6 +215,7 @@ const initialState: AppState = {
   selectedTagId: null,
   selectedTagIds: [],
   viewMode: "all",
+  sidebarPanel: "tree",
   searchQuery: "",
   sidebarCollapsed: false,
   sidebarWidth: getSavedSidebarWidth(),
@@ -315,6 +323,10 @@ function reducer(state: AppState, action: Action): AppState {
         selectedTagIds: [],
         selectedTagId: null,
       };
+    case "SET_SIDEBAR_PANEL":
+      return state.sidebarPanel === action.payload
+        ? state
+        : { ...state, sidebarPanel: action.payload, sidebarCollapsed: false };
     case "SET_VIEW_MODE":
       return { ...state, viewMode: action.payload };
     case "SET_SEARCH_QUERY":
@@ -609,6 +621,7 @@ export function useAppActions() {
     toggleSelectedTag: (v: string) => dispatch({ type: "TOGGLE_SELECTED_TAG", payload: v }),
     clearSelectedTags: () => dispatch({ type: "CLEAR_SELECTED_TAGS" }),
     setViewMode: (v: ViewMode) => dispatch({ type: "SET_VIEW_MODE", payload: v }),
+    setSidebarPanel: (p: SidebarPanelId) => dispatch({ type: "SET_SIDEBAR_PANEL", payload: p }),
     setSearchQuery: (v: string) => dispatch({ type: "SET_SEARCH_QUERY", payload: v }),
     toggleSidebar: () => dispatch({ type: "TOGGLE_SIDEBAR" }),
     setSidebarWidth: (v: number) => dispatch({ type: "SET_SIDEBAR_WIDTH", payload: v }),
