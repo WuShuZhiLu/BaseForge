@@ -8,8 +8,8 @@ function source(relativeUrl: string) {
 describe("knowledge tree sidebar contract", () => {
   it("uses the unified tree as the only Sidebar hierarchy", () => {
     const sidebar = source("../../components/Sidebar.tsx");
-    expect(sidebar).toContain("import KnowledgeTreePanel");
-    expect(sidebar).toContain("<KnowledgeTreePanel");
+    expect(sidebar).toContain("import TreePanelContent");
+    expect(sidebar).toContain("<TreePanelContent");
     expect(sidebar).not.toContain("sidebarTreeMode");
     expect(sidebar).not.toContain("SharedNotebookTree");
     expect(sidebar).not.toContain("getSharedNotebooks");

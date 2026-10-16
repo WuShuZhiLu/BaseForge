@@ -15,6 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import OriginalAIChatPanel from "./AIChatPanel";
 import { api } from "@/lib/api";
 import { useApp } from "@/store/AppContext";
+import { useToolPageActive } from "@/lib/toolPage";
 import {
   exportDiagnosticsFile,
   getReliableAIStatus,
@@ -74,6 +75,10 @@ function StatusPill({ status }: { status: ReliableStatus | null }) {
 export default function AIChatReliabilityShell(props: Props) {
   const { state } = useApp();
   const activeNote = state.activeNote;
+  // 隐藏态治理：工具页 keepAlive 挂载，非激活页签需暂停轮询（lib/toolPage）。
+  // 探针 ref 挂在内层 section：只要在宿主页签容器内，closest() 即可读到激活态。
+  const pageProbeRef = useRef<HTMLElement>(null);
+  const pageActive = useToolPageActive(pageProbeRef);
   const [mode, setMode] = useState<ReliableAskMode>("knowledge");
   const [selectedText, setSelectedText] = useState("");
   const [status, setStatus] = useState<ReliableStatus | null>(null);
@@ -108,6 +113,8 @@ export default function AIChatReliabilityShell(props: Props) {
   }, [contextCollapsed]);
 
   useEffect(() => {
+    // 非激活页签：暂停状态轮询与监听；重新激活时本 effect 重跑＝立即补一次刷新。
+    if (!pageActive) return;
     void refreshStatus();
     const timer = window.setInterval(() => void refreshStatus(), 30_000);
     const refresh = () => void refreshStatus();
@@ -118,7 +125,7 @@ export default function AIChatReliabilityShell(props: Props) {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("nowen:ai-manual-enabled-changed", refresh);
     };
-  }, [refreshStatus]);
+  }, [pageActive, refreshStatus]);
 
   useEffect(() => {
     if (mode !== "selection" || selectedText.trim()) return;
@@ -181,7 +188,7 @@ export default function AIChatReliabilityShell(props: Props) {
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-app-bg">
-      <section className="shrink-0 border-b border-app-border bg-app-surface/95 px-3 py-2 backdrop-blur md:px-5">
+      <section ref={pageProbeRef} className="shrink-0 border-b border-app-border bg-app-surface/95 px-3 py-2 backdrop-blur md:px-5">
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="mr-1 flex min-w-0 items-center gap-2">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">

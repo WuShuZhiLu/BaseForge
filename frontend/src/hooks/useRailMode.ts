@@ -28,6 +28,8 @@ export type RailMode = "icon" | "label" | "hidden";
 export const RAIL_MODE_CYCLE: readonly RailMode[] = ["icon", "label", "hidden"] as const;
 
 const STORAGE_KEY = "nowen-rail-mode";
+/** 一次性重置标记：原型口径 = Rail 纯图标（48px）。用户仍可在「面板 ⋯」菜单里切回带文字。 */
+const RESET_MARKER = "nowen-rail-mode.icon-reset.v1";
 const SYNC_EVENT = "nowen:rail-mode-changed";
 const DEFAULT_MODE: RailMode = "icon";
 
@@ -36,6 +38,15 @@ function isValid(v: string | null): v is RailMode {
 }
 
 function readFromStorage(): RailMode {
+  try {
+    if (!window.localStorage.getItem(RESET_MARKER)) {
+      window.localStorage.setItem(RESET_MARKER, "1");
+      window.localStorage.setItem(STORAGE_KEY, DEFAULT_MODE);
+      return DEFAULT_MODE;
+    }
+  } catch {
+    // 存储不可用：按默认值走
+  }
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     return isValid(v) ? v : DEFAULT_MODE;

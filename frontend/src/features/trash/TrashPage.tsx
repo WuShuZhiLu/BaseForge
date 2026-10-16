@@ -5,6 +5,10 @@ import { useApp, useAppActions } from "@/store/AppContext";
 import { getCurrentWorkspace } from "@/lib/api";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
 import { parseServerTime } from "@/lib/dateTime";
+import type { ToolPageHeaderMode } from "@/lib/toolPage";
+
+/** 页签契约：页面自带标题行（回收站 header），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 import { toast } from "@/lib/toast";
 import { confirm } from "@/components/ui/confirm";
 import { useTrash } from "./useTrash";

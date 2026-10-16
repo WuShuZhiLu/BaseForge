@@ -226,7 +226,26 @@
     "openFullAttachments": "Open attachment manager",
     "noFavorites": "No favorites yet",
     "noAttachments": "No attachments yet",
-    "trashEmpty": "Trash is empty"
+    "trashEmpty": "Trash is empty",
+    "openEditors": "Open editors",
+    "panels": "Panels",
+    "panelList": "Panel list",
+    "panelReset": "Reset layout",
+    "panelFixed": "Fixed",
+    "panelPending": "This panel is not wired yet",
+    "panelNew": "New / Import",
+    "panelRefresh": "Refresh",
+    "panelMore": "More",
+    "panelToggleHint": "Click to collapse / expand",
+    "panelExpandAll": "Expand all",
+    "panelCollapseAll": "Collapse all",
+    "panelMoveUp": "Move up",
+    "panelMoveDown": "Move down",
+    "panelClose": "Close panel",
+    "panelOnly": "Show only this panel",
+    "noOpenEditors": "Nothing open",
+    "badgeMore": "More",
+    "badgeAdd": "Add badge"
   },
   "noteList": {
     "moveTo": "Move to...",
@@ -3330,5 +3349,15 @@
   },
   "trash": {
     "restore": "Restore"
+  },
+  "topbar": {
+    "searchPlaceholder": "Search everything…",
+    "tools": "Tools",
+    "toolsOpenAsTab": "Tools (open as tab)",
+    "opened": "Open",
+    "search": "Search"
+  },
+  "tabs": {
+    "closeTool": "Close"
   }
 }

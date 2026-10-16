@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, LogOut, Shield, User } from "lucide-react";
 import {
   Users,
-  Star,
-  Trash2,
-  Paperclip,
   Link2,
   Settings as SettingsIcon,
   Sparkles,
@@ -45,7 +42,6 @@ export default function RailUserMenu({ onOpenSettings, onLogout, notificationCou
   const actions = useAppActions();
   const [open, setOpen] = useState(false);
   const [workspace, setWorkspace] = useState<{ name: string; role?: string; memberCount?: number } | null>(null);
-  const [pagesOpen, setPagesOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -92,14 +88,6 @@ export default function RailUserMenu({ onOpenSettings, onLogout, notificationCou
     : workspace?.role === "owner"
       ? t("account.owner")
       : t("account.member");
-
-  const openFullPage = useCallback(
-    (mode: "favorites" | "trash" | "files" | "shares") => {
-      actions.setViewMode(mode);
-      setOpen(false);
-    },
-    [actions],
-  );
 
   const itemClass =
     "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary";
@@ -221,27 +209,8 @@ export default function RailUserMenu({ onOpenSettings, onLogout, notificationCou
             </button>
           </div>
 
-          {/* 过渡区：旧整页入口（B2 页签系统接管后移除） */}
-          <div className="my-1 h-px bg-app-border" />
-          <button
-            type="button"
-            className={cn(itemClass)}
-            onClick={() => setPagesOpen((v) => !v)}
-          >
-            <span className="flex items-center gap-2.5">
-              <Sparkles size={14} className="shrink-0 text-tx-tertiary" />
-              <span>{t("sidebar.shareManagement")}</span>
-            </span>
-            <ChevronRight size={13} className={cn("text-tx-quaternary transition-transform", pagesOpen && "rotate-90")} />
-          </button>
-          {pagesOpen && (
-            <div className="pb-1 pl-3" data-account-full-pages="">
-              <button type="button" className={itemClass} onClick={() => openFullPage("shares")}>
-                <Link2 size={13} className="shrink-0 text-tx-tertiary" />
-                <span className="flex-1 truncate">{t("sidebar.shareManagement")}</span>
-              </button>
-            </div>
-          )}
+          {/* 整页入口组已移除（B2 页签系统接管）：分享/附件/回收站均在主区顶栏「工具」菜单内，
+              以工具页签形式打开，账号菜单不再重复提供。 */}
 
           <div className="my-1 h-px bg-app-border" />
           <button

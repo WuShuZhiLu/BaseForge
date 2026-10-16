@@ -4,6 +4,10 @@ import { TaskMetadataWorkspace } from "./tasks/TaskMetadataWorkspace";
 import TaskEntryUxBridge from "./tasks/TaskEntryUxBridge";
 import TaskDetailRichExperienceBridge from "./tasks/TaskDetailRichExperienceBridge";
 import { shouldConfirmHabitDelete } from "./tasks/taskCenterHardening";
+import type { ToolPageHeaderMode } from "@/lib/toolPage";
+
+/** 页签契约：页面自带标题行（任务中心头部），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 export * from "./TaskCenterImpl";
 

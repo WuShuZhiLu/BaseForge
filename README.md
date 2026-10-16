@@ -1,6 +1,6 @@
 <div align="center">
   <img src="./electron/icon.png" alt="Base Notes" width="104" />
-  <h1>Base Notes（弄文笔记）</h1>
+  <h1>Base Notes</h1>
   <p><strong>开源、自托管的知识库、每日记录与任务协作工作台</strong></p>
   <p>
     统一知识树 · 富文本 / Markdown 双编辑器 · 离线工作区 · AI RAG 问答 · 每日记录 · 任务中心 · 多端协作

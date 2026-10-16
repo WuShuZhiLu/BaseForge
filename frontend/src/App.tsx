@@ -7,6 +7,7 @@ import NavRail from "@/components/NavRail";
 import { useRailMode } from "@/hooks/useRailMode";
 import NoteList from "@/components/NoteList";
 import EditorPane from "@/components/EditorPane";
+import ToolPageHost from "@/components/ToolPageHost";
 import EditorSplitView from "@/components/EditorSplitView";
 import TaskCenter from "@/components/TaskCenter";
 import MindMapCenter from "@/components/MindMapEditor";
@@ -970,9 +971,17 @@ function AppLayout() {
               : "absolute inset-0 z-20 md:static md:z-auto md:flex-1"}
             ${mediumNoteWorkspace || state.mobileView === "editor" ? "flex" : "hidden md:flex"}
           `}>
-            <PhaseAPerfProfiler id="EditorPane">
-              {state.editorSplit ? <EditorSplitView /> : <EditorPane />}
-            </PhaseAPerfProfiler>
+        <PhaseAPerfProfiler id="EditorPane">
+          {/* 方案 B（B2）：不新增顶栏行——工具页签并进编辑器既有页签行（NoteTabsBar），
+              工具页签激活时编辑器列改挂工具页宿主（组件不改，只换容器）。 */}
+          {state.activeToolTab ? (
+            <ToolPageHost tool={state.activeToolTab} />
+          ) : state.editorSplit ? (
+            <EditorSplitView />
+          ) : (
+            <EditorPane />
+          )}
+        </PhaseAPerfProfiler>
           </div>
         </div>
       )}

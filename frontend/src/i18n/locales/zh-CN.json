@@ -233,7 +233,26 @@
     "openFullAttachments": "打开附件管理",
     "noFavorites": "还没有收藏的内容",
     "noAttachments": "还没有附件",
-    "trashEmpty": "回收站是空的"
+    "trashEmpty": "回收站是空的",
+    "openEditors": "打开的",
+    "panels": "面板",
+    "panelList": "面板清单",
+    "panelReset": "重置布局",
+    "panelFixed": "固定",
+    "panelPending": "该面板内容待接入",
+    "panelNew": "新建 / 导入",
+    "panelRefresh": "刷新",
+    "panelMore": "更多",
+    "panelToggleHint": "点击折叠 / 展开",
+    "panelExpandAll": "全部展开",
+    "panelCollapseAll": "全部折叠",
+    "panelMoveUp": "上移",
+    "panelMoveDown": "下移",
+    "panelClose": "关闭面板",
+    "panelOnly": "仅显示此面板",
+    "noOpenEditors": "没有打开的内容",
+    "badgeMore": "更多",
+    "badgeAdd": "添加徽章"
   },
   "noteList": {
     "moveTo": "移动到...",
@@ -3337,5 +3356,15 @@
   },
   "trash": {
     "restore": "恢复"
+  },
+  "topbar": {
+    "searchPlaceholder": "搜索全部内容…",
+    "tools": "工具",
+    "toolsOpenAsTab": "工具（打开为页签）",
+    "opened": "已打开",
+    "search": "搜索"
+  },
+  "tabs": {
+    "closeTool": "关闭"
   }
 }

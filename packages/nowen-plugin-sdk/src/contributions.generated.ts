@@ -1,4 +1,6 @@
 // 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
+// 【2026-10-16 手工同步注明】生成器脚本已不在仓库内（文件头引用缺失）；按 .cmp/COLLAB-BOARD.md 6.8 B-7，
+// 由 B 线按既有生成格式手工追加 sidebarPanels / activityBadges（contractVersion 4 → 5）。
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const nested of Object.values(value)) deepFreeze(nested);
@@ -8,7 +10,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export type PluginContributionRuntime = "declarative" | "sandbox-js" | "node-action";
-export type PluginContributionType = "automationTemplates" | "commands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "uiComponents";
+export type PluginContributionType = "activityBadges" | "automationTemplates" | "commands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
 
 export interface PluginContributionContractEntry {
   id: PluginContributionType;
@@ -18,9 +20,18 @@ export interface PluginContributionContractEntry {
   description: string;
 }
 
-export const CONTRIBUTION_CONTRACT_VERSION = 4 as const;
+export const CONTRIBUTION_CONTRACT_VERSION = 5 as const;
 export const CONTRIBUTION_NAMESPACE_TEMPLATE = "<pluginId>/<contributionId>" as const;
 export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] = deepFreeze([
+  {
+    "id": "activityBadges",
+    "since": "2.2",
+    "runtimes": [
+      "declarative"
+    ],
+    "declarative": true,
+    "description": "Declarative activity-bar badges that open a sidebar panel or a tool tab"
+  },
   {
     "id": "automationTemplates",
     "since": "2.0",
@@ -107,6 +118,15 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     "description": "Host-rendered extension settings"
   },
   {
+    "id": "sidebarPanels",
+    "since": "2.2",
+    "runtimes": [
+      "declarative"
+    ],
+    "declarative": true,
+    "description": "Declarative sidebar panels rendered by the host inside the sidebar panel container"
+  },
+  {
     "id": "uiComponents",
     "since": "2.1",
     "runtimes": [
@@ -155,6 +175,18 @@ export const PROMPT_PACK_CONTRIBUTION_LIMITS = deepFreeze({
   "schemaVersion": 1,
   "maxPromptsPerPlugin": 100,
   "maxPromptBytes": 65536
+} as const);
+export const ACTIVITY_BADGE_CONTRIBUTION_LIMITS = deepFreeze({
+  "schemaVersion": 1,
+  "maxBadgesPerPlugin": 10,
+  "targets": [
+    "panel",
+    "tool"
+  ]
+} as const);
+export const SIDEBAR_PANEL_CONTRIBUTION_LIMITS = deepFreeze({
+  "schemaVersion": 1,
+  "maxPanelsPerPlugin": 10
 } as const);
 export const UI_COMPONENT_CONTRIBUTION_LIMITS = deepFreeze({
   "schemaVersion": 1,

@@ -53,7 +53,6 @@ import {
   PresenceBar,
 } from "@/components/PresenceBar";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
-import NoteTabsBar from "@/components/NoteTabsBar";
 import NoteLoadingSkeleton from "@/components/NoteLoadingSkeleton";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { useRealtimeNote } from "@/hooks/useRealtimeNote";
@@ -3208,7 +3207,7 @@ const moveToTrash = useCallback(async () => {
       </AnimatePresence>
 
       {/* Desktop Editor Header */}
-      <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-2 border-b border-app-border bg-app-surface/30 transition-colors">
+      <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-1.5 border-b border-app-border bg-app-surface/30 transition-colors">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {/* �ʼ��б����۵�ʱ���������ṩ��չ������ť��δ�۵�ʱ���ء�
               ����������м��࣬�����ڡ���˭���б���ס�ˡ������֪��һ�ۿ����� */}
@@ -3216,7 +3215,7 @@ const moveToTrash = useCallback(async () => {
           <div className="relative shrink min-w-0 max-w-[300px]">
           <button
             onClick={() => setShowMoveDropdown(!showMoveDropdown)}
-            className="flex min-w-0 max-w-full items-center gap-1 overflow-hidden text-xs text-tx-tertiary hover:text-tx-secondary transition-colors rounded-md px-1.5 py-1 hover:bg-app-hover"
+            className="flex h-7 min-w-0 max-w-full items-center gap-1 overflow-hidden rounded-lg px-2 text-[12.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
             title={t('editor.moveToNotebook')}
           >
             {currentPath.length > 0 ? (
@@ -3340,7 +3339,7 @@ const moveToTrash = useCallback(async () => {
             <button
               type="button"
               onClick={() => { setShowVersionHistory(true); }}
-              className="shrink-0 overflow-hidden text-ellipsis text-[11px] text-tx-tertiary hover:text-accent-primary hover:underline cursor-pointer bg-transparent border-none p-0 hidden lg:inline"
+              className="hidden shrink-0 cursor-pointer overflow-hidden text-ellipsis rounded-md px-1.5 py-0.5 text-[11px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary lg:inline"
               title={t('editor.versionHistory')}
             >
               {t('tiptap.version')}{activeNote.version} · {new Date(activeNote.updatedAt + "Z").toLocaleString()}
@@ -3356,12 +3355,12 @@ const moveToTrash = useCallback(async () => {
             </span>
           )}
           {activeNote.contentFormat === "markdown" ? (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-500" title={t('note.format.markdown')}>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-emerald-500" title={t('note.format.markdown')}>
               <FileCode size={11} />
               {t('note.format.markdownShort')}
             </span>
           ) : (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded border border-app-border bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
               <FileText size={11} />
               {t('note.format.richTextShort')}
             </span>
@@ -3739,8 +3738,7 @@ const moveToTrash = useCallback(async () => {
         </div>
       </div>
 
-      {userPrefs.enableNoteTabs && !state.editorSplit && <NoteTabsBar />}
-
+      
       {/* Editor (HTML 预览 / MD / Tiptap 三模式共用) + Outline */}
       <div className="flex-1 flex overflow-hidden">
         <div className="note-theme-surface flex-1 overflow-hidden relative" data-note-id={activeNote.id}>

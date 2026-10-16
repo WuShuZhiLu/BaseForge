@@ -34,6 +34,11 @@ import { confirm as confirmDialog } from "@/components/ui/confirm";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, resolveAttachmentUrl } from "@/lib/api";
+import type { ToolPageHeaderMode } from "@/lib/toolPage";
+
+/** 页签契约：页面自带标题行（AI 对话头部），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
+
 import { withAbortableAiFetch } from "@/lib/abortableAiAsk";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -799,7 +804,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
   }, [clampConversationSidebarWidth]);
 
   return (
-    <div ref={panelRef} className="flex h-full min-w-0 max-w-full bg-app-bg">
+    <div ref={panelRef} className="flex h-full min-h-0 min-w-0 flex-1 max-w-full bg-app-bg">
       <aside className={cn(
         "flex shrink-0 flex-col overflow-hidden border-r border-app-border bg-app-surface/45",
         !sidebarResizing && "transition-[width] duration-200",

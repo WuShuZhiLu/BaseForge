@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 文件管理中心（ViewMode=files）
  * ---------------------------------------------------------------------------
  * 定位：
@@ -59,6 +59,12 @@ import {
   Globe,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
+import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
+import { navigateToolPage } from "@/components/toolTabs";
+
+/** 页签契约：页面自带标题行（附件管理顶栏），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
+
 import { FileItem, FileStats, FileSortKey, FileCategory } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -459,6 +465,16 @@ export default function FileManager() {
     loadList();
   }, [loadList]);
 
+  // 隐藏态治理：keepAlive 非激活页签期间数据可能过期，重新激活时补一次列表刷新。
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const pageActive = useToolPageActive(pageRootRef);
+  const previousPageActiveRef = useRef(true);
+  useEffect(() => {
+    if (previousPageActiveRef.current === pageActive) return;
+    previousPageActiveRef.current = pageActive;
+    if (pageActive) loadList();
+  }, [pageActive, loadList]);
+
   // ---- 一键清理孤儿附件（走真 cleanup）----
   // 放在 loadList 之后声明，避免"使用前声明"的 TS 错误。
   const handleCleanupOrphans = useCallback(async () => {
@@ -858,6 +874,8 @@ export default function FileManager() {
   );
 
   // ---- 跳转到引用笔记 ----
+  // 页签契约（P3）：不调 actions.setViewMode，改派发 nowen:tool-page-navigate
+  // 由 ToolPageHost 翻译为「关闭工具页签 + 打开笔记」。
   const jumpToNote = useCallback(
     async (noteId: string) => {
       try {
@@ -866,10 +884,9 @@ export default function FileManager() {
           toast.error("笔记不存在或已被删除");
           return;
         }
-        actions.setActiveNote(note);
+        // 宿主不处理侧栏选中态，这里保留（非视图切换动作）。
         actions.setSelectedNotebook(note.notebookId);
-        actions.setViewMode("all");
-        actions.setMobileView("editor");
+        navigateToolPage({ kind: "note", noteId });
       } catch (err: any) {
         console.error("[FileManager] jumpToNote failed:", err);
         toast.error(err?.message || "跳转失败");
@@ -1068,7 +1085,8 @@ export default function FileManager() {
 
   return (
     <div
-      className="flex-1 flex flex-col h-full bg-app-bg overflow-hidden relative"
+      ref={pageRootRef}
+      className="flex min-h-0 min-w-0 flex-1 flex-col h-full bg-app-bg overflow-hidden relative"
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}

@@ -29,8 +29,8 @@ describe("desktop knowledge tree browsing mode", () => {
   it("switches only the desktop sidebar surface", () => {
     expect(sidebarSource).toContain("loadDesktopKnowledgeTreeViewMode");
     expect(sidebarSource).toContain('desktopKnowledgeTreeMode === "quick"');
-    expect(sidebarSource).toContain('<MobileKnowledgeTreePanel variant="desktop" />');
-    expect(sidebarSource).toContain('<KnowledgeTreePanel variant="desktop" />');
+    expect(sidebarSource).toContain("<TreePanelContent");
+    expect(sidebarSource).toContain('mode={desktopKnowledgeTreeMode === "quick" ? "quick" : "full"}');
     expect(quickPanelSource).toContain('variant = "mobile"');
     expect(quickPanelSource).toContain('data-nowen-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}');
   });

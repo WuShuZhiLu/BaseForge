@@ -23,6 +23,12 @@ import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/confirm";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
+import type { ToolPageHeaderMode } from "@/lib/toolPage";
+import { navigateToolPage } from "@/components/toolTabs";
+
+/** 页签契约：页面自带标题行（分享管理 header），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
+
 import { copyText } from "@/lib/clipboard";
 import { openCommentCenter } from "@/lib/noteCommentNavigation";
 import {
@@ -40,7 +46,6 @@ import {
 } from "@/lib/shareManagement";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
-import { useAppActions } from "@/store/AppContext";
 import type {
   ShareEffectiveStatus,
   ShareManagementItem,
@@ -313,7 +318,6 @@ function PublicOriginRiskControl({
 }
 
 export default function ShareManagementPage() {
-  const actions = useAppActions();
   const { siteConfig, updatePublicWebOrigin } = useSiteSettings();
   const [data, setData] = useState<ShareManagementResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -473,10 +477,11 @@ export default function ShareManagementPage() {
       return;
     }
     try {
-      const note = await api.getNote(item.noteId);
-      actions.setActiveNote(note);
-      actions.setViewMode("all");
-      actions.setMobileView("editor");
+      // 页签契约（P3）：不调 actions.setViewMode，改派发 nowen:tool-page-navigate
+      // 由 ToolPageHost 翻译为「关闭工具页签 + 打开笔记」。此处的 getNote 仅用于
+      // 保留原「无法打开原笔记」的错误提示。
+      await api.getNote(item.noteId);
+      navigateToolPage({ kind: "note", noteId: item.noteId });
     } catch (openError: any) {
       toast.error(openError?.message || "无法打开原笔记");
     }
@@ -501,7 +506,7 @@ export default function ShareManagementPage() {
   const showHeaderRisk = publicOrigin.risk !== "none" && !showLocalhostBanner;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-app-bg">
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-app-bg">
       <div className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

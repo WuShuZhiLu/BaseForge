@@ -39,13 +39,7 @@ export default function SidebarTagsPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-sidebar-panel="tags">
-      <div className="flex shrink-0 items-center gap-2 border-b border-app-border px-4 py-2.5">
-        <Tags size={13} className="text-tx-tertiary" />
-        <span className="text-[12.5px] font-semibold text-tx-primary">{t("sidebar.tags")}</span>
-        <span className="ml-auto rounded-full bg-app-hover px-1.5 text-[10.5px] tabular-nums text-tx-tertiary">
-          {tags.length}
-        </span>
-      </div>
+      {/* 头部由面板框架 Shell 提供（标题 + 计数 + 动作），此处只保留内容 */}
 
       <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         {tags.length === 0 ? (

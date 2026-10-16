@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Search,
   Star,
-  Table2,
   TreePine,
   X,
 } from "lucide-react";
@@ -110,6 +109,7 @@ import { toast } from "@/lib/toast";
 import NoteColorMarkBar from "@/components/NoteColorMarkBar";
 import { cn } from "@/lib/utils";
 import { useApp, useAppActions } from "@/store/AppContext";
+import { NodeIcon } from "@/lib/nodeIcons";
 
 const FOCUS_KNOWLEDGE_TREE_EVENT = "nowen:focus-knowledge-tree";
 const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
@@ -130,14 +130,7 @@ function emitTreeChanged(reason: string) {
 }
 
 function nodeIcon(node: KnowledgeTreeNode) {
-  if (node.nodeType === "folder") {
-    return node.icon
-      ? <span className="w-5 shrink-0 text-center text-base leading-none">{node.icon}</span>
-      : <Folder size={18} className="shrink-0 text-amber-500" />;
-  }
-  if (node.nodeType === "markdown") return <FileCode size={18} className="shrink-0 text-emerald-500" />;
-  if (node.noteType === "sheet") return <Table2 size={18} className="shrink-0 text-sky-500" />;
-  return <FileText size={18} className="shrink-0 text-accent-primary" />;
+  return <NodeIcon node={node} size={18} />;
 }
 
 function descendantsOf(nodeId: string, nodes: KnowledgeTreeNode[]) {

@@ -9,18 +9,14 @@ import KnowledgeTreePanel, {
 } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import MobileKnowledgeTreePanel from "@/components/MobileKnowledgeTreePanel";
 import SidebarTagsPanel from "@/components/SidebarTagsPanel";
-import {
-  SidebarAttachmentsPanel,
-  SidebarFavoritesPanel,
-  SidebarTrashPanel,
-} from "@/components/SidebarAuxPanels";
+import SidebarPanelContainer from "@/components/sidebar/SidebarPanelContainer";
+import TagsPanelContent from "@/components/sidebar/panels/TagsPanelContent";
+import TreePanelContent from "@/components/sidebar/panels/TreePanelContent";
 import { OPEN_KNOWLEDGE_TREE_EVENT } from "@/components/KnowledgeTreeDrawer";
 import TagColorPopover from "@/components/TagColorPopover";
 import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
 import { useMobileSidebarControlsCollapsed } from "@/hooks/useMobileSidebarControlsCollapsed";
-import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
-import { useRailMode, nextRailMode } from "@/hooks/useRailMode";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
 import { refreshKnowledgeTreeScrollbars } from "@/lib/knowledgeTreeScrollbarBridge";
@@ -30,8 +26,11 @@ import {
   loadDesktopKnowledgeTreeViewMode,
   type DesktopKnowledgeTreeViewMode,
 } from "@/lib/mobileKnowledgeTreeViewMode";
+import WorkspaceSwitcher from "@/components/WorkspaceSwitcher";
+import { useRailMode } from "@/hooks/useRailMode";
 import { cn } from "@/lib/utils";
-import { useApp, useAppActions } from "@/store/AppContext";
+import { updateSidebarPanel } from "@/lib/sidebarPanels";
+import { useApp, useAppActions, type ToolTabKey } from "@/store/AppContext";
 
 interface DeleteTagTarget {
   id: string;
@@ -96,6 +95,14 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
   const { state } = useApp();
   const actions = useAppActions();
   const { t } = useTranslation();
+
+  // 兼容 B1：Rail 面板按钮写入的 sidebarPanel 仍是「单选」语义，
+  // 这里把它翻译为面板框架里的「显示并展开该面板」，两种模型并存不冲突。
+  useEffect(() => {
+    const id = state.sidebarPanel;
+    if (!id) return;
+    updateSidebarPanel(id as never, { visible: true, collapsed: false });
+  }, [state.sidebarPanel]);
   const { siteConfig } = useSiteSettings();
   const [railMode, setRailMode] = useRailMode();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -238,11 +245,15 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
         <style data-knowledge-tree-scrollbar="">{KNOWLEDGE_TREE_SCROLLBAR_CSS}</style>
       )}
 
-      <header
-        className="flex shrink-0 items-center justify-between border-b border-app-border px-4 py-3"
-        style={{ paddingTop: "calc(var(--safe-area-top) + 12px)" }}
-      >
-        {variant === "mobile" && (
+      {/* 桌面端不再渲染「Base Notes」标题行：
+          用户 2026-10-16 要求按原型对齐（顶栏那一坨去掉）。
+          功能保全：工作区切换仍在 Rail 头像菜单；railMode 切换按钮移到「面板 ⋯」行右侧（见 SidebarPanelContainer）。
+          移动端仍需要这行（含移动端专属控件），保持原样。 */}
+      {variant === "mobile" && (
+        <header
+          className="flex shrink-0 items-center justify-between border-b border-app-border px-4 py-3"
+          style={{ paddingTop: "calc(var(--safe-area-top) + 12px)" }}
+        >
           <button
             type="button"
             onClick={() => setMobileControlsCollapsed(!mobileControlsCollapsed)}
@@ -252,113 +263,93 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
           >
             {mobileControlsCollapsed ? <PanelTopOpen size={16} /> : <PanelTopClose size={16} />}
           </button>
-        )}
-        <span className={cn("min-w-0 truncate font-semibold", classicText ? "text-[13px]" : "text-sm")}>{siteConfig.title || "nowen-note"}</span>
-        {variant === "mobile" && mobileRailHidden && (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              data-mobile-rail-show=""
-              onClick={() => setMobileRailHidden(false)}
-              title={t("sidebar.showMobileRail")}
-              aria-label={t("sidebar.showMobileRail")}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-            >
-              <PanelLeft size={16} />
-            </button>
-            <button
-              type="button"
-              data-mobile-sidebar-settings=""
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent("nowen:open-settings"));
-              }}
-              title={t("settings.title", { defaultValue: "设置" })}
-              aria-label={t("settings.title", { defaultValue: "设置" })}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-            >
-              <Settings size={16} />
-            </button>
-          </div>
-        )}
-        {variant === "desktop" && (
-          <button
-            type="button"
-            onClick={() => setRailMode(nextRailMode(railMode))}
-            title={t(`sidebar.railMode.switchTo.${nextRailMode(railMode)}`)}
-            aria-label={t(`sidebar.railMode.switchTo.${nextRailMode(railMode)}`)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          >
-            <PanelLeft size={16} />
-          </button>
-        )}
-      </header>{(variant !== "mobile" || !mobileControlsCollapsed) && (
-  
-  
+          <span className={cn("min-w-0 truncate font-semibold", classicText ? "text-[13px]" : "text-sm")}>
+            {siteConfig.title || "nowen-note"}
+          </span>
+          {mobileRailHidden && (
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                data-mobile-rail-show=""
+                onClick={() => setMobileRailHidden(false)}
+                title={t("sidebar.showMobileRail")}
+                aria-label={t("sidebar.showMobileRail")}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <PanelLeft size={16} />
+              </button>
+              <button
+                type="button"
+                data-mobile-sidebar-settings=""
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("nowen:open-settings"));
+                }}
+                title={t("settings.title", { defaultValue: "设置" })}
+                aria-label={t("settings.title", { defaultValue: "设置" })}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <Settings size={16} />
+              </button>
+            </div>
+          )}
+        </header>
+      )}
+      {/* 桌面端不再渲染「个人空间」卡片（用户 2026-10-16：按原型去掉顶栏那一坨）；
+          工作区切换入口仍在 Rail 顶部的账号菜单（B1 已实现），功能不丢。
+          移动端保持原样：仍显示工作区切换，并受移动端控件折叠开关控制。 */}
+      {variant === "mobile" && !mobileControlsCollapsed && (
         <div className="shrink-0 px-3 py-2">
           <WorkspaceSwitcher />
         </div>
-
-
       )}
 
       <section className="flex min-h-0 flex-1 flex-col border-t border-app-border/60">
-        {variant === "desktop" && state.sidebarPanel === "tree" && (
-          <div className="shrink-0 px-4 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
-            内容
+        {variant === "mobile" ? (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <MobileKnowledgeTreePanel />
           </div>
-        )}
-        {state.sidebarPanel === "fav" && variant !== "mobile" ? (
-          <SidebarFavoritesPanel />
-        ) : state.sidebarPanel === "trash" && variant !== "mobile" ? (
-          <SidebarTrashPanel />
-        ) : state.sidebarPanel === "files" && variant !== "mobile" ? (
-          <SidebarAttachmentsPanel />
-        ) : state.sidebarPanel === "tags" && variant !== "mobile" ? (
-          <SidebarTagsPanel
-            tags={state.tags}
-            selectedTagIds={state.selectedTagIds}
-            onTagClick={handleTagClick}
-            onTagContextMenu={openTagColor}
-            onRequestDelete={(tag) =>
-              setDeleteTagTarget({ id: tag.id, name: tag.name, color: tag.color })
+        ) : (
+          /* 面板框架（S1）：容器按布局 store 渲染可见面板；面板头/折叠/排序由 Shell 统一提供。 */
+          <SidebarPanelContainer
+            treeContent={
+              <TreePanelContent mode={desktopKnowledgeTreeMode === "quick" ? "quick" : "full"} />
             }
-            onLongPressFired={() => {
-              tagLongPressFired.current = false;
-            }}
-            onLongPressStart={(cb) => {
-              if (tagLongPressTimer.current) clearTimeout(tagLongPressTimer.current);
-              tagLongPressTimer.current = setTimeout(() => {
-                tagLongPressFired.current = true;
-                cb();
-              }, 500);
-            }}
-            onLongPressCancel={() => {
-              if (!tagLongPressTimer.current) return;
-              clearTimeout(tagLongPressTimer.current);
-              tagLongPressTimer.current = null;
-            }}
-            onLongPressEnd={() => {
-              if (!tagLongPressTimer.current) return;
-              clearTimeout(tagLongPressTimer.current);
-              tagLongPressTimer.current = null;
+            contents={{
+              tags: (
+                <TagsPanelContent
+                  tags={state.tags}
+                  selectedTagIds={state.selectedTagIds}
+                  onTagClick={handleTagClick}
+                  onTagContextMenu={openTagColor}
+                  onRequestDelete={(tag) =>
+                    setDeleteTagTarget({ id: tag.id, name: tag.name, color: tag.color })
+                  }
+                  onLongPressFired={() => {
+                    tagLongPressFired.current = false;
+                  }}
+                  onLongPressStart={(cb) => {
+                    if (tagLongPressTimer.current) clearTimeout(tagLongPressTimer.current);
+                    tagLongPressTimer.current = setTimeout(() => {
+                      tagLongPressFired.current = true;
+                      cb();
+                    }, 500);
+                  }}
+                  onLongPressCancel={() => {
+                    if (!tagLongPressTimer.current) return;
+                    clearTimeout(tagLongPressTimer.current);
+                    tagLongPressTimer.current = null;
+                  }}
+                  onLongPressEnd={() => {
+                    if (!tagLongPressTimer.current) return;
+                    clearTimeout(tagLongPressTimer.current);
+                    tagLongPressTimer.current = null;
+                  }}
+                />
+              ),
             }}
           />
-        ) : (
-          <div className="flex min-h-0 flex-1 overflow-hidden">
-            {variant === "mobile" ? (
-              <MobileKnowledgeTreePanel />
-            ) : desktopKnowledgeTreeMode === "quick" ? (
-              <MobileKnowledgeTreePanel variant="desktop" />
-            ) : (
-              <KnowledgeTreePanel variant="desktop" />
-            )}
-          </div>
         )}
       </section>
-
-      {/* 标签已升级为侧栏面板（State: sidebarPanel === "tags"），原底部折叠行已移除。 */}
-
-      {/* 标签面板已移至侧栏面板区（见上方 sidebarPanel === "tags" 分支） */}
 
       <AnimatePresence>
         {deleteTagTarget && (
@@ -409,44 +400,8 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
         )}
       </AnimatePresence>
 
-      {/* 桌面端底部工具条：任务 / 小记 / AI / 分享。
-          Rail 桌面端不再平铺这些工具（知识库优先 IA），入口收敛到侧栏底部；
-          移动端仍走抽屉 Rail（触屏可达性优先）。 */}
-      {variant === "desktop" && (
-        <section
-          data-sidebar-toolbar=""
-          className="shrink-0 border-t border-app-border px-2 py-1.5"
-        >
-          <div className="flex items-center gap-1">
-            {([
-              { mode: "tasks" as const, labelKey: "sidebar.tasks", icon: <ListTodo size={15} /> },
-              { mode: "diary" as const, labelKey: "sidebar.diary", icon: <NotebookPen size={15} /> },
-              { mode: "ai-chat" as const, labelKey: "sidebar.aiChat", icon: <Sparkles size={15} /> },
-              { mode: "shares" as const, labelKey: "sidebar.shareManagement", icon: <Link2 size={15} /> },
-            ]).map((item) => (
-              <button
-                key={item.mode}
-                type="button"
-                data-sidebar-tool={item.mode}
-                onClick={() => actions.setViewMode(item.mode)}
-                title={t(item.labelKey)}
-                aria-label={t(item.labelKey)}
-                className={cn(
-                  "flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-md transition-colors",
-                  state.viewMode === item.mode
-                    ? "bg-app-hover text-accent-primary"
-                    : "text-tx-tertiary hover:bg-app-hover hover:text-tx-primary",
-                )}
-              >
-                {item.icon}
-                {classicText && (
-                  <span className="truncate text-[10px]">{t(item.labelKey)}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* 工具入口已迁移到活动栏徽章区（固定 5 徽章 + 「更多」组），原底部工具条按原型移除；
+          功能不丢：待办/小记/AI/分享仍从徽章或「＋添加徽章」进入。 */}
 
       {tagColorPopover && (
         <TagColorPopover

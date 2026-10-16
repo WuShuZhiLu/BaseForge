@@ -48,6 +48,11 @@ export interface EditorSplitState {
 /** 左侧栏面板 id（方案 B）。 */
 export type SidebarPanelId = "tree" | "tags" | "fav" | "trash" | "files";
 
+/** 工具页签（方案 B · B2）：待办 / 小记 / AI / 分享 / 附件管理 / 回收站。
+ *  与笔记页签共处一条页签区：工具页签占用主区编辑器列，笔记页签由 NoteTabsBar 管理。 */
+export type ToolTabKey = "tasks" | "diary" | "ai-chat" | "shares" | "files" | "trash";
+export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "diary", "ai-chat", "shares", "files", "trash"];
+
 interface AppState {
   notebooks: Notebook[];
   notes: NoteListItem[];
@@ -84,6 +89,10 @@ interface AppState {
   notesRefreshToken: number;
   /** 顶部笔记标签页 V1：只保存元信息，不保存正文/编辑器状态。 */
   openNoteTabs: OpenNoteTab[];
+  /** 已打开的工具页签（顺序即显示顺序）。 */
+  openToolTabs: ToolTabKey[];
+  /** 当前激活的工具页签；null 表示主区显示笔记/其它视图。 */
+  activeToolTab: ToolTabKey | null;
   /** 桌面端编辑区分屏：V1 支持一个副分屏，主分屏仍跟随 activeNote。 */
   editorSplit: EditorSplitState | null;
 }
@@ -129,6 +138,9 @@ type Action =
   | { type: "SET_MOBILE_SIDEBAR"; payload: boolean }
   | { type: "TRIGGER_REFRESH_NOTES" }
   | { type: "OPEN_NOTE_TAB"; payload: OpenNoteTab }
+  | { type: "OPEN_TOOL_TAB"; payload: ToolTabKey }
+  | { type: "CLOSE_TOOL_TAB"; payload: ToolTabKey }
+  | { type: "SET_ACTIVE_TOOL_TAB"; payload: ToolTabKey | null }
   | { type: "CLOSE_NOTE_TAB"; payload: string }
   | { type: "UPDATE_NOTE_TAB"; payload: Partial<OpenNoteTab> & { id: string } }
   | { type: "REMOVE_NOTE_TAB"; payload: string }
@@ -231,6 +243,8 @@ const initialState: AppState = {
   mobileSidebarOpen: false,
   notesRefreshToken: 0,
   openNoteTabs: [],
+  openToolTabs: [],
+  activeToolTab: null,
   editorSplit: null,
 };
 
@@ -323,6 +337,22 @@ function reducer(state: AppState, action: Action): AppState {
         selectedTagIds: [],
         selectedTagId: null,
       };
+    case "OPEN_TOOL_TAB": {
+      const already = state.openToolTabs.includes(action.payload);
+      return {
+        ...state,
+        openToolTabs: already ? state.openToolTabs : [...state.openToolTabs, action.payload],
+        activeToolTab: action.payload,
+      };
+    }
+    case "CLOSE_TOOL_TAB": {
+      const rest = state.openToolTabs.filter((key) => key !== action.payload);
+      const nextActive =
+        state.activeToolTab === action.payload ? (rest.length > 0 ? rest[rest.length - 1] : null) : state.activeToolTab;
+      return { ...state, openToolTabs: rest, activeToolTab: nextActive };
+    }
+    case "SET_ACTIVE_TOOL_TAB":
+      return state.activeToolTab === action.payload ? state : { ...state, activeToolTab: action.payload };
     case "SET_SIDEBAR_PANEL":
       return state.sidebarPanel === action.payload
         ? state
@@ -446,7 +476,7 @@ function reducer(state: AppState, action: Action): AppState {
         )
         : [...state.openNoteTabs, incoming];
       tabs = trimOpenNoteTabs(sortOpenNoteTabs(tabs), state.activeNote?.id);
-      return { ...state, openNoteTabs: tabs };
+      return { ...state, openNoteTabs: tabs, activeToolTab: null };
     }
     case "CLOSE_NOTE_TAB":
     case "REMOVE_NOTE_TAB":
@@ -644,6 +674,9 @@ export function useAppActions() {
     setMobileView: (v: MobileView) => dispatch({ type: "SET_MOBILE_VIEW", payload: v }),
     setMobileSidebar: (v: boolean) => dispatch({ type: "SET_MOBILE_SIDEBAR", payload: v }),
     openNoteTab: (v: OpenNoteTab) => dispatch({ type: "OPEN_NOTE_TAB", payload: v }),
+    openToolTab: (key: ToolTabKey) => dispatch({ type: "OPEN_TOOL_TAB", payload: key }),
+    closeToolTab: (key: ToolTabKey) => dispatch({ type: "CLOSE_TOOL_TAB", payload: key }),
+    setActiveToolTab: (key: ToolTabKey | null) => dispatch({ type: "SET_ACTIVE_TOOL_TAB", payload: key }),
     closeNoteTab: (id: string) => dispatch({ type: "CLOSE_NOTE_TAB", payload: id }),
     updateNoteTab: (v: Partial<OpenNoteTab> & { id: string }) => dispatch({ type: "UPDATE_NOTE_TAB", payload: v }),
     removeNoteTab: (id: string) => dispatch({ type: "REMOVE_NOTE_TAB", payload: id }),

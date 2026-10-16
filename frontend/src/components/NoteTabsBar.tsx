@@ -12,6 +12,7 @@ import type { Notebook, NoteListItem } from "@/types";
 import { EditorToolbarExpandSlot } from "@/components/CollapsibleEditorToolbar";
 import { buildNoteDeepLinkUrl } from "@/lib/noteDeepLink";
 import NoteColorMarkBar from "@/components/NoteColorMarkBar";
+import { toolTabMeta } from "@/components/toolTabs";
 
 type TabContextMenuState = {
   tabId: string;
@@ -690,6 +691,51 @@ export default function NoteTabsBar() {
             </button>
           );
         })}
+
+        {/* 工具页签（方案 B · B2）：与笔记页签**同一行**，不新增顶栏。
+            由侧栏底部工具条 / 页面入口打开；点 chip 切换、点 ✕ 关闭。 */}
+        {(state.openToolTabs?.length ?? 0) > 0 && (
+          <div className="my-1 mr-1 flex shrink-0 items-center gap-1" data-tool-tab-strip="">
+            <span className="h-4 w-px shrink-0 bg-app-border/70" aria-hidden />
+            {(state.openToolTabs ?? []).map((key) => {
+              const meta = toolTabMeta(key);
+              const active = state.activeToolTab === key;
+              const label = t(meta.labelKey, { defaultValue: meta.defaultLabel });
+              return (
+                <div
+                  key={key}
+                  data-tool-tab={key}
+                  className={cn(
+                    "group/tooltab flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs transition-colors",
+                    active
+                      ? "bg-accent-primary/12 font-medium text-accent-primary"
+                      : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => actions.setActiveToolTab(key)}
+                    className="flex min-w-0 items-center gap-1.5"
+                    title={label}
+                  >
+                    {meta.icon}
+                    <span className="max-w-[120px] truncate">{label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => actions.closeToolTab(key)}
+                    aria-label={`${t("editorTabs.close")}：${label}`}
+                    title={t("tabs.closeTool", { defaultValue: "关闭" })}
+                    className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-tx-tertiary opacity-60 transition-colors hover:bg-app-active hover:text-tx-primary group-hover/tooltab:opacity-100"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         <button
           ref={newTabButtonRef}
           type="button"

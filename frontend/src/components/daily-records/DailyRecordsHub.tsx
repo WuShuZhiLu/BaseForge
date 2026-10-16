@@ -23,6 +23,10 @@ import {
 import { resolveJournalScope, type JournalScope } from "@/lib/journalScope";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import type { ToolPageHeaderMode } from "@/lib/toolPage";
+
+/** 页签契约：页面自带标题行（每日记录 header），宿主顶栏无需重复渲染。 */
+export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 import "@/components/daily-records/daily-records-mobile.css";
 
 const VIEW_OPTIONS: Array<{

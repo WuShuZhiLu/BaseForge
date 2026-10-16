@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { reportPanelCount } from "@/lib/sidebarPanelCounts";
 import {
   Check,
   ChevronDown,
@@ -7,8 +8,6 @@ import {
   ChevronsUp,
   CircleAlert,
   CloudDownload,
-  FileCode,
-  FileText,
   Folder,
   Loader2,
   LockKeyhole,
@@ -20,7 +19,6 @@ import {
   SplitSquareHorizontal,
   SplitSquareVertical,
   Star,
-  Table2,
   Trash2,
   TreePine,
   X,
@@ -125,6 +123,7 @@ import {
   type KnowledgeTreeClearSearchDetail,
 } from "@/lib/knowledgeTreeCreateVisibility";
 import { useApp, useAppActions } from "@/store/AppContext";
+import { NodeIcon, NodeKindIcon } from "@/lib/nodeIcons";
 
 export const FOCUS_KNOWLEDGE_TREE_EVENT = "nowen:focus-knowledge-tree";
 export const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
@@ -149,20 +148,11 @@ function buildChildren(nodes: KnowledgeTreeNode[]) {
 }
 
 function nodeIcon(node: KnowledgeTreeNode) {
-  if (node.nodeType === "folder") {
-    return node.icon
-      ? <span className="w-[15px] shrink-0 text-center text-sm leading-none">{node.icon}</span>
-      : <Folder size={15} className="text-amber-500" />;
-  }
-  if (node.nodeType === "markdown") return <FileCode size={15} className="text-emerald-500" />;
-  if (node.noteType === "sheet") return <Table2 size={15} className="text-sky-500" />;
-  return <FileText size={15} className="text-accent-primary" />;
+  return <NodeIcon node={node} size={15} />;
 }
 
 function draftIcon(kind: KnowledgeTreeInlineCreateKind) {
-  if (kind === "folder") return <Folder size={15} className="text-amber-500" />;
-  if (kind === "markdown") return <FileCode size={15} className="text-emerald-500" />;
-  return <FileText size={15} className="text-accent-primary" />;
+  return <NodeKindIcon kind={kind} size={15} />;
 }
 
 function descendantsOf(nodeId: string, children: Map<string | null, KnowledgeTreeNode[]>) {
@@ -308,6 +298,8 @@ export function KnowledgeTreePanel({
   importRequest,
   templateCreateRequest,
   showAllNotesToolbar = true,
+  /** 面板框架（侧栏面板容器）挂载时置 true：隐藏内部动作组（展开/收起、＋、刷新），
+   *  避免与面板头的 ＋ / ⋯ 重复；功能入口保留在面板头（⋯ 里有全部展开/全部折叠/刷新）。 */
   layoutMode = "standard",
 }: KnowledgeTreePanelProps) {
   const { state } = useApp();
@@ -353,6 +345,8 @@ export function KnowledgeTreePanel({
   } | null>(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [compactDesktopToolbar, setCompactDesktopToolbar] = useState(false);
+  // B-4 浏览所有导图：只按 nodeType === "mindmap" 过滤展示（不改数据结构、不做迁移）。
+  const [mindmapBrowseOpen, setMindmapBrowseOpen] = useState(false);
   const [treeDropTarget, setTreeDropTarget] = useState<{
     nodeId: string;
     placement: KnowledgeTreeDropPlacement;
@@ -516,6 +510,7 @@ export function KnowledgeTreePanel({
   ));
   const firstLevelNoteCounts = useMemo(() => buildFirstLevelNoteCounts(visibleNodes), [visibleNodes]);
   const filteredNodes = useMemo(() => filterKnowledgeTreeNodes(visibleNodes, query), [visibleNodes, query]);
+  const mindmapNodes = useMemo(() => nodes.filter((node) => node.nodeType === "mindmap"), [nodes]);
   const children = useMemo(() => buildChildren(filteredNodes), [filteredNodes]);
   const effectiveExpanded = query.trim() ? new Set(filteredNodes.map((node) => node.id)) : expanded;
   const expandableFolderIds = visibleNodes.filter((node) => (
@@ -609,6 +604,8 @@ export function KnowledgeTreePanel({
       toggleAll();
     } else if (value === "refresh") {
       void reload();
+    } else if (value === "browse-mindmaps") {
+      setMindmapBrowseOpen((current) => !current);
     } else if (value === "multi-select") {
       setMultiSelectMode(true);
       setSelectedNodeIds(new Set());
@@ -776,6 +773,32 @@ export function KnowledgeTreePanel({
       error: null,
     });
   }, [closeMenu, setNodeExpanded, unlockedFolderIds]);
+
+  /**
+   * 面板框架（A 侧）：侧栏面板头的 ＋ → 派发 nowen:sidebar-panel-action { panelId:"tree", action:"new" }。
+   * 这里监听并复用本面板既有的「新建根文件夹」入口（startInlineCreate(null,"folder")），
+   * 与树自身工具栏的 ＋ 行为完全一致——不新增创建 UI。
+   */
+  useEffect(() => {
+    if (variant === "mobile") return;
+    const onPanelAction = (event: Event) => {
+      const detail = (event as CustomEvent<{ panelId?: string; action?: string }>).detail;
+      if (detail?.panelId !== "tree" || detail?.action !== "new") return;
+      startInlineCreate(null, "folder");
+    };
+    window.addEventListener("nowen:sidebar-panel-action", onPanelAction);
+    // 面板框架刷新协议：面板头 ⋯ → 刷新
+    const onPanelRefresh = (event: Event) => {
+      const detail = (event as CustomEvent<{ panelId?: string }>).detail;
+      if (detail?.panelId !== "tree") return;
+      void reload();
+    };
+    window.addEventListener("nowen:sidebar-panel-refresh", onPanelRefresh);
+    return () => {
+      window.removeEventListener("nowen:sidebar-panel-action", onPanelAction);
+      window.removeEventListener("nowen:sidebar-panel-refresh", onPanelRefresh);
+    };
+  }, [startInlineCreate, variant, reload]);
 
   useEffect(() => {
     if (!createRequest || handledCreateRequestRef.current === createRequest.requestId) return;
@@ -1390,6 +1413,11 @@ export function KnowledgeTreePanel({
   const ownedRoots = rootNodes.filter((node) => !node.sharedRootId);
   const sharedRoots = rootNodes.filter((node) => Boolean(node.sharedRootId));
   const ownedNoteCount = countOwnedNotes(nodes);
+
+  // 面板框架：把当前空间笔记数上报给面板头（侧栏「文档树」标题后的计数）
+  useEffect(() => {
+    reportPanelCount("tree", ownedNoteCount);
+  }, [ownedNoteCount]);
   const currentSortMode = loadKnowledgeTreeSortMode();
   const hasRootDraft = draft?.parentId === null;
   const compactToolbar = variant === "mobile"
@@ -1589,6 +1617,7 @@ export function KnowledgeTreePanel({
               separatorBefore: true,
             },
             { value: "refresh", label: "刷新目录" },
+            { value: "browse-mindmaps", label: "浏览所有导图", checked: mindmapBrowseOpen, separatorBefore: true },
             ...(variant === "mobile" ? [{ value: "multi-select", label: "多选", separatorBefore: true }] : []),
           ]}
           onSelect={runMobileTreeAction}
@@ -1615,7 +1644,29 @@ export function KnowledgeTreePanel({
           if (!target.closest("[data-knowledge-tree-select-id]")) clearSelection();
         }}
       >
-        {loading && nodes.length === 0 ? (
+        {mindmapBrowseOpen ? (
+          <div data-knowledge-tree-mindmap-browse="">
+            {mindmapNodes.length === 0 ? (
+              <div className="flex flex-col items-center py-14 text-center">
+                <TreePine size={28} className="mb-2 text-tx-tertiary/40" />
+                <p className="text-xs text-tx-secondary">没有导图</p>
+                <p className="mt-1 max-w-[230px] text-[10px] leading-relaxed text-tx-tertiary">在树中新建思维导图后，这里会列出全部导图。</p>
+              </div>
+            ) : (
+              mindmapNodes.map((node) => (
+                <button
+                  key={node.id}
+                  type="button"
+                  onClick={() => void openDocument(node)}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-app-hover"
+                >
+                  <NodeIcon node={node} size={15} />
+                  <span className="min-w-0 flex-1 truncate text-xs text-tx-secondary">{node.title || "未命名导图"}</span>
+                </button>
+              ))
+            )}
+          </div>
+        ) : loading && nodes.length === 0 ? (
           <div className="flex justify-center py-14"><Loader2 size={20} className="animate-spin text-tx-tertiary" /></div>
         ) : error ? (
           <div role="status" className="mx-2 mt-4 rounded-xl border border-app-border bg-app-surface/70 px-4 py-5 text-center shadow-sm">

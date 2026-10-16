@@ -19,6 +19,7 @@ import {
   TASK_CENTER_ROOT_CLASS,
   TASK_MOBILE_FILTER_BAR_CLASS,
 } from "@/lib/taskLayout";
+import { useToolPageActive } from "@/lib/toolPage";
 
 // sub-components & utilities
 import { useTaskTree } from "./tasks/useTaskTree";
@@ -369,6 +370,20 @@ export default function TaskCenter() {
   }, [loadReminderBadge]);
 
   useEffect(() => { loadTasks(); loadDependencies(); loadReminderBadge(); loadHabits(); }, [loadTasks, loadDependencies, loadReminderBadge, loadHabits]);
+
+  // 隐藏态治理：keepAlive 非激活页签期间任务/提醒数据可能过期，重新激活时补一次刷新。
+  const pageRootRef = useRef<HTMLDivElement>(null);
+  const pageActive = useToolPageActive(pageRootRef);
+  const previousPageActiveRef = useRef(true);
+  useEffect(() => {
+    if (previousPageActiveRef.current === pageActive) return;
+    previousPageActiveRef.current = pageActive;
+    if (pageActive) {
+      loadTasks();
+      loadReminderBadge();
+      refreshCounts();
+    }
+  }, [pageActive, loadTasks, loadReminderBadge, refreshCounts]);
 
   useEffect(() => {
     const onWs = () => {
@@ -821,7 +836,7 @@ export default function TaskCenter() {
   }, [taskFullscreen]);
 
   return (
-    <div className={cn(TASK_CENTER_ROOT_CLASS, taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
+    <div ref={pageRootRef} className={cn(TASK_CENTER_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
       {/* Left: Sidebar Filters + Projects (desktop) */}
       <div className="hidden md:flex w-56 shrink-0 flex-col border-r border-app-border bg-app-surface overflow-y-auto" style={{ paddingTop: "var(--safe-area-top)" }}>
         <nav className="flex-1 px-2 py-1.5 space-y-0.5">

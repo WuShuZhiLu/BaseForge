@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   HOST_API_CONTRACT_VERSION,
+  CONTRIBUTION_CONTRACT_VERSION,
   CONTRIBUTION_CONTRACT,
+  ACTIVITY_BADGE_CONTRIBUTION_LIMITS,
+  SIDEBAR_PANEL_CONTRIBUTION_LIMITS,
   NOWEN_PLUGIN_ERROR_CATALOG,
   createHostApiCallMock,
 } from "../dist/index.js";
@@ -24,4 +27,25 @@ test("generated capability contracts expose V2.1 contributions without shrinking
   assert.deepEqual(mock.calls, [{ method: "runtime.capabilities", input: {} }]);
   mock.reset();
   assert.equal(mock.calls.length, 0);
+});
+
+test("contribution contract v5 adds declarative sidebarPanels + activityBadges（B-7 契约先行，运行链路由宿主后续接线）", () => {
+  assert.equal(CONTRIBUTION_CONTRACT_VERSION, 5);
+  const contributionIds = new Set(CONTRIBUTION_CONTRACT.map((entry) => entry.id));
+  assert.equal(contributionIds.has("sidebarPanels"), true);
+  assert.equal(contributionIds.has("activityBadges"), true);
+
+  const sidebarPanels = CONTRIBUTION_CONTRACT.find((entry) => entry.id === "sidebarPanels");
+  assert.equal(sidebarPanels.since, "2.2");
+  assert.equal(sidebarPanels.declarative, true);
+  assert.deepEqual([...sidebarPanels.runtimes], ["declarative"]);
+
+  const activityBadges = CONTRIBUTION_CONTRACT.find((entry) => entry.id === "activityBadges");
+  assert.equal(activityBadges.since, "2.2");
+  assert.equal(activityBadges.declarative, true);
+  assert.deepEqual([...activityBadges.runtimes], ["declarative"]);
+
+  assert.deepEqual([...ACTIVITY_BADGE_CONTRIBUTION_LIMITS.targets], ["panel", "tool"]);
+  assert.equal(ACTIVITY_BADGE_CONTRIBUTION_LIMITS.maxBadgesPerPlugin, 10);
+  assert.equal(SIDEBAR_PANEL_CONTRIBUTION_LIMITS.maxPanelsPerPlugin, 10);
 });
