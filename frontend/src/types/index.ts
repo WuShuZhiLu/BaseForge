@@ -262,6 +262,45 @@ export interface SearchResult {
 
 export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues";
 
+// ========== 远程文件管理插件（remote-files） ==========
+/** 已配置的远程源（凭据掩码，密码/token 不下发） */
+export interface RemoteSourcePublic {
+  id: string;
+  type: "webdav" | "baidu" | "smb";
+  name: string;
+  baseUrl: string;
+  username: string;
+  rootPath: string;
+  /** SMB：域/工作组（可选） */
+  domain?: string;
+  /** 百度 OAuth：API Key（可选） */
+  clientId?: string;
+  /** 百度 OAuth：已配置 refresh_token（可自动续期） */
+  hasOAuth?: boolean;
+  hasPassword: boolean;
+  createdAt: string;
+}
+
+/** 远程文件 ↔ 本地笔记 的同步链接（baseHash 为上次同步基准） */
+export interface RemoteNoteLink {
+  sourceId: string;
+  remotePath: string;
+  noteId: string;
+  title: string;
+  baseRemoteHash: string;
+  baseNoteHash: string;
+  syncedAt: string;
+}
+
+/** 远程文件条目（path 为源内相对路径，根目录为 ""） */
+export interface RemoteFileEntry {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  size: number;
+  modifiedAt: string | null;
+}
+
 // ========== 文件管理（/api/files 聚合视图） ==========
 
 /** 文件分类：按 MIME 粗分，UI 用图标/筛选。 */

@@ -68,3 +68,9 @@ frontend/dist.bak
 
 # 品牌设计稿暂存（AI 生成稿含第三方平台水印，不入库）
 .branding/
+
+# 临时工作脚本与提交信息草稿（AI 协作会话产物，不入库）
+scratch-*.cjs
+scratch-*.sh
+scratch-*.mjs
+.commitmsg-*.txt

@@ -34,6 +34,7 @@
  *   中间件传输；一次详情查询可以接受。更大规模时再考虑建倒排索引。
  */
 import { Hono } from "hono";
+import { resolveRemoteSourceContext } from "../services/remote-files";
 import type { Context } from "hono";
 import { v4 as uuid } from "uuid";
 import crypto from "crypto";
@@ -1359,6 +1360,115 @@ app.post("/upload", requireWorkspaceFeature("files"), async (c) => {
       mimeType: mime,
       size: file.size,
       filename: file.name || `${id}.${ext}`,
+      category: isImage(mime) ? "image" : "file",
+      createdAt: new Date().toISOString(),
+      accessUrls: createUserAttachmentAccessUrls(userId, [{ id, noteId }]),
+    },
+    201,
+  );
+});
+
+// 远程文件插件桥：把远程源文件拉取为本地附件（remote-files 内置插件联动）。
+// 复用 /upload 的存储管线（holder note + hash 去重 + 对象存储），内容来自远程提供方。
+const REMOTE_MIME_BY_EXT: Record<string, string> = {
+  md: "text/markdown", markdown: "text/markdown", txt: "text/plain", json: "application/json",
+  csv: "text/csv", html: "text/html", htm: "text/html", css: "text/css", js: "text/javascript",
+  ts: "text/plain", xml: "application/xml", yaml: "text/yaml", yml: "text/yaml", log: "text/plain",
+  pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+  webp: "image/webp", svg: "image/svg+xml", mp4: "video/mp4", mp3: "audio/mpeg", zip: "application/zip",
+};
+
+app.post("/upload-from-remote", requireWorkspaceFeature("files"), async (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!userId) return c.json({ error: "未授权" }, 401);
+  const scope = resolveFilesScope(c.req.query("workspaceId") || "", userId);
+  if (scope.error) return c.json({ error: scope.error, code: "FORBIDDEN" }, 403);
+
+  const body = await c.req.json().catch(() => ({}) as Record<string, unknown>);
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const remotePath = typeof body.path === "string" ? body.path : "";
+  if (!sourceId || !remotePath) return c.json({ error: "缺少 sourceId 或 path" }, 400);
+
+  const resolved = resolveRemoteSourceContext(userId, sourceId);
+  if (!resolved) return c.json({ error: "远程源不存在" }, 404);
+
+  let buffer: Buffer;
+  try {
+    buffer = await resolved.provider.readBinary(resolved.ctx, remotePath);
+  } catch (err) {
+    return c.json(
+      { error: `拉取远程文件失败: ${err instanceof Error ? err.message : String(err)}`, code: "REMOTE_PROVIDER" },
+      502,
+    );
+  }
+  if (buffer.length > MAX_UPLOAD_SIZE) {
+    return c.json({ error: `文件过大（最大 ${MAX_UPLOAD_SIZE / 1024 / 1024}MB）` }, 413);
+  }
+
+  const filename =
+    (typeof body.filename === "string" && body.filename.trim()) ||
+    remotePath.split("/").pop() ||
+    "remote-file";
+  const extLower = filename.includes(".") ? filename.split(".").pop()!.toLowerCase() : "";
+  let mime = REMOTE_MIME_BY_EXT[extLower] || "application/octet-stream";
+  mime = analyzeModernMedia(buffer, resolveHeifUploadMime(buffer, mime)).mimeType;
+  const { noteId } = ensureHolderNote(userId, scope.workspaceId);
+  ensureAttachmentsDir();
+  const id = uuid();
+  const storagePath = `${getUploadMonthPath()}/${id}.${pickExt(filename, mime)}`;
+
+  const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
+  const db = getDb();
+  const dedupRow = db
+    .prepare(
+      scope.workspaceId
+        ? `SELECT id, noteId, mimeType, size, filename FROM attachments WHERE userId = ? AND workspaceId = ? AND hash = ? LIMIT 1`
+        : `SELECT id, noteId, mimeType, size, filename FROM attachments WHERE userId = ? AND workspaceId IS NULL AND hash = ? LIMIT 1`,
+    )
+    .get(
+      ...(scope.workspaceId ? [userId, scope.workspaceId, sha256] : [userId, sha256]),
+    ) as { id: string; noteId: string; mimeType: string; size: number; filename: string } | undefined;
+
+  if (dedupRow) {
+    return c.json(
+      {
+        id: dedupRow.id,
+        url: `/api/attachments/${dedupRow.id}`,
+        mimeType: dedupRow.mimeType,
+        size: dedupRow.size,
+        filename: dedupRow.filename,
+        category: isImage(dedupRow.mimeType) ? "image" : "file",
+        createdAt: new Date().toISOString(),
+        deduplicated: true,
+        accessUrls: createUserAttachmentAccessUrls(userId, [{ id: dedupRow.id, noteId: dedupRow.noteId }]),
+      },
+      200,
+    );
+  }
+
+  try {
+    await writeAttachmentObject(storagePath, buffer, mime);
+  } catch (err) {
+    return c.json({ error: `写入文件失败: ${err instanceof Error ? err.message : String(err)}` }, 500);
+  }
+  try {
+    db.prepare(
+      `INSERT INTO attachments (id, noteId, userId, filename, mimeType, size, path, workspaceId, hash, uploadSource, folderId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    ).run(id, noteId, userId, filename, mime, buffer.length, storagePath, scope.workspaceId, sha256, "file_manager");
+  } catch (err) {
+    try { await deleteAttachmentObject(storagePath); } catch { /* ignore */ }
+    return c.json({ error: `写入数据库失败: ${err instanceof Error ? err.message : String(err)}` }, 500);
+  }
+
+  recordMediaAnalysis(id, buffer, mime);
+  return c.json(
+    {
+      id,
+      url: `/api/attachments/${id}`,
+      mimeType: mime,
+      size: buffer.length,
+      filename,
       category: isImage(mime) ? "image" : "file",
       createdAt: new Date().toISOString(),
       accessUrls: createUserAttachmentAccessUrls(userId, [{ id, noteId }]),

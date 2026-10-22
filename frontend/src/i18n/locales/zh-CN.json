@@ -1,4 +1,19 @@
 {
+  "railCustom": {
+    "addBadges": "添加徽章…",
+    "hide": "隐藏“{{name}}”",
+    "pluginDetails": "插件详情",
+    "collapseGroup": "折叠插件组",
+    "expandGroup": "展开插件组",
+    "manageBadges": "徽章管理",
+    "restoreDefaults": "恢复默认",
+    "badgeHint": "右键徽章可隐藏；右键空白处可重新添加",
+    "pluginDisabled": "插件已停用",
+    "managePlugins": "管理插件",
+    "version": "版本",
+    "openPlugin": "进入插件",
+    "close": "关闭"
+  },
   "common": {
     "cancel": "取消",
     "chars": "字符",

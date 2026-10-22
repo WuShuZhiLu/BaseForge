@@ -1,4 +1,19 @@
 {
+  "railCustom": {
+    "addBadges": "Add badges…",
+    "hide": "Hide \"{{name}}\"",
+    "pluginDetails": "Plugin details",
+    "collapseGroup": "Expand plugin group items",
+    "expandGroup": "Show plugin group items",
+    "manageBadges": "Badge manager",
+    "restoreDefaults": "Restore defaults",
+    "badgeHint": "Right-click a badge to hide it; right-click empty space to re-add",
+    "pluginDisabled": "Plugin disabled",
+    "managePlugins": "Manage plugins",
+    "version": "Version",
+    "openPlugin": "Open plugin",
+    "close": "Close"
+  },
   "common": {
     "cancel": "Cancel",
     "chars": "chars",

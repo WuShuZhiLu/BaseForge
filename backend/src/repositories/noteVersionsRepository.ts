@@ -595,7 +595,7 @@ export const noteVersionsRepository = {
   },
 
   /** 保留策略：每笔记保留最近 N 条 auto，其余删除。 */
-  pruneAutoVersionsByCount(keepRecent: number): { deleted: number; freedBytes: number } {
+  pruneAutoVersionsByCount(keepRecent: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
     const db = getDb();
     const doomed = db
       .prepare(

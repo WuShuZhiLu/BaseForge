@@ -1917,7 +1917,7 @@ export default function SidebarNext() {
           <div className="shrink-0">
             {(() => {
               const def = BUILTIN_PLUGINS.find((p) => p.id === openPluginPanel);
-              if (!def || !isBuiltinPluginEnabled(def.id)) return null;
+              if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
               return (
                 <>
                   <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-1 py-1">
@@ -2091,6 +2091,16 @@ export default function SidebarNext() {
               {([["all", "全部"], ["image", "图片"], ["other", "其他"]] as Array<[typeof fileCat, string]>).map(([cat, label]) => (
                 <span key={cat} className={cn("sbx-chip", fileCat === cat && "on")} onClick={() => setFileCat(cat)}>{label}</span>
               ))}
+              <span
+                className="sbx-chip"
+                title="远程文件（WebDAV / 百度网盘）：在文件管理中打开"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
+                  actions.setViewMode("files");
+                }}
+              >
+                ☁ 远程
+              </span>
             </div>
             <div className="px-1 pb-2">
               {fileItems.filter((f) => fileCat === "all" || f.category === fileCat).length === 0 ? (

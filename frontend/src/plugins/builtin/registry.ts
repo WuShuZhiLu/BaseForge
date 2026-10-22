@@ -9,18 +9,20 @@
  * 与第三方插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条
  * contributions 消费链路（registry → host → 面板），未来可平移为独立插件包。
  */
-export type BuiltinPluginId = "tasks" | "diary" | "ai";
+export type BuiltinPluginId = "tasks" | "diary" | "ai" | "remote-files";
 
 export interface BuiltinPluginDef {
   id: BuiltinPluginId;
   name: string;
   description: string;
   version: string;
-  icon: "tasks" | "diary" | "ai";
+  icon: "tasks" | "diary" | "ai" | "remote-files";
   /** 主区 viewMode（ Rail / 打开主区用） */
-  viewMode: "tasks" | "diary" | "ai-chat";
+  viewMode: "tasks" | "diary" | "ai-chat" | "remote-files";
   /** 主区入口所需的 WorkspaceFeatures 键 */
   workspaceFeature: "tasks" | "diaries" | "notes";
+  /** 增强型插件：不占独立导航徽章，嵌入宿主视图（如文件管理的远程文件面板） */
+  embedded?: boolean;
   /** 侧栏迷你面板贡献 */
   sidebarPanel: {
     id: string;
@@ -58,6 +60,17 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
     viewMode: "ai-chat",
     workspaceFeature: "notes",
     sidebarPanel: { id: "ai-panel", title: "AI 问答" },
+  },
+  {
+    id: "remote-files",
+    name: "远程文件",
+    description: "官方 · WebDAV/百度网盘等远程文档管理（读取/编辑/写回）",
+    version: "0.1.0",
+    icon: "remote-files",
+    embedded: true,
+    viewMode: "remote-files",
+    workspaceFeature: "notes",
+    sidebarPanel: { id: "remote-files-panel", title: "远程文件" },
   },
 ];
 

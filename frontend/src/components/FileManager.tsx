@@ -25,8 +25,11 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import RemoteFilesCenter from "@/components/RemoteFilesCenter";
+import type { RemoteSourcePublic } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  Cloud,
   Upload,
   UploadCloud,
   X,
@@ -254,6 +257,14 @@ export default function FileManager() {
   const actions = useAppActions();
 
   // 列表状态
+  // 远程文件管理（remote-files 内置插件）：文件管理内的并列视图（本地附件 / 远程文件 Tab）
+  const [sourceTab, setSourceTab] = useState<"local" | "remote">("local");
+  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab
+  useEffect(() => {
+    const handler = () => setSourceTab("remote");
+    window.addEventListener("nowen:files-remote-tab", handler);
+    return () => window.removeEventListener("nowen:files-remote-tab", handler);
+  }, []);
   const [items, setItems] = useState<FileItem[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<FileStats | null>(null);
@@ -596,6 +607,42 @@ export default function FileManager() {
     },
     [loadStats, loadReclaimable, loadList, items.length, page],
   );
+
+  // ---- 附件另存到远程（remote-files 内置插件联动）----
+  const [remoteSaveDlg, setRemoteSaveDlg] = useState<{ attachmentId: string; filename: string } | null>(null);
+  const [remoteSaveSources, setRemoteSaveSources] = useState<RemoteSourcePublic[]>([]);
+  const [remoteSaveSourceId, setRemoteSaveSourceId] = useState("");
+  const [remoteSavePath, setRemoteSavePath] = useState("");
+  const [remoteSaving, setRemoteSaving] = useState(false);
+  const [remoteSaveMsg, setRemoteSaveMsg] = useState("");
+
+  const openRemoteSave = useCallback(async (it: FileItem) => {
+    setRemoteSaveDlg({ attachmentId: it.id, filename: it.filename });
+    setRemoteSavePath(`/from-files/${it.filename}`);
+    setRemoteSaveMsg("");
+    try {
+      const res = await api.getRemoteFileSources();
+      setRemoteSaveSources(res.sources);
+      setRemoteSaveSourceId((prev) => (prev && res.sources.some((s) => s.id === prev) ? prev : res.sources[0]?.id || ""));
+    } catch {
+      setRemoteSaveSources([]);
+    }
+  }, []);
+
+  const submitRemoteSave = useCallback(async () => {
+    if (!remoteSaveDlg || !remoteSaveSourceId) return;
+    setRemoteSaving(true);
+    setRemoteSaveMsg("");
+    try {
+      await api.saveAttachmentToRemote(remoteSaveSourceId, remoteSaveDlg.attachmentId, remoteSavePath);
+      setRemoteSaveDlg(null);
+      toast.success("已保存到远程源");
+    } catch (err: any) {
+      setRemoteSaveMsg(err?.message || "保存到远程失败");
+    } finally {
+      setRemoteSaving(false);
+    }
+  }, [remoteSaveDlg, remoteSaveSourceId, remoteSavePath]);
 
   // ListView 行内删除按钮入口：自带二次确认 + 网络请求 + afterDelete。
   const handleDelete = useCallback(
@@ -1092,6 +1139,57 @@ export default function FileManager() {
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      {/* 保存到远程：把本地附件另存到远程源（remote-files 内置插件联动） */}
+      {remoteSaveDlg && (
+        <div
+          className="absolute inset-0 z-40 flex items-center justify-center bg-black/30"
+          onMouseDown={() => setRemoteSaveDlg(null)}
+        >
+          <div
+            className="w-80 rounded-xl border border-app-border bg-app-elevated p-4 shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs font-semibold text-tx-primary">保存到远程</p>
+            <p className="mt-0.5 truncate text-[11px] text-tx-tertiary">{remoteSaveDlg.filename}</p>
+            <select
+              className="mt-2 h-7 w-full rounded border border-app-border bg-transparent px-1.5 text-xs"
+              value={remoteSaveSourceId}
+              onChange={(e) => setRemoteSaveSourceId(e.target.value)}
+            >
+              {remoteSaveSources.length === 0 ? <option value="">（无远程源，请先在远程文件页添加）</option> : null}
+              {remoteSaveSources.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}（{s.type}）
+                </option>
+              ))}
+            </select>
+            <input
+              className="mt-2 h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs"
+              placeholder="远程目标路径，如 /from-files/xx.png"
+              value={remoteSavePath}
+              onChange={(e) => setRemoteSavePath(e.target.value)}
+            />
+            {remoteSaveMsg ? <p className="mt-1 text-[11px] text-red-500">{remoteSaveMsg}</p> : null}
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-md border border-app-border px-3 py-1 text-xs text-tx-secondary"
+                onClick={() => setRemoteSaveDlg(null)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={remoteSaving || !remoteSaveSourceId}
+                className="rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                onClick={() => void submitRemoteSave()}
+              >
+                {remoteSaving ? "保存中…" : "保存"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* 顶栏 */}
       <div
         className="flex flex-wrap items-center gap-2 md:gap-3 px-3 md:px-6 py-2.5 md:py-3 border-b border-app-border bg-app-surface/40"
@@ -1114,6 +1212,34 @@ export default function FileManager() {
               <h2 className="text-sm font-semibold text-tx-primary whitespace-nowrap">
                 {isImageHostMode ? "图床" : "附件"}
               </h2>
+              {!isImageHostMode && (
+                <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5" role="tablist">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={sourceTab === "local"}
+                    onClick={() => setSourceTab("local")}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
+                      sourceTab === "local" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
+                    )}
+                  >
+                    本地
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={sourceTab === "remote"}
+                    onClick={() => setSourceTab("remote")}
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
+                      sourceTab === "remote" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
+                    )}
+                  >
+                    远程
+                  </button>
+                </div>
+              )}
               {storageBadge && (
                 <div
                   className={cn(
@@ -1286,6 +1412,14 @@ export default function FileManager() {
           onChange={onFileInputChange}
         />
       </div>
+
+      {/* 远程文件视图（remote-files 内置插件）：与本地附件并列的补充视图，经顶栏 Tab 切换 */}
+      {sourceTab === "remote" ? (
+        <div className="min-h-0 flex-1 min-w-0">
+          <RemoteFilesCenter />
+        </div>
+      ) : (
+        <>
 
       {/* 工具条：分类 / 搜索 / 排序 */}
       <div className="flex flex-wrap items-center gap-2 px-3 md:px-6 py-1.5 md:py-2 border-b border-app-border bg-app-surface/20">
@@ -1569,6 +1703,7 @@ export default function FileManager() {
                             onJumpToNote={jumpToNote}
                             onDownload={downloadItem}
                             onDelete={afterDelete}
+                            onSaveRemote={openRemoteSave}
                             copiedId={copiedId}
                             downloadingId={downloadingId}
                             selectionMode={selectionMode}
@@ -1600,9 +1735,10 @@ export default function FileManager() {
                 items={displayItems}
                 onOpen={openDetail}
                 onCopyUrl={copyUrl}
-                onJumpToNote={jumpToNote}
-                onDownload={downloadItem}
-                onDelete={handleDelete}
+                 onJumpToNote={jumpToNote}
+                 onDownload={downloadItem}
+                 onDelete={handleDelete}
+                 onSaveRemote={openRemoteSave}
                 copiedId={copiedId}
                 downloadingId={downloadingId}
                 selectionMode={selectionMode}
@@ -1688,6 +1824,8 @@ export default function FileManager() {
         onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); }}
         defaultFolderId={null}
       />
+        </>
+      )}
     </div>
   );
 }
@@ -2036,6 +2174,7 @@ function ListView({
   onJumpToNote,
   onDownload,
   onDelete,
+  onSaveRemote,
   copiedId,
   downloadingId,
   selectionMode,
@@ -2048,6 +2187,7 @@ function ListView({
   onJumpToNote: (noteId: string) => void;
   onDownload: (item: FileItem) => void;
   onDelete: (id: string) => void;
+  onSaveRemote: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
@@ -2157,6 +2297,16 @@ function ListView({
                       title="下载"
                     >
                       {downloadingId === it.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    </button>
+                    <button
+                      className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onSaveRemote(it);
+                      }}
+                      title="保存到远程（WebDAV / 百度网盘）"
+                    >
+                      <Cloud size={12} />
                     </button>
                     <button
                       className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"

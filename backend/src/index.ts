@@ -53,6 +53,7 @@ import clipperLocalRouter from "./routes/clipper-local";
 
 import aiRouter from "./routes/ai";
 import pluginsRouter from "./routes/plugins";
+import remoteFilesRouter from "./routes/remote-files";
 import pluginStudioRouter from "./routes/plugin-studio";
 import pluginExecutionsRouter from "./routes/plugin-executions";
 import pluginInboundRouter from "./routes/plugin-inbound";
@@ -571,6 +572,7 @@ app.route("/api/sync/local", syncLocalRouter);
 app.route("/api/local/clipper", clipperLocalRouter);
 app.route("/api/plugins/studio", pluginStudioRouter);
 app.route("/api/plugins", pluginsRouter);
+app.route("/api/remote-files", remoteFilesRouter);
 app.route("/api/wechat-assistant", wechatAssistantRouter);
 app.route("/api/wechat-capture", wechatCaptureRouter);
 app.route("/api/plugin-executions", pluginExecutionsRouter);

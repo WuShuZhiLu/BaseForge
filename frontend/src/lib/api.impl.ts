@@ -1,10 +1,10 @@
-import { getOfflineQueueStorageKey } from "./offlineScope";
+﻿import { getOfflineQueueStorageKey } from "./offlineScope";
 import { withConversionRequestLease } from "./encryptedNotes/conversionBarrier";
 import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination";
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -3503,6 +3503,52 @@ export const api = {
   },
   clearNoteVersions: (noteId: string) =>
     request<{ success: boolean; count: number; skippedManual: number }>(`/shares/note/${noteId}/versions`, { method: "DELETE" }),
+
+  // 远程文件管理插件（remote-files）
+  getRemoteFileSources: () =>
+    request<{ sources: RemoteSourcePublic[]; types: string[] }>("/remote-files/sources"),
+  saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string }) =>
+    request<{ source: RemoteSourcePublic }>("/remote-files/sources", { method: "POST", body: JSON.stringify(data) }),
+  deleteRemoteFileSource: (sourceId: string) =>
+    request<{ success: boolean }>(`/remote-files/sources/${sourceId}`, { method: "DELETE" }),
+  testRemoteFileSource: (data: Record<string, unknown>) =>
+    request<{ success: boolean }>("/remote-files/sources/test", { method: "POST", body: JSON.stringify(data) }),
+  listRemoteFiles: (sourceId: string, path: string) =>
+    request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
+  readRemoteFile: (sourceId: string, path: string) =>
+    request<{ path: string; content: string; size: number }>(`/remote-files/sources/${sourceId}/read`, { method: "POST", body: JSON.stringify({ path }) }),
+  writeRemoteFile: (sourceId: string, path: string, content: string) =>
+    request<{ success: boolean }>(`/remote-files/sources/${sourceId}/write`, { method: "POST", body: JSON.stringify({ path, content }) }),
+  mkdirRemoteFile: (sourceId: string, path: string) =>
+    request<{ success: boolean }>(`/remote-files/sources/${sourceId}/mkdir`, { method: "POST", body: JSON.stringify({ path }) }),
+  deleteRemoteFile: (sourceId: string, path: string) =>
+    request<{ success: boolean }>(`/remote-files/sources/${sourceId}/delete`, { method: "POST", body: JSON.stringify({ path }) }),
+  renameRemoteFile: (sourceId: string, path: string, newName: string) =>
+    request<{ success: boolean }>(`/remote-files/sources/${sourceId}/rename`, { method: "POST", body: JSON.stringify({ path, newName }) }),
+  // 远程文件 → 本地附件（走 /api/files 存储管线：holder note + hash 去重）
+  uploadRemoteFileToLocal: (sourceId: string, path: string, filename?: string) =>
+    request<{ id: string; filename: string; deduplicated?: boolean }>("/files/upload-from-remote", { method: "POST", body: JSON.stringify({ sourceId, path, filename }) }),
+  // 本地附件 → 远程源（另存到远程）
+  saveAttachmentToRemote: (sourceId: string, attachmentId: string, path: string) =>
+    request<{ success: boolean; path: string; size: number }>(`/remote-files/sources/${sourceId}/save-attachment`, { method: "POST", body: JSON.stringify({ attachmentId, path }) }),
+  // 源级连接健康检查（用已保存凭据探测）
+  testRemoteSourceById: (sourceId: string) =>
+    request<{ success: boolean; latencyMs: number }>(`/remote-files/sources/${sourceId}/test`, { method: "POST" }),
+  // 百度 OAuth：生成授权页链接（oob）
+  getBaiduAuthorizeUrl: (clientId: string) =>
+    request<{ url: string }>("/remote-files/baidu/authorize-url", { method: "POST", body: JSON.stringify({ clientId }) }),
+  // 百度 OAuth：授权码换令牌（无状态，令牌随源表单保存）
+  exchangeBaiduToken: (code: string, clientId: string, clientSecret: string) =>
+    request<{ accessToken: string; refreshToken: string; expiresIn: number }>("/remote-files/baidu/exchange", { method: "POST", body: JSON.stringify({ code, clientId, clientSecret }) }),
+  // 笔记级同步：链接映射
+  getRemoteNoteLinks: () =>
+    request<{ links: RemoteNoteLink[] }>("/remote-files/links"),
+  linkRemoteNote: (data: { sourceId: string; remotePath: string; noteId: string; title: string; baseRemoteHash: string; baseNoteHash: string }) =>
+    request<{ link: RemoteNoteLink }>("/remote-files/links", { method: "POST", body: JSON.stringify(data) }),
+  updateRemoteNoteLinkSync: (data: { sourceId: string; remotePath: string; baseRemoteHash: string; baseNoteHash: string }) =>
+    request<{ link: RemoteNoteLink }>("/remote-files/links/update", { method: "POST", body: JSON.stringify(data) }),
+  deleteRemoteNoteLink: (sourceId: string, remotePath: string) =>
+    request<{ success: boolean }>("/remote-files/links/delete", { method: "POST", body: JSON.stringify({ sourceId, remotePath }) }),
   // v2 契约端点（VERSION_V2_BRIEF 固定契约表）：手动版本 / 副本 / 单删 / 批量删 / auto 快照 / 全局清理 / 设置读写
   saveNoteVersion: (noteId: string, data: { label?: string; description?: string } = {}) =>
     request<NoteVersion>(`/shares/note/${noteId}/versions`, { method: "POST", body: JSON.stringify(data) }),

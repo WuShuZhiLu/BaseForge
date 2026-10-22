@@ -31,7 +31,7 @@ import { useTheme } from "next-themes";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api, broadcastLogout, getCurrentWorkspace } from "@/lib/api";
 import { isDesktop as isDesktopApp, clearDesktopLocalAuth } from "@/lib/desktopBridge";
-import { isBuiltinPluginEnabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
+import { BUILTIN_PLUGINS, isBuiltinPluginEnabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/workspaceIssueNavigation";
 import { useRailMode, type RailMode } from "@/hooks/useRailMode";
 import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
@@ -122,6 +122,37 @@ const PLUGIN_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * Rail 徽章自定义（localStorage 持久化）：
+ * - hiddenModes：被隐藏的导航项 mode（右键徽章隐藏 / 徽章管理面板恢复）；
+ * - pluginGroupCollapsed：插件组折叠（折叠时点「插件」徽章弹出插件菜单）。
+ */
+type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean };
+const RAIL_CUSTOMIZATION_KEY = "nowen-rail-customization";
+
+function loadRailCustomization(): RailCustomization {
+  try {
+    const raw = localStorage.getItem(RAIL_CUSTOMIZATION_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<RailCustomization>) : {};
+    return {
+      hiddenModes: Array.isArray(parsed.hiddenModes)
+        ? parsed.hiddenModes.filter((m): m is string => typeof m === "string")
+        : [],
+      pluginGroupCollapsed: parsed.pluginGroupCollapsed === true,
+    };
+  } catch {
+    return { hiddenModes: [], pluginGroupCollapsed: false };
+  }
+}
+
+function saveRailCustomization(value: RailCustomization): void {
+  try {
+    localStorage.setItem(RAIL_CUSTOMIZATION_KEY, JSON.stringify(value));
+  } catch {
+    // storage failures are non-fatal
+  }
+}
+
 function initialsOf(name: string | null | undefined): string {
   const trimmed = (name ?? "").trim();
   if (!trimmed) return "U";
@@ -139,6 +170,31 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
   const { theme, setTheme } = useTheme();
 
   const [popupOpen, setPopupOpen] = useState(false);
+  const [railCustom, setRailCustomState] = useState<RailCustomization>(loadRailCustomization);
+  const [badgeMenu, setBadgeMenu] = useState<{ x: number; y: number; item: NavItem | null } | null>(null);
+  const [badgeManagerOpen, setBadgeManagerOpen] = useState(false);
+  const [pluginGroupMenuOpen, setPluginGroupMenuOpen] = useState(false);
+  const [pluginDetail, setPluginDetail] = useState<NavItem | null>(null);
+
+  const setRailCustom = useCallback((next: RailCustomization) => {
+    setRailCustomState(next);
+    saveRailCustomization(next);
+  }, []);
+
+  const isBadgeHidden = useCallback(
+    (mode: string) => railCustom.hiddenModes.includes(mode),
+    [railCustom],
+  );
+
+  const toggleBadge = useCallback(
+    (mode: string, shown: boolean) => {
+      const hiddenModes = shown
+        ? [...railCustom.hiddenModes.filter((m) => m !== mode), mode]
+        : railCustom.hiddenModes.filter((m) => m !== mode);
+      setRailCustom({ ...railCustom, hiddenModes });
+    },
+    [railCustom, setRailCustom],
+  );
   const [me, setMe] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -268,7 +324,8 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         <button
           key={item.mode}
           type="button"
-          onClick={() => navigate("plugins")}
+          onClick={() => (railCustom.pluginGroupCollapsed ? setPluginGroupMenuOpen(true) : navigate("plugins"))}
+          onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
           aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
           title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
           className={cn(
@@ -295,6 +352,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         key={item.mode}
         type="button"
         onClick={() => navigate(navMode)}
+        onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
         aria-current={active ? "page" : undefined}
         aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
         title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
@@ -341,19 +399,214 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         />
       </div>
 
-      <div className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex flex-col items-center gap-1">{CORE_ITEMS.map(renderItem)}</div>
-        <div className="flex flex-col items-center gap-1">{renderItem(SHARES_NAV_ITEM)}</div>
+      <div
+        className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onContextMenu={(e) => {
+          if ((e.target as HTMLElement).closest("button")) return;
+          e.preventDefault();
+          setBadgeMenu({ x: e.clientX, y: e.clientY, item: null });
+        }}
+      >
+        <div className="flex flex-col items-center gap-1">{CORE_ITEMS.filter((item) => !isBadgeHidden(item.mode)).map(renderItem)}</div>
+        {!isBadgeHidden("shares") && <div className="flex flex-col items-center gap-1">{renderItem(SHARES_NAV_ITEM)}</div>}
         <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
-        <div className="flex flex-col items-center gap-1">{PLUGIN_ITEMS.map(renderItem)}</div>
+        {PLUGIN_ITEMS.filter((item) => !isBadgeHidden(item.mode)).map(renderItem)}
         {(() => {
+          if (railCustom.pluginGroupCollapsed) return null;
           const visiblePluginNav = PLUGIN_NAV_ITEMS.filter(
-            (item) => isPluginNavVisible(item.pluginId, item.workspaceFeature) || activeMode === item.mode,
+            (item) =>
+              !isBadgeHidden(item.mode) &&
+              (isPluginNavVisible(item.pluginId, item.workspaceFeature) || activeMode === item.mode),
           );
           if (visiblePluginNav.length === 0) return null;
           return <div className="flex flex-col items-center gap-1">{visiblePluginNav.map(renderItem)}</div>;
         })()}
       </div>
+
+      {/* 徽章右键菜单（空白处右键 = 添加徽章入口） */}
+      {badgeMenu ? (
+        <div
+          className="fixed inset-0 z-[210]"
+          onMouseDown={() => setBadgeMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setBadgeMenu(null); }}
+        >
+          <div
+            className="absolute min-w-[168px] rounded-lg border border-app-border bg-app-elevated py-1 text-xs shadow-lg"
+            style={{ left: badgeMenu.x, top: badgeMenu.y }}
+            onMouseDown={(e) => e.stopPropagation()}
+            role="menu"
+          >
+            {badgeMenu.item ? (
+              <>
+                {badgeMenu.item.mode === "plugins" ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
+                    onClick={() => { setRailCustom({ ...railCustom, pluginGroupCollapsed: !railCustom.pluginGroupCollapsed }); setBadgeMenu(null); }}
+                  >
+                    {railCustom.pluginGroupCollapsed
+                      ? t("railCustom.expandGroup", { defaultValue: "展开插件组" })
+                      : t("railCustom.collapseGroup", { defaultValue: "折叠插件组" })}
+                  </button>
+                ) : null}
+                {badgeMenu.item.mode === "tasks" || badgeMenu.item.mode === "diary" || badgeMenu.item.mode === "ai-chat" ? (
+                  <button
+                    type="button"
+                    className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
+                    onClick={() => { setPluginDetail(badgeMenu.item); setBadgeMenu(null); }}
+                  >
+                    {t("railCustom.pluginDetails", { defaultValue: "插件详情" })}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="flex w-full items-center px-3 py-1.5 text-left text-red-500 hover:bg-red-500/10"
+                  onClick={() => { toggleBadge(badgeMenu.item!.mode, true); setBadgeMenu(null); }}
+                >
+                  {t("railCustom.hide", {
+                    defaultValue: "隐藏“{{name}}”",
+                    name: t(badgeMenu.item.titleKey, { defaultValue: badgeMenu.item.titleDefault }),
+                  })}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
+                onClick={() => { setBadgeManagerOpen(true); setBadgeMenu(null); }}
+              >
+                {t("railCustom.addBadges", { defaultValue: "添加徽章…" })}
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* 徽章管理面板（显示/隐藏全部导航项） */}
+      {badgeManagerOpen ? (
+        <div className="fixed inset-0 z-[205]" onMouseDown={() => setBadgeManagerOpen(false)}>
+          <div
+            className="absolute left-14 top-16 w-64 rounded-xl border border-app-border bg-app-elevated p-2 shadow-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <p className="px-1 pb-1.5 text-[11px] font-semibold text-tx-secondary">
+              {t("railCustom.manageBadges", { defaultValue: "徽章管理" })}
+            </p>
+            <div className="max-h-72 overflow-y-auto">
+              {[...CORE_ITEMS, SHARES_NAV_ITEM, ...PLUGIN_ITEMS, ...PLUGIN_NAV_ITEMS].map((item) => {
+                const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+                const gate = typed.pluginId && typed.workspaceFeature
+                  ? !isPluginNavVisible(typed.pluginId, typed.workspaceFeature)
+                  : false;
+                const shown = !isBadgeHidden(item.mode) && !gate;
+                return (
+                  <button
+                    key={item.mode}
+                    type="button"
+                    disabled={gate}
+                    onClick={() => toggleBadge(item.mode, shown)}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover disabled:opacity-45"
+                  >
+                    <span className="w-4 shrink-0 text-center text-accent-primary">{shown ? "✓" : ""}</span>
+                    <span className="shrink-0 text-tx-secondary">{item.icon(14)}</span>
+                    <span className="min-w-0 flex-1 truncate">{t(item.titleKey, { defaultValue: item.titleDefault })}</span>
+                    {gate ? (
+                      <span className="shrink-0 text-[10px] text-tx-tertiary">
+                        {t("railCustom.pluginDisabled", { defaultValue: "插件已停用" })}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 border-t border-app-border pt-1.5">
+              <button
+                type="button"
+                className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover"
+                onClick={() => setRailCustom({ hiddenModes: [], pluginGroupCollapsed: false })}
+              >
+                {t("railCustom.restoreDefaults", { defaultValue: "恢复默认" })}
+              </button>
+              <p className="px-2 pt-1 text-[10px] leading-4 text-tx-tertiary">
+                {t("railCustom.badgeHint", { defaultValue: "右键徽章可隐藏；右键空白处可重新添加" })}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 折叠态：点「插件」徽章弹出插件菜单 */}
+      {pluginGroupMenuOpen ? (
+        <div className="fixed inset-0 z-[205]" onMouseDown={() => setPluginGroupMenuOpen(false)}>
+          <div
+            className="absolute bottom-16 left-14 w-52 rounded-xl border border-app-border bg-app-elevated p-1 shadow-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {PLUGIN_NAV_ITEMS.filter(
+              (item) => !isBadgeHidden(item.mode) && isPluginNavVisible(item.pluginId, item.workspaceFeature),
+            ).map((item) => (
+              <button
+                key={item.mode}
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
+                onClick={() => { setPluginGroupMenuOpen(false); navigate(item.mode); }}
+              >
+                <span className="shrink-0 text-tx-secondary">{item.icon(15)}</span>
+                <span className="min-w-0 flex-1 truncate">{t(item.titleKey, { defaultValue: item.titleDefault })}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover"
+              onClick={() => { setPluginGroupMenuOpen(false); navigate("plugins"); }}
+            >
+              {t("railCustom.managePlugins", { defaultValue: "管理插件" })}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 插件详情弹层 */}
+      {pluginDetail ? (
+        <div
+          className="fixed inset-0 z-[205] flex items-center justify-center bg-black/30"
+          onMouseDown={() => setPluginDetail(null)}
+        >
+          {(() => {
+            const def = BUILTIN_PLUGINS.find((p) => p.id === pluginDetail.mode);
+            return (
+              <div
+                className="w-72 rounded-xl border border-app-border bg-app-elevated p-4 shadow-lg"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <p className="text-sm font-semibold text-tx-primary">
+                  {def?.name ?? t(pluginDetail.titleKey, { defaultValue: pluginDetail.titleDefault })}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-tx-secondary">{def?.description ?? ""}</p>
+                <p className="mt-2 text-[11px] text-tx-tertiary">
+                  {t("railCustom.version", { defaultValue: "版本" })} {def?.version ?? "—"}
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border border-app-border px-2.5 py-1 text-xs text-tx-secondary hover:bg-app-hover"
+                    onClick={() => setPluginDetail(null)}
+                  >
+                    {t("railCustom.close", { defaultValue: "关闭" })}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-accent-primary px-2.5 py-1 text-xs font-medium text-white"
+                    onClick={() => { setPluginDetail(null); navigate(pluginDetail.mode as NavItemMode); }}
+                  >
+                    {t("railCustom.openPlugin", { defaultValue: "进入插件" })}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      ) : null}
 
       <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
 
