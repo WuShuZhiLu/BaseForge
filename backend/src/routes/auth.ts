@@ -1,5 +1,7 @@
 import { Hono, type Context } from "hono";
 import { timingSafeEqual } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { getDb } from "../db/schema";
 import { userSessionsRepository } from "../repositories";
 import { v4 as uuid } from "uuid";
@@ -179,7 +181,12 @@ function isDemoUser(userId: string): boolean {
 function extractUserId(c: any): string | null {
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
-  const token = authHeader.slice(7);
+  return resolveVerifiedUserFromToken(authHeader.slice(7));
+}
+
+// 从 token 解析 userId；供 extractUserId 与头像文件路由（?token= 查询参数）共用
+function resolveVerifiedUserFromToken(token: string): string | null {
+  if (!token) return null;
   const payload = verifyLoginToken(token);
   if (!payload) return null;
 
@@ -191,7 +198,7 @@ function extractUserId(c: any): string | null {
   // 旧 token 没有 tver 字段，按 0 比对：一旦 DB 中 tokenVersion > 0 则拒绝
   if ((payload.tver ?? 0) !== user.tokenVersion) return null;
   if (payload.jti) {
-    const session = userSessionsRepository.getByIdAndUser(payload.jti, user.id);
+    const session = userSessionsRepository.getByIdAndUser(payload.jti, payload.userId);
     if (!session || session.revokedAt) return null;
     if (session.expiresAt && Date.parse(session.expiresAt) <= Date.now()) return null;
   }
@@ -669,6 +676,114 @@ auth.post("/change-password", async (c) => {
   }
 
   return c.json({ success: true, message: "账户信息更新成功", ...newTokens });
+});
+
+// ========== 头像上传 / 移除 / 文件服务 ==========
+//
+// 文件存 data/avatars/<userId>.<ext>（每用户单文件，覆盖写）；
+// users.avatarUrl 存带 cache-bust 版本号的相对 URL，由 avatar-file 路由鉴权后下发。
+
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_MIME_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+function getAvatarDir(): string {
+  const dataDir = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
+  return path.join(dataDir, "avatars");
+}
+
+function removeAvatarFile(userId: string): void {
+  try {
+    for (const ext of Object.values(AVATAR_MIME_EXT)) {
+      const file = path.join(getAvatarDir(), `${userId}.${ext}`);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    }
+  } catch {
+    // 清理失败不阻塞流程
+  }
+}
+
+auth.post("/avatar", async (c) => {
+  const userId = extractUserId(c);
+  if (!userId) return c.json({ error: "未授权" }, 401);
+  if (isDemoUser(userId)) {
+    return c.json({ error: "体验账号不允许修改头像", code: "DEMO_LOCKED" }, 403);
+  }
+
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!(file instanceof File)) {
+    return c.json({ error: "缺少头像文件（字段名 file）" }, 400);
+  }
+  const ext = AVATAR_MIME_EXT[file.type.toLowerCase()];
+  if (!ext) {
+    return c.json({ error: "仅支持 PNG/JPEG/WebP/GIF 图片" }, 400);
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return c.json({ error: "头像文件不能超过 5MB" }, 400);
+  }
+
+  const dir = getAvatarDir();
+  fs.mkdirSync(dir, { recursive: true });
+  removeAvatarFile(userId);
+  const target = path.join(dir, `${userId}.${ext}`);
+  fs.writeFileSync(target, Buffer.from(await file.arrayBuffer()));
+
+  const avatarUrl = `/api/auth/avatar-file/${userId}?v=${Date.now()}`;
+  getDb().prepare("UPDATE users SET avatarUrl = ?, updatedAt = datetime('now') WHERE id = ?").run(avatarUrl, userId);
+  return c.json({ success: true, avatarUrl });
+});
+
+auth.delete("/avatar", (c) => {
+  const userId = extractUserId(c);
+  if (!userId) return c.json({ error: "未授权" }, 401);
+  if (isDemoUser(userId)) {
+    return c.json({ error: "体验账号不允许修改头像", code: "DEMO_LOCKED" }, 403);
+  }
+  removeAvatarFile(userId);
+  getDb().prepare("UPDATE users SET avatarUrl = NULL, updatedAt = datetime('now') WHERE id = ?").run(userId);
+  return c.json({ success: true, avatarUrl: null });
+});
+
+auth.get("/avatar-file/:userId", (c) => {
+  // <img> 标签无法携带 Authorization 头，额外接受 ?token= 查询参数
+  const authHeader = c.req.header("Authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : String(c.req.query("token") || "");
+  const viewerId = resolveVerifiedUserFromToken(token);
+  if (!viewerId) return c.json({ error: "未授权" }, 401);
+
+  const targetId = c.req.param("userId");
+  // 防路径穿越：userId 必须是 uuid 形态
+  if (!/^[0-9a-fA-F-]{36}$/.test(targetId)) {
+    return c.json({ error: "参数不合法" }, 400);
+  }
+  const target = getDb().prepare("SELECT avatarUrl FROM users WHERE id = ?").get(targetId) as
+    | { avatarUrl: string | null }
+    | undefined;
+  if (!target?.avatarUrl) return c.json({ error: "无头像" }, 404);
+
+  const dir = getAvatarDir();
+  for (const [mime, ext] of Object.entries(AVATAR_MIME_EXT)) {
+    const file = path.join(dir, `${targetId}.${ext}`);
+    if (fs.existsSync(file)) {
+      const data = fs.readFileSync(file);
+      return new Response(new Uint8Array(data), {
+        headers: {
+          "Content-Type": mime,
+          "Cache-Control": "private, max-age=60",
+        },
+      });
+    }
+  }
+  // DB 有记录但文件丢失：清掉脏数据
+  getDb().prepare("UPDATE users SET avatarUrl = NULL WHERE id = ?").run(targetId);
+  return c.json({ error: "无头像" }, 404);
 });
 
 // ========== Sudo 二次验证（H2）==========

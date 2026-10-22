@@ -215,6 +215,13 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
     api.getMe().then((u) => setMe(u)).catch(() => undefined);
   }, []);
 
+  // 头像等用户资料变更后刷新（SecuritySettings 上传/移除头像时广播）
+  useEffect(() => {
+    const onUserUpdated = () => { api.getMe().then((u) => setMe(u)).catch(() => undefined); };
+    window.addEventListener("nowen:user-updated", onUserUpdated);
+    return () => window.removeEventListener("nowen:user-updated", onUserUpdated);
+  }, []);
+
   // Rail 激活态跟随侧栏当前视图（语雀式：点击切换的是侧栏视图而非主区）
   const [activeView, setActiveView] = useState<string>("kb");
   useEffect(() => {
@@ -632,9 +639,13 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
           title={t("sidebarNext.nav.account", { defaultValue: "账户菜单" })}
           className="flex h-11 w-full shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[rgba(17,24,39,0.06)] dark:hover:bg-[rgba(255,255,255,0.07)]"
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-[13px] font-semibold text-accent-primary dark:bg-accent-primary/14">
-            {initials}
-          </span>
+          {me?.avatarUrl ? (
+            <img src={api.avatarFileUrl(me.id)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-[13px] font-semibold text-accent-primary dark:bg-accent-primary/14">
+              {initials}
+            </span>
+          )}
         </button>
 
         {/* 头像浮窗（260px，左下弹出，锚定底部） */}
@@ -645,9 +656,13 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
             role="menu"
           >
             <div className="flex items-center gap-2.5 px-2.5 pb-2 pt-2.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-xs font-semibold text-accent-primary dark:bg-accent-primary/14">
-                {initials}
-              </span>
+              {me?.avatarUrl ? (
+                <img src={api.avatarFileUrl(me.id)} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-xs font-semibold text-accent-primary dark:bg-accent-primary/14">
+                  {initials}
+                </span>
+              )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px] font-semibold">{displayName}</span>
                 <span className="block truncate text-[11px] text-tx-tertiary">

@@ -1,4 +1,4 @@
-﻿import { getOfflineQueueStorageKey } from "./offlineScope";
+import { getOfflineQueueStorageKey } from "./offlineScope";
 import { withConversionRequestLease } from "./encryptedNotes/conversionBarrier";
 import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination";
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
@@ -2191,6 +2191,32 @@ export const api = {
       storeAuthTokens({ token: res.token, refreshToken: res.refreshToken ?? null });
     }
     return res;
+  },
+
+  // Avatar（头像）
+  uploadAvatar: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getAccessToken();
+    const res = await fetch(`${getBaseUrl()}/auth/avatar`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(String((payload as { error?: string }).error || "头像上传失败"));
+    }
+    return (await res.json()) as { success: boolean; avatarUrl: string };
+  },
+  removeAvatar: async () => {
+    const res = await request<{ success: boolean; avatarUrl: string | null }>("/auth/avatar", { method: "DELETE" });
+    return res;
+  },
+  /** 头像文件地址：<img> 无法带 Authorization 头，token 走查询参数 */
+  avatarFileUrl: (userId: string): string => {
+    const token = getAccessToken();
+    return `${getBaseUrl()}/auth/avatar-file/${userId}${token ? `?token=${encodeURIComponent(token)}` : ""}`;
   },
   factoryReset: async (confirmText: string, sudoToken?: string) => {
     // factory-reset 同样会 bump tokenVersion 并下发新 token，必须更新本地存储，
