@@ -2,6 +2,24 @@
 <html lang="zh-CN" class="dark" spellcheck="false">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      /* 临时错误记录器（排查 PM 空白页用，问题定位后移除）：错误写入 localStorage.__pm_errs */
+      (function () {
+        var record = function (kind, msg) {
+          try {
+            var arr = JSON.parse(localStorage.getItem('__pm_errs') || '[]');
+            arr.push({ kind: kind, msg: String(msg).slice(0, 600), at: new Date().toISOString(), url: location.href });
+            localStorage.setItem('__pm_errs', JSON.stringify(arr.slice(-30)));
+          } catch (_) {}
+        };
+        window.addEventListener('error', function (e) {
+          record('error', e.message + ' @ ' + (e.filename || '') + ':' + e.lineno + ':' + e.colno);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          record('rejection', String((e.reason && e.reason.message) || e.reason));
+        });
+      })();
+    </script>
     <!-- SEC-ELECTRON-01-E3.4: CSP — 保留严格默认策略，补齐 nowen-note 实际资源来源 -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';

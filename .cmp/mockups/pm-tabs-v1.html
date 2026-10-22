@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PM 插件 · 项目内模块 Tab 分离（v1）</title>
+<style>
+  :root{
+    --accent:#2563EB; --accent-soft:#EFF4FE;
+    --surface:#FFFFFF; --surface-2:#F7F7F9; --surface-3:#F1F1F4;
+    --border:#E8E8EC; --tx-1:#1D1D22; --tx-2:#55555E; --tx-3:#8B8B93; --tx-4:#B0B0B8;
+    --amber:#F59E0B; --blue:#2563EB; --violet:#8B5CF6; --emerald:#10B981; --red:#EF4444;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"SF Pro SC","PingFang SC","Noto Sans SC",sans-serif;background:#0F0F12;color:var(--tx-1);padding:22px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1500px;margin:0 auto}
+  h1{color:#fff;font-size:17px;font-weight:600;margin-bottom:4px}
+  .sub{color:#9a9aa4;font-size:12.5px;margin-bottom:14px;line-height:1.7}
+  .sub b{color:#e8e8ee}
+  svg.i{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+  svg.i.sm{width:13px;height:13px}
+  .app-scroll{overflow-x:auto;padding-bottom:4px}
+  .app{display:flex;height:660px;min-width:1360px;background:var(--surface-2);border:1px solid #26262c;border-radius:12px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.35);position:relative}
+  /* Rail（宿主固定，如实还原） */
+  .rail{width:50px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:7px;flex-shrink:0;outline:1px dashed #c9c9d4;outline-offset:-4px}
+  .rail .logo{width:30px;height:30px;border-radius:8px;background:#1D1D22;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-bottom:2px}
+  .rail .ri{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--tx-3)}
+  .rail .badge-pm{width:30px;height:30px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow:0 2px 6px rgba(37,99,235,.35)}
+  /* 侧栏（项目面板，沿用已确认的重设计） */
+  .side{width:276px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;min-width:0}
+  .side-top{display:flex;align-items:center;gap:6px;padding:12px 12px 10px;border-bottom:1px solid var(--border)}
+  .side-top .t{font-size:13px;font-weight:600;flex:1}
+  .side-top .cnt{font-size:10px;color:var(--tx-3);background:var(--surface-3);border-radius:8px;padding:1px 6px}
+  .iconbtn{width:24px;height:24px;border:0;background:transparent;border-radius:6px;color:var(--tx-3);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .iconbtn:hover{background:var(--surface-3);color:var(--tx-1)}
+  .side-scroll{flex:1;overflow-y:auto;min-height:0}
+  .proj-row{display:flex;align-items:center;gap:8px;margin:10px 10px 6px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+  .proj-row.on{background:var(--accent-soft);border-color:#C7D9FB}
+  .proj-row .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+  .proj-row .nm{font-size:12.5px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proj-row .badge{font-size:10px;color:var(--tx-2);background:var(--surface-3);border-radius:8px;padding:1px 6px}
+  .proj-row.on .badge{background:#fff;color:var(--accent)}
+  .sec-label{font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--tx-4);padding:12px 14px 4px}
+  .grp{display:flex;align-items:center;gap:9px;padding:6px 14px;cursor:pointer;color:var(--tx-2)}
+  .grp.on{background:var(--accent-soft);color:var(--accent)}
+  .grp .gi{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .grp .gl{flex:1;font-size:12.5px;white-space:nowrap}
+  .grp .gc{font-size:11px;color:var(--tx-3);font-variant-numeric:tabular-nums}
+  .side-foot{border-top:1px solid var(--border);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+  .foot-btn{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;font-size:12px;color:var(--tx-2);cursor:pointer;border:0;background:transparent;text-align:left}
+  .foot-btn.primary{color:var(--accent);font-weight:500}
+  .foot-btn:hover{background:var(--surface-2);color:var(--tx-1)}
+  /* ===== 主区 ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface-2)}
+  /* 身份行 + 模块 Tab */
+  .head{background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+  .head-id{display:flex;align-items:center;gap:10px;padding:12px 20px 8px;white-space:nowrap}
+  .head-id .cube{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--blue),#7c9ef5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .head-id .pn{font-size:15px;font-weight:600}
+  .head-id .pk{font-family:ui-monospace,monospace;font-size:10px;color:var(--tx-3);background:var(--surface-3);border-radius:5px;padding:1px 5px}
+  .head-id .desc{font-size:11px;color:var(--tx-3)}
+  .head-id .sp{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:5px;border-radius:8px;padding:5px 10px;font-size:11.5px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--tx-2)}
+  .btn:hover{background:var(--surface-2)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500}
+  .btn.primary:hover{background:#1D4ED8}
+  .btn.icon{padding:5px;border-radius:7px}
+  /* 模块 Tab 栏（分离入口） */
+  .tabs{display:flex;align-items:center;gap:2px;padding:0 16px;white-space:nowrap}
+  .tab{position:relative;display:flex;align-items:center;gap:5px;padding:8px 12px 10px;font-size:12.5px;color:var(--tx-2);cursor:pointer;border-bottom:2px solid transparent}
+  .tab:hover{color:var(--tx-1)}
+  .tab.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
+  .tab .tc{font-size:10px;color:var(--tx-3);background:var(--surface-3);border-radius:8px;padding:1px 6px;font-variant-numeric:tabular-nums}
+  .tab.on .tc{background:var(--accent-soft);color:var(--accent)}
+  .tabs .tsep{width:1px;height:16px;background:var(--border);margin:0 8px}
+  /* 视图容器 */
+  .view{flex:1;overflow-y:auto;min-height:0}
+  /* 概览 */
+  .ov{padding:16px 20px}
+  .ov-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:980px}
+  .ov-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .ov-card .lab{font-size:11px;color:var(--tx-3);display:flex;align-items:center;gap:5px}
+  .ov-card .num{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .ov-card .hint{font-size:10px;color:var(--tx-4);margin-top:2px}
+  .ov-sec{margin-top:18px;max-width:980px}
+  .ov-sec .st{font-size:12.5px;font-weight:600;margin-bottom:8px}
+  .ov-prog{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .ov-bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden;display:flex}
+  .ov-bar i{display:block;height:100%}
+  .ov-legend{display:flex;gap:14px;margin-top:8px;font-size:10.5px;color:var(--tx-3);flex-wrap:wrap}
+  .ov-legend span{display:flex;align-items:center;gap:4px}
+  .ov-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+  .ov-act{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px 14px}
+  .ov-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--surface-2);font-size:11.5px;color:var(--tx-2)}
+  .ov-row:last-child{border-bottom:0}
+  .ov-row .tm{margin-left:auto;color:var(--tx-4);font-size:10px;flex-shrink:0}
+  /* 看板 */
+  .bd-head{display:flex;align-items:center;gap:8px;padding:10px 20px;white-space:nowrap}
+  .search{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px;width:220px;color:var(--tx-3)}
+  .search input{border:0;background:transparent;outline:none;font-size:11.5px;flex:1;color:var(--tx-1)}
+  .fchip{display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--tx-2);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px;cursor:pointer}
+  .fchip .lab{color:var(--tx-3);font-size:10.5px}
+  .seg{display:flex;background:var(--surface-3);border-radius:8px;padding:2px;margin-left:auto}
+  .seg .s{padding:3px 10px;border-radius:6px;font-size:11.5px;color:var(--tx-2);cursor:pointer}
+  .seg .s.on{background:#fff;color:var(--tx-1);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+  .board{display:flex;gap:12px;padding:4px 20px 16px;min-height:520px}
+  .col{width:280px;flex-shrink:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:12px;min-height:0;max-height:calc(100% - 8px)}
+  .col .band{height:3px;border-radius:12px 12px 0 0}
+  .col-head{display:flex;align-items:center;gap:6px;padding:10px 12px 8px;white-space:nowrap}
+  .col-head .ci{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .col-head .cl{font-size:12.5px;font-weight:600;flex:1}
+  .col-head .cc{font-size:10px;color:var(--tx-3);background:var(--surface-3);border-radius:8px;padding:1px 6px}
+  .col-head .add{color:var(--tx-3);cursor:pointer}
+  .col-body{padding:2px 8px 10px;overflow-y:auto;min-height:60px;display:flex;flex-direction:column;gap:8px}
+  .card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 10px 8px 13px;cursor:pointer;transition:box-shadow .15s,transform .15s,border-color .15s}
+  .card:hover{border-color:#C7D9FB;box-shadow:0 4px 14px rgba(37,99,235,.10);transform:translateY(-1px)}
+  .card .typebar{position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px}
+  .card .r1{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .card .no{font-family:ui-monospace,monospace;font-size:10px;color:var(--tx-3)}
+  .card .pri{margin-left:auto;font-size:9.5px;font-weight:600}
+  .card .tt{margin-top:5px;font-size:12px;line-height:1.45;color:var(--tx-1);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+  .card .tag{font-size:9.5px;border-radius:5px;padding:1px 6px;background:var(--surface-3);color:var(--tx-2)}
+  .card .r3{display:flex;align-items:center;gap:6px;margin-top:7px}
+  .card .due{font-size:10px;color:var(--tx-3)}
+  .card .due.over{color:var(--red);font-weight:500}
+  .card .doc{margin-left:auto;color:var(--tx-4);display:flex;align-items:center;gap:2px;font-size:9.5px}
+  .emptycol{border:1.5px dashed var(--border);border-radius:10px;margin:2px 8px 10px;padding:22px 0;text-align:center;color:var(--tx-4)}
+  .emptycol p{font-size:10.5px;margin-top:6px}
+  /* 列表 */
+  .lt{background:var(--surface);border:1px solid var(--border);border-radius:12px;margin:4px 20px 16px;overflow:hidden}
+  .lt-head{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:10.5px;color:var(--tx-3)}
+  .lt-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--surface-2);font-size:12px;color:var(--tx-2);cursor:pointer}
+  .lt-row:hover{background:var(--surface-2)}
+  .lt-row:last-child{border-bottom:0}
+  .lt-row .no{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--tx-3);width:56px;flex-shrink:0}
+  .lt-row .ti{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx-1)}
+  .tchip{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:1px 6px;font-size:9.5px;font-weight:500}
+  /* 设置 */
+  .set{padding:16px 20px;max-width:760px}
+  .set .sec{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+  .set .st{font-size:12.5px;font-weight:600;margin-bottom:10px}
+  .set input{width:100%;max-width:420px;height:32px;border:1px solid var(--border);border-radius:8px;padding:0 10px;font-size:12px;background:var(--surface-2);color:var(--tx-1)}
+  .set textarea{width:100%;max-width:420px;min-height:60px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;background:var(--surface-2);color:var(--tx-1);margin-top:8px}
+  .tyrow{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--surface-2);font-size:12px}
+  .tyrow:last-child{border-bottom:0}
+  .tyrow .dot{width:10px;height:10px;border-radius:3px}
+  .tyrow .k{font-family:ui-monospace,monospace;font-size:10px;color:var(--tx-4)}
+  .pal{display:flex;gap:4px}
+  .pal i{width:14px;height:14px;border-radius:50%;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>PM 插件 · 项目内模块 Tab 分离（v1）</h1>
+  <div class="sub">
+    你的要求：<b>统计/项目/进度/任务不再挤一屏</b>——主区顶部加<b>模块 Tab 栏</b>，点哪个切哪个视图。<br>
+    本原型 Tab = <b>概览 / 需求 / 任务 / 缺陷 / 设置</b>（工作项 Tab 按 typeConfig 动态生成、带计数；每类内部保留 看板/列表 切换）。Rail 与侧栏沿用已确认形态。
+  </div>
+
+  <div class="app-scroll"><div class="app">
+    <!-- Rail：宿主固定（不改动） -->
+    <div class="rail">
+      <div class="logo">B</div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.6l1-5.8L3.5 9.7l5.9-.9z"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V5.2A1.2 1.2 0 0110.7 4h2.6a1.2 1.2 0 011.2 1.2V7"/><path d="M6.5 7l.9 12.1A1.5 1.5 0 008.9 20.5h6.2a1.5 1.5 0 001.5-1.4L17.5 7"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M3 7.5A2 2 0 015 5.5h3.5l2 2H19a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M9 17H7A5 5 0 017 7h2"/><path d="M15 7h2a5 5 0 010 10h-2"/><path d="M8 12h8"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l4-1L20 7l-3-3L5 16z"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><path d="M12 4l1.7 5L19 10.7 13.7 12.4 12 17.5 10.3 12.4 5 10.7 10.3 9z"/></svg></div>
+      <div class="ri"><svg class="i" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="15" rx="2"/><path d="M9 5V3h6v2z"/><path d="M9 13l2 2 4-4"/></svg></div>
+      <div class="badge-pm" title="项目管理插件">管</div>
+      <div class="ri" style="margin-top:4px"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3"/><circle cx="15" cy="8" r="2"/><path d="M4 16h3M11 16h9"/><circle cx="9" cy="16" r="2"/></svg></div>
+    </div>
+
+    <!-- 侧栏：项目面板（沿用已确认形态，简化示意） -->
+    <div class="side">
+      <div class="side-top">
+        <span class="t">项目管理</span>
+        <span class="cnt">2 项目 · 6 工单</span>
+      </div>
+      <div class="side-scroll">
+        <div class="proj-row on">
+          <span class="dot" style="background:var(--blue)"></span>
+          <span class="nm">B端康复训练APP</span>
+          <span class="badge">4</span>
+        </div>
+        <div class="sec-label">工单 · 按状态</div>
+        <div class="grp on"><span class="gi" style="background:#FEF3C7;color:var(--amber)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span><span class="gl">待处理</span><span class="gc">2</span></div>
+        <div class="grp"><span class="gi" style="background:#DBEAFE;color:var(--blue)"><svg class="i sm" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></span><span class="gl">进行中</span><span class="gc">2</span></div>
+        <div class="grp"><span class="gi" style="background:#EDE9FE;color:var(--violet)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span><span class="gl">待验证</span><span class="gc">0</span></div>
+        <div class="grp"><span class="gi" style="background:#D1FAE5;color:var(--emerald)"><svg class="i sm" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="gl">已完成</span><span class="gc">2</span></div>
+      </div>
+      <div class="side-foot">
+        <button class="foot-btn primary"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> 新建工作项</button>
+        <button class="foot-btn"><svg class="i sm" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16"/></svg> 在主区打开看板</button>
+        <button class="foot-btn"><svg class="i sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 4v16"/></svg> 新建项目</button>
+      </div>
+    </div>
+
+    <!-- 主区：身份行 + 模块 Tab + 视图 -->
+    <div class="main">
+      <div class="head">
+        <div class="head-id">
+          <span class="cube">B</span>
+          <span class="pn">B端康复训练APP</span>
+          <span class="pk">KFX</span>
+          <span class="desc">康复训练客户端 · 2026 Q4</span>
+          <span class="sp"></span>
+          <button class="btn icon" title="项目设置" onclick="switchTab('settings')"><svg class="i sm" viewBox="0 0 24 24"><path d="M4 8h9M17 8h3"/><circle cx="15" cy="8" r="2"/><path d="M4 16h3M11 16h9"/><circle cx="9" cy="16" r="2"/></svg></button>
+          <button class="btn primary"><svg class="i sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> 新建工作项</button>
+        </div>
+        <div class="tabs" id="tabs">
+          <div class="tab on" data-v="overview" onclick="switchTab('overview')">概览</div>
+          <div class="tab" data-v="requirement" onclick="switchTab('requirement')">需求 <span class="tc">2</span></div>
+          <div class="tab" data-v="task" onclick="switchTab('task')">任务 <span class="tc">3</span></div>
+          <div class="tab" data-v="bug" onclick="switchTab('bug')">缺陷 <span class="tc">1</span></div>
+          <div class="tsep"></div>
+          <div class="tab" data-v="settings" onclick="switchTab('settings')">设置</div>
+        </div>
+      </div>
+
+      <div class="view" id="view">
+        <!-- 概览 -->
+        <div class="ov" id="v-overview">
+          <div class="ov-cards">
+            <div class="ov-card"><div class="lab"><i style="width:8px;height:8px;border-radius:50%;background:var(--amber);display:inline-block"></i>待处理</div><div class="num">2</div><div class="hint">其中 1 个今日到期</div></div>
+            <div class="ov-card"><div class="lab"><i style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block"></i>进行中</div><div class="num">2</div><div class="hint">较上周 +1</div></div>
+            <div class="ov-card"><div class="lab"><i style="width:8px;height:8px;border-radius:50%;background:var(--violet);display:inline-block"></i>待验证</div><div class="num">0</div><div class="hint">—</div></div>
+            <div class="ov-card"><div class="lab"><i style="width:8px;height:8px;border-radius:50%;background:var(--emerald);display:inline-block"></i>已完成</div><div class="num">2</div><div class="hint">完成率 33%</div></div>
+          </div>
+          <div class="ov-sec">
+            <div class="st">整体进度（按状态）</div>
+            <div class="ov-prog">
+              <div class="ov-bar">
+                <i style="width:33%;background:var(--amber)"></i>
+                <i style="width:33%;background:var(--blue)"></i>
+                <i style="width:0%;background:var(--violet)"></i>
+                <i style="width:34%;background:var(--emerald)"></i>
+              </div>
+              <div class="ov-legend">
+                <span><i style="background:var(--amber)"></i>待处理 2</span>
+                <span><i style="background:var(--blue)"></i>进行中 2</span>
+                <span><i style="background:var(--violet)"></i>待验证 0</span>
+                <span><i style="background:var(--emerald)"></i>已完成 2</span>
+                <span><i style="background:var(--red)"></i>逾期 1</span>
+              </div>
+            </div>
+          </div>
+          <div class="ov-sec">
+            <div class="st">最近动态</div>
+            <div class="ov-act">
+              <div class="ov-row"><span style="color:var(--blue);font-weight:600">KFX-16</span> 创建需求「训练数据看板：按日/按动作汇总完成度」<span class="tm">今天 10:24</span></div>
+              <div class="ov-row"><span style="color:var(--emerald);font-weight:600">KFX-13</span> 状态：待处理 → 进行中<span class="tm">今天 09:58</span></div>
+              <div class="ov-row"><span style="color:var(--violet);font-weight:600">KFX-12</span> 截止日期：10月26日 → 10月21日<span class="tm">昨天 18:40</span></div>
+              <div class="ov-row"><span style="color:var(--emerald);font-weight:600">KFX-08</span> 解除文档关联「缺陷复盘.md」<span class="tm">昨天 15:12</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 需求 -->
+        <div id="v-requirement" hidden>
+          <div class="bd-head">
+            <div class="search"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="搜索需求…"></div>
+            <span class="fchip"><span class="lab">标签</span> 全部</span>
+            <span class="fchip"><span class="lab">优先级</span> 全部</span>
+            <div class="seg"><span class="s on">看板</span><span class="s">列表</span></div>
+          </div>
+          <div class="board">
+            <div class="col"><div class="band" style="background:var(--amber)"></div>
+              <div class="col-head"><span class="ci" style="background:#FEF3C7;color:var(--amber)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span><span class="cl">待处理</span><span class="cc">1</span></div>
+              <div class="col-body">
+                <div class="card"><span class="typebar" style="background:var(--blue)"></span>
+                  <div class="r1"><span class="no">KFX-12</span><span class="pri" style="color:var(--red)">紧急</span></div>
+                  <div class="tt">校准-手部APP范式校准-校准后设备会断开</div>
+                  <div class="tags"><span class="tag">硬件</span></div>
+                  <div class="r3"><span class="due over">今日到期</span><span class="doc">文档 1</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--blue)"></div>
+              <div class="col-head"><span class="ci" style="background:#DBEAFE;color:var(--blue)"><svg class="i sm" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></span><span class="cl">进行中</span><span class="cc">1</span></div>
+              <div class="col-body">
+                <div class="card"><span class="typebar" style="background:var(--blue)"></span>
+                  <div class="r1"><span class="no">KFX-16</span><span class="pri" style="color:var(--tx-3)">中</span></div>
+                  <div class="tt">训练数据看板：按日/按动作汇总完成度</div>
+                  <div class="tags"><span class="tag">看板</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--violet)"></div>
+              <div class="col-head"><span class="ci" style="background:#EDE9FE;color:var(--violet)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span><span class="cl">待验证</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--emerald)"></div>
+              <div class="col-head"><span class="ci" style="background:#D1FAE5;color:var(--emerald)"><svg class="i sm" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="cl">已完成</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 任务 -->
+        <div id="v-task" hidden>
+          <div class="bd-head">
+            <div class="search"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="搜索任务…"></div>
+            <span class="fchip"><span class="lab">标签</span> 全部</span>
+            <div class="seg"><span class="s on">看板</span><span class="s">列表</span></div>
+          </div>
+          <div class="board">
+            <div class="col"><div class="band" style="background:var(--amber)"></div>
+              <div class="col-head"><span class="ci" style="background:#FEF3C7;color:var(--amber)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span><span class="cl">待处理</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--blue)"></div>
+              <div class="col-head"><span class="ci" style="background:#DBEAFE;color:var(--blue)"><svg class="i sm" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></span><span class="cl">进行中</span><span class="cc">1</span></div>
+              <div class="col-body">
+                <div class="card"><span class="typebar" style="background:var(--emerald)"></span>
+                  <div class="r1"><span class="no">KFX-13</span><span class="pri" style="color:var(--amber)">高</span></div>
+                  <div class="tt">主动训练模式-正常结束-训练结束和训练回到首页设备断开</div>
+                  <div class="tags"><span class="tag">算法</span><span class="tag">训练流程</span></div>
+                  <div class="r3"><span class="due">10月28日到期</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--violet)"></div>
+              <div class="col-head"><span class="ci" style="background:#EDE9FE;color:var(--violet)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span><span class="cl">待验证</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--emerald)"></div>
+              <div class="col-head"><span class="ci" style="background:#D1FAE5;color:var(--emerald)"><svg class="i sm" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="cl">已完成</span><span class="cc">1</span></div>
+              <div class="col-body">
+                <div class="card" style="opacity:.78"><span class="typebar" style="background:var(--emerald)"></span>
+                  <div class="r1"><span class="no">KFX-15</span><span class="pri" style="color:var(--tx-3)">中</span></div>
+                  <div class="tt" style="text-decoration:line-through;color:var(--tx-3)">训练报告导出为 PDF（含曲线图）</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 缺陷 -->
+        <div id="v-bug" hidden>
+          <div class="bd-head">
+            <div class="search"><svg class="i sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input placeholder="搜索缺陷…"></div>
+            <div class="seg"><span class="s on">看板</span><span class="s">列表</span></div>
+          </div>
+          <div class="board">
+            <div class="col"><div class="band" style="background:var(--amber)"></div>
+              <div class="col-head"><span class="ci" style="background:#FEF3C7;color:var(--amber)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></span><span class="cl">待处理</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--blue)"></div>
+              <div class="col-head"><span class="ci" style="background:#DBEAFE;color:var(--blue)"><svg class="i sm" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg></span><span class="cl">进行中</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--violet)"></div>
+              <div class="col-head"><span class="ci" style="background:#EDE9FE;color:var(--violet)"><svg class="i sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span><span class="cl">待验证</span><span class="cc">1</span></div>
+              <div class="col-body">
+                <div class="card"><span class="typebar" style="background:var(--red)"></span>
+                  <div class="r1"><span class="no">KFX-14</span><span class="pri" style="color:var(--red)">紧急</span></div>
+                  <div class="tt">训练结束回到首页设备断开</div>
+                  <div class="tags"><span class="tag">硬件</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="col"><div class="band" style="background:var(--emerald)"></div>
+              <div class="col-head"><span class="ci" style="background:#D1FAE5;color:var(--emerald)"><svg class="i sm" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="cl">已完成</span><span class="cc">0</span></div>
+              <div class="emptycol"><p>拖拽工单到这里</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 列表（示意：全部工单表格） -->
+        <div id="v-list" hidden>
+          <div class="lt">
+            <div class="lt-head"><span>编号</span><span style="flex:1">标题</span><span style="width:52px">类型</span><span style="width:44px">优先级</span><span style="width:52px">状态</span><span style="width:88px">截止</span></div>
+            <div class="lt-row"><span class="no">KFX-12</span><span class="ti">校准-手部APP范式校准-校准后设备会断开</span><span class="tchip" style="color:var(--blue);background:var(--accent-soft)">需求</span><span style="width:44px;color:var(--red)">紧急</span><span style="width:52px">待处理</span><span style="width:88px;color:var(--red)">10月21日</span></div>
+            <div class="lt-row"><span class="no">KFX-16</span><span class="ti">训练数据看板：按日/按动作汇总完成度</span><span class="tchip" style="color:var(--blue);background:var(--accent-soft)">需求</span><span style="width:44px">中</span><span style="width:52px">进行中</span><span style="width:88px">—</span></div>
+            <div class="lt-row"><span class="no">KFX-13</span><span class="ti">主动训练模式-正常结束-训练结束和训练回到首页设备断开</span><span class="tchip" style="color:var(--emerald);background:#D1FAE5">任务</span><span style="width:44px;color:var(--amber)">高</span><span style="width:52px">进行中</span><span style="width:88px">10月28日</span></div>
+            <div class="lt-row"><span class="no">KFX-15</span><span class="ti">训练报告导出为 PDF（含曲线图）</span><span class="tchip" style="color:var(--emerald);background:#D1FAE5">任务</span><span style="width:44px">中</span><span style="width:52px">已完成</span><span style="width:88px">—</span></div>
+            <div class="lt-row"><span class="no">KFX-14</span><span class="ti">训练结束回到首页设备断开</span><span class="tchip" style="color:var(--red);background:#FEE2E2">缺陷</span><span style="width:44px;color:var(--red)">紧急</span><span style="width:52px">待验证</span><span style="width:88px">—</span></div>
+            <div class="lt-row"><span class="no">KFX-08</span><span class="ti">康复训练APP-登录页头像裁切偏移</span><span class="tchip" style="color:var(--red);background:#FEE2E2">缺陷</span><span style="width:44px">低</span><span style="width:52px">已完成</span><span style="width:88px">—</span></div>
+          </div>
+        </div>
+
+        <!-- 设置 -->
+        <div id="v-settings" hidden>
+          <div class="set">
+            <div class="sec">
+              <div class="st">基本信息</div>
+              <input value="B端康复训练APP" readonly>
+              <textarea readonly>康复训练客户端 · 2026 Q4</textarea>
+              <p style="font-size:10.5px;color:var(--tx-4);margin-top:6px">编辑入口 = 身份行右侧齿轮（沿用现状）</p>
+            </div>
+            <div class="sec">
+              <div class="st">工单类型（typeConfig，动态生成模块 Tab）</div>
+              <div class="tyrow"><span class="dot" style="background:var(--blue)"></span>需求<span class="k">requirement</span><span style="flex:1"></span><span class="pal"><i style="background:var(--blue)"></i></span></div>
+              <div class="tyrow"><span class="dot" style="background:var(--emerald)"></span>任务<span class="k">task</span><span style="flex:1"></span><span class="pal"><i style="background:var(--emerald)"></i></span></div>
+              <div class="tyrow"><span class="dot" style="background:var(--red)"></span>缺陷<span class="k">bug</span><span style="flex:1"></span><span class="pal"><i style="background:var(--red)"></i></span></div>
+              <p style="font-size:10.5px;color:var(--tx-4);margin-top:8px">在此增删类型 → 模块 Tab 与计数实时跟随（M3 B5 已实现的能力，本页为展示位）</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="tips">
+    <b>可交互：</b>点顶部 <b>概览 / 需求 / 任务 / 缺陷 / 设置</b> Tab 切换视图 · 每个 Tab 只呈现该模块的内容 · 需求/任务/缺陷 Tab 内保留 看板/列表 切换与筛选。
+  </div>
+
+  <div class="cap">
+    <div class="c"><h3>分离逻辑（你说的意思，请确认）</h3>
+      <ul>
+        <li>概览 = 纯数据：状态统计卡 + 整体进度条 + <b>最近动态</b>（活动流聚合）</li>
+        <li>需求 / 任务 / 缺陷 = <b>按 typeConfig 动态生成</b>的模块 Tab，各自独立看板（默认）+ 列表切换</li>
+        <li>设置 = 基本信息 + 工单类型管理</li>
+        <li>统计胶囊、筛选框不再常驻看板上方——各回各家</li>
+      </ul>
+    </div>
+    <div class="c"><h3>与 PingCode 的映射</h3>
+      <ul>
+        <li>PingCode 项目内导航：需求 / 迭代 / 任务 / 缺陷 / 设置（带计数）</li>
+        <li>我们的 Tab：<b>概览 / [类型…] / 设置</b>——类型来自项目 typeConfig，增删类型 Tab 实时跟随</li>
+        <li>迭代/里程碑（E1）未来作为新 Tab 插入「概览」与「设置」之间</li>
+      </ul>
+    </div>
+    <div class="c"><h3>备选方案（如果你要的是另一个形状）</h3>
+      <ul>
+        <li>方案 B：固定四页 <b>概览 / 看板 / 列表 / 设置</b>（不按类型拆 Tab，类型做看板内分组）</li>
+        <li>方案 C：Tab 只分 <b>工作项 / 设置</b>，类型筛选保留在看板内</li>
+      </ul>
+      <p>选 A / B / C，或者说你的分法。</p>
+    </div>
+    <div class="c"><h3>落地范围</h3>
+      <ul>
+        <li>PmCenter 主区改造：身份行保留 + 新增 Tab 栏 + 四类视图容器（Rail/侧栏零改动）</li>
+        <li>概览页新增内容：整体进度条 + 最近动态（活动流聚合接口，M3 已有 logs 数据）</li>
+        <li>类型 Tab = typeConfig.map + 按 type 过滤的看板/列表</li>
+      </ul>
+      <p style="margin-top:6px"><span class="ok">确认 Tab 方案后我按此实现。</span></p>
+    </div>
+  </div>
+</div>
+</body>
+<script>
+  function switchTab(view) {
+    document.querySelectorAll("#tabs .tab").forEach((t) => t.classList.toggle("on", t.dataset.v === view));
+    ["overview", "requirement", "task", "bug", "settings", "list"].forEach((v) => {
+      const el = document.getElementById("v-" + v);
+      if (el) el.hidden = v !== view;
+    });
+  }
+</script>
+</html>

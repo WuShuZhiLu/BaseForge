@@ -18,6 +18,7 @@ import DiaryCenter from "@/components/DiaryCenter";
 import SheetEditor from "@/components/SheetEditor";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
+import PmCenter from "@/components/PmCenter";
 import TrashPage from "@/features/trash/TrashPage";
 import WorkspaceIssues from "@/components/issues/WorkspaceIssues";
 import NotificationCenter from "@/components/issues/NotificationCenter";
@@ -502,6 +503,7 @@ function AppLayout() {
   const isDiaryView = state.viewMode === "diary";
   const isFilesView = state.viewMode === "files";
   const isSharesView = state.viewMode === "shares";
+  const isPmView = state.viewMode === "projects";
   const editorFocusLayout = resolveEditorFocusLayout({
     editorFullscreen: state.editorFullscreen,
     railVisible,
@@ -959,6 +961,11 @@ function AppLayout() {
         <div className="flex-1 flex min-w-0 flex-col">
           <MobileTopBar />
           <ShareManagementPage />
+        </div>
+      ) : isPmView ? (
+        <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <MobileTopBar />
+          <PmCenter />
         </div>
       ) : (
         <div

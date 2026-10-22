@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
+  ClipboardList,
   FolderOpen,
   Layers,
   Link2,
@@ -40,7 +41,7 @@ import SettingsModal from "@/components/SettingsModal";
 
 type NavItemMode = Extract<
   ViewMode,
-  "notebook" | "favorites" | "trash" | "files" | "tasks" | "diary" | "ai-chat" | "shares"
+  "notebook" | "favorites" | "trash" | "files" | "tasks" | "diary" | "ai-chat" | "shares" | "projects"
 > | "plugins";
 
 interface NavItem {
@@ -101,6 +102,14 @@ const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFe
     titleDefault: "AI 问答",
     icon: (sz: number) => <Sparkles size={sz} strokeWidth={2} />,
     pluginId: "ai",
+    workspaceFeature: "notes",
+  },
+  {
+    mode: "projects",
+    titleKey: "sidebarNext.nav.projects",
+    titleDefault: "项目管理",
+    icon: (sz: number) => <ClipboardList size={sz} strokeWidth={2} />,
+    pluginId: "pm",
     workspaceFeature: "notes",
   },
 ];
@@ -228,7 +237,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
   const activeMode: NavItemMode | null = useMemo(() => {
     // activeView 是侧栏视图 id（kb），item.mode 是 ViewMode 语义（notebook）
     const mapped = activeView === "kb" ? "notebook" : activeView;
-    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "diary" || mapped === "ai-chat" || mapped === "shares" || mapped === "plugins") {
+    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "diary" || mapped === "ai-chat" || mapped === "shares" || mapped === "projects" || mapped === "plugins") {
       return mapped as NavItemMode;
     }
     return null;
@@ -285,7 +294,10 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
   const navigate = useCallback(
     (mode: NavItemMode) => {
       // 插件贡献的导航项（tasks/diary）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
-      if (mode === "tasks" || mode === "diary" || mode === "ai-chat" || mode === "shares") {
+      if (mode === "tasks" || mode === "diary" || mode === "ai-chat" || mode === "shares" || mode === "projects") {
+        if (mode === "projects") {
+          window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: "projects" } }));
+        }
         actions.setViewMode(mode);
         window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
         return;

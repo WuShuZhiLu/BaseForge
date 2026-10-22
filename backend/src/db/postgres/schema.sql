@@ -1,4 +1,4 @@
-\set ON_ERROR_STOP on
+﻿\set ON_ERROR_STOP on
 
 -- Existing PostgreSQL pilot databases may already have tasks without completedAt.
 -- Add the column before replaying the idempotent baseline, otherwise the index in
@@ -233,3 +233,85 @@ CREATE TABLE IF NOT EXISTS version_gc_queue (
   "freedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_version_gc_queue_freed ON version_gc_queue("freedAt");
+
+-- ============================================================
+-- 项目管理插件 (v126 / pm-projects-work-items) —— 幂等块
+-- ============================================================
+CREATE TABLE IF NOT EXISTS pm_projects (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  color TEXT,
+  "workspaceId" TEXT,
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pm_projects_user ON pm_projects("userId");
+ALTER TABLE pm_projects ADD COLUMN IF NOT EXISTS "typeConfig" TEXT;
+
+CREATE TABLE IF NOT EXISTS pm_work_items (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "projectId" TEXT NOT NULL REFERENCES pm_projects(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'task',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'todo',
+  priority TEXT NOT NULL DEFAULT 'medium',
+  "dueDate" TEXT,
+  "notebookId" TEXT,
+  "noteId" TEXT,
+  "gitRepo" TEXT,
+  "gitBranch" TEXT,
+  "gitIssue" TEXT,
+  "gitSourceId" TEXT,
+  "gitIssueState" TEXT,
+  "gitIssueUrl" TEXT,
+  "itemNo" INTEGER,
+  tags TEXT NOT NULL DEFAULT '[]',
+  "sortOrder" INTEGER NOT NULL DEFAULT 0,
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pm_work_items_project
+  ON pm_work_items("projectId", status, "sortOrder");
+CREATE INDEX IF NOT EXISTS idx_pm_work_items_note ON pm_work_items("noteId");
+ALTER TABLE pm_work_items ADD COLUMN IF NOT EXISTS "itemNo" INTEGER;
+CREATE INDEX IF NOT EXISTS idx_pm_work_items_no ON pm_work_items("projectId", "itemNo");
+
+-- 项目管理插件 (v129 / pm-m3-model-deepening) —— 幂等块
+-- ============================================================
+ALTER TABLE pm_work_items ADD COLUMN IF NOT EXISTS "parentId" TEXT REFERENCES pm_work_items(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_pm_work_items_parent ON pm_work_items("projectId", "parentId");
+
+CREATE TABLE IF NOT EXISTS pm_work_item_logs (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "itemId" TEXT NOT NULL REFERENCES pm_work_items(id) ON DELETE CASCADE,
+  "projectId" TEXT NOT NULL,
+  field TEXT NOT NULL,
+  oldValue TEXT,
+  newValue TEXT,
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pm_logs_item ON pm_work_item_logs("itemId", "createdAt" DESC);
+CREATE INDEX IF NOT EXISTS idx_pm_logs_project ON pm_work_item_logs("projectId", "createdAt" DESC);
+
+CREATE TABLE IF NOT EXISTS pm_item_notes (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT NOT NULL,
+  "itemId" TEXT NOT NULL REFERENCES pm_work_items(id) ON DELETE CASCADE,
+  "noteId" TEXT NOT NULL,
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE("itemId", "noteId")
+);
+CREATE INDEX IF NOT EXISTS idx_pm_item_notes_note ON pm_item_notes("noteId");
+
+INSERT INTO pm_item_notes (id, "userId", "itemId", "noteId", "createdAt")
+SELECT 'm3-' || w.id, w."userId", w.id, w."noteId", w."updatedAt"
+FROM pm_work_items w
+WHERE w."noteId" IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM pm_item_notes n WHERE n."itemId" = w.id AND n."noteId" = w."noteId"
+  );

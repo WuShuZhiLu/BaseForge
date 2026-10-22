@@ -8,11 +8,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import { ListTodo, Plus, RefreshCw } from "lucide-react";
 
 import { api } from "@/lib/api";
+import type { PmProject, PmWorkItem } from "@/types";
 import { getTaskInbox } from "@/lib/taskInboxApi";
 import type { Task } from "@/types";
 import { cn } from "@/lib/utils";
 
-type OpenMainView = (viewMode: "tasks" | "diary") => void;
+type OpenMainView = (viewMode: "tasks" | "diary" | "projects") => void;
 
 interface MiniPanelShellProps {
   title: string;
@@ -45,6 +46,61 @@ function MiniPanelShell({ title, onOpenMain, onRefresh, children }: MiniPanelShe
 
 function EmptyHint({ text }: { text: string }) {
   return <p className="sbx-view-empty">{text}</p>;
+}
+
+/** ============ 项目管理迷你面板 ============ */
+export function PmMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+  const [projects, setProjects] = useState<PmProject[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    api.listPmProjects()
+      .then(async (r) => {
+        setProjects(r.projects);
+        const entries = await Promise.all(
+          r.projects.map(async (p) => {
+            try {
+              const res = await api.listPmWorkItems(p.id);
+              return [p.id, res.items.filter((i) => i.status !== "done" && i.status !== "canceled").length] as const;
+            } catch {
+              return [p.id, 0] as const;
+            }
+          }),
+        );
+        setCounts(Object.fromEntries(entries));
+      })
+      .catch(() => setProjects([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  return (
+    <MiniPanelShell title="项目管理" onOpenMain={() => onOpenMain("projects")} onRefresh={reload}>
+      {loading ? (
+        <EmptyHint text="加载中…" />
+      ) : projects.length === 0 ? (
+        <EmptyHint text="还没有项目，在主区新建" />
+      ) : (
+        <div className="px-2 pb-2 space-y-1">
+          {projects.slice(0, 8).map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onOpenMain("projects")}
+              className="sbx-row w-full text-left flex items-center gap-2"
+            >
+              <ListTodo size={11} className="shrink-0 text-accent-primary" />
+              <span className="min-w-0 flex-1 truncate text-[11px]">{p.name}</span>
+              <span className="text-[10px] text-zinc-400">{counts[p.id] ?? 0} 未完成</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </MiniPanelShell>
+  );
 }
 
 /** ============ 待办迷你面板 ============ */

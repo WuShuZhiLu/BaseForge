@@ -260,7 +260,137 @@ export interface SearchResult {
   matchedField?: string;
 }
 
-export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues";
+export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues" | "projects";
+
+// ========== 远程文件管理插件（remote-files） ==========
+/** 已配置的远程源（凭据掩码，密码/token 不下发） */
+export interface RemoteSourcePublic {
+  id: string;
+  type: "webdav" | "baidu" | "smb";
+  name: string;
+  baseUrl: string;
+  username: string;
+  rootPath: string;
+  /** SMB：域/工作组（可选） */
+  domain?: string;
+  /** 百度 OAuth：API Key（可选） */
+  clientId?: string;
+  /** 百度 OAuth：已配置 refresh_token（可自动续期） */
+  hasOAuth?: boolean;
+  hasPassword: boolean;
+  createdAt: string;
+}
+
+// ========== 项目管理插件（pm） ==========
+export interface PmItemTypeConfig {
+  key: string;
+  label: string;
+  color?: string;
+}
+
+export const DEFAULT_PM_TYPE_CONFIG: PmItemTypeConfig[] = [
+  { key: "requirement", label: "需求", color: "#0ea5e9" },
+  { key: "task", label: "任务", color: "#10b981" },
+  { key: "bug", label: "缺陷", color: "#ef4444" },
+];
+
+export interface PmProject {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  color: string | null;
+  workspaceId: string | null;
+  typeConfig?: PmItemTypeConfig[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// M3：工单类型为项目级自定义（typeConfig JSON 的 key），不再是封闭联合
+export type PmWorkItemType = string;
+export type PmWorkItemStatus = "todo" | "doing" | "review" | "done" | "canceled";
+export type PmWorkItemPriority = "urgent" | "high" | "medium" | "low";
+
+export interface PmWorkItem {
+  id: string;
+  userId: string;
+  projectId: string;
+  type: PmWorkItemType;
+  title: string;
+  description: string;
+  status: PmWorkItemStatus;
+  priority: PmWorkItemPriority;
+  dueDate: string | null;
+  notebookId: string | null;
+  noteId: string | null;
+  gitRepo: string | null;
+  gitBranch: string | null;
+  gitIssue: string | null;
+  gitSourceId: string | null;
+  gitIssueState: string | null;
+  gitIssueUrl: string | null;
+  itemNo: number | null;
+  parentId: string | null;
+  tags: string[];
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 活动流条目（M3 B9）：字段级变更历史 */
+export interface PmWorkItemLog {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+}
+
+/** 工作项多文档关联（M3 C2） */
+export interface PmItemNoteLink {
+  id: string;
+  noteId: string;
+  title: string | null;
+  isTrashed: boolean;
+  createdAt: string;
+}
+
+export type PmGitSourceType = "github" | "gitlab" | "gitea";
+
+export interface PmGitSource {
+  id: string;
+  type: PmGitSourceType;
+  name: string;
+  apiBase: string;
+  createdAt: string;
+}
+
+export interface PmProjectStats {
+  todo: number;
+  doing: number;
+  review: number;
+  done: number;
+  canceled: number;
+}
+
+/** 远程文件 ↔ 本地笔记 的同步链接（baseHash 为上次同步基准） */
+export interface RemoteNoteLink {
+  sourceId: string;
+  remotePath: string;
+  noteId: string;
+  title: string;
+  baseRemoteHash: string;
+  baseNoteHash: string;
+  syncedAt: string;
+}
+
+/** 远程文件条目（path 为源内相对路径，根目录为 ""） */
+export interface RemoteFileEntry {
+  name: string;
+  path: string;
+  isFolder: boolean;
+  size: number;
+  modifiedAt: string | null;
+}
 
 // ========== 远程文件管理插件（remote-files） ==========
 /** 已配置的远程源（凭据掩码，密码/token 不下发） */

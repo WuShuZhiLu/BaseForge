@@ -18,6 +18,7 @@ export { tagsRepository } from "./tagsRepository";
 export { noteTagsRepository } from "./noteTagsRepository";
 export { aiCustomPromptsRepository } from "./aiCustomPromptsRepository";
 export { noteVersionsRepository } from "./noteVersionsRepository";
+export { pmRepository } from "./pmRepository";
 export { favoritesRepository } from "./favoritesRepository";
 export { userSessionsRepository } from "./userSessionsRepository";
 export { taskRemindersRepository } from "./taskRemindersRepository";

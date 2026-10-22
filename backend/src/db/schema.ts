@@ -431,6 +431,59 @@ function initSchema(db: Database.Database) {
     );
     CREATE INDEX IF NOT EXISTS idx_version_gc_queue_freed ON version_gc_queue("freedAt");
 
+    -- 项目管理插件（v126）：项目与工作项
+    CREATE TABLE IF NOT EXISTS pm_projects (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      color TEXT,
+      workspaceId TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_pm_projects_user ON pm_projects(userId);
+
+    CREATE TABLE IF NOT EXISTS pm_projects (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      color TEXT,
+      workspaceId TEXT,
+      typeConfig TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS pm_work_items (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      projectId TEXT NOT NULL REFERENCES pm_projects(id) ON DELETE CASCADE,
+      type TEXT NOT NULL DEFAULT 'task',
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'todo',
+      priority TEXT NOT NULL DEFAULT 'medium',
+      dueDate TEXT,
+      notebookId TEXT,
+      noteId TEXT,
+      gitRepo TEXT,
+      gitBranch TEXT,
+      gitIssue TEXT,
+      gitSourceId TEXT,
+      gitIssueState TEXT,
+      gitIssueUrl TEXT,
+      itemNo INTEGER,
+      tags TEXT NOT NULL DEFAULT '[]',
+      sortOrder INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_pm_work_items_project
+      ON pm_work_items(projectId, status, sortOrder);
+    CREATE INDEX IF NOT EXISTS idx_pm_work_items_note ON pm_work_items(noteId);
+
     -- 评论批注表
     --
     -- userId 的语义（v13 起放松为可空）：

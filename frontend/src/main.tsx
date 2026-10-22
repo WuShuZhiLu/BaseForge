@@ -6,11 +6,25 @@ import "./lib/androidCompat";
 import "./lib/noteTransferRefreshBridge";
 import "./lib/workspaceRefreshBridge";
 import "./i18n";
+
+// dev 诊断：未捕获错误上报到后端（仅开发模式），用于远程定位页面空白类问题
+if (import.meta.env.DEV) {
+  const reportClientError = (source: string, message: string, stack?: string) => {
+    fetch("/api/pm/client-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, message: (message || "unknown").slice(0, 500), stack: (stack || "").slice(0, 3000) }),
+    }).catch(() => {});
+  };
+  window.addEventListener("error", (e) => reportClientError("window.error", e.message ?? "unknown", e.error?.stack));
+  window.addEventListener("unhandledrejection", (e) => reportClientError("unhandledrejection", String((e.reason as any)?.message ?? e.reason ?? "unknown"), (e.reason as any)?.stack));
+}
 // Must run before App and its import/export/editor schemas are evaluated.
 import "./lib/imageNodeTransformBootstrap";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SiteSettingsProvider } from "./hooks/useSiteSettings";
 import { ConfirmProvider } from "./components/ui/confirm";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 import Toaster from "./components/Toaster";
 import NoteIconBridge from "./components/NoteIconBridge";
 import EmbedPasswordBridge from "./components/EmbedPasswordBridge";
@@ -187,9 +201,11 @@ function renderApplication(): void {
             <InlineCommentBridge />
             {/* 语音备忘录制面板：全局单例，监听 "nowen:voice-record" 事件弹出 */}
             <VoiceRecorderSheet />
-            <React.Suspense fallback={<MainRouteFallback />}>
-              <App />
-            </React.Suspense>
+            <AppErrorBoundary>
+              <React.Suspense fallback={<MainRouteFallback />}>
+                <App />
+              </React.Suspense>
+            </AppErrorBoundary>
           </>
         )}
       </ConfirmProvider>

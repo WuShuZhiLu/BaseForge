@@ -12,7 +12,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  CheckCircle2,
   ChevronDown,
+  Circle,
+  ExternalLink,
   FileCode,
   FileText,
   Folder,
@@ -20,9 +23,10 @@ import {
   Link2,
   ListTodo,
   Pin,
+  Play,
   BookOpen,
-  RefreshCw,
   Plus,
+  RefreshCw,
   RotateCcw,
   Search,
   Sparkles,
@@ -42,10 +46,10 @@ import {
   knowledgeTreeApi,
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
-import type { FileItem, NoteListItem, Tag, Workspace } from "@/types";
+import type { FileItem, NoteListItem, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
 import { JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
-import { TasksMiniPanel, DiaryMiniPanel } from "@/plugins/builtin/MiniPanels";
+import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import {
   KNOWLEDGE_TREE_SORT_OPTIONS,
@@ -328,7 +332,7 @@ export default function SidebarNext() {
 
   // ===== 侧栏活动栏视图（FR-IA-02）：kb / star / trash / files / plugins =====
   // Rail 点击经 nowen:sidebar-view 事件切换；主区视图不变（语雀式）
-  type SidebarView = "kb" | "star" | "trash" | "files" | "plugins";
+  type SidebarView = "kb" | "star" | "trash" | "files" | "plugins" | "projects";
   const [sidebarView, setSidebarView] = useState<SidebarView>("kb");
 
   // 收藏 / 回收站 / 文件管理数据
@@ -374,7 +378,7 @@ export default function SidebarNext() {
       }
       // 切到其他视图（收藏/回收站/文件管理/知识库等）时关闭插件迷你面板
       setOpenPluginPanel(null);
-      if (view && ["kb", "star", "trash", "files", "plugins"].includes(view)) {
+      if (view && ["kb", "star", "trash", "files", "projects", "plugins"].includes(view)) {
         setSidebarView(view as SidebarView);
         if (view === "star") {
           api.getNotes({ isFavorite: "1" }).then((items) => setStarDocs(items)).catch(() => setStarDocs([]));
@@ -393,6 +397,14 @@ export default function SidebarNext() {
     window.addEventListener("nowen:sidebar-view", onSwitch);
     return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
   }, []);
+
+  // PM 主区激活时，侧栏跟随切到项目面板（URL 直达/刷新恢复不走 Rail 点击，需主动跟随）
+  useEffect(() => {
+    if (state.viewMode === "projects" && sidebarView !== "projects") {
+      setOpenPluginPanel(null);
+      setSidebarView("projects");
+    }
+  }, [state.viewMode, sidebarView]);
 
   useEffect(() => {
     const onChanged = () => setBuiltinDisabled(getDisabledBuiltinPlugins());
@@ -1933,6 +1945,7 @@ export default function SidebarNext() {
                   </div>
                   {def.id === "tasks" && <TasksMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
                   {def.id === "diary" && <DiaryMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
+                  {def.id === "pm" && <PmMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
                   {def.id === "ai" && (
                     <p className="sbx-view-empty">{def.sidebarPanel.title}面板（后续批次）</p>
                   )}
@@ -2076,6 +2089,9 @@ export default function SidebarNext() {
             </div>
           </div>
         )}
+
+        {/* ===== 项目管理视图 ===== */}
+        {sidebarView === "projects" && <ProjectsSidePanel onOpenMain={() => actions.setViewMode("projects")} />}
 
         {/* ===== 文件管理视图 ===== */}
         {sidebarView === "files" && (
@@ -2421,4 +2437,235 @@ export function isNextSidebarEnabled(): boolean {
   } catch {
     return false;
   }
+}
+
+
+/** 项目管理侧栏面板（官方插件 pm · 视觉重设计）：项目选择 + 状态分组导航 + 工单速览快改 */
+function ProjectsSidePanel(props: { onOpenMain: () => void }) {
+  const { onOpenMain } = props;
+  const [projects, setProjects] = useState<PmProject[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [items, setItems] = useState<PmWorkItem[]>([]);
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState<Set<PmWorkItemStatus>>(() => new Set(["done"]));
+
+  const loadCounts = useCallback(async (list: PmProject[]) => {
+    const entries = await Promise.all(
+      list.map((p) =>
+        api
+          .listPmWorkItems(p.id)
+          .then((r) => [p.id, r.items.filter((i) => i.status !== "done" && i.status !== "canceled").length] as const)
+          .catch(() => [p.id, 0] as const),
+      ),
+    );
+    setCounts(Object.fromEntries(entries));
+  }, []);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.listPmProjects();
+      setProjects(res.projects);
+      setActiveId((prev) => (prev && res.projects.some((p) => p.id === prev) ? prev : res.projects[0]?.id || ""));
+      void loadCounts(res.projects);
+    } catch {
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [loadCounts]);
+
+  useEffect(() => { void reload(); }, [reload]);
+
+  const loadItems = useCallback(async (projectId: string) => {
+    if (!projectId) { setItems([]); return; }
+    try {
+      const res = await api.listPmWorkItems(projectId);
+      setItems(res.items);
+    } catch {
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => { void loadItems(activeId); }, [activeId, loadItems]);
+
+  const quickStatus = useCallback(
+    async (id: string, status: PmWorkItemStatus) => {
+      await api.updatePmWorkItem(id, { status });
+      await loadItems(activeId);
+      void loadCounts(projects);
+    },
+    [activeId, loadItems, loadCounts, projects],
+  );
+
+  const activeProject = projects.find((p) => p.id === activeId) || null;
+  const byStatus = (st: PmWorkItemStatus) => items.filter((i) => i.status === st);
+  const isOverdue = (item: PmWorkItem) =>
+    !!item.dueDate && new Date(item.dueDate) < new Date(new Date().toDateString()) && item.status !== "done" && item.status !== "canceled";
+
+  const GROUPS: Array<{ key: PmWorkItemStatus; label: string; tint: string; color: string }> = [
+    { key: "todo", label: "待处理", tint: "#FEF3C7", color: "#F59E0B" },
+    { key: "doing", label: "进行中", tint: "#DBEAFE", color: "#2563EB" },
+    { key: "review", label: "待验证", tint: "#EDE9FE", color: "#8B5CF6" },
+    { key: "done", label: "已完成", tint: "#D1FAE5", color: "#10B981" },
+  ];
+  const GROUP_ICONS: Partial<Record<PmWorkItemStatus, React.ReactNode>> = {
+    todo: <Circle size={12} />,
+    doing: <Play size={12} />,
+    review: <CheckCircle2 size={12} />,
+    done: <Check size={12} />,
+  };
+
+  const toggleGroup = (key: PmWorkItemStatus) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <div className="sbx-view flex min-h-0 flex-col">
+      <div className="sbx-view-head">
+        <span>项目管理</span>
+        <span className="flex-1" />
+        <button type="button" title="刷新" className="sbx-btn" onClick={() => void reload()}>↻</button>
+        <button type="button" title="在主区打开" className="sbx-btn" onClick={onOpenMain}>↗</button>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {loading ? (
+          <p className="sbx-view-empty">加载中…</p>
+        ) : projects.length === 0 ? (
+          <p className="sbx-view-empty">还没有项目，去主区新建</p>
+        ) : (
+          <>
+            {/* 项目选择：色块 + 名称 + 未完成计数 + 选中态 */}
+            <div className="px-2 pt-2">
+              {projects.map((p) => {
+                const on = p.id === activeId;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setActiveId(p.id)}
+                    className={`mb-0.5 flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
+                      on ? "border-accent-primary/40 bg-accent-primary/10" : "border-transparent hover:bg-app-hover"}`}
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ backgroundColor: p.color || "#6b7280" }} />
+                    <span className={`min-w-0 flex-1 truncate text-[12px] ${on ? "font-semibold text-accent-primary" : "text-tx-primary"}`}>{p.name}</span>
+                    <span
+                      className={`shrink-0 rounded-full px-1.5 text-[10px] tabular-nums ${
+                        on ? "bg-white text-accent-primary" : "bg-app-hover text-tx-tertiary"}`}
+                    >
+                      {counts[p.id] ?? 0}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 状态分组导航：彩色图标底 + 组名 + 计数右对齐；点击折叠/展开 */}
+            {activeProject
+              ? GROUPS.map((group) => {
+                  const list = byStatus(group.key);
+                  const isCollapsed = collapsed.has(group.key);
+                  return (
+                    <div key={group.key} className="mb-0.5">
+                      <button
+                        type="button"
+                        className={`flex w-full items-center gap-2 px-2.5 py-1 text-left ${isCollapsed ? "" : "text-tx-primary"}`}
+                        onClick={() => toggleGroup(group.key)}
+                      >
+                        <span
+                          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md"
+                          style={{ backgroundColor: group.tint, color: group.color }}
+                        >
+                          {GROUP_ICONS[group.key]}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[12px]">{group.label}</span>
+                        <span className={`shrink-0 text-[11px] tabular-nums ${isCollapsed ? "text-tx-tertiary" : "font-semibold text-accent-primary"}`}>{list.length}</span>
+                      </button>
+                      {!isCollapsed ? (
+                        <div className="pb-1">
+                          {list.length === 0 ? (
+                            <p className="px-3 pb-1 pt-0.5 text-[10px] text-zinc-400">空</p>
+                          ) : (
+                            list.map((item) => (
+                              <div key={item.id} className="sbx-row group flex items-center gap-1.5 rounded-md py-1 pl-4 pr-1.5">
+                                <span className="w-[30px] shrink-0 font-mono text-[9.5px] text-zinc-400">#{item.itemNo ?? "—"}</span>
+                                <span
+                                  className={`min-w-0 flex-1 truncate text-[11px] ${item.status === "done" ? "text-zinc-400 line-through" : ""}`}
+                                  title={item.title}
+                                >
+                                  {item.title}
+                                </span>
+                                {isOverdue(item) ? <span className="shrink-0 text-[9.5px] text-red-500">逾期</span> : null}
+                                <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                                  {item.status !== "done" && item.status !== "canceled" ? (
+                                    <button
+                                      type="button"
+                                      title="标记完成"
+                                      className="rounded p-0.5 text-emerald-500 hover:bg-app-hover"
+                                      onClick={() => void quickStatus(item.id, "done")}
+                                    >
+                                      <Check size={11} />
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    title="在主区打开"
+                                    className="rounded p-0.5 text-zinc-400 hover:bg-app-hover"
+                                    onClick={onOpenMain}
+                                  >
+                                    <ExternalLink size={11} />
+                                  </button>
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              : null}
+          </>
+        )}
+      </div>
+
+      {/* 底部动作：新建走主区表单（事件通知），打开看板切换主区 */}
+      <div className="border-t border-app-border px-2 py-1.5">
+        <button
+          type="button"
+          className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] font-medium text-accent-primary hover:bg-app-hover"
+          onClick={() => {
+            onOpenMain();
+            window.dispatchEvent(new CustomEvent("nowen:pm-new-item"));
+          }}
+        >
+          <Plus size={12} /> 新建工作项
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
+          onClick={onOpenMain}
+        >
+          <ListTodo size={12} /> 在主区打开看板
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
+          onClick={() => {
+            onOpenMain();
+            window.dispatchEvent(new CustomEvent("nowen:pm-new-project"));
+          }}
+        >
+          <Plus size={12} /> 新建项目
+        </button>
+      </div>
+    </div>
+  );
 }

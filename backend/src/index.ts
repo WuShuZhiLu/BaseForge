@@ -54,6 +54,9 @@ import clipperLocalRouter from "./routes/clipper-local";
 import aiRouter from "./routes/ai";
 import pluginsRouter from "./routes/plugins";
 import remoteFilesRouter from "./routes/remote-files";
+import pmRouter from "./routes/pm";
+import clientLogRouter from "./routes/client-log";
+import pmGitRouter from "./routes/pm-git";
 import pluginStudioRouter from "./routes/plugin-studio";
 import pluginExecutionsRouter from "./routes/plugin-executions";
 import pluginInboundRouter from "./routes/plugin-inbound";
@@ -439,6 +442,8 @@ function touchSessionLastSeen(sessionId: string) {
   }
 }
 
+app.route("/api/pm", clientLogRouter);
+
 app.use("/api/*", async (c, next) => {
   const authHeader = c.req.header("Authorization");
 
@@ -573,6 +578,8 @@ app.route("/api/local/clipper", clipperLocalRouter);
 app.route("/api/plugins/studio", pluginStudioRouter);
 app.route("/api/plugins", pluginsRouter);
 app.route("/api/remote-files", remoteFilesRouter);
+app.route("/api/pm", pmRouter);
+app.route("/api/pm/git", pmGitRouter);
 app.route("/api/wechat-assistant", wechatAssistantRouter);
 app.route("/api/wechat-capture", wechatCaptureRouter);
 app.route("/api/plugin-executions", pluginExecutionsRouter);

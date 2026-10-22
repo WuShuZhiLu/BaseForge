@@ -9,16 +9,16 @@
  * 与第三方插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条
  * contributions 消费链路（registry → host → 面板），未来可平移为独立插件包。
  */
-export type BuiltinPluginId = "tasks" | "diary" | "ai" | "remote-files";
+export type BuiltinPluginId = "tasks" | "diary" | "ai" | "remote-files" | "pm";
 
 export interface BuiltinPluginDef {
   id: BuiltinPluginId;
   name: string;
   description: string;
   version: string;
-  icon: "tasks" | "diary" | "ai" | "remote-files";
+  icon: "tasks" | "diary" | "ai" | "remote-files" | "pm";
   /** 主区 viewMode（ Rail / 打开主区用） */
-  viewMode: "tasks" | "diary" | "ai-chat" | "remote-files";
+  viewMode: "tasks" | "diary" | "ai-chat" | "remote-files" | "projects";
   /** 主区入口所需的 WorkspaceFeatures 键 */
   workspaceFeature: "tasks" | "diaries" | "notes";
   /** 增强型插件：不占独立导航徽章，嵌入宿主视图（如文件管理的远程文件面板） */
@@ -71,6 +71,16 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
     viewMode: "remote-files",
     workspaceFeature: "notes",
     sidebarPanel: { id: "remote-files-panel", title: "远程文件" },
+  },
+  {
+    id: "pm",
+    name: "项目管理",
+    description: "官方 · 项目/工作项（需求·任务·缺陷）看板，联动笔记与 git",
+    version: "0.1.0",
+    icon: "pm",
+    viewMode: "projects",
+    workspaceFeature: "notes",
+    sidebarPanel: { id: "pm-panel", title: "项目" },
   },
 ];
 

@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -3540,6 +3540,50 @@ export const api = {
   // 百度 OAuth：授权码换令牌（无状态，令牌随源表单保存）
   exchangeBaiduToken: (code: string, clientId: string, clientSecret: string) =>
     request<{ accessToken: string; refreshToken: string; expiresIn: number }>("/remote-files/baidu/exchange", { method: "POST", body: JSON.stringify({ code, clientId, clientSecret }) }),
+  // ===== 项目管理插件（pm） =====
+  listPmProjects: () =>
+    request<{ projects: PmProject[] }>("/pm/projects"),
+  createPmProject: (data: { name: string; description?: string; color?: string }) =>
+    request<{ project: PmProject }>("/pm/projects", { method: "POST", body: JSON.stringify(data) }),
+  updatePmProject: (id: string, data: { name?: string; description?: string; color?: string; typeConfig?: PmItemTypeConfig[] }) =>
+    request<{ project: PmProject }>(`/pm/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePmProject: (id: string) =>
+    request<{ success: boolean; itemsDeleted: number }>(`/pm/projects/${id}`, { method: "DELETE" }),
+  listPmWorkItems: (projectId: string) =>
+    request<{ items: PmWorkItem[]; stats: PmProjectStats }>(`/pm/projects/${projectId}/items`),
+  createPmWorkItem: (projectId: string, data: { type?: string; title: string; description?: string; priority?: string; dueDate?: string | null; parentId?: string | null; tags?: string[] }) =>
+    request<{ item: PmWorkItem }>(`/pm/projects/${projectId}/items`, { method: "POST", body: JSON.stringify(data) }),
+  updatePmWorkItem: (id: string, data: { title?: string; description?: string; status?: string; priority?: string; dueDate?: string | null; noteId?: string | null; gitRepo?: string | null; gitBranch?: string | null; gitIssue?: string | null; gitSourceId?: string | null; gitIssueState?: string | null; gitIssueUrl?: string | null; type?: string; tags?: string[]; parentId?: string | null }) =>
+    request<{ item: PmWorkItem }>(`/pm/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePmWorkItem: (id: string) =>
+    request<{ success: boolean }>(`/pm/items/${id}`, { method: "DELETE" }),
+  listPmItemLogs: (id: string) =>
+    request<{ logs: PmWorkItemLog[] }>(`/pm/items/${id}/logs`),
+  listPmItemNotes: (id: string) =>
+    request<{ notes: PmItemNoteLink[] }>(`/pm/items/${id}/notes`),
+  addPmItemNote: (id: string, noteId: string) =>
+    request<{ duplicate: boolean }>(`/pm/items/${id}/notes`, { method: "POST", body: JSON.stringify({ noteId }) }),
+  removePmItemNote: (id: string, noteId: string) =>
+    request<{ success: boolean; wasPrimary: boolean }>(`/pm/items/${id}/notes/${noteId}`, { method: "DELETE" }),
+  listPmOverview: () =>
+    request<{ totals: { projects: number; items: number; byStatus: Record<string, number>; byType: Array<{ key: string; label: string; count: number }>; overdue: number }; projects: Array<{ id: string; name: string; color: string | null; total: number; done: number; byStatus: Record<string, number>; overdue: number }>; overdueItems: Array<{ id: string; itemNo: number | null; title: string; dueDate: string; status: string; projectName: string }>; recent: Array<{ itemId: string; itemNo: number | null; title: string; field: string; oldValue: string | null; newValue: string | null; createdAt: string }> }>("/pm/overview"),
+  // ===== PM git 双向同步 =====
+  listPmGitSources: () =>
+    request<{ sources: PmGitSource[]; types: string[] }>("/pm/git/sources"),
+  savePmGitSource: (data: { id?: string; type: string; name: string; apiBase?: string; token?: string }) =>
+    request<{ source: PmGitSource }>("/pm/git/sources", { method: "POST", body: JSON.stringify(data) }),
+  deletePmGitSource: (id: string) =>
+    request<{ success: boolean }>(`/pm/git/sources/${id}`, { method: "DELETE" }),
+  listPmGitRepos: (sourceId: string) =>
+    request<{ repos: Array<{ fullName: string; description: string; url: string; private: boolean }> }>(`/pm/git/sources/${sourceId}/repos`, { method: "POST" }),
+  importPmIssues: (sourceId: string, data: { projectId: string; repo: string; state?: string }) =>
+    request<{ imported: number; updated: number; total: number }>(`/pm/git/sources/${sourceId}/import-issues`, { method: "POST", body: JSON.stringify({ ...data }) }),
+  pullPmItem: (itemId: string) =>
+    request<{ item: PmWorkItem }>("/pm/git/pull", { method: "POST", body: JSON.stringify({ itemId }) }),
+  pushPmItem: (itemId: string) =>
+    request<{ item: PmWorkItem }>("/pm/git/push", { method: "POST", body: JSON.stringify({ itemId }) }),
+  createPmIssueOnPlatform: (itemId: string, data: { sourceId: string; repo: string }) =>
+    request<{ item: PmWorkItem }>("/pm/git/create-issue", { method: "POST", body: JSON.stringify({ itemId, ...data }) }),
   // 笔记级同步：链接映射
   getRemoteNoteLinks: () =>
     request<{ links: RemoteNoteLink[] }>("/remote-files/links"),
