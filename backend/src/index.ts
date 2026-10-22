@@ -101,6 +101,7 @@ import { publishMdns, stopMdns } from "./services/discovery";
 import { startEmbeddingWorker, stopEmbeddingWorker } from "./services/embedding-worker";
 import { initVecStore, reindexAllVectors, isVecAvailable } from "./services/vec-store";
 import { startCalendarExportScheduler, stopCalendarExportScheduler } from "./services/calendar-export";
+import { startVersionSnapshotScheduler, stopVersionSnapshotScheduler } from "./services/version-snapshot";
 import { DEFAULT_NATIVE_CORS_ORIGINS, resolveCorsOrigin, resolveCorsOrigins } from "./lib/cors-policy";
 import {
   createStaticAssetHeaders,
@@ -919,6 +920,15 @@ try {
   console.warn("[init] startCalendarExportScheduler failed:", e);
 }
 
+// 启动版本自动快照定时器（版本历史 v2）
+//   - VERSION_SNAPSHOT_TIMER_DISABLED=1 可关闭
+//   - NODE_ENV=test 时不启动
+try {
+  startVersionSnapshotScheduler();
+} catch (e) {
+  console.warn("[init] startVersionSnapshotScheduler failed:", e);
+}
+
 console.log(`🚀 Base Notes API running on http://localhost:${port}`);
 console.log(`📖 OpenAPI 文档: http://localhost:${port}/api/openapi.json`);
 
@@ -989,6 +999,8 @@ async function gracefulShutdown(signal: string) {
     try { stopEmbeddingWorker(); } catch { /* ignore */ }
     // 停掉日历导出定时器
     try { stopCalendarExportScheduler(); } catch { /* ignore */ }
+    // 停掉版本自动快照定时器
+    try { stopVersionSnapshotScheduler(); } catch { /* ignore */ }
     // mDNS 停播放在最后：即使 realtime shutdown 抛错，也要尽量通知网络"下线"
     try { stopMdns(); } catch { /* ignore */ }
     // 关停 DB 连接：内部会先 wal_checkpoint(TRUNCATE)，把 -wal 中的事务全部

@@ -193,3 +193,43 @@ EXECUTE FUNCTION clear_task_inbox_after_completion();
 \ir migrations/0117-encrypted-note-storage-guards.sql
 \ir migrations/0118-encrypted-block-write-guards.sql
 \ir migrations/0119-encrypted-note-conversion-guards.sql
+
+-- ============================================================
+-- 版本历史 v2 (v124 / version-history-v2) —— 幂等块
+-- SQLite 侧迁移见 versionHistoryV2Migration.ts；此处仅服务 PG 试点库。
+-- ============================================================
+DO $$
+BEGIN
+  IF to_regclass('public.note_versions') IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='note_versions' AND column_name='kind') THEN
+      ALTER TABLE note_versions ADD COLUMN kind TEXT NOT NULL DEFAULT 'auto';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='note_versions' AND column_name='label') THEN
+      ALTER TABLE note_versions ADD COLUMN label TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='note_versions' AND column_name='description') THEN
+      ALTER TABLE note_versions ADD COLUMN description TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='note_versions' AND column_name='contentHash') THEN
+      ALTER TABLE note_versions ADD COLUMN "contentHash" TEXT;
+    END IF;
+  END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS version_attachment_refs (
+  "versionId" TEXT NOT NULL,
+  "attachmentId" TEXT NOT NULL,
+  PRIMARY KEY ("versionId", "attachmentId")
+);
+
+-- ============================================================
+-- 版本历史 v2 P2 附件 GC 队列 (v125 / version-gc-queue) —— 幂等块
+-- ============================================================
+CREATE TABLE IF NOT EXISTS version_gc_queue (
+  "attachmentId" TEXT PRIMARY KEY,
+  path TEXT NOT NULL,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  "freedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_version_gc_queue_freed ON version_gc_queue("freedAt");

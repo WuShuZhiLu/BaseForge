@@ -12,8 +12,11 @@
  * - 不涉及 notes 主表 CRUD
  */
 
+import { createHash } from "node:crypto";
+import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
 import { SqliteAdapter } from "../db/adapters";
+import { extractAttachmentIdsFromContent } from "../lib/attachmentRefs";
 
 function getAdapter() {
   return new SqliteAdapter(getDb());
@@ -30,6 +33,11 @@ export interface NoteVersionListItem {
   changeSummary: string | null;
   createdAt: string;
   username: string | null;
+  /** 版本历史 v2：auto=自动备份，manual=手动备份 */
+  kind: "auto" | "manual";
+  label: string | null;
+  description: string | null;
+  contentBytes: number;
 }
 
 /** note_versions 完整记录 */
@@ -45,6 +53,10 @@ export interface NoteVersionRecord {
   changeType: string;
   changeSummary: string | null;
   createdAt: string;
+  kind: "auto" | "manual";
+  label: string | null;
+  description: string | null;
+  contentHash: string | null;
 }
 
 export const noteVersionsRepository = {
@@ -58,19 +70,22 @@ export const noteVersionsRepository = {
    * @param offset 偏移量
    * @returns 版本列表
    */
-  listByNoteId(noteId: string, limit: number, offset: number): NoteVersionListItem[] {
+  listByNoteId(noteId: string, limit: number, offset: number, kind?: "auto" | "manual"): NoteVersionListItem[] {
     const db = getDb();
+    const kindClause = kind ? " AND nv.kind = ?" : "";
     return db
       .prepare(
         `SELECT nv.id, nv."noteId", nv."userId", nv.title, nv.version, nv."changeType", nv."changeSummary", nv."createdAt",
+                nv.kind, nv.label, nv.description,
+                COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS contentBytes,
                 u.username
          FROM note_versions nv
          LEFT JOIN users u ON nv."userId" = u.id
-         WHERE nv."noteId" = ?
+         WHERE nv."noteId" = ?${kindClause}
          ORDER BY nv.version DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(noteId, limit, offset) as NoteVersionListItem[];
+      .all(...(kind ? [noteId, kind, limit, offset] : [noteId, limit, offset])) as NoteVersionListItem[];
   },
 
   /**
@@ -79,11 +94,12 @@ export const noteVersionsRepository = {
    * @param noteId 笔记 ID
    * @returns 版本总数
    */
-  countByNoteId(noteId: string): number {
+  countByNoteId(noteId: string, kind?: "auto" | "manual"): number {
     const db = getDb();
+    const kindClause = kind ? " AND kind = ?" : "";
     const row = db
-      .prepare('SELECT COUNT(*) as count FROM note_versions WHERE "noteId" = ?')
-      .get(noteId) as { count: number };
+      .prepare(`SELECT COUNT(*) as count FROM note_versions WHERE "noteId" = ?${kindClause}`)
+      .get(...(kind ? [noteId, kind] : [noteId])) as { count: number };
     return row.count;
   },
 
@@ -237,7 +253,7 @@ export const noteVersionsRepository = {
     return db
       .prepare(
         `SELECT id, "noteId", "userId", title, content, "contentText", "contentFormat", version,
-                "changeType", "changeSummary", "createdAt"
+                "changeType", "changeSummary", "createdAt", kind, label, description
          FROM note_versions
          WHERE "noteId" IN (${placeholders})`,
       )
@@ -404,4 +420,316 @@ export const noteVersionsRepository = {
     );
     return result.changes;
   },
+
+  /**
+   * v2 统一版本创建入口（自动快照/手动备份/还原备份共用）。
+   *
+   * - 计算 contentHash（内容指纹，供自动快照去重与快照端点幂等判断）；
+   * - 解析 content 中的附件引用写入 version_attachment_refs（版本级引用源，
+   *   供附件孤儿扫描排除「仅被历史版本引用」的附件）；
+   * - 版本行与引用行在同一事务内写入。
+   */
+  createTypedVersion(input: {
+    noteId: string;
+    userId: string;
+    kind: "auto" | "manual";
+    changeType: "edit" | "guest_edit" | "restore";
+    label?: string;
+    description?: string;
+    changeSummary?: string;
+    snapshot: {
+      title: string;
+      content: string;
+      contentText: string;
+      contentFormat: string;
+      version: number;
+    };
+  }): { id: string; version: number } {
+    const db = getDb();
+    const id = uuid();
+    const contentFormat = input.snapshot.contentFormat || "tiptap-json";
+    const contentHash = computeContentHash({
+      title: input.snapshot.title,
+      content: input.snapshot.content,
+      contentText: input.snapshot.contentText,
+      contentFormat,
+    });
+    db.transaction(() => {
+      db.prepare(
+        `INSERT INTO note_versions (id, "noteId", "userId", title, content, "contentText", "contentFormat", version, "changeType", "changeSummary", kind, label, description, "contentHash")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        id,
+        input.noteId,
+        input.userId,
+        input.snapshot.title,
+        input.snapshot.content,
+        input.snapshot.contentText,
+        contentFormat,
+        input.snapshot.version,
+        input.changeType,
+        input.changeSummary ?? null,
+        input.kind,
+        input.label ?? null,
+        input.description ?? null,
+        contentHash,
+      );
+      const attachmentIds = extractAttachmentIdsFromContent(input.snapshot.content);
+      if (attachmentIds.size > 0) {
+        const insertRef = db.prepare(
+          'INSERT OR IGNORE INTO version_attachment_refs ("versionId", "attachmentId") VALUES (?, ?)',
+        );
+        for (const attachmentId of attachmentIds) insertRef.run(id, attachmentId);
+      }
+    })();
+    return { id, version: input.snapshot.version };
+  },
+
+  /** 旧版本 contentHash 为 NULL 时按行内容补算并写回；已有值直接返回。 */
+  ensureContentHash(versionId: string): string | null {
+    const db = getDb();
+    const row = db
+      .prepare('SELECT title, content, "contentText", "contentFormat", "contentHash" FROM note_versions WHERE id = ?')
+      .get(versionId) as
+      | { title: string | null; content: string | null; contentText: string | null; contentFormat: string; contentHash: string | null }
+      | undefined;
+    if (!row) return null;
+    if (row.contentHash) return row.contentHash;
+    const hash = computeContentHash({
+      title: row.title,
+      content: row.content,
+      contentText: row.contentText,
+      contentFormat: row.contentFormat,
+    });
+    db.prepare('UPDATE note_versions SET "contentHash" = ? WHERE id = ?').run(hash, versionId);
+    return hash;
+  },
+
+  getLatestVersionByNoteId(noteId: string): { id: string; contentHash: string | null; createdAt: string } | undefined {
+    const db = getDb();
+    // createdAt 优先：保存路径移除后 version 可能并列（快照不递增 note.version），version DESC 只作次序参考
+    return db
+      .prepare('SELECT id, "contentHash", "createdAt" FROM note_versions WHERE "noteId" = ? ORDER BY "createdAt" DESC, id DESC LIMIT 1')
+      .get(noteId) as { id: string; contentHash: string | null; createdAt: string } | undefined;
+  },
+
+  /** 删除单个版本（含版本附件引用）；noteId 不匹配时无操作。 */
+  deleteVersionById(noteId: string, versionId: string): { deleted: boolean; freedAttachmentIds: string[] } {
+    const db = getDb();
+    let deleted = false;
+    let freedAttachmentIds: string[] = [];
+    db.transaction(() => {
+      const refs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?').all(versionId) as Array<{ attachmentId: string }>;
+      const result = db.prepare('DELETE FROM note_versions WHERE id = ? AND "noteId" = ?').run(versionId, noteId);
+      deleted = result.changes > 0;
+      if (deleted) {
+        db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?').run(versionId);
+        freedAttachmentIds = enqueueFreedVersionAttachments(db, refs.map((ref) => ref.attachmentId));
+      }
+    })();
+    return { deleted, freedAttachmentIds };
+  },
+
+  /** 批量删除（仅 kind=auto 生效，manual 跳过计数）。 */
+  deleteAutoVersionsByIds(noteId: string, ids: string[]): { deleted: number; skipped: number; freedAttachmentIds: string[] } {
+    const db = getDb();
+    if (ids.length === 0) return { deleted: 0, skipped: 0, freedAttachmentIds: [] };
+    let deleted = 0;
+    let skipped = 0;
+    const freed = new Set<string>();
+    db.transaction(() => {
+      const select = db.prepare('SELECT kind FROM note_versions WHERE id = ? AND "noteId" = ?');
+      const selectRefs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?');
+      const deleteRefs = db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?');
+      const deleteRow = db.prepare("DELETE FROM note_versions WHERE id = ?");
+      for (const id of ids) {
+        const row = select.get(id, noteId) as { kind: string } | undefined;
+        if (!row || row.kind !== "auto") {
+          skipped += 1;
+          continue;
+        }
+        const refs = selectRefs.all(id) as Array<{ attachmentId: string }>;
+        for (const ref of refs) freed.add(ref.attachmentId);
+        deleteRefs.run(id);
+        deleteRow.run(id);
+        deleted += 1;
+      }
+    })();
+    const freedAttachmentIds = enqueueFreedVersionAttachments(db, [...freed]);
+    return { deleted, skipped, freedAttachmentIds };
+  },
+
+  /** 清空某笔记版本历史（语义：仅清 auto，manual 保留并计数）。 */
+  clearAutoByNoteId(noteId: string): { deleted: number; skippedManual: number; freedAttachmentIds: string[] } {
+    const db = getDb();
+    let deleted = 0;
+    let skippedManual = 0;
+    const freed = new Set<string>();
+    db.transaction(() => {
+      const rows = db.prepare('SELECT id, kind FROM note_versions WHERE "noteId" = ?').all(noteId) as Array<{ id: string; kind: string }>;
+      const selectRefs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?');
+      const deleteRefs = db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?');
+      const deleteRow = db.prepare("DELETE FROM note_versions WHERE id = ?");
+      for (const row of rows) {
+        if (row.kind === "manual") {
+          skippedManual += 1;
+          continue;
+        }
+        const refs = selectRefs.all(row.id) as Array<{ attachmentId: string }>;
+        for (const ref of refs) freed.add(ref.attachmentId);
+        deleteRefs.run(row.id);
+        deleteRow.run(row.id);
+        deleted += 1;
+      }
+    })();
+    const freedAttachmentIds = enqueueFreedVersionAttachments(db, [...freed]);
+    return { deleted, skippedManual, freedAttachmentIds };
+  },
+
+  sumContentBytesByNoteId(noteId: string): number {
+    const db = getDb();
+    const row = db
+      .prepare('SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) AS total FROM note_versions WHERE "noteId" = ?')
+      .get(noteId) as { total: number };
+    return row.total;
+  },
+
+  /** 保留策略：每笔记保留最近 N 条 auto，其余删除。 */
+  pruneAutoVersionsByCount(keepRecent: number): { deleted: number; freedBytes: number } {
+    const db = getDb();
+    const doomed = db
+      .prepare(
+        `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
+         FROM note_versions nv
+         WHERE nv.kind = 'auto'
+           AND nv.id NOT IN (
+             SELECT v2.id FROM note_versions v2
+             WHERE v2."noteId" = nv."noteId" AND v2.kind = 'auto'
+             ORDER BY v2.version DESC, v2."createdAt" DESC
+             LIMIT ?
+           )`,
+      )
+      .all(Math.max(0, keepRecent)) as Array<{ id: string; bytes: number }>;
+    const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
+    return { deleted: result.deleted, freedBytes: doomed.reduce((sum, row) => sum + row.bytes, 0), freedAttachmentIds: result.freedAttachmentIds };
+  },
+
+  /** 保留策略：删除 N 天前的 auto 版本。 */
+  pruneAutoVersionsByDays(days: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+    const db = getDb();
+    const doomed = db
+      .prepare(
+        `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
+         FROM note_versions nv
+         WHERE nv.kind = 'auto' AND nv."createdAt" < datetime('now', ?)`,
+      )
+      .all(`-${Math.max(1, Math.round(days))} days`) as Array<{ id: string; bytes: number }>;
+    const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
+    return { deleted: result.deleted, freedBytes: doomed.reduce((sum, row) => sum + row.bytes, 0), freedAttachmentIds: result.freedAttachmentIds };
+  },
+
+  /** P2 存储配额：auto 总字节超过 quotaBytes 时按最旧优先删除，直到回到配额内。 */
+  pruneAutoVersionsOverQuota(quotaBytes: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+    if (quotaBytes <= 0) return { deleted: 0, freedBytes: 0, freedAttachmentIds: [] };
+    const db = getDb();
+    let deleted = 0;
+    let freedBytes = 0;
+    const freedAttachmentIds: string[] = [];
+    // 分批删最旧的 auto，直到总量回到配额内（防单事务过长；上限 1000 批防死循环）
+    for (let round = 0; round < 1000; round += 1) {
+      const total = db
+        .prepare(`SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) AS total FROM note_versions WHERE kind = 'auto'`)
+        .get() as { total: number };
+      if (total.total <= quotaBytes) break;
+      const doomed = db
+        .prepare(
+          `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
+           FROM note_versions nv
+           WHERE nv.kind = 'auto'
+           ORDER BY nv."createdAt" ASC, nv.id ASC
+           LIMIT 1`,
+        )
+        .all() as Array<{ id: string; bytes: number }>;
+      if (doomed.length === 0) break;
+      const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
+      if (result.deleted === 0) break;
+      deleted += result.deleted;
+      freedBytes += doomed.reduce((sum, row) => sum + row.bytes, 0);
+      freedAttachmentIds.push(...result.freedAttachmentIds);
+    }
+    return { deleted, freedBytes, freedAttachmentIds };
+  },
+
+  /** 清扫悬空版本附件引用（版本行已不存在时的残留）。 */
+  deleteDanglingAttachmentRefs(): number {
+    const db = getDb();
+    const result = db
+      .prepare('DELETE FROM version_attachment_refs WHERE "versionId" NOT IN (SELECT id FROM note_versions)')
+      .run();
+    return result.changes;
+  },
 };
+
+type VersionDb = ReturnType<typeof getDb>;
+
+/** 删除版本行并同步清理版本附件引用（事务内逐行删除）；失去全部引用的附件进入 GC 宽限队列。 */
+function deleteVersionRowsWithRefs(db: VersionDb, ids: string[]): { deleted: number; freedAttachmentIds: string[] } {
+  if (ids.length === 0) return { deleted: 0, freedAttachmentIds: [] };
+  let deleted = 0;
+  const freed = new Set<string>();
+  db.transaction(() => {
+    const selectRefs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?');
+    const deleteRefs = db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?');
+    const deleteRow = db.prepare("DELETE FROM note_versions WHERE id = ?");
+    for (const id of ids) {
+      const refs = selectRefs.all(id) as Array<{ attachmentId: string }>;
+      for (const ref of refs) freed.add(ref.attachmentId);
+      deleteRefs.run(id);
+      deleteRow.run(id);
+      deleted += 1;
+    }
+  })();
+  const freedAttachmentIds = enqueueFreedVersionAttachments(db, [...freed]);
+  return { deleted, freedAttachmentIds };
+}
+
+/**
+ * 版本附件两阶段 GC 第一阶段：失去全部引用（当前内容 + 所有版本均不再引用）的附件
+ * 进入 version_gc_queue 宽限队列（默认 7 天），由调度器物理删除并输出审计日志。
+ */
+function enqueueFreedVersionAttachments(db: VersionDb, attachmentIds: string[]): string[] {
+  if (attachmentIds.length === 0) return [];
+  const enqueued: string[] = [];
+  const getAttachment = db.prepare("SELECT path, size FROM attachments WHERE id = ?");
+  const hasNoteRef = db.prepare('SELECT 1 FROM attachment_references WHERE "attachmentId" = ? LIMIT 1');
+  const hasVersionRef = db.prepare('SELECT 1 FROM version_attachment_refs WHERE "attachmentId" = ? LIMIT 1');
+  const alreadyQueued = db.prepare('SELECT 1 FROM version_gc_queue WHERE "attachmentId" = ? LIMIT 1');
+  const insert = db.prepare('INSERT OR IGNORE INTO version_gc_queue ("attachmentId", path, bytes) VALUES (?, ?, ?)');
+  for (const id of attachmentIds) {
+    const attachment = getAttachment.get(id) as { path: string; size: number } | undefined;
+    if (!attachment) continue;
+    if (hasNoteRef.get(id)) continue;
+    if (hasVersionRef.get(id)) continue;
+    if (alreadyQueued.get(id)) continue;
+    insert.run(id, attachment.path, attachment.size ?? 0);
+    enqueued.push(id);
+  }
+  return enqueued;
+}
+
+/**
+ * 内容指纹（版本历史 v2）：sha1(title / contentFormat / contentText / content) 前 16 位 hex。
+ * - 加密笔记的 content 为密文，同样参与 hash（contentText 为空也能检测变化）；
+ * - 自动快照去重、快照端点幂等判断共用同一实现。
+ */
+export function computeContentHash(input: {
+  title?: string | null;
+  content?: string | null;
+  contentText?: string | null;
+  contentFormat?: string | null;
+}): string {
+  const digest = createHash("sha1")
+    .update(`${input.title ?? ""}\n${input.contentFormat ?? ""}\n${input.contentText ?? ""}\n${input.content ?? ""}`)
+    .digest("hex");
+  return digest.slice(0, 16);
+}

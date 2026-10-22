@@ -48,7 +48,7 @@ import {
 } from "../services/legacyKnowledgeHierarchy";
 import { syncAutomaticNoteLinkTitles } from "../lib/noteLinkTitles";
 import { isValidNoteColorMarkInput, normalizeNoteColorMark } from "../lib/noteColorMark";
-import { noteLinksRepository, noteTagsRepository, noteVersionsRepository, favoritesRepository, noteYsnapshotsRepository, noteYupdatesRepository } from "../repositories";
+import { noteLinksRepository, noteTagsRepository, favoritesRepository, noteYsnapshotsRepository, noteYupdatesRepository } from "../repositories";
 import { rebuildYjsSubdocumentsIfEnabled } from "../services/yjs-subdocuments";
 import { reclaimSpace } from "../lib/reclaimSpace";
 import { buildFtsSearchTerm } from "../lib/searchQuery";
@@ -1014,47 +1014,8 @@ app.put("/:id", async (c) => {
     delete (body as Record<string, unknown>).workspaceId;
   }
 
-  // Phase 3: 保存版本历史（仅在内容有实质变更时）
-  const VERSION_MERGE_WINDOW_MS = 5 * 60 * 1000; // 5 分钟
-  if (body.content !== undefined || body.contentText !== undefined || body.title !== undefined || body.contentFormat !== undefined) {
-    const currentNote = db.prepare("SELECT title, content, contentText, contentFormat, version, userId FROM notes WHERE id = ?").get(id) as any;
-    if (currentNote) {
-      const hasContentChange = (body.content !== undefined && body.content !== currentNote.content)
-        || (body.contentText !== undefined && body.contentText !== currentNote.contentText)
-        || (body.title !== undefined && body.title !== currentNote.title)
-        || (body.contentFormat !== undefined && body.contentFormat !== currentNote.contentFormat);
-      if (hasContentChange) {
-        const lastEdit = noteVersionsRepository.getLastEditByNoteId(id);
-
-        let shouldInsert = true;
-        if (lastEdit) {
-          const normalized = /Z$|[+-]\d{2}:?\d{2}$/.test(lastEdit.createdAt)
-            ? lastEdit.createdAt
-            : lastEdit.createdAt.replace(" ", "T") + "Z";
-          const lastTs = new Date(normalized).getTime();
-          if (!Number.isNaN(lastTs) && Date.now() - lastTs < VERSION_MERGE_WINDOW_MS) {
-            shouldInsert = false;
-          }
-        }
-
-        if (shouldInsert) {
-          const versionId = uuid();
-          // 版本历史里记录实际编辑者（可能与笔记所有者不同）
-          noteVersionsRepository.create({
-            id: versionId,
-            noteId: id,
-            userId,
-            title: currentNote.title,
-            content: currentNote.content,
-            contentText: currentNote.contentText,
-            contentFormat: currentNote.contentFormat,
-            version: currentNote.version,
-            changeType: 'edit',
-          });
-        }
-      }
-    }
-  }
+  // 版本历史 v2：保存不再产生版本（避免 Ctrl+S/自动保存污染版本流）；
+  // 版本由定时快照/会话结束快照/手动备份/还原路径产生（docs/version-history-v2.md §4.1）。
 
   const previousTitleRow = typeof body.title === "string"
     ? db.prepare("SELECT title FROM notes WHERE id = ?").get(id) as { title: string } | undefined

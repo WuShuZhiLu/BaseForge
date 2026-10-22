@@ -146,15 +146,15 @@ test("notes.put rejects stale version when contentFormat changes", async () => {
   assert.equal(res.json.currentVersion, 2);
 });
 
-test("notes.put contentFormat change creates a version snapshot with previous format", async () => {
+test("notes.put contentFormat change no longer creates a version snapshot (v2: versions come from snapshot/manual paths)", async () => {
   seedNote("tiptap-json");
 
   const res = await requestJson("PUT", `/notes/${NOTE_ID}`, { contentFormat: "markdown", version: 1 });
 
   assert.equal(res.status, 200);
-  const version = db().prepare("SELECT contentFormat FROM note_versions WHERE noteId = ?").get(NOTE_ID) as any;
-  assert.ok(version);
-  assert.equal(version.contentFormat, "tiptap-json");
+  // 版本历史 v2：保存路径（含格式转换）不再产生版本——版本由定时快照/手动备份/还原产生（docs/version-history-v2.md §4.1）。
+  const versions = db().prepare("SELECT COUNT(*) AS c FROM note_versions WHERE noteId = ?").get(NOTE_ID) as any;
+  assert.equal(versions.c, 0);
 });
 
 test("restoring a markdown version restores contentFormat and returns it", async () => {

@@ -5,7 +5,8 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { signShareAccessToken, verifyShareAccessToken } from "../lib/auth-security";
 import { resolvePublicOrigin, rewriteRelativeAttachmentUrls } from "../lib/shareUrlRewrite";
-import { resolveNotePermission, hasPermission } from "../middleware/acl";
+import { isSystemAdmin, resolveNotePermission, hasPermission } from "../middleware/acl";
+import { computeContentHash } from "../repositories/noteVersionsRepository";
 import { broadcastNoteUpdated, broadcastToUser } from "../services/realtime";
 import { yDestroyDoc } from "../services/yjs";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
@@ -549,18 +550,19 @@ sharedRouter.put("/:token/content", async (c) => {
       || (contentFormat !== undefined && contentFormat !== share.noteContentFormat)
       || (title !== undefined && title !== share.noteTitle);
     if (hasContentChange) {
-      const versionId = uuid();
-      noteVersionsRepository.create({
-        id: versionId,
+      noteVersionsRepository.createTypedVersion({
         noteId: share.noteId,
         userId: share.noteUserId,
-        title: share.noteTitle,
-        content: share.noteContent,
-        contentText: share.noteContentText,
-        contentFormat: share.noteContentFormat,
-        version: share.noteVersion,
+        kind: "auto",
         changeType: 'guest_edit',
         changeSummary: `访客 ${trimmedName} 编辑`,
+        snapshot: {
+          title: share.noteTitle ?? "",
+          content: share.noteContent ?? "",
+          contentText: share.noteContentText ?? "",
+          contentFormat: share.noteContentFormat || "tiptap-json",
+          version: share.noteVersion,
+        },
       });
     }
   }
@@ -592,33 +594,37 @@ sharedRouter.put("/:token/content", async (c) => {
 
 // ===== Phase 3: 版本历史 API =====
 
-// 获取版本历史列表
+// 获取版本历史列表（v2：kind 筛选 + 占用统计；共享笔记协作者可见）
 sharesRouter.get("/note/:noteId/versions", (c) => {
-  const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
   const noteId = c.req.param("noteId");
   const limit = parseInt(c.req.query("limit") || "20");
   const offset = parseInt(c.req.query("offset") || "0");
+  const kindParam = c.req.query("kind");
+  const kind = kindParam === "auto" || kindParam === "manual" ? kindParam : undefined;
 
-  // 验证笔记归属
-  const note = db.prepare("SELECT id FROM notes WHERE id = ? AND userId = ?").get(noteId, userId) as any;
-  if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
+  const { permission } = resolveNotePermission(noteId, userId);
+  if (!hasPermission(permission, "read")) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
 
-  const versions = noteVersionsRepository.listByNoteId(noteId, limit, offset);
-  const total = noteVersionsRepository.countByNoteId(noteId);
+  const versions = noteVersionsRepository.listByNoteId(noteId, limit, offset, kind);
+  const total = noteVersionsRepository.countByNoteId(noteId, kind);
+  const contentBytesTotal = noteVersionsRepository.sumContentBytesByNoteId(noteId);
 
-  return c.json({ versions, total });
+  return c.json({ versions, total, contentBytesTotal });
 });
 
 // 获取某个版本的完整内容
 sharesRouter.get("/note/:noteId/versions/:versionId", (c) => {
-  const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
   const noteId = c.req.param("noteId");
   const versionId = c.req.param("versionId");
 
-  const note = db.prepare("SELECT id FROM notes WHERE id = ? AND userId = ?").get(noteId, userId) as any;
-  if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
+  const { permission } = resolveNotePermission(noteId, userId);
+  if (!hasPermission(permission, "read")) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
 
   const version = noteVersionsRepository.getByIdAndNoteId(versionId, noteId);
   if (!version) return c.json({ error: "版本不存在" }, 404);
@@ -646,18 +652,19 @@ sharesRouter.post("/note/:noteId/versions/:versionId/restore", (c) => {
   if (!version) return c.json({ error: "版本不存在" }, 404);
 
   const updated = db.transaction(() => {
-    const currentVersionId = uuid();
-    noteVersionsRepository.create({
-      id: currentVersionId,
+    noteVersionsRepository.createTypedVersion({
       noteId,
       userId,
-      title: note.title,
-      content: note.content,
-      contentText: note.contentText,
-      contentFormat: note.contentFormat,
-      version: note.version,
+      kind: "auto",
       changeType: 'restore',
       changeSummary: "恢复前自动备份",
+      snapshot: {
+        title: note.title ?? "",
+        content: note.content ?? "",
+        contentText: note.contentText ?? "",
+        contentFormat: note.contentFormat || "tiptap-json",
+        version: note.version,
+      },
     });
 
     db.prepare(`
@@ -733,6 +740,7 @@ sharesRouter.post("/note/:noteId/versions/:versionId/restore", (c) => {
 });
 
 // 清空某笔记的全部版本历史
+// 清空版本历史（v2 语义：仅清 auto，manual 版本保留）
 sharesRouter.delete("/note/:noteId/versions", (c) => {
   const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
@@ -742,10 +750,159 @@ sharesRouter.delete("/note/:noteId/versions", (c) => {
   const note = db.prepare("SELECT id FROM notes WHERE id = ? AND userId = ?").get(noteId, userId) as any;
   if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
 
-  const before = noteVersionsRepository.countByNoteId(noteId);
-  const deleted = noteVersionsRepository.deleteByNoteId(noteId);
+  const result = noteVersionsRepository.clearAutoByNoteId(noteId);
 
-  return c.json({ success: true, count: before, deleted });
+  return c.json({ success: true, count: result.deleted, deleted: result.deleted, skippedManual: result.skippedManual });
+});
+
+// ===== 版本历史 v2 新增端点 =====
+
+// v2: 手动保存版本（发版/定稿；共享笔记协作者需编辑权限）
+sharesRouter.post("/note/:noteId/versions", async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const noteId = c.req.param("noteId");
+
+  const { permission } = resolveNotePermission(noteId, userId);
+  if (!hasPermission(permission, "write")) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
+  const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(noteId) as any;
+  if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
+  if (note.isLocked) return c.json({ error: "笔记已锁定" }, 403);
+
+  const body = await c.req.json().catch(() => ({}) as any);
+  const label = typeof body.label === "string" ? body.label.trim().slice(0, 80) : "";
+  const description = typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
+  const defaultLabel = `手动备份 ${new Date().toLocaleString("zh-CN", { hour12: false })}`;
+
+  const created = noteVersionsRepository.createTypedVersion({
+    noteId,
+    userId,
+    kind: "manual",
+    changeType: "edit",
+    label: label || defaultLabel,
+    description: description || undefined,
+    snapshot: {
+      title: note.title ?? "",
+      content: note.content ?? "",
+      contentText: note.contentText ?? "",
+      contentFormat: note.contentFormat || "tiptap-json",
+      version: note.version,
+    },
+  });
+  const record = noteVersionsRepository.getByIdAndNoteId(created.id, noteId);
+  return c.json(record, 201);
+});
+
+// v2: 会话结束快照（幂等；内容未变返回 created:false）
+sharesRouter.post("/note/:noteId/versions/snapshot", (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const noteId = c.req.param("noteId");
+
+  const { permission } = resolveNotePermission(noteId, userId);
+  if (!hasPermission(permission, "write")) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
+  const note = db.prepare("SELECT * FROM notes WHERE id = ? AND isTrashed = 0").get(noteId) as any;
+  if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
+
+  const latest = noteVersionsRepository.getLatestVersionByNoteId(noteId);
+  const currentHash = computeContentHash({
+    title: note.title,
+    content: note.content,
+    contentText: note.contentText,
+    contentFormat: note.contentFormat,
+  });
+  if (latest?.contentHash && latest.contentHash === currentHash) {
+    return c.json({ created: false });
+  }
+  noteVersionsRepository.createTypedVersion({
+    noteId,
+    userId,
+    kind: "auto",
+    changeType: "edit",
+    snapshot: {
+      title: note.title ?? "",
+      content: note.content ?? "",
+      contentText: note.contentText ?? "",
+      contentFormat: note.contentFormat || "tiptap-json",
+      version: note.version,
+    },
+  });
+  return c.json({ created: true });
+});
+
+// v2: 从版本创建副本笔记（加密笔记不支持）
+sharesRouter.post("/note/:noteId/versions/:versionId/duplicate", (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const noteId = c.req.param("noteId");
+  const versionId = c.req.param("versionId");
+
+  const { permission } = resolveNotePermission(noteId, userId);
+  if (!hasPermission(permission, "write")) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
+  const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(noteId) as any;
+  if (!note) return c.json({ error: "笔记不存在或无权操作" }, 404);
+  const version = noteVersionsRepository.getByIdAndNoteId(versionId, noteId);
+  if (!version) return c.json({ error: "版本不存在" }, 404);
+  if (/^encrypted-note/.test(version.contentFormat || "")) {
+    return c.json({ error: "加密笔记暂不支持从版本创建副本", code: "ENCRYPTED_DUPLICATE_UNSUPPORTED" }, 400);
+  }
+
+  const newId = uuid();
+  const columns = (db.prepare("PRAGMA table_info(notes)").all() as Array<{ name: string }>).map((col) => col.name);
+  const copyColumns = ["userId", "notebookId", "workspaceId", "contentFormat", "sortOrder"].filter((col) => columns.includes(col));
+  const newTitle = `${version.title || note.title || "无标题笔记"}（副本）`;
+  const insertColumns = ['"id"', '"title"', '"content"', '"contentText"', '"version"', ...copyColumns.map((col) => `"${col}"`)];
+  const insertValues: unknown[] = [newId, newTitle, version.content ?? "{}", version.contentText ?? "", 1];
+  for (const col of copyColumns) {
+    if (col === "contentFormat") insertValues.push(version.contentFormat || "tiptap-json");
+    else insertValues.push((note as Record<string, unknown>)[col] ?? null);
+  }
+  db.prepare(
+    `INSERT INTO notes (${insertColumns.join(", ")}) VALUES (${insertColumns.map(() => "?").join(", ")})`,
+  ).run(...insertValues);
+  syncAttachmentReferences(db, newId, version.content ?? "");
+  const created = db.prepare("SELECT * FROM notes WHERE id = ?").get(newId) as any;
+  return c.json(created, 201);
+});
+
+// v2: 删除单个版本（仅所有者/管理员）
+sharesRouter.delete("/note/:noteId/versions/:versionId", (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const noteId = c.req.param("noteId");
+  const versionId = c.req.param("versionId");
+
+  const note = db.prepare("SELECT id, userId FROM notes WHERE id = ?").get(noteId) as any;
+  if (!note || (note.userId !== userId && !isSystemAdmin(userId))) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
+
+  const result = noteVersionsRepository.deleteVersionById(noteId, versionId);
+  if (!result.deleted) return c.json({ error: "版本不存在" }, 404);
+  return c.json({ success: true });
+});
+
+// v2: 批量删除（仅 kind=auto 生效，manual 自动跳过）
+sharesRouter.post("/note/:noteId/versions/batch-delete", async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const noteId = c.req.param("noteId");
+
+  const note = db.prepare("SELECT id, userId FROM notes WHERE id = ?").get(noteId) as any;
+  if (!note || (note.userId !== userId && !isSystemAdmin(userId))) {
+    return c.json({ error: "笔记不存在或无权操作" }, 404);
+  }
+
+  const body = await c.req.json().catch(() => ({}) as any);
+  const ids = Array.isArray(body.ids) ? body.ids.filter((id: unknown) => typeof id === "string") : [];
+  const result = noteVersionsRepository.deleteAutoVersionsByIds(noteId, ids);
+  return c.json({ success: true, deleted: result.deleted, skipped: result.skipped });
 });
 
 // ===== Phase 3: 评论批注 API =====

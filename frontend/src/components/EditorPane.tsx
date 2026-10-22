@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import SheetEmbedInsertDialog from "@/components/SheetEmbedInsertDialog";
 import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
+import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -44,6 +44,8 @@ import { extractFinalAnswer, parseAiTags } from "@/lib/aiOutput";
 import { buildAiContext } from "@/lib/aiContextBuilder";
 import ShareModal from "@/components/ShareModal";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
+import SaveVersionDialog from "@/components/SaveVersionDialog";
+import { maybeSnapshotOnEditorLeave } from "@/lib/versionSnapshot";
 import CommentPanel from "@/components/CommentPanel";
 import NoteAttachmentsPanel from "@/components/NoteAttachmentsPanel";
 import FolderSyncAttachmentPreviewPane, { isFolderSyncAttachmentNote } from "@/components/FolderSyncAttachmentPreviewPane";
@@ -281,6 +283,7 @@ function EditorPaneCore({
   const [showMobileOutline, setShowMobileOutline] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showSaveVersionDialog, setShowSaveVersionDialog] = useState(false);
   const [showCommentPanel, setShowCommentPanel] = useState(false);
   const [showAttachmentsPanel, setShowAttachmentsPanel] = useState(false);
   const [showBacklinksPanel, setShowBacklinksPanel] = useState(false);
@@ -656,9 +659,19 @@ function EditorPaneCore({
       } else {
         try { editorHandleRef.current?.flushSave(); } catch { /* ignore */ }
       }
+      // 版本历史 v2：切走时对前一篇笔记触发会话结束快照（fire-and-forget，失败静默）
+      maybeSnapshotOnEditorLeave(prevId);
     }
     lastActiveIdRef.current = nextId;
   }, [activeNote?.id]);
+
+  // 版本历史 v2：编辑器整体卸载时对最后一篇笔记触发会话结束快照（fire-and-forget，失败静默）
+  useEffect(() => {
+    return () => {
+      const id = lastActiveIdRef.current;
+      if (id) maybeSnapshotOnEditorLeave(id);
+    };
+  }, []);
 
   // ������ P2-5: ��ǰ�༭��ģʽ ref���� handleUpdate ͬ��д�ݸ��ã� ������������������������������
   const editorModeRef = useRef<EditorMode>(editorMode);
@@ -2763,7 +2776,7 @@ const moveToTrash = useCallback(async () => {
                     <React.Fragment key={nb.id}>
                       {idx > 0 && <ChevronRight size={10} className="text-tx-tertiary/60 shrink-0" />}
                       <span className={cn("flex min-w-0 items-center gap-0.5", isLast ? "text-tx-secondary font-medium" : "shrink-0")}>
-                        <span className="leading-none">{getNotebookIcon(nb.icon)}</span>
+                        <NotebookLineIcon depth={idx} size={12} />
                         <span className={cn("truncate", isLast ? "max-w-[120px]" : "max-w-[64px]")}>{nb.name}</span>
                       </span>
                     </React.Fragment>
@@ -2771,7 +2784,7 @@ const moveToTrash = useCallback(async () => {
                 })}
               </span>
             ) : (
-              <span className="shrink-0 leading-none">{getNotebookIcon()}</span>
+              <NotebookLineIcon depth={0} size={12} />
             )}
           </button>
           <div className="shrink-0">
@@ -3009,6 +3022,17 @@ const moveToTrash = useCallback(async () => {
                     <History size={15} className="text-violet-500" />
                     <span>{t('editor.versionHistory')}</span>
                   </button>
+                  {/* 保存版本（手动备份） */}
+                  <button
+                    onClick={() => {
+                      setShowSaveVersionDialog(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors"
+                  >
+                    <Save size={15} className="text-violet-500" />
+                    <span>{t('editor.saveVersion')}</span>
+                  </button>
                   {/* ���� */}
                   <button
                     onClick={() => {
@@ -3233,7 +3257,7 @@ const moveToTrash = useCallback(async () => {
                           isLast ? "min-w-0 text-tx-secondary font-medium" : "shrink-0"
                         )}
                       >
-                        <span className="shrink-0 leading-none">{getNotebookIcon(nb.icon)}</span>
+                        <NotebookLineIcon depth={idx} size={12} />
                         <span className={cn("truncate", isLast ? "max-w-[180px]" : "max-w-[120px]")}>
                           {nb.name}
                         </span>
@@ -3243,7 +3267,7 @@ const moveToTrash = useCallback(async () => {
                 })}
               </span>
             ) : (
-              <span className="shrink-0 leading-none">{getNotebookIcon()}</span>
+              <NotebookLineIcon depth={0} size={12} />
             )}
             <ChevronDown size={12} className="shrink-0 ml-0.5" />
           </button>
@@ -3336,14 +3360,6 @@ const moveToTrash = useCallback(async () => {
             >
               {activeNote.title || t('editor.untitled')}
             </span>
-            <button
-              type="button"
-              onClick={() => { setShowVersionHistory(true); }}
-              className="hidden shrink-0 cursor-pointer overflow-hidden text-ellipsis rounded-md px-1.5 py-0.5 text-[11px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary lg:inline"
-              title={t('editor.versionHistory')}
-            >
-              {t('tiptap.version')}{activeNote.version} · {new Date(activeNote.updatedAt + "Z").toLocaleString()}
-            </button>
           </span>
           {collabYDoc && (
             <span
@@ -3365,6 +3381,15 @@ const moveToTrash = useCallback(async () => {
               {t('note.format.richTextShort')}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => { setShowVersionHistory(true); }}
+            className="shrink-0 whitespace-nowrap text-[11px] text-tx-tertiary hover:text-accent-primary hover:underline cursor-pointer bg-transparent border-none p-0"
+            title={t('editor.versionHistory')}
+          >
+            {t('tiptap.version')}{activeNote.version}
+            <span className="hidden lg:inline"> · {new Date(activeNote.updatedAt + "Z").toLocaleString()}</span>
+          </button>
         </div>
 
         {/* Sync Indicator + Grouped Actions */}
@@ -3604,6 +3629,13 @@ const moveToTrash = useCallback(async () => {
                   >
                     <History size={15} className="text-violet-500" />
                     <span>{t('editor.versionHistory')}</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowSaveVersionDialog(true); setShowDesktopMoreMenu(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
+                  >
+                    <Save size={15} className="text-violet-500" />
+                    <span>{t('editor.saveVersion')}</span>
                   </button>
                   <button
                     onClick={() => { setShowCommentPanel(true); setShowDesktopMoreMenu(false); }}
@@ -3914,9 +3946,20 @@ const moveToTrash = useCallback(async () => {
             actions.setSyncStatus("saved");
             actions.setLastSynced(new Date().toISOString());
           }}
+          ensureSaved={async () => { try { await editorHandleRef.current?.flushSave(); } catch { /* ignore */ } }}
           onClose={() => setShowVersionHistory(false)}
         />
       )}
+
+        {/* 保存版本弹窗（编辑器「保存版本…」菜单入口；与版本历史面板共用组件） */}
+        {activeNote && (
+          <SaveVersionDialog
+            open={showSaveVersionDialog}
+            noteId={activeNote.id}
+            ensureSaved={async () => { try { await editorHandleRef.current?.flushSave(); } catch { /* ignore */ } }}
+            onClose={() => setShowSaveVersionDialog(false)}
+          />
+        )}
 
       {/* 导出级联子菜单（三级菜单）：通过 portal 渲染到 body，避免被主菜单 overflow 裁切 */}
       {exportSubmenuOpen && exportSubmenuPos && createPortal(
@@ -4424,10 +4467,12 @@ function findPathById(notebooks: Notebook[], id: string | null | undefined): Not
   return path;
 }
 
-function getNotebookIcon(icon?: string | null): string {
-  const value = (icon ?? "").trim();
-  if (!value || value === "??" || value.includes("\uFFFD")) return "📒";
-  return value;
+/* 编辑区“移动到”面包屑与目标树的节点图标：与侧边栏知识树同风格——
+   根层笔记本用 BookOpen（紫），子级文件夹用 Folder（琥珀），不再渲染 emoji。 */
+function NotebookLineIcon({ depth, size = 14 }: { depth: number; size?: number }) {
+  return depth <= 0
+    ? <BookOpen size={size} className="shrink-0 text-violet-500" />
+    : <Folder size={size} className="shrink-0 text-amber-500" />;
 }
 
 /* ===== �༭������"�ƶ��ʼǱ�"������Ŀ��������Ŀ¼�ṹ����һ�£� ===== */
@@ -4477,7 +4522,7 @@ function MoveTreeItem({
         ) : (
           <span className="w-4 h-4 shrink-0" />
         )}
-        <span className="text-base shrink-0">{getNotebookIcon(notebook.icon)}</span>
+        <NotebookLineIcon depth={depth} size={14} />
         <span className="truncate flex-1 text-left">{notebook.name}</span>
         {isCurrent && (
           <span className="ml-auto text-[10px] text-tx-tertiary shrink-0">{t('common.current')}</span>

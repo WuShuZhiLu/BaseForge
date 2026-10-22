@@ -1094,6 +1094,25 @@ export function scanOrphanAttachments(graceHours = 24): OrphanScanResult {
   }
   const haystack = sources.join("\n");
 
+  // 版本历史 v2：历史版本里引用的附件同样算“存活”（还原版本会再次用到），
+  // 否则保留策略删除版本前，孤儿扫描会误判这些附件为可回收。
+  const versionReferencedIds = new Set(
+    (
+      db.prepare('SELECT DISTINCT "attachmentId" FROM version_attachment_refs').all() as Array<{
+        attachmentId: string;
+      }>
+    ).map((row) => row.attachmentId),
+  );
+
+  // P2 附件 GC：已进入待清理队列的附件由 GC 扫尾统一处理，孤儿扫描不再重复列出
+  const gcQueuedIds = new Set(
+    (
+      db.prepare('SELECT "attachmentId" FROM version_gc_queue').all() as Array<{
+        attachmentId: string;
+      }>
+    ).map((row) => row.attachmentId),
+  );
+
   const cutoff = Date.now() - graceHours * 3600 * 1000;
   const contentOrphans: OrphanScanResult["contentOrphans"] = [];
   for (const r of dbRows) {
@@ -1102,6 +1121,10 @@ export function scanOrphanAttachments(graceHours = 24): OrphanScanResult {
     if (Number.isFinite(created) && created > cutoff) continue;
     // 引用判定：搜 `/api/attachments/<id>`（uuid 不会与其他随机字符串混淆）
     if (haystack.indexOf(`/api/attachments/${r.id}`) >= 0) continue;
+    // 版本历史 v2：被任意历史版本引用的附件不算孤儿
+    if (versionReferencedIds.has(r.id)) continue;
+    // P2 附件 GC：待清理队列中的附件由 GC 扫尾处理
+    if (gcQueuedIds.has(r.id)) continue;
     contentOrphans.push({
       id: r.id,
       filename: r.path,

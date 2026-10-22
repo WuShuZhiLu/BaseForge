@@ -55,7 +55,8 @@ import {
   shouldResetSharedFileImport,
   type ImportMethod,
 } from "@/lib/importHub";
-import type { Workspace } from "@/types";
+import type { VersionHistorySettings, Workspace } from "@/types";
+import { getVersionHistorySettings, primeVersionHistorySettingsCache } from "@/lib/versionSnapshot";
 import { openTaskDataTransfer } from "@/lib/taskDataTransferBridge";
 import { runFullBackupJob } from "@/lib/fullBackupJobClient";
 
@@ -2245,6 +2246,257 @@ function fmtBytes(n: number | undefined | null): string {
   return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/**
+ * 版本历史 v2 设置卡片：自动备份间隔 / 保留策略 / 会话结束快照 / 立即清理。
+ * 设置存服务端 KV（version_history_settings），经 /api/settings 合并读写；
+ * 保存成功后同步刷新 versionSnapshot 的 TTL 缓存。
+ */
+function VersionHistorySettingsCard() {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<VersionHistorySettings | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupMsg, setCleanupMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getVersionHistorySettings()
+      .then((s) => { if (!cancelled) setSettings(s); })
+      .catch(() => { if (!cancelled) setLoadFailed(true); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!settings) {
+    return (
+      <div className="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center gap-2 mb-2">
+          <Save size={14} className="text-violet-500" />
+          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{t("dataManager.versionHistory.title")}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          {loadFailed ? (
+            <>
+              <AlertCircle size={12} className="text-red-500" />
+              <span>{t("dataManager.versionHistory.loadFailed")}</span>
+            </>
+          ) : (
+            <>
+              <Loader2 size={12} className="animate-spin" />
+              <span>{t("dataManager.versionHistory.loading")}</span>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const setRetentionMode = (mode: VersionHistorySettings["retention"]["mode"]) => {
+    setSettings((prev) => (prev ? { ...prev, retention: { ...prev.retention, mode } } : prev));
+  };
+  const setRetentionParam = (raw: string) => {
+    const n = Math.max(1, Math.min(99999, parseInt(raw, 10) || 0));
+    setSettings((prev) => {
+      if (!prev) return prev;
+      const retention = prev.retention.mode === "count"
+        ? { ...prev.retention, count: n }
+        : { ...prev.retention, days: n };
+      return { ...prev, retention };
+    });
+  };
+
+  const handleSave = async () => {
+    if (!settings || saving) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await api.updateVersionHistorySettings(settings);
+      primeVersionHistorySettingsCache(settings);
+      setSaveMsg({ type: "ok", text: t("dataManager.versionHistory.saveSuccess") });
+    } catch (err: any) {
+      setSaveMsg({ type: "err", text: t("dataManager.versionHistory.saveFailed", { error: err?.message || "error" }) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    if (cleaning) return;
+    setCleaning(true);
+    setCleanupMsg(null);
+    try {
+      const res = await api.cleanupNoteVersions();
+      setCleanupMsg({
+        type: "ok",
+        text: t("dataManager.versionHistory.cleanupSuccess", { deleted: res.deleted, size: fmtBytes(res.freedBytes) }),
+      });
+    } catch (err: any) {
+      setCleanupMsg({ type: "err", text: t("dataManager.versionHistory.cleanupFailed", { error: err?.message || "error" }) });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const retentionParam = settings.retention.mode === "count" ? settings.retention.count : settings.retention.days;
+
+  return (
+    <div className="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-700">
+      <div className="flex items-center gap-2 mb-2">
+        <Save size={14} className="text-violet-500" />
+        <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{t("dataManager.versionHistory.title")}</span>
+      </div>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">{t("dataManager.versionHistory.description")}</p>
+
+      <div className="space-y-3">
+        {/* 自动备份间隔 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" htmlFor="vh-interval">
+            {t("dataManager.versionHistory.intervalLabel")}
+          </label>
+          <select
+            id="vh-interval"
+            value={settings.autoVersionIntervalMinutes}
+            onChange={(e) => setSettings((prev) => (prev ? { ...prev, autoVersionIntervalMinutes: Number(e.target.value) } : prev))}
+            className="px-2 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-violet-500/30"
+          >
+            {[5, 10, 15, 30, 60].map((m) => (
+              <option key={m} value={m}>{t("dataManager.versionHistory.intervalMinutes", { n: m })}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* P2 存储配额 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400" htmlFor="vh-quota">
+            {t("dataManager.versionHistory.quotaLabel")}
+          </label>
+          <input
+            id="vh-quota"
+            type="number"
+            min={0}
+            value={settings.storageQuotaMb}
+            onChange={(e) => setSettings((prev) => (prev ? { ...prev, storageQuotaMb: Math.max(0, Math.round(Number(e.target.value) || 0)) } : prev))}
+            className="w-24 px-2 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-violet-500/30"
+          />
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">MB</span>
+          <span className="text-[11px] text-zinc-400 dark:text-zinc-500">{t("dataManager.versionHistory.quotaHint")}</span>
+        </div>
+
+        {/* 保留策略三选一 + N 输入 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("dataManager.versionHistory.retentionLabel")}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {([
+              { mode: "forever" as const, labelKey: "dataManager.versionHistory.retentionForever" },
+              { mode: "count" as const, labelKey: "dataManager.versionHistory.retentionCount" },
+              { mode: "days" as const, labelKey: "dataManager.versionHistory.retentionDays" },
+            ]).map((opt) => (
+              <label key={opt.mode} className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="vh-retention-mode"
+                  checked={settings.retention.mode === opt.mode}
+                  onChange={() => setRetentionMode(opt.mode)}
+                  className="accent-violet-500"
+                />
+                <span className="text-xs text-zinc-600 dark:text-zinc-300">{t(opt.labelKey)}</span>
+              </label>
+            ))}
+          </div>
+          {settings.retention.mode !== "forever" && (
+            <input
+              type="number"
+              min={1}
+              max={99999}
+              value={retentionParam}
+              onChange={(e) => setRetentionParam(e.target.value)}
+              aria-label={t("dataManager.versionHistory.retentionParamLabel")}
+              className="w-20 px-2 py-1.5 text-xs rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent text-zinc-700 dark:text-zinc-200 outline-none focus:ring-2 focus:ring-violet-500/30"
+            />
+          )}
+        </div>
+        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 -mt-1.5">
+          {settings.retention.mode === "count"
+            ? t("dataManager.versionHistory.retentionCountHint")
+            : settings.retention.mode === "days"
+              ? t("dataManager.versionHistory.retentionDaysHint")
+              : t("dataManager.versionHistory.retentionForeverHint")}
+        </p>
+
+        {/* 会话结束快照开关 */}
+        <label className="flex flex-wrap items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.sessionEndSnapshot}
+            onChange={(e) => setSettings((prev) => (prev ? { ...prev, sessionEndSnapshot: e.target.checked } : prev))}
+            className="accent-violet-500"
+          />
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t("dataManager.versionHistory.sessionEndLabel")}</span>
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{t("dataManager.versionHistory.sessionEndHint")}</span>
+        </label>
+
+        {/* 保存 + 立即清理 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className={`flex items-center justify-center py-2 px-3 rounded-lg font-medium text-sm transition-all ${saving
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed"
+              : "bg-violet-600 hover:bg-violet-700 text-white shadow-sm"
+              }`}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {t("dataManager.versionHistory.savingButton")}
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                {t("dataManager.versionHistory.saveButton")}
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleCleanup}
+            disabled={cleaning}
+            className={`flex items-center justify-center py-2 px-3 rounded-lg font-medium text-sm transition-all ${cleaning
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed"
+              : "bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+              }`}
+          >
+            {cleaning ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {t("dataManager.versionHistory.cleaning")}
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                {t("dataManager.versionHistory.cleanupNow")}
+              </>
+            )}
+          </button>
+        </div>
+
+        {saveMsg && (
+          <div className={`text-xs flex items-start gap-1 ${saveMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>
+            {saveMsg.type === "ok" ? <CheckCircle size={12} className="mt-0.5" /> : <AlertCircle size={12} className="mt-0.5" />}
+            <span>{saveMsg.text}</span>
+          </div>
+        )}
+        {cleanupMsg && (
+          <div className={`text-xs flex items-start gap-1 ${cleanupMsg.type === "ok" ? "text-green-600" : "text-red-500"}`}>
+            {cleanupMsg.type === "ok" ? <CheckCircle size={12} className="mt-0.5" /> : <AlertCircle size={12} className="mt-0.5" />}
+            <span>{cleanupMsg.text}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function DataFileSection() {
   const { t } = useTranslation();
   const [info, setInfo] = useState<DataFileInfo | null>(null);
@@ -3498,6 +3750,9 @@ export function DataFileSection() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ===== 版本历史（v2）：自动备份间隔 / 保留策略 / 会话结束快照 / 立即清理 ===== */}
+      <VersionHistorySettingsCard />
     </section>
   );
 }

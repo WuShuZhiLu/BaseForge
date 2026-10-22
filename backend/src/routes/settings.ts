@@ -13,6 +13,8 @@ import {
 import systemUpdateRouter from "./system-update";
 import importBatchesRouter from "./import-batches";
 import roundTripPermissionsRouter from "./roundtrip-permissions";
+import { readVersionHistorySettings, writeVersionHistorySettings } from "../services/version-history-settings";
+import { runVersionRetentionNow, sweepVersionGcQueue } from "../services/version-snapshot";
 
 const settings = new Hono();
 
@@ -144,6 +146,42 @@ settings.put("/", async (c) => {
 
   if (entries.length > 0) systemSettingsRepository.setMany(entries);
   return c.json(readSettings());
+});
+
+// 版本历史 v2 设置与立即清理（docs/version-history-v2.md）。
+// 挂在认证路由下：GET 需登录，写入与清理仅系统管理员（设置是部署级全局配置，
+// 服务端定时快照器直接读取同一 KV）。
+settings.get("/version-history", (c) => {
+  return c.json({ versionHistory: readVersionHistorySettings() });
+});
+
+settings.put("/version-history", async (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!isSystemAdmin(userId)) {
+    return c.json({ error: "仅管理员可修改版本历史设置", code: "FORBIDDEN" }, 403);
+  }
+  const body = await c.req.json().catch(() => ({}) as any);
+  const merged = writeVersionHistorySettings(body.versionHistory ?? body);
+  return c.json({ versionHistory: merged });
+});
+
+settings.post("/version-history/cleanup", (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!isSystemAdmin(userId)) {
+    return c.json({ error: "仅管理员可执行版本清理", code: "FORBIDDEN" }, 403);
+  }
+  const result = runVersionRetentionNow();
+  return c.json({ success: true, deleted: result.deleted, freedBytes: result.freedBytes });
+});
+
+// P2 附件 GC 第二阶段手动触发：清扫超过宽限期的待删除附件（默认 7 天）
+settings.post("/version-history/gc-sweep", (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!isSystemAdmin(userId)) {
+    return c.json({ error: "仅管理员可执行附件 GC", code: "FORBIDDEN" }, 403);
+  }
+  const result = sweepVersionGcQueue(7);
+  return c.json({ success: true, swept: result.swept, freedBytes: result.freedBytes });
 });
 
 // 管理员专用 Docker 在线升级控制面。挂在 settings 路由下可复用现有 JWT 中间件，

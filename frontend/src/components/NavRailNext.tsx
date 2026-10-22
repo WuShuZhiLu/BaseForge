@@ -38,9 +38,6 @@ import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
 import { cn } from "@/lib/utils";
 import SettingsModal from "@/components/SettingsModal";
 
-/** 纯图标模式 tooltip 显示选择器：hover 时展示（label 模式隐藏）。 */
-const RAIL_TIP_VISIBLE = "group-hover:opacity-100 group-hover:pointer-events-auto";
-
 type NavItemMode = Extract<
   ViewMode,
   "notebook" | "favorites" | "trash" | "files" | "tasks" | "diary" | "ai-chat" | "shares"
@@ -272,6 +269,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
           key={item.mode}
           type="button"
           onClick={() => navigate("plugins")}
+          aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
           title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
           className={cn(
             "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
@@ -287,11 +285,6 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
               {t(item.titleKey, { defaultValue: item.titleDefault })}
             </span>
           )}
-          {!showLabel && (
-            <span className={cn("rail-tip", RAIL_TIP_VISIBLE)} role="tooltip">
-              {t(item.titleKey, { defaultValue: item.titleDefault })}
-            </span>
-          )}
         </button>
       );
     }
@@ -303,6 +296,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         type="button"
         onClick={() => navigate(navMode)}
         aria-current={active ? "page" : undefined}
+        aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
         title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
         className={cn(
           "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
@@ -320,11 +314,6 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
               active && "font-medium text-accent-primary",
             )}
           >
-            {t(item.titleKey, { defaultValue: item.titleDefault })}
-          </span>
-        )}
-        {!showLabel && (
-          <span className={cn("rail-tip", RAIL_TIP_VISIBLE)} role="tooltip">
             {t(item.titleKey, { defaultValue: item.titleDefault })}
           </span>
         )}
@@ -504,6 +493,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
       <button
         type="button"
         onClick={() => setShowSettings(true)}
+        aria-label={t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         title={showLabel ? undefined : t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         className={cn(
           "group relative mx-auto flex h-11 shrink-0 items-center justify-center rounded-md text-tx-secondary transition-colors",
@@ -519,11 +509,6 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
             </span>
           )}
         </span>
-        {!showLabel && (
-          <span className={cn("rail-tip", RAIL_TIP_VISIBLE)} role="tooltip">
-            {t("sidebarNext.nav.settings", { defaultValue: "设置" })}
-          </span>
-        )}
       </button>
 
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

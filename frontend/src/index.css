@@ -2890,38 +2890,6 @@ html[data-electron="darwin"][data-fullscreen="1"] main::before {
 }
 
 /* ============================================================
-   NavRailNext（原型 r15 新导航栏）补充样式
-   纯图标模式：悬停深色 pill tooltip + 虚线连接
-   ============================================================ */
-.rail-tip {
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: #111827;
-  color: #f9fafb;
-  font-size: 11px;
-  line-height: 1;
-  padding: 5px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .12s;
-  z-index: 110;
-}
-.rail-tip::before {
-  content: "";
-  position: absolute;
-  right: 100%;
-  top: 50%;
-  width: 10px;
-  border-top: 1px dashed #9ca3af;
-}
-
-[data-next-rail] button.group:hover > .rail-tip { opacity: 1; }
-
-/* ============================================================
    SidebarNext 活动栏视图（收藏/回收站/文件管理/插件）——照抄原型 sb-view 系
    ============================================================ */
 .sbx-view { flex-shrink: 0; padding-bottom: 4px; }

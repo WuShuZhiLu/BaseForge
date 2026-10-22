@@ -404,12 +404,32 @@ function initSchema(db: Database.Database) {
       version INTEGER NOT NULL,
       changeType TEXT DEFAULT 'edit',
       changeSummary TEXT,
+      kind TEXT NOT NULL DEFAULT 'auto',
+      label TEXT,
+      description TEXT,
+      contentHash TEXT,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (noteId) REFERENCES notes(id) ON DELETE CASCADE,
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_note_versions_note ON note_versions(noteId, version DESC);
+
+    -- 版本级附件引用倒排（版本历史 v2）：附件孤儿扫描需把版本引用计入存活来源
+    CREATE TABLE IF NOT EXISTS version_attachment_refs (
+      versionId TEXT NOT NULL,
+      attachmentId TEXT NOT NULL,
+      PRIMARY KEY (versionId, attachmentId)
+    );
+
+    -- 版本附件两阶段 GC 待清理队列（v125）：宽限期内可还原，到期物理删除
+    CREATE TABLE IF NOT EXISTS version_gc_queue (
+      "attachmentId" TEXT PRIMARY KEY,
+      path TEXT NOT NULL,
+      bytes INTEGER NOT NULL DEFAULT 0,
+      "freedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_version_gc_queue_freed ON version_gc_queue("freedAt");
 
     -- 评论批注表
     --

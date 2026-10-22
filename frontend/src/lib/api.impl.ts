@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -3489,8 +3489,8 @@ export const api = {
   getSharedNoteIds: () => request<string[]>("/shares/status/batch"),
 
   // 版本历史
-  getNoteVersions: (noteId: string, limit = 20, offset = 0) =>
-    request<{ versions: NoteVersion[]; total: number }>(`/shares/note/${noteId}/versions?limit=${limit}&offset=${offset}`),
+  getNoteVersions: (noteId: string, limit = 20, offset = 0, kind?: "auto" | "manual") =>
+    request<{ versions: NoteVersion[]; total: number; contentBytesTotal?: number }>(`/shares/note/${noteId}/versions?limit=${limit}&offset=${offset}${kind ? `&kind=${kind}` : ""}`),
   getNoteVersion: (noteId: string, versionId: string) =>
     request<NoteVersion>(`/shares/note/${noteId}/versions/${versionId}`),
   restoreNoteVersion: (noteId: string, versionId: string) => {
@@ -3502,7 +3502,28 @@ export const api = {
     return p;
   },
   clearNoteVersions: (noteId: string) =>
-    request<{ success: boolean; count: number }>(`/shares/note/${noteId}/versions`, { method: "DELETE" }),
+    request<{ success: boolean; count: number; skippedManual: number }>(`/shares/note/${noteId}/versions`, { method: "DELETE" }),
+  // v2 契约端点（VERSION_V2_BRIEF 固定契约表）：手动版本 / 副本 / 单删 / 批量删 / auto 快照 / 全局清理 / 设置读写
+  saveNoteVersion: (noteId: string, data: { label?: string; description?: string } = {}) =>
+    request<NoteVersion>(`/shares/note/${noteId}/versions`, { method: "POST", body: JSON.stringify(data) }),
+  duplicateNoteFromVersion: (noteId: string, versionId: string) =>
+    request<Note>(`/shares/note/${noteId}/versions/${versionId}/duplicate`, { method: "POST" }),
+  deleteNoteVersion: (noteId: string, versionId: string) =>
+    request<{ success: boolean }>(`/shares/note/${noteId}/versions/${versionId}`, { method: "DELETE" }),
+  batchDeleteNoteVersions: (noteId: string, ids: string[]) =>
+    request<{ success: boolean; deleted: number; skipped: number }>(`/shares/note/${noteId}/versions/batch-delete`, { method: "POST", body: JSON.stringify({ ids }) }),
+  /** 会话结束快照（auto；内容未变时 created=false，幂等） */
+  snapshotNoteVersion: (noteId: string) =>
+    request<{ created: boolean }>(`/shares/note/${noteId}/versions/snapshot`, { method: "POST" }),
+  /** 全局立即清理（POST /api/settings/version-history/cleanup）：按保留策略清 auto 版本 */
+  cleanupNoteVersions: () =>
+    request<{ deleted: number; freedBytes: number }>("/settings/version-history/cleanup", { method: "POST" }),
+  /** 版本历史设置（认证子路径，独立于公开品牌 GET /api/settings） */
+  getVersionHistorySettings: () =>
+    request<{ versionHistory?: VersionHistorySettings }>("/settings/version-history"),
+  /** 版本历史设置局部更新（PUT /api/settings/version-history，仅管理员） */
+  updateVersionHistorySettings: (data: Partial<VersionHistorySettings>) =>
+    request<{ versionHistory: VersionHistorySettings }>("/settings/version-history", { method: "PUT", body: JSON.stringify(data) }),
 
   // 评论中心复用现有评论资源，不进入笔记离线写队列。
   getManagedNoteComments: (status = "all", q = "", offset = 0, limit = 30) =>

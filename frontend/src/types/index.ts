@@ -849,6 +849,30 @@ export interface NoteVersion {
   changeType: string;
   changeSummary: string | null;
   createdAt: string;
+  /** v2：auto=自动/系统版本，manual=手动保存版本；旧后端不下发时按 auto 归类 */
+  kind?: "auto" | "manual";
+  /** 手动版本名称（label 为空时服务端默认「手动备份 YYYY/MM/DD HH:mm」） */
+  label?: string | null;
+  /** 手动版本描述 */
+  description?: string | null;
+  /** 版本内容占用字节（列表接口下发，用于占用统计） */
+  contentBytes?: number;
+}
+
+/** 版本历史 v2 保留策略配置 */
+export interface VersionRetentionConfig {
+  mode: "forever" | "count" | "days";
+  count: number;
+  days: number;
+}
+
+/** 版本历史 v2 全局设置（服务端 KV version_history_settings，经 /api/settings 合并下发） */
+export interface VersionHistorySettings {
+  autoVersionIntervalMinutes: number;
+  sessionEndSnapshot: boolean;
+  retention: VersionRetentionConfig;
+  /** P2 存储配额（MB）：auto 版本总字节超限时最旧优先清理；0 = 不限制 */
+  storageQuotaMb: number;
 }
 
 // 评论批注
