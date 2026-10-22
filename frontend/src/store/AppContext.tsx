@@ -242,7 +242,15 @@ const initialState: AppState = {
   mobileView: "list",
   mobileSidebarOpen: false,
   notesRefreshToken: 0,
-  openNoteTabs: [],
+  openNoteTabs: (() => {
+    try {
+      const saved = localStorage.getItem("nowen-open-note-tabs");
+      const parsed = saved ? JSON.parse(saved) as OpenNoteTab[] : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })(),
   openToolTabs: [],
   activeToolTab: null,
   editorSplit: null,
@@ -295,12 +303,14 @@ function reducer(state: AppState, action: Action): AppState {
     case "SET_TAGS":
       return { ...state, tags: action.payload };
     case "SET_SELECTED_NOTEBOOK":
+      if (state.selectedNotebookId === action.payload) return state;
       return {
         ...state,
         selectedNotebookId: action.payload,
         selectedKnowledgeTreeParentId: undefined,
       };
     case "SET_SELECTED_KNOWLEDGE_TREE_PARENT":
+      if (state.selectedKnowledgeTreeParentId === action.payload) return state;
       return { ...state, selectedKnowledgeTreeParentId: action.payload };
     case "SET_SELECTED_TAG": {
       // 兼容旧调用：同步更新 selectedTagId + selectedTagIds
@@ -358,8 +368,11 @@ function reducer(state: AppState, action: Action): AppState {
         ? state
         : { ...state, sidebarPanel: action.payload, sidebarCollapsed: false };
     case "SET_VIEW_MODE":
+      // 幂等：视图未变化时返回原 state，避免下游 useEffect 重复拉取造成卡顿
+      if (state.viewMode === action.payload) return state;
       return { ...state, viewMode: action.payload };
     case "SET_SEARCH_QUERY":
+      if (state.searchQuery === action.payload) return state;
       return { ...state, searchQuery: action.payload };
     case "TOGGLE_SIDEBAR":
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
@@ -493,7 +506,7 @@ function reducer(state: AppState, action: Action): AppState {
         )),
       };
     case "CLEAR_NOTE_TABS":
-      return { ...state, openNoteTabs: [], editorSplit: null };
+      return { ...state, openNoteTabs: [], editorSplit: null, activeNote: null };
     case "SET_NOTE_TABS":
       return {
         ...state,
@@ -521,6 +534,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // 打开的页签持久化：刷新后恢复"打开的编辑器"（侧栏面板依赖）
+  useEffect(() => {
+    try {
+      localStorage.setItem("nowen-open-note-tabs", JSON.stringify(state.openNoteTabs));
+    } catch { /* quota/serialization failures are non-fatal */ }
+  }, [state.openNoteTabs]);
   const noteActivationGuard = useMemo(() => new NoteActivationGuard(), []);
   const profiledDispatch = useCallback<React.Dispatch<Action>>((action) => {
     if (action.type === "BEGIN_NOTE_LOAD") {

@@ -1,0 +1,190 @@
+/**
+ * 内置官方插件的侧栏迷你面板：待办 / 每日记录。
+ *
+ * 由 PluginPanelHost 按 builtinId 渲染；数据走统一 api；
+ * "在主区打开"切 viewMode（主区全屏中心仍在 App.tsx）。
+ */
+import React, { useCallback, useEffect, useState } from "react";
+import { ListTodo, Plus, RefreshCw } from "lucide-react";
+
+import { api } from "@/lib/api";
+import { getTaskInbox } from "@/lib/taskInboxApi";
+import type { Task } from "@/types";
+import { cn } from "@/lib/utils";
+
+type OpenMainView = (viewMode: "tasks" | "diary") => void;
+
+interface MiniPanelShellProps {
+  title: string;
+  onOpenMain: () => void;
+  onRefresh: () => void;
+  children: React.ReactNode;
+}
+
+function MiniPanelShell({ title, onOpenMain, onRefresh, children }: MiniPanelShellProps) {
+  return (
+    <div className="sbx-view">
+      <div className="sbx-view-head">
+        <span>{title}</span>
+        <span className="sbx-mini-tag">官方插件</span>
+        <span className="flex-1" />
+        <button type="button" title="刷新" onClick={onRefresh} className="sbx-btn">
+          <RefreshCw size={12} />
+        </button>
+      </div>
+      {children}
+      <div className="sbx-foot-row">
+        <span className="sbx-foot-tip" />
+        <button type="button" onClick={onOpenMain} className="sbx-foot-link">
+          在主区打开
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyHint({ text }: { text: string }) {
+  return <p className="sbx-view-empty">{text}</p>;
+}
+
+/** ============ 待办迷你面板 ============ */
+export function TasksMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<"inbox" | "today" | "all">("inbox");
+  const [quickText, setQuickText] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    const load = mode === "inbox"
+      ? getTaskInbox().then((r) => r.items as Task[])
+      : api.getTasks(mode === "today" ? "today" : undefined);
+    load
+      .then((items) => setTasks(items))
+      .catch(() => setTasks([]))
+      .finally(() => setLoading(false));
+  }, [mode]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const toggleDone = useCallback((task: Task) => {
+    api.updateTask(task.id, { isCompleted: task.isCompleted ? 0 : 1 } as never)
+      .then(() => reload())
+      .catch(() => undefined);
+  }, [reload]);
+
+  const quickAdd = useCallback(async () => {
+    const title = quickText.trim();
+    if (!title) return;
+    setAdding(true);
+    try {
+      await api.createTask({ title } as never);
+      setQuickText("");
+      reload();
+    } catch (error) {
+      console.error("[TasksMiniPanel] quick add failed:", error);
+    } finally {
+      setAdding(false);
+    }
+  }, [quickText, reload]);
+
+  return (
+    <MiniPanelShell title="待办" onOpenMain={() => onOpenMain("tasks")} onRefresh={reload}>
+      <div className="sbx-chips">
+        {([["inbox", "收件箱"], ["today", "今日"], ["all", "任务"]] as Array<[typeof mode, string]>).map(([value, label]) => (
+          <span
+            key={value}
+            className={cn("sbx-chip", mode === value && "on")}
+            onClick={() => {
+              setMode(value);
+              // 同步主区：切到对应过滤视图
+              window.dispatchEvent(new CustomEvent("nowen:task-panel-navigate", { detail: { target: value } }));
+            }}
+          >{label}</span>
+        ))}
+      </div>
+      <div className="sbx-quick-add">
+        <Plus size={13} className="shrink-0" />
+        <input
+          value={quickText}
+          onChange={(e) => setQuickText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void quickAdd(); }}
+          placeholder="快速添加任务"
+          className="min-w-0 flex-1 bg-transparent text-[11px] text-tx-primary outline-none placeholder:text-tx-tertiary"
+        />
+        {quickText.trim() && (
+          <button type="button" onClick={() => void quickAdd()} disabled={adding} className="text-[11px] text-accent-primary">
+            {adding ? "…" : "添加"}
+          </button>
+        )}
+      </div>
+      <div className="px-1 pb-2">
+        {loading ? (
+          <EmptyHint text="加载中…" />
+        ) : tasks.length === 0 ? (
+          <EmptyHint text="暂无任务" />
+        ) : tasks.slice(0, 30).map((task) => (
+          <div key={task.id} className="sbx-row group" onClick={() => toggleDone(task)}>
+            <span
+              className={cn(
+                "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border",
+                task.isCompleted ? "border-accent-primary bg-accent-primary" : "border-app-border",
+              )}
+            >
+              {Boolean(task.isCompleted) && <ListTodo size={9} className="text-white" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <div className={cn("truncate text-xs", task.isCompleted ? "text-tx-tertiary line-through" : "text-tx-primary")}>
+                {task.title}
+              </div>
+              {task.dueAt && <div className="sbx-sub">{task.dueAt.slice(0, 10)}</div>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </MiniPanelShell>
+  );
+}
+
+interface JournalItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  journalDate: string;
+}
+
+/** ============ 每日记录迷你面板 ============ */
+export function DiaryMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+  const [items, setItems] = useState<JournalItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    api.journals.list({ limit: 20, sort: "date_desc" })
+      .then((r) => setItems(r.items as JournalItem[]))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  return (
+    <MiniPanelShell title="日记" onOpenMain={() => onOpenMain("diary")} onRefresh={reload}>
+      <div className="px-1 pb-2">
+        {loading ? (
+          <EmptyHint text="加载中…" />
+        ) : items.length === 0 ? (
+          <EmptyHint text="暂无记录" />
+        ) : items.map((item) => (
+          <div key={item.id} className="sbx-row group" onClick={() => onOpenMain("diary")}>
+            <span className="min-w-0 flex-1">
+              <div className="truncate text-xs text-tx-primary">{item.title || item.journalDate}</div>
+              <div className="sbx-sub">{item.subtitle || item.journalDate}</div>
+            </span>
+          </div>
+        ))}
+      </div>
+    </MiniPanelShell>
+  );
+}

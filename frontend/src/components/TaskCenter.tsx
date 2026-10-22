@@ -11,7 +11,7 @@ export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 export * from "./TaskCenterImpl";
 
-export default function TaskCenter() {
+export default function TaskCenter({ hideSidebar }: { hideSidebar?: boolean } = {}) {
   useEffect(() => {
     const handleDeleteCapture = (event: MouseEvent) => {
       if (!shouldConfirmHabitDelete(event.target)) return;
@@ -34,7 +34,7 @@ export default function TaskCenter() {
     <TaskMetadataWorkspace>
       <TaskEntryUxBridge />
       <TaskDetailRichExperienceBridge />
-      <TaskCenterImpl />
+      <TaskCenterImpl hideSidebar={hideSidebar} />
     </TaskMetadataWorkspace>
   );
 }

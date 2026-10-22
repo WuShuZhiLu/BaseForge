@@ -1271,6 +1271,11 @@ export const api = {
       request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash/batch?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ action, ids }) }),
     empty: (workspaceId: string) => request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "DELETE" }),
   },
+  plugins: {
+    list: () => request<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>("/plugins"),
+    enable: (id: string) => request<{ success: boolean }>(`/plugins/${encodeURIComponent(id)}/enable`, { method: "POST" }),
+    disable: (id: string) => request<{ success: boolean }>(`/plugins/${encodeURIComponent(id)}/disable`, { method: "POST" }),
+  },
   // Public (no auth required)
   getSiteSettingsPublic: async (): Promise<{
     site_title: string;

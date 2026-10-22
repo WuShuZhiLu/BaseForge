@@ -512,7 +512,7 @@ function CreateWorkspaceDialog({
 }
 
 /* ========== 加入工作区对话框 ========== */
-function JoinWorkspaceDialog({
+export function JoinWorkspaceDialog({
   onClose,
   onJoined,
 }: {

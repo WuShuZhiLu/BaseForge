@@ -2888,3 +2888,176 @@ html[data-electron="darwin"][data-fullscreen="1"] main::before {
 [data-note-workspace-window="medium"] [data-adaptive-editor-empty-header] {
   display: none !important;
 }
+
+/* ============================================================
+   NavRailNext（原型 r15 新导航栏）补充样式
+   纯图标模式：悬停深色 pill tooltip + 虚线连接
+   ============================================================ */
+.rail-tip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #111827;
+  color: #f9fafb;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s;
+  z-index: 110;
+}
+.rail-tip::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: 10px;
+  border-top: 1px dashed #9ca3af;
+}
+
+[data-next-rail] button.group:hover > .rail-tip { opacity: 1; }
+
+/* ============================================================
+   SidebarNext 活动栏视图（收藏/回收站/文件管理/插件）——照抄原型 sb-view 系
+   ============================================================ */
+.sbx-view { flex-shrink: 0; padding-bottom: 4px; }
+.sbx-view-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.sbx-badge {
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--color-hover);
+  padding: 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.sbx-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.sbx-row:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.sbx-ico { display: flex; flex-shrink: 0; }
+.sbx-sub { font-size: 10px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.sbx-meta { font-size: 10px; color: var(--color-text-tertiary); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.sbx-acts { display: none; align-items: center; gap: 2px; flex-shrink: 0; }
+.sbx-row:hover .sbx-acts { display: flex; }
+.sbx-btn {
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 4px;
+  color: var(--color-text-tertiary);
+}
+.sbx-btn:hover { background: var(--color-active); color: var(--color-text-primary); }
+.sbx-chips {
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 12px 8px; flex-wrap: wrap;
+}
+.sbx-chip {
+  font-size: 11px; padding: 3px 8px; border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all .12s;
+}
+.sbx-chip:hover { color: var(--color-text-secondary); }
+.sbx-chip.on { background: var(--color-active); border-color: transparent; color: var(--color-accent-primary); }
+.sbx-view-empty { padding: 24px 16px; font-size: 11px; color: var(--color-text-tertiary); text-align: center; }
+.sbx-view-tip { padding: 0 12px 8px; font-size: 10px; color: var(--color-text-tertiary); line-height: 1.6; }
+.sbx-cchip {
+  font-size: 10px; line-height: 16px; padding: 0 6px; border-radius: 4px;
+  color: var(--color-text-secondary); background: var(--color-hover);
+  border: 1px solid var(--color-border);
+}
+.sbx-cchip.off { color: var(--color-text-tertiary); text-decoration: line-through; }
+.sbx-switch {
+  width: 32px; height: 18px;
+  border-radius: 9999px;
+  background: var(--color-border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background .15s;
+  cursor: pointer;
+}
+.sbx-switch::after {
+  content: "";
+  position: absolute;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  top: 2px; left: 2px;
+  transition: left .15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.sbx-switch.on { background: var(--color-accent-primary); }
+.sbx-switch.on::after { left: 16px; }
+.sbx-switch:not(.on) { opacity: .5; }
+
+/* 插件迷你面板补充（内置官方插件：待办/日记） */
+.sbx-mini-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 6px;
+  border-radius: 5px;
+  color: var(--color-accent-primary);
+  background: color-mix(in srgb, var(--color-accent-primary) 12%, transparent);
+}
+.dark .sbx-mini-tag { background: color-mix(in srgb, var(--color-accent-primary) 20%, transparent); }
+.sbx-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 8px 6px;
+  padding: 7px 9px;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+}
+.sbx-quick-add:focus-within { border-color: var(--color-accent-primary); }
+.sbx-foot-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border);
+}
+.sbx-foot-tip { flex: 1; font-size: 10px; color: var(--color-text-tertiary); }
+.sbx-foot-link {
+  font-size: 10px;
+  color: var(--color-accent-primary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.sbx-foot-link:hover { text-decoration: underline; }
+
+/* Tailwind 对 CSS 变量颜色不生成透明度变体（bg-accent-primary/N 丢失），
+   在此显式补齐侧栏/Rail 需要的几档，避免选中态/高亮不可见。 */
+.bg-accent-primary\/10 { background-color: color-mix(in srgb, var(--color-accent-primary) 10%, transparent); }
+.bg-accent-primary\/12 { background-color: color-mix(in srgb, var(--color-accent-primary) 12%, transparent); }
+.bg-accent-primary\/15 { background-color: color-mix(in srgb, var(--color-accent-primary) 15%, transparent); }
+.bg-accent-primary\/20 { background-color: color-mix(in srgb, var(--color-accent-primary) 20%, transparent); }
+.bg-accent-primary\/25 { background-color: color-mix(in srgb, var(--color-accent-primary) 25%, transparent); }

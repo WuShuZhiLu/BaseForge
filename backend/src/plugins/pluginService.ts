@@ -90,7 +90,11 @@ export class PluginService {
       const manifest = manifestOf(record);
       if (manifest.apiVersion !== 2 || !manifest.contributes) return [];
       const contributions = { ...manifest.contributes };
-      if (!getExtensionPlatformFeatureFlags().uiExtensions) delete contributions.uiComponents;
+      if (!getExtensionPlatformFeatureFlags().uiExtensions) {
+        delete contributions.uiComponents;
+        delete contributions.sidebarPanels;
+        delete contributions.mainViewPanels;
+      }
       return [{ pluginId: record.id, publisher: manifest.publisher, ...contributions }];
     });
   }

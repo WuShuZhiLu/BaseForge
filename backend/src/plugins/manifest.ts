@@ -171,6 +171,51 @@ const uiComponentSchema = z.object({
   }
 });
 
+const uiIconEnum = z.enum(["home", "star", "files", "diary", "tasks", "mindmap", "ai", "shares", "settings"]);
+const uiPlatformEnum = z.enum(["web", "desktop", "android", "ios"]);
+
+const sidebarPanelCardSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+  title: z.string().min(1).max(120),
+  description: z.string().max(500).optional(),
+  link: z.object({
+    label: z.string().min(1).max(50),
+    target: z.enum(["all", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares", "settings"]),
+  }).strict().optional(),
+}).strict();
+
+const sidebarPanelSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+  title: z.string().min(1).max(100),
+  icon: uiIconEnum,
+  kind: z.enum(["builtin", "static-card"]),
+  builtinId: z.string().max(64).optional(),
+  cards: z.array(sidebarPanelCardSchema).max(20).optional(),
+  defaultOpen: z.boolean().optional(),
+  uiPlatform: z.array(uiPlatformEnum).min(1).max(4).optional(),
+}).strict().superRefine((panel, ctx) => {
+  if (panel.kind === "builtin" && !panel.builtinId) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["builtinId"], message: "builtin 面板必须声明 builtinId" });
+  }
+  if (panel.kind === "static-card" && !(panel.cards?.length)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cards"], message: "static-card 面板必须提供至少一张卡片" });
+  }
+  if (panel.kind === "builtin" && panel.cards?.length) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cards"], message: "builtin 面板不支持 cards（由宿主内置渲染）" });
+  }
+});
+
+const mainViewPanelSchema = z.object({
+  id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
+  title: z.string().min(1).max(100),
+  icon: uiIconEnum,
+  builtinId: z.enum(["tasks", "diary"]),
+  uiPlatform: z.array(uiPlatformEnum).min(1).max(4).optional(),
+}).strict();
+
+const sidebarPanelsField = z.array(sidebarPanelSchema).max(10).optional();
+const mainViewPanelsField = z.array(mainViewPanelSchema).max(5).optional();
+
 const v2BaseShape = {
   id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(150),
   name: z.string().min(1).max(100), description: z.string().max(1000).default(""),
@@ -202,6 +247,8 @@ const executableContributesSchema = z.object({
   noteTemplates: z.array(noteTemplateSchema).max(100).optional(),
   promptPacks: z.array(promptPackSchema).max(100).optional(),
   uiComponents: z.array(uiComponentSchema).max(50).optional(),
+  sidebarPanels: sidebarPanelsField,
+  mainViewPanels: mainViewPanelsField,
 }).strict().optional();
 
 const declarativeContributesSchema = z.object({
@@ -211,8 +258,10 @@ const declarativeContributesSchema = z.object({
   noteTemplates: z.array(noteTemplateSchema).max(100).optional(),
   promptPacks: z.array(promptPackSchema).max(100).optional(),
   uiComponents: z.array(uiComponentSchema).max(50).optional(),
+  sidebarPanels: sidebarPanelsField,
+  mainViewPanels: mainViewPanelsField,
 }).strict().superRefine((contributes, ctx) => {
-  if (!(contributes.settings?.length || contributes.automationTemplates?.length || contributes.noteThemes?.length || contributes.noteTemplates?.length || contributes.promptPacks?.length || contributes.uiComponents?.length)) {
+  if (!(contributes.settings?.length || contributes.automationTemplates?.length || contributes.noteThemes?.length || contributes.noteTemplates?.length || contributes.promptPacks?.length || contributes.uiComponents?.length || contributes.sidebarPanels?.length || contributes.mainViewPanels?.length)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "声明式插件必须至少提供一个静态 Contribution" });
   }
   if (contributes.settings?.some((setting) => setting.secret)) {
@@ -247,6 +296,10 @@ export const pluginManifestV2Schema = z.union([executableV2Schema, declarativeV2
   if (new Set(promptPackIds).size !== promptPackIds.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "promptPacks"], message: "Prompt Pack id 不能重复" });
   const uiComponentIds = (manifest.contributes?.uiComponents || []).map((item) => item.id);
   if (new Set(uiComponentIds).size !== uiComponentIds.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "uiComponents"], message: "UI Component id 不能重复" });
+  const sidebarPanelIds = (manifest.contributes?.sidebarPanels || []).map((item) => item.id);
+  if (new Set(sidebarPanelIds).size !== sidebarPanelIds.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "sidebarPanels"], message: "Sidebar Panel id 不能重复" });
+  const mainViewPanelIds = (manifest.contributes?.mainViewPanels || []).map((item) => item.id);
+  if (new Set(mainViewPanelIds).size !== mainViewPanelIds.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "mainViewPanels"], message: "Main View Panel id 不能重复" });
   for (const [index, permission] of manifest.permissions.entries()) {
     if (!isV2SupportedPluginPermission(permission)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["permissions", index], message: permission === "attachments:write" ? "Plugin API V2 不支持 attachments:write" : `Plugin API V2 不支持权限 ${permission}` });
   }

@@ -254,6 +254,18 @@ export function KnowledgeTreeCreateDropdown({
       style={position || { left: 8, top: 8, width: CREATE_MENU_WIDTH, visibility: "hidden" }}
       onPointerDown={(event) => event.stopPropagation()}
     >
+      {menu.parentId === null ? (
+        /* 根级（未选中任何节点）：只能新建知识库 */
+        <button
+          type="button"
+          role="menuitem"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          onClick={() => onCreate(null, "folder")}
+        >
+          <Folder size={15} className="text-amber-500" />
+          <span>新建知识库</span>
+        </button>
+      ) : (<>
       {CREATE_ITEMS.map((item) => {
         const Icon = item.icon;
         return (
@@ -290,10 +302,10 @@ export function KnowledgeTreeCreateDropdown({
         <Folder size={15} className="text-amber-500" />
         <span>{FOLDER_CREATE_ITEM.label}</span>
       </button>
-      {onCreateSheet && (
+      {menu.parentId !== null && onCreateSheet && (
         <button
           type="button"
-          role="menuitem"
+        role="menuitem"
           className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
           onClick={() => onCreateSheet(menu.parentId)}
         >
@@ -340,6 +352,7 @@ export function KnowledgeTreeCreateDropdown({
       <p className="border-t border-app-border px-2.5 pb-1 pt-2 text-[10px] text-tx-tertiary">
         也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
       </p>
+      </>)}
     </div>,
     document.body,
   );

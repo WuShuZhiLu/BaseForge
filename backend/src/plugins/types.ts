@@ -199,6 +199,40 @@ export interface PluginContributionManifest {
   noteTemplates?: PluginNoteTemplateContribution[];
   promptPacks?: PluginPromptPackContribution[];
   uiComponents?: PluginUiActionContribution[];
+  /** 侧栏/主区插件面板（V2.1，受 uiExtensions flag 门禁） */
+  sidebarPanels?: PluginSidebarPanelContribution[];
+  mainViewPanels?: PluginMainViewPanelContribution[];
+}
+
+/** 插件贡献的侧栏迷你面板（声明式：宿主渲染，零代码） */
+export interface PluginSidebarPanelContribution {
+  id: string;
+  title: string;
+  icon: PluginUiIcon;
+  /** 面板形态：内置宿主渲染的迷你列表（内置插件）或静态信息卡（第三方声明式） */
+  kind: "builtin" | "static-card";
+  /** builtin 面板指向宿主内置实现 id（如 "tasks" / "diary"） */
+  builtinId?: string;
+  /** static-card 的静态内容块（声明式渲染，无代码执行） */
+  cards?: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    link?: { label: string; target: PluginNavigationTarget };
+  }>;
+  /** 默认是否随插件启用挂载 */
+  defaultOpen?: boolean;
+  uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
+}
+
+/** 插件贡献的主区全屏面板（官方内置插件形态：tasks/diary 中心） */
+export interface PluginMainViewPanelContribution {
+  id: string;
+  title: string;
+  icon: PluginUiIcon;
+  /** 宿主内置主区实现 id（如 "tasks" / "diary"）；第三方暂不开放自定义主区 */
+  builtinId: string;
+  uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 
 export interface PluginInboundWebhookContribution {
@@ -217,6 +251,8 @@ export interface PluginDeclarativeContributionManifest {
   noteTemplates?: PluginNoteTemplateContribution[];
   promptPacks?: PluginPromptPackContribution[];
   uiComponents?: PluginUiActionContribution[];
+  sidebarPanels?: PluginSidebarPanelContribution[];
+  mainViewPanels?: PluginMainViewPanelContribution[];
 }
 
 interface PluginManifestV2Base {

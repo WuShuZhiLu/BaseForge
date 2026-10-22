@@ -1,0 +1,2754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Base Notes · 新导航栏 + 侧栏面板原型（基于现状复现版）</title>
+<style>
+/* ============================================================
+   Base Notes 现状复现版 — 按 Base-Notes main 分支代码整理
+   主题变量与 frontend/src/index.css 完全一致
+   ============================================================ */
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f9fafb;
+  --color-sidebar: #f3f4f6;
+  --color-elevated: #ffffff;
+  --color-border: #e5e7eb;
+  --color-hover: #f3f4f6;
+  --color-active: #e0e7ff;
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-inverse: #ffffff;
+
+  --color-accent-primary: #3b82f6;
+  --color-accent-secondary: #22c55e;
+  --color-accent-warning: #f59e0b;
+  --color-accent-danger: #ef4444;
+
+  --pm-text: #374151;
+  --pm-heading: #111827;
+  --pm-code-bg: #f3f4f6;
+  --pm-code-text: #dc2626;
+  --pm-pre-bg: #f9fafb;
+  --pm-pre-border: #e5e7eb;
+  --pm-blockquote-border: #3b82f6;
+  --pm-blockquote-text: #6b7280;
+  --pm-hr: #e5e7eb;
+  --pm-placeholder: #9ca3af;
+  --pm-task-done: #9ca3af;
+
+  --safe-area-top: 0px;
+}
+.dark {
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-sidebar: #1c2128;
+  --color-elevated: #1c2333;
+  --color-border: #30363d;
+  --color-hover: #1f2937;
+  --color-active: #253040;
+
+  --color-text-primary: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-text-tertiary: #6e7681;
+  --color-text-inverse: #0d1117;
+
+  --color-accent-primary: #58a6ff;
+  --color-accent-secondary: #7ee787;
+  --color-accent-warning: #f0883e;
+  --color-accent-danger: #f85149;
+
+  --pm-text: #c9d1d9;
+  --pm-heading: #e6edf3;
+  --pm-code-bg: #1c2333;
+  --pm-code-text: #f0883e;
+  --pm-pre-bg: #161b22;
+  --pm-pre-border: #30363d;
+  --pm-blockquote-border: #58a6ff;
+  --pm-blockquote-text: #8b949e;
+  --pm-hr: #30363d;
+  --pm-placeholder: #6e7681;
+  --pm-task-done: #6e7681;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+button { font-family: inherit; background: none; border: none; cursor: pointer; color: inherit; }
+
+/* ---------- 原型说明条（非 App 本体，仅评审辅助） ---------- */
+.prototype-bar {
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 12px;
+}
+.prototype-bar .pb-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.prototype-bar .pb-title { font-weight: 600; }
+.prototype-bar .pb-sub { color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prototype-bar .pb-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.pb-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  background: #1f2937; color: #d1d5db; border: 1px solid #374151;
+  transition: background .15s;
+}
+.pb-btn:hover { background: #374151; }
+.pb-btn.active { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.pb-btn svg { width: 13px; height: 13px; }
+
+/* ---------- App 骨架 ---------- */
+.app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  overflow: hidden;
+}
+
+/* ============================================================
+   NavRail v2（新导航栏：头像浮窗 / 分组 / 插件区预留 / 设置沉底）
+   ============================================================ */
+.nav-rail {
+  height: 100%;
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  transition: width .15s;
+  position: relative;
+  z-index: 130;
+  padding: 0 0 10px;
+  width: 48px;
+}
+.app.rail-label .nav-rail { width: 64px; }
+
+/* 头部带：Logo 与侧栏/编辑器头部同一 48px 线 */
+.rail-header {
+  height: 48px;
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--color-border);
+}
+/* 产品 Logo：32px accent 底色圆角块 + 17px 笔形图标 */
+.rail-logo {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: rgba(59, 130, 246, .12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.rail-logo svg { width: 17px; height: 17px; display: block; color: var(--color-accent-primary); }
+.dark .rail-logo { background: rgba(88, 166, 255, .14); }
+
+/* 头像：36px 圆 + 44px 命中区（48px 头部带内居中） */
+.rail-avatar {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.rail-avatar:hover { background: rgba(17, 24, 39, 0.06); }
+.avatar-circle {
+  width: 36px; height: 36px;
+  border-radius: 9999px;
+  background: rgba(59, 130, 246, .12);
+  color: var(--color-accent-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  flex-shrink: 0;
+}
+.avatar-circle.lg { width: 32px; height: 32px; font-size: 12px; }
+.avatar-circle.sm { width: 20px; height: 20px; font-size: 9px; }
+.dark .avatar-circle { background: rgba(88, 166, 255, .14); }
+
+/* 分隔线：icon 32px / label 40px */
+.rail-divider { border-top: 1px solid var(--color-border); width: 32px; margin: 8px 0; flex-shrink: 0; }
+.app.rail-label .rail-divider { width: 40px; }
+
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 0;
+  scrollbar-width: none;
+}
+.rail-scroll::-webkit-scrollbar { display: none; }
+.rail-group { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* 导航项：两档均 44px 高 / rx6 / pitch 48px */
+.rail-item {
+  position: relative;
+  width: 36px; height: 44px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.rail-item:hover { background: rgba(17, 24, 39, 0.06); color: var(--color-text-primary); }
+.dark .rail-item:hover { background: rgba(255, 255, 255, 0.07); }
+.dark .rail-avatar:hover { background: rgba(255, 255, 255, 0.07); }
+.rail-item svg { display: block; width: 21px; height: 21px; }
+.rail-item.active { background: rgba(59, 130, 246, .12); color: var(--color-accent-primary); }
+.dark .rail-item.active { background: rgba(88, 166, 255, .14); }
+
+/* label 模式：52px 宽，图标 19px 在上 + 11px 文字在下 */
+.app.rail-label .rail-item { width: 52px; flex-direction: column; gap: 3px; }
+.app.rail-label .rail-item svg { width: 19px; height: 19px; }
+.rail-label-text {
+  display: none;
+  font-size: 11px; line-height: 1;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+.app.rail-label .rail-label-text { display: block; }
+.app.rail-label .rail-item.active .rail-label-text { color: var(--color-accent-primary); font-weight: 500; }
+
+/* 纯图标模式：悬停深色 pill + 虚线连接 */
+.rail-tip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #111827; color: #f9fafb;
+  font-size: 11px; line-height: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s;
+  z-index: 110;
+}
+.rail-tip::before {
+  content: "";
+  position: absolute;
+  right: 100%; top: 50%;
+  width: 10px;
+  border-top: 1px dashed #9ca3af;
+}
+.app:not(.rail-label) .rail-item:hover .rail-tip { opacity: 1; }
+.app.rail-label .rail-tip { display: none; }
+
+/* ============================================================
+   头像浮窗菜单（260px）
+   ============================================================ */
+.rail-popup {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: auto;
+  bottom: 76px;
+  width: 260px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  z-index: 120;
+  display: none;
+  padding: 4px;
+  text-align: left;
+}
+.rail-popup.open { display: block; }
+.pop-head { display: flex; align-items: center; gap: 10px; padding: 10px 10px 8px; }
+.pop-meta { flex: 1; min-width: 0; }
+.pop-name { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop-mail { display: block; font-size: 11px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pop-role { font-size: 10px; font-weight: 500; background: rgba(59, 130, 246, .12); color: var(--color-accent-primary); border-radius: 9999px; padding: 2px 8px; flex-shrink: 0; }
+.dark .pop-role { background: rgba(88, 166, 255, .14); }
+.pop-sep { border-top: 1px solid var(--color-border); margin: 4px 0; }
+.pop-label { font-size: 11px; font-weight: 500; color: var(--color-text-tertiary); padding: 8px 10px 2px; }
+.pop-badge { margin-left: auto; background: var(--color-accent-danger); color: #fff; font-size: 9px; line-height: 1; border-radius: 9999px; padding: 2px 5px; flex-shrink: 0; }
+.pop-row {
+  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  text-align: left;
+  transition: background .12s;
+}
+.pop-row:hover { background: var(--color-hover); }
+.pop-row.on { background: var(--color-hover); }
+.row-ico { width: 14px; height: 14px; color: var(--color-text-tertiary); flex-shrink: 0; }
+.pop-row.on .row-ico { color: var(--color-accent-primary); }
+.pop-link .row-ico { color: var(--color-accent-primary); }
+.pop-row .row-check { margin-left: auto; width: 14px; height: 14px; color: var(--color-accent-primary); visibility: hidden; flex-shrink: 0; }
+.pop-row.on .row-check { visibility: visible; }
+.pop-row.danger { color: var(--color-accent-danger); }
+.pop-link {
+  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-accent-primary);
+  text-align: left;
+}
+.pop-link:hover { background: var(--color-hover); }
+.pop-seg-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 10px; }
+.pop-seg-label { font-size: 12px; color: var(--color-text-primary); }
+.pop-seg { display: inline-flex; background: var(--color-hover); border-radius: 6px; padding: 2px; gap: 2px; flex-shrink: 0; }
+.pop-seg button {
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 10px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.pop-seg button.on { background: var(--color-elevated); border-color: var(--color-border); color: var(--color-text-primary); font-weight: 500; }
+
+/* ============================================================
+   Sidebar（260px：标题头 + 工作区切换 + 内容树 + 标签）
+   ============================================================ */
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text-primary);
+}
+.sidebar-header {
+  position: relative;
+  flex-shrink: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 10px;
+}
+/* ============================================================
+   VSCode 式侧栏面板（知识库 / 标签 / 打开的编辑器）
+   ============================================================ */
+.sb-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+.sb-panel::-webkit-scrollbar { width: 6px; }
+.sb-panel::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+.sb-panel::-webkit-scrollbar-track { background: transparent; }
+.sb-section { flex-shrink: 0; }
+.sb-section + .sb-section { border-top: 1px solid var(--color-border); }
+/* 区段头：div 容器（可拖拽排序）> button.sb-sec-main（折叠）+ div.sb-sec-acts（右侧操作） */
+.sb-sec-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 8px;
+  color: var(--color-text-tertiary);
+  cursor: grab;
+  transition: background .15s, color .15s;
+}
+.sb-sec-head:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.sb-sec-head:active { cursor: grabbing; }
+.sb-sec-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: inherit;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sb-sec-main:hover { color: var(--color-text-primary); }
+.sb-sec-chev { width: 12px; height: 12px; flex-shrink: 0; transition: transform .15s; }
+.sb-section.collapsed .sb-sec-chev { transform: rotate(-90deg); }
+.sb-sec-title { white-space: nowrap; flex-shrink: 0; }
+.sb-sec-name {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+  min-width: 0;
+  max-width: 96px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 右侧操作区：按面板特性配置按钮 + 计数徽章 */
+.sb-sec-acts {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.sb-sec-acts .kt-count-badge { margin-left: 4px; }
+.sb-act {
+  width: 22px; height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  transition: background .12s, color .12s;
+}
+.sb-act svg { width: 13px; height: 13px; display: block; transition: transform .15s; }
+.sb-act:hover { background: var(--color-active); color: var(--color-text-primary); }
+.sb-act.on { background: var(--color-active); color: var(--color-text-primary); }
+.sb-act.flipped svg { transform: rotate(180deg); }
+.sb-act.spinning svg { animation: sb-spin .6s ease; }
+@keyframes sb-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* 拖拽排序 */
+.sb-section.dragging { opacity: .35; }
+.sb-sec-body { padding: 0 4px 8px; }
+.sb-section.collapsed .sb-sec-body { display: none; }
+/* 知识库之外的面板折叠后沉底（VS Code 语义）：
+   第一个折叠的用 auto margin 吃掉全部留白，后续折叠的 margin 归零紧贴成组 */
+.sb-section.collapsed:not(#secKb) { margin-top: auto; }
+.sb-section.collapsed:not(#secKb) ~ .sb-section.collapsed:not(#secKb) { margin-top: 0; }
+/* 面板内的知识树 / 标签列表：滚动统一交由 .sb-panel 处理 */
+.sb-sec-body .kt-scroll { flex: none; overflow: visible; padding: 0 0 4px; }
+.sb-sec-body .tags-body { max-height: none; overflow: visible; padding: 0 0 4px; }
+/* 知识树过滤无结果空态 */
+.kt-empty { padding: 10px 10px; font-size: 11px; color: var(--color-text-tertiary); }
+/* 知识库专注模式条：双击根层知识库进入，[←] 返回 */
+.kb-focus-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 6px;
+  padding: 4px 6px;
+  background: var(--color-active);
+  border-radius: 6px;
+}
+.kb-focus-bar[hidden] { display: none; }
+.kb-focus-back {
+  width: 20px; height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  transition: background .12s, color .12s;
+}
+.kb-focus-back:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.kb-focus-back svg { width: 13px; height: 13px; }
+.kb-focus-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 打开的编辑器：全部关闭后空态 */
+.ed-list.empty::after {
+  content: "没有打开的编辑器";
+  display: block;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+/* ============================================================
+   侧栏头部：位置（可点击切换空间）+ 搜索输入框（左）+ 筛选（右）
+   ============================================================ */
+.sb-loc {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px 0 2px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background .12s;
+}
+.sb-loc:hover { background: var(--color-hover); }
+.sb-loc > svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--color-text-tertiary); }
+.sb-loc .sb-loc-chev { width: 11px; height: 11px; transition: transform .15s; }
+.sb-loc[aria-expanded="true"] .sb-loc-chev { transform: rotate(180deg); }
+.sb-loc span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 搜索：小输入框（左侧，flex 占满；半透明底、无框，聚焦时实底 + accent 描边） */
+.sb-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(17, 24, 39, 0.05);
+  color: var(--color-text-tertiary);
+  transition: background .12s, border-color .12s;
+}
+.dark .sb-search { background: rgba(255, 255, 255, 0.06); }
+.sb-search:hover { background: rgba(17, 24, 39, 0.08); }
+.dark .sb-search:hover { background: rgba(255, 255, 255, 0.09); }
+.sb-search:focus-within { background: var(--color-bg); border-color: var(--color-accent-primary); }
+.sb-search > svg { width: 12px; height: 12px; flex-shrink: 0; opacity: .75; }
+.sb-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 12px;
+  color: var(--color-text-primary);
+}
+.sb-search input::placeholder { color: var(--color-text-tertiary); }
+/* 头部筛选按钮 */
+.sidebar-header .sb-act { flex-shrink: 0; }
+/* 头部浮层：空间切换（左对齐）/ 筛选（右对齐） */
+.sb-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 4px;
+  min-width: 160px;
+  padding: 4px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+  z-index: 60;
+  display: none;
+  text-align: left;
+}
+.sb-pop.open { display: block; }
+.sb-pop-filter { left: auto; right: 4px; }
+.dark .sb-pop { box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+
+/* 打开的编辑器 */
+.ed-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.ed-row:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.ed-row.active { background: var(--color-active); color: var(--color-text-primary); }
+.ed-row svg { flex-shrink: 0; }
+.ed-row-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ed-row-close {
+  width: 16px; height: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.ed-row:hover .ed-row-close { display: flex; }
+.ed-row-close:hover { background: var(--color-active); color: var(--color-text-primary); }
+
+/* 知识树 */
+.kt-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 4px 12px;
+}
+.kt-count-badge {
+  min-width: 16px;
+  border-radius: 9999px;
+  background: var(--color-hover);
+  padding: 0 6px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--color-text-tertiary);
+}
+.kt-node {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  transition: background .12s;
+}
+.kt-node:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.kt-node.active { background: var(--color-active); color: var(--color-text-primary); }
+.kt-chevron-btn {
+  width: 20px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.kt-node-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+  text-align: left;
+}
+.kt-node-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kt-node-note-count {
+  min-width: 16px;
+  border-radius: 9999px;
+  background: var(--color-hover);
+  padding: 0 6px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.kt-plus {
+  width: 24px; height: 24px;
+  display: none;
+  align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.kt-node:hover .kt-plus { display: flex; }
+.kt-plus:hover { background: var(--color-active); }
+/* 行级更多操作（⋮）：hover 显示，点击弹出行级菜单 */
+.kt-more {
+  width: 22px; height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+.kt-node:hover .kt-more { display: flex; }
+.kt-more:hover { background: var(--color-active); color: var(--color-text-primary); }
+/* 定位闪烁：从标签定位知识库文档时高亮渐隐 */
+.kt-node.kt-flash { animation: kt-flash 1.6s ease; }
+@keyframes kt-flash {
+  0%, 55% { background: var(--color-active); color: var(--color-text-primary); }
+  100% { background: transparent; }
+}
+/* kb 树拖拽指示：上/下插入线 + 移入高亮 */
+.kt-node.kt-dragging { opacity: .4; }
+.kt-node.kt-drop-above { box-shadow: inset 0 2px 0 var(--color-accent-primary); }
+.kt-node.kt-drop-below { box-shadow: inset 0 -2px 0 var(--color-accent-primary); }
+.kt-node.kt-drop-inside { background: var(--color-active); }
+/* 行级菜单浮层（fixed 定位，挂 body） */
+.kt-menu {
+  position: fixed;
+  min-width: 132px;
+  padding: 4px;
+  background: var(--color-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+  z-index: 80;
+}
+.dark .kt-menu { box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+.kt-menu-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: left;
+  transition: background .1s, color .1s;
+}
+.kt-menu-row:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.kt-menu-row.danger { color: var(--color-accent-danger); }
+.kt-menu-row.danger:hover { background: rgba(220, 38, 38, .08); color: var(--color-accent-danger); }
+/* 行内重命名输入框 */
+.kt-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  border: 1px solid var(--color-accent-primary);
+  border-radius: 4px;
+  padding: 1px 4px;
+  outline: none;
+}
+
+/* ============================================================
+   树形折叠引擎（知识库 / 标签共用）：
+   .kt-fold = 被过滤/折叠隐藏的行；.collapsed = 组已折叠（chevron 转向）；
+   .kt-force-open = 搜索激活时折叠组虚拟展开（仅视觉，状态不变）
+   ============================================================ */
+.kt-node.kt-fold { display: none; }
+.kt-chevron-btn svg { transition: transform .15s; }
+.kt-node.collapsed > .kt-chevron-btn svg { transform: rotate(-90deg); }
+.kt-force-open .kt-node.collapsed > .kt-chevron-btn svg { transform: rotate(0deg); }
+
+/* 标签区（VSCode 式面板内，头部样式复用 .sb-sec-head；行结构复用 .kt-node） */
+.tags-body { padding: 0 0 4px; }
+.tag-dot { width: 10px; height: 10px; border-radius: 9999px; flex-shrink: 0; }
+
+/* ============================================================
+   拖拽调宽把手（2px）
+   ============================================================ */
+.resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  transition: background .15s;
+  position: relative;
+  z-index: 5;
+}
+.resize-handle:hover { background: rgba(59, 130, 246, 0.3); }
+.resize-handle .grip {
+  width: 2px; height: 32px;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background .15s;
+}
+.resize-handle:hover .grip { background: rgba(59, 130, 246, 0.6); }
+
+/* ============================================================
+   EditorPane
+   ============================================================ */
+.editor-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  overflow: hidden;
+  position: relative;
+}
+.ed-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(249, 250, 251, 0.3);
+  flex-shrink: 0;
+}
+.dark .ed-header { background: rgba(22, 27, 34, 0.3); }
+.ed-header .ed-left { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.crumb-btn {
+  display: flex;
+  min-width: 0;
+  max-width: 300px;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--color-text-tertiary);
+  border-radius: 6px;
+  padding: 4px 6px;
+  transition: background .15s, color .15s;
+  overflow: hidden;
+}
+.crumb-btn:hover { background: var(--color-hover); color: var(--color-text-secondary); }
+.crumb-btn .crumb-item { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.crumb-btn .crumb-item.last { min-width: 0; color: var(--color-text-secondary); font-weight: 500; }
+.crumb-btn .crumb-item.last .crumb-name { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb-btn .crumb-item:not(.last) .crumb-name { max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.crumb-btn .crumb-sep { color: rgba(156, 163, 175, 0.6); flex-shrink: 0; display: flex; }
+
+.ed-title-line { display: flex; min-width: 0; align-items: baseline; gap: 8px; margin-left: 4px; }
+.ed-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-version {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: transparent;
+}
+.ed-version:hover { color: var(--color-accent-primary); text-decoration: underline; }
+.fmt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
+  color: var(--color-text-tertiary);
+  border-radius: 4px;
+  padding: 3px 5px;
+  flex-shrink: 0;
+}
+.fmt-chip.md { border-color: rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.1); color: #059669; }
+.dark .fmt-chip.md { color: #34d399; }
+
+.ed-header .ed-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.sync-ind { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--color-text-tertiary); }
+.sync-ind svg { width: 15px; height: 15px; }
+.ed-vdiv { width: 1px; height: 20px; background: var(--color-border); flex-shrink: 0; }
+.ed-action-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(243, 244, 246, 0.5);
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+.dark .ed-action-group { background: rgba(31, 41, 55, 0.5); }
+.ed-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.ed-btn:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.ed-btn.on-star { color: #fbbf24; }
+.ed-btn.on-star svg { fill: #fbbf24; }
+.ed-btn.on-pin { color: var(--color-accent-primary); }
+.ed-btn.on-pin svg { fill: var(--color-accent-primary); }
+.ed-btn.emerald { color: #10b981; }
+.ed-btn.mode {
+  width: auto;
+  padding: 0 6px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
+  color: var(--color-text-tertiary);
+  border-radius: 6px;
+  height: 28px;
+}
+.ed-btn.mode:hover { color: var(--color-text-secondary); background: var(--color-active); }
+
+/* 编辑器主工具栏（sticky） */
+.ed-toolbar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(249, 250, 251, 0.95);
+  padding: 4px 16px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.dark .ed-toolbar { background: rgba(22, 27, 34, 0.95); }
+.tb-scroll { flex: 1; display: flex; align-items: center; gap: 2px; overflow: hidden; }
+.tb-btn {
+  padding: 6px;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.tb-btn:hover { background: var(--color-hover); color: var(--color-text-primary); }
+.tb-btn.active { background: rgba(59, 130, 246, 0.2); color: var(--color-accent-primary); }
+.tb-btn.disabled { opacity: 0.3; cursor: default; }
+.tb-btn.disabled:hover { background: transparent; color: var(--color-text-secondary); }
+.tb-divider { width: 1px; height: 20px; background: var(--color-border); margin: 0 4px; flex-shrink: 0; }
+
+/* 编辑区（ProseMirror 复现） */
+.ed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 48px 48px;
+  min-height: 0;
+}
+.prose { min-height: 300px; padding-bottom: 40vh; outline: none; position: relative; }
+.prose p { margin: 0; line-height: 1.6; color: var(--pm-text); font-size: 15px; }
+.prose .pm-h {
+  position: relative;
+  color: var(--pm-heading);
+  line-height: 1.4;
+}
+.prose .pm-h .h-mark {
+  position: absolute;
+  left: -3em;
+  top: 50%;
+  transform: translate(-10%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--color-text-tertiary);
+  opacity: 0.45;
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.prose h1 { font-size: 1.75rem; font-weight: 700; margin: 32px 0 12px; }
+.prose h2 { font-size: 1.375rem; font-weight: 600; margin: 28px 0 10px; }
+.prose h3 { font-size: 1.125rem; font-weight: 600; margin: 24px 0 8px; }
+.prose ul, .prose ol { margin: 8px 0 8px 24px; color: var(--pm-text); }
+.prose ul { list-style: disc; }
+.prose ol { list-style: decimal; }
+.prose li { font-size: 15px; line-height: 1.6; margin: 4px 0; padding-left: 4px; }
+.prose li p { font-size: 15px; }
+.prose blockquote {
+  border-left: 3px solid var(--pm-blockquote-border);
+  padding: 4px 0 4px 16px;
+  margin: 16px 0;
+  color: var(--pm-blockquote-text);
+  font-size: 14px;
+}
+.prose code {
+  background: var(--pm-code-bg);
+  color: var(--pm-code-text);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.prose hr { border: none; border-top: 1px solid var(--pm-hr); margin: 24px 0; }
+/* 任务列表 */
+.prose ul.pm-task { list-style: none; margin-left: 0; }
+.prose ul.pm-task li { display: flex; align-items: flex-start; gap: 8px; padding-left: 0; }
+.pm-check {
+  width: 15px; height: 15px;
+  border: 1.5px solid var(--color-text-tertiary);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+}
+.pm-check.done { background: var(--pm-task-done); border-color: var(--pm-task-done); }
+.prose ul.pm-task li.done span.t-text { color: var(--pm-task-done); text-decoration: line-through; }
+.prose a { color: #4f46e5; text-decoration: underline; text-decoration-color: rgba(79,70,229,0.45); text-underline-offset: 2px; }
+.dark .prose a { color: #818cf8; text-decoration-color: rgba(129,140,248,0.5); }
+.prose .gap-p { height: 8px; }
+
+/* 滚动条（细） */
+.kt-scroll::-webkit-scrollbar, .tags-body::-webkit-scrollbar, .ed-scroll::-webkit-scrollbar { width: 8px; }
+.kt-scroll::-webkit-scrollbar-thumb, .tags-body::-webkit-scrollbar-thumb, .ed-scroll::-webkit-scrollbar-thumb { background: rgba(156,163,175,0.35); border-radius: 4px; }
+.kt-scroll::-webkit-scrollbar-thumb:hover, .tags-body::-webkit-scrollbar-thumb:hover, .ed-scroll::-webkit-scrollbar-thumb:hover { background: rgba(156,163,175,0.6); }
+</style>
+</head>
+<body>
+
+<!-- ================= 原型说明条（评审辅助，非 App 本体） ================= -->
+<div class="prototype-bar">
+  <div class="pb-left">
+    <span class="pb-title">Base Notes · 新导航栏 + 侧栏面板原型</span>
+    <span class="pb-sub">基于现状复现版（main 分支）· 默认图标+文字 64px · 1440×900</span>
+  </div>
+  <div class="pb-actions">
+    <button class="pb-btn active" id="btn-theme-light">亮色</button>
+    <button class="pb-btn" id="btn-theme-dark">暗色</button>
+    <button class="pb-btn" id="btn-rail-icon">纯图标 48px</button>
+    <button class="pb-btn active" id="btn-rail-label">图标+文字 64px</button>
+  </div>
+</div>
+
+<!-- ================= App ================= -->
+<div class="app rail-label" id="app">
+
+  <!-- ========== NavRail（新导航栏：头像浮窗 / 分组 / 插件区预留 / 设置沉底） ========== -->
+  <nav class="nav-rail">
+    <!-- 顶部：产品 Logo（VS Code 式，品牌沉顶） -->
+    <div class="rail-header">
+      <div class="rail-logo" title="Base Notes" aria-label="Base Notes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+      </div>
+    </div>
+
+    <div class="rail-scroll">
+      <!-- 组：核心 -->
+      <div class="rail-group">
+        <button class="rail-item active" data-nav="kb" title="知识库" aria-label="知识库">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+          <span class="rail-label-text">知识库</span>
+          <span class="rail-tip">知识库</span>
+        </button>
+        <button class="rail-item" data-nav="star" title="收藏" aria-label="收藏">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="rail-label-text">收藏</span>
+          <span class="rail-tip">收藏</span>
+        </button>
+        <button class="rail-item" data-nav="trash" title="回收站" aria-label="回收站">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+          <span class="rail-label-text">回收站</span>
+          <span class="rail-tip">回收站</span>
+        </button>
+        <button class="rail-item" data-nav="files" title="文件管理" aria-label="文件管理">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+          <span class="rail-label-text">文件管理</span>
+          <span class="rail-tip">文件管理</span>
+        </button>
+      </div>
+
+      <div class="rail-divider"></div>
+
+      <!-- 组：插件 -->
+      <div class="rail-group">
+        <button class="rail-item" data-nav="plugins" title="插件" aria-label="插件">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="14.5" y="14.5" width="7" height="7" rx="1.5"/></svg>
+          <span class="rail-label-text">插件</span>
+          <span class="rail-tip">插件</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="rail-divider"></div>
+
+    <!-- 底部：头像（设置上方，VS Code 式账户位） -->
+    <button class="rail-avatar" id="railAvatar" title="账户菜单" aria-label="账户菜单" aria-expanded="false">
+      <span class="avatar-circle">LZ</span>
+    </button>
+
+    <!-- 底部：仅设置 -->
+    <button class="rail-item" data-nav="settings" title="设置" aria-label="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+      <span class="rail-label-text">设置</span>
+      <span class="rail-tip">设置</span>
+    </button>
+
+    <!-- ========== 头像浮窗菜单 ========== -->
+    <div class="rail-popup" id="railPopup">
+      <div class="pop-head">
+        <span class="avatar-circle lg">LZ</span>
+        <span class="pop-meta">
+          <span class="pop-name">lingz</span>
+          <span class="pop-mail">lingz@local</span>
+        </span>
+        <span class="pop-role">Owner</span>
+      </div>
+
+      <div class="pop-sep"></div>
+      <div class="pop-label">账号</div>
+      <button class="pop-row" data-inert>
+        <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+        消息通知
+        <span class="pop-badge">3</span>
+      </button>
+      <button class="pop-row on">
+        <span class="avatar-circle sm">LZ</span>
+        lingz（当前）
+      </button>
+      <button class="pop-row" data-inert>
+        <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        切换账号
+      </button>
+      <button class="pop-row danger" data-inert>
+        <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/></svg>
+        登出
+      </button>
+
+      <div class="pop-sep"></div>
+      <div class="pop-label">外观</div>
+      <div class="pop-seg-row">
+        <span class="pop-seg-label">主题</span>
+        <div class="pop-seg" id="segTheme">
+          <button data-v="light" class="on">白天</button>
+          <button data-v="dark">黑夜</button>
+        </div>
+      </div>
+      <div class="pop-seg-row">
+        <span class="pop-seg-label">导航栏样式</span>
+        <div class="pop-seg" id="segRail">
+          <button data-v="icon">纯图标</button>
+          <button data-v="label" class="on">图标+文字</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== Sidebar ========== -->
+  <aside class="sidebar">
+    <header class="sidebar-header">
+      <!-- 位置：当前空间（点击切换空间） -->
+      <button class="sb-loc" id="sbLocBtn" title="切换空间" aria-label="切换空间" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 9.5V21h14V9.5"/></svg>
+        <span id="sbSpaceName">个人空间</span>
+        <svg class="sb-loc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <!-- 搜索：小输入框（左），实时过滤知识库 -->
+      <div class="sb-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="kbSearchInput" placeholder="搜索" aria-label="搜索知识库">
+      </div>
+      <!-- 筛选（右） -->
+      <button class="sb-act" id="sbFilter" title="筛选" aria-label="筛选">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      </button>
+
+      <!-- 空间切换浮层（左对齐，锚定位置显示） -->
+      <div class="sb-pop" id="sbSpacePop">
+        <button class="pop-row on" data-space="personal" data-label="个人空间">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"/><path d="M5 9.5V21h14V9.5"/></svg>
+          个人空间
+          <svg class="row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+        <button class="pop-row" data-space="team" data-label="团队空间">
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          团队空间
+          <svg class="row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+        <button class="pop-link" data-inert>
+          <svg class="row-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          加入空间
+        </button>
+      </div>
+
+      <!-- 筛选浮层（右对齐） -->
+      <div class="sb-pop sb-pop-filter" id="sbFilterPop">
+        <button class="pop-row on" data-scope="all">全部
+          <svg class="row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+        <button class="pop-row" data-scope="folder">仅文件夹
+          <svg class="row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+        <button class="pop-row" data-scope="note">仅笔记
+          <svg class="row-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- VSCode 式侧栏面板 -->
+    <div class="sb-panel">
+
+      <!-- 知识库（默认展开，不可去除） -->
+      <section class="sb-section" id="secKb" draggable="true">
+        <div class="sb-sec-head" title="拖拽调整面板顺序">
+          <button class="sb-sec-main" aria-expanded="true">
+            <svg class="sb-sec-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="sb-sec-title">知识库</span>
+          </button>
+          <div class="sb-sec-acts">
+            <button class="sb-act" id="kbFold" title="折叠全部文件夹" aria-label="折叠全部文件夹">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+            </button>
+            <button class="sb-act" id="kbNew" title="新建文件夹" aria-label="新建文件夹">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+            <button class="sb-act" id="kbMore" title="更多操作" aria-label="更多操作">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+            </button>
+            <button class="sb-act" id="kbRefresh" title="刷新" aria-label="刷新">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+            <span class="kt-count-badge" aria-label="当前空间共 12 条笔记">12</span>
+          </div>
+        </div>
+        <div class="sb-sec-body">
+          <!-- 专注模式条：双击根层知识库进入，仅显示该知识库内容 -->
+          <div class="kb-focus-bar" id="kbFocusBar" hidden>
+            <button class="kb-focus-back" id="kbFocusBack" title="返回全部知识库" aria-label="返回全部知识库">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            </button>
+            <span class="kb-focus-name" id="kbFocusName">技术笔记</span>
+          </div>
+          <div class="kt-scroll" id="kbTree">
+            <div class="kt-empty" id="kbEmpty" hidden>无匹配的文件夹或笔记</div>
+
+        <!-- 产品设计（lv1 文件夹，2 篇，展开） -->
+        <div class="kt-node" data-kb-lv="1" style="padding-left:2px">
+          <button class="kt-chevron-btn" aria-label="折叠">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">产品设计</span>
+            <span class="kt-node-note-count">2</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">信息架构 v2</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">导航栏改版讨论</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+
+        <!-- 技术笔记（lv1 文件夹，5 篇，展开，含当前文档） -->
+        <div class="kt-node" data-kb-lv="1" style="padding-left:2px">
+          <button class="kt-chevron-btn" aria-label="折叠">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">技术笔记</span>
+            <span class="kt-node-note-count">5</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <!-- 嵌入式（lv2 子文件夹，3 篇，展开） -->
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" aria-label="折叠">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">嵌入式</span>
+            <span class="kt-node-note-count">3</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="3" style="padding-left:34px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+            <span class="kt-node-title">CH585 驱动重构</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="3" style="padding-left:34px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">STM32 CMSIS 版本差异</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node active" data-kb-lv="3" style="padding-left:34px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">BLE OTA 升级方案</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:var(--color-accent-primary);flex-shrink:0" aria-label="已置顶"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <!-- 移动端（lv2 子文件夹，2 篇，折叠） -->
+        <div class="kt-node collapsed" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" aria-label="展开">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">移动端</span>
+            <span class="kt-node-note-count">2</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="3" style="padding-left:34px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">Flutter Isar 持久化</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="3" style="padding-left:34px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">Flutter 设备连接稳定性方案</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+
+        <!-- 硬件项目（lv1 文件夹，2 篇，折叠） -->
+        <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+          <button class="kt-chevron-btn" aria-label="展开">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">硬件项目</span>
+            <span class="kt-node-note-count">2</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">nrf52840 分体键盘布线</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">OLED 安装支架 3D 模型</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+
+        <!-- 键盘项目（lv1 文件夹，3 篇，折叠） -->
+        <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+          <button class="kt-chevron-btn" aria-label="展开">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+            <span class="kt-node-title">键盘项目</span>
+            <span class="kt-node-note-count">3</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+            <span class="kt-node-title">Dactyl Manuform SCAD</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">键帽配置文件</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+        <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+          <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+          <button class="kt-node-main">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <span class="kt-node-title">轴体选型对比</span>
+          </button>
+          <button class="kt-plus" title="新建文档">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          </button>
+          <button class="kt-more" title="更多操作" aria-label="更多操作">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+          </button>
+        </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 标签 -->
+      <section class="sb-section" id="secTags" draggable="true">
+        <div class="sb-sec-head" title="拖拽调整面板顺序">
+          <button class="sb-sec-main" aria-expanded="true">
+            <svg class="sb-sec-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="sb-sec-title">标签</span>
+          </button>
+          <div class="sb-sec-acts">
+            <button class="sb-act" id="tagFold" title="折叠全部标签文档" aria-label="折叠全部标签文档">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+            </button>
+            <button class="sb-act" id="tagRefresh" title="刷新" aria-label="刷新">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>
+            </button>
+            <span class="kt-count-badge">5</span>
+          </div>
+        </div>
+        <div class="sb-sec-body">
+          <div class="tags-body" id="tagTree">
+
+            <!-- BLE（3 篇，展开） -->
+            <div class="kt-node" data-kb-lv="1" style="padding-left:2px">
+              <button class="kt-chevron-btn" aria-label="折叠">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="kt-node-main">
+                <span class="tag-dot" style="background:#3b82f6"></span>
+                <span class="kt-node-title">BLE</span>
+                <span class="kt-node-note-count">3</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">BLE OTA 升级方案</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">BLE notify 丢包风险分析</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">蓝牙配网与重连流程</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+
+            <!-- Flutter（2 篇，折叠） -->
+            <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+              <button class="kt-chevron-btn" aria-label="展开">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="kt-node-main">
+                <span class="tag-dot" style="background:#8b5cf6"></span>
+                <span class="kt-node-title">Flutter</span>
+                <span class="kt-node-note-count">2</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">Flutter Isar 持久化</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">Flutter 设备连接稳定性方案</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+
+            <!-- 硬件（5 篇，折叠） -->
+            <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+              <button class="kt-chevron-btn" aria-label="展开">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="kt-node-main">
+                <span class="tag-dot" style="background:#10b981"></span>
+                <span class="kt-node-title">硬件</span>
+                <span class="kt-node-note-count">5</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+                <span class="kt-node-title">CH585 驱动重构</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">STM32 CMSIS 版本差异</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">nrf52840 分体键盘布线</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">OLED 安装支架 3D 模型</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">布线规则 comb orthogonal</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+
+            <!-- OpenSCAD（1 篇，折叠） -->
+            <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+              <button class="kt-chevron-btn" aria-label="展开">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="kt-node-main">
+                <span class="tag-dot" style="background:#f59e0b"></span>
+                <span class="kt-node-title">OpenSCAD</span>
+                <span class="kt-node-note-count">1</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981;flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+                <span class="kt-node-title">Dactyl Manuform SCAD</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+
+            <!-- PCB（2 篇，折叠） -->
+            <div class="kt-node collapsed" data-kb-lv="1" style="padding-left:2px">
+              <button class="kt-chevron-btn" aria-label="展开">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              <button class="kt-node-main">
+                <span class="tag-dot" style="background:#f43f5e"></span>
+                <span class="kt-node-title">PCB</span>
+                <span class="kt-node-note-count">2</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">nrf52840 分体键盘布线</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+            <div class="kt-node" data-kb-lv="2" style="padding-left:18px">
+              <button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>
+              <button class="kt-node-main">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                <span class="kt-node-title">布线规则 comb orthogonal</span>
+              </button>
+              <button class="kt-more" title="更多操作" aria-label="更多操作">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 打开的编辑器 -->
+      <section class="sb-section" id="secEditors" draggable="true">
+        <div class="sb-sec-head" title="拖拽调整面板顺序">
+          <button class="sb-sec-main" aria-expanded="true">
+            <svg class="sb-sec-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="sb-sec-title">打开的编辑器</span>
+          </button>
+          <div class="sb-sec-acts">
+            <button class="sb-act" id="edCloseAll" title="全部关闭" aria-label="全部关闭">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+            </button>
+            <span class="kt-count-badge" id="edCount">3</span>
+          </div>
+        </div>
+        <div class="sb-sec-body">
+          <div class="ed-list">
+            <div class="ed-row active">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary)"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+              <span class="ed-row-title">BLE OTA 升级方案</span>
+              <button class="ed-row-close" title="关闭" aria-label="关闭 BLE OTA 升级方案">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div class="ed-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#10b981"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></svg>
+              <span class="ed-row-title">CH585 驱动重构</span>
+              <button class="ed-row-close" title="关闭" aria-label="关闭 CH585 驱动重构">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <div class="ed-row">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary)"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+              <span class="ed-row-title">Flutter 设备连接稳定性方案</span>
+              <button class="ed-row-close" title="关闭" aria-label="关闭 Flutter 设备连接稳定性方案">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ========== Sidebar 调宽把手 ========== -->
+  <div class="resize-handle" title="拖拽调整侧边栏宽度 / 双击恢复默认"><div class="grip"></div></div>
+
+  <!-- ========== EditorPane ========== -->
+  <main class="editor-pane">
+    <!-- 桌面端编辑器头部 -->
+    <header class="ed-header">
+      <div class="ed-left">
+        <button class="crumb-btn" title="移动到笔记本">
+          <span class="crumb-item">
+            <span style="line-height:1">📁</span>
+            <span class="crumb-name">技术笔记</span>
+          </span>
+          <span class="crumb-sep">/</span>
+          <span class="crumb-item last">
+            <span class="crumb-name">嵌入式</span>
+          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:2px"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="ed-title-line">
+          <span class="ed-title">BLE OTA 升级方案</span>
+          <button class="ed-version" title="版本历史">版本 7 · 2026/10/17 14:32:10</button>
+        </div>
+        <span class="fmt-chip">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+          富文本
+        </span>
+      </div>
+      <div class="ed-right">
+        <span class="sync-ind" title="已同步">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+          <span>已同步</span>
+        </span>
+        <div class="ed-vdiv"></div>
+        <div class="ed-action-group">
+          <button class="ed-btn" title="锁定笔记">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </button>
+          <button class="ed-btn on-pin" title="取消置顶">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+          </button>
+          <button class="ed-btn on-star" title="取消收藏">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+        </div>
+        <button class="ed-btn emerald" title="分享笔记">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="5.51" y2="9.49"/></svg>
+        </button>
+        <button class="ed-btn" title="编辑器全屏">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="ed-btn mode" title="切换到 Markdown 编辑">RTE</button>
+        <button class="ed-btn" title="更多">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 编辑器主工具栏（sticky 单行） -->
+    <div class="ed-toolbar">
+      <div class="tb-scroll">
+        <button class="tb-btn" title="添加内容">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary)"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn disabled" title="撤销">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+        </button>
+        <button class="tb-btn disabled" title="重做">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn active" title="标题 1">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="m17 12 3-2v8"/></svg>
+        </button>
+        <button class="tb-btn" title="标题 2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M21 18h-4a3 3 0 0 0 0-6h4"/></svg>
+        </button>
+        <button class="tb-btn" title="标题 3">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17.5 10.5a2.12 2.12 0 0 1 2.38 2.04c0 1.2-1.2 2.3-2.4 2.7"/><path d="M17.5 15.5a2.12 2.12 0 0 0 2.38-2.04"/></svg>
+        </button>
+        <button class="tb-btn" title="标题 4">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 10v8"/><path d="M21 10v8"/><path d="M17 14h4"/></svg>
+        </button>
+        <button class="tb-btn" title="标题 5">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><path d="M17 10a2 2 0 1 0 4 0c0-1.5-1.5-2-2-2"/><path d="M19 10v6a2 2 0 0 1-2 2h-1"/></svg>
+        </button>
+        <button class="tb-btn" title="标题 6">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h8"/><path d="M4 18V6"/><path d="M12 18V6"/><circle cx="19" cy="15" r="2"/><path d="M19 13V7h-2"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn active" title="加粗">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>
+        </button>
+        <button class="tb-btn" title="斜体">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>
+        </button>
+        <button class="tb-btn" title="下划线">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" x2="20" y1="20" y2="20"/></svg>
+        </button>
+        <button class="tb-btn" title="删除线">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>
+        </button>
+        <button class="tb-btn" title="字号">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+        </button>
+        <button class="tb-btn" title="文字颜色">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 0-20 10 10 0 0 1 0 20z"/><path d="M12 2a10 10 0 0 1 10 10h-10z" fill="currentColor" stroke="none" opacity=".25"/><path d="M4 10h16"/><path d="M12 2v20" opacity=".4"/></svg>
+        </button>
+        <button class="tb-btn" title="格式刷">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+        </button>
+        <button class="tb-btn" title="链接">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>
+        </button>
+        <button class="tb-btn" title="行内代码">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="无序列表">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+        </button>
+        <button class="tb-btn" title="有序列表">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+        </button>
+        <button class="tb-btn" title="任务列表">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="引用">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/></svg>
+        </button>
+        <button class="tb-btn" title="插入加密内容">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+        <button class="tb-btn" title="分割线">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="插入图片">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+        </button>
+        <button class="tb-btn" title="上传本地视频">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 4v16"/><path d="M17 4v16"/><path d="M3 8h4"/><path d="M3 16h4"/><path d="M17 8h4"/><path d="M17 16h4"/></svg>
+        </button>
+        <button class="tb-btn" title="上传新附件">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <button class="tb-btn" title="插入表格">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="插入 Mermaid 图">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+        </button>
+        <button class="tb-btn" title="插入思维导图">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>
+        </button>
+        <button class="tb-btn" title="插入公式">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V5a1 1 0 0 0-1-1H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h11a1 1 0 0 0 1-1v-2"/><path d="M16 7h2a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-2"/><path d="M7 15h5"/><path d="M7 12h5"/><path d="M9.5 9V6"/></svg>
+        </button>
+        <button class="tb-btn" title="插入脚注">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/></svg>
+        </button>
+        <div class="tb-divider"></div>
+        <button class="tb-btn" title="更多">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 编辑区 -->
+    <div class="ed-scroll">
+      <div class="prose">
+        <h1 class="pm-h"><span class="h-mark">H1</span>BLE OTA 升级方案</h1>
+        <p>本文档记录 Base Notes 配套设备（CH585）OTA 升级的方案选型与执行细节，重点是<strong>上行通道的可靠性</strong>。所有结论以实测数据为准，定稿后同步更新 <code>docs/0803</code> 计划。</p>
+
+        <h2 class="pm-h"><span class="h-mark">H2</span>背景</h2>
+        <ul>
+          <li>固件包 64~256KB，单次升级窗口约 3~8 分钟；</li>
+          <li>设备侧资源受限，重传缓冲仅 4KB，无法做完整窗口重传；</li>
+          <li>现网 notify 通道在弱信号环境下丢包率约 2%，且无应用层确认。</li>
+        </ul>
+
+        <h2 class="pm-h"><span class="h-mark">H2</span>现状：notify 上行</h2>
+        <p>设备通过 notify 将升级进度与校验结果推送给上位机，上位机发送 <code>start</code> 命令后进入等待。问题在于 notify 不保证送达，设备侧重发间隔与上位机 read 的时机都缺少约定，长尾进度经常丢一帧。</p>
+        <blockquote>notify 是「发了不管」；indicate 有应用层 ACK，适合做控制通道，代价是吞吐略低。</blockquote>
+
+        <h2 class="pm-h"><span class="h-mark">H2</span>候选方案</h2>
+        <ol>
+          <li>继续 notify + 应用层序号校验，丢帧由上位机按序号补问；</li>
+          <li>上行切 indicate，牺牲约 15% 吞吐换取可靠性；</li>
+          <li>start 之后固定窗口 read，把主动权收回上位机。</li>
+        </ol>
+
+        <h2 class="pm-h"><span class="h-mark">H2</span>下一步</h2>
+        <ul class="pm-task">
+          <li class="done"><span class="pm-check done"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="t-text">整理三种方案的吞吐 / 延迟实测数据</span></li>
+          <li><span class="pm-check"></span><span class="t-text">与固件侧确认 indicate MTU 与连接间隔</span></li>
+          <li><span class="pm-check"></span><span class="t-text">定稿后更新 docs/0803 计划并同步 README</span></li>
+        </ul>
+
+        <hr>
+        <p style="font-size:13px;color:var(--color-text-tertiary)">相关：<a href="#">CH585 驱动重构</a> · <a href="#">Flutter 设备连接稳定性方案</a></p>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var html = document.documentElement;
+
+  /* ---------- 主题 ---------- */
+  function setTheme(dark) {
+    html.classList.toggle('dark', dark);
+    document.getElementById('btn-theme-light').classList.toggle('active', !dark);
+    document.getElementById('btn-theme-dark').classList.toggle('active', dark);
+    document.querySelector('.prototype-bar').style.background = dark ? '#0d1117' : '#111827';
+    document.body.style.background = dark ? '#010409' : '#e5e7eb';
+    syncSeg('segTheme', dark ? 'dark' : 'light');
+  }
+
+  /* ---------- 导航栏模式 ---------- */
+  function setRail(label) {
+    app.classList.toggle('rail-label', label);
+    document.getElementById('btn-rail-icon').classList.toggle('active', !label);
+    document.getElementById('btn-rail-label').classList.toggle('active', label);
+    syncSeg('segRail', label ? 'label' : 'icon');
+  }
+
+  function syncSeg(id, value) {
+    var seg = document.getElementById(id);
+    if (!seg) return;
+    var btns = seg.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('on', btns[i].getAttribute('data-v') === value);
+    }
+  }
+
+  document.getElementById('btn-theme-light').onclick = function () { setTheme(false); };
+  document.getElementById('btn-theme-dark').onclick = function () { setTheme(true); };
+  document.getElementById('btn-rail-icon').onclick = function () { setRail(false); };
+  document.getElementById('btn-rail-label').onclick = function () { setRail(true); };
+
+  /* ---------- 头像浮窗 ---------- */
+  var avatar = document.getElementById('railAvatar');
+  var popup = document.getElementById('railPopup');
+  function setPopup(open) {
+    popup.classList.toggle('open', open);
+    avatar.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  avatar.addEventListener('click', function (e) {
+    e.stopPropagation();
+    setPopup(!popup.classList.contains('open'));
+  });
+  document.addEventListener('click', function (e) {
+    if (!popup.contains(e.target) && !avatar.contains(e.target)) setPopup(false);
+    if (!sbFilterPop.contains(e.target) && !sbFilterBtn.contains(e.target) &&
+        !sbSpacePop.contains(e.target) && !sbLocBtn.contains(e.target)) closeSbPops();
+    closeKtMenu();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      setPopup(false);
+      closeSbPops();
+      closeKtMenu();
+      if (focusKb) {
+        exitKbFocus();  /* 专注优先退出 */
+      } else {
+        if (kbSearchInput) { kbSearchInput.value = ''; refreshKbTree(); }
+      }
+    }
+  });
+
+  /* 浮窗内分段控件（事件委托） */
+  document.getElementById('segTheme').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b) setTheme(b.getAttribute('data-v') === 'dark');
+  });
+  document.getElementById('segRail').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (b) setRail(b.getAttribute('data-v') === 'label');
+  });
+
+  /* ---------- 侧栏头部：静态位置 + 搜索输入框 + 筛选浮层 ---------- */
+  var SPACES = {
+    personal: { name: '个人空间' },
+    team: { name: '团队空间' }
+  };
+  var sbSpaceName = document.getElementById('sbSpaceName');
+  var sbLocBtn = document.getElementById('sbLocBtn');
+  var sbSpacePop = document.getElementById('sbSpacePop');
+  var sbFilterBtn = document.getElementById('sbFilter');
+  var sbFilterPop = document.getElementById('sbFilterPop');
+  var kbSearchInput = document.getElementById('kbSearchInput');
+  var kbEmpty = document.getElementById('kbEmpty');
+  var kbScope = 'all';
+
+  function closeSbPops() {
+    sbSpacePop.classList.remove('open');
+    sbLocBtn.setAttribute('aria-expanded', 'false');
+    sbFilterPop.classList.remove('open');
+  }
+  /* 折叠钮操作 / 搜索 / 筛选时若对应区段收起则自动展开 */
+  function ensureSectionOpen(id) {
+    var sec = document.getElementById(id);
+    if (sec && sec.classList.contains('collapsed')) {
+      sec.classList.remove('collapsed');
+      var main = sec.querySelector('.sb-sec-main');
+      if (main) main.setAttribute('aria-expanded', 'true');
+    }
+  }
+
+  /* ============================================================
+     树形折叠 / 过滤引擎（知识库 + 标签共用）
+     行约定：#rootId 容器内 .kt-node 按文档顺序排列；
+       data-kb-lv = 层级（1/2/3…，父 = 之前最近的更小层级）；
+       .kt-node-note-count = 可折叠组（文件夹 / 标签组）；
+       .collapsed = 组已折叠，后代全部隐藏；
+       .kt-fold = 当前不可见（搜索 / 筛选过滤，或祖先折叠）。
+     两遍扫描：正序遍用层级栈推导父子索引；
+               倒序遍把 desc（自身或后代匹配）向祖先传播（兄弟不互传）；
+               再正序遍历按「祖先未折叠」计算可见性。
+     kw 激活时忽略折叠态（匹配路径自动展开），并给根节点加
+     .kt-force-open 让折叠组 chevron 保持向下（仅视觉，状态不变）。
+     ============================================================ */
+  var TREE_INPUTS = { kbTree: kbSearchInput, tagTree: null };
+
+  function refreshTree(rootId, input, scope) {
+    var root = document.getElementById(rootId);
+    if (!root) return { shown: 0, anyExpanded: false };
+    var kw = (input && input.value || '').trim().toLowerCase();
+    var rows = Array.prototype.slice.call(root.querySelectorAll('.kt-node'));
+    var n = rows.length;
+    var lvs = [], parentIdx = [], desc = [], i;
+    for (i = 0; i < n; i++) {
+      lvs[i] = parseInt(rows[i].getAttribute('data-kb-lv') || '1', 10) || 1;
+      var isGroup = !!rows[i].querySelector('.kt-node-note-count');
+      var t = rows[i].querySelector('.kt-node-title');
+      var name = t ? t.textContent.toLowerCase() : '';
+      var kwOk = !kw || name.indexOf(kw) >= 0;
+      var typeOk = scope === 'all' || (scope === 'folder' ? isGroup : !isGroup);
+      desc[i] = kwOk && typeOk;
+      parentIdx[i] = -1;
+    }
+    /* 正序遍：层级栈推导父索引 */
+    var stack = [];
+    for (i = 0; i < n; i++) {
+      while (stack.length && lvs[stack[stack.length - 1]] >= lvs[i]) stack.pop();
+      parentIdx[i] = stack.length ? stack[stack.length - 1] : -1;
+      stack.push(i);
+    }
+    /* 倒序遍：desc 向祖先传播 */
+    for (i = n - 1; i >= 0; i--) {
+      if (parentIdx[i] >= 0 && desc[i]) desc[parentIdx[i]] = true;
+    }
+    /* 正序遍历：可见性 = desc 匹配且祖先链未折叠（kw 激活时忽略折叠） */
+    var shown = 0, anyExpanded = false, hiddenByAnc = [];
+    for (i = 0; i < n; i++) hiddenByAnc[i] = false;
+    for (i = 0; i < n; i++) {
+      var isGroup2 = !!rows[i].querySelector('.kt-node-note-count');
+      var collapsed = rows[i].classList.contains('collapsed');
+      var vis = kw ? desc[i] : (desc[i] && !hiddenByAnc[i]);
+      rows[i].classList.toggle('kt-fold', !vis);
+      if (vis) shown++;
+      if (isGroup2 && !collapsed) anyExpanded = true;
+      /* 后代继承隐藏：本节点折叠或不可见，则后续更深层级全隐藏 */
+      if (collapsed || !vis) {
+        var j = i + 1;
+        while (j < n && lvs[j] > lvs[i]) { hiddenByAnc[j] = true; j++; }
+      }
+    }
+    root.classList.toggle('kt-force-open', !!kw);
+    return { shown: shown, anyExpanded: anyExpanded };
+  }
+
+  /* 单组折叠 / 展开（chevron 与组行点击均可触发；搜索激活时禁用） */
+  function toggleNode(node) {
+    if (!node) return;
+    var root = node.closest('#kbTree, #tagTree');
+    if (!root || !node.querySelector('.kt-node-note-count')) return; /* 仅组可折叠 */
+    var input = TREE_INPUTS[root.id];
+    var kw = input ? (input.value || '').trim() : '';
+    if (kw) return; /* 搜索激活时不手动折叠，避免遮挡匹配路径 */
+    var collapsed = node.classList.toggle('collapsed');
+    var chev = node.querySelector('.kt-chevron-btn');
+    if (chev) chev.setAttribute('aria-label', collapsed ? '展开' : '折叠');
+    if (root.id === 'kbTree') refreshKbTree(); else refreshTagTree();
+  }
+
+  /* 折叠 / 展开全部组（VS Code Collapse Folders 语义：
+     force=true 全折 / false 全展；缺省 = 有展开则全折，全折则全展） */
+  function toggleFoldAll(rootId, force) {
+    var root = document.getElementById(rootId);
+    if (!root) return;
+    var input = TREE_INPUTS[rootId];
+    if (input && (input.value || '').trim()) input.value = '';
+    var nodes = root.querySelectorAll('.kt-node');
+    var anyExpanded = false, i;
+    for (i = 0; i < nodes.length; i++) {
+      if (nodes[i].querySelector('.kt-node-note-count') && !nodes[i].classList.contains('collapsed')) {
+        anyExpanded = true; break;
+      }
+    }
+    var target = (typeof force === 'boolean') ? force : anyExpanded;
+    for (i = 0; i < nodes.length; i++) {
+      if (nodes[i].classList.contains('kt-fold')) continue; /* 专注视图外的行不动 */
+      if (!nodes[i].querySelector('.kt-node-note-count')) continue;
+      nodes[i].classList.toggle('collapsed', target);
+      var chev = nodes[i].querySelector('.kt-chevron-btn');
+      if (chev) chev.setAttribute('aria-label', target ? '展开' : '折叠');
+    }
+    if (rootId === 'kbTree') refreshKbTree(); else refreshTagTree();
+  }
+
+  /* 知识库树刷新：可见性 + 专注过滤 + 空态 + 折叠钮图标态 */
+  function refreshKbTree() {
+    var st = refreshTree('kbTree', kbSearchInput, kbScope);
+    var root = document.getElementById('kbTree');
+    var shown = st.shown;
+    /* kb 行可拖拽（移动 / 改层级），动态新增节点也在此补齐 */
+    var dRows = root.querySelectorAll('.kt-node');
+    for (var d = 0; d < dRows.length; d++) {
+      if (!dRows[d].getAttribute('draggable')) dRows[d].setAttribute('draggable', 'true');
+    }
+    if (focusKb) {
+      /* 专注：只保留 focusKb 根行及其后代，其余行强制隐藏 */
+      var rows = Array.prototype.slice.call(root.querySelectorAll('.kt-node'));
+      var inRange = false;
+      shown = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var lv = nodeLv(rows[i]);
+        var t = rows[i].querySelector('.kt-node-title');
+        var isFocusRoot = lv === 1 && t && t.textContent === focusKb;
+        if (isFocusRoot) inRange = true;
+        else if (inRange && lv === 1) inRange = false;
+        if (!inRange) {
+          rows[i].classList.add('kt-fold');
+        } else if (!rows[i].classList.contains('kt-fold')) {
+          shown++;
+        }
+      }
+    }
+    if (kbEmpty) kbEmpty.hidden = shown > 0;
+    /* 折叠钮图标态：基于当前可见（未被专注/过滤隐藏）的组 */
+    var visNodes = root.querySelectorAll('.kt-node:not(.kt-fold)');
+    var anyExpanded = false;
+    for (var v = 0; v < visNodes.length; v++) {
+      if (visNodes[v].querySelector('.kt-node-note-count') && !visNodes[v].classList.contains('collapsed')) {
+        anyExpanded = true; break;
+      }
+    }
+    var btn = document.getElementById('kbFold');
+    if (btn) {
+      btn.classList.toggle('flipped', !anyExpanded);
+      btn.title = anyExpanded ? '折叠全部文件夹' : '展开全部文件夹';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  }
+  /* 标签树刷新：可见性 + 折叠钮图标态 */
+  function refreshTagTree() {
+    var st = refreshTree('tagTree', TREE_INPUTS.tagTree, 'all');
+    var btn = document.getElementById('tagFold');
+    if (btn) {
+      btn.classList.toggle('flipped', !st.anyExpanded);
+      btn.title = st.anyExpanded ? '折叠全部标签文档' : '展开全部标签文档';
+      btn.setAttribute('aria-label', btn.title);
+    }
+  }
+
+  /* ============================================================
+     知识库专注模式（下钻仅到根层）：双击 lv1 知识库进入，
+     侧栏只显示该知识库的内容；lv2/lv3 子文件夹不下钻；
+     [←] 或 Esc 退出。实现 = refreshKbTree 叠加范围 mask。
+     ============================================================ */
+  var focusKb = null;
+  var kbFocusBar = document.getElementById('kbFocusBar');
+  var kbFocusName = document.getElementById('kbFocusName');
+  function enterKbFocus(title) {
+    focusKb = title;
+    var rows = document.querySelectorAll('#kbTree .kt-node');
+    for (var i = 0; i < rows.length; i++) {
+      var t = rows[i].querySelector('.kt-node-title');
+      if (nodeLv(rows[i]) === 1 && t && t.textContent === title) {
+        rows[i].classList.remove('collapsed');  /* 折叠着的先展开 */
+        var chev = rows[i].querySelector('.kt-chevron-btn');
+        if (chev) chev.setAttribute('aria-label', '折叠');
+        break;
+      }
+    }
+    kbFocusName.textContent = title;
+    kbFocusBar.hidden = false;
+    ensureSectionOpen('secKb');
+    refreshKbTree();
+  }
+  function exitKbFocus() {
+    focusKb = null;
+    kbFocusBar.hidden = true;
+    refreshKbTree();
+  }
+  document.getElementById('kbFocusBack').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    exitKbFocus();
+  });
+
+  /* 筛选：范围浮层（全部 / 仅文件夹 / 仅笔记） */
+  sbFilterBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = sbFilterPop.classList.toggle('open');
+    if (open) ensureSectionOpen('secKb');
+  });
+  sbFilterPop.addEventListener('click', function (e) {
+    var row = e.target.closest('.pop-row');
+    if (!row) return;
+    e.stopPropagation();
+    var rows = this.querySelectorAll('.pop-row');
+    for (var i = 0; i < rows.length; i++) rows[i].classList.remove('on');
+    row.classList.add('on');
+    kbScope = row.getAttribute('data-scope');
+    sbFilterBtn.classList.toggle('on', kbScope !== 'all');
+    ensureSectionOpen('secKb');
+    refreshKbTree();
+    this.classList.remove('open');
+  });
+
+  /* 搜索：头部输入框实时过滤（自动展开匹配路径） */
+  kbSearchInput.addEventListener('input', refreshKbTree);
+  kbSearchInput.addEventListener('click', function (e) { e.stopPropagation(); });
+  kbSearchInput.addEventListener('focus', function () { ensureSectionOpen('secKb'); });
+
+  /* ============================================================
+     行级菜单（⋮ 更多操作）：fixed 定位浮层，挂 body，点外/Esc 关闭
+     ============================================================ */
+  var ktMenu = null;
+  function closeKtMenu() {
+    if (ktMenu) { ktMenu.remove(); ktMenu = null; }
+  }
+  function openKtMenu(anchor, items) {
+    closeKtMenu();
+    var menu = document.createElement('div');
+    menu.className = 'kt-menu';
+    items.forEach(function (it) {
+      var row = document.createElement('button');
+      row.className = 'kt-menu-row' + (it.danger ? ' danger' : '');
+      row.textContent = it.label;
+      row.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        closeKtMenu();
+        if (it.action) it.action();
+      });
+      menu.appendChild(row);
+    });
+    document.body.appendChild(menu);
+    var r = anchor.getBoundingClientRect();
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    var left = Math.max(8, Math.min(r.right - mw, window.innerWidth - mw - 8));
+    var top = r.bottom + 4;
+    if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    ktMenu = menu;
+  }
+
+  /* 行操作工具：node 的全部后代之后的位置（null = 容器末尾） */
+  function nodeLv(node) {
+    return parseInt(node.getAttribute('data-kb-lv') || '1', 10) || 1;
+  }
+  function afterDescendants(node) {
+    var root = node.closest('#kbTree, #tagTree');
+    var rows = Array.prototype.slice.call(root.querySelectorAll('.kt-node'));
+    var i = rows.indexOf(node), lv = nodeLv(node), j = i + 1;
+    while (j < rows.length && nodeLv(rows[j]) > lv) j++;
+    return rows[j] || null;
+  }
+  function refreshTreeOf(root) {
+    if (root.id === 'kbTree') refreshKbTree(); else refreshTagTree();
+  }
+  var MORE_SVG = '<button class="kt-more" title="更多操作" aria-label="更多操作"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>';
+  var PLUS_SVG = '<button class="kt-plus" title="新建文档"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>';
+
+  /* 新建子节点（文档 / 子文件夹）：插入父节点后代之后并进入重命名 */
+  function newChildNode(parent, type) {
+    var root = parent.closest('#kbTree, #tagTree');
+    var lv = nodeLv(parent) + 1;
+    var pad = 2 + (lv - 1) * 16;
+    var node = document.createElement('div');
+    node.className = 'kt-node';
+    node.setAttribute('data-kb-lv', String(lv));
+    node.setAttribute('style', 'padding-left:' + pad + 'px');
+    if (type === 'folder') {
+      node.innerHTML =
+        '<button class="kt-chevron-btn" aria-label="折叠"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>' +
+        '<button class="kt-node-main"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="kt-node-title">新建文件夹</span><span class="kt-node-note-count">0</span></button>' +
+        PLUS_SVG + MORE_SVG;
+    } else {
+      node.innerHTML =
+        '<button class="kt-chevron-btn" style="visibility:hidden" aria-hidden="true"></button>' +
+        '<button class="kt-node-main"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-accent-primary);flex-shrink:0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span class="kt-node-title">新建文档</span></button>' +
+        PLUS_SVG + MORE_SVG;
+    }
+    /* 折叠中的父节点先展开，保证新子节点可见 */
+    parent.classList.remove('collapsed');
+    var chev = parent.querySelector('.kt-chevron-btn');
+    if (chev) chev.setAttribute('aria-label', '折叠');
+    var ref = afterDescendants(parent);
+    if (ref) root.insertBefore(node, ref); else root.appendChild(node);
+    refreshTreeOf(root);
+    renameNode(node);
+  }
+
+  /* 行内重命名：标题替换为输入框，Enter 提交 / Esc 取消 */
+  function renameNode(node) {
+    var title = node.querySelector('.kt-node-title');
+    if (!title) return;
+    var input = document.createElement('input');
+    input.className = 'kt-rename-input';
+    input.value = title.textContent;
+    title.style.display = 'none';
+    title.parentNode.insertBefore(input, title);
+    input.focus();
+    input.select();
+    var closed = false;
+    var done = function (commit) {
+      if (closed) return;
+      closed = true;
+      if (commit) {
+        var v = input.value.trim();
+        if (v) title.textContent = v;
+      }
+      input.remove();
+      title.style.display = '';
+      refreshTreeOf(node.closest('#kbTree, #tagTree'));
+    };
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); done(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+      e.stopPropagation();
+    });
+    input.addEventListener('blur', function () { done(true); });
+    input.addEventListener('click', function (e) { e.stopPropagation(); });
+  }
+
+  /* 删除行及其全部后代（子树整删，不破坏层级序） */
+  function deleteNode(node) {
+    var root = node.closest('#kbTree, #tagTree');
+    var rows = Array.prototype.slice.call(root.querySelectorAll('.kt-node'));
+    var i = rows.indexOf(node), lv = nodeLv(node), victims = [node];
+    for (var j = i + 1; j < rows.length; j++) {
+      if (nodeLv(rows[j]) > lv) victims.push(rows[j]); else break;
+    }
+    for (var k = 0; k < victims.length; k++) victims[k].remove();
+    refreshTreeOf(root);
+  }
+
+  /* 文档行置顶标记切换（📌 视觉标记；真实排序归代码实现阶段） */
+  function togglePin(node) {
+    var title = node.querySelector('.kt-node-title');
+    if (!title) return;
+    var pin = node.querySelector('.kt-pin-icon');
+    if (pin) { pin.remove(); return; }
+    var holder = document.createElement('span');
+    holder.innerHTML = '<svg class="kt-pin-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:var(--color-accent-primary);flex-shrink:0" aria-label="已置顶"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+    title.parentNode.insertBefore(holder.firstChild, title.nextSibling);
+  }
+
+  /* 从标签定位知识库文档：展开祖先路径 + 高亮闪烁 + 滚动到可见 */
+  function locateInKb(node) {
+    var t = node.querySelector('.kt-node-title');
+    if (!t) return;
+    var name = t.textContent;
+    var allRows = Array.prototype.slice.call(document.querySelectorAll('#kbTree .kt-node'));
+    var hit = null;
+    for (var i = 0; i < allRows.length; i++) {
+      var tt = allRows[i].querySelector('.kt-node-title');
+      if (tt && tt.textContent === name && !allRows[i].querySelector('.kt-node-note-count')) { hit = allRows[i]; break; }
+    }
+    if (!hit) return;
+    function rootName(n) {
+      for (var j = allRows.indexOf(n); j >= 0; j--) {
+        if (nodeLv(allRows[j]) === 1) {
+          var rt = allRows[j].querySelector('.kt-node-title');
+          return rt ? rt.textContent : null;
+        }
+      }
+      return null;
+    }
+    if (focusKb && rootName(hit) !== focusKb) exitKbFocus();  /* 目标不在当前专注知识库则先退出 */
+    var minLv = nodeLv(hit);
+    for (var j = allRows.indexOf(hit) - 1; j >= 0; j--) {
+      var l2 = nodeLv(allRows[j]);
+      if (l2 < minLv) {
+        minLv = l2;
+        allRows[j].classList.remove('collapsed');
+        var cv = allRows[j].querySelector('.kt-chevron-btn');
+        if (cv) cv.setAttribute('aria-label', '折叠');
+        if (minLv === 1) break;
+      }
+    }
+    ensureSectionOpen('secKb');
+    refreshKbTree();
+    hit.scrollIntoView({ block: 'nearest' });
+    hit.classList.remove('kt-flash');
+    void hit.offsetWidth;
+    hit.classList.add('kt-flash');
+    setTimeout(function () { hit.classList.remove('kt-flash'); }, 1600);
+  }
+
+  function menuItemsForNode(node) {
+    var isGroup = !!node.querySelector('.kt-node-note-count');
+    if (node.closest('#tagTree')) {
+      /* 标签组：重命名 / 删除；标签下文档：定位在知识库 / 重命名 / 删除 */
+      var tItems = [];
+      if (!isGroup) {
+        tItems.push({ label: '定位', action: function () { locateInKb(node); } });
+      }
+      tItems.push({ label: '重命名', action: function () { renameNode(node); } });
+      tItems.push({ label: '删除', danger: true, action: function () { deleteNode(node); } });
+      return tItems;
+    }
+    var items = [];
+    if (isGroup) {
+      items.push({ label: '新建文档', action: function () { newChildNode(node, 'note'); } });
+      items.push({ label: '新建子文件夹', action: function () { newChildNode(node, 'folder'); } });
+    } else {
+      items.push({ label: '置顶 / 取消置顶', action: function () { togglePin(node); } });
+    }
+    items.push({ label: '重命名', action: function () { renameNode(node); } });
+    items.push({ label: '删除', danger: true, action: function () { deleteNode(node); } });
+    return items;
+  }
+
+  /* 知识库区段头 ⋮：全部展开 / 全部折叠 */
+  document.getElementById('kbMore').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    ensureSectionOpen('secKb');
+    openKtMenu(this, [
+      { label: '全部展开', action: function () { toggleFoldAll('kbTree', false); } },
+      { label: '全部折叠', action: function () { toggleFoldAll('kbTree', true); } }
+    ]);
+  });
+
+  /* 树点击委托：组行 / chevron 点击 = 折叠展开；⋮ = 行级菜单；行内 + 新建不触发 */
+  ['kbTree', 'tagTree'].forEach(function (id) {
+    var root = document.getElementById(id);
+    if (!root) return;
+    root.addEventListener('click', function (e) {
+      if (e.target.closest('.kt-plus')) return;
+      var moreBtn = e.target.closest('.kt-more');
+      if (moreBtn) {
+        e.stopPropagation();
+        var target = moreBtn.closest('.kt-node');
+        if (target) openKtMenu(moreBtn, menuItemsForNode(target));
+        return;
+      }
+      var node = e.target.closest('.kt-node');
+      if (!node) return;
+      toggleNode(node);
+    });
+  });
+
+  /* 双击根层知识库（lv1 组）进入专注；lv2/lv3 子文件夹不下钻 */
+  document.getElementById('kbTree').addEventListener('dblclick', function (e) {
+    if (e.target.closest('.kt-plus, .kt-more, .kt-rename-input')) return;
+    var node = e.target.closest('.kt-node');
+    if (!node || nodeLv(node) !== 1 || !node.querySelector('.kt-node-note-count')) return;
+    var t = node.querySelector('.kt-node-title');
+    if (t) enterKbFocus(t.textContent);
+  });
+
+  /* ============================================================
+     kb 树拖拽：移动位置 / 改变层级（标签树不拖拽）
+     目标行上 30% = 插到其前（同层）；下 30% = 插到其后（同层）；
+     中间 = 移入目标文件夹（仅组目标，文档目标折叠为前/后）。
+     摘除整子树后按新父层级平移 data-kb-lv 与缩进，不能移入自身子树。
+     ============================================================ */
+  var kbTreeEl = document.getElementById('kbTree');
+  var dragKbNode = null;
+  function clearDropMarks() {
+    var marks = kbTreeEl.querySelectorAll('.kt-drop-above, .kt-drop-below, .kt-drop-inside');
+    for (var i = 0; i < marks.length; i++) {
+      marks[i].classList.remove('kt-drop-above', 'kt-drop-below', 'kt-drop-inside');
+    }
+  }
+  function isKbDescendant(node, ancestor) {
+    var lv = nodeLv(ancestor);
+    var rows = Array.prototype.slice.call(kbTreeEl.querySelectorAll('.kt-node'));
+    for (var j = rows.indexOf(ancestor) + 1; j < rows.length; j++) {
+      if (nodeLv(rows[j]) <= lv) return false;
+      if (rows[j] === node) return true;
+    }
+    return false;
+  }
+  function kbSubtree(node) {
+    var rows = Array.prototype.slice.call(kbTreeEl.querySelectorAll('.kt-node'));
+    var i = rows.indexOf(node), lv = nodeLv(node), j = i + 1;
+    while (j < rows.length && nodeLv(rows[j]) > lv) j++;
+    return rows.slice(i, j);
+  }
+  function relvKbSubtree(rows, delta) {
+    for (var k = 0; k < rows.length; k++) {
+      var nlv = nodeLv(rows[k]) + delta;
+      rows[k].setAttribute('data-kb-lv', String(nlv));
+      rows[k].setAttribute('style', 'padding-left:' + (2 + (nlv - 1) * 16) + 'px');
+    }
+  }
+  kbTreeEl.addEventListener('dragstart', function (ev) {
+    var node = ev.target.closest('.kt-node');
+    if (!node) return;
+    dragKbNode = node;
+    node.classList.add('kt-dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', 'kb-node'); } catch (err) {}
+  });
+  kbTreeEl.addEventListener('dragover', function (ev) {
+    if (!dragKbNode) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    var target = ev.target.closest('.kt-node');
+    clearDropMarks();
+    if (!target || target === dragKbNode || isKbDescendant(target, dragKbNode)) return;
+    var r = target.getBoundingClientRect();
+    var y = ev.clientY - r.top;
+    var mode;
+    if (y < r.height * 0.3) mode = 'above';
+    else if (y > r.height * 0.7) mode = 'below';
+    else if (target.querySelector('.kt-node-note-count')) mode = 'inside';
+    else mode = (y < r.height / 2) ? 'above' : 'below';
+    target.classList.add(mode === 'inside' ? 'kt-drop-inside' : (mode === 'above' ? 'kt-drop-above' : 'kt-drop-below'));
+  });
+  kbTreeEl.addEventListener('drop', function (ev) {
+    if (!dragKbNode) return;
+    ev.preventDefault();
+    var marked = kbTreeEl.querySelector('.kt-drop-above, .kt-drop-below, .kt-drop-inside');
+    clearDropMarks();
+    if (!marked || marked === dragKbNode) { dragKbNode = null; return; }
+    var target = marked;
+    var mode = marked.classList.contains('kt-drop-inside') ? 'inside'
+             : marked.classList.contains('kt-drop-above') ? 'above' : 'below';
+    var rows = kbSubtree(dragKbNode);
+    var dragLv = nodeLv(dragKbNode);
+    for (var k = 0; k < rows.length; k++) rows[k].remove();  /* 先摘除整子树 */
+    var newLv = (mode === 'inside') ? nodeLv(target) + 1 : nodeLv(target);
+    var ref = (mode === 'above') ? target : afterDescendants(target);  /* 摘除后取插入参照 */
+    relvKbSubtree(rows, newLv - dragLv);
+    if (ref && ref.parentNode === kbTreeEl) kbTreeEl.insertBefore(rows[0], ref);
+    else kbTreeEl.appendChild(rows[0]);
+    if (mode === 'inside') {
+      target.classList.remove('collapsed');
+      var cv = target.querySelector('.kt-chevron-btn');
+      if (cv) cv.setAttribute('aria-label', '折叠');
+    }
+    dragKbNode = null;
+    refreshKbTree();
+  });
+  kbTreeEl.addEventListener('dragend', function () {
+    clearDropMarks();
+    if (dragKbNode) dragKbNode.classList.remove('kt-dragging');
+    dragKbNode = null;
+  });
+
+  /*  inert 行 / 加入空间：仅关闭浮窗 */
+  var inertRows = document.querySelectorAll('[data-inert]');
+  for (var k = 0; k < inertRows.length; k++) {
+    inertRows[k].addEventListener('click', function () { setPopup(false); });
+  }
+
+  /* 导航项：激活态迁移 */
+  var navItems = document.querySelectorAll('.rail-item[data-nav]');
+  for (var m = 0; m < navItems.length; m++) {
+    navItems[m].addEventListener('click', function () {
+      for (var n = 0; n < navItems.length; n++) navItems[n].classList.remove('active');
+      this.classList.add('active');
+    });
+  }
+
+  /* VSCode 式面板：区段折叠 / 展开（头部 = div.sb-sec-head > button.sb-sec-main + div.sb-sec-acts） */
+  var secMains = document.querySelectorAll('.sb-sec-main');
+  for (var q = 0; q < secMains.length; q++) {
+    secMains[q].addEventListener('click', function () {
+      var sec = this.closest('.sb-section');
+      var collapsed = sec.classList.toggle('collapsed');
+      this.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    });
+  }
+
+  /* 知识库 - 新建文件夹：向知识树追加 lv1 节点并刷新 */
+  document.getElementById('kbNew').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    var scroll = document.querySelector('#secKb .kt-scroll');
+    if (!scroll) return;
+    var node = document.createElement('div');
+    node.className = 'kt-node';
+    node.setAttribute('data-kb-lv', '1');
+    node.setAttribute('style', 'padding-left:2px');
+    node.innerHTML =
+      '<button class="kt-chevron-btn" aria-label="折叠"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>' +
+      '<button class="kt-node-main"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#f59e0b;flex-shrink:0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span class="kt-node-title">新建文件夹</span></button>' +
+      PLUS_SVG + MORE_SVG;
+    scroll.appendChild(node);
+    refreshKbTree();
+  });
+
+  /* 刷新按钮（知识库 / 标签）：图标旋转动画 */
+  var refreshBtns = document.querySelectorAll('#kbRefresh, #tagRefresh');
+  for (var rf = 0; rf < refreshBtns.length; rf++) {
+    refreshBtns[rf].addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      this.classList.remove('spinning');
+      void this.offsetWidth;
+      this.classList.add('spinning');
+    });
+  }
+
+  /* 知识库 - 折叠/展开全部文件夹（对树内容，非面板） */
+  document.getElementById('kbFold').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    ensureSectionOpen('secKb');
+    toggleFoldAll('kbTree');
+  });
+
+  /* 标签 - 折叠/展开全部标签文档组（对标签下面的文档，非面板） */
+  document.getElementById('tagFold').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    ensureSectionOpen('secTags');
+    toggleFoldAll('tagTree');
+  });
+
+  /* 打开的编辑器：全部关闭 */
+  document.getElementById('edCloseAll').addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    var list = document.querySelector('#secEditors .ed-list');
+    if (!list) return;
+    var rows = list.querySelectorAll('.ed-row');
+    for (var i = 0; i < rows.length; i++) rows[i].remove();
+    refreshEdCount();
+  });
+
+  /* 面板拖拽排序：HTML5 DnD，事件委托在 .sb-panel，按中点比较实时插入 */
+  var sbPanel = document.querySelector('.sb-panel');
+  var dragSec = null;
+  sbPanel.addEventListener('dragstart', function (ev) {
+    var sec = ev.target.closest('.sb-section');
+    if (!sec || !sbPanel.contains(sec)) return;
+    dragSec = sec;
+    sec.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', sec.id);
+  });
+  sbPanel.addEventListener('dragover', function (ev) {
+    if (!dragSec) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    var secs = sbPanel.querySelectorAll('.sb-section:not(.dragging)');
+    var after = null;
+    for (var i = 0; i < secs.length; i++) {
+      var rect = secs[i].getBoundingClientRect();
+      if (ev.clientY < rect.top + rect.height / 2) { after = secs[i]; break; }
+    }
+    sbPanel.insertBefore(dragSec, after);
+  });
+  sbPanel.addEventListener('dragend', function () {
+    if (dragSec) dragSec.classList.remove('dragging');
+    dragSec = null;
+  });
+
+  /* 打开的编辑器：激活 / 关闭；计数徽章同步 */
+  function refreshEdCount() {
+    var c = document.getElementById('edCount');
+    var list = document.querySelector('#secEditors .ed-list');
+    var n = list ? list.querySelectorAll('.ed-row').length : 0;
+    if (c) c.textContent = n;
+    if (list) list.classList.toggle('empty', n === 0);
+  }
+  var edRows = document.querySelectorAll('.ed-row');
+  for (var r = 0; r < edRows.length; r++) {
+    edRows[r].addEventListener('click', function (ev) {
+      var closeBtn = ev.target.closest('.ed-row-close');
+      if (closeBtn) {
+        ev.stopPropagation();
+        var row = closeBtn.closest('.ed-row');
+        if (row.classList.contains('active')) {
+          var next = row.nextElementSibling;
+          if (!next || !next.classList.contains('ed-row')) next = row.previousElementSibling;
+          if (next && next.classList.contains('ed-row')) next.classList.add('active');
+        }
+        row.remove();
+        refreshEdCount();
+        return;
+      }
+      for (var t = 0; t < edRows.length; t++) edRows[t].classList.remove('active');
+      this.classList.add('active');
+    });
+  }
+
+  /* 初始化：默认图标+文字 64px */
+  setRail(true);
+  setTheme(false);
+  refreshKbTree();
+  refreshTagTree();
+  refreshEdCount();
+})();
+</script>
+</body>
+</html>

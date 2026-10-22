@@ -85,7 +85,7 @@ function getQuickAddCreatePatch(parsed: TaskQuickAddParseResult): Partial<Task> 
 }
 
 /* ===== Main Component ===== */
-export default function TaskCenter() {
+export default function TaskCenter({ hideSidebar = false }: { hideSidebar?: boolean } = {}) {
   const { t } = useTranslation();
   const { prefs: userPrefs } = useUserPreferences();
 
@@ -111,6 +111,20 @@ export default function TaskCenter() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats | null>(null);
   const [centerMode, setCenterMode] = useState<CenterMode>("tasks");
+  // 侧栏接管过滤导航后主区左栏默认隐藏；浮动按钮可临时展开为 overlay
+  const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(false);
+
+  // 侧栏迷你面板 chips → 主区切换对应视图
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const target = (event as CustomEvent<{ target: string }>).detail?.target;
+      if (target === "inbox") { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }
+      else if (target === "today") { setCenterMode("tasks"); selectTaskFilter("today"); }
+      else if (target === "all") { setCenterMode("tasks"); selectTaskFilter("all"); }
+    };
+    window.addEventListener("nowen:task-panel-navigate", onNavigate);
+    return () => window.removeEventListener("nowen:task-panel-navigate", onNavigate);
+  }, []);
 
   useEffect(() => {
     if (!isTaskCenterModuleVisible(centerMode, userPrefs.hiddenTaskCenterModules)) {
@@ -837,7 +851,8 @@ export default function TaskCenter() {
 
   return (
     <div ref={pageRootRef} className={cn(TASK_CENTER_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
-      {/* Left: Sidebar Filters + Projects (desktop) */}
+      {/* Left: Sidebar Filters + Projects (desktop)——侧栏接管导航后默认隐藏，可浮动展开 */}
+      {!hideSidebar && (
       <div className="hidden md:flex w-56 shrink-0 flex-col border-r border-app-border bg-app-surface overflow-y-auto" style={{ paddingTop: "var(--safe-area-top)" }}>
         <nav className="flex-1 px-2 py-1.5 space-y-0.5">
           <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
@@ -999,6 +1014,64 @@ export default function TaskCenter() {
           ))}
         </nav>
       </div>
+      )}
+
+      {/* 侧栏隐藏时的浮动展开按钮 */}
+      {hideSidebar && (
+        <button
+          type="button"
+          onClick={() => setSidebarOverlayOpen(true)}
+          title="任务导航"
+          className="absolute left-2 top-1/2 z-30 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-app-border bg-app-elevated text-tx-tertiary shadow-sm hover:text-tx-primary md:flex"
+        >
+          <ListTodo size={14} />
+        </button>
+      )}
+      {hideSidebar && sidebarOverlayOpen && (
+        <>
+          <div className="fixed inset-0 z-[70]" onClick={() => setSidebarOverlayOpen(false)} />
+          <div className="fixed left-0 top-0 z-[75] h-full w-56 flex-col border-r border-app-border bg-app-surface overflow-y-auto pt-[var(--safe-area-top)] hidden md:flex">
+            <button
+              type="button"
+              onClick={() => setSidebarOverlayOpen(false)}
+              className="mx-2 mt-2 flex h-7 items-center justify-end rounded px-2 text-xs text-tx-tertiary hover:bg-app-hover"
+            >
+              收起
+            </button>
+            <nav className="flex-1 px-2 py-1.5 space-y-0.5">
+              <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
+                {t("tasks.title")}
+              </div>
+              {(() => {
+                // overlay 内渲染与左栏一致的导航（简化：复用同源渲染块——通过 CSS 复制代价高，这里提供主过滤项）
+                return FILTERS.map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => { selectTaskFilter(f.key); setSidebarOverlayOpen(false); }}
+                    className={cn(
+                      "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors",
+                      centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+                    )}
+                  >
+                    {f.icon}
+                    <span className="flex-1 text-left">{f.label}</span>
+                  </button>
+                ));
+              })()}
+              <button
+                onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); setSidebarOverlayOpen(false); }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                  centerMode === "inbox" ? "bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400" : "text-tx-secondary hover:bg-app-hover",
+                )}
+              >
+                <Inbox size={16} />
+                <span className="flex-1 text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
+              </button>
+            </nav>
+          </div>
+        </>
+      )}
 
       {/* Center: Task List */}
       <div className={TASK_CENTER_MAIN_CLASS}>

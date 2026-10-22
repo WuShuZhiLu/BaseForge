@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "@/components/Sidebar";
+import SidebarNext from "@/components/SidebarNext";
+import NavRailNext from "@/components/NavRailNext";
 import NavRail from "@/components/NavRail";
 import { useRailMode } from "@/hooks/useRailMode";
 import NoteList from "@/components/NoteList";
@@ -245,16 +247,42 @@ function SidebarResizeHandle() {
     window.addEventListener("mouseup", handleMouseUp);
   }, [state.sidebarWidth, actions]);
 
-  if (state.sidebarCollapsed) return null;
+  if (state.sidebarCollapsed) {
+    // 语雀式：细竖条（8×38）骑线、柔和投影，位置侧栏 1/4 高度，小三角朝右；靠近边缘淡入
+    return (
+      <div className="group/edge relative hidden w-3 shrink-0 md:block">
+        <button
+          type="button"
+          onClick={actions.toggleSidebar}
+          title="展开侧边栏"
+          aria-label="展开侧边栏"
+          className="absolute left-1/2 top-1/4 z-[140] flex h-[44px] w-3 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-black/5 bg-white opacity-0 shadow-[0_1px_4px_rgba(0,0,0,0.15)] transition-opacity duration-150 hover:opacity-100 group-hover/edge:opacity-100 dark:border-white/10 dark:bg-app-elevated"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-tx-tertiary"><path d="M9 6.5c0-.9 1-1.4 1.7-.9l7 5.1c.6.5.6 1.5 0 2l-7 5.1c-.7.5-1.7 0-1.7-.9v-10.4Z" /></svg>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div
       onMouseDown={handleMouseDown}
       onDoubleClick={() => actions.setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
-      className="hidden md:flex w-1 cursor-col-resize items-center justify-center hover:bg-accent-primary/30 active:bg-accent-primary/50 transition-colors shrink-0 group"
+      className="group/edge relative hidden md:flex w-1 cursor-col-resize items-center justify-center shrink-0"
       title="拖拽调整侧边栏宽度 / 双击恢复默认"
     >
-      <div className="w-[2px] h-8 rounded-full bg-transparent group-hover:bg-accent-primary/60 transition-colors" />
+      <div className="w-[2px] h-8 rounded-full bg-transparent group-hover/edge:bg-accent-primary/60 transition-colors" />
+      {/* 语雀式收起按钮：细竖条（8×38）骑线、柔和投影，位于侧栏 1/4 高度，小三角朝左；靠近边缘淡入 */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); actions.toggleSidebar(); }}
+        onMouseDown={(e) => e.stopPropagation()}
+        title="收起侧边栏"
+        aria-label="收起侧边栏"
+        className="absolute left-1/2 top-1/4 z-[140] flex h-[44px] w-3 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-black/5 bg-white opacity-0 shadow-[0_1px_4px_rgba(0,0,0,0.15)] transition-opacity duration-150 hover:opacity-100 group-hover/edge:opacity-100 dark:border-white/10 dark:bg-app-elevated"
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" className="text-tx-tertiary"><path d="M15 6.5c0-.9-1-1.4-1.7-.9l-7 5.1c-.6.5-.6 1.5 0 2l7 5.1c.7.5 1.7 0 1.7-.9v-10.4Z" /></svg>
+      </button>
     </div>
   );
 }
@@ -853,16 +881,15 @@ function AppLayout() {
           但 Rail 仍在，模块切换永远 1 次点击可达。
           v16 P3 后续：Rail 三档模式（icon=48px 纯图标 / label=64px 图标+文字 / hidden=完全隐藏）；
           hidden 模式下若主侧栏也折叠，强制保留 Rail（避免完全无侧栏入口）。 */}
-      {showRail && <PhaseAPerfProfiler id="NavRail"><NavRail notificationCount={notificationCount} /></PhaseAPerfProfiler>}
+      {showRail && <PhaseAPerfProfiler id="NavRailNext"><NavRailNext notificationCount={notificationCount} /></PhaseAPerfProfiler>}
       {showSidebar && (
-        <div
-          className="hidden md:flex shrink-0"
-          style={{ width: `${state.sidebarWidth}px` }}
-        >
-          <PhaseAPerfProfiler id="Sidebar"><Sidebar variant="desktop" /></PhaseAPerfProfiler>
+        <div className="hidden md:flex shrink-0">
+          <PhaseAPerfProfiler id="SidebarNext"><SidebarNext /></PhaseAPerfProfiler>
         </div>
       )}
       {showSidebar && <SidebarResizeHandle />}
+      {/* 收起态也挂载：SidebarResizeHandle 内部按 sidebarCollapsed 切换为展开按钮 */}
+      {!showSidebar && !isSheetView && <SidebarResizeHandle />}
 
       {/* ===== 主内容区 ===== */}
       {isSheetView ? (
@@ -887,7 +914,7 @@ function AppLayout() {
         <div className={TASK_VIEW_SHELL_CLASS}>
           {/* 移动端顶栏 */}
           <MobileTopBar />
-          <TaskCenter />
+          <TaskCenter hideSidebar />
         </div>
       ) : isMindMapView ? (
         <div className="flex-1 flex flex-col">
