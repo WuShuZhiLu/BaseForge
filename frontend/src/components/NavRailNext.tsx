@@ -335,7 +335,14 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
   const displayName = user?.displayName || user?.username || "用户";
   const initials = initialsOf(user?.displayName || user?.username);
 
-  const renderItem = (item: NavItem) => {
+  const renderItem = (item: NavItem, index = 0) => {
+    // 链式反应：尺寸/间距变化按序号依次延迟；颜色（hover/激活）保持即时响应
+    const sizeDelay = `${Math.min(index, 12) * 45}ms`;
+    const staggerStyle = {
+      transitionProperty: "width, height, gap, background-color, color",
+      transitionDuration: "200ms, 200ms, 200ms, 150ms, 150ms",
+      transitionDelay: `${sizeDelay}, ${sizeDelay}, ${sizeDelay}, 0ms, 0ms`,
+    } as React.CSSProperties;
     if (item.mode === "plugins") {
       // 插件：切侧栏到插件管理视图（原型 FR-IA-02 语义）
       const plugActive = activeMode === "plugins";
@@ -343,16 +350,17 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         <button
           key={item.mode}
           type="button"
+          style={staggerStyle}
           onClick={() => (railCustom.pluginGroupCollapsed ? setPluginGroupMenuOpen(true) : navigate("plugins"))}
           onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
           aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
           title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
           className={cn(
-            "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
+            "group relative flex shrink-0 items-center justify-center rounded-md",
             plugActive
               ? "bg-accent-primary/12 text-accent-primary dark:bg-accent-primary/14"
               : "text-tx-secondary hover:bg-[rgba(17,24,39,0.06)] hover:text-tx-primary dark:hover:bg-[rgba(255,255,255,0.07)]",
-            showLabel ? "w-[52px] flex-col gap-[3px]" : "w-9",
+            showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
           )}
         >
           {item.icon(showLabel ? 19 : 21)}
@@ -370,17 +378,18 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
       <button
         key={item.mode}
         type="button"
+        style={staggerStyle}
         onClick={() => navigate(navMode)}
         onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
         aria-current={active ? "page" : undefined}
         aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
         title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
         className={cn(
-          "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
+          "group relative flex shrink-0 items-center justify-center rounded-md",
           active
             ? "bg-accent-primary/12 text-accent-primary dark:bg-accent-primary/14"
             : "text-tx-secondary hover:bg-[rgba(17,24,39,0.06)] hover:text-tx-primary dark:hover:bg-[rgba(255,255,255,0.07)]",
-          showLabel ? "w-[52px] flex-col gap-[3px]" : "w-9",
+          showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
         )}
       >
         {item.icon(showLabel ? 19 : 21)}
