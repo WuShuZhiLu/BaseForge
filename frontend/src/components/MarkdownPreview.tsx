@@ -20,6 +20,8 @@ import { MathView } from "@/components/MathView";
 import { NoteLinkPreviewAnchor } from "@/components/NoteLinkPreview";
 import { BlockEmbedCard } from "@/components/BlockEmbedExtension";
 import MindMapEmbedCard, { parseMindMapEmbedHref } from "@/components/MindMapEmbedCard";
+import BoardEmbedCard from "@/components/BoardEmbedCard";
+import { parseBoardEmbedHref } from "@/lib/boardEmbed";
 import { getGfmTaskChecked, wrapGfmTaskInlineContent } from "@/lib/gfmTaskChecked";
 import { preprocessInternalNoteLinks } from "@/lib/noteLinkSyntax";
 import { projectMarkdownForUser } from "@/lib/markdownUserContent";
@@ -423,6 +425,9 @@ function createComponents(
       const embedHref = props["data-nowen-block-embed"] ?? props.dataNowenBlockEmbed;
       if (typeof embedHref === "string" && parseMindMapEmbedHref(embedHref)) {
         return <div className="my-4"><MindMapEmbedCard href={embedHref} /></div>;
+      }
+      if (typeof embedHref === "string" && parseBoardEmbedHref(embedHref)) {
+        return <div className="my-4"><BoardEmbedCard href={embedHref} /></div>;
       }
       if (typeof embedHref === "string" && embedHref.startsWith("note:")) {
         return <div className="my-4"><BlockEmbedCard href={embedHref} /></div>;

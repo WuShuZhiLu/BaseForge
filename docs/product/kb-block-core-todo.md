@@ -20,8 +20,8 @@
 - [x] 安装 excalidraw（`@excalidraw/excalidraw@0.18.1`；BoardCanvas 独立 chunk，BoardEditor 内 React.lazy 懒加载）
 - [x] contentFormat 新增 `"board"`：SDK 类型 + 后端 knowledgeTreeCore/notes 路由 + openapi + 知识树图标/新建菜单（桌面 + 移动）
 - [x] BoardEditor 编辑器（走 EditorPane 的 contentFormat 分支，未做 `/boards/:id` 独立路由；画板仍是知识库文档，和 sheets/mindmaps 的独立模块模型不同）
-- [ ] BlockEmbedExtension 加 `![[board:<id>]]` 解析 → BoardEmbedCard（只读态渲染导出 SVG，点击进全屏）
-- [ ] 创建入口：富文本块插入菜单（知识树新建菜单已完成）
+- [x] BlockEmbedExtension 加 `![[board:<id>]]` 解析 → BoardEmbedCard（只读态 `exportToSvg` 预览，点击"打开"进画板文档；Markdown 预览同管线）
+- [x] 创建入口：富文本斜杠命令「嵌入画板」（知识树新建菜单已完成）；选择对话框由原 SheetEmbedInsertDialog 泛化为 KnowledgeDocEmbedDialog
 - [x] 画板正文派生搜索文本：`noteBlocks.syncNoteBlocks` 必须对 board 提前返回，否则会被当成 Markdown 生成"整段 JSON"contentText（已修）
 
 ### 2. 匿名文档机制（插块即匿名、单独创建才有名，导图同步适用，方案 plan 阶段 2）
@@ -51,3 +51,5 @@
 - plain/plainTextFromNoteContent、searchIndex.normalizeContentFormat 已放行 "plain"；新增格式值记得同步这两处 + SDK types + knowledgeTreeCore + notes.ts 创建路由 + capabilityCatalog（构建时生成）
 - Excalidraw 的 onChange 也会随"空闲状态"等非场景 appState 变化触发；BoardEditor 已加"内容未变化不排队保存"的守卫，去掉会变成每秒一次无效 PUT + 版本膨胀
 - 新增 contentFormat 后必须检查 `noteBlocks.syncNoteBlocks`（保存链路会在事务后再次覆盖 contentText）与 `searchIndex.normalizeContentFormat`，只改 `extractSearchableText` 不够
+- wiki 嵌入（`![[mindmap:|board:]]`）只有正式预览/分屏走 MarkdownPreview 才渲染卡片；Markdown 的「实时预览」(cm inline) 仍显示原文，与 mindmap 行为一致
+- 画板嵌入预览用 `exportToSvg(..., skipInliningFonts: true)`，字体依赖随 chunk 加载的 @font-face，不要在导出后删掉这份 CSS

@@ -771,7 +771,9 @@
     "mermaidCopySourceOnError": "Copy source",
     "blockMenu": "Block actions",
     "sheetEmbed": "Embed sheet",
-    "sheetEmbedDesc": "Embed an existing sheet document into this note"
+    "sheetEmbedDesc": "Embed an existing sheet document into this note",
+    "boardEmbed": "Embed board",
+    "boardEmbedDesc": "Embed an existing board document into this note"
   },
   "settings": {
     "title": "Settings",

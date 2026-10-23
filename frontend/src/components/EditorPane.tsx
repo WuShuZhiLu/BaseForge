@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import SheetEmbedInsertDialog from "@/components/SheetEmbedInsertDialog";
+import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool } from "lucide-react";
@@ -2445,7 +2445,7 @@ const moveToTrash = useCallback(async () => {
   const [aiMermaidType, setAiMermaidType] = useState<"mermaid_mindmap" | "mermaid_flowchart">("mermaid_mindmap");
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
   const [showMindMapInsertDialog, setShowMindMapInsertDialog] = useState(false);
-  const [showSheetEmbedPicker, setShowSheetEmbedPicker] = useState(false);
+  const [embedPickerKind, setEmbedPickerKind] = useState<KnowledgeDocEmbedKind | null>(null);
 
   useEffect(() => {
     const openMindMapInsert = () => setShowMindMapInsertDialog(true);
@@ -2454,9 +2454,14 @@ const moveToTrash = useCallback(async () => {
   }, []);
 
   useEffect(() => {
-    const openSheetEmbedPicker = () => setShowSheetEmbedPicker(true);
+    const openSheetEmbedPicker = () => setEmbedPickerKind("sheet");
+    const openBoardEmbedPicker = () => setEmbedPickerKind("board");
     window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-    return () => window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
+    window.addEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    return () => {
+      window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
+      window.removeEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    };
   }, []);
 
   const handleAIMermaid = useCallback(async (type: "mermaid_mindmap" | "mermaid_flowchart") => {
@@ -4291,19 +4296,21 @@ const moveToTrash = useCallback(async () => {
           return inserted;
         }}
       />
-      {/* 轻量表格嵌入选择对话框（斜杠命令「嵌入轻量表格」触发） */}
-      <SheetEmbedInsertDialog
-        open={showSheetEmbedPicker && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
-        onClose={() => setShowSheetEmbedPicker(false)}
-        onInsert={(sheetId, sheetTitle) => {
+      {/* 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」触发） */}
+      <KnowledgeDocEmbedDialog
+        open={embedPickerKind !== null && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
+        kind={embedPickerKind ?? "sheet"}
+        onClose={() => setEmbedPickerKind(null)}
+        onInsert={(docId, docTitle) => {
           if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
-          const markdown = `\n\n![[sheet:${sheetId}]]\n\n`;
+          const kind = embedPickerKind;
+          const markdown = `\n\n![[${kind}:${docId}]]\n\n`;
           const editorHandle = editorHandleRef.current;
           const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
           const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
           if (inserted) {
             editorHandle?.flushSave?.();
-            toast.success("已嵌入轻量表格");
+            toast.success(kind === "board" ? "已插入画板" : "已嵌入轻量表格");
           }
           return inserted;
         }}
