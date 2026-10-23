@@ -4,7 +4,7 @@
     android:height="108dp"
     android:viewportHeight="108"
     android:viewportWidth="108">
-    <!-- Base Notes 简约图标背景：温润奶白（与 values/ic_launcher_background.xml 保持一致） -->
+    <!-- BaseForge 简约图标背景：温润奶白（与 values/ic_launcher_background.xml 保持一致） -->
     <path
         android:fillColor="#F5F3EE"
         android:pathData="M0,0h108v108h-108z" />

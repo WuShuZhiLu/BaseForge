@@ -1,4 +1,4 @@
-# Base Notes 官网教程体系 — 项目分析与教程规划
+# BaseForge 官网教程体系 — 项目分析与教程规划
 
 > 本文档基于 nowen-note v1.1.18 代码分析，为官网教程页面提供完整的规划蓝图。
 
@@ -6,7 +6,7 @@
 
 ## 第一部分：项目分析
 
-### 1. Base Notes 是什么？
+### 1. BaseForge 是什么？
 
 自托管的私有知识库，对标群晖 Note Station。支持 Web / Electron 桌面端 / Android 移动端 / 鸿蒙。
 
@@ -92,10 +92,10 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 ```
 教程中心
 ├── 快速开始
-│   ├── 01. 5 分钟快速上手 Base Notes
+│   ├── 01. 5 分钟快速上手 BaseForge
 │   ├── 02. 创建你的第一篇笔记
-│   ├── 03. 了解 Base Notes 界面
-│   └── 04. 在手机上使用 Base Notes
+│   ├── 03. 了解 BaseForge 界面
+│   └── 04. 在手机上使用 BaseForge
 │
 ├── 笔记管理
 │   ├── 05. 文档树 / 笔记本使用教程       ✅ 已完成
@@ -175,7 +175,7 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 
 | # | 标题 | slug | 目标用户 | 核心内容 |
 |---|---|---|---|---|
-| 01 | 5 分钟快速上手 Base Notes | /tutorials/quick-start | 新用户 | 安装→登录→创建笔记→创建笔记本→第一篇 AI 总结 |
+| 01 | 5 分钟快速上手 BaseForge | /tutorials/quick-start | 新用户 | 安装→登录→创建笔记→创建笔记本→第一篇 AI 总结 |
 | 05 | 文档树 / 笔记本使用教程 | /tutorials/tree-tutorial | 普通用户 | **✅ 已完成** |
 | 11 | 富文本编辑器使用教程 | /tutorials/editor-rich-text | 普通用户 | 基础编辑、格式、图片、链接、列表、标题 |
 | 17 | 如何配置 AI 服务商 | /tutorials/ai-setup | 所有用户 | 支持的 AI 服务商、配置步骤、Ollama 本地部署 |
@@ -187,7 +187,7 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 | # | 标题 | slug | 目标用户 | 核心内容 |
 |---|---|---|---|---|
 | 02 | 创建你的第一篇笔记 | /tutorials/first-note | 新用户 | 打开编辑器→输入内容→保存→查看笔记列表 |
-| 03 | 了解 Base Notes 界面 | /tutorials/ui-overview | 新用户 | 侧边栏→笔记列表→编辑器→导航栏→设置 |
+| 03 | 了解 BaseForge 界面 | /tutorials/ui-overview | 新用户 | 侧边栏→笔记列表→编辑器→导航栏→设置 |
 | 06 | 标签和收藏使用教程 | /tutorials/tags-favorites | 普通用户 | 创建标签、彩色标签、收藏笔记、标签过滤 |
 | 07 | 如何搜索笔记 | /tutorials/search | 普通用户 | 全文搜索、搜索结果高亮、搜索替换 |
 | 12 | Markdown 编辑器使用教程 | /tutorials/editor-markdown | 技术用户 | Markdown 模式、快捷键、代码高亮、切换 |
@@ -201,7 +201,7 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 
 | # | 标题 | slug | 目标用户 |
 |---|---|---|---|
-| 04 | 在手机上使用 Base Notes | /tutorials/mobile | 移动用户 |
+| 04 | 在手机上使用 BaseForge | /tutorials/mobile | 移动用户 |
 | 08 | 如何恢复误删内容 | /tutorials/trash-recover | 普通用户 |
 | 09 | 笔记排序和批量管理 | /tutorials/batch-manage | 高级用户 |
 | 10 | 笔记导入和导出 | /tutorials/import-export | 数据迁移用户 |
@@ -229,9 +229,9 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 ### 每篇教程的 SEO 模板
 
 ```
-SEO Title: [功能名称]教程 - Base Notes 使用指南
-Meta Description: 了解如何使用 Base Notes 的 [功能]。[一句话核心价值]。
-Keywords: Base Notes, [功能名], [相关关键词], 私有知识库, 自托管
+SEO Title: [功能名称]教程 - BaseForge 使用指南
+Meta Description: 了解如何使用 BaseForge 的 [功能]。[一句话核心价值]。
+Keywords: BaseForge, [功能名], [相关关键词], 私有知识库, 自托管
 Slug: /tutorials/[功能英文名]
 OpenGraph Title: [功能名称]教程 - [吸引人的副标题]
 OpenGraph Description: [详细的 OG 描述]

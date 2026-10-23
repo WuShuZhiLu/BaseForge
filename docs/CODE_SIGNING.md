@@ -4,7 +4,7 @@ Free code signing provided by SignPath.io, certificate by SignPath Foundation.
 
 ## Project and roles
 
-- Project: **Base Notes**
+- Project: **BaseForge**
 - Source repository: `https://github.com/cropflre/nowen-note`
 - Authors: [cropflre](https://github.com/cropflre)
 - Reviewers: [cropflre](https://github.com/cropflre)

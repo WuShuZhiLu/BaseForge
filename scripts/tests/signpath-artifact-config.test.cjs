@@ -29,14 +29,14 @@ function assertCommonContract(source) {
 
 test("Full Artifact Configuration only signs stable setup/portable executables", () => {
   assertCommonContract(full);
-  assert.match(full, /path="Base-Notes-\$\{version\}-setup\.exe"/);
-  assert.match(full, /path="Base-Notes-\$\{version\}-portable\.exe"/);
-  assert.equal(count(full, /product-name="Base Notes"/g), 2);
+  assert.match(full, /path="BaseForge-\$\{version\}-setup\.exe"/);
+  assert.match(full, /path="BaseForge-\$\{version\}-portable\.exe"/);
+  assert.equal(count(full, /product-name="BaseForge"/g), 2);
 });
 
 test("Lite Artifact Configuration only signs stable Lite setup/portable executables", () => {
   assertCommonContract(lite);
-  assert.match(lite, /path="Base-Notes-Lite-\$\{version\}-setup\.exe"/);
-  assert.match(lite, /path="Base-Notes-Lite-\$\{version\}-portable\.exe"/);
-  assert.equal(count(lite, /product-name="Base Notes Lite"/g), 2);
+  assert.match(lite, /path="BaseForge-Lite-\$\{version\}-setup\.exe"/);
+  assert.match(lite, /path="BaseForge-Lite-\$\{version\}-portable\.exe"/);
+  assert.equal(count(lite, /product-name="BaseForge Lite"/g), 2);
 });

@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="./electron/icon.png" alt="Base Notes" width="104" />
-  <h1>Base Notes</h1>
+  <img src="./electron/icon.png" alt="BaseForge" width="104" />
+  <h1>BaseForge</h1>
   <p><strong>开源、自托管的知识库、每日记录与任务协作工作台</strong></p>
   <p>
     统一知识树 · 富文本 / Markdown 双编辑器 · 离线工作区 · AI RAG 问答 · 每日记录 · 任务中心 · 多端协作
@@ -27,17 +27,17 @@
 
 </div>
 
-> Base Notes 不只是一个编辑器。它希望成为一套由你掌控数据、可长期运行在 NAS / 服务器上，并能通过 Web、桌面端和移动端随时访问的个人与团队知识基础设施。
+> BaseForge 不只是一个编辑器。它希望成为一套由你掌控数据、可长期运行在 NAS / 服务器上，并能通过 Web、桌面端和移动端随时访问的个人与团队知识基础设施。
 
 > **NAS 远程连接登录**：支持部署到 **绿联 NAS（UGOS / UGOS Pro）** 和 **飞牛 NAS（fnOS）**。部署完成后，可在 Web、桌面端或 Android 客户端中，通过局域网 IP、IPv6 地址或已配置 HTTPS 的公网域名远程连接并登录。
 
 ## 开发预览版
 
-Base Notes 目前处于**开发预览阶段**（当前版本 `1.0.0-preview.1`）。版本线自 **1.0.0** 起独立演进，不再跟随上游 nowen-note 的版本号；代码基线为 nowen-note **v1.4.16**（fd17d980），并已吸收上游 **v1.5.1** 的功能与框架层更新，界面、交互与品牌保持 Base Notes 自有设计。
+BaseForge 目前处于**开发预览阶段**（当前版本 `1.0.0-preview.1`）。版本线自 **1.0.0** 起独立演进，不再跟随上游 nowen-note 的版本号；代码基线为 nowen-note **v1.4.16**（fd17d980），并已吸收上游 **v1.5.1** 的功能与框架层更新，界面、交互与品牌保持 BaseForge 自有设计。
 
 > 完整版本记录见 [CHANGELOG.md](./CHANGELOG.md)。
 
-## 为什么选择 Base Notes
+## 为什么选择 BaseForge
 
 | | |
 | --- | --- |
@@ -67,7 +67,7 @@ Base Notes 目前处于**开发预览阶段**（当前版本 `1.0.0-preview.1`�
 
 ## AI 问答与隐私
 
-Base Notes 的知识库问答采用 RAG 检索增强方式，**不会在每次提问时把全部笔记内容都发送给大模型**。
+BaseForge 的知识库问答采用 RAG 检索增强方式，**不会在每次提问时把全部笔记内容都发送给大模型**。
 
 - **知识库模式**：先在本地索引中检索相关笔记和附件，再发送匹配到的片段。
 - **当前笔记模式**：只使用当前打开的笔记。
@@ -76,15 +76,15 @@ Base Notes 的知识库问答采用 RAG 检索增强方式，**不会在每次�
 
 使用在线 Embedding 或在线大模型时，建立索引或回答问题所需的相关文本会发送给你自行配置的服务商。身份证、密码、API Key、助记词等高度敏感信息仍不建议以明文保存。
 
-## 让 AI 客户端连接 Base Notes
+## 让 AI 客户端连接 BaseForge
 
-Base Notes 支持 MCP Server，可让 Claude Code、Cursor、VS Code 等 AI 客户端在授权范围内搜索、读取、创建和更新笔记。
+BaseForge 支持 MCP Server，可让 Claude Code、Cursor、VS Code 等 AI 客户端在授权范围内搜索、读取、创建和更新笔记。
 
 - [MCP Server 中文安装教程](./docs/tutorials/mcp.md)
 - [MCP Server English guide](./docs/tutorials/mcp.en.md)
 - [nowen-mcp 独立包说明](./packages/nowen-mcp/README.md)
 
-当前正式可用方式为源码构建：安装 Node.js 20+，构建 `packages/nowen-mcp`，在 Base Notes 创建 restricted Personal API Token，再把 `packages/nowen-mcp/bin/nowen-mcp.mjs` 的绝对路径配置到客户端。`dist/scoped-entry.js` 是启动器加载的内部构建入口，不应直接配置给客户端。
+当前正式可用方式为源码构建：安装 Node.js 20+，构建 `packages/nowen-mcp`，在 BaseForge 创建 restricted Personal API Token，再把 `packages/nowen-mcp/bin/nowen-mcp.mjs` 的绝对路径配置到客户端。`dist/scoped-entry.js` 是启动器加载的内部构建入口，不应直接配置给客户端。
 
 ## 当前版本包含的关键能力
 
@@ -165,7 +165,7 @@ docker compose up -d
 
 ### 绿联 NAS / 飞牛 NAS 远程连接登录
 
-Base Notes 支持部署在 **绿联 NAS（UGOS / UGOS Pro）** 与 **飞牛 NAS（fnOS）** 上。可使用 Releases 中对应的 `.upk` / `.fpk` 安装包，也可以直接通过 Docker Compose 部署。
+BaseForge 支持部署在 **绿联 NAS（UGOS / UGOS Pro）** 与 **飞牛 NAS（fnOS）** 上。可使用 Releases 中对应的 `.upk` / `.fpk` 安装包，也可以直接通过 Docker Compose 部署。
 
 部署并启动服务后：
 
@@ -405,7 +405,7 @@ npm run build:all
 
 ## 支持作者
 
-如果 Base Notes 对你有帮助，欢迎扫码请作者喝杯咖啡。感谢每一份支持，它会帮助项目持续维护和迭代。
+如果 BaseForge 对你有帮助，欢迎扫码请作者喝杯咖啡。感谢每一份支持，它会帮助项目持续维护和迭代。
 
 <table align="center">
   <tr>
@@ -424,7 +424,7 @@ npm run build:all
 
 本项目基于上游开源项目 [nowen-note](https://github.com/cropflre/nowen-note)（GNU General Public License v3.0）二次开发，遵循 [GNU General Public License v3.0](./LICENSE) 开源。
 
-**来源与归属**：Base Notes 是上游 nowen-note 的下游分支（fork）。代码与文档的主要版权归上游原作者所有，本项目仅在此基础上进行品牌替换与后续开发；上游历史记录（[CHANGELOG.md](./CHANGELOG.md)、[作者感言](./AUTHOR_STORY.md)、`docs/superpowers/`）均原样保留。
+**来源与归属**：BaseForge 是上游 nowen-note 的下游分支（fork）。代码与文档的主要版权归上游原作者所有，本项目仅在此基础上进行品牌替换与后续开发；上游历史记录（[CHANGELOG.md](./CHANGELOG.md)、[作者感言](./AUTHOR_STORY.md)、`docs/superpowers/`）均原样保留。
 
 <!-- CHANGELOG:BEGIN -->
 <!-- 详细版本记录请查看 CHANGELOG.md；README 仅维护稳定能力与近期重点增强。 -->

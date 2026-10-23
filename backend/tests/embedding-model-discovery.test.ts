@@ -162,7 +162,7 @@ test("tests /embeddings and returns vector dimension and duration", async () => 
     assert.ok(result.body.durationMs >= 0);
     assert.deepEqual(requestBody, {
       model: "text-embedding-3-small",
-      input: ["Base Notes embedding connectivity test."],
+      input: ["BaseForge embedding connectivity test."],
     });
   } finally {
     globalThis.fetch = originalFetch;

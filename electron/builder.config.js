@@ -61,11 +61,11 @@ module.exports = {
   },
   nsis: {
     ...(base.nsis || {}),
-    artifactName: "Base-Notes-${version}-setup.${ext}",
+    artifactName: "BaseForge-${version}-setup.${ext}",
   },
   portable: {
     ...(base.portable || {}),
-    artifactName: "Base-Notes-${version}-portable.${ext}",
+    artifactName: "BaseForge-${version}-portable.${ext}",
     // Portable EXE 必须先解压整个应用再启动 Electron。ZIP 解压明显快于默认 LZMA，
     // 以少量体积增长换取 Windows 端更短的双击等待时间。
     useZip: true,
@@ -74,10 +74,10 @@ module.exports = {
   },
   mac: {
     ...(base.mac || {}),
-    artifactName: "Base-Notes-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-${arch}.${ext}",
   },
   linux: {
     ...(base.linux || {}),
-    artifactName: "Base-Notes-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-${arch}.${ext}",
   },
 };

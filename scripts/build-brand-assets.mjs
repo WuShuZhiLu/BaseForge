@@ -67,12 +67,12 @@ function main() {
   const DERIVED = "由 build/icon-source.svg 派生，请勿手改；改图标请改母图后重跑本脚本";
 
   for (const rel of ["frontend/public/favicon.svg", "frontend/public/base-notes-icon.svg"]) {
-    writeSvg(path.join(root, rel), svgDoc({ width: 32, height: 32, body, comment: `Base Notes 图标（32）· ${DERIVED}` }));
+    writeSvg(path.join(root, rel), svgDoc({ width: 32, height: 32, body, comment: `BaseForge 图标（32）· ${DERIVED}` }));
   }
 
   writeSvg(
     path.join(root, "frontend/public/apple-touch-icon.svg"),
-    svgDoc({ width: 180, height: 180, body, comment: `Base Notes iOS / Android 主屏幕图标（180）· ${DERIVED}` })
+    svgDoc({ width: 180, height: 180, body, comment: `BaseForge iOS / Android 主屏幕图标（180）· ${DERIVED}` })
   );
 
   writeSvg(
@@ -81,14 +81,14 @@ function main() {
       width: 24,
       height: 24,
       body,
-      comment: `Base Notes 品牌小图标（24）· ${DERIVED}`,
+      comment: `BaseForge 品牌小图标（24）· ${DERIVED}`,
       extraRootAttrs: ' fill="none"',
     })
   );
 
   writeSvg(
     path.join(root, "packages/nowen-clipper/public/icons/icon.svg"),
-    svgDoc({ width: 128, height: 128, body, comment: `Base Notes Web Clipper 工具栏图标 · ${DERIVED}` })
+    svgDoc({ width: 128, height: 128, body, comment: `BaseForge Web Clipper 工具栏图标 · ${DERIVED}` })
   );
 
   // 自适应深浅主题：把母图里的 fill 换成 class
@@ -124,7 +124,7 @@ function main() {
 `;
     writeSvg(
       path.join(root, "frontend/public/favicon-mono.svg"),
-      svgDoc({ width: 32, height: 32, body: monoBody, comment: `Base Notes 自适应深浅主题 favicon（32）· ${DERIVED}`, style })
+      svgDoc({ width: 32, height: 32, body: monoBody, comment: `BaseForge 自适应深浅主题 favicon（32）· ${DERIVED}`, style })
     );
   }
 
@@ -132,7 +132,7 @@ function main() {
     "nowen-harmony/AppScope/resources/base/media/app_icon.svg",
     "nowen-harmony/entry/src/main/resources/base/media/app_icon.svg",
   ]) {
-    writeSvg(path.join(root, rel), svgDoc({ body, comment: `Base Notes 鸿蒙应用图标（108）· ${DERIVED}` }));
+    writeSvg(path.join(root, rel), svgDoc({ body, comment: `BaseForge 鸿蒙应用图标（108）· ${DERIVED}` }));
   }
 }
 

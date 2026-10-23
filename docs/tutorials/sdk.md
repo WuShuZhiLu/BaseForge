@@ -60,7 +60,7 @@ export type NoteContentFormat = "markdown" | "tiptap-json" | "html";
 
 - 无需加载 Tiptap 或浏览器环境；
 - 原始 Markdown 可以继续被外部工具编辑；
-- Base Notes 会自动使用 Markdown 编辑器打开；
+- BaseForge 会自动使用 Markdown 编辑器打开；
 - 服务端负责派生 `contentText`、搜索索引和块索引。
 
 不要把 Markdown 包装成单段纯文本 Tiptap JSON，也不需要调用 Markdown → Tiptap 转换接口。

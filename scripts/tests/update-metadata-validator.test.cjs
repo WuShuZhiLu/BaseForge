@@ -12,7 +12,7 @@ const {
 function createFixture(options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-update-metadata-"));
   const version = options.version || "1.4.2";
-  const assetName = options.assetName || "Base-Notes-1.4.2-setup.exe";
+  const assetName = options.assetName || "BaseForge-1.4.2-setup.exe";
   const metadataName = options.metadataName || "latest.yml";
   const assetPath = path.join(directory, assetName);
   fs.writeFileSync(assetPath, Buffer.from(options.assetContent || "installer-binary"));
@@ -43,14 +43,14 @@ test("parses electron-builder files[] metadata", () => {
   const parsed = parseUpdateMetadata([
     "version: 1.4.2",
     "files:",
-    "  - url: Base-Notes-1.4.2-setup.exe",
+    "  - url: BaseForge-1.4.2-setup.exe",
     "    sha512: abc",
     "    size: 123",
-    "path: Base-Notes-1.4.2-setup.exe",
+    "path: BaseForge-1.4.2-setup.exe",
     "sha512: abc",
   ].join("\n"));
   assert.equal(parsed.version, "1.4.2");
-  assert.deepEqual(parsed.files, [{ url: "Base-Notes-1.4.2-setup.exe", sha512: "abc", size: 123 }]);
+  assert.deepEqual(parsed.files, [{ url: "BaseForge-1.4.2-setup.exe", sha512: "abc", size: 123 }]);
 });
 
 test("accepts a valid stable Windows updater asset", () => {
@@ -67,7 +67,7 @@ test("accepts a valid stable Windows updater asset", () => {
 test("rejects metadata that references a missing installer", () => {
   const fixture = createFixture();
   try {
-    fs.renameSync(path.join(fixture.directory, fixture.assetName), path.join(fixture.directory, "Base-Notes-1.4.2-renamed.exe"));
+    fs.renameSync(path.join(fixture.directory, fixture.assetName), path.join(fixture.directory, "BaseForge-1.4.2-renamed.exe"));
     assert.throws(
       () => verifyLocalDirectory({ directory: fixture.directory, expectedVersion: "1.4.2" }),
       /referenced asset does not exist/,
@@ -78,7 +78,7 @@ test("rejects metadata that references a missing installer", () => {
 });
 
 test("rejects unsafe names that GitHub may normalize", () => {
-  const fixture = createFixture({ assetName: "Base Notes Setup 1.4.2.exe" });
+  const fixture = createFixture({ assetName: "BaseForge Setup 1.4.2.exe" });
   try {
     assert.throws(
       () => verifyLocalDirectory({ directory: fixture.directory, expectedVersion: "1.4.2" }),
@@ -103,7 +103,7 @@ test("rejects a missing blockmap", () => {
 
 test("accepts an AppImage with an embedded blockmap", () => {
   const fixture = createFixture({
-    assetName: "Base-Notes-Lite-1.4.2-x86_64.AppImage",
+    assetName: "BaseForge-Lite-1.4.2-x86_64.AppImage",
     metadataName: "latest-lite-linux.yml",
     blockmap: false,
     blockMapSize: 107891,
@@ -118,7 +118,7 @@ test("accepts an AppImage with an embedded blockmap", () => {
 
 test("rejects an AppImage without embedded blockmap metadata", () => {
   const fixture = createFixture({
-    assetName: "Base-Notes-Lite-1.4.2-x86_64.AppImage",
+    assetName: "BaseForge-Lite-1.4.2-x86_64.AppImage",
     metadataName: "latest-lite-linux.yml",
     blockmap: false,
   });
@@ -145,7 +145,7 @@ test("rejects size and sha512 mismatches", () => {
 });
 
 test("keeps full and lite update channels isolated", () => {
-  const fixture = createFixture({ metadataName: "latest-lite.yml", assetName: "Base-Notes-1.4.2-setup.exe" });
+  const fixture = createFixture({ metadataName: "latest-lite.yml", assetName: "BaseForge-1.4.2-setup.exe" });
   try {
     assert.throws(
       () => verifyLocalDirectory({ directory: fixture.directory, expectedVersion: "1.4.2" }),

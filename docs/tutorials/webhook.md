@@ -6,7 +6,7 @@
 
 ## 什么是 Webhook？
 
-Webhook 是一种「事件驱动」的自动化机制。当 Base Notes 中发生特定事件（如创建笔记、更新笔记）时，自动向你指定的 URL 发送通知。
+Webhook 是一种「事件驱动」的自动化机制。当 BaseForge 中发生特定事件（如创建笔记、更新笔记）时，自动向你指定的 URL 发送通知。
 
 ---
 
@@ -39,7 +39,7 @@ Webhook 是一种「事件驱动」的自动化机制。当 Base Notes 中发生
 
 ## Webhook 请求格式
 
-当事件触发时，Base Notes 会向指定 URL 发送 POST 请求：
+当事件触发时，BaseForge 会向指定 URL 发送 POST 请求：
 
 ```json
 {

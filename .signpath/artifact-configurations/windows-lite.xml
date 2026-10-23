@@ -5,14 +5,14 @@
   </parameters>
   <zip-file>
     <pe-file
-      path="Base-Notes-Lite-${version}-setup.exe"
-      product-name="Base Notes Lite"
+      path="BaseForge-Lite-${version}-setup.exe"
+      product-name="BaseForge Lite"
       product-version="${version}">
       <authenticode-sign hash-algorithm="sha256" />
     </pe-file>
     <pe-file
-      path="Base-Notes-Lite-${version}-portable.exe"
-      product-name="Base Notes Lite"
+      path="BaseForge-Lite-${version}-portable.exe"
+      product-name="BaseForge Lite"
       product-version="${version}">
       <authenticode-sign hash-algorithm="sha256" />
     </pe-file>

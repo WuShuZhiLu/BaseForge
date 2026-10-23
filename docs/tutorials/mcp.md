@@ -1,6 +1,6 @@
 # MCP Server 安装与使用教程
 
-> 通过 Model Context Protocol（MCP），让 Claude Code、Cursor、VS Code 等 AI 客户端在授权范围内搜索、读取和维护你的 Base Notes 笔记。
+> 通过 Model Context Protocol（MCP），让 Claude Code、Cursor、VS Code 等 AI 客户端在授权范围内搜索、读取和维护你的 BaseForge 笔记。
 
 [返回教程中心](./README.md) · [English](./mcp.en.md) · [MCP 包说明](../../packages/nowen-mcp/README.md)
 
@@ -9,12 +9,12 @@
 - MCP 功能仍然受支持，服务端代码位于 `packages/nowen-mcp/`。
 - 当前官方仓库提供的是**源码安装方式**，需要 Node.js 20+、Git 和 npm。
 - 不要直接照抄 `/path/to/...`。客户端配置中的脚本路径必须替换为你电脑上的**绝对路径**。
-- 如果 Base Notes 部署在 NAS 或其他服务器，`NOWEN_URL` 应填写该设备能从当前电脑访问的地址，例如 `http://192.168.1.20:3001`，而不是 `localhost`。
+- 如果 BaseForge 部署在 NAS 或其他服务器，`NOWEN_URL` 应填写该设备能从当前电脑访问的地址，例如 `http://192.168.1.20:3001`，而不是 `localhost`。
 - 推荐使用独立的 restricted Personal API Token，不要把管理员密码写进 MCP 配置。
 
 ## 5 分钟快速接入
 
-### 1. 确认 Base Notes 可以访问
+### 1. 确认 BaseForge 可以访问
 
 先在运行 AI 客户端的电脑浏览器中打开：
 
@@ -94,7 +94,7 @@ test -f ./dist/scoped-entry.js && echo "MCP build OK"
 
 ### 4. 创建 Personal API Token
 
-进入 Base Notes：
+进入 BaseForge：
 
 ```text
 设置 → 个人访问令牌 → 创建令牌
@@ -339,7 +339,7 @@ MCP: List Servers
 - 必须使用绝对路径。
 - Linux、macOS 和 WSL 的绝对路径必须以 `/` 开头，不能写成 `home/user/...`。
 - Windows JSON 路径中的 `\` 必须转义为 `\\`。
-- 当前 Claude Desktop 更推荐通过 Settings → Extensions 安装 DXT 扩展；Base Notes 目前仍以源码 stdio Server 为正式可用方式。使用 Claude Desktop 的本地开发者 MCP 配置时，请以客户端当前版本提供的入口为准。
+- 当前 Claude Desktop 更推荐通过 Settings → Extensions 安装 DXT 扩展；BaseForge 目前仍以源码 stdio Server 为正式可用方式。使用 Claude Desktop 的本地开发者 MCP 配置时，请以客户端当前版本提供的入口为准。
 - Claude.ai / Claude Desktop 的远程 Connector 不能直接连接这个本地 stdio 脚本；远程 MCP 需要单独的 HTTP 传输和认证实现。
 
 官方参考：[Claude Desktop local MCP](https://support.anthropic.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
@@ -371,13 +371,13 @@ nowen_search
 然后让 AI 执行只读测试：
 
 ```text
-请使用 Base Notes MCP 列出我有权限访问的笔记本，不要修改任何内容。
+请使用 BaseForge MCP 列出我有权限访问的笔记本，不要修改任何内容。
 ```
 
 继续测试搜索：
 
 ```text
-请使用 Base Notes MCP 搜索“测试”，只返回标题和所属笔记本。
+请使用 BaseForge MCP 搜索“测试”，只返回标题和所属笔记本。
 ```
 
 最后再测试写入权限：
@@ -411,7 +411,7 @@ npm run build
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
-| `NOWEN_URL` | Base Notes 服务地址 | `http://localhost:3001` |
+| `NOWEN_URL` | BaseForge 服务地址 | `http://localhost:3001` |
 | `NOWEN_API_TOKEN` | Personal API Token；配置后优先于用户名密码 | — |
 | `NOWEN_USERNAME` | 兼容旧配置的登录用户名 | `admin` |
 | `NOWEN_PASSWORD` | 兼容旧配置的登录密码 | `admin123` |
@@ -570,8 +570,8 @@ npm run build
 
 ### `NOWEN_URL` 连接失败
 
-- MCP 与 Base Notes 在同一台电脑：使用 `http://localhost:3001`。
-- Base Notes 在 NAS：使用 `http://NAS局域网IP:3001`。
+- MCP 与 BaseForge 在同一台电脑：使用 `http://localhost:3001`。
+- BaseForge 在 NAS：使用 `http://NAS局域网IP:3001`。
 - 使用 HTTPS 反向代理：填写完整公网地址，例如 `https://note.example.com`。
 - 先在运行客户端的电脑浏览器中验证该地址。
 
@@ -635,7 +635,7 @@ stdio MCP Server 正常情况下会等待客户端输入，可能没有任何提
 - Token 会出现在客户端配置中，不要把包含 Token 的 `.cursor/mcp.json`、`.vscode/mcp.json` 或其他配置提交到公开仓库。
 - 优先使用只读 Token 验证连接，再按需要增加写权限。
 - 每个 Agent 使用独立 Token，方便撤销和审计。
-- 对外网开放 Base Notes 时配置 HTTPS、强密码、备份和最小 CORS 范围。
+- 对外网开放 BaseForge 时配置 HTTPS、强密码、备份和最小 CORS 范围。
 
 ## 下一步
 

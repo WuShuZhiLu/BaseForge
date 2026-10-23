@@ -316,7 +316,7 @@ taskCalendar.get("/feed/:token", (c) => {
   const calLines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Base Notes//Tasks//CN",
+    "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     icsFold("X-WR-CALNAME:Nowen Tasks"),
@@ -458,7 +458,7 @@ export function buildIcsForToken(token: string): { body: string; feedId: string 
   }
 
   const calLines = [
-    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Base Notes//Tasks//CN",
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
     icsFold("X-WR-CALNAME:Nowen Tasks"),
   ];

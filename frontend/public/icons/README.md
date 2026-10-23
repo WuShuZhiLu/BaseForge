@@ -3,7 +3,7 @@
 一套与品牌 Logo 共享同一视觉语言的矢量图标方案。
 
 > **归属**：本套图标及其设计规范来自上游项目 [nowen-note](https://github.com/cropflre/nowen-note)（GPL-3.0），沿用其原有视觉语言。
-> 本项目（Base Notes）当前品牌图标为 `/base-notes-icon.svg`（上游原路径为 `/nowen-note-icon.svg`）。
+> 本项目（BaseForge）当前品牌图标为 `/base-notes-icon.svg`（上游原路径为 `/nowen-note-icon.svg`）。
 
 ## 设计规范
 

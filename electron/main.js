@@ -419,7 +419,7 @@ function waitForRemoteReady(remoteUrl, timeoutMs = 15000) {
             return resolve();
           }
           lastErr = new Error(
-            `HTTP ${res.statusCode}，未检测到 Base Notes API（可能仍是 NAS 门户或反代路径不正确）`,
+            `HTTP ${res.statusCode}，未检测到 BaseForge API（可能仍是 NAS 门户或反代路径不正确）`,
           );
           retry();
         });
@@ -782,7 +782,7 @@ function createSplash(message) {
       .dot:nth-child(2){animation-delay:.15s}.dot:nth-child(3){animation-delay:.3s}
       @keyframes b{0%,80%,100%{transform:scale(.5);opacity:.4}40%{transform:scale(1);opacity:1}}
     </style></head><body><div class="box">
-      <div class="title">Base Notes</div>
+      <div class="title">BaseForge</div>
       <div class="hint">${hint} <span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
     </div></body></html>`;
   splashWindow.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
@@ -852,7 +852,7 @@ function openAboutWindow() {
     maximizable: false,
     parent: mainWindow || undefined,
     modal: true,
-    title: "关于 Base Notes",
+    title: "关于 BaseForge",
     backgroundColor: "#0D1117",
     // SEC-ELECTRON-01-B: 显式安全参数
     webPreferences: {
@@ -874,7 +874,7 @@ function openAboutWindow() {
       .ver{font-size:13px;color:#7d8590;margin-bottom:16px}
       .desc{font-size:12px;color:#8b949e;line-height:1.6}
     </style></head><body><div class="box">
-      <div class="title">Base Notes</div>
+      <div class="title">BaseForge</div>
       <div class="ver">v${app.getVersion()}</div>
       <div class="desc">一款现代化的笔记应用<br/>© Nowen</div>
     </div></body></html>`;
@@ -925,7 +925,7 @@ function createWindow() {
     ...restoredWindowState.bounds,
     minWidth: 900,
     minHeight: 600,
-    title: "Base Notes",
+    title: "BaseForge",
     icon: path.join(__dirname, "icon.png"),
     backgroundColor: isMac ? "#00000000" : "#0D1117",
     show: false,
@@ -1019,7 +1019,7 @@ function createWindow() {
     if (!loadingErrorPage) {
       loadingErrorPage = true;
       loadMainWindowErrorPage(mainWindow, {
-        title: "Base Notes 窗口加载失败",
+        title: "BaseForge 窗口加载失败",
         message: "主窗口初始资源加载失败。应用已打开诊断页，避免只剩后台进程。",
         details: [
           { label: "error", value: err?.stack || err?.message || err },
@@ -1065,8 +1065,8 @@ function createWindow() {
     // packaged / lite 包缺前端时直接展示本地错误页，不要静默落到远端或隐藏窗口。
     loadingErrorPage = true;
     loadMainWindowErrorPage(mainWindow, {
-      title: "Base Notes 客户端资源缺失",
-      message: "本地前端文件未找到。请重新安装 Base Notes，或检查安装包是否完整。",
+      title: "BaseForge 客户端资源缺失",
+      message: "本地前端文件未找到。请重新安装 BaseForge，或检查安装包是否完整。",
       details: [
         { label: "frontendIndex", value: frontendIndex },
         { label: "frontendIndex exists", value: String(frontendIndexExists) },
@@ -1136,7 +1136,7 @@ function createWindow() {
       }
       loadingErrorPage = true;
       loadMainWindowErrorPage(mainWindow, {
-        title: "Base Notes 窗口加载失败",
+        title: "BaseForge 窗口加载失败",
         message: "主窗口资源加载失败。应用已打开诊断页，方便定位安装包资源、前端或本地服务问题。",
         details: [
           { label: "errorCode", value: String(errorCode) },
@@ -1183,7 +1183,7 @@ function createWindow() {
     if (!loadingErrorPage) {
       loadingErrorPage = true;
       loadMainWindowErrorPage(mainWindow, {
-        title: "Base Notes 渲染进程异常",
+        title: "BaseForge 渲染进程异常",
         message: "主窗口渲染进程连续退出或无法安全恢复。请点击“重新加载应用”；若仍失败，请重启客户端并提供日志。",
         details: [
           { label: "reason", value: details?.reason },
@@ -1217,7 +1217,7 @@ function createWindow() {
     if (!loadingErrorPage) {
       loadingErrorPage = true;
       loadMainWindowErrorPage(mainWindow, {
-        title: "Base Notes Preload 加载失败",
+        title: "BaseForge Preload 加载失败",
         message: "主窗口 preload 脚本加载失败。桌面端桥接能力不可用，请根据下面路径和日志排查安装包。",
         details: [
           { label: "preload", value: failedPreloadPath || preloadPath },
@@ -1318,7 +1318,7 @@ function showStartupError(err) {
     `日志目录：\n${logDir}\n\n` +
     `数据目录：\n${getUserDataPath()}`;
   dialog.showErrorBox(
-    isLite ? "Base Notes 连接失败" : "Base Notes 启动失败",
+    isLite ? "BaseForge 连接失败" : "BaseForge 启动失败",
     detail
   );
 }
@@ -1447,7 +1447,7 @@ function formatDataDirError(error) {
     TARGET_INSIDE_SYSTEM: "不能选择 Program Files 等系统安装目录。",
     TARGET_INSIDE_APP: "不能选择应用安装目录或资源目录。",
     TARGET_NOT_DIRECTORY: "目标路径不是文件夹。",
-    TARGET_NOT_EMPTY: "目标目录非空，请选择空目录或已有 Base Notes 数据目录。",
+    TARGET_NOT_EMPTY: "目标目录非空，请选择空目录或已有 BaseForge 数据目录。",
     CREATE_TARGET_FAILED: "创建目标目录失败。",
     WRITE_POINTER_FAILED: "保存数据目录设置失败。",
   };
@@ -1467,14 +1467,14 @@ async function promptDataDirOnFirstRunIfNeeded() {
     cancelId: 1,
     title: "选择本地数据存储位置",
     message: "选择本地数据存储位置",
-    detail: "Base Notes 会在本机保存数据库、附件和备份。你可以使用默认位置，也可以选择 D 盘等其它目录。",
+    detail: "BaseForge 会在本机保存数据库、附件和备份。你可以使用默认位置，也可以选择 D 盘等其它目录。",
   });
   if (intro.response !== 0) return;
 
   const defaultDataDir = getDefaultDataPath(userDataRoot);
   while (true) {
     const result = await dialog.showOpenDialog({
-      title: "选择 Base Notes 本地数据目录",
+      title: "选择 BaseForge 本地数据目录",
       properties: ["openDirectory", "createDirectory"],
     });
     if (result.canceled || !result.filePaths?.[0]) return;
@@ -1885,7 +1885,7 @@ function registerAppIpc() {
     });
     if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
 
-    const targetPath = path.join(result.filePaths[0], "Base Notes Offline Cache");
+    const targetPath = path.join(result.filePaths[0], "BaseForge Offline Cache");
     const sourcePath = currentOfflineCacheDir || app.getPath("userData");
     if (path.resolve(targetPath) === path.resolve(sourcePath)) {
       return { ok: true, path: targetPath, unchanged: true };

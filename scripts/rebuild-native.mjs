@@ -89,7 +89,7 @@ function rimrafSync(p) {
 
   throw new Error(
     `无法清理 ${p}：${lastError?.message || lastError}\n` +
-      "  Windows 正在占用 better_sqlite3.node。请先关闭正在运行的 Base Notes、后端 dev server 或相关 node.exe 后重试。"
+      "  Windows 正在占用 better_sqlite3.node。请先关闭正在运行的 BaseForge、后端 dev server 或相关 node.exe 后重试。"
   );
 }
 

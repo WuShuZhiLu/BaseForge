@@ -16,8 +16,8 @@ function normalizeVersion(value) {
 
 function stableSetupName(channel, version) {
   return channel === "lite"
-    ? `Base-Notes-Lite-${version}-setup.exe`
-    : `Base-Notes-${version}-setup.exe`;
+    ? `BaseForge-Lite-${version}-setup.exe`
+    : `BaseForge-${version}-setup.exe`;
 }
 
 function expectedMetadataName(channel) {
@@ -30,8 +30,8 @@ function listChannelSetupCandidates(assetDir, channel) {
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((name) => {
-      if (channel === "lite") return /^Base-Notes-Lite-.+-setup\.exe$/.test(name);
-      return /^Base-Notes-.+-setup\.exe$/.test(name) && !/^Base-Notes-Lite-/.test(name);
+      if (channel === "lite") return /^BaseForge-Lite-.+-setup\.exe$/.test(name);
+      return /^BaseForge-.+-setup\.exe$/.test(name) && !/^BaseForge-Lite-/.test(name);
     })
     .sort();
 }

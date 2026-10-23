@@ -298,7 +298,7 @@ function updateModeUi() {
   byId("image-option").classList.toggle("hidden", quick || screenshot || mode === "simplified");
   select("output-format").disabled = mode === "fullpage" || screenshot;
   if (mode === "fullpage") select("output-format").value = "html";
-  byId("clip").textContent = quick ? "保存速记" : screenshot ? "开始截图" : "剪藏到 Base Notes";
+  byId("clip").textContent = quick ? "保存速记" : screenshot ? "开始截图" : "剪藏到 BaseForge";
   updatePermissionState();
 }
 

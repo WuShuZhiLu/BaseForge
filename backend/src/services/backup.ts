@@ -1,5 +1,5 @@
 /**
- * Base Notes 数据备份与恢复系统
+ * BaseForge 数据备份与恢复系统
  *
  * 设计原则（P0/P1 重构后）：
  *  1. **真·全量备份**：full 备份是 zip 包，内容含
@@ -1174,11 +1174,11 @@ export class BackupManager {
       const zip = await JSZip.loadAsync(bytes);
       const metaFile = zip.file("meta.json");
       if (!metaFile) {
-        throw new Error(".zip 内缺少 meta.json，非 Base Notes 全量备份格式");
+        throw new Error(".zip 内缺少 meta.json，非 BaseForge 全量备份格式");
       }
       const dbFile = zip.file("db.sqlite");
       if (!dbFile) {
-        throw new Error(".zip 内缺少 db.sqlite，非 Base Notes 全量备份格式");
+        throw new Error(".zip 内缺少 db.sqlite，非 BaseForge 全量备份格式");
       }
       let meta: {
         formatVersion?: number;
@@ -1197,7 +1197,7 @@ export class BackupManager {
           `无法导入：备份格式版本太高。`,
           `  备份调用的格式版本：${meta.formatVersion}`,
           `  当前程序支持的最高格式版本：${BACKUP_FORMAT_VERSION}`,
-          `  请升级 Base Notes 到该备份产生时的版本（或更新）后再导入。`,
+          `  请升级 BaseForge 到该备份产生时的版本（或更新）后再导入。`,
         ].join("\n"),
       );
     }
@@ -1322,7 +1322,7 @@ export class BackupManager {
           `无法恢复：备份格式版本高于当前程序。`,
           `  备份格式版本：${meta.formatVersion}（备份产生时间 ${meta.createdAt || "unknown"}）`,
           `  当前程序支持的最高格式版本：${BACKUP_FORMAT_VERSION}`,
-          `  请升级 Base Notes 到该备份产生时的版本或更新后再恢复；`,
+          `  请升级 BaseForge 到该备份产生时的版本或更新后再恢复；`,
           `  若仅需从该备份拼选数据，可在 https://github.com/ 查看项目 Releases 页获取对应版本。`,
         ].join("\n"),
       );
@@ -1341,8 +1341,8 @@ export class BackupManager {
           `  当前程序支持的最高 schema 版本：${codeMaxSchema}`,
           `  备份产生时间：${meta.createdAt || "unknown"}`,
           ``,
-          `原因：该备份是从更新版本的 Base Notes 产生的，错误地被灌到了旧程序。`,
-          `解决方案：升级 Base Notes 到与该备份同版或更新后再试。`,
+          `原因：该备份是从更新版本的 BaseForge 产生的，错误地被灌到了旧程序。`,
+          `解决方案：升级 BaseForge 到与该备份同版或更新后再试。`,
           `提示：不要手动修改 meta.json 来绕过此检查，将造成数据不一致。`,
         ].join("\n"),
       );
@@ -1807,7 +1807,7 @@ export class BackupManager {
     const tooLarge = stat.size > EMAIL_ATTACHMENT_LIMIT;
 
     const lines = [
-      `这是一封由 Base Notes 自动发送的备份完成通知。`,
+      `这是一封由 BaseForge 自动发送的备份完成通知。`,
       ``,
       `备份文件：${filename}`,
       `大小：${sizeMB} MB`,
@@ -1830,7 +1830,7 @@ export class BackupManager {
 
     const result = await sendMail({
       to,
-      subject: `[Base Notes] 自动备份 ${filename}`,
+      subject: `[BaseForge] 自动备份 ${filename}`,
       text: lines.join("\n"),
       attachments,
     });
@@ -1955,7 +1955,7 @@ export class BackupManager {
         return;
       }
       const lines = [
-        `Base Notes 备份链路连续失败 ${this.health.consecutiveFailures} 次，已进入降级状态。`,
+        `BaseForge 备份链路连续失败 ${this.health.consecutiveFailures} 次，已进入降级状态。`,
         ``,
         `最近失败时间：${this.health.lastFailureAt || new Date().toISOString()}`,
         `失败原因：${reason}`,
@@ -1966,7 +1966,7 @@ export class BackupManager {
       ];
       const result = await sendMail({
         to: cfg.emailTo,
-        subject: `[Base Notes] 备份连续失败告警（${this.health.consecutiveFailures} 次）`,
+        subject: `[BaseForge] 备份连续失败告警（${this.health.consecutiveFailures} 次）`,
         text: lines.join("\n"),
       });
       if (result.success) {

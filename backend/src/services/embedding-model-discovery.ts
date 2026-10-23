@@ -365,7 +365,7 @@ export async function testEmbeddingModel(
       },
       body: JSON.stringify({
         model: config.model,
-        input: ["Base Notes embedding connectivity test."],
+        input: ["BaseForge embedding connectivity test."],
       }),
       signal: AbortSignal.timeout(TEST_TIMEOUT_MS),
     });

@@ -5,7 +5,7 @@
 如果 macOS 提示：
 
 ```text
-“Base Notes” 已损坏，无法打开。你应该将它移到废纸篓。
+“BaseForge” 已损坏，无法打开。你应该将它移到废纸篓。
 ```
 
 这通常不是机器性能问题，也不是应用已经启动后的崩溃，而是 macOS Gatekeeper 在启动前拦截了未完成公证或带有隔离标记的下载包。Chrome、Safari 等浏览器下载的应用会带上 `com.apple.quarantine` 标记。
@@ -15,18 +15,18 @@
 如果应用已经拖到“应用程序”目录：
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Base Notes.app"
-open "/Applications/Base Notes.app"
+xattr -dr com.apple.quarantine "/Applications/BaseForge.app"
+open "/Applications/BaseForge.app"
 ```
 
 如果应用还在“下载”目录：
 
 ```bash
-xattr -dr com.apple.quarantine "$HOME/Downloads/Base Notes.app"
-open "$HOME/Downloads/Base Notes.app"
+xattr -dr com.apple.quarantine "$HOME/Downloads/BaseForge.app"
+open "$HOME/Downloads/BaseForge.app"
 ```
 
-如果是从 `.dmg` 打开，建议先把 `Base Notes.app` 拖到“应用程序”，再执行上面的命令。
+如果是从 `.dmg` 打开，建议先把 `BaseForge.app` 拖到“应用程序”，再执行上面的命令。
 
 ## 正式发布要求
 
@@ -40,8 +40,8 @@ open "$HOME/Downloads/Base Notes.app"
 本项目的 macOS 产物文件名包含架构，例如：
 
 ```text
-Base Notes-1.2.5-arm64.dmg
-Base Notes-1.2.5-x64.dmg
+BaseForge-1.2.5-arm64.dmg
+BaseForge-1.2.5-x64.dmg
 ```
 
 未签名或未公证的测试包可以用上面的 `xattr` 临时打开；正式 release 不应要求用户执行该命令。

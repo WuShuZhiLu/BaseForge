@@ -1,4 +1,4 @@
-# 5 分钟快速上手 Base Notes
+# 5 分钟快速上手 BaseForge
 
 > 从选择使用方式开始，完成登录、创建笔记本、写下第一篇笔记，并了解数据备份和 AI 配置。
 
@@ -40,7 +40,7 @@ http://<服务器或 NAS 的 IP>:3001
 - Windows / macOS / Linux：Electron 桌面客户端
 - Android：APK
 
-客户端首次启动时填写已经部署好的 Base Notes 服务器地址。手机连接 NAS 时不要填写 `localhost` 或 `127.0.0.1`，应填写 NAS 局域网 IP 或可访问的域名。
+客户端首次启动时填写已经部署好的 BaseForge 服务器地址。手机连接 NAS 时不要填写 `localhost` 或 `127.0.0.1`，应填写 NAS 局域网 IP 或可访问的域名。
 
 ### 在线体验
 
@@ -158,7 +158,7 @@ Docker 首次启动会自动生成并持久化 JWT 密钥。多实例部署时�
 3. 输入标题和正文。
 4. 等待底部保存状态显示完成。
 
-Base Notes 会自动保存，不需要手动按 `Ctrl/Cmd + S`。
+BaseForge 会自动保存，不需要手动按 `Ctrl/Cmd + S`。
 
 常用管理操作包括：
 

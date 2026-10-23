@@ -12,7 +12,7 @@
  *      frontend/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732*.png
  *      —— 背景 #F5F3EE + 居中品牌图标（短边 26.8%，与 Android 同比例）
  *   3. Windows 便携版解包开屏
- *      build/portable-splash.bmp —— 1bpp 单色黑白（沿用原格式），文案改为 Base Notes
+ *      build/portable-splash.bmp —— 1bpp 单色黑白（沿用原格式），文案改为 BaseForge
  *
  * 用法：node scripts/build-splash-assets.mjs
  */
@@ -122,7 +122,7 @@ function buildPortableSplashSvg(W, H) {
   <rect width="${W}" height="${H}" fill="#000000"/>
   <rect x="3.5" y="3.5" width="${W - 7}" height="${H - 7}" rx="10" fill="none" stroke="#ffffff" stroke-width="1.5"/>
 ${shapes}
-  <text x="118" y="75" font-family="Arial, Segoe UI, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">Base Notes</text>
+  <text x="118" y="75" font-family="Arial, Segoe UI, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#ffffff">BaseForge</text>
   <text x="118" y="95" font-family="Arial, Segoe UI, Helvetica, sans-serif" font-size="13" fill="#ffffff">Starting application…</text>
   <circle cx="148" cy="118" r="3" fill="#ffffff"/>
   <circle cx="164" cy="118" r="3" fill="#ffffff"/>

@@ -1,12 +1,12 @@
 # 创建你的第一篇笔记
 
-> 从零开始，写出你的第一篇 Base Notes 笔记。
+> 从零开始，写出你的第一篇 BaseForge 笔记。
 
 ---
 
 ## 前提
 
-确保已安装并登录 Base Notes。如果没有，请先参考 [5 分钟快速上手](./quick-start.md)。
+确保已安装并登录 BaseForge。如果没有，请先参考 [5 分钟快速上手](./quick-start.md)。
 
 ---
 
@@ -46,7 +46,7 @@
 
 ## 第四步：自动保存
 
-Base Notes 自动保存内容。底部状态栏显示：「已保存」/「保存中...」/「保存失败」。
+BaseForge 自动保存内容。底部状态栏显示：「已保存」/「保存中...」/「保存失败」。
 
 ---
 
@@ -80,7 +80,7 @@ Base Notes 自动保存内容。底部状态栏显示：「已保存」/「保�
 
 ## 下一步
 
-- [了解 Base Notes 界面](./ui-overview.md)
+- [了解 BaseForge 界面](./ui-overview.md)
 - [富文本编辑器教程](./editor-rich-text.md)
 - [标签和收藏教程](./tags-favorites.md)
 

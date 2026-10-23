@@ -728,8 +728,8 @@ app.post("/ask", async (c) => {
     ? `\n\n注意：上下文超过 ${CONTEXT_BUDGET} 字预算，系统已明确采用分段或裁剪策略，省略 ${contextBudget.omittedChars} 字。回答中不要声称已读取未包含的部分。`
     : "";
   const systemPrompt = contextBlock
-    ? `你是 Base Notes 的知识库助手。仅把下面提供的上下文视为用户知识库证据。请优先依据证据回答，并用来源标题说明依据；证据不足时明确说“不足以从当前范围确认”，不要虚构。${truncationNotice}\n\n${contextBlock}`
-    : "你是 Base Notes 的知识库助手。当前检索范围没有找到可用上下文，请明确告知用户，再基于通用知识回答。";
+    ? `你是 BaseForge 的知识库助手。仅把下面提供的上下文视为用户知识库证据。请优先依据证据回答，并用来源标题说明依据；证据不足时明确说“不足以从当前范围确认”，不要虚构。${truncationNotice}\n\n${contextBlock}`
+    : "你是 BaseForge 的知识库助手。当前检索范围没有找到可用上下文，请明确告知用户，再基于通用知识回答。";
   const messages = [
     { role: "system", content: systemPrompt },
     ...(Array.isArray(body.history) ? body.history : [])

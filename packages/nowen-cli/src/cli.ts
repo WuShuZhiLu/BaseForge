@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * nowen-cli — Base Notes 命令行工具
+ * nowen-cli — BaseForge 命令行工具
  *
  * 用法：
  *   nowen notes list              列出笔记
@@ -18,7 +18,7 @@
  *   nowen config                  配置连接信息
  *
  * 环境变量：
- *   NOWEN_URL       Base Notes 后端地址（默认 http://localhost:3001）
+ *   NOWEN_URL       BaseForge 后端地址（默认 http://localhost:3001）
  *   NOWEN_USERNAME  登录用户名（默认 admin）
  *   NOWEN_PASSWORD  登录密码（默认 admin123）
  */
@@ -58,7 +58,7 @@ const program = new Command();
 
 program
   .name("nowen")
-  .description(chalk.bold("Base Notes 命令行工具") + " — 从终端管理你的笔记")
+  .description(chalk.bold("BaseForge 命令行工具") + " — 从终端管理你的笔记")
   .version("1.0.0");
 
 registerNotesCommands(program);

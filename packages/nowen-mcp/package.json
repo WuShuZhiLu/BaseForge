@@ -1,7 +1,7 @@
 {
   "name": "nowen-mcp",
   "version": "1.0.0",
-  "description": "Base Notes MCP Server — 让 AI 工具直接操作笔记系统",
+  "description": "BaseForge MCP Server — 让 AI 工具直接操作笔记系统",
   "type": "module",
   "main": "dist/scoped-entry.js",
   "bin": {

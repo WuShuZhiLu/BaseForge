@@ -27,26 +27,26 @@ module.exports = {
   win,
   nsis: {
     ...(base.nsis || {}),
-    artifactName: "Base-Notes-Lite-${version}-setup.${ext}",
+    artifactName: "BaseForge-Lite-${version}-setup.${ext}",
   },
   portable: {
     ...(base.portable || {}),
-    artifactName: "Base-Notes-Lite-${version}-portable.${ext}",
+    artifactName: "BaseForge-Lite-${version}-portable.${ext}",
   },
   mac: {
     ...(base.mac || {}),
-    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
   },
   dmg: {
     ...(base.dmg || {}),
-    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
   },
   linux: {
     ...(base.linux || {}),
-    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
   },
   appImage: {
     ...(base.appImage || {}),
-    artifactName: "Base-Notes-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
   },
 };

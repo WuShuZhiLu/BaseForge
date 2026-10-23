@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="./electron/icon.png" alt="Base Notes" width="104" />
-  <h1>Base Notes</h1>
+  <img src="./electron/icon.png" alt="BaseForge" width="104" />
+  <h1>BaseForge</h1>
   <p><strong>An open-source, self-hosted knowledge base, collaborative note app, and task workspace</strong></p>
   <p>
     Unified knowledge tree · Rich text / Markdown editors · AI knowledge Q&A · Real-time collaboration · Tasks and mind maps · Cross-platform clients
@@ -27,27 +27,27 @@
 
 </div>
 
-> Base Notes is more than an editor. It is designed as user-controlled knowledge infrastructure that can run long-term on a NAS or server and remain accessible from the web, desktop, and mobile clients.
+> BaseForge is more than an editor. It is designed as user-controlled knowledge infrastructure that can run long-term on a NAS or server and remain accessible from the web, desktop, and mobile clients.
 
-> **Remote NAS connection and sign-in:** Base Notes supports deployment on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. After deployment, connect and sign in from the web, desktop, or Android client using a LAN IP address, an IPv6 address, or a public domain secured with HTTPS.
+> **Remote NAS connection and sign-in:** BaseForge supports deployment on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. After deployment, connect and sign in from the web, desktop, or Android client using a LAN IP address, an IPv6 address, or a public domain secured with HTTPS.
 
 ## Development preview
 
-Base Notes is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain Base Notes' own design.
+BaseForge is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain BaseForge' own design.
 
 > See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
-## Connect AI clients to Base Notes
+## Connect AI clients to BaseForge
 
-Base Notes includes a supported MCP Server. Claude Code, Cursor, VS Code, and other compatible AI clients can search, read, create, and update notes within the permissions granted by your account and token.
+BaseForge includes a supported MCP Server. Claude Code, Cursor, VS Code, and other compatible AI clients can search, read, create, and update notes within the permissions granted by your account and token.
 
 - [MCP Server installation guide](./docs/tutorials/mcp.en.md)
 - [中文安装教程](./docs/tutorials/mcp.md)
 - [Standalone nowen-mcp package README](./packages/nowen-mcp/README.md)
 
-The currently supported distribution is a source build: install Node.js 20+, build `packages/nowen-mcp`, create a restricted Personal API Token in Base Notes, and configure the absolute path to `packages/nowen-mcp/bin/nowen-mcp.mjs` in your client. `dist/scoped-entry.js` is an internal build entry used by the launcher and should not be configured directly. The guide covers Windows, macOS, Linux/WSL, NAS addresses, Claude Code, Cursor, VS Code, verification, updates, and troubleshooting.
+The currently supported distribution is a source build: install Node.js 20+, build `packages/nowen-mcp`, create a restricted Personal API Token in BaseForge, and configure the absolute path to `packages/nowen-mcp/bin/nowen-mcp.mjs` in your client. `dist/scoped-entry.js` is an internal build entry used by the launcher and should not be configured directly. The guide covers Windows, macOS, Linux/WSL, NAS addresses, Claude Code, Cursor, VS Code, verification, updates, and troubleshooting.
 
-## Why Base Notes
+## Why BaseForge
 
 | | |
 | --- | --- |
@@ -158,7 +158,7 @@ Password: admin123
 
 ### UGREEN NAS / Feiniu NAS remote connection and sign-in
 
-Base Notes can be deployed on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. Use the corresponding `.upk` or `.fpk` package from Releases, or deploy with Docker Compose.
+BaseForge can be deployed on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. Use the corresponding `.upk` or `.fpk` package from Releases, or deploy with Docker Compose.
 
 After the service starts:
 
@@ -408,7 +408,7 @@ Feedback channels:
 
 ## Support the project
 
-If Base Notes helps you, sponsorship supports continued maintenance and development.
+If BaseForge helps you, sponsorship supports continued maintenance and development.
 
 <table align="center">
   <tr>
@@ -427,7 +427,7 @@ Read the [author's note](./AUTHOR_STORY.md).
 
 This project is a downstream fork of the upstream open-source project [nowen-note](https://github.com/cropflre/nowen-note) and is released under the [GNU General Public License v3.0](./LICENSE).
 
-**Origin and attribution**: Base Notes is a fork of upstream nowen-note. Copyright for the code and documentation remains primarily with the upstream author; this project only applies rebranding and further development on top of it. Upstream historical records ([CHANGELOG.md](./CHANGELOG.md), [author's note](./AUTHOR_STORY.md), `docs/superpowers/`) are preserved as-is.
+**Origin and attribution**: BaseForge is a fork of upstream nowen-note. Copyright for the code and documentation remains primarily with the upstream author; this project only applies rebranding and further development on top of it. Upstream historical records ([CHANGELOG.md](./CHANGELOG.md), [author's note](./AUTHOR_STORY.md), `docs/superpowers/`) are preserved as-is.
 
 <!-- CHANGELOG:BEGIN -->
 <!-- Detailed release history lives in CHANGELOG.md. Keep the README focused on stable capabilities and recent highlights. -->

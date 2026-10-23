@@ -1,6 +1,6 @@
 /**
- * Base Notes API 客户端
- * 封装对 Base Notes 后端 REST API 的调用
+ * BaseForge API 客户端
+ * 封装对 BaseForge 后端 REST API 的调用
  */
 
 import { readFile } from "node:fs/promises";

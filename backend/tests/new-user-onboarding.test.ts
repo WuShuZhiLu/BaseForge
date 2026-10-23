@@ -106,7 +106,7 @@ test("seeds Chinese and English guides only on a new account's first confirmed l
 
     const root = notebooks.find((notebook) => notebook.parentId === null);
     assert.ok(root);
-    assert.equal(root.name, "Base Notes 使用指南 / Guide");
+    assert.equal(root.name, "BaseForge 使用指南 / Guide");
     assert.equal(root.icon, "📘");
 
     const chinese = notebooks.find((notebook) => notebook.name === "中文指南");
@@ -141,11 +141,11 @@ test("seeds Chinese and English guides only on a new account's first confirmed l
 
     const chineseWelcome = notes.find((note) => note.id === onboardingWelcomeNoteId(userId));
     assert.ok(chineseWelcome);
-    assert.equal(chineseWelcome.title, "欢迎使用 Base Notes");
+    assert.equal(chineseWelcome.title, "欢迎使用 BaseForge");
     assert.equal(chineseWelcome.isPinned, 1);
     assert.match(chineseWelcome.content, /删除后系统不会重新创建/);
 
-    const englishWelcome = notes.find((note) => note.title === "Welcome to Base Notes");
+    const englishWelcome = notes.find((note) => note.title === "Welcome to BaseForge");
     assert.ok(englishWelcome);
     assert.equal(englishWelcome.isPinned, 1);
     assert.match(englishWelcome.content, /will not be recreated after deletion/);

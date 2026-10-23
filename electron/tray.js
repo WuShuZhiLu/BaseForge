@@ -32,7 +32,7 @@ function createTray(deps) {
     process.platform === "darwin" ? image.resize({ width: 18, height: 18 }) : image;
 
   tray = new Tray(trayImage);
-  tray.setToolTip("Base Notes");
+  tray.setToolTip("BaseForge");
 
   const isLite = deps.mode === "lite";
   const liteOnly = !!deps.liteOnly;

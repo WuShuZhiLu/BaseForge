@@ -1,6 +1,6 @@
 # 桌面端（Electron）使用指南
 
-> 在 Windows、macOS、Linux 上使用 Base Notes 桌面客户端。
+> 在 Windows、macOS、Linux 上使用 BaseForge 桌面客户端。
 
 ---
 
@@ -29,7 +29,7 @@
 3. ⚠️ 首次打开可能报错，需要执行：
 
 ```bash
-sudo xattr -dr com.apple.quarantine "/Applications/Base Notes.app"
+sudo xattr -dr com.apple.quarantine "/Applications/BaseForge.app"
 ```
 
 4. 重新双击打开
@@ -37,8 +37,8 @@ sudo xattr -dr com.apple.quarantine "/Applications/Base Notes.app"
 ### Linux
 
 ```bash
-chmod +x Base-Notes-*.AppImage
-./Base-Notes-*.AppImage
+chmod +x BaseForge-*.AppImage
+./BaseForge-*.AppImage
 ```
 
 ---
@@ -78,7 +78,7 @@ chmod +x Base-Notes-*.AppImage
 ### Q：macOS 报错 "ERR_DLOPEN_FAILED"？
 
 执行 ```bash
-sudo xattr -dr com.apple.quarantine "/Applications/Base Notes.app"
+sudo xattr -dr com.apple.quarantine "/Applications/BaseForge.app"
 ```
 
 ### Q：后端启动超时？

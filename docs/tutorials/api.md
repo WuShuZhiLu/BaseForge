@@ -1,12 +1,12 @@
 # OpenAPI 接入指南
 
-> 通过 REST API 与 Base Notes 集成，构建 CLI、自动化脚本、AI Agent 或自定义客户端。
+> 通过 REST API 与 BaseForge 集成，构建 CLI、自动化脚本、AI Agent 或自定义客户端。
 
 ---
 
 ## API 概览
 
-Base Notes 提供完整的 REST API。服务启动后可访问 `/api/openapi.json` 获取 OpenAPI 3.0 规范。
+BaseForge 提供完整的 REST API。服务启动后可访问 `/api/openapi.json` 获取 OpenAPI 3.0 规范。
 
 所有业务 API 均使用 JWT Token 认证。
 

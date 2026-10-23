@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Base Notes</string>
+	<string>BaseForge</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -42,7 +42,7 @@
 		<string>_nowen-note._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Base Notes uses your local network to connect to self-hosted servers and discover nearby Base Notes instances.</string>
+	<string>BaseForge uses your local network to connect to self-hosted servers and discover nearby BaseForge instances.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

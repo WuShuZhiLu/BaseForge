@@ -2,9 +2,9 @@
   "modelVersion": "6.1.1",
   "name": "nowen-harmony",
   "version": "1.0.0",
-  "description": "Base Notes HarmonyOS App",
+  "description": "BaseForge HarmonyOS App",
   "main": "",
-  "author": "Base Notes",
+  "author": "BaseForge",
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {

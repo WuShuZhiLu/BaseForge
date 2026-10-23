@@ -1,7 +1,7 @@
 {
   "name": "nowen-cli",
   "version": "1.0.0",
-  "description": "Base Notes 命令行工具 — 从终端管理你的笔记",
+  "description": "BaseForge 命令行工具 — 从终端管理你的笔记",
   "type": "module",
   "bin": {
     "nowen": "dist/cli.js"

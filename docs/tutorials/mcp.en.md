@@ -1,6 +1,6 @@
 # MCP Server installation and usage
 
-> Connect Claude Code, Cursor, VS Code, and other MCP clients to Base Notes so they can search, read, and maintain notes within the permissions you grant.
+> Connect Claude Code, Cursor, VS Code, and other MCP clients to BaseForge so they can search, read, and maintain notes within the permissions you grant.
 
 [Back to tutorials](./README.md) · [简体中文](./mcp.md) · [Package README](../../packages/nowen-mcp/README.md)
 
@@ -9,12 +9,12 @@
 - MCP support is still available under `packages/nowen-mcp/`.
 - The repository currently provides a **source installation**. Install Node.js 20+, Git, and npm first.
 - Replace every `/absolute/path/...` placeholder with the real absolute path on your computer.
-- When Base Notes runs on a NAS or another server, `NOWEN_URL` must be reachable from the computer running the AI client, for example `http://192.168.1.20:3001`.
+- When BaseForge runs on a NAS or another server, `NOWEN_URL` must be reachable from the computer running the AI client, for example `http://192.168.1.20:3001`.
 - Use a dedicated restricted Personal API Token instead of storing an administrator password in the MCP configuration.
 
 ## Five-minute setup
 
-### 1. Verify the Base Notes server
+### 1. Verify the BaseForge server
 
 Open the server from the same computer that runs your MCP client:
 
@@ -22,7 +22,7 @@ Open the server from the same computer that runs your MCP client:
 http://192.168.1.20:3001
 ```
 
-Use `http://localhost:3001` only when Base Notes runs on that same computer.
+Use `http://localhost:3001` only when BaseForge runs on that same computer.
 
 ### 2. Check prerequisites
 
@@ -62,7 +62,7 @@ test -f ./dist/scoped-entry.js && echo "MCP build OK"
 
 ### 4. Create a Personal API Token
 
-In Base Notes, open:
+In BaseForge, open:
 
 ```text
 Settings → Personal access tokens → Create token
@@ -206,7 +206,7 @@ Most clients that accept local stdio MCP servers use this structure:
 }
 ```
 
-Current Claude Desktop versions prefer Desktop Extensions (DXT) under Settings → Extensions. Base Notes currently ships the source-based stdio server, so use the local developer MCP entry exposed by your client version. A local stdio script cannot be added as a remote Claude connector; remote MCP requires a separate HTTP transport and authentication implementation.
+Current Claude Desktop versions prefer Desktop Extensions (DXT) under Settings → Extensions. BaseForge currently ships the source-based stdio server, so use the local developer MCP entry exposed by your client version. A local stdio script cannot be added as a remote Claude connector; remote MCP requires a separate HTTP transport and authentication implementation.
 
 Official reference: [Local MCP servers on Claude Desktop](https://support.anthropic.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
 
@@ -235,13 +235,13 @@ nowen_search
 Start with a read-only test:
 
 ```text
-Use the Base Notes MCP server to list the notebooks I can access. Do not modify anything.
+Use the BaseForge MCP server to list the notebooks I can access. Do not modify anything.
 ```
 
 Then test search:
 
 ```text
-Use Base Notes MCP to search for "test" and return only titles and notebook names.
+Use BaseForge MCP to search for "test" and return only titles and notebook names.
 ```
 
 Only after read operations work should you test creating or updating a note.
@@ -261,7 +261,7 @@ Restart the MCP server or the client afterwards. If you move the repository, upd
 
 | Variable | Description | Default |
 |---|---|---|
-| `NOWEN_URL` | Base Notes server URL | `http://localhost:3001` |
+| `NOWEN_URL` | BaseForge server URL | `http://localhost:3001` |
 | `NOWEN_API_TOKEN` | Personal API Token; preferred over username/password | — |
 | `NOWEN_USERNAME` | Legacy username authentication | `admin` |
 | `NOWEN_PASSWORD` | Legacy password authentication | `admin123` |

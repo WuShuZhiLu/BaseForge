@@ -1,13 +1,13 @@
 # 交接文档：项目管理插件（pm）与远程文件插件（remote-files）
 
 > 交接时间：2026-10-21 · 交接人：AutoClaw 会话 · 接手 agent 请**全文读完再动代码**
-> 工作目录：`C:\Users\27339\WorkBuddy\note\Base-Notes`
+> 工作目录：`C:\Users\27339\WorkBuddy\note\BaseForge`
 
 ---
 
 ## 一、仓库与分支路径
 
-- 仓库根：`C:\Users\27339\WorkBuddy\note\Base-Notes`
+- 仓库根：`C:\Users\27339\WorkBuddy\note\BaseForge`
 - **当前分支：`feat/plugin-git-projects`**（HEAD = `877cd64f`，工作区干净，**未推送**）
 - 祖先链（同分支上，按时间序）：
   1. `2450a248` PM 插件 P1（项目/工作项/看板）

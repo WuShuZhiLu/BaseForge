@@ -2,7 +2,7 @@
 /**
  * End-to-end smoke test for the S3-compatible attachment migration path.
  *
- * It starts a tiny local S3-like HTTP server, creates a temporary Base Notes
+ * It starts a tiny local S3-like HTTP server, creates a temporary BaseForge
  * SQLite database plus local attachment files, then runs the migration script
  * in dry-run and apply modes. This verifies the same signed HTTP HEAD/PUT
  * path used for R2/S3/MinIO without requiring Docker or real cloud credentials.

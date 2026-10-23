@@ -1,8 +1,8 @@
 {
   "name": "nowen-note",
   "version": "1.0.0-preview.1",
-  "description": "Base Notes - A modern note-taking application",
-  "author": "Base Notes Team",
+  "description": "BaseForge - A modern note-taking application",
+  "author": "BaseForge Team",
   "private": true,
   "main": "electron/main-bootstrap.js",
   "scripts": {

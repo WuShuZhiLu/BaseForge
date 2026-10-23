@@ -1035,7 +1035,7 @@ auth.post("/2fa/setup", async (c) => {
 
   const secret = generateTotpSecret();
   const otpauthUri = buildOtpAuthUri({
-    issuer: "Base Notes",
+    issuer: "BaseForge",
     account: user.username,
     secretBase32: secret,
   });

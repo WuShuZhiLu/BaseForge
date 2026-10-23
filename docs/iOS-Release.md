@@ -1,6 +1,6 @@
 # iOS 发布指南（无 Mac 方案）
 
-> 适用于：Windows/Linux 开发者，想把 Base Notes 发到 App Store/TestFlight，但**没有 Mac 设备**。
+> 适用于：Windows/Linux 开发者，想把 BaseForge 发到 App Store/TestFlight，但**没有 Mac 设备**。
 >
 > 整体思路：**全部代码在 Windows 写，构建/签名/上传由 GitHub Actions 的 macOS runner 完成。**
 

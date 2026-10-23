@@ -1,18 +1,18 @@
 # 微信收藏导入教程
 
-Base Notes 支持导入 [WeChatDataAnalysis](https://github.com/LifeArchiveProject/WeChatDataAnalysis) 导出的微信收藏 **JSON ZIP**，并迁移收藏正文、图片、视频、语音、文件、来源、时间和标签。
+BaseForge 支持导入 [WeChatDataAnalysis](https://github.com/LifeArchiveProject/WeChatDataAnalysis) 导出的微信收藏 **JSON ZIP**，并迁移收藏正文、图片、视频、语音、文件、来源、时间和标签。
 
 本教程重点说明两件事：
 
-1. 如何从微信本地数据中获得 Base Notes 可识别的微信收藏 ZIP；
-2. 如何将该 ZIP 导入 Base Notes。
+1. 如何从微信本地数据中获得 BaseForge 可识别的微信收藏 ZIP；
+2. 如何将该 ZIP 导入 BaseForge。
 
 > [!IMPORTANT]
-> WeChatDataAnalysis 是第三方开源工具，不属于 Base Notes。请只处理你本人有权访问的微信数据，并从其官方 GitHub Release 下载程序。
+> WeChatDataAnalysis 是第三方开源工具，不属于 BaseForge。请只处理你本人有权访问的微信数据，并从其官方 GitHub Release 下载程序。
 
-## 一、Base Notes 需要什么文件
+## 一、BaseForge 需要什么文件
 
-Base Notes 需要的是：
+BaseForge 需要的是：
 
 ```text
 WeChatDataAnalysis
@@ -31,7 +31,7 @@ WeChatDataAnalysis
 - 不要使用“账号数据归档”ZIP 代替收藏导出 ZIP；
 - 不要解压后修改、重命名内部文件或重新压缩。
 
-Base Notes 同时兼容以下收藏 JSON 结构：
+BaseForge 同时兼容以下收藏 JSON 结构：
 
 - `dataset: "favorites"` 且收藏位于 `items` 中的原始收藏数据；
 - WeChatDataAnalysis 当前导出的聊天归档结构，其中收藏内容位于 `messages` 或 `conversations[].messages` 中。
@@ -140,7 +140,7 @@ JSON
 ```
 
 > [!CAUTION]
-> WeChatDataAnalysis 当前打开导出弹窗时默认选择的是 **HTML**。必须手动点击 **JSON**，否则生成的包不能作为 Base Notes 微信收藏导入包使用。
+> WeChatDataAnalysis 当前打开导出弹窗时默认选择的是 **HTML**。必须手动点击 **JSON**，否则生成的包不能作为 BaseForge 微信收藏导入包使用。
 
 不要选择：
 
@@ -215,7 +215,7 @@ JSON
 
 ## 五、检查导出的文件是否正确
 
-导入 Base Notes 前，可以先检查以下项目。
+导入 BaseForge 前，可以先检查以下项目。
 
 ### 正确文件应满足
 
@@ -248,7 +248,7 @@ JSON
 手动创建的“只有一个 JSON”的 ZIP
 ```
 
-## 六、导入 Base Notes
+## 六、导入 BaseForge
 
 ### 第 1 步：打开微信收藏入口
 
@@ -274,7 +274,7 @@ JSON
 
 选择 WeChatDataAnalysis 刚刚生成的原始 ZIP。
 
-ZIP 会上传到当前 Base Notes 实例的后端进行安全预检和导入。大型媒体包不会在浏览器内完整解压。
+ZIP 会上传到当前 BaseForge 实例的后端进行安全预检和导入。大型媒体包不会在浏览器内完整解压。
 
 ### 第 3 步：查看预检结果
 
@@ -328,13 +328,13 @@ ZIP 会上传到当前 Base Notes 实例的后端进行安全预检和导入。�
 
 #### 保留微信标签
 
-开启后，微信收藏标签会创建或复用为 Base Notes 标签。
+开启后，微信收藏标签会创建或复用为 BaseForge 标签。
 
 #### 媒体缺失时继续导入正文
 
 建议保持开启。
 
-当某张图片、视频、语音或文件在本地微信数据中已经不存在时，Base Notes 仍会导入正文、标题、来源和时间，并在报告中记录媒体缺失。
+当某张图片、视频、语音或文件在本地微信数据中已经不存在时，BaseForge 仍会导入正文、标题、来源和时间，并在报告中记录媒体缺失。
 
 #### 重复数据处理
 
@@ -375,7 +375,7 @@ ZIP 会上传到当前 Base Notes 实例的后端进行安全预检和导入。�
 
 单条收藏或单个附件失败不会中断整批导入。
 
-## 七、内容如何映射到 Base Notes
+## 七、内容如何映射到 BaseForge
 
 - 文本和微信笔记转换为可编辑富文本；
 - 图片和表情进入附件系统，并在正文中显示；
@@ -384,14 +384,14 @@ ZIP 会上传到当前 Base Notes 实例的后端进行安全预检和导入。�
 - 位置信息保留地点、地址和经纬度；
 - 合并聊天记录转换为结构化正文；
 - 来源名称、收藏类型和收藏时间写入笔记；
-- 微信收藏标签转换为 Base Notes 标签；
+- 微信收藏标签转换为 BaseForge 标签；
 - 默认按“微信收藏 / 年份”创建目录。
 
 ## 八、增量更新收藏
 
-后续新增微信收藏后，可以重新从 WeChatDataAnalysis 导出一份新的完整 JSON ZIP，再导入 Base Notes。
+后续新增微信收藏后，可以重新从 WeChatDataAnalysis 导出一份新的完整 JSON ZIP，再导入 BaseForge。
 
-Base Notes 会使用微信收藏的 `serverId`、`localId` 或稳定内容摘要判断来源。
+BaseForge 会使用微信收藏的 `serverId`、`localId` 或稳定内容摘要判断来源。
 
 推荐策略：
 
@@ -424,7 +424,7 @@ Base Notes 会使用微信收藏的 `serverId`、`localId` 或稳定内容摘要
 - 至少选择一种内容类型；
 - 当前没有正在执行的导出任务。
 
-### 3. Base Notes 提示“未识别到微信收藏数据”
+### 3. BaseForge 提示“未识别到微信收藏数据”
 
 最常见原因是导出格式选错。
 
@@ -453,7 +453,7 @@ WeChatDataAnalysis 的导出弹窗默认是 HTML，请特别检查是否已经�
 1. 在微信客户端中确认原图片、视频或文件仍可打开；
 2. 回到 WeChatDataAnalysis 刷新收藏；
 3. 重新导出 JSON ZIP；
-4. 在 Base Notes 中使用“更新”策略再次导入。
+4. 在 BaseForge 中使用“更新”策略再次导入。
 
 如果原媒体已经被微信清理或不再可访问，通常只能保留正文和媒体缺失提示。
 
@@ -464,7 +464,7 @@ WeChatDataAnalysis 的导出弹窗默认是 HTML，请特别检查是否已经�
 - 按收藏类型导出；
 - 使用关键词搜索后导出；
 - 将视频和普通文件单独导出；
-- 确认 Base Notes 服务端的上传和附件大小限制。
+- 确认 BaseForge 服务端的上传和附件大小限制。
 
 多个分批 ZIP 可以依次导入，默认“跳过”策略会减少重复笔记。
 
@@ -478,11 +478,11 @@ WeChatDataAnalysis 的导出弹窗默认是 HTML，请特别检查是否已经�
 
 目前不支持。
 
-Base Notes 不直接读取手机微信数据，也不会在浏览器中提取微信数据库密钥。当前流程需要先用 WeChatDataAnalysis 从本人电脑上的微信本地数据导出收藏 JSON ZIP。
+BaseForge 不直接读取手机微信数据，也不会在浏览器中提取微信数据库密钥。当前流程需要先用 WeChatDataAnalysis 从本人电脑上的微信本地数据导出收藏 JSON ZIP。
 
 ### 9. macOS 可以导出吗
 
-WeChatDataAnalysis 当前官方快速开始主要提供 Windows EXE，并面向微信 4.x 本地数据。建议在保存有本人微信数据的 Windows 电脑上完成导出，再将 ZIP 上传到 Base Notes。
+WeChatDataAnalysis 当前官方快速开始主要提供 Windows EXE，并面向微信 4.x 本地数据。建议在保存有本人微信数据的 Windows 电脑上完成导出，再将 ZIP 上传到 BaseForge。
 
 ### 10. 导入到哪个空间
 
@@ -509,7 +509,7 @@ WeChatDataAnalysis 当前官方快速开始主要提供 Windows EXE，并面向�
 - 只处理本人有权访问的数据；
 - 不把导出的 ZIP 上传到不受信任的网站；
 - 导入完成后删除临时副本，或放入加密磁盘；
-- 使用远程部署的 Base Notes 时，确认服务器和传输链路可信；
+- 使用远程部署的 BaseForge 时，确认服务器和传输链路可信；
 - 不在 Issue、聊天群或日志中公开真实收藏 ZIP。
 
-Base Notes 会对 ZIP 执行路径穿越、压缩比、文件数量、总体积、危险文件和 JSON 深度等安全检查，但这不能替代对导出文件本身的妥善保管。
+BaseForge 会对 ZIP 执行路径穿越、压缩比、文件数量、总体积、危险文件和 JSON 深度等安全检查，但这不能替代对导出文件本身的妥善保管。

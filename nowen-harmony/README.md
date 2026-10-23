@@ -1,6 +1,6 @@
-﻿# Base Notes - HarmonyOS App
+﻿# BaseForge - HarmonyOS App
 
-鸿蒙版 Base Notes，基于 ArkTS + ArkWeb (WebView) 实现。
+鸿蒙版 BaseForge，基于 ArkTS + ArkWeb (WebView) 实现。
 
 ## 架构方案
 

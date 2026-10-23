@@ -72,7 +72,7 @@ try {
   process.exit(1)
 }
 
-console.log("\n🚀 Base Notes 开发环境")
+console.log("\n🚀 BaseForge 开发环境")
 console.log(`   前端: ${frontendUrl}`)
 console.log(`   后端: ${backendUrl}`)
 console.log("   依赖变更时会自动执行对应目录的 npm install")

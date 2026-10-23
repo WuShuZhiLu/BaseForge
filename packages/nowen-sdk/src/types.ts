@@ -1,10 +1,10 @@
 /**
- * Base Notes SDK 类型定义
+ * BaseForge SDK 类型定义
  */
 
 // ===== 配置 =====
 export interface NowenConfig {
-  /** Base Notes 后端地址，例如 http://localhost:3001 */
+  /** BaseForge 后端地址，例如 http://localhost:3001 */
   baseUrl: string;
   /** 登录用户名 */
   username: string;

@@ -244,7 +244,7 @@ async function saveNote(
 
     const noteUrl = buildNoteUrl(cfg, noteId);
     sendProgress("done", `已保存「${note.title}」`, note.images);
-    notify("保存成功", warnings.length ? `笔记已保存，${warnings.length} 项附加操作未完成` : `已保存到 Base Notes`);
+    notify("保存成功", warnings.length ? `笔记已保存，${warnings.length} 项附加操作未完成` : `已保存到 BaseForge`);
     return {
       ok: true,
       noteId,

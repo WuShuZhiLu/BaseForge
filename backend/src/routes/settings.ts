@@ -43,7 +43,7 @@ export interface SiteSettings {
 }
 
 const DEFAULTS: SiteSettings = {
-  site_title: "Base Notes",
+  site_title: "BaseForge",
   site_favicon: "",
   site_icp_beian: "",
   site_public_web_origin: "",

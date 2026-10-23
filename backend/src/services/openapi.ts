@@ -1,5 +1,5 @@
 /**
- * Base Notes OpenAPI 规范自动生成
+ * BaseForge OpenAPI 规范自动生成
  *
  * 从路由定义自动生成 OpenAPI 3.0 JSON，
  * 提供 /api/openapi.json 端点供 Swagger UI 等工具消费。
@@ -9,10 +9,10 @@ export function generateOpenAPISpec(): Record<string, any> {
   return {
     openapi: "3.0.3",
     info: {
-      title: "Base Notes API",
+      title: "BaseForge API",
       version: "1.0.0",
-      description: "Base Notes 笔记系统完整 REST API 文档",
-      contact: { name: "Base Notes" },
+      description: "BaseForge 笔记系统完整 REST API 文档",
+      contact: { name: "BaseForge" },
     },
     servers: [
       { url: "http://localhost:3001", description: "本地开发" },

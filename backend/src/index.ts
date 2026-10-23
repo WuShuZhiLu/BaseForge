@@ -314,7 +314,7 @@ app.get("/api/openapi.json", (c) => c.json(generateOpenAPISpec()));
 app.get("/api/settings", (c) => {
   const db = getDb();
   const rows = db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'site_%' OR key LIKE 'editor_%' OR key LIKE 'debug_%' OR key = 'web_ui_enabled'").all() as { key: string; value: string }[];
-  const result: Record<string, string> = { site_title: "Base Notes", site_favicon: "", site_icp_beian: "", editor_font_family: "", debug_files_query: "false", web_ui_enabled: "true" };
+  const result: Record<string, string> = { site_title: "BaseForge", site_favicon: "", site_icp_beian: "", editor_font_family: "", debug_files_query: "false", web_ui_enabled: "true" };
   for (const row of rows) {
     result[row.key] = row.value;
   }
@@ -744,7 +744,7 @@ function webUiDisabledResponse(): Response {
     "<!doctype html><html><head><meta charset=\"utf-8\"><title>Web UI Disabled</title></head>" +
     "<body style=\"font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8fafc;color:#334155\">" +
     "<main style=\"max-width:520px;padding:32px;text-align:center\"><h1 style=\"font-size:22px;color:#0f172a\">网页端已被管理员关闭</h1>" +
-    "<p style=\"line-height:1.7\">当前服务器仅提供 API 服务。请使用 Base Notes 桌面客户端连接该服务器。</p></main></body></html>",
+    "<p style=\"line-height:1.7\">当前服务器仅提供 API 服务。请使用 BaseForge 桌面客户端连接该服务器。</p></main></body></html>",
     { status: 403, headers: { "Content-Type": "text/html; charset=utf-8" } },
   );
 }
@@ -938,7 +938,7 @@ try {
   console.warn("[init] startVersionSnapshotScheduler failed:", e);
 }
 
-console.log(`🚀 Base Notes API running on http://localhost:${port}`);
+console.log(`🚀 BaseForge API running on http://localhost:${port}`);
 console.log(`📖 OpenAPI 文档: http://localhost:${port}/api/openapi.json`);
 
 // @hono/node-server 的 serve 返回底层 http.Server；拿到后挂 WebSocket

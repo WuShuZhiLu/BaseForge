@@ -314,7 +314,7 @@ async function readAndValidateMeta(directory: StreamingZipDirectory): Promise<Fu
       "无法恢复：备份格式版本高于当前程序。",
       `  备份格式版本：${meta.formatVersion}（备份产生时间 ${meta.createdAt || "unknown"}）`,
       `  当前程序支持的最高格式版本：${BACKUP_FORMAT_VERSION}`,
-      "  请升级 Base Notes 到该备份产生时的版本或更新后再恢复；",
+      "  请升级 BaseForge 到该备份产生时的版本或更新后再恢复；",
     ].join("\n"));
   }
 
@@ -326,8 +326,8 @@ async function readAndValidateMeta(directory: StreamingZipDirectory): Promise<Fu
       `  当前程序支持的最高 schema 版本：${codeMaxSchema}`,
       `  备份产生时间：${meta.createdAt || "unknown"}`,
       "",
-      "原因：该备份是从更新版本的 Base Notes 产生的，错误地被灌到了旧程序。",
-      "解决方案：升级 Base Notes 到与该备份同版或更新后再试。",
+      "原因：该备份是从更新版本的 BaseForge 产生的，错误地被灌到了旧程序。",
+      "解决方案：升级 BaseForge 到与该备份同版或更新后再试。",
       "提示：不要手动修改 meta.json 来绕过此检查，将造成数据不一致。",
     ].join("\n"));
   }

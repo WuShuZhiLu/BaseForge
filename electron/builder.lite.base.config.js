@@ -42,7 +42,7 @@ const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "Nowen";
 module.exports = {
   // appId 加 .lite 后缀 —— 关键：避免与 full 安装包互覆盖、autoUpdate 串 feed
   appId: "com.nowen.note.lite",
-  productName: "Base Notes Lite",
+  productName: "BaseForge Lite",
 
   /**
    * 没有 backend 就不跑 better-sqlite3 的 ABI 校验。留一个 beforeBuild 只做前端产物存在性检查。
@@ -154,7 +154,7 @@ module.exports = {
     verifyUpdateCodeSignature: true,
     publisherName: "Nowen",
     // 产物名加 -lite 后缀，便于跟 full 分发包并排
-    artifactName: "Base-Notes-${version}-lite-setup.${ext}",
+    artifactName: "BaseForge-${version}-lite-setup.${ext}",
   },
   nsis: {
     oneClick: false,
@@ -163,12 +163,12 @@ module.exports = {
     deleteAppDataOnUninstall: false,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
-    shortcutName: "Base Notes Lite",
-    // 关键：独立安装目录，避免与 full 的 "Base Notes" 相互覆盖
-    // 默认 %LOCALAPPDATA%\Programs\Base Notes Lite
+    shortcutName: "BaseForge Lite",
+    // 关键：独立安装目录，避免与 full 的 "BaseForge" 相互覆盖
+    // 默认 %LOCALAPPDATA%\Programs\BaseForge Lite
   },
   portable: {
-    artifactName: "Base-Notes-${version}-lite-portable.${ext}",
+    artifactName: "BaseForge-${version}-lite-portable.${ext}",
   },
 
   mac: {
@@ -186,7 +186,7 @@ module.exports = {
     // bundleId 实际上由顶层 appId 决定，这里冗余不写
   },
   dmg: {
-    artifactName: "Base-Notes-${version}-lite.${ext}",
+    artifactName: "BaseForge-${version}-lite.${ext}",
   },
 
   linux: {
@@ -196,21 +196,21 @@ module.exports = {
     mimeTypes: ["text/markdown", "text/plain"],
     maintainer: LINUX_MAINTAINER,
     vendor: LINUX_VENDOR,
-    synopsis: "Base Notes (Lite) — remote-only client",
+    synopsis: "BaseForge (Lite) — remote-only client",
     description:
-      "Base Notes Lite — 仅包含前端客户端的轻量发行版，需连接远端 Base Notes 服务器；安装体积更小，启动更快。",
+      "BaseForge Lite — 仅包含前端客户端的轻量发行版，需连接远端 BaseForge 服务器；安装体积更小，启动更快。",
     desktop: {
       entry: {
-        StartupWMClass: "Base Notes Lite",
+        StartupWMClass: "BaseForge Lite",
         Keywords: "note;markdown;editor;nowen;lite;",
       },
     },
-    artifactName: "Base-Notes-${version}-lite.${ext}",
+    artifactName: "BaseForge-${version}-lite.${ext}",
   },
   deb: {
     priority: "optional",
   },
   appImage: {
-    artifactName: "Base-Notes-${version}-lite.${ext}",
+    artifactName: "BaseForge-${version}-lite.${ext}",
   },
 };

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024">
-  <!-- Base Notes 自适应深浅主题 favicon（32）· 由 build/icon-source.svg 派生，请勿手改；改图标请改母图后重跑本脚本 -->
+  <!-- BaseForge 自适应深浅主题 favicon（32）· 由 build/icon-source.svg 派生，请勿手改；改图标请改母图后重跑本脚本 -->
   <style>
     .tile  { fill: #352D49; }
     .letter{ fill: #F3E3C4; }

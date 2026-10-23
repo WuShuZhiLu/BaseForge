@@ -38,7 +38,7 @@ test("reads a valid custom data directory from the bootstrap pointer", () => {
 test("ignores a custom data directory under Program Files", () => {
   const root = tempRoot();
   const programFiles = path.join(root, "Program Files");
-  const custom = path.join(programFiles, "Base Notes");
+  const custom = path.join(programFiles, "BaseForge");
   fs.mkdirSync(custom, { recursive: true });
   writeCustomDataDir(root, custom);
 
@@ -69,7 +69,7 @@ test("rejects unsafe migration targets", () => {
   const originalProgramFiles = process.env.ProgramFiles;
   process.env.ProgramFiles = path.join(root, "Program Files");
   try {
-    const programFilesTarget = path.join(process.env.ProgramFiles, "Base Notes");
+    const programFilesTarget = path.join(process.env.ProgramFiles, "BaseForge");
     assert.equal(validateMigrationTarget(programFilesTarget, { currentDir }).ok, false);
   } finally {
     if (originalProgramFiles === undefined) delete process.env.ProgramFiles;

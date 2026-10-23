@@ -1,6 +1,6 @@
 # Attachment Object Storage
 
-Base Notes can keep attachment metadata in SQLite while storing attachment bytes either in the local data directory or in an S3-compatible bucket such as Cloudflare R2, MinIO, or AWS S3.
+BaseForge can keep attachment metadata in SQLite while storing attachment bytes either in the local data directory or in an S3-compatible bucket such as Cloudflare R2, MinIO, or AWS S3.
 
 This feature is for attachments only. The main SQLite database remains the source of truth for notes, notebooks, users, permissions, and attachment metadata.
 

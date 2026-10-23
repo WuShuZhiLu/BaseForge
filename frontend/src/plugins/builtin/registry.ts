@@ -3,7 +3,7 @@
  *
  * 待办中心 / 每日记录以"官方内置插件"形态接入统一插件管线：
  * - contributes.sidebarPanels 侧栏迷你面板（宿主内置渲染）
- * - contributes.mainViewPanels 主区全屏中心（TaskCenter / DiaryCenter 原组件）
+ * - contributes.mainViewPanels 主区全屏中心（TaskWorkspace / DiaryWorkspace 原组件）
  * - 启停状态持久化到 localStorage；停用后侧栏/Rail 入口消失、主区不可达，数据保留。
  *
  * 与第三方插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条

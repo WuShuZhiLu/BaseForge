@@ -33,37 +33,37 @@ chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({
         id: "nowen-clip-selection",
-        title: "剪藏选中内容到 Base Notes",
+        title: "剪藏选中内容到 BaseForge",
         contexts: ["selection"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-page",
-        title: "剪藏整个页面到 Base Notes",
+        title: "剪藏整个页面到 BaseForge",
         contexts: ["page"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-simplified",
-        title: "剪藏简化内容到 Base Notes",
+        title: "剪藏简化内容到 BaseForge",
         contexts: ["page"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-fullpage",
-        title: "完全克隆页面到 Base Notes",
+        title: "完全克隆页面到 BaseForge",
         contexts: ["page"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-screenshot",
-        title: "截图当前可视区域到 Base Notes",
+        title: "截图当前可视区域到 BaseForge",
         contexts: ["page"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-full-screenshot",
-        title: "截图整个页面到 Base Notes",
+        title: "截图整个页面到 BaseForge",
         contexts: ["page"],
       });
       chrome.contextMenus.create({
         id: "nowen-clip-link",
-        title: "剪藏这个链接到 Base Notes",
+        title: "剪藏这个链接到 BaseForge",
         contexts: ["link"],
       });
     });
@@ -136,7 +136,7 @@ async function runClip(req: ClipRequest): Promise<ClipResult> {
   const cfg = await getConfig();
   if (!isConfigured(cfg)) {
     notify(
-      "请先设置 Base Notes",
+      "请先设置 BaseForge",
       "右键扩展图标 → 选项，填入服务器地址并登录账号。",
     );
     try {
@@ -170,7 +170,7 @@ async function runClip(req: ClipRequest): Promise<ClipResult> {
 
   // fullpage 模式：完整克隆的自包含 HTML 文档，跳过图片内联和格式转换，直接上传
   if (req.mode === "fullpage") {
-    sendProgress({ type: "CLIP_PROGRESS", phase: "upload", message: "正在上传完整页面到 Base Notes..." });
+    sendProgress({ type: "CLIP_PROGRESS", phase: "upload", message: "正在上传完整页面到 BaseForge..." });
     const notebookName = (req.overrideNotebook ?? cfg.defaultNotebook).trim() || "Web 剪藏";
     const tags = parseTags(req.overrideTags ?? cfg.defaultTags);
 
@@ -368,7 +368,7 @@ async function runClip(req: ClipRequest): Promise<ClipResult> {
   }
 
   // 上传
-  sendProgress({ type: "CLIP_PROGRESS", phase: "upload", message: "正在上传到 Base Notes..." });
+  sendProgress({ type: "CLIP_PROGRESS", phase: "upload", message: "正在上传到 BaseForge..." });
   const notebookName = (req.overrideNotebook ?? cfg.defaultNotebook).trim() || "Web 剪藏";
   try {
     const resp = await importNote(cfg, {

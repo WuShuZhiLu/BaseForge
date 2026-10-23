@@ -1,8 +1,8 @@
 // electron/logger.js
 // 日志落地（按日期轮转）+ 崩溃上报（crashReporter + uncaughtException / unhandledRejection）。
 // 日志目录：<userData>/logs/   示例：
-//   %APPDATA%/Base Notes/logs/main-2026-04-23.log
-//   %APPDATA%/Base Notes/logs/crash/<guid>.dmp
+//   %APPDATA%/BaseForge/logs/main-2026-04-23.log
+//   %APPDATA%/BaseForge/logs/crash/<guid>.dmp
 //
 // 不依赖 electron-log / winston，保持零新增依赖；必要时可升级。
 
@@ -145,7 +145,7 @@ function initLogger(opts = {}) {
   // Electron 要求 start() 必须调用才能产生 minidump；uploadToServer=false 时不会外发。
   try {
     crashReporter.start({
-      productName: "Base Notes",
+      productName: "BaseForge",
       companyName: "Nowen",
       submitURL: opts.crashSubmitURL || "https://example.invalid/submit",
       uploadToServer: !!opts.uploadCrashes && !!opts.crashSubmitURL,
@@ -176,7 +176,7 @@ function initLogger(opts = {}) {
   });
 
   write("INFO", [
-    `===== Base Notes 启动 v${app.getVersion()} platform=${process.platform} arch=${process.arch} =====`,
+    `===== BaseForge 启动 v${app.getVersion()} platform=${process.platform} arch=${process.arch} =====`,
   ]);
 }
 

@@ -6,10 +6,10 @@ function requiredMacReleaseAssets(version) {
   const normalized = normalizeVersion(version);
   if (!normalized) throw new Error("release version is required");
   return [
-    `Base-Notes-${normalized}-x64.dmg`,
-    `Base-Notes-${normalized}-arm64.dmg`,
-    `Base-Notes-${normalized}-x64.zip`,
-    `Base-Notes-${normalized}-arm64.zip`,
+    `BaseForge-${normalized}-x64.dmg`,
+    `BaseForge-${normalized}-arm64.dmg`,
+    `BaseForge-${normalized}-x64.zip`,
+    `BaseForge-${normalized}-arm64.zip`,
     "latest-mac.yml",
   ];
 }
@@ -28,7 +28,7 @@ function assertCompleteMacReleaseAssets(assetNames, version, source = "macOS rel
 }
 
 function isMacManualDownloadZip(name) {
-  return /^Base-Notes-\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?-(?:x64|arm64)\.zip$/i.test(String(name || ""));
+  return /^BaseForge-\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?-(?:x64|arm64)\.zip$/i.test(String(name || ""));
 }
 
 module.exports = {
