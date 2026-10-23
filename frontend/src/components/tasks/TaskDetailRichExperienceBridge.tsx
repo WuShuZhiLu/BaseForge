@@ -23,7 +23,7 @@ function setNativeTextareaValue(textarea: HTMLTextAreaElement, value: string): v
   else textarea.value = value;
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
   // TaskDetailPanel persists description on blur. React maps onBlur to focusout,
-  // so preserve the original save path instead of bypassing TaskCenter state.
+  // so preserve the original save path instead of bypassing TaskWorkspace state.
   queueMicrotask(() => {
     textarea.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
   });

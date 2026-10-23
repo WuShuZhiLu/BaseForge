@@ -21,7 +21,7 @@ export interface SiteConfig {
   editorFontFamily: string; // 空串=默认(Inter), 自定义字体 id, 或内置字体名
   // 注：v6 起，"个人空间导出/导入"不再是站点级全站开关；它已下沉为 users 表
   // 的 personalExportEnabled / personalImportEnabled 两列，由管理员在
-  // 「用户管理 → 编辑用户」里为每个用户独立控制。消费方（Sidebar、DataManager）
+  // 「用户管理 → 编辑用户」里为每个用户独立控制。消费方（SidebarMobile、DataManager）
   // 请读当前登录用户自己（api.getMe() 的返回）上的这两字段，不要再从这里读。
 }
 

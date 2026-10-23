@@ -8,7 +8,7 @@ function readSource(relativePath: string): string {
 
 describe("已移除的连接与迁移功能", () => {
   it("不再暴露连接与迁移入口或全局连接中心", () => {
-    const navRailSource = readSource("src/components/NavRail.tsx");
+    const navRailSource = readSource("src/components/NavRailMobile.tsx");
     const mainSource = readSource("src/main.tsx");
     const loginSource = readSource("src/components/LoginPage.tsx");
 
@@ -33,7 +33,7 @@ describe("已移除的连接与迁移功能", () => {
   });
 
   it("删除侧栏账号弹层并保留退出和本地恢复能力", () => {
-    const navRailSource = readSource("src/components/NavRail.tsx");
+    const navRailSource = readSource("src/components/NavRailMobile.tsx");
     const dataManagerSource = readSource("src/components/DataManager.tsx");
 
     expect(navRailSource).not.toContain("accountMenuOpen");

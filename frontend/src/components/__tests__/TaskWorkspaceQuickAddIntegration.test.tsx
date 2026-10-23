@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import TaskCenter from "../TaskCenter";
+import TaskWorkspace from "../TaskWorkspace";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -256,14 +256,14 @@ async function flush() {
     await Promise.resolve();
 }
 
-async function renderTaskCenter(root: Root) {
+async function renderTaskWorkspace(root: Root) {
     await act(async () => {
-        root.render(<TaskCenter />);
+        root.render(<TaskWorkspace />);
         await flush();
     });
 }
 
-describe("TaskCenter quick-add integration", () => {
+describe("TaskWorkspace quick-add integration", () => {
     let host: HTMLDivElement;
     let root: Root;
 
@@ -301,7 +301,7 @@ describe("TaskCenter quick-add integration", () => {
     });
 
     it("creates task with parsed fields and creates reminders", async () => {
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const input = host.querySelector<HTMLInputElement>("[data-testid='quick-add-input']");
         const submit = host.querySelector<HTMLButtonElement>("[data-testid='quick-add-submit']");
@@ -334,7 +334,7 @@ describe("TaskCenter quick-add integration", () => {
     });
 
     it("continues when one reminder creation fails", async () => {
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         apiMocks.createTaskReminder
             .mockRejectedValueOnce(new Error("network"))
@@ -360,7 +360,7 @@ describe("TaskCenter quick-add integration", () => {
     });
 
     it("creates custom repeat task with object repeatRuleJson payload", async () => {
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const input = host.querySelector<HTMLInputElement>("[data-testid='quick-add-input']");
         const submit = host.querySelector<HTMLButtonElement>("[data-testid='quick-add-submit']");
@@ -386,7 +386,7 @@ describe("TaskCenter quick-add integration", () => {
     it("creates child task with parsed fields and reminders", async () => {
         apiMocks.getTasks.mockResolvedValueOnce([makeTask({ id: "parent-task", title: "parent" })]);
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const childButton = host.querySelector<HTMLButtonElement>("[data-testid='create-child-parent-task']");
         expect(childButton).not.toBeNull();
@@ -423,7 +423,7 @@ describe("TaskCenter quick-add integration", () => {
             }),
         ]);
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const childButton = host.querySelector<HTMLButtonElement>("[data-testid='create-child-parent-task']");
         expect(childButton).not.toBeNull();
@@ -455,7 +455,7 @@ describe("TaskCenter quick-add integration", () => {
             makeHabit({ id: "habit-archived", title: "已归档习惯", archivedAt: null }),
         );
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const habitsTab = Array.from(host.querySelectorAll("button")).find((button) => button.textContent?.includes("habits.title"));
         expect(habitsTab).not.toBeUndefined();
@@ -498,7 +498,7 @@ describe("TaskCenter quick-add integration", () => {
             makeHabit({ id: "habit-delete", title: "待删除习惯", archivedAt: "2026-07-07T00:00:00" }),
         ]);
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const habitsTab = Array.from(host.querySelectorAll("button")).find((button) => button.textContent?.includes("habits.title"));
         await act(async () => {
@@ -532,7 +532,7 @@ describe("TaskCenter quick-add integration", () => {
         apiMocks.getHabitStats.mockResolvedValue({ totalCheckins: 2, checkinDays: 2, currentStreak: 2, successCount: 2, partialCount: 0, failureCount: 0 });
         apiMocks.getHabitCheckinLog.mockResolvedValue([makeHabitCheckinLogItem({ habitId: "habit-stats", habitTitle: "统计习惯" })]);
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const statsTab = Array.from(host.querySelectorAll("button")).find((button) => button.textContent?.includes("stats.title"));
         expect(statsTab).not.toBeUndefined();
@@ -588,7 +588,7 @@ describe("TaskCenter quick-add integration", () => {
                 : [makeHabitCheckinLogItem({ id: "check-new", habitId: "habit-new", habitTitle: "新工作区习惯", checkinDate: "2026-07-09" })]
         ));
 
-        await renderTaskCenter(root);
+        await renderTaskWorkspace(root);
 
         const statsTab = Array.from(host.querySelectorAll("button")).find((button) => button.textContent?.includes("stats.title"));
         expect(statsTab).not.toBeUndefined();

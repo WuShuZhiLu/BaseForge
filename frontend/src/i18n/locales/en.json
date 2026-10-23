@@ -72,7 +72,7 @@
     "ugreenAccess": {
       "title": "UGREEN authentication required",
       "description": "The UGREEN gateway blocked the native login request. Sign in with UGREEN first, then use nowen-note in the web workspace.",
-      "desktopDescription": "Sign in to UGREEN in a secure Base Notes window and continue directly to the remote workspace.",
+      "desktopDescription": "Sign in to UGREEN in a secure BaseForge window and continue directly to the remote workspace.",
       "button": "Continue with UGREEN",
       "desktopButton": "Open inside the app",
       "opening": "Opening UGREEN...",
@@ -1831,7 +1831,7 @@
       "created": "Calendar subscription enabled",
       "updated": "Settings updated",
       "error": "Operation failed, please try again",
-      "description": "Export tasks as a calendar subscription link for iPhone, Android or third-party calendar apps. Reminders are handled by the system calendar, independent of Base Notes.",
+      "description": "Export tasks as a calendar subscription link for iPhone, Android or third-party calendar apps. Reminders are handled by the system calendar, independent of BaseForge.",
       "active": "Active",
       "disabled": "Disabled",
       "lastAccess": "Last accessed",
@@ -2578,7 +2578,7 @@
   },
   "server": {
     "title": "Connect to Server",
-    "subtitle": "Enter your Base Notes server address to get started",
+    "subtitle": "Enter your BaseForge server address to get started",
     "addressLabel": "Server Address",
     "addressPlaceholder": "e.g. 192.168.1.100:3001 or note.example.com",
     "addressHint": "Pick a protocol and enter host and port (port is optional)",
@@ -2719,7 +2719,7 @@
   },
   "download": {
     "title": "Downloads",
-    "subtitle": "Get Base Notes on desktop, mobile and NAS. Mainland China users can switch to a mirror for faster downloads.",
+    "subtitle": "Get BaseForge on desktop, mobile and NAS. Mainland China users can switch to a mirror for faster downloads.",
     "latestVersion": "Latest version",
     "viewOnGithub": "View full release on GitHub",
     "refresh": "Refresh",
@@ -2750,7 +2750,7 @@
   },
   "about": {
     "title": "About",
-    "appName": "Base Notes",
+    "appName": "BaseForge",
     "slogan": "Lightweight Self-Hosted Knowledge Platform",
     "version": "Version",
     "description": "An open-source, self-hosted note-taking app focused on privacy and productivity. Supports Markdown / rich-text editing, AI assistant, web clipping, mind maps, real-time sync, and team collaboration.",
@@ -2772,7 +2772,7 @@
     "sponsorWechat": "WeChat",
     "sponsorAlipay": "Alipay",
     "sponsorWechatTip": "Scan with WeChat · buy the author a keyboard / a bug fix",
-    "sponsorAlipayTip": "Scan with Alipay · thank you for supporting Base Notes",
+    "sponsorAlipayTip": "Scan with Alipay · thank you for supporting BaseForge",
     "madeWith": "Made with ??",
     "changelog": "What's New",
     "changelogDesc": "See this release's new features and past fixes",

@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
 import AIChatPanel from "@/components/AIChatPanel";
-import DiaryCenter from "@/components/DiaryCenter";
+import DiaryWorkspace from "@/components/DiaryWorkspace";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
-import TaskCenter from "@/components/TaskCenter";
+import TaskWorkspace from "@/components/TaskWorkspace";
 import TrashPage from "@/features/trash/TrashPage";
 import { useApp, useAppActions, type ToolTabKey } from "@/store/AppContext";
 import { TOOL_PAGE_NAVIGATE_EVENT, type ToolPageNavigateDetail } from "@/components/toolTabs";
@@ -92,9 +92,9 @@ export default function ToolPageHost({ tool }: Props) {
 function renderToolPage(key: ToolTabKey, actions: ReturnType<typeof useAppActions>) {
   switch (key) {
     case "tasks":
-      return <TaskCenter />;
+      return <TaskWorkspace />;
     case "diary":
-      return <DiaryCenter />;
+      return <DiaryWorkspace />;
     case "ai-chat":
       return (
         <AIChatPanel

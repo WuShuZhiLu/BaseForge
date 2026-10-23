@@ -2051,9 +2051,9 @@ function FilterBar({
 }
 
 // ============================================================
-// 主组件：DiaryCenter
+// 主组件：DiaryWorkspace
 // ============================================================
-export default function DiaryCenter() {
+export default function DiaryWorkspace() {
   const { t } = useTranslation();
   const { state } = useApp();
   const [items, setItems] = useState<Diary[]>([]);

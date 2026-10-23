@@ -1508,7 +1508,7 @@ function EditorPaneCore({
     };
   }, []);
 
-  // NoteList/Sidebar �������л� activeNote ǰ�������¼������� Tiptap �յ��� note.id ��
+  // NoteList/SidebarMobile �������л� activeNote ǰ�������¼������� Tiptap �յ��� note.id ��
   // ������ɱʼǵ� debounce�������л�ǰ 500ms �ڵı༭û����⡣
   useEffect(() => {
     const onBeforeNoteSwitch = () => {
@@ -2650,7 +2650,7 @@ const moveToTrash = useCallback(async () => {
     return (
       <div className="flex-1 flex flex-col bg-app-bg transition-colors relative">
         {/* ����˿�̬��ҲҪ����"չ���ʼ��б�"��ڣ�����һ���۵�+��ѡ�бʼǣ�������Ļ
-            ��ֻʣ NavRail���û��Ҳ����κλص��б��ķ�ʽ��ͼƬ�������� bug����
+            ��ֻʣ NavRailMobile���û��Ҳ����κλص��б��ķ�ʽ��ͼƬ�������� bug����
             ���ɾ��Զ�λ�����Ͻǣ������ƻ�ԭ�����еĿ�̬�Ӿ��� */}
         {/* 移除"展开笔记列表"悬浮按钮，用户可通过侧栏/快捷键恢复 */}
         {/* �ƶ��ˣ��������ذ�ť + ��ʾ��
@@ -4423,7 +4423,7 @@ function OutlinePanel({
   );
 }
 
-/* ===== �ʼǱ����������� Sidebar.tsx �� buildTree ��ȫһ�£� ===== */
+/* ===== �ʼǱ����������� SidebarMobile.tsx �� buildTree ��ȫһ�£� ===== */
 function buildTree(notebooks: Notebook[]): Notebook[] {
   const map = new Map<string, Notebook>();
   const roots: Notebook[] = [];

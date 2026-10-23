@@ -86,7 +86,7 @@ function railMountsEqual(previous: RailMount[], next: RailMount[]): boolean {
  * 全局空间入口桥。
  *
  * “跨空间转移”和“公共空间”都是低频的空间级能力，不再使用右下角悬浮按钮。
- * 本组件将一个与 NavRail 原生导航项同尺寸的“空间”入口挂载到工具组末尾，当前
+ * 本组件将一个与 NavRailMobile 原生导航项同尺寸的“空间”入口挂载到工具组末尾，当前
  * 工具组最后一项是 AI 问答，因此视觉上稳定展示在 AI 问答下方。
  *
  * 桌面端点击后在导航栏右侧打开紧凑菜单；移动端点击后打开底部 Sheet，避免和

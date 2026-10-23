@@ -18,7 +18,7 @@ import { FIXED_BADGE_IDS, EXTRA_BADGE_CATALOG } from "../../components/sidebar/A
  *  - 「其余徽章」收进可折叠的「更多」组（默认折叠，展开态经 updateSidebarBadges 持久化）
  *    ——对应**工具入口**（待办 / 小记 / AI 对话 / 分享管理），点击打开工具页签；
  *  - 「＋ 添加徽章」位于「更多」之下；
- *  - Rail 左下角「设置」保持原位（仍在 NavRail，不在徽章组件内）。
+ *  - Rail 左下角「设置」保持原位（仍在 NavRailMobile，不在徽章组件内）。
  *
  * 注：2026-10-16 用户澄清「不是让你补齐大纲与时间线面板」，故侧栏面板集合收敛为
  *     tree / openEditors / tags / fav / trash / files 六个真实面板；扩展徽章改为工具入口。
@@ -29,7 +29,7 @@ function source(relativeUrl: string): string {
 }
 
 const BADGES = source("../../components/sidebar/ActivityBarBadges.tsx");
-const NAV_RAIL = source("../../components/NavRail.tsx");
+const NAV_RAIL = source("../../components/NavRailMobile.tsx");
 const STORE = source("../../lib/sidebarPanels.ts");
 
 function layoutStorageKey(): string {
@@ -103,7 +103,7 @@ describe("徽章交互协议（接口冻结 v1）", () => {
   });
 });
 
-describe("NavRail 接线（设置仍在左下）", () => {
+describe("NavRailMobile 接线（设置仍在左下）", () => {
   it("桌面分支渲染 ActivityBarBadges（showLabel/classicText 透传）", () => {
     expect(NAV_RAIL).toContain("<ActivityBarBadges");
     expect(NAV_RAIL).toContain("showLabel={showLabel}");
@@ -115,7 +115,7 @@ describe("NavRail 接线（设置仍在左下）", () => {
     expect(NAV_RAIL).not.toContain("setSidebarPanel");
   });
 
-  it("设置入口仍在 NavRail 底部（徽章区之后渲染，未被移除或改名）", () => {
+  it("设置入口仍在 NavRailMobile 底部（徽章区之后渲染，未被移除或改名）", () => {
     const badgesIndex = NAV_RAIL.indexOf("<ActivityBarBadges");
     // 用「设置按钮」自身的 aria-label 标记定位（顶部账号菜单里也有 setShowSettings 调用，不能拿它比较）
     const settingsButtonIndex = NAV_RAIL.indexOf('aria-label={t("sidebar.settings")}');

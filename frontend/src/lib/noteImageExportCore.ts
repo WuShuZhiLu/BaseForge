@@ -675,7 +675,7 @@ function createSvgBlob(prepared: PreparedHost): Blob {
 async function zipFiles(files: NoteImageExportFile[], baseName: string): Promise<{ blob: Blob; name: string }> {
   const zip = new JSZip();
   for (const file of files) zip.file(file.fileName, file.blob);
-  zip.file("README.txt", "该压缩包由 Base Notes 分页图片导出生成。按文件名序号从上到下阅读。\n");
+  zip.file("README.txt", "该压缩包由 BaseForge 分页图片导出生成。按文件名序号从上到下阅读。\n");
   return {
     blob: await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }),
     name: `${baseName}-pages.zip`,
@@ -697,7 +697,7 @@ async function saveFiles(
       file.displayPath = saved.displayPath;
     }
     return {
-      displayPath: files.length === 1 ? files[0].displayPath : `Pictures/Base Notes（${files.length} 张）`,
+      displayPath: files.length === 1 ? files[0].displayPath : `Pictures/BaseForge（${files.length} 张）`,
       openUri: files[0]?.uri,
       files,
     };

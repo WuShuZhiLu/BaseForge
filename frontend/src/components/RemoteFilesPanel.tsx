@@ -516,7 +516,7 @@ function SourceManager(props: {
 }
 
 /** ============ 主区中心 ============ */
-export default function RemoteFilesCenter() {
+export default function RemoteFilesPanel() {
   const [sources, setSources] = useState<RemoteSourcePublic[]>([]);
   const [activeId, setActiveId] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);

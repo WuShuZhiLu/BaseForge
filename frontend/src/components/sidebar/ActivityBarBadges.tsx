@@ -34,8 +34,8 @@ import { useApp, useAppActions, type ToolTabKey } from "@/store/AppContext";
  * - 其余徽章收进可折叠的「更多」组（默认折叠，展开/收起经 updateSidebarBadges 持久化）；
  * - 「＋ 添加徽章」位于「更多」之下：勾选加入 / 取消移除（只移除入口，不删功能）；
  * - 徽章点击 = updateSidebarPanel(id, { visible: true, collapsed: false })，
- *   不直接操作 Sidebar（协议：接口在 lib/sidebarPanels.ts，A 已冻结）；
- * - Rail 左下角的「设置」仍由 NavRail 自行渲染，本组件不包含任何设置入口。
+ *   不直接操作 SidebarMobile（协议：接口在 lib/sidebarPanels.ts，A 已冻结）；
+ * - Rail 左下角的「设置」仍由 NavRailMobile 自行渲染，本组件不包含任何设置入口。
  *
  * 图标 / 标题键与 A 的 components/sidebar/panelRegistry.tsx 保持一致（同一对象同一图标）。
  */
@@ -65,9 +65,9 @@ export const EXTRA_BADGE_CATALOG: Array<{ id: ToolTabKey; labelKey: string; icon
 ];
 
 interface ActivityBarBadgesProps {
-  /** 与 NavRail 的 railMode 联动：label 模式下徽章下显示文字。 */
+  /** 与 NavRailMobile 的 railMode 联动：label 模式下徽章下显示文字。 */
   showLabel: boolean;
-  /** 经典文字色偏好（同 NavRail）。 */
+  /** 经典文字色偏好（同 NavRailMobile）。 */
   classicText: boolean;
 }
 

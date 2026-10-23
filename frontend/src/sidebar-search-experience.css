@@ -1,7 +1,7 @@
 /*
- * 统一内容树上线后，Sidebar 旧的全文搜索输入框与树筛选框紧邻，
+ * 统一内容树上线后，SidebarMobile 旧的全文搜索输入框与树筛选框紧邻，
  * 视觉和语义重复。旧节点暂时由兼容桥标记，避免在本次改动中冒险拆除
- * Sidebar 内尚未完全退场的旧目录代码。
+ * SidebarMobile 内尚未完全退场的旧目录代码。
  */
 [data-retired-sidebar-search-row="true"] {
   display: none !important;

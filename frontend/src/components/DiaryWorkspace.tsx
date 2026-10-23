@@ -7,6 +7,6 @@ import DailyRecordsHub from "@/components/daily-records/DailyRecordsHub";
  * The existing diary timeline stays intact inside the "moments" tab, while the
  * hub adds a date-oriented journal workspace without duplicating diary data.
  */
-export default function DiaryCenter() {
+export default function DiaryWorkspace() {
   return <DailyRecordsHub />;
 }

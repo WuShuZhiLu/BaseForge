@@ -29,9 +29,9 @@ vi.mock("@/lib/api", () => ({ api: apiMocks }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string, opts?: unknown) => (typeof opts === "string" ? opts : (opts as { defaultValue?: string } | undefined)?.defaultValue ?? key) }) }));
 vi.mock("@/components/MarkdownPreview", () => ({ MarkdownPreview: () => null }));
 
-import PmCenter from "../PmCenter";
+import PmWorkspace from "../PmWorkspace";
 
-describe("PmCenter 渲染冒烟（复现空白页）", () => {
+describe("PmWorkspace 渲染冒烟（复现空白页）", () => {
   beforeEach(() => {
     for (const mock of Object.values(apiMocks)) {
       if (typeof mock === "function" && typeof (mock as { mockReset?: unknown }).mockReset === "function") continue;
@@ -45,7 +45,7 @@ describe("PmCenter 渲染冒烟（复现空白页）", () => {
     let renderError: unknown = null;
     try {
       await act(async () => {
-        root.render(<PmCenter />);
+        root.render(<PmWorkspace />);
       });
       await act(async () => {
         await new Promise((r) => setTimeout(r, 50));

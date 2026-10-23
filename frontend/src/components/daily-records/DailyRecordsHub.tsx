@@ -7,7 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import DiaryCenterImpl from "@/components/DiaryCenterImpl";
+import DiaryWorkspaceImpl from "@/components/DiaryWorkspaceImpl";
 import DiaryExperienceBridge from "@/components/diary/DiaryExperienceBridge";
 import SayCalendarView from "@/components/diary/SayCalendarView";
 import DailyJournalView from "@/components/daily-records/DailyJournalView";
@@ -174,7 +174,7 @@ export default function DailyRecordsHub() {
           className="flex min-h-0 min-w-0 flex-1 overflow-hidden"
           data-daily-records-moments=""
         >
-          <DiaryCenterImpl />
+          <DiaryWorkspaceImpl />
           <DiaryExperienceBridge rootRef={momentRootRef} />
         </div>
       )}

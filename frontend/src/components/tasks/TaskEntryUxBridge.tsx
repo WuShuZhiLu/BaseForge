@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 
 /**
- * The legacy TaskCenter renders search and quick-add as adjacent full-width rows. They are
+ * The legacy TaskWorkspace renders search and quick-add as adjacent full-width rows. They are
  * functionally different but visually almost identical, which makes accidental clicks likely.
- * Keep TaskCenter's data/state logic untouched and annotate only these two existing surfaces so
+ * Keep TaskWorkspace's data/state logic untouched and annotate only these two existing surfaces so
  * the hierarchy can be corrected without coupling search state to the quick-add component.
  */
 export const TASK_ENTRY_HIERARCHY_CSS = `

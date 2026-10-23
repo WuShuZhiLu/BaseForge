@@ -14,9 +14,9 @@ import { isToolPageElementActive, TOOL_PAGE_ACTIVE_ATTRIBUTE, useToolPageActive 
  *  - 契约 5：不自行切换全局视图 —— 无 actions.setViewMode(<工具视图>)。
  *
  * 已记录的例外（非遗漏）：
- *  - TaskCenterImpl 根元素保留 `taskFullscreen && "fixed inset-0 ..."`：
+ *  - TaskWorkspaceImpl 根元素保留 `taskFullscreen && "fixed inset-0 ..."`：
  *    这是用户主动点击的「全屏显示」既有功能（非破坏性铁律，不得删除），
- *    默认根类为 TASK_CENTER_ROOT_CLASS + min-h-0 flex-1，符合自适应。
+ *    默认根类为 TASK_WORKSPACE_ROOT_CLASS + min-h-0 flex-1，符合自适应。
  *  - daily-records/DailyJournalView 的 actions.setViewMode("notebook")
  *    为「跳转到笔记」链路，待迁移（见 .cmp/COLLAB-QUEUE.md）。
  *  - FileManager / ShareManagementPage 已完成 P3 迁移：
@@ -83,22 +83,22 @@ describe("B2 工具页页签契约（toolPageContract）", () => {
     });
   });
 
-  describe("components/TaskCenter.tsx（根入口）", () => {
-    const entry = source("../../components/TaskCenter.tsx");
+  describe("components/TaskWorkspace.tsx（根入口）", () => {
+    const entry = source("../../components/TaskWorkspace.tsx");
 
     it("契约3：导出 TOOL_PAGE_HEADER_MODE 且默认 own", () => {
       expect(entry).toContain('export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own"');
     });
 
     it("契约1：Impl 根类含 min-h-0 flex-1（全屏切换为既有功能保留）", () => {
-      const impl = source("../../components/TaskCenterImpl.tsx");
-      expect(impl).toContain('cn(TASK_CENTER_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")');
+      const impl = source("../../components/TaskWorkspaceImpl.tsx");
+      expect(impl).toContain('cn(TASK_WORKSPACE_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")');
       expect(impl).not.toMatch(/h-screen/);
     });
 
     it("契约5：不自行切换到工具视图", () => {
       expect(entry).not.toMatch(TOOL_VIEW_MODES);
-      expect(source("../../components/TaskCenterImpl.tsx")).not.toMatch(TOOL_VIEW_MODES);
+      expect(source("../../components/TaskWorkspaceImpl.tsx")).not.toMatch(TOOL_VIEW_MODES);
     });
   });
 
@@ -177,7 +177,7 @@ describe("隐藏态治理（keepAlive · .cmp/COLLAB-BOARD.md 第二节 B 批次
   it("工具页不得在模块顶层 setInterval（行首裸调用）", () => {
     const files = [
       ...TOOL_PAGES.map((page) => page.file),
-      "../../components/TaskCenterImpl.tsx",
+      "../../components/TaskWorkspaceImpl.tsx",
       "../../components/AIChatReliabilityShell.tsx",
     ];
     for (const file of files) {
@@ -195,13 +195,13 @@ describe("隐藏态治理（keepAlive · .cmp/COLLAB-BOARD.md 第二节 B 批次
     expect(src).toContain("[pageActive, refreshStatus]");
   });
 
-  it("FileManager / TaskCenterImpl 重新激活补一次刷新", () => {
+  it("FileManager / TaskWorkspaceImpl 重新激活补一次刷新", () => {
     const fm = source("../../components/FileManager.tsx");
     expect(fm).toContain("useToolPageActive(pageRootRef)");
     expect(fm).toContain("if (pageActive) loadList();");
     expect(fm).toContain("previousPageActiveRef.current = pageActive;");
 
-    const tc = source("../../components/TaskCenterImpl.tsx");
+    const tc = source("../../components/TaskWorkspaceImpl.tsx");
     expect(tc).toContain("useToolPageActive(pageRootRef)");
     expect(tc).toContain("previousPageActiveRef.current = pageActive;");
     expect(tc).toContain("重新激活时补一次刷新");

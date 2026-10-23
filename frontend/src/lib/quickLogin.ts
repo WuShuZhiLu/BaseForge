@@ -345,9 +345,9 @@ export async function attemptQuickLogin(): Promise<QuickLoginAttemptResult> {
 
   try {
     await bio.BiometricAuth.authenticate({
-      reason: "解锁 Base Notes",
+      reason: "解锁 BaseForge",
       cancelTitle: "改用密码登录",
-      androidTitle: "Base Notes 快速登录",
+      androidTitle: "BaseForge 快速登录",
       androidSubtitle: "请验证你的指纹 / 人脸 / 锁屏密码",
       androidConfirmationRequired: false,
       allowDeviceCredential: true,

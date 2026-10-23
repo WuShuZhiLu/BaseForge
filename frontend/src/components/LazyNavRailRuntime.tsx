@@ -1,6 +1,6 @@
 import React, { Suspense } from "react";
 
-const LazyNavRail = React.lazy(() => import("./NavRail"));
+const LazyNavRail = React.lazy(() => import("./NavRailMobile"));
 
 interface LazyNavRailRuntimeProps {
   variant?: "desktop" | "mobile";

@@ -3,7 +3,7 @@ import { getCurrentWorkspace } from "@/lib/api";
 /**
  * 侧栏面板布局 store（面板框架 S1 · **接口冻结 v1**，2026-10-16）
  *
- * 为什么单独一个文件：Sidebar（面板容器）与 NavRail（活动栏徽章）都要读同一份布局，
+ * 为什么单独一个文件：SidebarMobile（面板容器）与 NavRailMobile（活动栏徽章）都要读同一份布局，
  * 但两者分属两个并行开发 agent（见 .cmp/COLLAB-BOARD.md 第六节）。把状态集中在此，
  * 双方各自订阅，**互不修改对方的组件文件**，从根本上避免并行冲突。
  *
@@ -197,7 +197,7 @@ export function updateSidebarBadges(patch: Partial<SidebarLayoutState["badges"]>
   emit();
 }
 
-/** 切换工作空间后重载布局（Sidebar 挂载与切空间时调用）。 */
+/** 切换工作空间后重载布局（SidebarMobile 挂载与切空间时调用）。 */
 export function reloadSidebarLayoutForWorkspace(): void {
   currentWorkspaceId = safeCurrentWorkspace();
   layout = loadSidebarLayout(currentWorkspaceId);

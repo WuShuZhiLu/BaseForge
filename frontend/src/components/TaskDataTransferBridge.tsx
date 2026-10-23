@@ -13,7 +13,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { TASK_CENTER_ROOT_CLASS } from "@/lib/taskLayout";
+import { TASK_WORKSPACE_ROOT_CLASS } from "@/lib/taskLayout";
 import {
   buildTaskCsv,
   collectTaskBackup,
@@ -27,7 +27,7 @@ import {
 } from "@/lib/taskDataTransfer";
 import { cn } from "@/lib/utils";
 
-const TASK_ROOT_CLASSES = TASK_CENTER_ROOT_CLASS.split(/\s+/).filter(Boolean);
+const TASK_ROOT_CLASSES = TASK_WORKSPACE_ROOT_CLASS.split(/\s+/).filter(Boolean);
 
 export function findTaskCenterRoot(root: ParentNode = document): HTMLElement | null {
   const candidates = root.querySelectorAll<HTMLElement>("div");

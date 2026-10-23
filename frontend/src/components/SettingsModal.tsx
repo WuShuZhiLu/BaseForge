@@ -407,7 +407,7 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClo
 function AboutPanel() {
   const { t } = useTranslation();
   const feedbackEmail = "nowenlab@qq.com";
-  const feedbackMailto = `mailto:${feedbackEmail}?subject=${encodeURIComponent("[Base Notes 反馈]")}`;
+  const feedbackMailto = `mailto:${feedbackEmail}?subject=${encodeURIComponent("[BaseForge 反馈]")}`;
   const feedbackQqGroupNumber = "1093473044";
   const [showSponsor, setShowSponsor] = useState(false);
   const [sponsorMethod, setSponsorMethod] = useState<"wechat" | "alipay">("wechat");
@@ -1586,19 +1586,19 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   ];
 
   // 用 Portal 挂载到 body：
-  //   SettingsModal 调用点位于 Sidebar 组件内部（见 Sidebar.tsx 的 AnimatePresence）。
-  //   Sidebar 根容器使用 `.vibrancy-sidebar`，在 macOS 皮肤下会经由 ::before 应用
+  //   SettingsModal 调用点位于 SidebarMobile 组件内部（见 SidebarMobile.tsx 的 AnimatePresence）。
+  //   SidebarMobile 根容器使用 `.vibrancy-sidebar`，在 macOS 皮肤下会经由 ::before 应用
   //   backdrop-filter；CSS 规范规定任何非 none 的 backdrop-filter 都会让宿主成为
   //   内部 position: fixed 的 containing block。即使我们已经把 filter 挪到伪元素
-  //   减小了冲撞面，Sidebar 子树未来可能加入 transform / filter / contain 等属性，
-  //   都会再次困住本模态框。用 Portal 一次性脱离 Sidebar 子树，彻底杜绝此类布局事故。
+  //   减小了冲撞面，SidebarMobile 子树未来可能加入 transform / filter / contain 等属性，
+  //   都会再次困住本模态框。用 Portal 一次性脱离 SidebarMobile 子树，彻底杜绝此类布局事故。
   //
   // 移动端关闭误触防御（重要）：
   //   实测在 Capacitor / Android & iOS WebView 里，用户在弹窗内"长按 / 滚动 / 横向触摸"
   //   都会让弹窗瞬间消失。真因不是弹窗自身处理了点击，而是 App.tsx 的 useSwipeGesture
   //   在 document 上监听全局 touchstart/touchend：打开 SettingsModal 时 mobileSidebarOpen
   //   仍为 true，任何足够大的 deltaX 都会触发 setMobileSidebar(false)。SettingsModal 虽
-  //   然 portal 到 body，但生命周期挂在 Sidebar 子树——Sidebar 卸载就把弹窗一起带走。
+  //   然 portal 到 body，但生命周期挂在 SidebarMobile 子树——SidebarMobile 卸载就把弹窗一起带走。
   //   React 合成事件的 stopPropagation 拦不住 document 原生监听，必须用 data 属性让全局
   //   hook 主动跳过本子树（见 App.tsx 同名实现）。
   //

@@ -138,7 +138,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       markSearchPending(true)
 
       // Clearing search is an explicit navigation action and should feel immediate. Normal typing is
-      // buffered so the giant Sidebar/AppContext tree is not invalidated for every single keypress.
+      // buffered so the giant SidebarMobile/AppContext tree is not invalidated for every single keypress.
       if (!nextValue) {
         flushSidebarSearch(nextValue)
         return
@@ -202,7 +202,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       setSidebarValue(nextValue)
 
       // SearchCenter mirrors the visible sidebar field with an untrusted native input event. It may
-      // update presentation, but it must never execute Sidebar's legacy navigation branch.
+      // update presentation, but it must never execute SidebarMobile's legacy navigation branch.
       if (!shouldForwardSidebarSearchChange(nativeEvent, composingRef.current)) return
 
       if (suppressTrustedDuplicateRef.current === nextValue) {

@@ -2473,7 +2473,7 @@ body.density-compact {
  * 閲嶈瀹炵幇缁嗚妭锛堣俯鍧戠粡楠岋級锛?
  *   CSS 瑙勮寖瑙勫畾锛氶潪 none 鐨?`backdrop-filter` 浼氳鍏冪礌鎴愪负 fixed/absolute 鍚庝唬
  *   鐨?containing block銆傝嫢瀹夸富鍏冪礌鍐呴儴鏈?`position: fixed` 鐨?Modal / Portal
- *   缁勪欢锛堜緥濡?SettingsModal 娓叉煋鍦?Sidebar 瀛愭爲閲岋級锛屽涓讳竴鏃﹀紑鍚?backdrop-filter锛?
+ *   缁勪欢锛堜緥濡?SettingsModal 娓叉煋鍦?SidebarMobile 瀛愭爲閲岋級锛屽涓讳竴鏃﹀紑鍚?backdrop-filter锛?
  *   fixed 灏变細琚洶鍦ㄥ涓荤洅瀛愰噷鑰屼笉鏄摵婊¤鍙ｂ€斺€斿鑷村脊绐楄鎸ゆ垚涓€灏忔潯銆?
  *
  *   鍥犳**涓嶈兘鐩存帴**鍦ㄥ涓讳笂搴旂敤 `backdrop-filter`銆傝繖閲屾敼鐢?`::before` 浼厓绱?
@@ -2496,7 +2496,7 @@ body.density-compact {
 
 /* macOS 鐨偆涓嬶細瀹夸富 bg 閫忔槑锛岀敱 ::before 浼厓绱犺礋璐ｆ瘺鐜荤拑灞傘€?
  * 涓嶄娇鐢?isolation: isolate锛岄伩鍏嶅垱寤烘柊灞傚彔涓婁笅鏂囷紙鍚﹀垯瀹夸富鍐呴儴鐨勯珮 z-index
- * 瀛愬厓绱狅紝渚嬪 Sidebar 瀛愭爲閲屽彲鑳芥覆鏌撶殑 SettingsModal锛屽皢琚洶鍦ㄥ涓?stacking
+ * 瀛愬厓绱狅紝渚嬪 SidebarMobile 瀛愭爲閲屽彲鑳芥覆鏌撶殑 SettingsModal锛屽皢琚洶鍦ㄥ涓?stacking
  * context 鍐咃紝鍑虹幇琚?濉炶繘渚ф爮"鐨勯敊涔憋級銆傞潬 ::before 鐨?z-index: -1 璁╁畠绌块€?
  * 瀹夸富鑳屾櫙灞傦紱瀹夸富鏈韩鑳屾櫙閫忔槑锛岀湡瀹炲唴瀹硅嚜鐒跺彔鍦ㄤ笂鏂广€?*/
 :root[data-skin="macos"] .vibrancy-sidebar,
@@ -2631,7 +2631,7 @@ html[data-electron="darwin"][data-fullscreen="1"] .nav-rail {
  *   NSFullSizeContentViewWindowMask鈥斺€旂獥鍙ｆ病鏈夌嫭绔嬫爣棰樻爮锛屽唴瀹逛粠 y=0 寮€濮嬬粯鍒躲€?
  *   浣?HIG 瑕佹眰"鍘熷簲鐢辨爣棰樻爮鎵挎媴鐨勬嫋鎷借兘鍔?蹇呴』鍦ㄥ唴瀹瑰尯琛ュ洖锛屽惁鍒欑敤鎴锋棤澶勬姄鍙?
  *   绐楀彛銆傜粰涓诲唴瀹瑰尯椤堕儴 28px 璁句负 drag region 鍗冲彲锛涗晶鏍忛《閮ㄦ湰韬凡鏄?drag region锛?
- *   杩欓噷琛ョ殑鏄?Sidebar 涔嬪鐨勫ぇ鍖哄煙锛堢紪杈戝櫒/绗旇鍒楄〃涓婃柟锛夈€?
+ *   杩欓噷琛ョ殑鏄?SidebarMobile 涔嬪鐨勫ぇ鍖哄煙锛堢紪杈戝櫒/绗旇鍒楄〃涓婃柟锛夈€?
  *
  *   閫夋嫨鍣ㄧ敤 `main`锛圓pp.tsx 鏍瑰竷灞€涓殑 <main> 鍏冪礌锛夈€傝嫢鏈潵缁撴瀯鏀瑰彉锛屽彲鏀规垚
  *   data-app-root 涔嬬被鐨勭ǔ瀹氶€夋嫨鍣紱杩欓噷鍏堢敤璇箟鏍囩浠ュ厤姹℃煋涓氬姟 DOM銆?
@@ -2890,7 +2890,7 @@ html[data-electron="darwin"][data-fullscreen="1"] main::before {
 }
 
 /* ============================================================
-   SidebarNext 活动栏视图（收藏/回收站/文件管理/插件）——照抄原型 sb-view 系
+   SidebarDesktop 活动栏视图（收藏/回收站/文件管理/插件）——照抄原型 sb-view 系
    ============================================================ */
 .sbx-view { flex-shrink: 0; padding-bottom: 4px; }
 .sbx-view-head {

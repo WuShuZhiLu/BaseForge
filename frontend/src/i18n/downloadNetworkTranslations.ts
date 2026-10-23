@@ -66,7 +66,7 @@ export const enDownloadNetworkTranslations = {
   },
   download: {
     title: "Download clients",
-    subtitle: "Use Base Notes on desktop, mobile, and NAS. If GitHub downloads are slow, try an accelerated source.",
+    subtitle: "Use BaseForge on desktop, mobile, and NAS. If GitHub downloads are slow, try an accelerated source.",
     latestVersion: "Latest version",
     viewOnGithub: "View the full release on GitHub",
     refresh: "Refresh",

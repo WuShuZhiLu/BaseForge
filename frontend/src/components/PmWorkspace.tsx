@@ -429,7 +429,7 @@ function ItemDrawer(props: {
 }
 
 /** 主区中心 */
-export default function PmCenter() {
+export default function PmWorkspace() {
   const [projects, setProjects] = useState<PmProject[]>([]);
   const ui = usePmUi();
   const activeId = ui.activeProjectId;

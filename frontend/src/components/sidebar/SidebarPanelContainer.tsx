@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
  */
 
 export interface SidebarPanelContainerProps {
-  /** 文档树内容由 Sidebar 注入（依赖 variant 与树视图模式） */
+  /** 文档树内容由 SidebarMobile 注入（依赖 variant 与树视图模式） */
   treeContent: React.ReactNode;
   /** 面板内容映射（未提供的内容会显示占位提示） */
   contents?: Partial<Record<SidebarPanelId, React.ReactNode>>;
@@ -66,7 +66,7 @@ export default function SidebarPanelContainer({ treeContent, contents }: Sidebar
       // 1) 内容层 v1（新实现）优先
       const PanelContent = PANEL_CONTENT[id];
       if (PanelContent) return <PanelContent />;
-      // 2) Sidebar 注入（如标签：需要回调接线）
+      // 2) SidebarMobile 注入（如标签：需要回调接线）
       if (contents && contents[id]) return contents[id];
       // 3) 尚未迁移的面板：占位提示（B 线交付的后继内容组件登记进 PANEL_CONTENT 即可替换）
       return (

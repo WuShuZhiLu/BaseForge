@@ -90,18 +90,18 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
   });
 
   it("wires the mobile rail hide/restore loop", () => {
-    expect(read("../../components/NavRail.tsx")).toContain('data-mobile-rail-hide=""');
-    expect(read("../../App.tsx")).toContain("!mobileRailHidden && <NavRail variant=\"mobile\"");
-    const sidebar = read("../../components/Sidebar.tsx");
+    expect(read("../../components/NavRailMobile.tsx")).toContain('data-mobile-rail-hide=""');
+    expect(read("../../App.tsx")).toContain("!mobileRailHidden && <NavRailMobile variant=\"mobile\"");
+    const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).toContain('data-mobile-rail-show=""');
     expect(sidebar).toContain("useMobileRailHidden");
   });
 
   it("wires the mobile sidebar controls collapse", () => {
-    const sidebar = read("../../components/Sidebar.tsx");
+    const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).toContain("setMobileControlsCollapsed(!mobileControlsCollapsed)");
     expect(sidebar).toContain('{variant === "mobile" && !mobileControlsCollapsed && (');
-    expect(sidebar).not.toContain('{"Base Notes"');
+    expect(sidebar).not.toContain('{"BaseForge"');
     expect(read("../../components/KnowledgeTreePanel.tsx")).toContain('controlsCollapsed && "hidden"');
   });
 
@@ -109,8 +109,8 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
     expect(read("../../components/settings/SidebarDisplaySettings.tsx")).toContain("setSidebarTextStyle");
     expect(read("../../components/SettingsModal.tsx")).toContain("<SidebarDisplaySettings />");
     for (const file of [
-      "../../components/Sidebar.tsx",
-      "../../components/NavRail.tsx",
+      "../../components/SidebarMobile.tsx",
+      "../../components/NavRailMobile.tsx",
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
       "../../components/NoteList.tsx",
@@ -148,21 +148,21 @@ describe("sync domain wiring contract (runtime audit 2026-10-13)", () => {
 
 describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
   it("侧栏主体是知识树面板（桌面/移动各自变体）", () => {
-    const sidebar = read("../../components/Sidebar.tsx");
+    const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).toContain("<TreePanelContent");
     expect(sidebar).toContain("mode={desktopKnowledgeTreeMode");
   });
 
   it("脑图中心不再出现在主导航（导图是树内文档）", () => {
-    const rail = read("../../components/NavRail.tsx");
+    const rail = read("../../components/NavRailMobile.tsx");
     expect(rail).not.toContain('mode: "mindmaps"');
   });
 
   it("桌面端 Rail 收敛工具组；工具入口在活动栏徽章区（原型口径：侧栏底部不再有工具条）", () => {
-    const rail = read("../../components/NavRail.tsx");
+    const rail = read("../../components/NavRailMobile.tsx");
     expect(rail).toContain('variant === "desktop" && item.group === "tools"');
     // 侧栏底部工具条已按原型移除（工具入口 = 固定 5 徽章 + 「更多」组里的工具徽章）
-    const sidebar = read("../../components/Sidebar.tsx");
+    const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).not.toContain('data-sidebar-toolbar');
     const badges = read("../../components/sidebar/ActivityBarBadges.tsx");
     for (const mode of ["tasks", "diary", "ai-chat", "shares"]) {
@@ -176,7 +176,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
    * 否则桌面端待办/小记/AI 会失去入口 —— 上面那条断言因此仍然有效。
    */
   it("方案 B·B1：侧栏面板 + 账号菜单集中账号级入口 + 活动栏徽章区", () => {
-    const rail = read("../../components/NavRail.tsx");
+    const rail = read("../../components/NavRailMobile.tsx");
     // S2：桌面活动栏徽章区由 B 线实现（ActivityBarBadges），Rail 不再内置单选面板清单
     expect(rail).toContain("<ActivityBarBadges");
     // 左下角设置入口必须保留（用户 2026-10-16 明确）
@@ -191,9 +191,9 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(badges).toContain('data-activity-badge-more');
     expect(badges).toContain('data-activity-badge-add');
 
-    const sidebar = read("../../components/Sidebar.tsx");
-    // 面板框架 S1 接管后：Sidebar 通过容器渲染面板；B1 的「单选 sidebarPanel」退化为兼容桥
-    // （切到某面板 → 在容器中显示并展开它），标签面板仍由 Sidebar 注入交互回调。
+    const sidebar = read("../../components/SidebarMobile.tsx");
+    // 面板框架 S1 接管后：SidebarMobile 通过容器渲染面板；B1 的「单选 sidebarPanel」退化为兼容桥
+    // （切到某面板 → 在容器中显示并展开它），标签面板仍由 SidebarMobile 注入交互回调。
     expect(sidebar).toContain("<SidebarPanelContainer");
     expect(sidebar).toContain("<TagsPanelContent");
     expect(sidebar).toContain("updateSidebarPanel(id as never, { visible: true, collapsed: false })");
@@ -285,7 +285,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     // 头部不得出现 ✕（关闭在 ⋯ 菜单里）
     expect(shell).not.toContain("关闭面板\"\n            className");
 
-    const sidebar = read("../../components/Sidebar.tsx");
+    const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).toContain("<SidebarPanelContainer");
 
     // 主区不得再渲染横向页签行（顶栏与格式化工具栏必须直接相邻）
@@ -310,8 +310,8 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(host).toContain('data-tool-page-active');
     expect(host).toContain("TOOL_PAGE_NAVIGATE_EVENT");
     for (const component of [
-      "<TaskCenter />",
-      "<DiaryCenter />",
+      "<TaskWorkspace />",
+      "<DiaryWorkspace />",
       "<AIChatPanel",
       "<ShareManagementPage />",
       "<FileManager />",

@@ -74,7 +74,7 @@ const NAV_CONFIG: NavConfigItem[] = [
   { icon: <Link2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.shareManagement", mode: "shares", group: "tools" },
 ];
 
-export default function NavRail({ variant = "desktop", notificationCount = 0 }: { variant?: "desktop" | "mobile"; notificationCount?: number } = {}) {
+export default function NavRailMobile({ variant = "desktop", notificationCount = 0 }: { variant?: "desktop" | "mobile"; notificationCount?: number } = {}) {
   const { t } = useTranslation();
   const { state } = useApp();
   const actions = useAppActions();

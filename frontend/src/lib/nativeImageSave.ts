@@ -49,7 +49,7 @@ export async function saveImageToGalleryDetailed(options: {
     base64Data: await blobToBase64(options.blob),
     fileName: options.fileName,
     mimeType: options.mimeType,
-    relativePath: "Pictures/Base Notes",
+    relativePath: "Pictures/BaseForge",
   });
   if (!result?.success || !result.uri) throw new Error("Android 相册保存失败：系统没有返回有效文件地址");
   return result;
@@ -96,7 +96,7 @@ export async function shareNativeFiles(files: Array<{
       mimeType: file.mimeType,
     });
   }
-  const result = await MediaStoreSave.shareFiles({ files: payload, title: "Base Notes 导出" });
+  const result = await MediaStoreSave.shareFiles({ files: payload, title: "BaseForge 导出" });
   if (!result?.success) throw new Error("无法打开 Android 系统分享面板");
 }
 

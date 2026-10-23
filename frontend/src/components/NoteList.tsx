@@ -2048,7 +2048,7 @@ export default function NoteList() {
   };
 
   // 一键清空回收站：只查询数量 → confirm → 单次批量删除 → 刷新列表。
-  // 移动端 Sidebar 未挂载，自定义事件无人监听，因此 NoteList 直接实现完整逻辑。
+  // 移动端 SidebarMobile 未挂载，自定义事件无人监听，因此 NoteList 直接实现完整逻辑。
   const handleEmptyTrash = async () => {
     haptic.medium();
     try {
@@ -3586,7 +3586,7 @@ export default function NoteList() {
           )}
           {state.viewMode === "trash" ? (
             // 回收站视图下用"一键清空"按钮替换"新建"——后者在回收站语义不通且会被禁止；
-            // 移动端 Sidebar 未挂载时自定义事件无人监听，改为直接调用 confirm + api.emptyTrash。
+            // 移动端 SidebarMobile 未挂载时自定义事件无人监听，改为直接调用 confirm + api.emptyTrash。
             <Button
               variant="ghost"
               size="icon"
@@ -3688,7 +3688,7 @@ export default function NoteList() {
           )}
           {state.viewMode === "trash" ? (
             // 回收站视图：将"+"换成"一键清空回收站"——破坏性操作做红色降级 + 标题提示，
-            // 直接调用 confirm + api.emptyTrash，不依赖 Sidebar 自定义事件。
+            // 直接调用 confirm + api.emptyTrash，不依赖 SidebarMobile 自定义事件。
             <Button
               variant="ghost"
               size="icon"

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatLocalDateKey, getDefaultTaskPatchForFilter } from "../TaskCenter";
+import { formatLocalDateKey, getDefaultTaskPatchForFilter } from "../TaskWorkspace";
 
-describe("TaskCenter default task patch", () => {
+describe("TaskWorkspace default task patch", () => {
   it("uses local today as dueDate for the today filter", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 6, 5, 23, 30, 0));

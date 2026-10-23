@@ -6,8 +6,8 @@ function source(relativeUrl: string) {
 }
 
 describe("knowledge tree sidebar contract", () => {
-  it("uses the unified tree as the only Sidebar hierarchy", () => {
-    const sidebar = source("../../components/Sidebar.tsx");
+  it("uses the unified tree as the only SidebarMobile hierarchy", () => {
+    const sidebar = source("../../components/SidebarMobile.tsx");
     expect(sidebar).toContain("import TreePanelContent");
     expect(sidebar).toContain("<TreePanelContent");
     expect(sidebar).not.toContain("sidebarTreeMode");
@@ -42,7 +42,7 @@ describe("knowledge tree sidebar contract", () => {
   });
 
   it("loads and focuses only the currently visible desktop or mobile tree", () => {
-    const sidebar = source("../../components/Sidebar.tsx");
+    const sidebar = source("../../components/SidebarMobile.tsx");
     const panel = source("../../components/KnowledgeTreePanel.tsx");
     expect(sidebar).toMatch(/(?:sidebarRootRef|rootRef)\.current/);
     expect(sidebar).toContain("root.getClientRects().length === 0");

@@ -60,7 +60,7 @@ export const SIDEBAR_PANELS: Record<SidebarPanelId, SidebarPanelDefinition> = {
     closable: false,
     movable: false,
     fixed: true,
-    render: null as unknown as () => React.ReactNode, // 由 Sidebar 注入（需要 variant / 视图模式）
+    render: null as unknown as () => React.ReactNode, // 由 SidebarMobile 注入（需要 variant / 视图模式）
   },
   openEditors: {
     id: "openEditors",

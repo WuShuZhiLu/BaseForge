@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { shouldConfirmHabitDelete } from "../tasks/taskCenterHardening";
 
-describe("TaskCenter hardening", () => {
+describe("TaskWorkspace hardening", () => {
   it("recognizes the destructive habit delete control", () => {
     const row = document.createElement("div");
     row.dataset.nowenHabitRow = "true";

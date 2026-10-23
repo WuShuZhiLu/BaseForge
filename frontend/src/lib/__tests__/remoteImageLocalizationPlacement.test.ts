@@ -7,7 +7,7 @@ function source(relativeUrl: string) {
 
 describe("remote image localization placement", () => {
   it("lives in Settings data management instead of the task-center corner", () => {
-    const taskCenter = source("../../components/TaskCenter.tsx");
+    const taskCenter = source("../../components/TaskWorkspace.tsx");
     const dataManager = source("../../components/DataManager.tsx");
     const panel = source("../../components/RemoteImageLocalizationPanel.tsx");
 

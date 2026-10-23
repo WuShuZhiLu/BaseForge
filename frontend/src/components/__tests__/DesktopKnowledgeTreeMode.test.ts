@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const sidebarSource = readFileSync(path.resolve(__dirname, "../Sidebar.tsx"), "utf8");
+const sidebarSource = readFileSync(path.resolve(__dirname, "../SidebarMobile.tsx"), "utf8");
 const quickPanelSource = readFileSync(path.resolve(__dirname, "../MobileKnowledgeTreePanel.tsx"), "utf8");
 const treePanelSource = readFileSync(path.resolve(__dirname, "../KnowledgeTreePanel.tsx"), "utf8");
 const expansionSource = readFileSync(path.resolve(__dirname, "../../lib/knowledgeTreeExpansion.ts"), "utf8");

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const mobileSource = readFileSync(path.resolve(__dirname, "../MobileKnowledgeTreePanel.tsx"), "utf8");
-const sidebarSource = readFileSync(path.resolve(__dirname, "../Sidebar.tsx"), "utf8");
+const sidebarSource = readFileSync(path.resolve(__dirname, "../SidebarMobile.tsx"), "utf8");
 const helperSource = readFileSync(path.resolve(__dirname, "../../lib/mobileKnowledgeTree.ts"), "utf8");
 
 describe("MobileKnowledgeTreePanel product contract", () => {

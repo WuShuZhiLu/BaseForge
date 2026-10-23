@@ -29,7 +29,7 @@ describe("knowledge tree scrollbar runtime contract", () => {
 
   it("lets the desktop sidebar request reconciliation without observing the whole document", () => {
     const bridge = source("../knowledgeTreeScrollbarBridge.ts");
-    const sidebar = source("../../components/Sidebar.tsx");
+    const sidebar = source("../../components/SidebarMobile.tsx");
 
     expect(bridge).toContain("export function refreshKnowledgeTreeScrollbars");
     expect(bridge).not.toContain("rootObserver.observe(document.body");
@@ -39,7 +39,7 @@ describe("knowledge tree scrollbar runtime contract", () => {
   });
 
   it("constrains the tree panel to the remaining sidebar height", () => {
-    const sidebar = source("../../components/Sidebar.tsx");
+    const sidebar = source("../../components/SidebarMobile.tsx");
 
     expect(sidebar).toContain(
       '<div className="flex min-h-0 flex-1 overflow-hidden">',
@@ -64,7 +64,7 @@ describe("knowledge tree scrollbar runtime contract", () => {
 
   it("uses the quiet pill visual treatment on web and desktop", () => {
     const bridge = source("../knowledgeTreeScrollbarBridge.ts");
-    const sidebar = source("../../components/Sidebar.tsx");
+    const sidebar = source("../../components/SidebarMobile.tsx");
 
     expect(bridge).toContain("left: 2.5px");
     expect(bridge).toContain("right: 2.5px");

@@ -1,7 +1,7 @@
 
 # `office/` — 自研 Office 文档（Word/Excel/PPT）模块
 
-> 长期自研路线，目标：在 Base Notes 内**原生**预览与编辑 OOXML 文档（.docx/.xlsx/.pptx），不依赖服务端转换，不依赖大体积第三方库。
+> 长期自研路线，目标：在 BaseForge 内**原生**预览与编辑 OOXML 文档（.docx/.xlsx/.pptx），不依赖服务端转换，不依赖大体积第三方库。
 
 ## 设计原则
 

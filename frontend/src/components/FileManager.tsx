@@ -5,7 +5,7 @@
  *   跨笔记的"相册 + 文件柜"。本页面**不新增存储**——直接消费后端
  *   /api/files 聚合视图，复用已有的 attachments 表 + ATTACHMENTS_DIR。
  *
- * 布局（与 DiaryCenter / TaskCenter 同构，沿用 flex 高度 + ScrollArea）：
+ * 布局（与 DiaryWorkspace / TaskWorkspace 同构，沿用 flex 高度 + ScrollArea）：
  *   ┌── 顶栏：标题 / 统计徽标 / 上传按钮 / 视图切换 ──────────┐
  *   ├── 工具条：分类 Tabs / 搜索 / 排序 ─────────────────────┤
  *   ├── 主区：
@@ -21,11 +21,11 @@
  *
  * 反向跳转：
  *   点 "跳转到笔记" → api.getNote(id) → setActiveNote + setViewMode("all")；
- *   复用 AppContext，与 Sidebar / NoteList 的跳转路径一致。
+ *   复用 AppContext，与 SidebarMobile / NoteList 的跳转路径一致。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import RemoteFilesCenter from "@/components/RemoteFilesCenter";
+import RemoteFilesPanel from "@/components/RemoteFilesPanel";
 import type { RemoteSourcePublic } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -1416,7 +1416,7 @@ export default function FileManager() {
       {/* 远程文件视图（remote-files 内置插件）：与本地附件并列的补充视图，经顶栏 Tab 切换 */}
       {sourceTab === "remote" ? (
         <div className="min-h-0 flex-1 min-w-0">
-          <RemoteFilesCenter />
+          <RemoteFilesPanel />
         </div>
       ) : (
         <>

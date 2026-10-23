@@ -193,7 +193,7 @@ function createRefreshButton(): HTMLButtonElement {
 }
 
 function mountDesktopRefreshButton(): void {
-  // Sidebar's notebook sort action is the stable desktop anchor. Keep refresh
+  // SidebarMobile's notebook sort action is the stable desktop anchor. Keep refresh
   // with the notebook controls instead of the global panel-collapse control.
   document.querySelectorAll<HTMLButtonElement>("button[data-nowen-notebook-sort]").forEach((sortButton) => {
     const toolbar = sortButton.parentElement;

@@ -30,7 +30,7 @@ function errorDetail(error: unknown): string {
 }
 
 function shouldShowUpdateToast(patch: TaskPatch): boolean {
-  // TaskCenter already has dedicated messages for description and Gantt date-range failures.
+  // TaskWorkspace already has dedicated messages for description and Gantt date-range failures.
   if (hasOwn(patch, "description")) return false;
   const keys = Object.keys(patch);
   if (keys.length > 0 && keys.every((key) => key === "startDate" || key === "dueDate")) return false;

@@ -87,7 +87,7 @@ export const KNOWLEDGE_TREE_SCROLLBAR_CSS = `
  *
  * 桌面端默认保留递归目录树，并可按本地偏好切换为快捷浏览；移动端默认使用快捷浏览。
  */
-export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | "mobile" } = {}) {
+export default function SidebarMobile({ variant = "mobile" }: { variant?: "desktop" | "mobile" } = {}) {
   const [mobileControlsCollapsed, setMobileControlsCollapsed] = useMobileSidebarControlsCollapsed();
   const [mobileRailHidden, setMobileRailHidden] = useMobileRailHidden();
   const [sidebarTextStyle] = useSidebarTextStyle();
@@ -142,7 +142,7 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
       actions.setNotebooks(notebooks);
       actions.setTags(tags);
     } catch (error) {
-      console.error("[Sidebar] failed to refresh unified sidebar data:", error);
+      console.error("[SidebarMobile] failed to refresh unified sidebar data:", error);
     }
   }, [actions]);
 
@@ -230,7 +230,7 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
         if (state.viewMode === "tag") actions.setViewMode("all");
       }
     } catch (error) {
-      console.error("[Sidebar] failed to delete tag:", error);
+      console.error("[SidebarMobile] failed to delete tag:", error);
     }
   };
 
@@ -245,7 +245,7 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
         <style data-knowledge-tree-scrollbar="">{KNOWLEDGE_TREE_SCROLLBAR_CSS}</style>
       )}
 
-      {/* 桌面端不再渲染「Base Notes」标题行：
+      {/* 桌面端不再渲染「BaseForge」标题行：
           用户 2026-10-16 要求按原型对齐（顶栏那一坨去掉）。
           功能保全：工作区切换仍在 Rail 头像菜单；railMode 切换按钮移到「面板 ⋯」行右侧（见 SidebarPanelContainer）。
           移动端仍需要这行（含移动端专属控件），保持原样。 */}
@@ -414,7 +414,7 @@ export default function Sidebar({ variant = "mobile" }: { variant?: "desktop" | 
               await api.updateTag(tagColorPopover.tagId, { color });
               actions.setTags(await api.getTags());
             } catch (error) {
-              console.error("[Sidebar] failed to update tag color:", error);
+              console.error("[SidebarMobile] failed to update tag color:", error);
             }
           }}
           onClose={() => setTagColorPopover(null)}

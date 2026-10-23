@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sidebarSource = readFileSync(
-  path.resolve(process.cwd(), "src/components/Sidebar.tsx"),
+  path.resolve(process.cwd(), "src/components/SidebarMobile.tsx"),
   "utf8",
 );
 

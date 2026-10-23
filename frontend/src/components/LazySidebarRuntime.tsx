@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import LazyWorkspaceFallback from "./LazyWorkspaceFallback";
 
-const LazySidebar = React.lazy(() => import("./Sidebar"));
+const LazySidebar = React.lazy(() => import("./SidebarMobile"));
 
 interface LazySidebarRuntimeProps {
   variant?: "desktop" | "mobile";

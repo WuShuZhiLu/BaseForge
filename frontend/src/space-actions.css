@@ -1,5 +1,5 @@
 /*
- * 空间入口已经迁移到左侧 NavRail（AI 问答下方）。
+ * 空间入口已经迁移到左侧 NavRailMobile（AI 问答下方）。
  * NoteTransferCenter 暂时仍保留旧触发按钮作为兼容命令入口；在转移中心完成事件式
  * 打开 API 之前，强制隐藏该按钮，避免桌面端和移动端再次出现重复悬浮入口。
  */
@@ -8,7 +8,7 @@ button[aria-label="跨空间转移笔记"] {
 }
 
 /*
- * PublicSpaceLauncher 通过 portal 挂载到 NavRail。开发模式的 StrictMode/HMR 或旧
+ * PublicSpaceLauncher 通过 portal 挂载到 NavRailMobile。开发模式的 StrictMode/HMR 或旧
  * DOM 残留可能让同一个 mount 短暂存在两个入口：一个持有展开态，另一个仍是默认态。
  * 同一个 mount 始终只展示一个按钮；有展开态时优先展示展开态，否则展示第一个。
  */

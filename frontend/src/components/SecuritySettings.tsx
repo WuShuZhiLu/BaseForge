@@ -1041,7 +1041,7 @@ function SessionsSection() {
         : /Mac OS/.test(ua) ? "macOS"
         : /Linux/.test(ua) ? "Linux"
         : "";
-      return os ? `Base Notes · ${os}` : "Base Notes";
+      return os ? `BaseForge · ${os}` : "BaseForge";
     }
     // 粗略提取浏览器+OS，足够识别场景
     const os = /Windows/.test(ua) ? "Windows"

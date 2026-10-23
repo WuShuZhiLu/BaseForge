@@ -352,7 +352,7 @@ export function clearMobileStartupCache(): void {
  * Android cold-start request coalescer.
  *
  * Web/Electron are deliberately untouched. On Android, the duplicate collection reads
- * issued by App sync, NoteList and Sidebar share one compact server snapshot. Unsupported
+ * issued by App sync, NoteList and SidebarMobile share one compact server snapshot. Unsupported
  * filters and any bootstrap failure transparently fall through to the original API call.
  */
 export function installMobileStartupBridge(): (() => void) | null {

@@ -12,7 +12,7 @@ describe("TaskEntryUxBridge", () => {
     document.body.innerHTML = "";
   });
 
-  it("separates search and create surfaces without changing TaskCenter state", () => {
+  it("separates search and create surfaces without changing TaskWorkspace state", () => {
     document.body.innerHTML = `
       <main>
         <div id="search" class="border-b">

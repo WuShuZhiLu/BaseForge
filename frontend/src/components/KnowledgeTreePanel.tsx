@@ -321,7 +321,7 @@ export function KnowledgeTreePanel({
   const [nodes, setNodes] = useState<KnowledgeTreeNode[]>([]);
   // 当前打开的导图（用于树里的激活态判定，见 isActiveKnowledgeTreeDocument）。
   const activeMindMapId = useSyncExternalStore(subscribeMindMapAppPath, getCurrentMindMapAppId, () => null);
-  // 移动端侧栏控件折叠（与 Sidebar 的折叠按钮联动）。
+  // 移动端侧栏控件折叠（与 SidebarMobile 的折叠按钮联动）。
   const mobileControlsCollapsed = useMobileSidebarControlsCollapsed()[0];
   const controlsCollapsed = variant === "mobile" && mobileControlsCollapsed;
   const [sidebarTextStyle] = useSidebarTextStyle();

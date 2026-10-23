@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import TaskCenterImpl from "./TaskCenterImpl";
+import TaskWorkspaceImpl from "./TaskWorkspaceImpl";
 import { TaskMetadataWorkspace } from "./tasks/TaskMetadataWorkspace";
 import TaskEntryUxBridge from "./tasks/TaskEntryUxBridge";
 import TaskDetailRichExperienceBridge from "./tasks/TaskDetailRichExperienceBridge";
@@ -9,9 +9,9 @@ import type { ToolPageHeaderMode } from "@/lib/toolPage";
 /** 页签契约：页面自带标题行（任务中心头部），宿主顶栏无需重复渲染。 */
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
-export * from "./TaskCenterImpl";
+export * from "./TaskWorkspaceImpl";
 
-export default function TaskCenter({ hideSidebar }: { hideSidebar?: boolean } = {}) {
+export default function TaskWorkspace({ hideSidebar }: { hideSidebar?: boolean } = {}) {
   useEffect(() => {
     const handleDeleteCapture = (event: MouseEvent) => {
       if (!shouldConfirmHabitDelete(event.target)) return;
@@ -34,7 +34,7 @@ export default function TaskCenter({ hideSidebar }: { hideSidebar?: boolean } = 
     <TaskMetadataWorkspace>
       <TaskEntryUxBridge />
       <TaskDetailRichExperienceBridge />
-      <TaskCenterImpl hideSidebar={hideSidebar} />
+      <TaskWorkspaceImpl hideSidebar={hideSidebar} />
     </TaskMetadataWorkspace>
   );
 }

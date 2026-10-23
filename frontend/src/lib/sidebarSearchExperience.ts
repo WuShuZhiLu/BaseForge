@@ -29,8 +29,8 @@ function findInputs(root: ParentNode, selector: string): HTMLInputElement[] {
  * - 全文搜索由内容树搜索框的范围切换、Cmd/Ctrl+K 和桌面端原生菜单共同承载；
  * - 内容树输入框默认负责当前树节点过滤，并通过范围控件显式区分全文搜索。
  *
- * 这里暂时保留旧输入节点供旧版 Sidebar 代码兼容，但从可见 UI 和键盘导航中退休。
- * Sidebar 后续拆除旧目录代码时，可以连同该兼容层一起删除。
+ * 这里暂时保留旧输入节点供旧版 SidebarMobile 代码兼容，但从可见 UI 和键盘导航中退休。
+ * SidebarMobile 后续拆除旧目录代码时，可以连同该兼容层一起删除。
  */
 export function applySidebarSearchExperience(root: ParentNode = document): boolean {
   let changed = false;

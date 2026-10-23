@@ -1,12 +1,12 @@
 import React, { Suspense } from "react";
 import LazyWorkspaceFallback from "./LazyWorkspaceFallback";
 
-const LazyTaskCenter = React.lazy(() => import("./TaskCenter"));
+const LazyTaskWorkspace = React.lazy(() => import("./TaskWorkspace"));
 
-export default function LazyTaskCenterRuntime(props: { hideSidebar?: boolean } = {}) {
+export default function LazyTaskWorkspaceRuntime(props: { hideSidebar?: boolean } = {}) {
   return (
     <Suspense fallback={<LazyWorkspaceFallback label="正在加载任务中心…" />}>
-      <LazyTaskCenter {...props} />
+      <LazyTaskWorkspace {...props} />
     </Suspense>
   );
 }

@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { isTaskBlockedByDependency } from "./tasks/taskDependencyUtils";
 import {
   TASK_CENTER_MAIN_CLASS,
-  TASK_CENTER_ROOT_CLASS,
+  TASK_WORKSPACE_ROOT_CLASS,
   TASK_MOBILE_FILTER_BAR_CLASS,
 } from "@/lib/taskLayout";
 import { useToolPageActive } from "@/lib/toolPage";
@@ -85,7 +85,7 @@ function getQuickAddCreatePatch(parsed: TaskQuickAddParseResult): Partial<Task> 
 }
 
 /* ===== Main Component ===== */
-export default function TaskCenter({ hideSidebar = false }: { hideSidebar?: boolean } = {}) {
+export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: boolean } = {}) {
   const { t } = useTranslation();
   const { prefs: userPrefs } = useUserPreferences();
 
@@ -850,8 +850,8 @@ export default function TaskCenter({ hideSidebar = false }: { hideSidebar?: bool
   }, [taskFullscreen]);
 
   return (
-    <div ref={pageRootRef} className={cn(TASK_CENTER_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
-      {/* Left: Sidebar Filters + Projects (desktop)——侧栏接管导航后默认隐藏，可浮动展开 */}
+    <div ref={pageRootRef} className={cn(TASK_WORKSPACE_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
+      {/* Left: SidebarMobile Filters + Projects (desktop)——侧栏接管导航后默认隐藏，可浮动展开 */}
       {!hideSidebar && (
       <div className="hidden md:flex w-56 shrink-0 flex-col border-r border-app-border bg-app-surface overflow-y-auto" style={{ paddingTop: "var(--safe-area-top)" }}>
         <nav className="flex-1 px-2 py-1.5 space-y-0.5">

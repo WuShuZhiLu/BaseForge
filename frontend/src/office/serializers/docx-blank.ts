@@ -44,7 +44,7 @@ function nowIso(): string {
 interface BlankDocxOptions {
   /** 写入 docProps/core.xml 的 title。默认 "新建 Word 文档"。 */
   title?: string;
-  /** 写入 docProps/core.xml 的 author。默认 "Base Notes"。 */
+  /** 写入 docProps/core.xml 的 author。默认 "BaseForge"。 */
   author?: string;
   /**
    * 文档体内的初始段落文本。默认为空（即一个空段落，光标可直接落入）。
@@ -64,7 +64,7 @@ export async function createBlankDocx(
   opts: BlankDocxOptions = {},
 ): Promise<Blob> {
   const title = opts.title ?? "新建 Word 文档";
-  const author = opts.author ?? "Base Notes";
+  const author = opts.author ?? "BaseForge";
   const created = nowIso();
 
   // 段落体：把 initialText 按 \n 切成多个段落；空字符串/undefined 就给一个空段
@@ -132,7 +132,7 @@ export async function createBlankDocx(
   // ---------- docProps/app.xml ----------
   const appXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
-  <Application>Base Notes</Application>
+  <Application>BaseForge</Application>
 </Properties>`;
 
   // ---------- 打包 ----------

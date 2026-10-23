@@ -9,7 +9,7 @@ describe("daily records mobile scroll contract", () => {
   it("allows every flex layer above the moments timeline to shrink", () => {
     const app = source("../../../App.tsx");
     const hub = source("../DailyRecordsHub.tsx");
-    const diary = source("../../DiaryCenterImpl.tsx");
+    const diary = source("../../DiaryWorkspaceImpl.tsx");
 
     expect(app).toContain('className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden"');
     expect(hub).toContain('className="flex min-h-0 min-w-0 flex-1 overflow-hidden"');
@@ -19,7 +19,7 @@ describe("daily records mobile scroll contract", () => {
   });
 
   it("keeps the moments timeline as the bounded vertical scroll owner", () => {
-    const diary = source("../../DiaryCenterImpl.tsx");
+    const diary = source("../../DiaryWorkspaceImpl.tsx");
 
     expect(diary).toContain('<ScrollArea className="h-full min-h-0 flex-1 max-w-[760px]"');
   });
