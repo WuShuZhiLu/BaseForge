@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import QRCode from "@/components/ui/QRCode";
 import FolderAutoLockSettings from "@/components/FolderAutoLockSettings";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { useTranslation } from "react-i18next";
 import { api, broadcastAuthChanged, withSudo } from "@/lib/api";
 import {
@@ -118,7 +119,6 @@ export default function SecuritySettings() {
         </div>
       )}
       {/* 用 key={currentUserId} 强制子组件在用户切换时完全 remount，清除所有旧状态 */}
-      {!isDemo && <AvatarSection key={`avatar-${currentUserId}`} />}
       {!isDemo && <PasswordSection key={`pwd-${currentUserId}`} />}
       {!isDemo && <TwoFactorSection key={`2fa-${currentUserId}`} />}
       <FolderAutoLockSettings key={`folder-lock-${currentUserId}`} />
@@ -128,13 +128,15 @@ export default function SecuritySettings() {
 }
 
 // ====================================================================
-// 头像（上传 / 移除）：users.avatarUrl 走 /auth/avatar 系列接口
+// 头像（裁切 / 上传 / 移除）：users.avatarUrl 走 /auth/avatar 系列接口；
+// 嵌在「账号与密码」表单顶部，与用户名/邮箱/昵称同区块。
 // ====================================================================
 function AvatarSection() {
   const { t } = useTranslation();
   const [user, setUser] = useState<{ id: string; username: string; displayName: string | null; avatarUrl: string | null } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(() => {
@@ -151,17 +153,26 @@ function AvatarSection() {
     window.dispatchEvent(new CustomEvent("nowen:user-updated"));
   }, [reload]);
 
-  const handleFile = useCallback(async (file: File | undefined) => {
+  const handleFile = useCallback((file: File | undefined) => {
     if (!file) return;
     setError("");
     if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
       setError(t("securitySettings.avatarTypeError", { defaultValue: "仅支持 PNG/JPEG/WebP/GIF 图片" }));
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError(t("securitySettings.avatarTooLarge", { defaultValue: "头像文件不能超过 5MB" }));
+    if (file.size > 20 * 1024 * 1024) {
+      setError(t("securitySettings.avatarTooLarge", { defaultValue: "图片文件不能超过 20MB" }));
       return;
     }
+    // 读入裁切弹窗（裁切后输出 512×512 PNG，远小于原图限制）
+    const reader = new FileReader();
+    reader.onload = () => setImageSrc(String(reader.result));
+    reader.readAsDataURL(file);
+    if (inputRef.current) inputRef.current.value = "";
+  }, [t]);
+
+  const handleCropped = useCallback(async (file: File) => {
+    setImageSrc(null);
     setUploading(true);
     try {
       await api.uploadAvatar(file);
@@ -170,9 +181,8 @@ function AvatarSection() {
       setError(String(e?.message || e || "上传失败"));
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
-  }, [finishChange, t]);
+  }, [finishChange]);
 
   const handleRemove = useCallback(async () => {
     setError("");
@@ -190,61 +200,63 @@ function AvatarSection() {
   const initials = (user?.displayName || user?.username || "U").trim().slice(0, 1).toUpperCase() || "U";
 
   return (
-    <section>
-      <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-        {t("securitySettings.avatar", { defaultValue: "头像" })}
-      </h3>
-      <div className="mt-3 flex items-center gap-4">
-        {user?.avatarUrl ? (
-          <img
-            key={user.avatarUrl}
-            src={api.avatarFileUrl(user.id)}
-            alt=""
-            className="h-16 w-16 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-xl font-semibold text-accent-primary dark:bg-accent-primary/14">
-            {initials}
-          </span>
-        )}
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex items-center gap-2">
+    <div className="flex items-center gap-4 pb-1">
+      {user?.avatarUrl ? (
+        <img
+          key={user.avatarUrl}
+          src={api.avatarFileUrl(user.id)}
+          alt=""
+          className="h-16 w-16 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-xl font-semibold text-accent-primary dark:bg-accent-primary/14">
+          {initials}
+        </span>
+      )}
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            className="rounded-md border border-app-border px-3 py-1.5 text-sm text-tx-secondary transition-colors hover:bg-app-hover disabled:opacity-50"
+          >
+            {user?.avatarUrl
+              ? t("securitySettings.changeAvatar", { defaultValue: "更换头像" })
+              : t("securitySettings.uploadAvatar", { defaultValue: "上传头像" })}
+          </button>
+          {user?.avatarUrl && (
             <button
               type="button"
               disabled={uploading}
-              onClick={() => inputRef.current?.click()}
-              className="rounded-md border border-app-border px-3 py-1.5 text-sm text-tx-secondary transition-colors hover:bg-app-hover disabled:opacity-50"
+              onClick={() => void handleRemove()}
+              className="rounded-md px-3 py-1.5 text-sm text-accent-danger transition-colors hover:bg-app-hover disabled:opacity-50"
             >
-              {user?.avatarUrl
-                ? t("securitySettings.changeAvatar", { defaultValue: "更换头像" })
-                : t("securitySettings.uploadAvatar", { defaultValue: "上传头像" })}
+              {t("securitySettings.removeAvatar", { defaultValue: "移除" })}
             </button>
-            {user?.avatarUrl && (
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={() => void handleRemove()}
-                className="rounded-md px-3 py-1.5 text-sm text-accent-danger transition-colors hover:bg-app-hover disabled:opacity-50"
-              >
-                {t("securitySettings.removeAvatar", { defaultValue: "移除" })}
-              </button>
-            )}
-          </div>
-          <p className="text-xs text-tx-tertiary">
-            {t("securitySettings.avatarHint", { defaultValue: "支持 PNG/JPEG/WebP/GIF，不超过 5MB" })}
-          </p>
+          )}
           {uploading && <Loader2 className="h-4 w-4 animate-spin text-tx-tertiary" />}
-          {error && <p className="text-xs text-accent-danger">{error}</p>}
         </div>
+        <p className="text-xs text-tx-tertiary">
+          {t("securitySettings.avatarHint", { defaultValue: "支持 PNG/JPEG/WebP/GIF，上传时可裁切选择区域" })}
+        </p>
+        {error && <p className="text-xs text-accent-danger">{error}</p>}
       </div>
       <input
         ref={inputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif"
         className="hidden"
-        onChange={(e) => void handleFile(e.target.files?.[0])}
+        onChange={(e) => handleFile(e.target.files?.[0])}
       />
-    </section>
+      {imageSrc && (
+        <AvatarCropDialog
+          imageSrc={imageSrc}
+          onConfirm={(file) => void handleCropped(file)}
+          onCancel={() => setImageSrc(null)}
+        />
+      )}
+    </div>
   );
 }
 
@@ -364,6 +376,11 @@ function PasswordSection() {
         <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{t('securitySettings.title')}</h3>
       </div>
       <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">{t('securitySettings.description')}</p>
+
+      {/* 头像：与账号信息同区块，位于表单顶部 */}
+      <div className="max-w-md mb-6">
+        <AvatarSection />
+      </div>
 
       <motion.form
         onSubmit={handleSubmit}
