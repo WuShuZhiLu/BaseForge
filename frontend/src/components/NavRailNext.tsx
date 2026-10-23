@@ -134,23 +134,29 @@ const PLUGIN_ITEMS: NavItem[] = [
 /**
  * Rail 徽章自定义（localStorage 持久化）：
  * - hiddenModes：被隐藏的导航项 mode（右键徽章隐藏 / 徽章管理面板恢复）；
- * - pluginGroupCollapsed：插件组折叠（折叠时点「插件」徽章弹出插件菜单）。
+ * - pluginGroupCollapsed：插件组折叠（折叠时点「插件」徽章弹出插件菜单）；
+ * - coreOrder / pluginOrder：分割线上下两组各自内部的显示顺序
+ *   （拖拽排序持久化，仅限组内；缺失的 mode 按默认顺序追加在末尾）。
+ *   分割线位置固定：核心徽章（知识库/收藏/回收站/文件管理/分享管理）在上，
+ *   插件徽章（固定不可动）与各插件徽章在下，禁止跨组拖拽。
  */
-type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean };
+type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean; coreOrder?: string[]; pluginOrder?: string[] };
 const RAIL_CUSTOMIZATION_KEY = "nowen-rail-customization";
 
 function loadRailCustomization(): RailCustomization {
   try {
     const raw = localStorage.getItem(RAIL_CUSTOMIZATION_KEY);
     const parsed = raw ? (JSON.parse(raw) as Partial<RailCustomization>) : {};
+    const cleanOrder = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((m): m is string => typeof m === "string") : [];
     return {
-      hiddenModes: Array.isArray(parsed.hiddenModes)
-        ? parsed.hiddenModes.filter((m): m is string => typeof m === "string")
-        : [],
+      hiddenModes: cleanOrder(parsed.hiddenModes),
       pluginGroupCollapsed: parsed.pluginGroupCollapsed === true,
+      coreOrder: cleanOrder(parsed.coreOrder),
+      pluginOrder: cleanOrder(parsed.pluginOrder),
     };
   } catch {
-    return { hiddenModes: [], pluginGroupCollapsed: false };
+    return { hiddenModes: [], pluginGroupCollapsed: false, coreOrder: [], pluginOrder: [] };
   }
 }
 
@@ -204,6 +210,80 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
     },
     [railCustom, setRailCustom],
   );
+
+  // ===== 徽章拖拽排序：分割线上下两组各自独立排序（组内持久化，禁止跨组） =====
+  const applyBadgeOrder = useCallback((badges: NavItem[], order: string[] | undefined): NavItem[] => {
+    const map = new Map(badges.map((i) => [i.mode, i]));
+    const out: NavItem[] = [];
+    for (const m of order ?? []) {
+      const it = map.get(m);
+      if (it) { out.push(it); map.delete(m); }
+    }
+    out.push(...map.values());
+    return out;
+  }, []);
+  const CORE_BADGES = useMemo(() => [...CORE_ITEMS, SHARES_NAV_ITEM], []);
+  const orderedCore = useMemo(
+    () => applyBadgeOrder(CORE_BADGES, railCustom.coreOrder),
+    [applyBadgeOrder, CORE_BADGES, railCustom.coreOrder],
+  );
+  // 插件组：「插件」徽章固定在首位不可拖动，其余插件徽章可在组内排序
+  const orderedPlugins = useMemo(
+    () => applyBadgeOrder(PLUGIN_NAV_ITEMS, railCustom.pluginOrder),
+    [applyBadgeOrder, railCustom.pluginOrder],
+  );
+
+  // 拖拽预演不重排渲染（沿用知识树侧栏方案）：拖拽意图存 ref/state，
+  // 由目标徽章的"上/下半内阴影高亮"表达落点，松手时 onDrop 一次性提交顺序。
+  // （实时重排会在换位时移除被拖徽章 DOM，导致原生拖影中断。）
+  const badgeDragRef = useRef<{ mode: string; group: "core" | "plugins" } | null>(null);
+  const [badgeDragMode, setBadgeDragMode] = useState<string | null>(null);
+  const [badgeDropHint, setBadgeDropHint] = useState<{ mode: string; after: boolean } | null>(null);
+
+  const onBadgeDragStart = useCallback((mode: string, group: "core" | "plugins") => (e: React.DragEvent) => {
+    badgeDragRef.current = { mode, group };
+    setBadgeDragMode(mode);
+    setBadgeDropHint(null);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", mode);
+  }, []);
+  const onBadgeDragOver = useCallback(
+    (targetMode: string, group: "core" | "plugins") => (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const drag = badgeDragRef.current;
+      if (!drag || drag.mode === targetMode || drag.group !== group) return;
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setBadgeDropHint({ mode: targetMode, after: e.clientY > rect.top + rect.height / 2 });
+    },
+    [],
+  );
+  const onBadgeDrop = useCallback(
+    (targetMode: string, group: "core" | "plugins") => (e: React.DragEvent) => {
+      e.preventDefault();
+      const drag = badgeDragRef.current;
+      setBadgeDropHint(null);
+      if (!drag || drag.mode === targetMode || drag.group !== group) return;
+      const list = group === "core" ? orderedCore : orderedPlugins;
+      const modes = list.map((i) => i.mode);
+      const fromIdx = modes.indexOf(drag.mode);
+      const toIdx = modes.indexOf(targetMode);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const after = e.clientY > rect.top + rect.height / 2;
+      // 落点在目标下半部 = 插到它后面；上半部 = 插到它前面
+      modes.splice(fromIdx, 1);
+      modes.splice(modes.indexOf(targetMode) + (after ? 1 : 0), 0, drag.mode);
+      const key = group === "core" ? "coreOrder" : "pluginOrder";
+      setRailCustom({ ...railCustom, [key]: modes });
+    },
+    [orderedCore, orderedPlugins, railCustom, setRailCustom],
+  );
+  const onBadgeDragEnd = useCallback(() => {
+    badgeDragRef.current = null;
+    setBadgeDragMode(null);
+    setBadgeDropHint(null);
+  }, []);
   const [me, setMe] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -335,7 +415,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
   const displayName = user?.displayName || user?.username || "用户";
   const initials = initialsOf(user?.displayName || user?.username);
 
-  const renderItem = (item: NavItem, index = 0) => {
+  const renderItem = (item: NavItem, index = 0, group: "core" | "plugins" = "core") => {
     // 链式反应：尺寸/间距变化按序号依次延迟；颜色（hover/激活）保持即时响应
     const sizeDelay = `${Math.min(index, 12) * 45}ms`;
     const staggerStyle = {
@@ -374,11 +454,24 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
     }
     const active = activeMode === item.mode;
     const navMode = item.mode as NavItemMode;
+    // 拖拽视觉（沿用知识树方案）：被拖徽章半透明；目标徽章按上/下半显示内阴影落点
+    const isDraggingThis = badgeDragMode === item.mode;
+    const isDropTarget = !!badgeDragMode && badgeDropHint?.mode === item.mode && badgeDragMode !== item.mode;
+    const dropShadowClass = isDropTarget
+      ? badgeDropHint!.after
+        ? "shadow-[inset_0_-14px_18px_-12px_rgba(59,130,246,0.55)]"
+        : "shadow-[inset_0_14px_18px_-12px_rgba(59,130,246,0.55)]"
+      : undefined;
     return (
       <button
         key={item.mode}
         type="button"
         style={staggerStyle}
+        draggable
+        onDragStart={onBadgeDragStart(item.mode, group)}
+        onDragOver={onBadgeDragOver(item.mode, group)}
+        onDrop={onBadgeDrop(item.mode, group)}
+        onDragEnd={onBadgeDragEnd}
         onClick={() => navigate(navMode)}
         onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
         aria-current={active ? "page" : undefined}
@@ -386,6 +479,8 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
         title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
         className={cn(
           "group relative flex shrink-0 items-center justify-center rounded-md",
+          dropShadowClass,
+          isDraggingThis && "opacity-60",
           active
             ? "bg-accent-primary/12 text-accent-primary dark:bg-accent-primary/14"
             : "text-tx-secondary hover:bg-[rgba(17,24,39,0.06)] hover:text-tx-primary dark:hover:bg-[rgba(255,255,255,0.07)]",
@@ -435,19 +530,36 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
           setBadgeMenu({ x: e.clientX, y: e.clientY, item: null });
         }}
       >
-        <div className="flex flex-col items-center gap-1">{CORE_ITEMS.filter((item) => !isBadgeHidden(item.mode)).map(renderItem)}</div>
-        {!isBadgeHidden("shares") && <div className="flex flex-col items-center gap-1">{renderItem(SHARES_NAV_ITEM)}</div>}
+        {/* 上组：核心徽章（组内可拖拽排序） */}
+        {(() => {
+          const rows: NavItem[] = [];
+          for (const item of orderedCore) {
+            if (isBadgeHidden(item.mode)) continue;
+            rows.push(item);
+          }
+          return rows.map((item, index) => renderItem(item, index, "core"));
+        })()}
+        {/* 固定分割线：上=核心徽章组，下=插件徽章组（位置不随排序变化） */}
         <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
-        {PLUGIN_ITEMS.filter((item) => !isBadgeHidden(item.mode)).map(renderItem)}
+        {/* 下组：「插件」徽章固定首位不可动，其余插件徽章组内可拖拽排序 */}
         {(() => {
           if (railCustom.pluginGroupCollapsed) return null;
-          const visiblePluginNav = PLUGIN_NAV_ITEMS.filter(
-            (item) =>
-              !isBadgeHidden(item.mode) &&
-              (isPluginNavVisible(item.pluginId, item.workspaceFeature) || activeMode === item.mode),
+          const rows: NavItem[] = [];
+          for (const item of orderedPlugins) {
+            if (isBadgeHidden(item.mode)) continue;
+            const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+            if (
+              typed.pluginId && typed.workspaceFeature &&
+              !(isPluginNavVisible(typed.pluginId, typed.workspaceFeature) || activeMode === item.mode)
+            ) continue;
+            rows.push(item);
+          }
+          return (
+            <>
+              {PLUGIN_ITEMS.map((item, index) => renderItem(item, index, "plugins"))}
+              {rows.map((item, index) => renderItem(item, index + 1, "plugins"))}
+            </>
           );
-          if (visiblePluginNav.length === 0) return null;
-          return <div className="flex flex-col items-center gap-1">{visiblePluginNav.map(renderItem)}</div>;
         })()}
       </div>
 
@@ -486,6 +598,13 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
                     {t("railCustom.pluginDetails", { defaultValue: "插件详情" })}
                   </button>
                 ) : null}
+                <button
+                  type="button"
+                  className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
+                  onClick={() => { setBadgeManagerOpen(true); setBadgeMenu(null); }}
+                >
+                  {t("railCustom.manageBadges", { defaultValue: "徽章管理…" })}
+                </button>
                 <button
                   type="button"
                   className="flex w-full items-center px-3 py-1.5 text-left text-red-500 hover:bg-red-500/10"
@@ -551,7 +670,7 @@ export default function NavRailNext({ notificationCount = 0 }: { notificationCou
               <button
                 type="button"
                 className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover"
-                onClick={() => setRailCustom({ hiddenModes: [], pluginGroupCollapsed: false })}
+                onClick={() => setRailCustom({ hiddenModes: [], pluginGroupCollapsed: false, coreOrder: [], pluginOrder: [] })}
               >
                 {t("railCustom.restoreDefaults", { defaultValue: "恢复默认" })}
               </button>
