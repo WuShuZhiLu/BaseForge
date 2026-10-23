@@ -1036,7 +1036,10 @@ function ToolbarButton({ onClick, isActive, disabled, children, title, compact, 
       disabled={disabled}
       title={title}
       className={cn(
-        compact ? "shrink-0 p-1 rounded-full transition-colors" : "shrink-0 p-1.5 rounded-full transition-colors",
+        // 统一固定高度：行高不随"哪个按钮被换行到第几行"变化，
+        // 保证折叠单行与展开态第一行高度一致
+        "flex h-7 shrink-0 items-center justify-center rounded-full transition-colors",
+        compact ? "p-1" : "p-1.5",
         isActive
           ? "bg-accent-primary/20 text-accent-primary"
           : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
@@ -5705,6 +5708,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           data-mobile-editor-toolbar="expanded"
           className={cn(
             "z-30 flex items-center border-b border-app-border bg-app-elevated px-3 py-2 transition-shadow duration-200 md:sticky md:top-0 md:z-20 md:touch-auto md:bg-app-surface/95 md:px-4 md:backdrop-blur md:supports-[backdrop-filter]:bg-app-surface/70",
+            // 折叠/展开保持同一行高：展开只是在下方追加第二行（内边距不随状态变化）
             mobileToolbarExpanded
               ? "flex max-md:max-h-[38vh] max-md:shadow-xl"
               : "hidden md:flex",
@@ -6089,7 +6093,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
             容器内的自动收起逻辑会把展开态复位。 */}
         <ToolbarButton
           compact
-          className="ml-auto shrink-0 self-start hidden md:flex"
+          className={cn("ml-auto shrink-0 hidden md:flex", toolbarExpanded ? "self-start" : "self-center")}
           onClick={() => setToolbarExpanded((v) => !v)}
           title={toolbarExpanded ? "折叠工具栏" : "展开工具栏"}
           isActive={toolbarExpanded}
