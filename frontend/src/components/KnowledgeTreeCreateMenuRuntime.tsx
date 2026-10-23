@@ -33,6 +33,7 @@ const CREATE_MENU_WIDTH = 232;
 const CREATE_ITEMS = [
   { kind: "note", label: "富文本文档", icon: FileText },
   { kind: "markdown", label: "Markdown 文档", icon: FileCode },
+  { kind: "plain", label: "纯文本文档", icon: Files },
 { kind: "mindmap", label: "思维导图", icon: BrainCircuit },
 ] as const;
 const FOLDER_CREATE_ITEM = { kind: "folder", label: "文件夹" } as const;

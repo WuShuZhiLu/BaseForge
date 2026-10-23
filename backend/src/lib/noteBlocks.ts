@@ -581,6 +581,9 @@ export function searchNoteBlocks(
 }
 
 export function plainTextFromNoteContent(content: string, contentFormat: string): string {
+  if (contentFormat === "plain") {
+    return content.replace(/\u0000/g, "").trim();
+  }
   if (contentFormat === "html") {
     return content.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   }

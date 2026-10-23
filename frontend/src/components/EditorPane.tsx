@@ -14,6 +14,7 @@ import { isEncryptedNoteFormat } from "@/lib/encryptedNotes/noteDocument";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import type { NoteEditorHeading, NoteEditorUpdatePayload } from "@/components/editors/types";
 import MarkdownEditor from "@/components/MarkdownEditor";
+import PlainTextEditor from "@/components/PlainTextEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -283,6 +284,8 @@ function EditorPaneCore({
   const [showMobileOutline, setShowMobileOutline] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  // 恢复历史版本时自增，作为编辑器 key 的一部分强制重挂载（编辑器不会响应 note.content 变化）
+  const [contentRevision, setContentRevision] = useState(0);
   const [showSaveVersionDialog, setShowSaveVersionDialog] = useState(false);
   const [showCommentPanel, setShowCommentPanel] = useState(false);
   const [showAttachmentsPanel, setShowAttachmentsPanel] = useState(false);
@@ -3818,11 +3821,19 @@ const moveToTrash = useCallback(async () => {
               content={activeNote.content}
               onOpenAttachmentDirectory={() => setShowAttachmentsPanel(true)}
             />
+          ) : activeNote.contentFormat === "plain" ? (
+            <PlainTextEditor
+              key={`plain-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
           ) : activeNote.contentFormat === "markdown" ? (
             <MarkdownEditor
               // useYDoc only exposes the document after y:sync. Remount at that point so
               // CodeMirror gains yCollab without disabling normal saves while unsynced.
-              key={collabYDoc ? `md-native-y-${activeNote.id}` : `md-native-${activeNote.id}`}
+              key={collabYDoc ? `md-native-y-${activeNote.id}-r${contentRevision}` : `md-native-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3836,7 +3847,7 @@ const moveToTrash = useCallback(async () => {
             />
           ) : shouldRenderHtmlPreview ? (
             <HtmlPreviewPane
-              key={`html-${activeNote.id}`}
+              key={`html-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3850,7 +3861,7 @@ const moveToTrash = useCallback(async () => {
             <MarkdownEditor
               // Phase 3: key �� CRDT ����̬���л� provider ʱǿ���ؽ��༭����
               // ���� yCollab ��չ������ʱ���� yText ������״̬����
-              key={collabYDoc ? `md-y-${activeNote.id}` : `md-${activeNote.id}`}
+              key={collabYDoc ? `md-y-${activeNote.id}-r${contentRevision}` : `md-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3866,6 +3877,7 @@ const moveToTrash = useCallback(async () => {
           ) : (
             <PhaseAPerfProfiler>
               <TiptapEditor
+                key={`tiptap-${activeNote.id}-r${contentRevision}`}
                 ref={editorHandleRef}
                 note={activeNote}
                 onUpdate={handleEditorUpdate}
@@ -3921,6 +3933,8 @@ const moveToTrash = useCallback(async () => {
             try { editorHandleRef.current?.discardPending?.(); } catch { /* ignore */ }
             try { clearDraft(updated.id); } catch { /* ignore */ }
             skipNextSwitchFlushForNoteIdRef.current = updated.id;
+            // 编辑器只在 mount 时读 note.content，恢复版本后必须重挂载才能显示新内容
+            setContentRevision((v) => v + 1);
             actions.setActiveNote(updated);
             actions.updateNoteInList({
               id: updated.id,

@@ -254,7 +254,7 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain";
   title: string;
   encryptedContent?: string;
   encryptedNoteId?: string;
@@ -312,9 +312,9 @@ export function createKnowledgeChild(input: {
         throw new KnowledgeTreeError("KNOWLEDGE_TREE_NOTE_CONTAINER_REQUIRED", 400, "根级文档需要先创建文件夹");
       }
       const noteId = input.encryptedContent && input.encryptedNoteId ? input.encryptedNoteId : uuid();
-      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : "tiptap-json";
+      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : "tiptap-json";
       const noteType = input.nodeType === "word" ? "word" : input.nodeType === "sheet" ? "sheet" : "normal";
-      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : "{}");
+      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : contentFormat === "plain" ? "" : "{}");
       db.prepare(`
         INSERT INTO notes (
           id, userId, workspaceId, notebookId, title, content, contentText,
@@ -370,7 +370,7 @@ export function createKnowledgeChild(input: {
     ...row,
     title,
     childCount: 0,
-    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
+    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
     noteType: input.nodeType === "sheet" ? "sheet" : input.nodeType === "word" ? "word" : undefined,
     access: resolveKnowledgeNodeAccess(row.id, input.actorUserId, db),
   };

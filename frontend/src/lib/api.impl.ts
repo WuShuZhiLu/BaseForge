@@ -1101,7 +1101,7 @@ type ImportNotePayload = {
   title: string;
   content: string;
   contentText: string;
-  contentFormat?: "tiptap-json" | "markdown" | "html";
+  contentFormat?: "tiptap-json" | "markdown" | "html" | "plain";
   createdAt?: string;
   updatedAt?: string;
   notebookName?: string;

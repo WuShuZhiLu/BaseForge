@@ -687,8 +687,11 @@ app.post("/", async (c) => {
   const initialColorMark = body.colorMark === undefined ? null : normalizeNoteColorMark(body.colorMark);
   const contentFormat = body.contentFormat === "markdown" ? "markdown"
     : body.contentFormat === "html" ? "html"
+    : body.contentFormat === "plain" ? "plain"
     : "tiptap-json";
-  const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n" : "{}";
+  const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n"
+    : contentFormat === "plain" ? ""
+    : "{}";
   let initialContent = typeof body.content === "string" ? body.content : defaultContent;
   try {
     initialContent = stabilizePersistedNoteContent(initialContent, contentFormat);
