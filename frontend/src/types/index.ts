@@ -260,7 +260,7 @@ export interface SearchResult {
   matchedField?: string;
 }
 
-export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues" | "projects";
+export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues" | "projects" | "plugins";
 
 // ========== 远程文件管理插件（remote-files） ==========
 /** 已配置的远程源（凭据掩码，密码/token 不下发） */

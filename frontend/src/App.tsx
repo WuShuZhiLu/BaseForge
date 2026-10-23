@@ -2,23 +2,24 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import Sidebar from "@/components/Sidebar";
-import SidebarNext from "@/components/SidebarNext";
-import NavRailNext from "@/components/NavRailNext";
-import NavRail from "@/components/NavRail";
+import SidebarMobile from "@/components/SidebarMobile";
+import SidebarDesktop from "@/components/SidebarDesktop";
+import NavRailDesktop from "@/components/NavRailDesktop";
+import NavRailMobile from "@/components/NavRailMobile";
 import { useRailMode } from "@/hooks/useRailMode";
 import NoteList from "@/components/NoteList";
 import EditorPane from "@/components/EditorPane";
 import ToolPageHost from "@/components/ToolPageHost";
 import EditorSplitView from "@/components/EditorSplitView";
-import TaskCenter from "@/components/TaskCenter";
+import TaskWorkspace from "@/components/TaskWorkspace";
 import MindMapCenter from "@/components/MindMapEditor";
 import AIChatPanel from "@/components/AIChatPanel";
-import DiaryCenter from "@/components/DiaryCenter";
+import DiaryWorkspace from "@/components/DiaryWorkspace";
 import SheetEditor from "@/components/SheetEditor";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
-import PmCenter from "@/components/PmCenter";
+import PmWorkspace from "@/components/PmWorkspace";
+import PluginsWorkspace from "@/components/PluginsWorkspace";
 import TrashPage from "@/features/trash/TrashPage";
 import WorkspaceIssues from "@/components/issues/WorkspaceIssues";
 import NotificationCenter from "@/components/issues/NotificationCenter";
@@ -39,7 +40,7 @@ import { UserPreferencesProvider, useUserPreferences } from "@/hooks/useUserPref
 import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Toaster from "@/components/Toaster";
-import { User } from "@/types";
+import { User, type ViewMode } from "@/types";
 import { getServerUrl, setServerUrl, clearServerUrl, broadcastLogout, initializeServerUrlFromRuntime } from "@/lib/api";
 import { TASK_VIEW_SHELL_CLASS } from "@/lib/taskLayout";
 import { useReminderNotifier } from "@/components/tasks/useReminderNotifier";
@@ -208,7 +209,7 @@ function WebUiDisabledPage() {
       <main className="max-w-lg rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-zinc-900 mb-3">网页端已被管理员关闭</h1>
         <p className="text-sm leading-7">
-          当前服务器仅提供 API 服务。请使用 Base Notes 桌面客户端连接该服务器。
+          当前服务器仅提供 API 服务。请使用 BaseForge 桌面客户端连接该服务器。
         </p>
       </main>
     </div>
@@ -340,10 +341,10 @@ function NoteListResizeHandle() {
  * 从屏幕左侧 30px 区域右滑打开侧边栏，侧边栏打开时左滑关闭
  *
  * 重要：本 hook 在 document 上挂全局 touchstart/touchend，触发的是 setMobileSidebar(false)。
- * 在移动端，用户从 Sidebar 进入 SettingsModal 时，Sidebar 仍处于 open 状态（关闭设置后
- * 还要回到 Sidebar），mobileSidebarOpen 为 true。此时只要 touchend 的 deltaX 超过阈值
- * 就会左滑关闭 Sidebar——而 SettingsModal 通过 createPortal 渲染到 body，但**生命周期
- * 仍挂在 Sidebar 子树**：Sidebar 卸载 = SettingsModal 卸载 = 设置弹窗"莫名消失"。
+ * 在移动端，用户从 SidebarMobile 进入 SettingsModal 时，SidebarMobile 仍处于 open 状态（关闭设置后
+ * 还要回到 SidebarMobile），mobileSidebarOpen 为 true。此时只要 touchend 的 deltaX 超过阈值
+ * 就会左滑关闭 SidebarMobile——而 SettingsModal 通过 createPortal 渲染到 body，但**生命周期
+ * 仍挂在 SidebarMobile 子树**：SidebarMobile 卸载 = SettingsModal 卸载 = 设置弹窗"莫名消失"。
  *
  * 实测表现：用户在 SettingsModal 里"长按 / 滚动 / 横向触摸"时，touch 起止位移就足够触发
  * 该判定，弹窗瞬间被卸掉，看起来像"动一下就关"。React 合成事件的 stopPropagation
@@ -384,7 +385,7 @@ function useSwipeGesture({
       const touch = e.touches[0];
       touchStartX.current = touch.clientX;
       touchStartY.current = touch.clientY;
-      // 起点在屏蔽层内：本次手势全程禁用，避免误关 Sidebar 顺带卸掉浮层。
+      // 起点在屏蔽层内：本次手势全程禁用，避免误关 SidebarMobile 顺带卸掉浮层。
       if (isInsideSwipeBlocker(e.target)) {
         isSwiping.current = false;
         return;
@@ -455,7 +456,11 @@ function AppLayout() {
       // sheet 优先于导图：两者路径互斥，这里只是把优先级写清楚。
       if (nextMindMapRoute.matched) {
         actions.setViewMode("mindmaps");
+        return;
       }
+      // 模块路径（/favorites /trash /files ...）：前进/后退/刷新恢复 → 切回对应工作区视图
+      const moduleView = viewModeFromAppPath(pathname);
+      if (moduleView) actions.setViewMode(moduleView);
     };
     applyRoute();
     window.addEventListener("popstate", applyRoute);
@@ -490,6 +495,14 @@ function AppLayout() {
       replaceAppPathState("/");
     }
   }, [sheetRoute.matched, state.activeNote, state.viewMode]);
+  // 模块路径同步：徽章切模块时 URL 跟随（/favorites /trash /files ...），刷新/前进/后退可恢复。
+  // sheet / 导图深链由各自 effect 管理，这里跳过以免互相覆盖。
+  useEffect(() => {
+    if (sheetRoute.matched || mindMapRoute.matched) return;
+    const target = VIEW_MODE_APP_PATHS[state.viewMode];
+    if (!target) return;
+    if (resolveCurrentAppPathname() !== target) replaceAppPathState(target);
+  }, [state.viewMode, sheetRoute.matched, mindMapRoute.matched]);
   // 只有「URL 命中 sheet」且「当前没有打开别的文档 / 没切到其它视图」时才占满主区。
   // 否则点知识树里的其它笔记/切视图时会被表格视图锁死（URL 仍是 /sheets/:id）。
   const isSheetView =
@@ -554,7 +567,7 @@ function AppLayout() {
    * 统一从外部事件驱动 setOpen(true)，组件只负责展示 + Esc 关闭。
    */
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  // 未读通知计数：由 NotificationCenter 通过 onUnreadChange 回写，驱动 NavRail 的铃铛角标。
+  // 未读通知计数：由 NotificationCenter 通过 onUnreadChange 回写，驱动 NavRailMobile 的铃铛角标。
   const [notificationCount, setNotificationCount] = useState(0);
   // 通知中心 / 评论中心内点击某条评论 → 打开对应笔记并定位到该评论。
   const handleOpenComment = useCallback(
@@ -744,8 +757,8 @@ function AppLayout() {
 
   // ── 工作区切换：清空当前会话态，回到空态页 ──────────────────────────
   //
-  // WorkspaceSwitcher 切换后会广播 "nowen:workspace-changed"。之前只有 Sidebar /
-  // TaskCenter / FileManager / DiaryCenter / MindMap 自己监听并各自重拉，但
+  // WorkspaceSwitcher 切换后会广播 "nowen:workspace-changed"。之前只有 SidebarMobile /
+  // TaskWorkspace / FileManager / DiaryWorkspace / MindMap 自己监听并各自重拉，但
   // App 顶层并没有清理"正在编辑的笔记 + 笔记列表 + 选择/筛选状态"——于是会
   // 出现两类问题：
   //   1) 切到 A 空间后，右侧仍显示着 B 空间的 activeNote，且该笔记被 B 空间
@@ -761,9 +774,9 @@ function AppLayout() {
   //   - viewMode = "all"       → 回到"所有笔记"默认视图
   //   - mobileView = "list"    → 移动端从编辑页退回列表页
   //   - searchQuery = ""       → 搜索词也一并清掉，避免跨空间的语义错位
-  //   - refreshNotes/Notebooks → 触发重拉，让 Sidebar/NoteList 拿到新空间数据
+  //   - refreshNotes/Notebooks → 触发重拉，让 SidebarMobile/NoteList 拿到新空间数据
   //
-  // 注：notebooks/tags 本身由 Sidebar 监听同一事件重拉，这里不重复；但我们
+  // 注：notebooks/tags 本身由 SidebarMobile 监听同一事件重拉，这里不重复；但我们
   //     显式调用 refreshNotebooks 以统一触发一次订阅刷新，保持一致性。
   useEffect(() => {
     const onWorkspaceChanged = () => {
@@ -788,7 +801,7 @@ function AppLayout() {
     onToggleSidebar: () => actions.toggleSidebar(),
     /**
      * 原生"搜索"菜单 / Dock Quick Action → 打开 Cmd-K 命令面板。
-     * 相比过去聚焦 Sidebar 搜索框的方案，命令面板是"即用即走"语义，
+     * 相比过去聚焦 SidebarMobile 搜索框的方案，命令面板是"即用即走"语义，
      * 不污染当前 viewMode，也与 Cmd-K 键盘入口完全统一。
      */
     onOpenSearch: () => setCommandPaletteOpen(true),
@@ -839,10 +852,10 @@ function AppLayout() {
   return (
     <div className="flex h-[100dvh] w-screen bg-app-bg overflow-hidden transition-colors duration-200">
       {/* ===== 移动端：抽屉式侧边栏 =====
-          v16 P3 后续：与桌面端对齐，抽屉内部也拆成 NavRail + Sidebar 双栏。
-          - NavRail variant="mobile"：48/64px，顶部含关闭 X 与图标/文字模式切换；
+          v16 P3 后续：与桌面端对齐，抽屉内部也拆成 NavRailMobile + SidebarMobile 双栏。
+          - NavRailMobile variant="mobile"：48/64px，顶部含关闭 X 与图标/文字模式切换；
                                        不接受 hidden 模式（抽屉里没意义）。
-          - Sidebar variant="mobile"：主区只渲染 WorkspaceSwitcher + 搜索 + 笔记本 + 标签。
+          - SidebarMobile variant="mobile"：主区只渲染 WorkspaceSwitcher + 搜索 + 笔记本 + 标签。
           抽屉总宽 max-w 从 340 → 380：Rail 约占 48-64px，主区保持 ~320px 与改造前持平。 */}
       <AnimatePresence>
         {state.mobileSidebarOpen && (
@@ -863,14 +876,14 @@ function AppLayout() {
               transition={{ type: "spring", bounce: 0, duration: 0.35 }}
               className="fixed inset-y-0 left-0 z-50 w-[88%] max-w-[380px] md:hidden shadow-2xl flex overflow-hidden"
               // 底部避让 home indicator / 手势栏：抽屉容器统一处理，
-              // 内部 NavRail / Sidebar 不再各自加 safe-area-bottom，避免重复 padding。
-              // 顶部状态栏避让仍由 NavRail / Sidebar Header 各自的 paddingTop 处理
+              // 内部 NavRailMobile / SidebarMobile 不再各自加 safe-area-bottom，避免重复 padding。
+              // 顶部状态栏避让仍由 NavRailMobile / SidebarMobile Header 各自的 paddingTop 处理
               // （桌面端两者也复用，写在子组件里更通用）。
               style={{ paddingBottom: 'var(--safe-area-bottom)' }}
             >
-              {!mobileRailHidden && <NavRail variant="mobile" notificationCount={notificationCount} />}
+              {!mobileRailHidden && <NavRailMobile variant="mobile" notificationCount={notificationCount} />}
               <div className="flex-1 min-w-0 overflow-hidden">
-                <Sidebar />
+                <SidebarMobile />
               </div>
             </motion.div>
           </>
@@ -883,10 +896,10 @@ function AppLayout() {
           但 Rail 仍在，模块切换永远 1 次点击可达。
           v16 P3 后续：Rail 三档模式（icon=48px 纯图标 / label=64px 图标+文字 / hidden=完全隐藏）；
           hidden 模式下若主侧栏也折叠，强制保留 Rail（避免完全无侧栏入口）。 */}
-      {showRail && <PhaseAPerfProfiler id="NavRailNext"><NavRailNext notificationCount={notificationCount} /></PhaseAPerfProfiler>}
+      {showRail && <PhaseAPerfProfiler id="NavRailDesktop"><NavRailDesktop notificationCount={notificationCount} /></PhaseAPerfProfiler>}
       {showSidebar && (
         <div className="hidden md:flex shrink-0">
-          <PhaseAPerfProfiler id="SidebarNext"><SidebarNext /></PhaseAPerfProfiler>
+          <PhaseAPerfProfiler id="SidebarDesktop"><SidebarDesktop /></PhaseAPerfProfiler>
         </div>
       )}
       {showSidebar && <SidebarResizeHandle />}
@@ -916,7 +929,7 @@ function AppLayout() {
         <div className={TASK_VIEW_SHELL_CLASS}>
           {/* 移动端顶栏 */}
           <MobileTopBar />
-          <TaskCenter hideSidebar />
+          <TaskWorkspace hideSidebar />
         </div>
       ) : isMindMapView ? (
         <div className="flex-1 flex flex-col">
@@ -950,7 +963,7 @@ function AppLayout() {
       ) : isDiaryView ? (
         <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
           <MobileTopBar />
-          <DiaryCenter />
+          <DiaryWorkspace />
         </div>
       ) : isFilesView ? (
         <div className="flex-1 flex flex-col">
@@ -965,7 +978,12 @@ function AppLayout() {
       ) : isPmView ? (
         <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden">
           <MobileTopBar />
-          <PmCenter />
+          <PmWorkspace />
+        </div>
+      ) : state.viewMode === "plugins" ? (
+        <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <MobileTopBar />
+          <PluginsWorkspace />
         </div>
       ) : (
         <div
@@ -979,7 +997,7 @@ function AppLayout() {
             移动端与桌面端共用同一个 NoteList 实例。仅靠 CSS 隐藏两个独立实例会让
             隐藏列表也执行数据请求，导致一次 refreshNotes 产生重复的 /api/notes 调用。
           */}
-          {(state.mobileView === "list" || persistentNoteList) && (
+          {(state.mobileView === "list" || persistentNoteList) && state.viewMode !== "favorites" && (
             <div
               className={`
                 flex-col shrink-0 h-full
@@ -1035,7 +1053,7 @@ function AppLayout() {
       {/* 微信剪贴板桥：桌面端监听系统剪贴板中的公众号文章链接，一键剪藏 */}
       <WechatClipboardBridge />
 
-      {/* 通知中心（由 NavRail 铃铛的 OPEN_NOTIFICATIONS_EVENT 打开，自管理显隐） */}
+      {/* 通知中心（由 NavRailMobile 铃铛的 OPEN_NOTIFICATIONS_EVENT 打开，自管理显隐） */}
       <NotificationCenter
         onUnreadChange={setNotificationCount}
         onOpenComment={handleOpenComment}
@@ -1062,6 +1080,38 @@ function AppLayout() {
     </div>
   );
 }
+
+// ===== 模块路径路由（viewMode ↔ URL 双向同步）=====
+// Rail 徽章切模块时 URL 跟随变化（/favorites /trash /files ...），刷新/前进/后退可恢复。
+// notebook 映射 "/"；sheet(/sheets/:id) 与导图(/mindmaps) 深链由各自模块处理，不在此列。
+const MODULE_APP_PATHS: ReadonlyArray<readonly [string, ViewMode]> = [
+  ["/favorites", "favorites"],
+  ["/trash", "trash"],
+  ["/files", "files"],
+  ["/shares", "shares"],
+  ["/projects", "projects"],
+  ["/tasks", "tasks"],
+  ["/diary", "diary"],
+  ["/ai", "ai-chat"],
+  ["/plugins", "plugins"],
+];
+
+function viewModeFromAppPath(pathname: string): ViewMode | null {
+  return MODULE_APP_PATHS.find(([path]) => path === pathname)?.[1] ?? null;
+}
+
+const VIEW_MODE_APP_PATHS: Partial<Record<ViewMode, string>> = {
+  notebook: "/",
+  favorites: "/favorites",
+  trash: "/trash",
+  files: "/files",
+  shares: "/shares",
+  projects: "/projects",
+  tasks: "/tasks",
+  diary: "/diary",
+  "ai-chat": "/ai",
+  plugins: "/plugins",
+};
 
 function MobileTopBar() {
   const actions = useAppActions();
@@ -1226,7 +1276,7 @@ function AuthGate() {
       return getAccessToken();
     })();
     // D-1：桌面端"切换到云端"开关。
-    //   用户在 NavRail 点击云端入口后会写 nowen-prefer-cloud=1，
+    //   用户在 NavRailMobile 点击云端入口后会写 nowen-prefer-cloud=1，
     //   此时强制跳过零登录，直接进登录页（让用户输入 fnos 服务器地址）。
     //   返回本地模式时 LoginPage 会清除该标记 + reload，零登录恢复。
     const preferCloud = (() => {
