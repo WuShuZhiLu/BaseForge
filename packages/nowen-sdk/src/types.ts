@@ -47,7 +47,7 @@ export interface UpdateNotebookParams {
 }
 
 // ===== 笔记 =====
-export type NoteContentFormat = "markdown" | "tiptap-json" | "html" | "plain";
+export type NoteContentFormat = "markdown" | "tiptap-json" | "html" | "plain" | "board";
 
 export interface Note {
   id: string;

@@ -1153,6 +1153,10 @@ const NoteCard = React.memo(function NoteCard({
               <span className="text-[10px] px-1 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 leading-none" title={t('note.format.markdown')}>
                 {t('note.format.markdownShort')}
               </span>
+            ) : note.contentFormat === "board" ? (
+              <span className="text-[10px] px-1 py-0.5 rounded border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 leading-none" title="画板文档">
+                画板
+              </span>
             ) : (
               <span className="text-[10px] px-1 py-0.5 rounded border border-app-border bg-app-hover text-tx-tertiary leading-none" title={t('note.format.richText')}>
                 {t('note.format.richTextShort')}

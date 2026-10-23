@@ -17,11 +17,12 @@
 ## 待办（按优先级）
 
 ### 1. 阶段 2：画板文档（本期核心，方案见 plan 阶段 2）
-- [ ] 安装 excalidraw（路由级 lazy 加载，控制首屏体积）
-- [ ] contentFormat 新增 `"board"`：SDK 类型 + 后端 knowledgeTreeCore/notes 路由（照抄 plain 的改法）
-- [ ] BoardEditor 全屏编辑器 + `/boards/:id` 深链（对齐 sheets/mindmaps 模式：App.tsx 路由 + 深链 lib）
+- [x] 安装 excalidraw（`@excalidraw/excalidraw@0.18.1`；BoardCanvas 独立 chunk，BoardEditor 内 React.lazy 懒加载）
+- [x] contentFormat 新增 `"board"`：SDK 类型 + 后端 knowledgeTreeCore/notes 路由 + openapi + 知识树图标/新建菜单（桌面 + 移动）
+- [x] BoardEditor 编辑器（走 EditorPane 的 contentFormat 分支，未做 `/boards/:id` 独立路由；画板仍是知识库文档，和 sheets/mindmaps 的独立模块模型不同）
 - [ ] BlockEmbedExtension 加 `![[board:<id>]]` 解析 → BoardEmbedCard（只读态渲染导出 SVG，点击进全屏）
-- [ ] 创建入口：知识树新建菜单 + 富文本块插入菜单
+- [ ] 创建入口：富文本块插入菜单（知识树新建菜单已完成）
+- [x] 画板正文派生搜索文本：`noteBlocks.syncNoteBlocks` 必须对 board 提前返回，否则会被当成 Markdown 生成"整段 JSON"contentText（已修）
 
 ### 2. 匿名文档机制（插块即匿名、单独创建才有名，导图同步适用，方案 plan 阶段 2）
 - [ ] notes 表加 `is_unlisted` 标记（新迁移，注意 DB 版本号递增；当前库版本见 backend/src/db/migrations.impl.ts 末尾）
@@ -48,3 +49,5 @@
 - EditorPane 各编辑器只在 mount 时读 note.content：任何"外部改正文"的场景（版本恢复、AI 写入等）都需要 contentRevision key 重挂载机制（见 EditorPane onRestore）
 - SidebarDesktop 有自己独立的知识树实现（openNode/fileIconFor/handleCreate），与 KnowledgeTreePanel/MobileKnowledgeTreePanel 三处并存——改树行为要三处对齐
 - plain/plainTextFromNoteContent、searchIndex.normalizeContentFormat 已放行 "plain"；新增格式值记得同步这两处 + SDK types + knowledgeTreeCore + notes.ts 创建路由 + capabilityCatalog（构建时生成）
+- Excalidraw 的 onChange 也会随"空闲状态"等非场景 appState 变化触发；BoardEditor 已加"内容未变化不排队保存"的守卫，去掉会变成每秒一次无效 PUT + 版本膨胀
+- 新增 contentFormat 后必须检查 `noteBlocks.syncNoteBlocks`（保存链路会在事务后再次覆盖 contentText）与 `searchIndex.normalizeContentFormat`，只改 `extractSearchableText` 不够

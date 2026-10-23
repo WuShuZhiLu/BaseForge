@@ -7,7 +7,7 @@
  *    · 导图紫 #7C3AED · 表格绿 #059669；
  *  - 用户自选 emoji 图标（文件夹 node.icon）保留，缩至 14px 与线性图标同基线。
  */
-import { FileCode, FileText, FileType2, Folder, Table2, Waypoints, FileDigit } from "lucide-react";
+import { FileCode, FileText, FileType2, Folder, Table2, Waypoints, FileDigit, PenTool } from "lucide-react";
 import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ export const NODE_ICON_SEMANTIC_COLORS = {
   note: "#2563EB",
   markdown: "#8B8B93",
   plain: "#64748B",
+  board: "#0D9488",
   mindmap: "#7C3AED",
   sheet: "#059669",
   word: "#2563EB",
@@ -28,6 +29,7 @@ const NODE_ICON_COMPONENTS = {
   note: FileText,
   markdown: FileCode,
   plain: FileDigit,
+  board: PenTool,
   mindmap: Waypoints,
   sheet: Table2,
   word: FileType2,
@@ -36,11 +38,12 @@ const NODE_ICON_COMPONENTS = {
 /** 依据节点模型判定图标语义类别（nodeType 优先，resourceType 兜底导图）。
  *  注：知识树 trigger 将 plain 笔记的 nodeType 映射为 "note"（树内显示通用文档图标），
  *  "plain" 类别仅供内联新建草稿图标（NodeKindIcon）使用。 */
-export function resolveNodeIconKind(node: Pick<KnowledgeTreeNode, "nodeType" | "resourceType" | "noteType">): NodeIconKind {
+export function resolveNodeIconKind(node: Pick<KnowledgeTreeNode, "nodeType" | "resourceType" | "noteType" | "contentFormat">): NodeIconKind {
   if (node.nodeType === "folder") return "folder";
   if (node.nodeType === "markdown") return "markdown";
   if (node.nodeType === "mindmap" || node.resourceType === "mindmap") return "mindmap";
   if (node.noteType === "sheet") return "sheet";
+  if (node.contentFormat === "board") return "board";
   if (node.nodeType === "word") return "word";
   return "note";
 }

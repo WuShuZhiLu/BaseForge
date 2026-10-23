@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import SheetEmbedInsertDialog from "@/components/SheetEmbedInsertDialog";
 import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
+import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -15,6 +15,7 @@ import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import type { NoteEditorHeading, NoteEditorUpdatePayload } from "@/components/editors/types";
 import MarkdownEditor from "@/components/MarkdownEditor";
 import PlainTextEditor from "@/components/PlainTextEditor";
+import BoardEditor from "@/components/BoardEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -3378,6 +3379,11 @@ const moveToTrash = useCallback(async () => {
               <FileCode size={11} />
               {t('note.format.markdownShort')}
             </span>
+          ) : activeNote.contentFormat === "board" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-teal-600" title="画板文档">
+              <PenTool size={11} />
+              画板
+            </span>
           ) : (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
               <FileText size={11} />
@@ -3820,6 +3826,14 @@ const moveToTrash = useCallback(async () => {
               revision={activeNote.version}
               content={activeNote.content}
               onOpenAttachmentDirectory={() => setShowAttachmentsPanel(true)}
+            />
+          ) : activeNote.contentFormat === "board" ? (
+            <BoardEditor
+              key={`board-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
             />
           ) : activeNote.contentFormat === "plain" ? (
             <PlainTextEditor

@@ -146,7 +146,7 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board";
   title: string;
   /** 加密笔记：只透传密文信封，服务端不解释正文。 */
   encryptedContent?: string;

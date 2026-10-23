@@ -688,9 +688,11 @@ app.post("/", async (c) => {
   const contentFormat = body.contentFormat === "markdown" ? "markdown"
     : body.contentFormat === "html" ? "html"
     : body.contentFormat === "plain" ? "plain"
+    : body.contentFormat === "board" ? "board"
     : "tiptap-json";
   const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n"
     : contentFormat === "plain" ? ""
+    : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}'
     : "{}";
   let initialContent = typeof body.content === "string" ? body.content : defaultContent;
   try {

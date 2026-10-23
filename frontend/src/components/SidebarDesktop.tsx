@@ -25,6 +25,7 @@ import {
   Pin,
   Play,
   BookOpen,
+  PenTool,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -236,6 +237,9 @@ function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
   if (node.noteType === "sheet") {
     return <Table2 size={15} className="shrink-0 text-emerald-500" />;
+  }
+  if (node.contentFormat === "board") {
+    return <PenTool size={15} className="shrink-0 text-teal-500" />;
   }
   if (node.nodeType === "mindmap" || node.resourceType === "mindmap") {
     return <Waypoints size={15} className="shrink-0 text-violet-500" />;
@@ -511,12 +515,12 @@ export default function SidebarDesktop() {
   }, []);
 
   /** + 新建菜单的统一创建入口（复用旧版节点创建语义） */
-  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet" | "plain") => {
+  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet" | "plain" | "board") => {
     setCreateMenuState(null);
     try {
       const titles: Record<string, string> = {
         folder: "新建文件夹", note: "新建文档", markdown: "新建 Markdown",
-        mindmap: "新建思维导图", sheet: "新建表格", plain: "新建纯文本",
+        mindmap: "新建思维导图", sheet: "新建表格", plain: "新建纯文本", board: "新建画板",
       };
       const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title: titles[kind] });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
@@ -1700,6 +1704,8 @@ export default function SidebarDesktop() {
                   >
                     {tab.contentFormat === "markdown" ? (
                       <FileCode size={14} className="shrink-0 text-emerald-500" />
+                    ) : tab.contentFormat === "board" ? (
+                      <PenTool size={14} className="shrink-0 text-teal-500" />
                     ) : (
                       <FileText size={14} className="shrink-0 text-[var(--color-accent-primary)]" />
                     )}

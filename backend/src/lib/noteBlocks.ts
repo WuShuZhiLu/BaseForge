@@ -458,6 +458,16 @@ export function syncNoteBlocks(
       changed: false,
     };
   }
+  if (contentFormat === "board") {
+    // 画板正文是 Excalidraw 场景 JSON，不是可切块的文档；不写块索引，只派生文本。
+    db.prepare("DELETE FROM note_blocks_index WHERE noteId = ?").run(noteId);
+    return {
+      content,
+      contentText: plainTextFromNoteContent(content, "board"),
+      blocks: [],
+      changed: false,
+    };
+  }
   const parsed = contentFormat === "tiptap-json"
     ? parseTiptap(noteId, content)
     : parseMarkdown(noteId, content);
@@ -583,6 +593,23 @@ export function searchNoteBlocks(
 export function plainTextFromNoteContent(content: string, contentFormat: string): string {
   if (contentFormat === "plain") {
     return content.replace(/\u0000/g, "").trim();
+  }
+  if (contentFormat === "board") {
+    // Excalidraw 场景是 JSON；只取未绑定容器的文本元素，避免容器与文本重复。
+    try {
+      const scene = JSON.parse(content) as {
+        elements?: Array<{ type?: string; text?: string; containerId?: string | null }>;
+      };
+      return (scene.elements || [])
+        .filter((element) => element?.type === "text" && typeof element.text === "string" && !element.containerId)
+        .map((element) => element.text!.trim())
+        .filter(Boolean)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    } catch {
+      return "";
+    }
   }
   if (contentFormat === "html") {
     return content.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();

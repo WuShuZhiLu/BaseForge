@@ -254,7 +254,7 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board";
   title: string;
   encryptedContent?: string;
   encryptedNoteId?: string;
@@ -285,7 +285,9 @@ export function createKnowledgeChild(input: {
         ? "无标题导图"
         : input.nodeType === "sheet"
           ? "无标题表格"
-          : "无标题笔记"
+          : input.nodeType === "board"
+            ? "无标题画板"
+            : "无标题笔记"
   );
   const key = expectedScope;
   const sortOrder = maxSortOrder(db, key, input.parentId);
@@ -312,9 +314,9 @@ export function createKnowledgeChild(input: {
         throw new KnowledgeTreeError("KNOWLEDGE_TREE_NOTE_CONTAINER_REQUIRED", 400, "根级文档需要先创建文件夹");
       }
       const noteId = input.encryptedContent && input.encryptedNoteId ? input.encryptedNoteId : uuid();
-      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : "tiptap-json";
+      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : "tiptap-json";
       const noteType = input.nodeType === "word" ? "word" : input.nodeType === "sheet" ? "sheet" : "normal";
-      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : contentFormat === "plain" ? "" : "{}");
+      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : contentFormat === "plain" ? "" : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}' : "{}");
       db.prepare(`
         INSERT INTO notes (
           id, userId, workspaceId, notebookId, title, content, contentText,
@@ -370,7 +372,7 @@ export function createKnowledgeChild(input: {
     ...row,
     title,
     childCount: 0,
-    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
+    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
     noteType: input.nodeType === "sheet" ? "sheet" : input.nodeType === "word" ? "word" : undefined,
     access: resolveKnowledgeNodeAccess(row.id, input.actorUserId, db),
   };
