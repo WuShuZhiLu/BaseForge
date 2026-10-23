@@ -74,3 +74,4 @@ scratch-*.cjs
 scratch-*.sh
 scratch-*.mjs
 .commitmsg-*.txt
+.trae-cn/
