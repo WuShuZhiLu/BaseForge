@@ -59,6 +59,9 @@ import {
   type KnowledgeTreeSortMode,
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
+import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
+import { Table2, Waypoints } from "lucide-react";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
@@ -229,6 +232,13 @@ function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
       return <BookOpen size={15} className="shrink-0 text-violet-500" />;
     }
     return <Folder size={15} className="shrink-0 text-amber-500" />;
+  }
+  // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
+  if (node.noteType === "sheet") {
+    return <Table2 size={15} className="shrink-0 text-emerald-500" />;
+  }
+  if (node.nodeType === "mindmap" || node.resourceType === "mindmap") {
+    return <Waypoints size={15} className="shrink-0 text-violet-500" />;
   }
   if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
     return <FileCode size={15} className="shrink-0 text-emerald-500" />;
@@ -501,16 +511,18 @@ export default function SidebarDesktop() {
   }, []);
 
   /** + 新建菜单的统一创建入口（复用旧版节点创建语义） */
-  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet") => {
+  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet" | "plain") => {
     setCreateMenuState(null);
     try {
       const titles: Record<string, string> = {
         folder: "新建文件夹", note: "新建文档", markdown: "新建 Markdown",
-        mindmap: "新建思维导图", sheet: "新建表格",
+        mindmap: "新建思维导图", sheet: "新建表格", plain: "新建纯文本",
       };
-      await knowledgeTreeApi.create({ parentId, nodeType: kind, title: titles[kind] });
+      const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title: titles[kind] });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
+      // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致
+      setRenaming({ kind: "kb", id: created.id, value: created.title });
     } catch (error) {
       console.error("[SidebarDesktop] create node failed:", error);
     }
@@ -844,6 +856,15 @@ export default function SidebarDesktop() {
   const openNode = useCallback(async (node: KnowledgeTreeNode) => {
     if (node.nodeType === "folder") {
       selectFolder(node);
+      return;
+    }
+    // 表格/导图走各自深链（对齐 KnowledgeTreePanel.openDocument），不能当笔记打开
+    if (node.noteType === "sheet") {
+      pushSheetAppPath(node.resourceId);
+      return;
+    }
+    if (node.nodeType === "mindmap" || node.resourceType === "mindmap") {
+      pushMindMapAppPath(node.resourceId);
       return;
     }
     try {
