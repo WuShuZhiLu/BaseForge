@@ -72,9 +72,9 @@
 - [x] 树图标：contentFormat="pdf" → 红色 FileText（nodeIcons + SidebarDesktop）；EditorPane"PDF"徽标
 - 备注：批注为纯文本（不做富文本/选区摘录捕获，quote 字段模型已留）；批注文本进 contentText → 全文搜索可命中；未做 ![[pdf:]] 嵌入块（plan 验收未要求）
 
-### 5. 小项（可选增强）
-- [ ] `.txt` 导入对话框加"保持纯文本"开关（默认仍转 markdown）
-- [ ] 命令面板目前没有"新建文档"命令（方案提过，暂缓）——补 plain/board 创建入口时一并考虑
+### 5. 小项（可选增强）——已完成（2026-10-24）
+- [x] `.txt` 导入加"保持纯文本"选择：导入 Markdown 文件的文件选择器放行 .txt，选中 .txt 时弹选择框（纯文本 / 转 Markdown，默认 Markdown，取消也按 Markdown）；拖拽导入路径行为不变
+- [x] 命令面板补"新建文档"命令组（富文本/Markdown/纯文本/画板/导图五项，目标 = 当前选中笔记本，创建后深链打开）
 
 ## 已知坑（前人教训）
 - EditorPane 各编辑器只在 mount 时读 note.content：任何"外部改正文"的场景（版本恢复、AI 写入等）都需要 contentRevision key 重挂载机制（见 EditorPane onRestore）

@@ -2,16 +2,23 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import {
   Columns2,
+  FileCode,
+  FileDigit,
+  FilePlus2,
   FileText,
   Loader2,
   Maximize2,
   Minimize2,
+  PenTool,
   Puzzle,
   Search as SearchIcon,
+  Waypoints,
   X,
 } from "lucide-react";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api } from "@/lib/api";
+import { openInternalNoteLink } from "@/lib/blockNavigation";
+import { toast } from "@/lib/toast";
 import { highlightTextNode, sanitizeSearchHtml } from "@/lib/searchHighlight";
 import {
   detectShortcutPlatform,
@@ -109,6 +116,66 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       });
     }
 
+    // 新建文档命令：plain/board/mindmap 等内容格式齐备后一并补齐（目标 = 当前选中的笔记本）
+    const targetNotebookId = state.selectedNotebookId || state.notebooks[0]?.id || null;
+    if (targetNotebookId) {
+      const createDoc = async (
+        label: string,
+        payload: { title: string; content: string; contentFormat: string },
+      ) => {
+        try {
+          const note = await api.createNote({ notebookId: targetNotebookId, ...payload });
+          actions.refreshNotes();
+          openInternalNoteLink(`note:${note.id}`);
+          toast.success(`已创建${label}`);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "创建文档失败");
+        }
+      };
+      commands.push(
+        {
+          id: "create-note-rich",
+          label: "新建富文本文档",
+          description: "在当前选中的笔记本里创建",
+          keywords: ["新建", "文档", "富文本", "create"],
+          icon: <FilePlus2 size={16} />,
+          run: () => { void createDoc("富文本文档", { title: "无标题笔记", content: "{}", contentFormat: "tiptap-json" }); },
+        },
+        {
+          id: "create-note-markdown",
+          label: "新建 Markdown 文档",
+          description: "在当前选中的笔记本里创建",
+          keywords: ["新建", "markdown", "create"],
+          icon: <FileCode size={16} />,
+          run: () => { void createDoc("Markdown 文档", { title: "无标题笔记", content: "# 无标题\n\n", contentFormat: "markdown" }); },
+        },
+        {
+          id: "create-note-plain",
+          label: "新建纯文本文档",
+          description: "等宽纯文本，无任何格式增强",
+          keywords: ["新建", "纯文本", "txt", "plain", "create"],
+          icon: <FileDigit size={16} />,
+          run: () => { void createDoc("纯文本文档", { title: "无标题纯文本", content: "", contentFormat: "plain" }); },
+        },
+        {
+          id: "create-note-board",
+          label: "新建画板文档",
+          description: "Excalidraw 白板，正文存场景 JSON",
+          keywords: ["新建", "画板", "白板", "board", "create"],
+          icon: <PenTool size={16} />,
+          run: () => { void createDoc("画板文档", { title: "无标题画板", content: '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}', contentFormat: "board" }); },
+        },
+        {
+          id: "create-note-mindmap",
+          label: "新建导图文档",
+          description: "知识库导图文档，正文存 MindMapData JSON",
+          keywords: ["新建", "导图", "思维导图", "mindmap", "create"],
+          icon: <Waypoints size={16} />,
+          run: () => { void createDoc("导图文档", { title: "无标题导图", content: JSON.stringify({ root: { id: "root", text: "无标题导图", children: [] } }), contentFormat: "mindmap" }); },
+        },
+      );
+    }
+
     const declared = pluginContributions.flatMap((contribution) => {
       const paletteIds = new Set((contribution.menus || []).filter((menu) => menu.location === "commandPalette").map((menu) => menu.command));
       return (contribution.commands || []).filter((command) => paletteIds.has(command.id)).map((command): WorkspaceCommand => ({
@@ -126,6 +193,8 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
     state.activeNote,
     state.editorFullscreen,
     state.editorSplit,
+    state.selectedNotebookId,
+    state.notebooks,
     pluginContributions,
     shortcutPlatform,
     shortcutSurface,
