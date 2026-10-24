@@ -41,6 +41,7 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importSpreadsheetIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
+  importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
@@ -280,7 +281,7 @@ export interface KnowledgeTreeInlineCreateRequest {
 export interface KnowledgeTreeImportRequest {
   requestId: number;
   parentId: string | null;
-  kind: "markdown" | "markdown-zip" | "word" | "wechat" | "yuque" | "spreadsheet" | "spreadsheet";
+  kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque" | "spreadsheet" | "spreadsheet";
 }
 
 export interface KnowledgeTreeTemplateCreateRequest {
@@ -842,7 +843,9 @@ export function KnowledgeTreePanel({
             ? await importMarkdownZipIntoKnowledgeTree(options)
             : importRequest.kind === "word"
               ? await importWordIntoKnowledgeTree(options)
-              : importRequest.kind === "wechat"
+              : importRequest.kind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : importRequest.kind === "wechat"
  ? await importWeChatArticleIntoKnowledgeTree(options)
  : await importSpreadsheetIntoKnowledgeTree(options);
         if (!imported) return;

@@ -84,6 +84,57 @@ export async function importWordIntoKnowledgeTree(
   }
 }
 
+export async function importPdfIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const file = await pickPdfFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 PDF 文档…", 0);
+  let noteId: string | null = null;
+  try {
+    const title = file.name.replace(/\.pdf$/i, "").trim() || "PDF 文档";
+    const workspaceId = getCurrentWorkspace();
+    // 1) 建正文骨架（contentFormat="pdf"，内容 = 原件引用 + 批注层）
+    const note = await api.createNote({
+      title,
+      notebookId,
+      contentFormat: "pdf",
+      ...(workspaceId && workspaceId !== "personal" ? { workspaceId } : {}),
+    });
+    noteId = note.id;
+    // 2) 原件存附件
+    const attachment = await api.attachments.upload(note.id, file);
+    // 3) 回填原件引用
+    await api.updateNote(note.id, {
+      content: JSON.stringify({ attachmentId: attachment.id, annotations: [] }),
+      contentText: "",
+    });
+    await moveImportedNote(note.id, notebookId, options.parent);
+    toast.dismiss(toastId);
+    toast.success("导入成功");
+    return note as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    // 失败回滚：把半成品笔记移入回收站（best-effort）
+    if (noteId) {
+      try { await api.updateNote(noteId, { isTrashed: 1 }); } catch { /* 尽力而为 */ }
+    }
+    throw error;
+  }
+}
+
+function pickPdfFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,application/pdf";
+    input.onchange = () => resolve(input.files?.[0] || null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 export async function importMarkdownIntoKnowledgeTree(
   options: KnowledgeTreeImportOptions,
 ): Promise<LoadedNote | null> {

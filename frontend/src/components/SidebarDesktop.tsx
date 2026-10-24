@@ -61,7 +61,7 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
-import { Table2, Waypoints } from "lucide-react";
+import { FileText, Table2, Waypoints } from "lucide-react";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
@@ -243,6 +243,9 @@ function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   // 导图归一后是 contentFormat="mindmap" 的笔记节点；nodeType/resourceType 判断保留给遗留数据。
   if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") {
     return <Waypoints size={15} className="shrink-0 text-violet-500" />;
+  }
+  if (node.contentFormat === "pdf") {
+    return <FileText size={15} className="shrink-0 text-red-500" />;
   }
   if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
     return <FileCode size={15} className="shrink-0 text-emerald-500" />;

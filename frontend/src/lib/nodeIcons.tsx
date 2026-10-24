@@ -20,6 +20,7 @@ export const NODE_ICON_SEMANTIC_COLORS = {
   mindmap: "#7C3AED",
   sheet: "#059669",
   word: "#2563EB",
+  pdf: "#DC2626",
 } as const;
 
 export type NodeIconKind = keyof typeof NODE_ICON_SEMANTIC_COLORS;
@@ -33,6 +34,7 @@ const NODE_ICON_COMPONENTS = {
   mindmap: Waypoints,
   sheet: Table2,
   word: FileType2,
+  pdf: FileText,
 } as const;
 
 /** 依据节点模型判定图标语义类别（nodeType 优先，resourceType 兜底导图）。
@@ -45,6 +47,7 @@ export function resolveNodeIconKind(node: Pick<KnowledgeTreeNode, "nodeType" | "
   if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") return "mindmap";
   if (node.noteType === "sheet") return "sheet";
   if (node.contentFormat === "board") return "board";
+  if (node.contentFormat === "pdf") return "pdf";
   if (node.nodeType === "word") return "word";
   return "note";
 }

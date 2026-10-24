@@ -17,6 +17,7 @@ import MarkdownEditor from "@/components/MarkdownEditor";
 import PlainTextEditor from "@/components/PlainTextEditor";
 import BoardEditor from "@/components/BoardEditor";
 import MindMapDocEditor from "@/components/MindMapDocEditor";
+import PdfDocEditor from "@/components/PdfDocEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -3446,6 +3447,11 @@ const moveToTrash = useCallback(async () => {
               <Waypoints size={11} />
               导图
             </span>
+          ) : activeNote.contentFormat === "pdf" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-red-500" title="PDF 文档（保原件 + 批注层）">
+              <FileText size={11} />
+              PDF
+            </span>
           ) : (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
               <FileText size={11} />
@@ -3912,6 +3918,15 @@ const moveToTrash = useCallback(async () => {
             // 导图文档：MindMapCenter 嵌入模式自管保存（/api/mindmaps 门面，乐观锁）。
             <MindMapDocEditor
               key={`mindmap-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "pdf" ? (
+            // PDF 文档：原件预览（pdfjs）+ 页码锚定批注层，正文走通用笔记保存。
+            <PdfDocEditor
+              key={`pdf-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}

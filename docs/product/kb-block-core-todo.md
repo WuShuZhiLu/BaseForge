@@ -61,9 +61,12 @@
 - [x] "导出为 .docx"复用现有序列化（exportNoteAsDocx 此前已有，双向闭环成立）
 - 备注：自研 IR 管线此前只用于预览（WordViewer），现在预览/导入/导出共用同一份 DocxIR；图片走 blob→fetch→附件上传，宽高 pt→px（×4/3）
 
-### 4. 阶段 4：PDF 保原件 + 批注层（方案 plan 阶段 4，用户已认可）
-- [ ] contentFormat 新增 `"pdf"`，正文存 `{ attachmentId }` + 批注层数据
-- [ ] 查看器复用 AttachmentPdfPreview（pdfjs-dist 已在用）+ 页码锚点笔记层（Tiptap 侧栏）
+### 4. 阶段 4：PDF 保原件 + 批注层（方案 plan 阶段 4，用户已认可）——已完成（2026-10-24）
+- [x] contentFormat 新增 `"pdf"`：后端创建白名单/默认正文 `{attachmentId,annotations:[]}`、searchIndex 白名单、noteBlocks 派生批注文本、openapi/SDK 类型；正文 = 原件引用 + 页码锚定批注层 JSON（`lib/pdfAnnotations.ts` 后端 / `lib/pdfDocContent.ts` 前端，同构）
+- [x] 查看器复用 AttachmentPdfPreview（pdfjs），扩展受控页码 props（page/onPageChange）；右侧批注层侧栏（PdfDocEditor：按页添加/编辑/删除批注、点击批注跳页、下载原文件），防抖走通用笔记保存
+- [x] 导入入口：知识树 +菜单/创建菜单"导入 PDF 文档（保原件）"（桌面两处菜单 + 移动端面板），建笔记→传附件→回填引用→失败回收站回滚
+- [x] 树图标：contentFormat="pdf" → 红色 FileText（nodeIcons + SidebarDesktop）；EditorPane"PDF"徽标
+- 备注：批注为纯文本（不做富文本/选区摘录捕获，quote 字段模型已留）；批注文本进 contentText → 全文搜索可命中；未做 ![[pdf:]] 嵌入块（plan 验收未要求）
 
 ### 5. 小项（可选增强）
 - [ ] `.txt` 导入对话框加"保持纯文本"开关（默认仍转 markdown）

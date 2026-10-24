@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , FileSpreadsheet, PenTool } from "lucide-react";
+import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , FileSpreadsheet, PenTool } from "lucide-react";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -43,6 +43,7 @@ const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
   { kind: "markdown-zip", label: "导入 Markdown + 附件（ZIP）", icon: FileArchive },
   { kind: "word", label: "导入 Word 文档", icon: FileType2 },
+  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },
 { kind: "spreadsheet", label: "导入 Excel/CSV 为 Markdown 表格", icon: FileSpreadsheet },
@@ -345,7 +346,9 @@ export function KnowledgeTreeCreateDropdown({
                   ? "text-amber-500"
                   : item.kind === "word"
                     ? "text-violet-500"
-                    : "text-sky-500"}
+                    : item.kind === "pdf"
+                      ? "text-red-500"
+                      : "text-sky-500"}
             />
             <span>{item.label}</span>
           </button>

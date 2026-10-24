@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BrainCircuit, Copy, FileArchive, FileCode, FileText, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
+import { BrainCircuit, Copy, FileArchive, FileCode, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
 import type { KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
 import { duplicateKnowledgeTreeNoteAsChild, resolveDuplicableKnowledgeTreeNote } from "@/lib/knowledgeTreeDuplicateAsChild";
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
@@ -23,6 +23,7 @@ const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
   { kind: "markdown-zip", label: "导入 Markdown + 附件（ZIP）", icon: FileArchive },
   { kind: "word", label: "导入 Word 文档", icon: FileType2 },
+  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
 ] as const;
 
@@ -37,7 +38,7 @@ interface KnowledgeTreeCreateDropdownProps {
   onCreate: (parentId: string | null, kind: KnowledgeTreeInlineCreateKind) => void;
   onCreateFromTemplate: (parentId: string | null) => void;
   onCreateEncrypted?: (parentId: string | null) => void;
-  onImport: (parentId: string | null, kind: "markdown" | "markdown-zip" | "word" | "wechat") => void;
+  onImport: (parentId: string | null, kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat") => void;
 }
 
 function menuPosition(anchor: DOMRect, menuHeight: number): React.CSSProperties {
@@ -218,7 +219,9 @@ export function KnowledgeTreeCreateDropdown({
                   ? "text-amber-500"
                   : item.kind === "word"
                     ? "text-violet-500"
-                    : "text-sky-500"}
+                    : item.kind === "pdf"
+                      ? "text-red-500"
+                      : "text-sky-500"}
             />
             <span>{item.label}</span>
           </button>
