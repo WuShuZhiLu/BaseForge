@@ -2,9 +2,9 @@ import React, { useCallback, useRef, useState, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
-import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, ArrowLeft } from "lucide-react";
+import { openInternalNoteLink } from "@/lib/blockNavigation";
+import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -16,6 +16,7 @@ import type { NoteEditorHeading, NoteEditorUpdatePayload } from "@/components/ed
 import MarkdownEditor from "@/components/MarkdownEditor";
 import PlainTextEditor from "@/components/PlainTextEditor";
 import BoardEditor from "@/components/BoardEditor";
+import MindMapDocEditor from "@/components/MindMapDocEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -2488,11 +2489,11 @@ const moveToTrash = useCallback(async () => {
   const [aiMermaidResult, setAiMermaidResult] = useState("");
   const [aiMermaidType, setAiMermaidType] = useState<"mermaid_mindmap" | "mermaid_flowchart">("mermaid_mindmap");
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
-  const [showMindMapInsertDialog, setShowMindMapInsertDialog] = useState(false);
   const [embedPickerKind, setEmbedPickerKind] = useState<KnowledgeDocEmbedKind | null>(null);
 
   useEffect(() => {
-    const openMindMapInsert = () => setShowMindMapInsertDialog(true);
+    // 导图插入复用泛化的文档嵌入选择对话框（与画板一致）。
+    const openMindMapInsert = () => setEmbedPickerKind("mindmap");
     window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
     return () => window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
   }, []);
@@ -2592,11 +2593,8 @@ const moveToTrash = useCallback(async () => {
       const created = await api.createMindMap({ title, data: JSON.stringify(data) });
       toast.success("已保存为思维导图");
       setShowMermaidDialog(false);
-      // 通知 MindMapEditor 打开新图
-      // 切换到思维导图视图
-      // 保存 pending ID 到 sessionStorage 并切换到思维导图视图
-      sessionStorage.setItem("pendingOpenMindMapId", created.id);
-      actions.setViewMode("mindmaps");
+      // 导图已归一为知识库文档：作为笔记打开（不再跳独立导图模块）。
+      openInternalNoteLink(`note:${created.id}`);
     } catch (e: any) {
       console.error("Save mindmap error:", e);
       toast.error(e?.message || "保存失败");
@@ -3443,6 +3441,11 @@ const moveToTrash = useCallback(async () => {
               <PenTool size={11} />
               画板
             </span>
+          ) : activeNote.contentFormat === "mindmap" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-violet-500" title="导图文档">
+              <Waypoints size={11} />
+              导图
+            </span>
           ) : (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
               <FileText size={11} />
@@ -3905,6 +3908,15 @@ const moveToTrash = useCallback(async () => {
               onUpdate={handleUpdate}
               editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
             />
+          ) : activeNote.contentFormat === "mindmap" ? (
+            // 导图文档：MindMapCenter 嵌入模式自管保存（/api/mindmaps 门面，乐观锁）。
+            <MindMapDocEditor
+              key={`mindmap-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
           ) : activeNote.contentFormat === "plain" ? (
             <PlainTextEditor
               key={`plain-${activeNote.id}-r${contentRevision}`}
@@ -4343,41 +4355,26 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
       {/* HTML Ԥ�� �� �༭ģʽ�л�ȷ�ϵ��� */}
-      {/* 思维导图插入对话框 */}
-      <MindMapEmbedInsertDialog
-        open={showMindMapInsertDialog && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
-        workspaceId={activeNote?.workspaceId ?? null}
-        onClose={() => setShowMindMapInsertDialog(false)}
-        onInsert={(id) => {
-          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
-          const markdown = `\n\n![[mindmap:${id}]]\n\n`;
-          const editorHandle = editorHandleRef.current;
-          const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
-          const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
-          if (inserted) {
-            editorHandle?.flushSave?.();
-            toast.success("已插入思维导图");
-          }
-          return inserted;
-        }}
-      />
-      {/* 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」触发） */}
+      {/* 思维导图插入复用泛化的文档嵌入选择对话框 */}
+      {/* 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」/「嵌入导图」触发） */}
       <KnowledgeDocEmbedDialog
         open={embedPickerKind !== null && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
         kind={embedPickerKind ?? "sheet"}
         onClose={() => setEmbedPickerKind(null)}
-        onCreate={embedPickerKind === "board" && activeNote?.notebookId ? async () => {
+        onCreate={(embedPickerKind === "board" || embedPickerKind === "mindmap") && activeNote?.notebookId ? async () => {
           if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return null;
+          const kind = embedPickerKind;
           try {
+            // 画板/导图插块即匿名：新建 isUnlisted=1 文档，仅以嵌入块形式存在。
             const created = await api.createNote({
-              title: "画板",
-              contentFormat: "board",
+              title: kind === "board" ? "画板" : "思维导图",
+              contentFormat: kind === "board" ? "board" : "mindmap",
               notebookId: activeNote.notebookId,
               isUnlisted: 1,
             });
-            return { id: created.id, title: created.title || "画板" };
+            return { id: created.id, title: created.title || (kind === "board" ? "画板" : "思维导图") };
           } catch (error) {
-            toast.error(error instanceof Error ? error.message : "创建画板失败");
+            toast.error(error instanceof Error ? error.message : "创建文档失败");
             return null;
           }
         } : undefined}

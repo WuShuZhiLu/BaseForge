@@ -560,13 +560,7 @@ export default function MobileKnowledgeTreePanel({
       if (variant === "mobile") actions.setMobileSidebar(false);
       return;
     }
-    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
-    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
-    if (node.resourceType === "mindmap") {
-      pushMindMapAppPath(node.resourceId);
-      if (variant === "mobile") actions.setMobileSidebar(false);
-      return;
-    }
+    // 导图归一后是 resourceType="note" 的文档节点，直接按笔记打开（EditorPane 导图分支）。
     if (node.resourceType !== "note") return;
     rememberOpened(node.id);
     try {
@@ -665,13 +659,7 @@ export default function MobileKnowledgeTreePanel({
         toast.success("已创建文件夹");
         return;
       }
-      // 建完自动打开：导图/表格走各自深链（上游同款行为）。
-      if (snapshot.kind === "mindmap") {
-        rememberOpened(created.id);
-        pushMindMapAppPath(created.resourceId);
-        if (variant === "mobile") actions.setMobileSidebar(false);
-        return;
-      }
+      // 建完自动打开：表格走深链；导图归一后是笔记文档，走通用笔记打开。
       if (snapshot.kind === "sheet") {
         rememberOpened(created.id);
         pushSheetAppPath(created.resourceId);

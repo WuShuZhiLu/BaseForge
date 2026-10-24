@@ -48,12 +48,14 @@ describe("1.5.1 runtime wiring contract", () => {
     }
   });
 
-  it("opens mind map nodes from the knowledge tree", () => {
+  it("opens mind map docs as notes from the knowledge tree (normalized)", () => {
+    // 导图归一后是 contentFormat="mindmap" 的笔记文档，不再走 /mindmaps/:id 深链。
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
+      "../../components/SidebarDesktop.tsx",
     ]) {
-      expect(read(file)).toContain("pushMindMapAppPath(node.resourceId)");
+      expect(read(file)).not.toContain("pushMindMapAppPath(node.resourceId)");
     }
   });
 });
@@ -67,14 +69,14 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
     expect(menu.split("<span>轻量表格</span>").length - 1).toBe(1);
     expect(menu).toContain("onCreateSheet");
 
-    // 导图建完自动打开（另一条已锁行为，勿在此项改动时丢失）。
+    // 导图建完自动打开（另一条已锁行为；归一后走通用笔记打开链路，勿在此项改动时丢失）。
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
     ]) {
       const source = read(file);
-      expect(source).toContain('snapshot.kind === "mindmap"');
-      expect(source).toContain("pushMindMapAppPath(created.resourceId)");
+      expect(source).not.toContain('snapshot.kind === "mindmap"');
+      expect(source).toContain("activateNote(await api.getNote(created.resourceId)");
     }
 
     // 表格数据 → Markdown 笔记导入（1.0.0：完善现有功能）。

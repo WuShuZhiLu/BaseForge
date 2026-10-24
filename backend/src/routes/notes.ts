@@ -35,6 +35,7 @@ import { deleteAttachmentFilesByNoteIds, extractInlineBase64Images } from "./att
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import { syncNoteLinks, getBacklinks } from "../lib/noteLinks";
 import { syncNoteBlocks } from "../lib/noteBlocks";
+import { defaultMindmapContent } from "../lib/mindmapData";
 import {
   readAuthoritativeNoteContent,
   readBlockAuthorityHistory,
@@ -690,13 +691,15 @@ app.post("/", async (c) => {
     : body.contentFormat === "html" ? "html"
     : body.contentFormat === "plain" ? "plain"
     : body.contentFormat === "board" ? "board"
+    : body.contentFormat === "mindmap" ? "mindmap"
     : "tiptap-json";
   // 匿名文档：没有知识树节点，只通过宿主笔记里的嵌入块访问。
-  // 当前 UI 只对画板开放；其他格式传入也按匿名处理，方便后续导图归一。
+  // 画板与导图的嵌入插块走这条链路（isUnlisted=1）。
   const isUnlisted = body.isUnlisted === true || body.isUnlisted === 1 ? 1 : 0;
   const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n"
     : contentFormat === "plain" ? ""
     : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}'
+    : contentFormat === "mindmap" ? defaultMindmapContent(body.title || "无标题导图")
     : "{}";
   let initialContent = typeof body.content === "string" ? body.content : defaultContent;
   try {

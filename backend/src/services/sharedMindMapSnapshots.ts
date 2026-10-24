@@ -110,8 +110,9 @@ export function collectSharedMindMapSnapshots(
   let totalBytes = 0;
 
   for (const id of ids) {
+    // 导图归一后正文存 notes（content 为 MindMapData JSON）。
     const row = db.prepare(
-      "SELECT id, userId, workspaceId, title, data, updatedAt FROM mindmaps WHERE id = ?",
+      "SELECT id, userId, workspaceId, title, content AS data, updatedAt FROM notes WHERE id = ? AND contentFormat = 'mindmap' AND isTrashed = 0",
     ).get(id) as
       | {
           id: string;

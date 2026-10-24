@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Edit3,
   ExternalLink,
+  FilePlus2,
   Maximize2,
   Minimize2,
   RefreshCw,
@@ -11,6 +12,8 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { openInternalNoteLink } from "@/lib/blockNavigation";
+import { toast } from "@/lib/toast";
 import type { MindMap } from "@/types";
 import {
   buildMindMapSnapshot,
@@ -18,7 +21,6 @@ import {
   parseMindMapSnapshotData,
   type MindMapSnapshot,
 } from "@/lib/mindMapSnapshot";
-import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
 import {
   DOCUMENT_MINDMAP_CHANGED_EVENT,
   invalidateDocumentMindMapCache,
@@ -92,6 +94,9 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
   const [scale, setScale] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteTitle, setPromoteTitle] = useState("");
+  const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => {
     setVisible(typeof IntersectionObserver === "undefined");
@@ -204,9 +209,32 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
 
   const openEditor = () => {
     if (!map) return;
-    // Route is the source of truth; AppLayout will switch the module and MindMapEditor
-    // will select the UUID from /mindmaps/:id. Keep the old event out of this path.
-    pushMindMapAppPath(map.id);
+    // 导图归一后就是知识库文档：作为笔记打开（不再走 /mindmaps/:id 深链）。
+    openInternalNoteLink(`note:${map.id}`);
+  };
+
+  const startPromote = () => {
+    if (!map) return;
+    setPromoteTitle(map.title && map.title !== "思维导图" ? map.title : "");
+    setPromoting(true);
+  };
+
+  const confirmPromote = async () => {
+    if (!map || upgrading) return;
+    setUpgrading(true);
+    try {
+      const updated = await api.promoteNote(map.id, { title: promoteTitle.trim() || "未命名导图" });
+      setMap({ ...map, title: updated.title || map.title, isUnlisted: 0 });
+      setPromoting(false);
+      toast.success("已转为独立文档，可在知识树中找到");
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+        detail: { reason: "anonymous-doc-promoted", noteId: map.id },
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "转为独立文档失败");
+    } finally {
+      setUpgrading(false);
+    }
   };
 
 
@@ -313,15 +341,60 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
               </span>
             )}
           </div>
-          {toolbar}
+          <div className="flex min-w-0 items-center gap-1">
+            {map?.isUnlisted === 1 && !promoting && (
+              <button
+                type="button"
+                onClick={startPromote}
+                title="转为独立文档（进入知识树）"
+                className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-violet-500 transition-colors hover:bg-app-hover"
+              >
+                <FilePlus2 size={12} />
+                转为独立文档
+              </button>
+            )}
+            {toolbar}
+          </div>
         </div>
+        {promoting && (
+          <div className="flex items-center gap-2 border-b border-app-border bg-app-hover/40 px-3 py-2">
+            <input
+              autoFocus
+              value={promoteTitle}
+              onChange={(event) => setPromoteTitle(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") { event.preventDefault(); void confirmPromote(); }
+                if (event.key === "Escape") { event.preventDefault(); setPromoting(false); }
+              }}
+              placeholder="文档名称"
+              className="min-w-0 flex-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+            />
+            <button
+              type="button"
+              disabled={upgrading}
+              className="rounded-md bg-accent-primary px-2 py-1 text-[11px] text-white disabled:opacity-50"
+              onClick={() => { void confirmPromote(); }}
+            >
+              {upgrading ? "处理中…" : "确定"}
+            </button>
+            <button
+              type="button"
+              className="rounded-md px-2 py-1 text-[11px] text-tx-secondary hover:bg-app-hover"
+              onClick={() => setPromoting(false)}
+            >
+              取消
+            </button>
+          </div>
+        )}
         <div className="min-h-24 max-h-[380px] overflow-auto overscroll-contain px-3 py-3" aria-label="思维导图只读预览">
           {body}
         </div>
         <div className="border-t border-app-border px-3 py-1.5 text-[11px] text-tx-tertiary">
           {cacheState.source === "cache"
             ? "离线只读快照 · 联网后自动刷新 · 删除此块不会删除源文件"
-            : "引用原始导图 · SVG 只读快照 · 删除此块不会删除源文件"}
+            : map?.isUnlisted === 1
+              ? "匿名导图 · 只通过此嵌入块访问 · 删除此块后会被自动清理"
+              : "引用原始导图 · SVG 只读快照 · 删除此块不会删除源文件"}
         </div>
       </div>
       {editing && mapId && typeof document !== "undefined" && createPortal(

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
 import type Database from "better-sqlite3";
 import { stripLegacyInternalMarkdownMarkers } from "./markdownUserContent";
+import { mindmapPlainText } from "./mindmapData";
 
 export const SUPPORTED_NOTE_BLOCK_TYPES = [
   "heading",
@@ -468,6 +469,16 @@ export function syncNoteBlocks(
       changed: false,
     };
   }
+  if (contentFormat === "mindmap") {
+    // 导图正文是 MindMapData JSON，不是可切块的文档；不写块索引，只派生节点文本。
+    db.prepare("DELETE FROM note_blocks_index WHERE noteId = ?").run(noteId);
+    return {
+      content,
+      contentText: mindmapPlainText(content),
+      blocks: [],
+      changed: false,
+    };
+  }
   const parsed = contentFormat === "tiptap-json"
     ? parseTiptap(noteId, content)
     : parseMarkdown(noteId, content);
@@ -593,6 +604,9 @@ export function searchNoteBlocks(
 export function plainTextFromNoteContent(content: string, contentFormat: string): string {
   if (contentFormat === "plain") {
     return content.replace(/\u0000/g, "").trim();
+  }
+  if (contentFormat === "mindmap") {
+    return mindmapPlainText(content);
   }
   if (contentFormat === "board") {
     // Excalidraw 场景是 JSON；只取未绑定容器的文本元素，避免容器与文本重复。

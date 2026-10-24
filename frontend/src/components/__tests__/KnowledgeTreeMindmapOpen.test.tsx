@@ -8,14 +8,16 @@ const MINDMAP_ID = "22222222-2222-4222-8222-222222222222";
 
 vi.mock("@/lib/knowledgeTreeApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/knowledgeTreeApi")>("@/lib/knowledgeTreeApi");
+  // 导图归一后是 contentFormat="mindmap" 的笔记节点（resourceType="note"）。
+  // 注意：vi.mock 工厂会被提升，不能用文件内常量。
   const node = {
-    id: "tree-mindmap",
+    id: `note:22222222-2222-4222-8222-222222222222`,
     userId: "u1",
     workspaceId: null,
     scopeKey: "personal",
     parentId: null,
-    nodeType: "mindmap",
-    resourceType: "mindmap",
+    nodeType: "note",
+    resourceType: "note",
     resourceId: "22222222-2222-4222-8222-222222222222",
     sortOrder: 0,
     isExpanded: 0,
@@ -25,7 +27,7 @@ vi.mock("@/lib/knowledgeTreeApi", async () => {
     updatedAt: "2026-10-13 00:00:00",
     title: "无标题导图",
     icon: null,
-    contentFormat: null,
+    contentFormat: "mindmap",
     colorMark: null,
     childCount: 0,
     access: { capabilities: { canRead: true, canCreate: false, canMove: false, canDelete: false, canRename: false, canShare: false }, inherited: true },
@@ -42,9 +44,44 @@ vi.mock("@/lib/knowledgeTreeApi", async () => {
 
 vi.mock("@/store/AppContext", async () => {
   const actual = await vi.importActual<typeof import("@/store/AppContext")>("@/store/AppContext");
-  const actions = new Proxy({}, { get: () => vi.fn() });
+  // 记录调用的 actions 代理，供断言 setActiveNote 被携带导图文档调用。
+  const actionsProxy: Record<string, ReturnType<typeof vi.fn>> = new Proxy({}, {
+    get: (target, prop) => {
+      if (typeof prop !== "string") return undefined;
+      target[prop] ??= vi.fn();
+      return target[prop];
+    },
+  });
   const state = { viewMode: "all", activeNote: null, searchQuery: "", mobileView: "list", editorSplit: false, notes: [], notebooks: [], tags: [] };
-  return { ...actual, useApp: () => ({ state, actions }), useAppActions: () => actions };
+  return { ...actual, useApp: () => ({ state, actions: actionsProxy }), useAppActions: () => actionsProxy, __actionsProxy: actionsProxy };
+});
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ...actual,
+    api: {
+      ...actual.api,
+      getNote: vi.fn().mockResolvedValue({
+        id: "22222222-2222-4222-8222-222222222222",
+        userId: "u1",
+        notebookId: "nb-1",
+        workspaceId: null,
+        title: "无标题导图",
+        content: JSON.stringify({ root: { id: "root", text: "无标题导图", children: [] } }),
+        contentText: "",
+        contentFormat: "mindmap",
+        isPinned: 0,
+        isFavorite: 0,
+        isLocked: 0,
+        isArchived: 0,
+        isTrashed: 0,
+        version: 1,
+        createdAt: "2026-10-13 00:00:00",
+        updatedAt: "2026-10-13 00:00:00",
+      }),
+    },
+  };
 });
 
 vi.mock("@/lib/toast", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
@@ -76,13 +113,12 @@ afterEach(async () => {
 });
 
 /**
- * 回归：知识树里的思维导图节点必须能点开。
+ * 回归：知识树里的导图文档节点必须能点开。
  *
- * openDocument 里曾经只处理 folder / sheet / note，mindmap 落到
- * `if (node.resourceType !== "note") return;` 被静默丢弃 —— 点「无标题导图」毫无反应、
- * URL 也不动。修法是照上游走导图深链 pushMindMapAppPath。
+ * 导图归一后是 contentFormat="mindmap" 的笔记节点（resourceType="note"），
+ * 点击走通用笔记打开链路（api.getNote → setActiveNote），不再跳 /mindmaps/:id 深链。
  */
-it("opens a mind map node by pushing the mind map deep link", async () => {
+it("opens a mind map doc as a note from the knowledge tree", async () => {
   await act(async () => {
     root.render(<MobileKnowledgeTreePanel variant="desktop" />);
   });
@@ -92,7 +128,7 @@ it("opens a mind map node by pushing the mind map deep link", async () => {
     await Promise.resolve();
   });
 
-  const row = host.querySelector('[data-desktop-knowledge-tree-node-id="tree-mindmap"]');
+  const row = host.querySelector(`[data-desktop-knowledge-tree-node-id="note:${MINDMAP_ID}"]`);
   expect(row).not.toBeNull();
   const button = row?.querySelector("button");
   expect(button).not.toBeNull();
@@ -100,6 +136,18 @@ it("opens a mind map node by pushing the mind map deep link", async () => {
   await act(async () => {
     button!.click();
   });
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 
-  expect(window.location.pathname.endsWith(`/mindmaps/${MINDMAP_ID}`)).toBe(true);
+  const { api } = await import("@/lib/api");
+  expect(vi.mocked(api.getNote)).toHaveBeenCalledWith(MINDMAP_ID);
+  const appContextModule = await import("@/store/AppContext");
+  const actionsProxy = (appContextModule as unknown as { __actionsProxy: Record<string, ReturnType<typeof vi.fn>> }).__actionsProxy;
+  expect(actionsProxy.setActiveNote).toHaveBeenCalled();
+  const activated = actionsProxy.setActiveNote.mock.calls[0]?.[0] as { id?: string } | undefined;
+  expect(activated?.id).toBe(MINDMAP_ID);
+  // 不再跳导图模块深链
+  expect(window.location.pathname.endsWith(`/mindmaps/${MINDMAP_ID}`)).toBe(false);
 });

@@ -178,9 +178,8 @@ app.patch("/nodes/:nodeId", async (c) => {
           db.prepare("UPDATE notebooks SET name = ?, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
         } else if (node.resourceType === "note") {
           db.prepare("UPDATE notes SET title = ?, version = version + 1, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
-        } else if (node.resourceType === "mindmap") {
-          db.prepare("UPDATE mindmaps SET title = ?, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
         }
+        // 导图已归一为 notes 行（contentFormat="mindmap"），走上面的 note 分支。
       }
       if (isExpanded !== undefined) {
         db.prepare("UPDATE knowledge_tree_nodes SET isExpanded = ?, updatedAt = datetime('now') WHERE id = ?")

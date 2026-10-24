@@ -1,6 +1,7 @@
 import { validateSheetData } from "./sheetData.js";
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
+import { defaultMindmapContent } from "../lib/mindmapData.js";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -303,11 +304,21 @@ export function createKnowledgeChild(input: {
       `).run(notebookId, resourceOwnerUserId, normalizedWorkspaceId, physicalParentId, title, sortOrder);
       createdNode = nodeForResource(db, "notebook", notebookId);
     } else if (input.nodeType === "mindmap") {
+      // 导图归一：与 markdown/plain/board 同走 notes 行（contentFormat="mindmap"），
+      // 正文存 MindMapData JSON；不再写独立 mindmaps 表。
+      const notebookId = nearestNotebookContainer(db, input.parentId);
+      if (!notebookId) {
+        throw new KnowledgeTreeError("KNOWLEDGE_TREE_NOTE_CONTAINER_REQUIRED", 400, "根级文档需要先创建文件夹");
+      }
       const mindmapId = uuid();
-      db.prepare("INSERT INTO mindmaps (id, userId, workspaceId, title, data) VALUES (?, ?, ?, ?, ?)")
-        .run(mindmapId, resourceOwnerUserId, normalizedWorkspaceId, title,
-          JSON.stringify({ root: { id: "root", text: title, children: [] } }));
-      createdNode = nodeForResource(db, "mindmap", mindmapId);
+      db.prepare(`
+        INSERT INTO notes (
+          id, userId, workspaceId, notebookId, title, content, contentText,
+          contentFormat, note_type, sortOrder
+        ) VALUES (?, ?, ?, ?, ?, ?, '', 'mindmap', 'normal', ?)
+      `).run(mindmapId, resourceOwnerUserId, normalizedWorkspaceId, notebookId, title,
+        defaultMindmapContent(title), sortOrder);
+      createdNode = nodeForResource(db, "note", mindmapId);
     } else {
       const notebookId = nearestNotebookContainer(db, input.parentId);
       if (!notebookId) {
@@ -372,7 +383,7 @@ export function createKnowledgeChild(input: {
     ...row,
     title,
     childCount: 0,
-    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
+    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : input.nodeType === "mindmap" ? "mindmap" : input.nodeType === "folder" ? undefined : "tiptap-json",
     noteType: input.nodeType === "sheet" ? "sheet" : input.nodeType === "word" ? "word" : undefined,
     access: resolveKnowledgeNodeAccess(row.id, input.actorUserId, db),
   };

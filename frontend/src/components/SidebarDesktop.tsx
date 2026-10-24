@@ -61,7 +61,6 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
-import { pushMindMapAppPath } from "@/lib/mindMapDeepLink";
 import { Table2, Waypoints } from "lucide-react";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
@@ -241,7 +240,8 @@ function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   if (node.contentFormat === "board") {
     return <PenTool size={15} className="shrink-0 text-teal-500" />;
   }
-  if (node.nodeType === "mindmap" || node.resourceType === "mindmap") {
+  // 导图归一后是 contentFormat="mindmap" 的笔记节点；nodeType/resourceType 判断保留给遗留数据。
+  if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") {
     return <Waypoints size={15} className="shrink-0 text-violet-500" />;
   }
   if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
@@ -848,13 +848,9 @@ export default function SidebarDesktop() {
       selectFolder(node);
       return;
     }
-    // 表格/导图走各自深链（对齐 KnowledgeTreePanel.openDocument），不能当笔记打开
+    // 表格走深链；导图归一后是笔记文档（contentFormat="mindmap"），直接当笔记打开
     if (node.noteType === "sheet") {
       pushSheetAppPath(node.resourceId);
-      return;
-    }
-    if (node.nodeType === "mindmap" || node.resourceType === "mindmap") {
-      pushMindMapAppPath(node.resourceId);
       return;
     }
     try {

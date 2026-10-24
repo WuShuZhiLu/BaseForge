@@ -838,6 +838,8 @@ export interface MindMap {
   updatedAt: string;
   /** 当前会话是否具备源导图编辑权限；GET /mindmaps/:id 返回。 */
   canEdit?: boolean;
+  /** 匿名文档标记：1 = 仅以嵌入块形式存在（归一后存于 notes.isUnlisted）。 */
+  isUnlisted?: number | null;
 }
 
 export interface MindMapListItem {

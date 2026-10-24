@@ -944,7 +944,7 @@ export function getDefaultSlashCommands(
     },
     {
       // 思维导图：打开插入对话框（选择已有脑图或新建后插入）。
-      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出 MindMapEmbedInsertDialog。
+      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出文档嵌入选择对话框（导图 kind）。
       id: "mindmap",
       label: t("slash.mindmap") || "思维导图",
       description: t("slash.mindmapDesc") || "选择已有脑图或新建后插入",

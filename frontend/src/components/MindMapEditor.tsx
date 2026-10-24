@@ -1497,6 +1497,18 @@ export default function MindMapCenter({
 
   embeddedFlushRef.current = flushEmbeddedSave;
 
+  // 嵌入编辑器挂在宿主组件（导图文档编辑器/嵌入卡片弹层）里，宿主切换笔记或关闭
+  // 弹层会直接卸载本组件；卸载前冲刷防抖中的保存，避免丢失最后 600ms 的编辑。
+  // 卸载后的 setState 是 React 18 无害 no-op，PUT 仍会发出。
+  useEffect(() => {
+    if (!embeddedMode) return;
+    return () => {
+      if (embeddedPendingSaveRef.current && !embeddedSaveRunningRef.current && !embeddedSaveConflictRef.current) {
+        void embeddedFlushRef.current?.();
+      }
+    };
+  }, [embeddedMode]);
+
   // 自动保存
   const triggerSave = useCallback((data: MindMapData, title?: string) => {
     const currentMap = activeMapRef.current || activeMap;

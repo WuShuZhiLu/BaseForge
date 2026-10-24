@@ -345,7 +345,7 @@ export function KnowledgeTreePanel({
   } | null>(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [compactDesktopToolbar, setCompactDesktopToolbar] = useState(false);
-  // B-4 浏览所有导图：只按 nodeType === "mindmap" 过滤展示（不改数据结构、不做迁移）。
+  // B-4 浏览所有导图：导图归一后是 contentFormat="mindmap" 的笔记节点，按格式过滤展示。
   const [mindmapBrowseOpen, setMindmapBrowseOpen] = useState(false);
   const [treeDropTarget, setTreeDropTarget] = useState<{
     nodeId: string;
@@ -512,7 +512,7 @@ export function KnowledgeTreePanel({
   ));
   const firstLevelNoteCounts = useMemo(() => buildFirstLevelNoteCounts(visibleNodes), [visibleNodes]);
   const filteredNodes = useMemo(() => filterKnowledgeTreeNodes(visibleNodes, query), [visibleNodes, query]);
-  const mindmapNodes = useMemo(() => nodes.filter((node) => node.nodeType === "mindmap"), [nodes]);
+  const mindmapNodes = useMemo(() => nodes.filter((node) => node.contentFormat === "mindmap"), [nodes]);
   const children = useMemo(() => buildChildren(filteredNodes), [filteredNodes]);
   const effectiveExpanded = query.trim() ? new Set(filteredNodes.map((node) => node.id)) : expanded;
   const expandableFolderIds = visibleNodes.filter((node) => (
@@ -646,12 +646,7 @@ export function KnowledgeTreePanel({
       pushSheetAppPath(node.resourceId);
       return;
     }
-    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
-    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
-    if (node.resourceType === "mindmap") {
-      pushMindMapAppPath(node.resourceId);
-      return;
-    }
+    // 导图归一后是 resourceType="note" 的文档节点，直接按笔记打开（EditorPane 导图分支）。
     if (node.resourceType !== "note") return;
     rememberOpened(node.id);
     try {
@@ -967,11 +962,7 @@ export function KnowledgeTreePanel({
       toast.success("已创建文件夹");
       return;
     }
-    // 建完自动打开：导图/表格走各自深链（上游同款行为）。
-    if (snapshot.kind === "mindmap") {
-      pushMindMapAppPath(created.resourceId);
-      return;
-    }
+    // 建完自动打开：表格走深链；导图归一后是笔记文档，走通用笔记打开。
     if (snapshot.kind === "sheet") {
       pushSheetAppPath(created.resourceId);
       return;

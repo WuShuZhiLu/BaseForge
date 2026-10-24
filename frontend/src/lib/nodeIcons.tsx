@@ -37,11 +37,12 @@ const NODE_ICON_COMPONENTS = {
 
 /** 依据节点模型判定图标语义类别（nodeType 优先，resourceType 兜底导图）。
  *  注：知识树 trigger 将 plain 笔记的 nodeType 映射为 "note"（树内显示通用文档图标），
- *  "plain" 类别仅供内联新建草稿图标（NodeKindIcon）使用。 */
+ *  "plain" 类别仅供内联新建草稿图标（NodeKindIcon）使用。
+ *  导图归一后是 contentFormat="mindmap" 的笔记节点。 */
 export function resolveNodeIconKind(node: Pick<KnowledgeTreeNode, "nodeType" | "resourceType" | "noteType" | "contentFormat">): NodeIconKind {
   if (node.nodeType === "folder") return "folder";
   if (node.nodeType === "markdown") return "markdown";
-  if (node.nodeType === "mindmap" || node.resourceType === "mindmap") return "mindmap";
+  if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") return "mindmap";
   if (node.noteType === "sheet") return "sheet";
   if (node.contentFormat === "board") return "board";
   if (node.nodeType === "word") return "word";

@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, PenTool, Plus, Search, Table2, X } from "lucide-react";
+import { Loader2, PenTool, Plus, Search, Table2, Waypoints, X } from "lucide-react";
 import { knowledgeTreeApi } from "@/lib/knowledgeTreeApi";
 
 /**
- * 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」触发）。
+ * 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」/「嵌入导图」触发）。
  * 列出知识树中对应的文档节点，选择后由 EditorPane 以
- * ![[sheet:id]] / ![[board:id]] wiki 引用插入当前笔记。
+ * ![[sheet:id]] / ![[board:id]] / ![[mindmap:id]] wiki 引用插入当前笔记。
  *
- * 画板额外提供「新建空白画板」：直接创建一个匿名文档（isUnlisted=1）
+ * 画板与导图额外提供「新建空白文档」：直接创建一个匿名文档（isUnlisted=1）
  * 并插入引用。匿名文档不进知识树，只存在于宿主笔记的嵌入块里。
  */
 
-export type KnowledgeDocEmbedKind = "sheet" | "board";
+export type KnowledgeDocEmbedKind = "sheet" | "board" | "mindmap";
 
 interface Props {
   open: boolean;
@@ -59,6 +59,15 @@ const CONFIG: Record<KnowledgeDocEmbedKind, {
     emptyHint: "没有找到画板文档。可在知识树「＋ 新建 → 画板文档」里先创建一个。",
     untitled: "无标题画板",
     matches: (node) => node.contentFormat === "board",
+  },
+  mindmap: {
+    Icon: Waypoints,
+    iconClass: "text-violet-500",
+    dialogTitle: "选择要嵌入的导图",
+    searchPlaceholder: "搜索导图标题…",
+    emptyHint: "没有找到导图文档。可在知识树「＋ 新建 → 思维导图」里先创建一个。",
+    untitled: "无标题导图",
+    matches: (node) => node.contentFormat === "mindmap",
   },
 };
 
@@ -164,7 +173,7 @@ export default function KnowledgeDocEmbedDialog({ open, kind, onClose, onInsert,
               }}
             >
               {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-              新建空白{kind === "board" ? "画板" : "文档"}并插入
+              新建空白{kind === "board" ? "画板" : kind === "mindmap" ? "导图" : "文档"}并插入
               <span className="ml-auto text-[10px] font-normal text-tx-tertiary">匿名</span>
             </button>
           )}
