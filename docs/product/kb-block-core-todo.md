@@ -7,7 +7,7 @@
 > 大批量改动后删除所有 tsbuildinfo 缓存再 tsc 全量检查（增量缓存会假通过）。
 > 查调试数据库用：`ELECTRON_RUN_AS_NODE=1 node_modules/electron/dist/electron.exe <script.cjs>`（better-sqlite3 是 ABI 130，系统 Node 装不上）。
 
-## 当前状态（2026-10-24）
+## 当前状态（2026-10-24，四阶段全部完成）
 
 分支 `feat/kb-block-core`，已完成并提交：
 - 方案文档 `docs/product/kb-block-core-plan.md`（含评审结论：Excalidraw 选型、纯文本极简、PDF 保原件+批注层、匿名文档机制）
@@ -15,7 +15,11 @@
 - UX 修复：导图/表格树节点点击深链 + 语义图标；+菜单创建后进入重命名；恢复历史版本编辑器立即刷新（contentRevision key 重挂载）
 - UX 修复（2026-10-24）：知识库默认全折叠；关闭"打开的编辑器"后清空 activeNote/URL；匿名文档编辑器补"返回来源笔记"入口
 - 匿名文档机制（迁移 130 + 前端插块/升级链路）已提交（5f2014a3）；UX 修复单独提交（f803e854）
-- **思维导图归一知识库文档**（迁移 131）代码完成，等待用户测试确认后提交（详见下方待办 2）
+- **思维导图归一知识库文档**（迁移 131，cc9d4009）——详见下方待办 2
+- **阶段 3 Word 导入即正文**（c09be9c5）：DocxIR→Tiptap 适配器（IR 优先 + mammoth 兜底）+ 原件存附件 + 降级报告——详见下方待办 3
+- **阶段 4 PDF 保原件 + 批注层**（b443e1f9）：contentFormat pdf + 受控分页查看器 + 页码锚定批注——详见下方待办 4
+
+**plan 四阶段（1 纯文本 / 2 画板+匿名+导图归一 / 3 Word / 4 PDF）全部落地，等用户整体测试。**
 
 ## 环境备忘（2026-10-24，WSL）
 - 本仓库在 WSL 里是软链：`/home/wushu/workspace/Base-Notes -> /home/wushu/workspace/BaseForge`
