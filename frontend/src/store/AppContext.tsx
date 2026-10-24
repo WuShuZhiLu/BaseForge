@@ -6,6 +6,7 @@ import { NOTEBOOKS_INVALIDATED_EVENT } from "@/lib/notebookInvalidation";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import { recordPhaseAPerfEvent } from "@/lib/phaseAPerfDiagnostics";
 import type { NoteLoadBeginPayload, NoteLoadSummary } from "@/lib/noteLoadCoordinator";
+import { primaryNoteLoadCoordinator } from "@/lib/noteLoadCoordinator";
 import { NoteActivationGuard } from "@/lib/noteActivationGuard";
 import {
   mergeAuthoritativeNotebooks,
@@ -542,6 +543,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [state.openNoteTabs]);
   const noteActivationGuard = useMemo(() => new NoteActivationGuard(), []);
   const profiledDispatch = useCallback<React.Dispatch<Action>>((action) => {
+    // 关闭页签/清空页签时取消仍在进行的加载，否则迟到的加载结果会把
+    // activeNote 重新写回已关闭的笔记（URL 也会跳回 /notes/:id）。
+    if (action.type === "CLEAR_NOTE_TABS") {
+      if (stateRef.current.noteLoadingState.pendingNoteId) primaryNoteLoadCoordinator.cancel();
+    } else if (action.type === "CLOSE_NOTE_TAB" || action.type === "REMOVE_NOTE_TAB") {
+      if (stateRef.current.noteLoadingState.pendingNoteId === action.payload) {
+        primaryNoteLoadCoordinator.cancel();
+      }
+    }
     if (action.type === "BEGIN_NOTE_LOAD") {
       noteActivationGuard.begin(action.payload, stateRef.current.activeNote?.id ?? null);
     } else if (action.type === "FAIL_NOTE_LOAD") {

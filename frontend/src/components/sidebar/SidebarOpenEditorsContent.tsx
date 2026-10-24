@@ -73,6 +73,19 @@ export default function SidebarOpenEditorsContent() {
     [actions, t],
   );
 
+  const closeTab = useCallback((tabId: string) => {
+    const closingActive = state.activeNote?.id === tabId;
+    const index = openTabs.findIndex((tab) => tab.id === tabId);
+    const remaining = openTabs.filter((tab) => tab.id !== tabId);
+    actions.closeNoteTab(tabId);
+    if (!closingActive) return;
+    // 关闭的是当前编辑器：切到相邻页签；没有页签则清空编辑区，
+    // 让 NoteDeepLinkBridge 一并把 URL 从 /notes/:id 收回 "/"。
+    const nextTab = remaining[index] ?? remaining[index - 1];
+    if (nextTab) void openNote(nextTab.id);
+    else actions.setActiveNote(null);
+  }, [actions, openNote, openTabs, state.activeNote?.id]);
+
   const closeOthers = useCallback(
     (tab: OpenNoteTab) => {
       actions.setNoteTabs([tab]);
@@ -125,7 +138,7 @@ export default function SidebarOpenEditorsContent() {
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                actions.closeNoteTab(tab.id);
+                closeTab(tab.id);
               }}
               aria-label={`${t("editorTabs.close")}：${title}`}
               title={t("editorTabs.close")}
@@ -181,7 +194,7 @@ export default function SidebarOpenEditorsContent() {
             type="button"
             className="flex w-full items-center px-3 py-1.5 text-left text-[12.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
             onClick={() => {
-              actions.closeNoteTab(menu.tabId);
+              closeTab(menu.tabId);
               setMenu(null);
             }}
           >

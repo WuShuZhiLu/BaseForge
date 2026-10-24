@@ -600,20 +600,6 @@ export default function SidebarDesktop() {
     window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
   }, []);
 
-  // ---- 默认展开：根层知识库 ----
-  useEffect(() => {
-    if (!nodes.length) return;
-    setExpanded((current) => {
-      if (current.size > 0) return current;
-      const next: ExpandedSet = new Set();
-      for (const node of nodes) {
-        if (node.isDeleted) continue;
-        if (node.parentId === null && node.nodeType === "folder") next.add(node.id);
-      }
-      return next;
-    });
-  }, [nodes]);
-
   // ---- 标签默认展开：BLE（首个），其余折叠 —— 原型 r15 的默认态是首个展开 ----
   // AppContext.tags 变化（TagInput 增删标签会 setTags）时同步标签面板
   useEffect(() => {

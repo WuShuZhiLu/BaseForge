@@ -404,9 +404,11 @@ export function KnowledgeTreePanel({
           .map((node) => node.id),
       );
       setNodes(merged);
+      // 知识库默认全折叠：服务端的 isExpanded 只作为节点元数据，
+      // 不再用于首次展开，避免每次打开应用都自动摊开根层文件夹。
       initializeKnowledgeTreeExpansion(
         requestExpansionScope,
-        merged.filter((node) => expandableNodeIds.has(node.id) && Boolean(node.isExpanded)).map((node) => node.id),
+        [],
         expandableNodeIds,
         sharedResult.status === "fulfilled",
       );
