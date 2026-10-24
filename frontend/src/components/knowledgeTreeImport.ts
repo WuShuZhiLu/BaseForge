@@ -63,11 +63,21 @@ export async function importWordIntoKnowledgeTree(
   if (!file) return null;
   const toastId = toast.info("正在导入 Word 文档…", 0);
   try {
-    const { note } = await importDocxAsNote({ notebookId, file });
-    await moveImportedNote(note.id, notebookId, options.parent);
+    const result = await importDocxAsNote({ notebookId, file });
+    await moveImportedNote(result.note.id, notebookId, options.parent);
     toast.dismiss(toastId);
-    toast.success("导入成功");
-    return note as LoadedNote;
+    // 导入报告：复杂版式按最接近格式转换，逐项提示（过长截断，完整清单在 warnings 里）。
+    const downgrades = result.downgrades || [];
+    if (downgrades.length > 0) {
+      const summary = downgrades
+        .map((item) => `${item.detail}×${item.count}`)
+        .join("、")
+        .slice(0, 80);
+      toast.info(`导入成功；以下版式已简化：${summary}${summary.length >= 80 ? "…" : ""}`);
+    } else {
+      toast.success("导入成功");
+    }
+    return result.note as LoadedNote;
   } catch (error) {
     toast.dismiss(toastId);
     throw error;

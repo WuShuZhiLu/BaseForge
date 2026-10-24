@@ -42,7 +42,7 @@
 - [x] 富文本插块（`![[board:]]` 新建）→ 自动创建匿名文档；块卡片提供"转为独立文档"（`POST /notes/:id/promote`）
 - [x] 引用计数 GC：从所有 `isUnlisted=0` 的笔记沿 `board:` / `mindmap:` 引用做可达性遍历；宿主内容变化或永久删除时清扫，24h 宽限期
 - [x] 匿名文档没有知识树/页签入口，编辑器抬头提供“返回来源笔记”（来源记录在 sessionStorage，刷新后仍可用）
-- [x] **思维导图归一知识库文档**（用户 2026-10-23 新要求，2026-10-24 完成，待测试提交）：
+- [x] **思维导图归一知识库文档**（用户 2026-10-23 新要求）已提交（cc9d4009，2026-10-24）：
   - 迁移 131（`db/mindmapDocsMigration.ts`）：活动+回收站导图全部迁为 notes 行（contentFormat="mindmap"，正文=MindMapData JSON），**沿用原 uuid**，`![[mindmap:<id>]]` 嵌入不失效；树节点由 notes 投影触发器重建为 `note:<id>`，parentId/sortOrder 对齐旧位置；回收站导图按 isTrashed=1 迁移（trash 展示/恢复走笔记链路）；迁移末尾清空 mindmaps 表并卸载导图树投影触发器
   - notebookId 映射：导图文件夹继续用伪 notebook 容器（`__nowen_mindmap_folder__:` 前缀的真实 notebooks 行）；无文件夹的挂靠自动创建的"思维导图"兜底笔记本（`services/mindmapDocs.ts`）
   - `/api/mindmaps` 保留为**门面路由**（SDK/移动端/嵌入卡片契约不变），读写全部落 notes：PUT 乐观锁（MINDMAP_CONFLICT 409）改锁 notes.updatedAt（毫秒精度）、star→isFavorite、move→伪 notebook、DELETE→树软删；插件 hostApiBroker 的 mindmaps get/list 同步门面化
@@ -54,11 +54,12 @@
   - 移动端：同步链路零改动（bootstrap 继续导出 mindmaps 表→现在为空，mobileSyncEngine 的 removeMissing 会自动清掉本地旧导图行）；本地内联创建导图改为创建本地 notes（走笔记同步）
   - **保留的遗留痕迹**（刻意）：/mindmaps 路由 + viewMode "mindmaps" + MindMapCenter 模块列表页保留（2026-10-14 已从导航移除，现仅 URL 直连可达，兼容旧深链）；knowledgeTreeListing 的 mindmaps JOIN、sync 的 mindmap entityType 收发、mindmap-folders 路由保留（空表/无节点，无害）
 
-### 3. 阶段 3：Word 导入即正文（方案 plan 阶段 3）
-- [ ] 补 DocxIR→Tiptap JSON 适配器（反向已有：frontend/src/office/ 有 parseDocx 与 Tiptap→DocxIR）
-- [ ] 导入 .docx 生成 tiptap-json 笔记 + 原件存附件；"导出为 .docx"复用现有序列化
-- [ ] 复杂版式降级清单 + 导入报告
-- [ ] 现有入口：知识树导入菜单"导入 Word 文档"（importWordIntoKnowledgeTree）
+### 3. 阶段 3：Word 导入即正文（方案 plan 阶段 3）——已完成（2026-10-24）
+- [x] DocxIR→Tiptap JSON 适配器：`frontend/src/office/serializers/ir-to-tiptap.ts`（标题/行内标记/列表聚合/表格合并/图片上传，含降级清单记录；单测 8 项在 `src/office/__tests__/`）
+- [x] 导入 .docx 生成 tiptap-json 笔记：`importDocxAsNote` 改为 **IR 管线优先、mammoth HTML 兜底**（损坏/极端格式静默回退）；原件 .docx 导入时同步存附件（失败不阻断，记 warning）
+- [x] 复杂版式降级清单 + 导入报告：downgrades 并入 result.warnings，知识树导入入口 toast 逐项提示（截断 80 字）
+- [x] "导出为 .docx"复用现有序列化（exportNoteAsDocx 此前已有，双向闭环成立）
+- 备注：自研 IR 管线此前只用于预览（WordViewer），现在预览/导入/导出共用同一份 DocxIR；图片走 blob→fetch→附件上传，宽高 pt→px（×4/3）
 
 ### 4. 阶段 4：PDF 保原件 + 批注层（方案 plan 阶段 4，用户已认可）
 - [ ] contentFormat 新增 `"pdf"`，正文存 `{ attachmentId }` + 批注层数据

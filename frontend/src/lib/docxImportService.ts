@@ -2,6 +2,8 @@ import { generateJSON } from "@tiptap/core";
 import type { Note } from "@/types";
 import { api, getBaseUrl, getCurrentWorkspace } from "@/lib/api";
 import { getTiptapExtensions } from "@/lib/contentFormat";
+import type { DocxIR } from "@/office";
+import type { IrToTiptapDowngrade } from "@/office/serializers/ir-to-tiptap";
 import {
   DOCX_IMPORT_LIMITS,
   getDocxFileViolation,
@@ -63,6 +65,12 @@ export interface ImportDocxAsNoteResult {
   previewText: string;
   metrics: DocxImportMetrics;
   warnings: string[];
+  /** 复杂版式降级清单（自研 IR 管线才有；mammoth 兜底时为空）。 */
+  downgrades?: IrToTiptapDowngrade[];
+  /** 正文转换管线（ir = 自研优先，mammoth = 兜底）。 */
+  pipeline?: "ir" | "mammoth";
+  /** 原件 .docx 的附件 id。 */
+  originalAttachmentId?: string;
 }
 
 interface WorkerImage {
@@ -452,6 +460,15 @@ async function uploadImages(
   return urls;
 }
 
+/** 释放自研管线解析期间创建的 blob URL（图片预览资源，导入不需要它们存活）。 */
+function disposeIr(ir: DocxIR | null): void {
+  const blobUrls = ir?.resources?.blobUrls;
+  if (!blobUrls) return;
+  for (const url of blobUrls) {
+    try { URL.revokeObjectURL(url); } catch { /* 已释放或非 blob URL 时忽略 */ }
+  }
+}
+
 async function rollbackImport(noteId: string | null, attachmentIds: string[]): Promise<void> {
   if (!noteId) return;
   try {
@@ -519,27 +536,64 @@ export async function importDocxAsNoteSafe(
   const uploadedAttachmentIds: string[] = [];
 
   try {
-    const parsed = await parseDocxInWorker(params.file, params.signal, params.onProgress);
-    metrics.archiveStats = parsed.archiveStats;
-    metrics.imageCount = parsed.images.length;
-    metrics.parseDurationMs = parsed.parseDurationMs;
-    metrics.mammothWarnings = parsed.mammothWarnings;
-    metrics.htmlChars = parsed.html.length;
-    warnings.push(...parsed.mammothWarnings);
-
-    if (parsed.html.length > DOCX_IMPORT_LIMITS.maxHtmlChars) {
-      throw new DocxImportError(
-        "DOCX_HTML_TOO_LARGE",
-        `Word 转换后的 HTML 过大（${parsed.html.length.toLocaleString()} 字符），请拆分文档后重试。`,
+    // ── 阶段 3：优先自研 IR 管线（表格/编号/行内样式保真度更高），失败回退 mammoth ──
+    let ir: DocxIR | null = null;
+    try {
+      const { parseDocx } = await import("@/office");
+      report(params.onProgress, {
+        stage: "read",
+        percent: 5,
+        message: "正在解析 Word 文档结构…",
+        metrics,
+      });
+      const parseStarted = performance.now();
+      const parsedIr = await parseDocx(params.file);
+      const blockCount = (parsedIr.sections || []).reduce(
+        (sum, section) => sum + (section.body?.length || 0),
+        0,
       );
+      if (blockCount > 0) {
+        ir = parsedIr;
+        metrics.parseDurationMs = Math.round(performance.now() - parseStarted);
+        metrics.pipeline = "ir";
+      } else {
+        disposeIr(parsedIr);
+      }
+    } catch {
+      // 自研管线不支持的文档（损坏/加密/极端格式）→ 静默回退 mammoth
     }
-    const title = extractTitleFromDocxHtml(
-      parsed.html,
-      params.file.name.replace(/\.docx$/i, ""),
-    );
-    const initialText = docxHtmlToPlainText(parsed.html);
-    if (!initialText && parsed.images.length === 0) {
-      throw new DocxImportError("DOCX_EMPTY", "文档内容为空或无法解析出正文");
+    throwIfAborted(params.signal);
+
+    let title: string;
+    let initialText: string;
+    let parsedMammoth: WorkerParseResult | null = null;
+    if (ir) {
+      const { irPlainText } = await import("@/office/serializers/ir-to-tiptap");
+      title = (ir.meta.title || "").trim() || params.file.name.replace(/\.docx$/i, "");
+      initialText = irPlainText(ir);
+    } else {
+      parsedMammoth = await parseDocxInWorker(params.file, params.signal, params.onProgress);
+      metrics.archiveStats = parsedMammoth.archiveStats;
+      metrics.imageCount = parsedMammoth.images.length;
+      metrics.parseDurationMs = parsedMammoth.parseDurationMs;
+      metrics.mammothWarnings = parsedMammoth.mammothWarnings;
+      metrics.htmlChars = parsedMammoth.html.length;
+      warnings.push(...parsedMammoth.mammothWarnings);
+
+      if (parsedMammoth.html.length > DOCX_IMPORT_LIMITS.maxHtmlChars) {
+        throw new DocxImportError(
+          "DOCX_HTML_TOO_LARGE",
+          `Word 转换后的 HTML 过大（${parsedMammoth.html.length.toLocaleString()} 字符），请拆分文档后重试。`,
+        );
+      }
+      title = extractTitleFromDocxHtml(
+        parsedMammoth.html,
+        params.file.name.replace(/\.docx$/i, ""),
+      );
+      initialText = docxHtmlToPlainText(parsedMammoth.html);
+      if (!initialText && parsedMammoth.images.length === 0) {
+        throw new DocxImportError("DOCX_EMPTY", "文档内容为空或无法解析出正文");
+      }
     }
     if (initialText.length > DOCX_IMPORT_LIMITS.maxPlainTextChars) {
       throw new DocxImportError(
@@ -579,38 +633,98 @@ export async function importDocxAsNoteSafe(
       throw new DocxImportError("NOTE_CREATE_FAILED", "无法创建导入目标笔记", { cause: error });
     }
 
-    let html = parsed.html;
-    let imageUrls = new Map<string, string>();
-    if (parsed.images.length > 0) {
-      report(params.onProgress, {
-        stage: "upload",
-        percent: 50,
-        message: `正在把 ${parsed.images.length} 张图片存入附件库…`,
-        metrics: { imageCount: parsed.images.length, uploadedImages: 0 },
-      });
-      imageUrls = await uploadImages(
-        noteId,
-        parsed.images,
-        params.signal,
-        params.onProgress,
-        uploadedAttachmentIds,
-      );
-      metrics.uploadedImages = uploadedAttachmentIds.length;
-      html = replaceDocxImagePlaceholders(html, imageUrls);
+    // 原件 .docx 同步存附件（"下载原文件"能力）；失败不阻断正文导入。
+    try {
+      throwIfAborted(params.signal);
+      const original = await api.attachments.upload(noteId, params.file);
+      uploadedAttachmentIds.push(original.id);
+      metrics.originalAttachmentId = original.id;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw error;
+      warnings.push("原件 .docx 上传失败，正文导入不受影响，可稍后在附件面板手动补传");
     }
 
-    report(params.onProgress, {
-      stage: "convert",
-      percent: 80,
-      message: "正在转换为可编辑富文本…",
-      metrics: { uploadedImages: uploadedAttachmentIds.length },
-    });
-    await yieldToBrowser();
-    throwIfAborted(params.signal);
-    const contentText = docxHtmlToPlainText(html);
-    const content = convertDocxHtmlToTiptap(html);
+    let content: string;
+    let contentText: string;
+    let downgrades: IrToTiptapDowngrade[] = [];
+    const imageUrls = new Map<string, string>();
+    if (ir) {
+      // 自研 IR 管线：转换时逐张上传图片（附件挂到刚建好的笔记上）。
+      report(params.onProgress, {
+        stage: "upload",
+        percent: 55,
+        message: "正在保存 Word 图片与转换正文…",
+        metrics: { pipeline: "ir" },
+      });
+      let imageSeq = 0;
+      const { irToTiptap } = await import("@/office/serializers/ir-to-tiptap");
+      const converted = await irToTiptap(ir, {
+        uploadImage: async ({ bytes, contentType }) => {
+          throwIfAborted(params.signal);
+          imageSeq += 1;
+          const file = new File(
+            [bytes],
+            `word-image-${imageSeq}.${extensionForContentType(contentType)}`,
+            { type: contentType || "application/octet-stream" },
+          );
+          const uploaded = await api.attachments.upload(noteId, file);
+          uploadedAttachmentIds.push(uploaded.id);
+          imageUrls.set(`ir-image-${imageSeq}`, uploaded.url);
+          report(params.onProgress, {
+            stage: "upload",
+            percent: Math.min(74, 55 + imageSeq * 3),
+            message: `正在保存 Word 图片 ${imageSeq}…`,
+            metrics: { uploadedImages: imageSeq },
+          });
+          return uploaded.url;
+        },
+      });
+      content = JSON.stringify(converted.doc);
+      contentText = initialText;
+      downgrades = converted.downgrades;
+      metrics.imageCount = converted.imageCount;
+      metrics.uploadedImages = converted.imageCount - converted.failedImageCount;
+      // 降级项（含图片上传失败）统一并入 warnings，供导入报告/提示展示
+      for (const item of converted.downgrades) warnings.push(`${item.detail} ×${item.count}`);
+      disposeIr(ir);
+    } else {
+      const html0 = parsedMammoth!.html;
+      let html = html0;
+      if (parsedMammoth!.images.length > 0) {
+        report(params.onProgress, {
+          stage: "upload",
+          percent: 50,
+          message: `正在把 ${parsedMammoth!.images.length} 张图片存入附件库…`,
+          metrics: { imageCount: parsedMammoth!.images.length, uploadedImages: 0 },
+        });
+        const urls = await uploadImages(
+          noteId,
+          parsedMammoth!.images,
+          params.signal,
+          params.onProgress,
+          uploadedAttachmentIds,
+        );
+        for (const [key, value] of urls) imageUrls.set(key, value);
+        metrics.uploadedImages = uploadedAttachmentIds.length;
+        html = replaceDocxImagePlaceholders(html, urls);
+      }
+
+      report(params.onProgress, {
+        stage: "convert",
+        percent: 80,
+        message: "正在转换为可编辑富文本…",
+        metrics: { uploadedImages: uploadedAttachmentIds.length },
+      });
+      await yieldToBrowser();
+      throwIfAborted(params.signal);
+      contentText = docxHtmlToPlainText(html);
+      content = convertDocxHtmlToTiptap(html);
+    }
     metrics.contentChars = content.length;
     metrics.contentTextChars = contentText.length;
+    if (contentText.length === 0 && imageUrls.size === 0) {
+      throw new DocxImportError("DOCX_EMPTY", "文档内容为空或无法解析出正文");
+    }
     if (content.length > DOCX_IMPORT_LIMITS.maxContentChars) {
       throw new DocxImportError(
         "DOCX_CONTENT_TOO_LARGE",
@@ -683,6 +797,9 @@ export async function importDocxAsNoteSafe(
       previewText: contentText.slice(0, 200),
       metrics,
       warnings,
+      downgrades,
+      pipeline: ir ? "ir" : "mammoth",
+      originalAttachmentId: metrics.originalAttachmentId,
     };
   } catch (error) {
     await rollbackImport(noteId, uploadedAttachmentIds);

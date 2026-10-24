@@ -23,6 +23,10 @@ export interface DocxImportMetrics {
   parseDurationMs?: number;
   totalDurationMs?: number;
   mammothWarnings?: string[];
+  /** 正文转换管线：ir = 自研 DocxIR（优先），mammoth = 兜底 HTML 管线。 */
+  pipeline?: "ir" | "mammoth";
+  /** 原件 .docx 的附件 id（导入时同步存附件，供"下载原文件"）。 */
+  originalAttachmentId?: string;
 }
 
 export interface DocxImportProgressUpdate {
