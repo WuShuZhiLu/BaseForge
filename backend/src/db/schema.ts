@@ -218,6 +218,7 @@ function initSchema(db: Database.Database) {
       isLocked INTEGER DEFAULT 0,
       isArchived INTEGER DEFAULT 0,
       isTrashed INTEGER DEFAULT 0,
+      isUnlisted INTEGER NOT NULL DEFAULT 0,
       trashedAt TEXT,
       themeId TEXT,
       colorMark TEXT,

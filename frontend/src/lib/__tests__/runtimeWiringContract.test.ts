@@ -221,12 +221,16 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(ctx).toContain('case "OPEN_TOOL_TAB"');
     expect(ctx).toContain('case "CLOSE_TOOL_TAB"');
     expect(ctx).toContain("openToolTab: (key: ToolTabKey)");
+    // 关闭页签时取消仍在进行的笔记加载，避免迟到的加载结果把 URL/编辑区拉回已关闭的笔记
+    expect(ctx).toContain("primaryNoteLoadCoordinator.cancel()");
 
     // 页签搬到侧栏「打开的」面板（VS Code OPEN EDITORS）；面板框架 S1 后它只是面板内容之一。
     const openEditors = read("../../components/sidebar/panels/OpenEditorsPanel.tsx");
     expect(openEditors).toContain("data-open-note-row={tab.id}");
     expect(openEditors).toContain("data-open-tool-row={key}");
-    expect(openEditors).toContain("actions.closeNoteTab(tab.id)");
+    expect(openEditors).toContain("actions.closeNoteTab(");
+    expect(openEditors).toContain("closeTab(tab.id)");
+    expect(openEditors).toContain("actions.setActiveNote(null)");
     expect(openEditors).toContain("actions.closeToolTab(key)");
     expect(openEditors).toContain("actions.setActiveToolTab(key)");
     // 内容-only：不再自带标题/折叠（由面板框架 Shell 提供）

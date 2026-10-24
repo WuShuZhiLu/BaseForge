@@ -1692,6 +1692,8 @@ export const api = {
     }
     return request<Note>("/notes", { method: "POST", body: JSON.stringify(payload) });
   },
+  promoteNote: (id: string, data: { title?: string; notebookId?: string } = {}) =>
+    request<Note>(`/notes/${id}/promote`, { method: "POST", body: JSON.stringify(data) }),
   duplicateNote: (id: string, options?: { placement: "sibling" | "child" }) =>
     request<Note & {
       tags: Tag[];

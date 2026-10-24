@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool } from "lucide-react";
+import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
@@ -135,6 +135,25 @@ interface EditorPaneProps {
   onSplitDocument?: () => void;
 }
 
+const ANONYMOUS_RETURN_NOTE_KEY = "nowen.anonymous-return-note-id";
+
+function readAnonymousReturnNoteId(): string | null {
+  try {
+    return sessionStorage.getItem(ANONYMOUS_RETURN_NOTE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeAnonymousReturnNoteId(noteId: string | null): void {
+  try {
+    if (noteId) sessionStorage.setItem(ANONYMOUS_RETURN_NOTE_KEY, noteId);
+    else sessionStorage.removeItem(ANONYMOUS_RETURN_NOTE_KEY);
+  } catch {
+    // sessionStorage 不可用时退回“仅关闭当前匿名文档”。
+  }
+}
+
 function EditorPaneCore({
   canSplitDocument = false,
   onSplitDocument,
@@ -234,14 +253,39 @@ function EditorPaneCore({
     setOutlineWidth(DEFAULT_OUTLINE_WIDTH);
     persistOutlineWidth(DEFAULT_OUTLINE_WIDTH);
   }, []);
+  /** 匿名文档没有知识树/页签入口，记录来源笔记以便“返回”。 */
   useEffect(() => subscribeOpenInternalNoteLink(async ({ noteId }) => {
+    const sourceNoteId = activeNoteRef.current?.id ?? null;
     await loadNote({
       noteId,
       summary: { title: t("editor.noteLoading"), notebookId: "" },
       request: () => api.getNote(noteId),
-      onSuccess: (target) => actions.setActiveNote(target),
+      onSuccess: (target) => {
+        if (target.isUnlisted === 1 && sourceNoteId && sourceNoteId !== target.id) {
+          writeAnonymousReturnNoteId(sourceNoteId);
+        } else if (target.isUnlisted !== 1) {
+          writeAnonymousReturnNoteId(null);
+        }
+        actions.setActiveNote(target);
+      },
     });
   }), [actions, loadNote, t]);
+
+  const exitAnonymousNote = useCallback(() => {
+    const returnNoteId = readAnonymousReturnNoteId();
+    writeAnonymousReturnNoteId(null);
+    if (!returnNoteId) {
+      actions.setActiveNote(null);
+      return;
+    }
+    void loadNote({
+      noteId: returnNoteId,
+      summary: { title: t("editor.noteLoading"), notebookId: "" },
+      request: () => api.getNote(returnNoteId),
+      onSuccess: (note) => actions.setActiveNote(note),
+      onError: () => actions.setActiveNote(null),
+    });
+  }, [actions, loadNote, t]);
 
   // �бʼ�ʱ��ƫ��Ӧ��"�򿪼�����"��
   // ����ֻ�� activeNote.id �仯ʱ��һ�Σ������� prefs.lockOnOpen���������û���
@@ -2828,6 +2872,16 @@ const moveToTrash = useCallback(async () => {
             <span className="truncate text-sm font-semibold text-tx-primary">
               {activeNote.title || t('editor.untitled')}
             </span>
+            {activeNote.isUnlisted === 1 && (
+              <button
+                type="button"
+                onClick={exitAnonymousNote}
+                title="返回来源笔记"
+                className="shrink-0 rounded-md bg-app-hover px-1.5 py-0.5 text-[11px] font-medium text-tx-secondary active:bg-app-active"
+              >
+                返回
+              </button>
+            )}
           </div>
           {/* ���� / �������ƶ��˹̶���������ť��࣬���ֳ�������ȶ��ɼ��� */}
           <Button
@@ -3394,6 +3448,17 @@ const moveToTrash = useCallback(async () => {
               <FileText size={11} />
               {t('note.format.richTextShort')}
             </span>
+          )}
+          {activeNote.isUnlisted === 1 && (
+            <button
+              type="button"
+              onClick={exitAnonymousNote}
+              title="返回来源笔记"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-medium text-tx-secondary transition-colors hover:bg-app-active hover:text-tx-primary"
+            >
+              <ArrowLeft size={11} />
+              返回
+            </button>
           )}
           <button
             type="button"
@@ -4301,6 +4366,21 @@ const moveToTrash = useCallback(async () => {
         open={embedPickerKind !== null && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
         kind={embedPickerKind ?? "sheet"}
         onClose={() => setEmbedPickerKind(null)}
+        onCreate={embedPickerKind === "board" && activeNote?.notebookId ? async () => {
+          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return null;
+          try {
+            const created = await api.createNote({
+              title: "画板",
+              contentFormat: "board",
+              notebookId: activeNote.notebookId,
+              isUnlisted: 1,
+            });
+            return { id: created.id, title: created.title || "画板" };
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "创建画板失败");
+            return null;
+          }
+        } : undefined}
         onInsert={(docId, docTitle) => {
           if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
           const kind = embedPickerKind;

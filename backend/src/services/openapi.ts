@@ -52,6 +52,7 @@ export function generateOpenAPISpec(): Record<string, any> {
             isFavorite: { type: "integer", enum: [0, 1] },
             isLocked: { type: "integer", enum: [0, 1] },
             isTrashed: { type: "integer", enum: [0, 1] },
+            isUnlisted: { type: "integer", enum: [0, 1], description: "匿名文档：不出现在知识树/列表/搜索中，仅通过宿主笔记的嵌入块访问" },
             version: { type: "integer" },
             tags: { type: "array", items: { $ref: "#/components/schemas/Tag" } },
             createdAt: { type: "string", format: "date-time" },

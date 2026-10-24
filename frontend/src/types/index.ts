@@ -188,6 +188,7 @@ export interface Note {
   isLocked: number;
   isArchived: number;
   isTrashed: number;
+  isUnlisted?: number;
   trashedAt: string | null;
   themeId?: string | null;
   colorMark?: NoteColorMark | null;
@@ -215,6 +216,7 @@ export interface NoteListItem {
   isLocked: number;
   isArchived: number;
   isTrashed: number;
+  isUnlisted?: number;
   colorMark?: NoteColorMark | null;
   version: number;
   sortOrder?: number;

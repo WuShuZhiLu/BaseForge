@@ -13,6 +13,8 @@
 - 方案文档 `docs/product/kb-block-core-plan.md`（含评审结论：Excalidraw 选型、纯文本极简、PDF 保原件+批注层、匿名文档机制）
 - 阶段 1 纯文本文档（plain 四件套：后端格式/创建/搜索 + PlainTextEditor + 知识树入口）
 - UX 修复：导图/表格树节点点击深链 + 语义图标；+菜单创建后进入重命名；恢复历史版本编辑器立即刷新（contentRevision key 重挂载）
+- UX 修复（2026-10-24）：知识库默认全折叠；关闭“打开的编辑器”后清空 activeNote/URL；匿名文档编辑器补“返回来源笔记”入口
+- 匿名文档机制（迁移 130 + 前端插块/升级链路）已完成，等待用户测试确认后提交
 
 ## 待办（按优先级）
 
@@ -25,10 +27,11 @@
 - [x] 画板正文派生搜索文本：`noteBlocks.syncNoteBlocks` 必须对 board 提前返回，否则会被当成 Markdown 生成"整段 JSON"contentText（已修）
 
 ### 2. 匿名文档机制（插块即匿名、单独创建才有名，导图同步适用，方案 plan 阶段 2）
-- [ ] notes 表加 `is_unlisted` 标记（新迁移，注意 DB 版本号递增；当前库版本见 backend/src/db/migrations.impl.ts 末尾）
-- [ ] 知识树/列表/搜索查询过滤 unlisted=1
-- [ ] 富文本插块（`![[board:]]` / `![[mindmap:]]` 新建）→ 自动创建匿名文档；块卡片提供"转为独立文档"
-- [ ] 引用计数 GC：宿主笔记删除块/笔记后清理无引用匿名文档（对齐附件两阶段 GC 思路，见 backend 附件 GC 实现）
+- [x] notes 表加 `isUnlisted` 标记（迁移 130；`schema.ts` 基线、sync outbox note payload、`sync/apply.ts` 已同步）
+- [x] 知识树/列表/搜索查询过滤 unlisted=1（含 shared tree、移动端 bootstrap、AI 检索、反链、搜索）
+- [x] 富文本插块（`![[board:]]` 新建）→ 自动创建匿名文档；块卡片提供"转为独立文档"（`POST /notes/:id/promote`）
+- [x] 引用计数 GC：从所有 `isUnlisted=0` 的笔记沿 `board:` / `mindmap:` 引用做可达性遍历；宿主内容变化或永久删除时清扫，24h 宽限期
+- [x] 匿名文档没有知识树/页签入口，编辑器抬头提供“返回来源笔记”（来源记录在 sessionStorage，刷新后仍可用）
 - [ ] **思维导图归一知识库文档**（用户 2026-10-23 新要求）：mindmap 从独立 mindmaps 表/独立模块迁为知识树文档类型（对齐画板方案：正文存导图 JSON 或迁表数据），树内直接创建/打开，去除独立化痕迹。迁移时保留现有 mindmaps 数据。注意：SidebarDesktop 的 openNode/fileIconFor 与 KnowledgeTreePanel.openDocument 都有导图深链分支，归一后同步调整。
 
 ### 3. 阶段 3：Word 导入即正文（方案 plan 阶段 3）
@@ -53,3 +56,10 @@
 - 新增 contentFormat 后必须检查 `noteBlocks.syncNoteBlocks`（保存链路会在事务后再次覆盖 contentText）与 `searchIndex.normalizeContentFormat`，只改 `extractSearchableText` 不够
 - wiki 嵌入（`![[mindmap:|board:]]`）只有正式预览/分屏走 MarkdownPreview 才渲染卡片；Markdown 的「实时预览」(cm inline) 仍显示原文，与 mindmap 行为一致
 - 画板嵌入预览用 `exportToSvg(..., skipInliningFonts: true)`，字体依赖随 chunk 加载的 @font-face，不要在导出后删掉这份 CSS
+- 匿名文档没有知识树节点，但 `knowledgeCapabilityProjectionRepair` 会在权限解析时把缺失节点补回来——必须在 `repairKnowledgeResourceProjectionIfStale` 里对 `isUnlisted=1` 直接返回，否则匿名文档会"自己长回"知识树
+- 匿名文档 GC 有 24h 宽限期：删除嵌入块后不会立刻回收；测试要回填 `createdAt` 到 2 天前。清扫触发点是宿主内容 PUT 与永久删除（`notes.ts` 和 `trash/noteTrashAdapter.ts` 两条删除链路）
+- SQLite `datetime('now')` 返回的 `createdAt` 没有时区标记，`new Date(str)` 会按本地时间解析；匿名文档宽限期判断需补 `Z`（服务内 `parseSqliteTimestamp`）
+- `notes.notebookId` 非空：匿名文档必须复用宿主笔记的 notebookId，不能为它单独建 notebook
+- EditorPaneCore 会随 activeNote.id 改变重挂载（`EncryptedConversionEditorGuard` 的 `EditorLease key=[scope,noteId]`），跨笔记的状态不能放组件内 ref；「匿名文档返回来源」用 sessionStorage
+- Electron 不支持 `window.prompt`：「转为独立文档」用卡片内联命名输入，不要换成 prompt
+- 新增 `notes` 列时别漏三处同步白名单：`syncOutboxCaptureMigration` 的 note payload、`sync/apply.ts`、`sync/applyLocal.ts`；`sync/bootstrap.ts` 的 `readLocalState` 也要带新列，否则新设备上匿名文档会以 `isUnlisted=0` 落库。迁移末尾要重装捕获触发器

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { AlertTriangle, ExternalLink, Loader2, PenTool, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, FilePlus2, Loader2, PenTool, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
 import { resolveAppAppearanceMode } from "@/lib/appAppearance";
 import { parseBoardEmbedHref } from "@/lib/boardEmbed";
+import { toast } from "@/lib/toast";
 import type { Note } from "@/types";
 
 /**
@@ -26,6 +27,9 @@ export default function BoardEmbedCard({ href }: { href: string }) {
   const [revision, setRevision] = useState(0);
   const [isDark, setIsDark] = useState(() => resolveAppAppearanceMode() === "dark");
   const [preview, setPreview] = useState<PreviewState>({ status: "loading" });
+  const [promoting, setPromoting] = useState(false);
+  const [promoteTitle, setPromoteTitle] = useState("");
+  const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -85,6 +89,30 @@ export default function BoardEmbedCard({ href }: { href: string }) {
     if (note) openInternalNoteLink(`note:${note.id}`);
   };
 
+  const startPromote = () => {
+    if (!note) return;
+    setPromoteTitle(note.title && note.title !== "画板" ? note.title : "");
+    setPromoting(true);
+  };
+
+  const confirmPromote = async () => {
+    if (!note || upgrading) return;
+    setUpgrading(true);
+    try {
+      const updated = await api.promoteNote(note.id, { title: promoteTitle.trim() || "未命名画板" });
+      setNote(updated);
+      setPromoting(false);
+      toast.success("已转为独立文档，可在知识树中找到");
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+        detail: { reason: "anonymous-doc-promoted", noteId: note.id },
+      }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "转为独立文档失败");
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
   return (
     <div
       data-nowen-board-embed={boardId}
@@ -95,6 +123,18 @@ export default function BoardEmbedCard({ href }: { href: string }) {
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-tx-primary">
           {note?.title || "画板"}
         </span>
+        {note?.isUnlisted === 1 && !promoting && (
+          <button
+            type="button"
+            contentEditable={false}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-teal-600 transition-colors hover:bg-app-hover dark:text-teal-400"
+            onClick={(event) => { event.preventDefault(); startPromote(); }}
+            title="转为独立文档（进入知识树）"
+          >
+            <FilePlus2 size={12} />
+            转为独立文档
+          </button>
+        )}
         <button
           type="button"
           contentEditable={false}
@@ -116,6 +156,37 @@ export default function BoardEmbedCard({ href }: { href: string }) {
           打开
         </button>
       </div>
+
+      {promoting && (
+        <div className="flex items-center gap-2 border-b border-app-border bg-app-hover/40 px-3 py-2">
+          <input
+            autoFocus
+            value={promoteTitle}
+            onChange={(event) => setPromoteTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") { event.preventDefault(); void confirmPromote(); }
+              if (event.key === "Escape") { event.preventDefault(); setPromoting(false); }
+            }}
+            placeholder="文档名称"
+            className="min-w-0 flex-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+          />
+          <button
+            type="button"
+            disabled={upgrading}
+            className="rounded-md bg-accent-primary px-2 py-1 text-[11px] text-white disabled:opacity-50"
+            onClick={(event) => { event.preventDefault(); void confirmPromote(); }}
+          >
+            {upgrading ? "处理中…" : "确定"}
+          </button>
+          <button
+            type="button"
+            className="rounded-md px-2 py-1 text-[11px] text-tx-secondary hover:bg-app-hover"
+            onClick={(event) => { event.preventDefault(); setPromoting(false); }}
+          >
+            取消
+          </button>
+        </div>
+      )}
 
       {loadError ? (
         <div className="flex h-24 items-center justify-center gap-2 px-3 text-xs text-amber-600">
@@ -145,7 +216,9 @@ export default function BoardEmbedCard({ href }: { href: string }) {
       )}
 
       <div className="border-t border-app-border px-3 py-1.5 text-[11px] text-tx-tertiary">
-        引用原始画板 · SVG 只读快照 · 删除此块不会删除画板
+        {note?.isUnlisted === 1
+          ? "匿名画板 · 只通过此嵌入块访问 · 删除此块后会被自动清理"
+          : "引用原始画板 · SVG 只读快照 · 删除此块不会删除画板"}
       </div>
     </div>
   );

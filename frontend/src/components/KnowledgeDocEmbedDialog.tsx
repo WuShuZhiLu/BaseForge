@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2, PenTool, Search, Table2, X } from "lucide-react";
+import { Loader2, PenTool, Plus, Search, Table2, X } from "lucide-react";
 import { knowledgeTreeApi } from "@/lib/knowledgeTreeApi";
 
 /**
  * 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」触发）。
  * 列出知识树中对应的文档节点，选择后由 EditorPane 以
  * ![[sheet:id]] / ![[board:id]] wiki 引用插入当前笔记。
+ *
+ * 画板额外提供「新建空白画板」：直接创建一个匿名文档（isUnlisted=1）
+ * 并插入引用。匿名文档不进知识树，只存在于宿主笔记的嵌入块里。
  */
 
 export type KnowledgeDocEmbedKind = "sheet" | "board";
@@ -16,6 +19,8 @@ interface Props {
   kind: KnowledgeDocEmbedKind;
   onClose: () => void;
   onInsert: (id: string, title: string) => boolean;
+  /** 新建匿名文档并返回 id/title；返回 null 表示失败或取消。 */
+  onCreate?: () => Promise<{ id: string; title: string } | null>;
 }
 
 interface EmbedListItem {
@@ -57,11 +62,12 @@ const CONFIG: Record<KnowledgeDocEmbedKind, {
   },
 };
 
-export default function KnowledgeDocEmbedDialog({ open, kind, onClose, onInsert }: Props) {
+export default function KnowledgeDocEmbedDialog({ open, kind, onClose, onInsert, onCreate }: Props) {
   const config = CONFIG[kind];
   const [items, setItems] = useState<EmbedListItem[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -70,6 +76,7 @@ export default function KnowledgeDocEmbedDialog({ open, kind, onClose, onInsert 
     setError("");
     setQuery("");
     setItems([]);
+    setCreating(false);
     setLoading(true);
     knowledgeTreeApi
       .list()
@@ -141,6 +148,26 @@ export default function KnowledgeDocEmbedDialog({ open, kind, onClose, onInsert 
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {onCreate && (
+            <button
+              type="button"
+              disabled={creating}
+              className="mb-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-app-border px-2.5 py-2 text-left text-xs font-medium text-accent-primary transition-colors hover:bg-app-hover disabled:opacity-50"
+              onClick={async () => {
+                setCreating(true);
+                try {
+                  const created = await onCreate();
+                  if (created && onInsert(created.id, created.title)) onClose();
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
+              {creating ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              新建空白{kind === "board" ? "画板" : "文档"}并插入
+              <span className="ml-auto text-[10px] font-normal text-tx-tertiary">匿名</span>
+            </button>
+          )}
           {loading ? (
             <div className="flex h-28 items-center justify-center gap-2 text-xs text-tx-tertiary">
               <Loader2 size={14} className="animate-spin" />

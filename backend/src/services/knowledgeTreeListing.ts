@@ -63,6 +63,7 @@ export function listKnowledgeTree(input: {
     LEFT JOIN mindmaps mm ON node.resourceType = 'mindmap' AND mm.id = node.resourceId
     LEFT JOIN files file ON node.resourceType = 'file' AND file.id = node.resourceId
     WHERE node.scopeKey = ? ${input.includeDeleted ? "" : "AND node.isDeleted = 0"}
+      AND (node.resourceType <> 'note' OR COALESCE(note.isUnlisted, 0) = 0)
     ORDER BY
       node.parentId IS NOT NULL,
       node.parentId,

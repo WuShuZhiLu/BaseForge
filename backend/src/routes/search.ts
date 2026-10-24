@@ -312,6 +312,7 @@ function fetchFtsTermCandidates(
         WHERE notes_search_fts MATCH ?
 AND ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
         ORDER BY bm25(notes_search_fts, 8.0, 1.0), n.id ASC
         LIMIT ? OFFSET ?
@@ -353,6 +354,7 @@ function fetchMetadataTermCandidates(
         JOIN notebooks nb ON nb.id = n.notebookId
         WHERE ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
 AND instr(nowen_search_normalize(COALESCE(t.name, '')), ?) > 0
 
@@ -365,6 +367,7 @@ AND instr(nowen_search_normalize(COALESCE(t.name, '')), ?) > 0
         JOIN notebooks nb ON nb.id = n.notebookId
         WHERE ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
 AND (
   instr(nowen_search_normalize(COALESCE(a.filename, '')), ?) > 0
@@ -407,6 +410,7 @@ function fetchLiteralTermCandidates(
       JOIN notebooks nb ON nb.id = n.notebookId
       WHERE ${scope.sql}
         AND n.isTrashed = 0
+        AND n.isUnlisted = 0
         AND nb.isDeleted = 0
         AND (
 instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
@@ -531,6 +535,7 @@ function fetchFtsScores(
         AND ${scope.sql}
         AND n.id IN (${placeholders})
         AND n.isTrashed = 0
+        AND n.isUnlisted = 0
         AND nb.isDeleted = 0
       ORDER BY score
     `).all(searchTerm, ...scope.params, ...ids) as Array<{ id: string; score: number }>;
@@ -590,6 +595,7 @@ function fetchCandidateRows(
     WHERE n.id IN (${placeholders})
       AND ${scope.sql}
       AND n.isTrashed = 0
+      AND n.isUnlisted = 0
       AND nb.isDeleted = 0
     ORDER BY n.updatedAt DESC
   `).all(userId, ...ids, ...scope.params) as SearchRow[];
@@ -923,6 +929,7 @@ function fetchSheetResults(
     WHERE ${scope.sql}
       AND n.note_type = 'sheet'
       AND n.isTrashed = 0
+      AND n.isUnlisted = 0
       AND nb.isDeleted = 0
       AND ${termSql}
     ORDER BY n.updatedAt DESC, n.id ASC
