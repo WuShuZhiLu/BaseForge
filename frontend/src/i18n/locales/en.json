@@ -995,7 +995,13 @@
       "revokeOthersConfirm": "Sign out all {{count}} other sessions?",
       "empty": "No active sessions",
       "refresh": "Refresh"
-    }
+    },
+    "avatarHint": "PNG/JPEG/WebP/GIF supported, crop on upload",
+    "avatarTooLarge": "Image must be under 20MB",
+    "avatarTypeError": "Only PNG/JPEG/WebP/GIF images are supported",
+    "changeAvatar": "Change avatar",
+    "removeAvatar": "Remove",
+    "uploadAvatar": "Upload avatar"
   },
   "userManagement": {
     "title": "User Management",
@@ -3450,5 +3456,47 @@
   },
   "tabs": {
     "closeTool": "Close"
+  },
+  "sidebarNext": {
+    "close": "Close",
+    "closeAll": "Close All",
+    "empty": "Nothing here yet",
+    "filter": "Filter",
+    "focusBack": "Back to all knowledge bases",
+    "foldAll": "Collapse all folders",
+    "foldAllTags": "Collapse all tag groups",
+    "knowledgeBase": "Knowledge Base",
+    "more": "More",
+    "newFolder": "New",
+    "noMatch": "No matching folders or notes",
+    "openEditors": "Open Editors",
+    "refresh": "Refresh",
+    "searchLabel": "Search knowledge base",
+    "searchPlaceholder": "Search",
+    "switchSpace": "Switch space",
+    "tags": "Tags",
+    "nav": {
+      "account": "Account menu",
+      "accountSection": "Account",
+      "ai": "AI Chat",
+      "appearance": "Appearance",
+      "diary": "Daily Records",
+      "files": "Files",
+      "kb": "Knowledge Base",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "plugins": "Plugins",
+      "railIcon": "Icons only",
+      "railLabel": "Icons + labels",
+      "railStyle": "Navigation style",
+      "settings": "Settings",
+      "shares": "Sharing",
+      "switchAccount": "Switch account",
+      "tasks": "To-dos",
+      "theme": "Theme",
+      "themeDark": "Dark",
+      "themeLight": "Light",
+      "trash": "Trash"
+    }
   }
 }

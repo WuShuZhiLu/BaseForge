@@ -1010,7 +1010,13 @@
       "revokeOthersConfirm": "确定要把其他 {{count}} 个会话全部下线吗？",
       "empty": "暂无活跃会话",
       "refresh": "刷新"
-    }
+    },
+    "avatarHint": "支持 PNG/JPEG/WebP/GIF，上传时可裁切选择区域",
+    "avatarTooLarge": "图片文件不能超过 20MB",
+    "avatarTypeError": "仅支持 PNG/JPEG/WebP/GIF 图片",
+    "changeAvatar": "更换头像",
+    "removeAvatar": "移除",
+    "uploadAvatar": "上传头像"
   },
   "userManagement": {
     "title": "用户管理",
@@ -3457,5 +3463,47 @@
   },
   "tabs": {
     "closeTool": "关闭"
+  },
+  "sidebarNext": {
+    "close": "关闭",
+    "closeAll": "全部关闭",
+    "empty": "暂无内容",
+    "filter": "筛选",
+    "focusBack": "返回全部知识库",
+    "foldAll": "折叠全部文件夹",
+    "foldAllTags": "折叠全部标签文档",
+    "knowledgeBase": "知识库",
+    "more": "更多操作",
+    "newFolder": "新建",
+    "noMatch": "无匹配的文件夹或笔记",
+    "openEditors": "打开的编辑器",
+    "refresh": "刷新",
+    "searchLabel": "搜索知识库",
+    "searchPlaceholder": "搜索",
+    "switchSpace": "切换空间",
+    "tags": "标签",
+    "nav": {
+      "account": "账户菜单",
+      "accountSection": "账号",
+      "ai": "AI 问答",
+      "appearance": "外观",
+      "diary": "每日记录",
+      "files": "文件管理",
+      "kb": "知识库",
+      "logout": "登出",
+      "notifications": "消息通知",
+      "plugins": "插件",
+      "railIcon": "纯图标",
+      "railLabel": "图标+文字",
+      "railStyle": "导航栏样式",
+      "settings": "设置",
+      "shares": "分享管理",
+      "switchAccount": "切换账号",
+      "tasks": "待办事项",
+      "theme": "主题",
+      "themeDark": "黑夜",
+      "themeLight": "白天",
+      "trash": "回收站"
+    }
   }
 }
