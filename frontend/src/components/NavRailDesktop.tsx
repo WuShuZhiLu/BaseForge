@@ -443,7 +443,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
           )}
         >
-          {item.icon(21)}
+          {item.icon(showLabel ? 19 : 21)}
           {showLabel && (
             <span className="max-w-full truncate text-[11px] leading-none text-tx-secondary">
               {t(item.titleKey, { defaultValue: item.titleDefault })}
@@ -487,7 +487,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
         )}
       >
-        {item.icon(21)}
+        {item.icon(showLabel ? 19 : 21)}
         {showLabel && (
           <span
             className={cn(
@@ -506,7 +506,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     <nav
       className={cn(
         "relative z-[130] flex h-full shrink-0 flex-col items-center border-r border-app-border bg-app-sidebar pb-2.5 transition-[width]",
-        "w-16",
+        showLabel ? "w-16" : "w-12",
       )}
       data-next-rail=""
       data-active-view={activeView}
@@ -540,7 +540,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           return rows.map((item, index) => renderItem(item, index, "core"));
         })()}
         {/* 固定分割线：上=核心徽章组，下=插件徽章组（位置不随排序变化） */}
-        <div className={cn("my-2 h-px shrink-0 border-t border-app-border", "w-10")} />
+        <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
         {/* 下组：「插件」徽章固定首位不可动，其余插件徽章组内可拖拽排序 */}
         {(() => {
           if (railCustom.pluginGroupCollapsed) return null;
@@ -755,7 +755,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         </div>
       ) : null}
 
-      <div className={cn("my-2 h-px shrink-0 border-t border-app-border", "w-10")} />
+      <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
 
       {/* 底部：头像（账户菜单） */}
       <div className="relative flex w-full flex-col items-center">
@@ -910,7 +910,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         )}
       >
         <span className={cn("flex items-center justify-center", showLabel && "flex-col gap-[3px]")}>
-          <svg width={21} height={21} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+          <svg width={showLabel ? 19 : 21} height={showLabel ? 19 : 21} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
           {showLabel && (
             <span className="max-w-full truncate text-[11px] leading-none text-tx-secondary">
               {t("sidebarNext.nav.settings", { defaultValue: "设置" })}
