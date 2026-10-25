@@ -506,7 +506,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     <nav
       className={cn(
         "relative z-[130] flex h-full shrink-0 flex-col items-center border-r border-app-border bg-app-sidebar pb-2.5 transition-[width]",
-        showLabel ? "w-16" : "w-12",
+        "w-16",
       )}
       data-next-rail=""
       data-active-view={activeView}
@@ -540,7 +540,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           return rows.map((item, index) => renderItem(item, index, "core"));
         })()}
         {/* 固定分割线：上=核心徽章组，下=插件徽章组（位置不随排序变化） */}
-        <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
+        <div className={cn("my-2 h-px shrink-0 border-t border-app-border", "w-10")} />
         {/* 下组：「插件」徽章固定首位不可动，其余插件徽章组内可拖拽排序 */}
         {(() => {
           if (railCustom.pluginGroupCollapsed) return null;
@@ -755,7 +755,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         </div>
       ) : null}
 
-      <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
+      <div className={cn("my-2 h-px shrink-0 border-t border-app-border", "w-10")} />
 
       {/* 底部：头像（账户菜单） */}
       <div className="relative flex w-full flex-col items-center">
