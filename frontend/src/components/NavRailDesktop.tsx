@@ -443,7 +443,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
           )}
         >
-          {item.icon(showLabel ? 19 : 21)}
+          {item.icon(21)}
           {showLabel && (
             <span className="max-w-full truncate text-[11px] leading-none text-tx-secondary">
               {t(item.titleKey, { defaultValue: item.titleDefault })}
@@ -487,7 +487,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
         )}
       >
-        {item.icon(showLabel ? 19 : 21)}
+        {item.icon(21)}
         {showLabel && (
           <span
             className={cn(
@@ -910,7 +910,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         )}
       >
         <span className={cn("flex items-center justify-center", showLabel && "flex-col gap-[3px]")}>
-          <svg width={showLabel ? 19 : 21} height={showLabel ? 19 : 21} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+          <svg width={21} height={21} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
           {showLabel && (
             <span className="max-w-full truncate text-[11px] leading-none text-tx-secondary">
               {t("sidebarNext.nav.settings", { defaultValue: "设置" })}
