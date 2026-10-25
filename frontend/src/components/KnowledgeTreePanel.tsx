@@ -39,7 +39,6 @@ import KnowledgeTreePermissionsDialog from "@/components/KnowledgeTreePermission
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
-  importSpreadsheetIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
@@ -281,7 +280,7 @@ export interface KnowledgeTreeInlineCreateRequest {
 export interface KnowledgeTreeImportRequest {
   requestId: number;
   parentId: string | null;
-  kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque" | "spreadsheet" | "spreadsheet";
+  kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque";
 }
 
 export interface KnowledgeTreeTemplateCreateRequest {
@@ -847,7 +846,7 @@ export function KnowledgeTreePanel({
                 ? await importPdfIntoKnowledgeTree(options)
                 : importRequest.kind === "wechat"
  ? await importWeChatArticleIntoKnowledgeTree(options)
- : await importSpreadsheetIntoKnowledgeTree(options);
+ : null;
         if (!imported) return;
         revealCreatedKnowledgeTreeNote(parent?.id || null);
         activateNote(imported, parent?.id || null);

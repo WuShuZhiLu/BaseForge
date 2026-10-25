@@ -3504,6 +3504,9 @@
       "themeDark": "黑夜",
       "themeLight": "白天",
       "trash": "回收站"
-    }
+    },
+    "newKnowledgeBase": "新建知识库",
+    "createUnder": "在当前节点下新建",
+    "createAtRoot": "在根目录新建"
   }
 }

@@ -3497,6 +3497,9 @@
       "themeDark": "Dark",
       "themeLight": "Light",
       "trash": "Trash"
-    }
+    },
+    "newKnowledgeBase": "New Knowledge Base",
+    "createUnder": "Create under current node",
+    "createAtRoot": "Create at root"
   }
 }

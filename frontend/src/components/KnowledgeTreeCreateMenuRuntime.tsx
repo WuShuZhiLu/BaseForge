@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , FileSpreadsheet, PenTool } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
+} from "lucide-react";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -46,7 +48,6 @@ const IMPORT_ITEMS = [
   { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },
-{ kind: "spreadsheet", label: "导入 Excel/CSV 为 Markdown 表格", icon: FileSpreadsheet },
 ] as const;
 
 export interface KnowledgeTreeCreateMenuState {
@@ -212,8 +213,13 @@ export function KnowledgeTreeCreateDropdown({
   onCreateSheet,
   onCreateEncrypted,
 }: KnowledgeTreeCreateDropdownProps) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<React.CSSProperties | null>(null);
+  // 「导入」子菜单：锚定父项右侧弹出，点外/执行后关闭
+  const [importSubmenu, setImportSubmenu] = useState<{ anchor: DOMRect } | null>(null);
+  const importSubmenuRef = useRef<HTMLDivElement>(null);
+  const [importSubmenuPosition, setImportSubmenuPosition] = useState<React.CSSProperties | null>(null);
 
   useLayoutEffect(() => {
     if (!menu || !menuRef.current) {
@@ -222,6 +228,37 @@ export function KnowledgeTreeCreateDropdown({
     }
     setPosition(menuPosition(menu.anchor, menuRef.current.scrollHeight));
   }, [menu]);
+
+  useLayoutEffect(() => {
+    if (!importSubmenu || !importSubmenuRef.current) {
+      setImportSubmenuPosition(null);
+      return;
+    }
+    setImportSubmenuPosition(menuPosition(importSubmenu.anchor, importSubmenuRef.current.scrollHeight));
+  }, [importSubmenu]);
+
+  useEffect(() => {
+    if (!importSubmenu) return;
+    const closeFromPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && (importSubmenuRef.current?.contains(target) || menuRef.current?.contains(target))) return;
+      setImportSubmenu(null);
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setImportSubmenu(null);
+    };
+    window.addEventListener("pointerdown", closeFromPointer, true);
+    window.addEventListener("keydown", closeFromKeyboard, true);
+    const onResize = () => setImportSubmenu(null);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("pointerdown", closeFromPointer, true);
+      window.removeEventListener("keydown", closeFromKeyboard, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [importSubmenu]);
 
   useEffect(() => {
     if (!menu) return;
@@ -252,7 +289,7 @@ export function KnowledgeTreeCreateDropdown({
     <div
       ref={menuRef}
       role="menu"
-      aria-label={menu.parentId ? "在当前节点下新建" : "在根目录新建"}
+      aria-label={menu.parentId ? t("sidebarNext.createUnder", { defaultValue: "在当前节点下新建" }) : t("sidebarNext.createAtRoot", { defaultValue: "在根目录新建" })}
       className="fixed z-[420] overflow-y-auto overscroll-contain rounded-lg border border-app-border bg-app-bg p-1 shadow-xl"
       style={position || { left: 8, top: 8, width: CREATE_MENU_WIDTH, visibility: "hidden" }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -266,7 +303,7 @@ export function KnowledgeTreeCreateDropdown({
           onClick={() => onCreate(null, "folder")}
         >
           <Folder size={15} className="text-amber-500" />
-          <span>新建知识库</span>
+          <span>{t("sidebarNext.newKnowledgeBase", { defaultValue: "新建知识库" })}</span>
         </button>
       ) : (<>
       {CREATE_ITEMS.map((item) => {
@@ -328,36 +365,67 @@ export function KnowledgeTreeCreateDropdown({
         </button>
       )}
       <div className="my-1 border-t border-app-border" />
-      {IMPORT_ITEMS.map((item) => {
-        const Icon = item.icon;
-        return (
-          <button
-            key={item.kind}
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
-            onClick={() => onImport(menu.parentId, item.kind)}
-          >
-            <Icon
-              size={15}
-              className={item.kind === "markdown"
-                ? "text-emerald-500"
-                : item.kind === "markdown-zip"
-                  ? "text-amber-500"
-                  : item.kind === "word"
-                    ? "text-violet-500"
-                    : item.kind === "pdf"
-                      ? "text-red-500"
-                      : "text-sky-500"}
-            />
-            <span>{item.label}</span>
-          </button>
-        );
-      })}
+      {/* 导入：折叠为单个父项，点击弹出右侧子菜单 */}
+      <button
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(importSubmenu)}
+        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        onClick={(event) => {
+          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+          setImportSubmenu((current) => current ? null : { anchor: new DOMRect(rect.right - 4, rect.top, rect.width, rect.height) });
+        }}
+      >
+        <CloudDownload size={15} className="text-sky-500" />
+        <span>导入</span>
+        <ChevronDown size={13} className={cn("ml-auto shrink-0 -rotate-90 text-tx-tertiary", importSubmenu && "rotate-0")} />
+      </button>
       <p className="border-t border-app-border px-2.5 pb-1 pt-2 text-[10px] text-tx-tertiary">
         也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
       </p>
       </>)}
+      {importSubmenu && createPortal(
+        <div
+          ref={importSubmenuRef}
+          role="menu"
+          aria-label="导入"
+          className="fixed z-[421] max-h-[60vh] overflow-y-auto rounded-lg border border-app-border bg-app-bg p-1 shadow-xl"
+          style={importSubmenuPosition || { left: importSubmenu.anchor.right + 4, top: importSubmenu.anchor.top, visibility: importSubmenuPosition ? undefined : "hidden" }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          {IMPORT_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.kind}
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+                onClick={() => {
+                  setImportSubmenu(null);
+                  onImport(menu.parentId, item.kind);
+                }}
+              >
+                <Icon
+                  size={15}
+                  className={item.kind === "markdown"
+                    ? "text-emerald-500"
+                    : item.kind === "markdown-zip"
+                      ? "text-amber-500"
+                      : item.kind === "word"
+                        ? "text-violet-500"
+                        : item.kind === "pdf"
+                          ? "text-red-500"
+                          : "text-sky-500"}
+                />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
     </div>,
     document.body,
   );
