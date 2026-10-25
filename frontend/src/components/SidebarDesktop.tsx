@@ -30,11 +30,13 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Table2,
   Sparkles,
   Star,
   Trash2,
   Upload,
   Users,
+  Waypoints,
   X,
   XCircle,
 } from "lucide-react";
@@ -61,7 +63,6 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
-import { FileText, Table2, Waypoints } from "lucide-react";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;

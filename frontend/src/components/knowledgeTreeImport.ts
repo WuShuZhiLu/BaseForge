@@ -148,7 +148,7 @@ export async function importMarkdownIntoKnowledgeTree(
   if (txtFiles.length > 0) {
     const choice = await choose({
       title: "检测到 .txt 文件",
-      message: `将 ${txtFiles.length} 个 .txt 文件导入为：`,
+      description: `将 ${txtFiles.length} 个 .txt 文件导入为：`,
       choices: [
         { value: "markdown", label: "Markdown（转换格式，默认）" },
         { value: "plain", label: "纯文本（保持原样，不做格式转换）" },

@@ -1,7 +1,7 @@
 // ir-to-tiptap 适配器单元测试：标题/段落/行内标记、列表聚合、表格合并、图片上传与降级。
 import { describe, expect, it, vi } from "vitest";
 import { irToTiptap, irPlainText } from "../serializers/ir-to-tiptap";
-import type { DocxIR, ParagraphNode } from "../../ir/document";
+import type { DocxIR, ParagraphNode } from "../ir/document";
 
 function paragraph(overrides: Partial<ParagraphNode> = {}): ParagraphNode {
   return { type: "paragraph", runs: [], ...overrides };

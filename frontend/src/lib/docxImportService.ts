@@ -610,6 +610,7 @@ export async function importDocxAsNoteSafe(
     });
     throwIfAborted(params.signal);
     noteId = crypto.randomUUID();
+    const createdNoteId: string = noteId; // 回调闭包内 TS 无法收窄 let，捕获为 const
     const emptyContent = JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] });
     const workspaceId = getCurrentWorkspace();
     let baseNote: Note;
@@ -667,7 +668,7 @@ export async function importDocxAsNoteSafe(
             `word-image-${imageSeq}.${extensionForContentType(contentType)}`,
             { type: contentType || "application/octet-stream" },
           );
-          const uploaded = await api.attachments.upload(noteId, file);
+          const uploaded = await api.attachments.upload(createdNoteId, file);
           uploadedAttachmentIds.push(uploaded.id);
           imageUrls.set(`ir-image-${imageSeq}`, uploaded.url);
           report(params.onProgress, {

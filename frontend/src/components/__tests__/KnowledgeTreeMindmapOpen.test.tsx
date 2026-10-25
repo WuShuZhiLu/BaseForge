@@ -45,7 +45,7 @@ vi.mock("@/lib/knowledgeTreeApi", async () => {
 vi.mock("@/store/AppContext", async () => {
   const actual = await vi.importActual<typeof import("@/store/AppContext")>("@/store/AppContext");
   // 记录调用的 actions 代理，供断言 setActiveNote 被携带导图文档调用。
-  const actionsProxy: Record<string, ReturnType<typeof vi.fn>> = new Proxy({}, {
+  const actionsProxy: Record<string, ReturnType<typeof vi.fn>> = new Proxy({} as Record<string, ReturnType<typeof vi.fn>>, {
     get: (target, prop) => {
       if (typeof prop !== "string") return undefined;
       target[prop] ??= vi.fn();
