@@ -6915,16 +6915,18 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 // 也会选到更深的栏内块，避免柄出现在整个分栏或单栏上。
                 id: "prioritizeColumn",
                 evaluate: ({ node, $pos, depth }: any) => {
+                  // 顶层 atom 块（画板/导图/表格嵌入等）depth 会传 $pos.depth+1，
+                  // $pos.node(d) 越界返回 undefined——必须守卫，否则评分抛异常导致柄消失
                   let inColumn = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "column") {
+                    if ($pos.node(d)?.type?.name === "column") {
                       inColumn = true;
                       break;
                     }
                   }
                   if (!inColumn) return 0;
                   // column 容器扣分；栏内块（paragraph 等）不扣分 → 栏内块胜出。
-                  return node.type.name === "column" ? 600 : 0;
+                  return node?.type?.name === "column" ? 600 : 0;
                 },
               },
               {
@@ -6937,13 +6939,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 evaluate: ({ node, $pos, depth }: any) => {
                   let inCallout = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "callout") {
+                    if ($pos.node(d)?.type?.name === "callout") {
                       inCallout = true;
                       break;
                     }
                   }
                   if (!inCallout) return 0;
-                  return node.type.name === "callout" ? 0 : 600;
+                  return node?.type?.name === "callout" ? 0 : 600;
                 },
               },
               {
@@ -6956,13 +6958,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 evaluate: ({ node, $pos, depth }: any) => {
                   let inDetails = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "details") {
+                    if ($pos.node(d)?.type?.name === "details") {
                       inDetails = true;
                       break;
                     }
                   }
                   if (!inDetails) return 0;
-                  return node.type.name === "details" ? 0 : 600;
+                  return node?.type?.name === "details" ? 0 : 600;
                 },
               },
             ],

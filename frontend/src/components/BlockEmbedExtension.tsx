@@ -54,6 +54,7 @@ function BlockEmbedNodeView({ node, selected }: any) {
     <NodeViewWrapper
       ref={observeRef}
       className="my-3"
+      data-drag-handle
       data-nowen-block-embed={node.attrs.href}
       data-block-embed-runtime-state={shouldRenderHeavyContent ? "mounted" : "deferred"}
       style={{
