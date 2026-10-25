@@ -266,7 +266,6 @@ function AvatarSection() {
 function PasswordSection() {
   const { t } = useTranslation();
   const [currentPassword, setCurrentPassword] = useState("");
-  const [newUsername, setNewUsername] = useState("");
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [originalEmail, setOriginalEmail] = useState("");
@@ -316,7 +315,7 @@ function PasswordSection() {
     const emailChanged = trimmedEmail !== originalEmail;
     const displayNameChanged = trimmedDisplayName !== originalDisplayName;
 
-    if (!newPassword && !newUsername.trim() && !emailChanged && !displayNameChanged) {
+    if (!newPassword && !emailChanged && !displayNameChanged) {
       return triggerShake(t('securitySettings.noChanges'));
     }
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -335,7 +334,6 @@ function PasswordSection() {
       // api.updateSecurity 会自动把新 token 写回 localStorage（后端改密会 bump tokenVersion）
       await api.updateSecurity({
         currentPassword,
-        newUsername: newUsername.trim() || undefined,
         newEmail: emailChanged ? (trimmedEmail || null) : undefined,
         newDisplayName: displayNameChanged ? (trimmedDisplayName || null) : undefined,
         newPassword: newPassword || undefined,
@@ -348,7 +346,6 @@ function PasswordSection() {
       setSuccessLabel(changedPassword ? t('securitySettings.successMessage') : t('securitySettings.profileUpdated'));
       setSuccess(true);
       setCurrentPassword("");
-      setNewUsername("");
       setNewPassword("");
       setConfirmPassword("");
       if (changedPassword) {
@@ -419,24 +416,6 @@ function PasswordSection() {
         </div>
 
         <div className="h-px w-full bg-zinc-200 dark:bg-zinc-800" />
-
-        {/* 新用户名 */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('securitySettings.newUsername')}</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <User className="h-4 w-4 text-zinc-400 dark:text-zinc-500" />
-            </div>
-            <input
-              type="text"
-              value={newUsername}
-              onChange={(e) => setNewUsername(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2.5 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-zinc-50/50 dark:bg-zinc-800/50 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-sm"
-              placeholder={t('securitySettings.newUsernamePlaceholder')}
-              autoComplete="username"
-            />
-          </div>
-        </div>
 
         {/* 邮箱 */}
         <div className="space-y-1.5">

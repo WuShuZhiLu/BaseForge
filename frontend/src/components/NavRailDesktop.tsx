@@ -415,7 +415,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   const displayName = user?.displayName || user?.username || "用户";
   const initials = initialsOf(user?.displayName || user?.username);
 
-  const renderItem = (item: NavItem, index = 0, group: "core" | "plugins" = "core") => {
+  const renderItem = (item: NavItem, group: "core" | "plugins" = "core") => {
     if (item.mode === "plugins") {
       // 插件：切侧栏到插件管理视图（原型 FR-IA-02 语义）
       const plugActive = activeMode === "plugins";
@@ -528,7 +528,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             if (isBadgeHidden(item.mode)) continue;
             rows.push(item);
           }
-          return rows.map((item, index) => renderItem(item, index, "core"));
+          return rows.map((item) => renderItem(item, "core"));
         })()}
         {/* 固定分割线：上=核心徽章组，下=插件徽章组（位置不随排序变化） */}
         <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
@@ -547,8 +547,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           }
           return (
             <>
-              {PLUGIN_ITEMS.map((item, index) => renderItem(item, index, "plugins"))}
-              {rows.map((item, index) => renderItem(item, index + 1, "plugins"))}
+              {PLUGIN_ITEMS.map((item) => renderItem(item, "plugins"))}
+              {rows.map((item) => renderItem(item, "plugins"))}
             </>
           );
         })()}
@@ -813,12 +813,6 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
                 </span>
               )}
             </button>
-            <div className="flex w-full items-center gap-2 rounded-md bg-app-hover px-2.5 py-1.5 text-left text-xs text-tx-primary">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-[9px] font-semibold text-accent-primary dark:bg-accent-primary/14">
-                {initials}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{displayName}（当前）</span>
-            </div>
             <button
               type="button"
               role="menuitem"
