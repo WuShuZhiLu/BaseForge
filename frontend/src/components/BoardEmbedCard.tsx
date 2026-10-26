@@ -116,45 +116,62 @@ export default function BoardEmbedCard({ href }: { href: string }) {
   return (
     <div
       data-nowen-board-embed={boardId}
-      className="my-4 min-w-0 max-w-full overflow-hidden rounded-xl border border-app-border bg-app-surface"
+      className="embed-block-wrapper min-w-0 max-w-full"
     >
-      <div className="flex min-w-0 items-center gap-2 border-b border-app-border px-3 py-2">
-        <PenTool size={14} className="shrink-0 text-teal-500" />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-tx-primary">
-          {note?.title || "画板"}
-        </span>
-        {note?.isUnlisted === 1 && !promoting && (
+      <div className="embed-block-toolbar" contentEditable={false}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <PenTool size={14} className="embed-block-icon" />
+          <span className="embed-block-title">{note?.title || "画板"}</span>
+          {note?.isUnlisted === 1 ? (
+            <span
+              className="embed-block-kind is-anonymous"
+              title="匿名画板 · 只通过此嵌入块访问 · 删除此块后会被自动清理"
+            >
+              匿名
+            </span>
+          ) : note ? (
+            <span
+              className="embed-block-kind"
+              title="引用原始画板 · SVG 只读快照 · 删除此块不会删除画板"
+            >
+              引用
+            </span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {note?.isUnlisted === 1 && !promoting && (
+            <button
+              type="button"
+              contentEditable={false}
+              className="embed-block-tool-btn"
+              onClick={(event) => { event.preventDefault(); startPromote(); }}
+              title="转为独立文档（进入知识树）"
+            >
+              <FilePlus2 size={12} />
+              转为独立文档
+            </button>
+          )}
           <button
             type="button"
             contentEditable={false}
-            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-teal-600 transition-colors hover:bg-app-hover dark:text-teal-400"
-            onClick={(event) => { event.preventDefault(); startPromote(); }}
-            title="转为独立文档（进入知识树）"
+            className="embed-block-tool-btn"
+            onClick={(event) => { event.preventDefault(); setRevision((value) => value + 1); }}
+            title="刷新预览"
           >
-            <FilePlus2 size={12} />
-            转为独立文档
+            <RefreshCw size={12} />
           </button>
-        )}
-        <button
-          type="button"
-          contentEditable={false}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          onClick={(event) => { event.preventDefault(); setRevision((value) => value + 1); }}
-          title="刷新预览"
-        >
-          <RefreshCw size={12} />
-        </button>
-        <button
-          type="button"
-          contentEditable={false}
-          disabled={!note}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-accent-primary transition-colors hover:bg-app-hover disabled:opacity-40"
-          onClick={(event) => { event.preventDefault(); openBoard(); }}
-          title="打开画板"
-        >
-          <ExternalLink size={12} />
-          打开
-        </button>
+          <button
+            type="button"
+            contentEditable={false}
+            disabled={!note}
+            className="embed-block-tool-btn"
+            onClick={(event) => { event.preventDefault(); openBoard(); }}
+            title="打开画板"
+          >
+            <ExternalLink size={12} />
+            打开
+          </button>
+        </div>
       </div>
 
       {promoting && (
@@ -209,17 +226,11 @@ export default function BoardEmbedCard({ href }: { href: string }) {
         </div>
       ) : (
         <div
-          className="board-embed-preview max-h-[380px] overflow-auto overscroll-contain p-2 [&_svg]:h-auto [&_svg]:max-w-full"
+          className="board-embed-preview max-h-[380px] overflow-auto p-2 [&_svg]:h-auto [&_svg]:max-w-full"
           aria-label="画板只读预览"
           dangerouslySetInnerHTML={{ __html: preview.svg }}
         />
       )}
-
-      <div className="border-t border-app-border px-3 py-1.5 text-[11px] text-tx-tertiary">
-        {note?.isUnlisted === 1
-          ? "匿名画板 · 只通过此嵌入块访问 · 删除此块后会被自动清理"
-          : "引用原始画板 · SVG 只读快照 · 删除此块不会删除画板"}
-      </div>
     </div>
   );
 }

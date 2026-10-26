@@ -732,6 +732,84 @@ html[data-code-theme="solarized-light"] {
   background: var(--code-copy-success-bg);
 }
 
+/* ===== 嵌入块（画板/思维导图/轻量表格 blockEmbed 卡片） =====
+ * 跟随应用亮暗主题（--color-* 变量），与正文同底色；结构与代码块工具条对齐
+ * （头部 + 内容区），但配色独立——代码块是恒定深底、可自选主题（--code-*），
+ * 嵌入块若跟随会与正文视觉冲突（实测反馈已修正）。
+ * 类名不带 .ProseMirror 前缀——同一组件还在 Markdown 预览（编辑器外）渲染。
+ */
+.embed-block-wrapper {
+  margin: 16px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.embed-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-border);
+  user-select: none;
+}
+.embed-block-icon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+.embed-block-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.embed-block-kind {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+/* 匿名 / 离线快照等状态徽标：琥珀色，亮暗两套主题下均可读 */
+.embed-block-kind.is-anonymous {
+  color: #d97706;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+.embed-block-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.embed-block-tool-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-active);
+}
+.embed-block-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* 涓嬫媺闈㈡澘锛堣瑷€/涓婚閫夋嫨鍣級鈥?浣跨敤涓嶅甫 .ProseMirror 鍓嶇紑鐨勯€夋嫨鍣紝
  * 浠ヤ究 Portal 娓叉煋鍒?<body> 涓嬫椂浠嶈兘鍛戒腑鏍峰紡锛堥伩鍏嶉€忚/鏃犺儗鏅級銆?*/
 .code-block-popup {
