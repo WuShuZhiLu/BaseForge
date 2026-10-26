@@ -63,6 +63,7 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
@@ -951,6 +952,7 @@ export default function SidebarDesktop() {
 
   const activeNoteId = state.activeNote?.id ?? null;
   const openTabs = state.openNoteTabs;
+  const openNoteFromTab = useTabNoteOpener();
 
   // ---- 区段折叠/排序 ----
   const toggleSection = useCallback((id: SectionId) => {
@@ -1697,16 +1699,7 @@ export default function SidebarDesktop() {
                     )}
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          const note = await api.getNote(tab.id);
-                          if (!note) return;
-                          actions.setActiveNote(note);
-                          actions.setViewMode("notebook");
-                        } catch (error) {
-                          console.error("[SidebarDesktop] activate tab failed:", error);
-                        }
-                      }}
+                      onClick={() => void openNoteFromTab(tab.id)}
                       className="min-w-0 flex-1 truncate text-left"
                     >
                       {tab.title}
@@ -1715,15 +1708,12 @@ export default function SidebarDesktop() {
                       type="button"
                       onClick={async () => {
                         const closingActive = tab.id === activeNoteId;
-                        const remaining = openTabs.filter((t) => t.id !== tab.id);
+                        const nextTab = closingActive ? getNextTabAfterClose(openTabs, tab.id) : null;
                         actions.closeNoteTab(tab.id);
                         if (!closingActive) return;
                         // 关闭激活文档：切到相邻页签（右侧优先），无页签则清空编辑区
-                        const idx = openTabs.findIndex((t) => t.id === tab.id);
-                        const nextTab = remaining[idx] ?? remaining[idx - 1];
                         if (nextTab) {
-                          const note = await api.getNote(nextTab.id);
-                          if (note) actions.setActiveNote(note);
+                          await openNoteFromTab(nextTab.id);
                         } else {
                           actions.setActiveNote(null);
                         }

@@ -248,7 +248,9 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(shared).toContain("export function usePanelRefresh");
     expect(shared).toContain("export function PanelRow");
     expect(shared).toContain("nowen:sidebar-panel-refresh");
-    expect(read("../../components/sidebar/panels/openNote.ts")).toContain("openNoteFromSidebarPanel");
+    // 打开笔记统一走 useTabNoteOpener（加载协调器链路）；裸 api.getNote + setActiveNote 已废除
+    expect(read("../../hooks/useTabNoteOpener.ts")).toContain("useNoteLoader");
+    expect(read("../../components/sidebar/panels/OpenEditorsPanel.tsx")).not.toContain("api.getNote");
 
     // 面板框架（S1）：布局 store + 容器 + 外壳 + 注册表
     const store = read("../../lib/sidebarPanels.ts");

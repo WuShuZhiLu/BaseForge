@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { markNewNoteForImmediateEdit } from "@/lib/newNoteImmediateEdit";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-import { useNoteLoader } from "@/hooks/useNoteLoader";
+import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import type { Notebook, NoteListItem } from "@/types";
 import { EditorToolbarExpandSlot } from "@/components/CollapsibleEditorToolbar";
 import { buildNoteDeepLinkUrl } from "@/lib/noteDeepLink";
@@ -42,12 +42,6 @@ type DragInsertTarget = {
   tabId: string;
   edge: "before" | "after";
 } | null;
-
-function getNextTabAfterClose(tabs: OpenNoteTab[], closingId: string): OpenNoteTab | null {
-  const index = tabs.findIndex((tab) => tab.id === closingId);
-  if (index === -1) return null;
-  return tabs[index + 1] || tabs[index - 1] || null;
-}
 
 function escapeMarkdownLinkText(text: string): string {
   return text.replace(/\r?\n/g, " ").replace(/]/g, "\\]");
@@ -171,7 +165,7 @@ function NoteTabVisual({
 export default function NoteTabsBar() {
   const { state } = useApp();
   const actions = useAppActions();
-  const { loadNote, cancelNoteLoad } = useNoteLoader();
+  const openNote = useTabNoteOpener();
   const { t } = useTranslation();
   const { openNoteTabs, activeNote, noteLoading } = state;
   const noteLoadingState = state.noteLoadingState ?? { pendingNoteId: null };
@@ -211,42 +205,6 @@ export default function NoteTabsBar() {
     if (!contextMenu) return null;
     return openNoteTabs.find((tab) => tab.id === contextMenu.tabId) || null;
   }, [contextMenu, openNoteTabs]);
-
-  const openNote = useCallback(async (noteId: string) => {
-    if (activeNote?.id === noteId) {
-      if (noteLoadingState.pendingNoteId && noteLoadingState.pendingNoteId !== noteId) {
-        cancelNoteLoad();
-      }
-      return;
-    }
-    try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
-    const targetTab = openNoteTabs.find((tab) => tab.id === noteId);
-    await loadNote({
-      noteId,
-      summary: {
-        title: targetTab?.title || t("editorTabs.noTitle"),
-        notebookId: targetTab?.notebookId || "",
-        contentFormat: targetTab?.contentFormat,
-      },
-      request: () => api.getNote(noteId),
-      onSuccess: (note) => {
-        const existingTab = openNoteTabs.find((tab) => tab.id === note.id);
-        actions.setActiveNote(note);
-        actions.setMobileView("editor");
-        actions.openNoteTab({
-          id: note.id,
-          title: note.title,
-          notebookId: note.notebookId,
-          workspaceId: note.workspaceId,
-          contentFormat: note.contentFormat,
-          isLocked: note.isLocked,
-          isTrashed: note.isTrashed,
-          updatedAt: note.updatedAt,
-          pinned: existingTab?.pinned,
-        });
-      },
-    });
-  }, [actions, activeNote?.id, cancelNoteLoad, loadNote, noteLoadingState.pendingNoteId, openNoteTabs, t]);
 
   const closeTab = useCallback((noteId: string) => {
     const closingActive = activeNote?.id === noteId;
