@@ -188,6 +188,48 @@ function trimOpenNoteTabs(tabs: OpenNoteTab[], activeId?: string | null): OpenNo
   return tabs.filter((_, tabIndex) => tabIndex !== index);
 }
 
+const OPEN_NOTE_TAB_STORAGE_KEY = "nowen-open-note-tabs";
+
+/**
+ * 从 localStorage 恢复「打开的」页签。恢复通道与 dispatch 通道走同样的防线：
+ * 条目形状校验（防旧版本/脏数据形态）、加密转换屏障 isConversionMetadataSafe
+ * （已转换笔记不得以明文 contentFormat 复活）、按 id 去重、上限截断。
+ * 不做存在性校验（需要后端）：404 由 useTabNoteOpener 打开时自愈移除。
+ */
+function loadSavedOpenNoteTabs(): OpenNoteTab[] {
+  try {
+    const saved = localStorage.getItem(OPEN_NOTE_TAB_STORAGE_KEY);
+    const parsed: unknown = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    const restored: OpenNoteTab[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const candidate = entry as Partial<OpenNoteTab>;
+      if (typeof candidate.id !== "string" || candidate.id.length === 0 || candidate.id.length > 512) continue;
+      if (seen.has(candidate.id)) continue;
+      const tab: OpenNoteTab = {
+        id: candidate.id,
+        title: typeof candidate.title === "string" ? candidate.title : "",
+        notebookId: typeof candidate.notebookId === "string" ? candidate.notebookId : "",
+        workspaceId: typeof candidate.workspaceId === "string" ? candidate.workspaceId : null,
+        contentFormat: typeof candidate.contentFormat === "string" ? candidate.contentFormat : undefined,
+        isLocked: candidate.isLocked === 1 ? 1 : 0,
+        isTrashed: candidate.isTrashed === 1 ? 1 : 0,
+        updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
+        pinned: candidate.pinned === true,
+      };
+      if (!isConversionMetadataSafe(tab)) continue;
+      seen.add(tab.id);
+      restored.push(tab);
+      if (restored.length >= MAX_OPEN_NOTE_TABS) break;
+    }
+    return restored;
+  } catch {
+    return [];
+  }
+}
+
 function getSavedSidebarWidth(): number {
   try {
     const saved = localStorage.getItem("nowen-sidebar-width");
@@ -243,15 +285,7 @@ const initialState: AppState = {
   mobileView: "list",
   mobileSidebarOpen: false,
   notesRefreshToken: 0,
-  openNoteTabs: (() => {
-    try {
-      const saved = localStorage.getItem("nowen-open-note-tabs");
-      const parsed = saved ? JSON.parse(saved) as OpenNoteTab[] : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  })(),
+  openNoteTabs: loadSavedOpenNoteTabs(),
   openToolTabs: [],
   activeToolTab: null,
   editorSplit: null,
@@ -538,7 +572,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 打开的页签持久化：刷新后恢复"打开的编辑器"（侧栏面板依赖）
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-open-note-tabs", JSON.stringify(state.openNoteTabs));
+      localStorage.setItem(OPEN_NOTE_TAB_STORAGE_KEY, JSON.stringify(state.openNoteTabs));
     } catch { /* quota/serialization failures are non-fatal */ }
   }, [state.openNoteTabs]);
   const noteActivationGuard = useMemo(() => new NoteActivationGuard(), []);

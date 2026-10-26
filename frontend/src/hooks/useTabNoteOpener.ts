@@ -1,7 +1,9 @@
 import { useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useApp, useAppActions, type OpenNoteTab } from "@/store/AppContext";
 import { api } from "@/lib/api";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
+import { toast } from "@/lib/toast";
 
 /** 关闭一个页签后应激活的相邻页签：右侧优先，否则左侧，否则 null。 */
 export function getNextTabAfterClose(tabs: OpenNoteTab[], closingId: string): OpenNoteTab | null {
@@ -21,6 +23,7 @@ export function getNextTabAfterClose(tabs: OpenNoteTab[], closingId: string): Op
 export function useTabNoteOpener() {
   const { state } = useApp();
   const actions = useAppActions();
+  const { t } = useTranslation();
   const { loadNote, cancelNoteLoad } = useNoteLoader();
 
   const openNote = useCallback(async (noteId: string) => {
@@ -34,7 +37,7 @@ export function useTabNoteOpener() {
     }
     try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
     const tab = state.openNoteTabs?.find((item) => item.id === noteId);
-    await loadNote({
+    const result = await loadNote({
       noteId,
       summary: {
         title: tab?.title ?? "",
@@ -62,7 +65,14 @@ export function useTabNoteOpener() {
         });
       },
     });
-  }, [actions, cancelNoteLoad, loadNote, state.activeNote?.id, state.noteLoadingState?.pendingNoteId, state.openNoteTabs]);
+    // 404 自愈：页签指向已删除/不存在的笔记时，把死页签从「打开的」移除并清掉
+    // 错误浮层。此前死页签永远留着，点击只会反复报「打开失败」。
+    if (result.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {
+      actions.removeNoteTab(noteId);
+      cancelNoteLoad();
+      toast.error(t("editorTabs.tabNoteMissing", { defaultValue: "笔记不存在或已被删除，已从「打开的」移除" }));
+    }
+  }, [actions, cancelNoteLoad, loadNote, state.activeNote?.id, state.noteLoadingState?.pendingNoteId, state.openNoteTabs, t]);
 
   return openNote;
 }

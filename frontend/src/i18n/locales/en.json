@@ -917,7 +917,8 @@
     "copySuccess": "Copied",
     "copyFailed": "Copy failed",
     "openInNewTab": "Open in new tab",
-    "copyInternalLink": "Copy internal link"
+    "copyInternalLink": "Copy internal link",
+    "tabNoteMissing": "Note not found or deleted; removed from Open Editors"
   },
   "securitySettings": {
     "title": "Account & Security",

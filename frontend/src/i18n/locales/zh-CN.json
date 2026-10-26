@@ -932,7 +932,8 @@
     "copySuccess": "已复制",
     "copyFailed": "复制失败",
     "openInNewTab": "在新标签页打开",
-    "copyInternalLink": "复制内部链接"
+    "copyInternalLink": "复制内部链接",
+    "tabNoteMissing": "笔记不存在或已被删除，已从「打开的」移除"
   },
   "securitySettings": {
     "title": "账号与安全",
