@@ -79,15 +79,15 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
       expect(source).toContain("activateNote(await api.getNote(created.resourceId)");
     }
 
-    // 表格数据 → Markdown 笔记导入（1.0.0：完善现有功能）。
-    expect(menu).toContain('kind: "spreadsheet"');
+    // 表格数据 → Markdown 笔记导入已在 57b37c29d 有意移除（新建菜单导入区折叠），
+    // 契约锁定移除态，防止误回流。
+    expect(menu).not.toContain('kind: "spreadsheet"');
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
     ]) {
       const source = read(file);
-      expect(source).toContain('importSpreadsheetIntoKnowledgeTree');
-      expect(source).toContain('"spreadsheet"');
+      expect(source).not.toContain('importSpreadsheetIntoKnowledgeTree');
     }
   });
 

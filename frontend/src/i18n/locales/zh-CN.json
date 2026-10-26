@@ -903,8 +903,6 @@
   },
   "editorTabs": {
     "close": "关闭标签",
-    "closeOthers": "关闭其他标签",
-    "closeAll": "关闭全部标签",
     "noTitle": "无标题笔记",
     "openedTabs": "已打开笔记",
     "allOpenedTabs": "全部已打开标签",
@@ -924,7 +922,6 @@
     "splitDown": "向下分屏",
     "closeSplit": "取消分屏",
     "closeAllSplits": "取消全部分屏",
-    "splitLoadFailed": "分屏加载失败",
     "copyWikiLink": "复制双链引用",
     "copyMarkdownLink": "复制 Markdown 链接",
     "copyTitle": "复制标题",
@@ -3420,6 +3417,12 @@
     }
   },
   "richText": {
+    "embedOpenSource": "打开源文档",
+    "embedCopyRef": "复制嵌入引用",
+    "embedRefCopied": "已复制嵌入引用",
+    "embedPromote": "转为独立文档",
+    "embedPromoted": "已转为独立文档",
+    "embedPromoteFailed": "转为独立文档失败",
     "noEmoji": "无匹配表情",
     "calloutStyle": "切换提示块样式",
     "calloutColors": {
@@ -3453,13 +3456,6 @@
   },
   "trash": {
     "restore": "恢复"
-  },
-  "topbar": {
-    "searchPlaceholder": "搜索全部内容…",
-    "tools": "工具",
-    "toolsOpenAsTab": "工具（打开为页签）",
-    "opened": "已打开",
-    "search": "搜索"
   },
   "tabs": {
     "closeTool": "关闭"

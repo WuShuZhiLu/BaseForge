@@ -1,8 +1,6 @@
 import {
-  APP_PATH_CHANGED_EVENT,
   buildAppPathUrl,
   pushAppPathState,
-  replaceAppPathState,
   resolveCurrentAppPathname,
 } from "@/lib/appPathNavigation";
 
@@ -47,15 +45,6 @@ export function getCurrentNoteAppRoute(): NoteAppRoute {
   return parseNoteAppPath(resolveCurrentAppPathname());
 }
 
-export function subscribeNoteAppPath(listener: () => void): () => void {
-  window.addEventListener(APP_PATH_CHANGED_EVENT, listener);
-  window.addEventListener("popstate", listener);
-  return () => {
-    window.removeEventListener(APP_PATH_CHANGED_EVENT, listener);
-    window.removeEventListener("popstate", listener);
-  };
-}
-
 export function buildNoteAppPath(noteId: string): string {
   return isNoteId(noteId)
     ? `/notes/${encodeURIComponent(noteId)}`
@@ -64,10 +53,6 @@ export function buildNoteAppPath(noteId: string): string {
 
 export function pushNoteAppPath(noteId: string): void {
   pushAppPathState(buildNoteAppPath(noteId));
-}
-
-export function replaceNoteAppPath(noteId: string): void {
-  replaceAppPathState(buildNoteAppPath(noteId));
 }
 
 export function buildNoteDeepLinkUrl(

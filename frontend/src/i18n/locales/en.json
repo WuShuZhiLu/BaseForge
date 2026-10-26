@@ -888,8 +888,6 @@
   },
   "editorTabs": {
     "close": "Close tab",
-    "closeOthers": "Close other tabs",
-    "closeAll": "Close all tabs",
     "noTitle": "Untitled note",
     "openedTabs": "Open notes",
     "allOpenedTabs": "All open tabs",
@@ -909,7 +907,6 @@
     "splitDown": "Split down",
     "closeSplit": "Close split",
     "closeAllSplits": "Close all splits",
-    "splitLoadFailed": "Failed to load split pane",
     "copyWikiLink": "Copy wiki link",
     "copyMarkdownLink": "Copy Markdown link",
     "copyTitle": "Copy title",
@@ -3413,6 +3410,12 @@
     }
   },
   "richText": {
+    "embedOpenSource": "Open source doc",
+    "embedCopyRef": "Copy embed reference",
+    "embedRefCopied": "Embed reference copied",
+    "embedPromote": "Promote to document",
+    "embedPromoted": "Promoted to document",
+    "embedPromoteFailed": "Failed to promote to document",
     "noEmoji": "No matching emoji",
     "calloutStyle": "Change callout style",
     "calloutColors": {
@@ -3446,13 +3449,6 @@
   },
   "trash": {
     "restore": "Restore"
-  },
-  "topbar": {
-    "searchPlaceholder": "Search everything…",
-    "tools": "Tools",
-    "toolsOpenAsTab": "Tools (open as tab)",
-    "opened": "Open",
-    "search": "Search"
   },
   "tabs": {
     "closeTool": "Close"

@@ -50,7 +50,7 @@ export interface EditorSplitState {
 export type SidebarPanelId = "tree" | "tags" | "fav" | "trash" | "files";
 
 /** 工具页签（方案 B · B2）：待办 / 小记 / AI / 分享 / 附件管理 / 回收站。
- *  与笔记页签共处一条页签区：工具页签占用主区编辑器列，笔记页签由 NoteTabsBar 管理。 */
+ *  工具页签占用主区编辑器列；笔记「打开的」列表在侧栏面板（OpenEditorsPanel / SidebarDesktop）。 */
 export type ToolTabKey = "tasks" | "diary" | "ai-chat" | "shares" | "files" | "trash";
 export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "diary", "ai-chat", "shares", "files", "trash"];
 
@@ -88,7 +88,7 @@ interface AppState {
   mobileSidebarOpen: boolean;
   /** 全局"笔记列表刷新"令牌：递增时 NoteList 会重新拉取当前视图的列表 */
   notesRefreshToken: number;
-  /** 顶部笔记标签页 V1：只保存元信息，不保存正文/编辑器状态。 */
+  /** 打开的笔记页签：只保存元信息，不保存正文/编辑器状态。展示于侧栏「打开的」面板。 */
   openNoteTabs: OpenNoteTab[];
   /** 已打开的工具页签（顺序即显示顺序）。 */
   openToolTabs: ToolTabKey[];

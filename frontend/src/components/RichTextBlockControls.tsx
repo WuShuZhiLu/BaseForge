@@ -111,13 +111,13 @@ export default function RichTextBlockControls({ editor, editable, isMobile }: { 
           <button type="button" role="menuitem" className={buttonClass} onClick={() => {
             openInternalNoteLink(`note:${menu.embed!.id}`);
             setMenu(null);
-          }}>{t("richText.embedOpenSource") || "打开源文档"}</button>
+          }}>{t("richText.embedOpenSource")}</button>
           <button type="button" role="menuitem" className={buttonClass} onClick={async () => {
             const ok = await copyText(`![[${menu.embed!.href}]]`);
             setMenu(null);
-            if (ok) toast.success(t("richText.embedRefCopied") || "已复制嵌入引用");
-            else toast.error(t("richText.copyFailed") || "复制失败");
-          }}>{t("richText.embedCopyRef") || "复制嵌入引用"}</button>
+            if (ok) toast.success(t("richText.embedRefCopied"));
+            else toast.error(t("richText.copyFailed"));
+          }}>{t("richText.embedCopyRef")}</button>
           <button type="button" role="menuitem" className={buttonClass} onClick={async () => {
             const { id } = menu.embed!;
             setMenu(null);
@@ -125,11 +125,11 @@ export default function RichTextBlockControls({ editor, editable, isMobile }: { 
               // 转正：匿名文档进入知识树；已有名文档时后端幂等（仅按需更新标题）。
               await api.promoteNote(id);
               window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "anonymous-doc-promoted", noteId: id } }));
-              toast.success(t("richText.embedPromoted") || "已转为独立文档");
+              toast.success(t("richText.embedPromoted"));
             } catch (error) {
-              toast.error(error instanceof Error ? error.message : t("richText.embedPromoteFailed") || "转为独立文档失败");
+              toast.error(error instanceof Error ? error.message : t("richText.embedPromoteFailed"));
             }
-          }}>{t("richText.embedPromote") || "转为独立文档"}</button>
+          }}>{t("richText.embedPromote")}</button>
         </>}
         {!menu.embed && <button type="button" className={buttonClass} onClick={() => setPanel("convert")}>{t("slash.convertTitle")}</button>}
         {(["copy", "cut", "paste", "delete"] as const).map((action) => <button type="button" role="menuitem" className={buttonClass} key={action} onClick={() => void run(action)}>{t(`slash.action${action[0].toUpperCase()}${action.slice(1)}`)}</button>)}
