@@ -317,6 +317,10 @@ export function convertBlock(editor: Editor, target: BlockTarget, from: number):
 
   const info = locateBlock(editor, from, { preferColumn: false });
   if (!info) return false;
+  // 嵌入块防呆：blockEmbed（画板/导图/轻量表格/块引用）是 atom 叶子，textContent
+  // 为空，走 nodeToParagraph 会把整块静默替换成空段落、丢失嵌入引用。直接拒绝，
+  // 由调用方 toast「不支持转换」。
+  if (info.typeName === "blockEmbed") return false;
   if (info.inColumn) return convertInColumn(editor, target, from);
 
   const $pos = state.doc.resolve(from);
