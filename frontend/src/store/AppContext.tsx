@@ -14,6 +14,7 @@ import {
 } from "@/lib/notebookCreateState";
 import { prepareEditorSplitClose } from "@/lib/editorSplitMirror";
 import type { SidebarPanelId } from "@/lib/sidebarPanels";
+import { getCurrentAppRoute, type AppRoute } from "@/lib/appRoute";
 
 export type SyncStatus = "idle" | "saving" | "saved" | "error" | "offline" | "queued";
 export type MobileView = "list" | "editor";
@@ -69,6 +70,9 @@ interface AppState {
   /** 左侧栏当前面板（方案 B：Rail 只切面板，不替换主区）。
    *  B1a 上线 tree/tags；B1b 扩到 fav/trash/files。 */
   sidebarPanel: SidebarPanelId;
+  /** 统一路由镜像（单一 RouteOwner 维护，见 lib/appRoute.ts）：
+   *  URL 解析结果，供视图层判断 isSheetView / issue 详情 / 导图路由等。 */
+  route: AppRoute;
   searchQuery: string;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
@@ -117,6 +121,7 @@ type Action =
   | { type: "CLEAR_SELECTED_TAGS" }                         // TAG-FILTER-MULTI-01
   | { type: "SET_VIEW_MODE"; payload: ViewMode }
   | { type: "SET_SIDEBAR_PANEL"; payload: SidebarPanelId }
+  | { type: "SET_ROUTE"; payload: AppRoute }
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "SET_SIDEBAR_WIDTH"; payload: number }
@@ -272,6 +277,7 @@ const initialState: AppState = {
   selectedTagIds: [],
   viewMode: "all",
   sidebarPanel: "tree",
+  route: getCurrentAppRoute(),
   searchQuery: "",
   sidebarCollapsed: false,
   sidebarWidth: getSavedSidebarWidth(),
@@ -407,6 +413,10 @@ function reducer(state: AppState, action: Action): AppState {
       // 幂等：视图未变化时返回原 state，避免下游 useEffect 重复拉取造成卡顿
       if (state.viewMode === action.payload) return state;
       return { ...state, viewMode: action.payload };
+    case "SET_ROUTE":
+      return state.route.url === action.payload.url && state.route.kind === action.payload.kind
+        ? state
+        : { ...state, route: action.payload };
     case "SET_SEARCH_QUERY":
       if (state.searchQuery === action.payload) return state;
       return { ...state, searchQuery: action.payload };
@@ -715,6 +725,7 @@ export function useAppActions() {
     toggleSelectedTag: (v: string) => dispatch({ type: "TOGGLE_SELECTED_TAG", payload: v }),
     clearSelectedTags: () => dispatch({ type: "CLEAR_SELECTED_TAGS" }),
     setViewMode: (v: ViewMode) => dispatch({ type: "SET_VIEW_MODE", payload: v }),
+    setRoute: (r: AppRoute) => dispatch({ type: "SET_ROUTE", payload: r }),
     setSidebarPanel: (p: SidebarPanelId) => dispatch({ type: "SET_SIDEBAR_PANEL", payload: p }),
     setSearchQuery: (v: string) => dispatch({ type: "SET_SEARCH_QUERY", payload: v }),
     toggleSidebar: () => dispatch({ type: "TOGGLE_SIDEBAR" }),

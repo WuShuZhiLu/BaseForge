@@ -53,7 +53,7 @@ export default function OpenEditorsPanel() {
     actions.closeNoteTab(tabId);
     if (!closingActive) return;
     // 关闭的是当前编辑器：切到相邻页签；没有页签则清空编辑区，
-    // 让 NoteDeepLinkBridge 一并把 URL 从 /notes/:id 收回 "/"。
+    // 让 AppRouteSync 的写侧 reconcile 一并把 URL 从 /notes/:id 收回 "/"。
     if (nextTab) void openNote(nextTab.id);
     else actions.setActiveNote(null);
   }, [actions, openNote, openTabs, state.activeNote?.id]);
