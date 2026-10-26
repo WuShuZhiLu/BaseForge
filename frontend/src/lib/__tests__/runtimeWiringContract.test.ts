@@ -198,7 +198,8 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     // （切到某面板 → 在容器中显示并展开它），标签面板仍由 SidebarMobile 注入交互回调。
     expect(sidebar).toContain("<SidebarPanelContainer");
     expect(sidebar).toContain("<TagsPanelContent");
-    expect(sidebar).toContain("updateSidebarPanel(id as never, { visible: true, collapsed: false })");
+    // SidebarPanelId 已并入 lib/sidebarPanels 唯一定义（AppContext 仅 re-export），兼容桥无需 as never
+    expect(sidebar).toContain("updateSidebarPanel(id, { visible: true, collapsed: false })");
     // 移动端分支保持原样（B3 未启动）
     expect(sidebar).toContain("<MobileKnowledgeTreePanel />");
 

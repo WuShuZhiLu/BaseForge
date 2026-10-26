@@ -64,6 +64,7 @@ import {
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
+import { useNoteLoader } from "@/hooks/useNoteLoader";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
@@ -472,13 +473,29 @@ export default function SidebarDesktop() {
     if (v && sidebarView !== v) applySidebarView(v);
   }, [state.viewMode, sidebarView, applySidebarView]);
 
-  // 收藏模块：当前笔记不在收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）
+  // 统一打开链路：页签/知识树/搜索/收藏的笔记打开共用 openNoteFromTab（协调器 + 404 自愈）
+  const openNoteFromTab = useTabNoteOpener();
+  const { loadNote, cancelNoteLoad } = useNoteLoader();
+
+  // 收藏模块：当前笔记不在收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
+  // 走协调器（缓存优先 + 意图守卫）但保持原语义：只预载 activeNote，不切视图、不开页签。
   useEffect(() => {
     if (state.viewMode !== "favorites" || starDocs.length === 0) return;
     const activeId = state.activeNote?.id;
     if (activeId && starDocs.some((d) => d.id === activeId)) return;
-    api.getNote(starDocs[0].id).then((note) => actions.setActiveNote(note)).catch(() => {});
-  }, [state.viewMode, state.activeNote?.id, starDocs]);
+    const first = starDocs[0];
+    void loadNote({
+      noteId: first.id,
+      summary: { title: first.title ?? "", notebookId: first.notebookId ?? "", contentFormat: first.contentFormat },
+      request: () => api.getNote(first.id),
+      onSuccess: (note) => actions.setActiveNote(note),
+    }).then((result) => {
+      // 收藏列表可能是陈旧数据（笔记已删）：404 静默收场，不弹错误浮层
+      if (result?.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {
+        cancelNoteLoad();
+      }
+    });
+  }, [state.viewMode, state.activeNote?.id, starDocs, loadNote, cancelNoteLoad, actions]);
 
   // 收藏区段数据：收藏已并入知识库面板区段（不再是独立视图），挂载与笔记变更时刷新
   const reloadStar = useCallback(() => {
@@ -683,29 +700,11 @@ export default function SidebarDesktop() {
   }, [tags, query]);
 
   const openSearchDoc = useCallback(async (docId: string) => {
-    try {
-      const note = await api.getNote(docId);
-      if (!note) return;
-      actions.setActiveNote(note);
-      actions.setSelectedNotebook(note.notebookId);
-      actions.setViewMode("notebook");
-      actions.openNoteTab({
-        id: note.id,
-        title: note.title,
-        notebookId: note.notebookId,
-        workspaceId: note.workspaceId,
-        contentFormat: note.contentFormat,
-        isLocked: note.isLocked,
-        isTrashed: note.isTrashed,
-        updatedAt: note.updatedAt,
-      });
-      actions.setMobileView("editor");
-      setSearchOpen(false);
-      setQuery("");
-    } catch (error) {
-      console.error("[SidebarDesktop] open search doc failed:", error);
-    }
-  }, [actions]);
+    // 统一走协调器链路（此前裸 getNote + setActiveNote 绕过加载协调器与页签治理）
+    setSearchOpen(false);
+    setQuery("");
+    await openNoteFromTab(docId);
+  }, [openNoteFromTab]);
 
   // 标签文档懒加载（弹层内展开标签时拉一次）
   const tagDocsForSearch = useCallback(async (tagId: string) => {
@@ -858,28 +857,10 @@ export default function SidebarDesktop() {
       pushSheetAppPath(node.resourceId);
       return;
     }
-    try {
-      const note = await api.getNote(node.resourceId);
-      if (!note) return;
-      actions.setActiveNote(note);
-      actions.setSelectedNotebook(note.notebookId);
-      actions.setSelectedKnowledgeTreeParent(node.parentId);
-      actions.setViewMode("notebook");
-      actions.openNoteTab({
-        id: note.id,
-        title: note.title,
-        notebookId: note.notebookId,
-        workspaceId: note.workspaceId,
-        contentFormat: note.contentFormat,
-        isLocked: note.isLocked,
-        isTrashed: note.isTrashed,
-        updatedAt: note.updatedAt,
-      });
-      actions.setMobileView("editor");
-    } catch (error) {
-      console.error("[SidebarDesktop] open node failed:", error);
-    }
-  }, [actions, toggleNode]);
+    // 统一走协调器链路（此前裸 getNote + setActiveNote 绕过加载协调器与页签治理）
+    actions.setSelectedKnowledgeTreeParent(node.parentId);
+    await openNoteFromTab(node.resourceId);
+  }, [actions, openNoteFromTab, selectFolder]);
 
   /** 统一行点击：ctrl/meta=多选切换，shift=范围选，普通=单选 */
   const handleRowClick = useCallback((event: React.MouseEvent, node: KnowledgeTreeNode) => {
@@ -952,7 +933,6 @@ export default function SidebarDesktop() {
 
   const activeNoteId = state.activeNote?.id ?? null;
   const openTabs = state.openNoteTabs;
-  const openNoteFromTab = useTabNoteOpener();
 
   // ---- 区段折叠/排序 ----
   const toggleSection = useCallback((id: SectionId) => {
@@ -1590,28 +1570,7 @@ export default function SidebarDesktop() {
                         <span className="w-5 shrink-0" />
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const note = await api.getNote(doc.id);
-                              if (!note) return;
-                              actions.setActiveNote(note);
-                              actions.setSelectedNotebook(note.notebookId);
-                              actions.setViewMode("notebook");
-                              actions.openNoteTab({
-                                id: note.id,
-                                title: note.title,
-                                notebookId: note.notebookId,
-                                workspaceId: note.workspaceId,
-                                contentFormat: note.contentFormat,
-                                isLocked: note.isLocked,
-                                isTrashed: note.isTrashed,
-                                updatedAt: note.updatedAt,
-                              });
-                              actions.setMobileView("editor");
-                            } catch (error) {
-                              console.error("[SidebarDesktop] open tagged note failed:", error);
-                            }
-                          }}
+                          onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
                           {doc.contentFormat === "markdown" ? (
@@ -1774,14 +1733,7 @@ export default function SidebarDesktop() {
               <div
                 key={doc.id}
                 className="sbx-row group"
-                onClick={async () => {
-                  const note = await api.getNote(doc.id);
-                  if (!note) return;
-                  actions.setActiveNote(note);
-                  actions.setSelectedNotebook(note.notebookId);
-                  actions.openNoteTab({ id: note.id, title: note.title, notebookId: note.notebookId, workspaceId: note.workspaceId, contentFormat: note.contentFormat, isLocked: note.isLocked, isTrashed: note.isTrashed, updatedAt: note.updatedAt });
-                  actions.setMobileView("editor");
-                }}
+                onClick={() => { void openNoteFromTab(doc.id); }}
               >
                 <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
                 <span className="min-w-0 flex-1">
