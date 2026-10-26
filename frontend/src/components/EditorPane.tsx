@@ -2492,23 +2492,76 @@ const moveToTrash = useCallback(async () => {
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
   const [embedPickerKind, setEmbedPickerKind] = useState<KnowledgeDocEmbedKind | null>(null);
 
-  useEffect(() => {
-    // 导图插入复用泛化的文档嵌入选择对话框（与画板一致）。
-    const openMindMapInsert = () => setEmbedPickerKind("mindmap");
-    window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-    return () => window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-  }, []);
+  // 斜杠命令「嵌入轻量表格/思维导图/画板」→ 插块即匿名：直接创建 isUnlisted=1
+  // 文档并插入，不再弹选择对话框。事件先经 state 中转，实际创建在下方
+  // pendingAnonEmbed 副作用里执行（那里能拿到最新的笔记/锁状态）。
+  const [pendingAnonEmbed, setPendingAnonEmbed] = useState<KnowledgeDocEmbedKind | null>(null);
+  // 防重入：创建期间再次触发（连点/双击）直接丢弃，避免重复建匿名文档。
+  const anonEmbedInFlightRef = useRef(false);
 
   useEffect(() => {
-    const openSheetEmbedPicker = () => setEmbedPickerKind("sheet");
-    const openBoardEmbedPicker = () => setEmbedPickerKind("board");
+    const openMindMapInsert = () => setPendingAnonEmbed("mindmap");
+    const openSheetEmbedPicker = () => setPendingAnonEmbed("sheet");
+    const openBoardEmbedPicker = () => setPendingAnonEmbed("board");
+    window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
     window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
     window.addEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
     return () => {
+      window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
       window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
       window.removeEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingAnonEmbed) return;
+    const kind = pendingAnonEmbed;
+    // 先清标记再执行；本副作用刻意不挂 cleanup 取消异步——cleanup 会随下面
+    // 的 setPendingAnonEmbed(null) 立即执行，把进行中的创建一并取消，导致
+    // 三类嵌入全部静默失败（实测 bug）。笔记切换的防护由创建完成后的
+    // activeNoteRef 比对承担。
+    setPendingAnonEmbed(null);
+    if (anonEmbedInFlightRef.current) return;
+    // 与下方文档嵌入选择对话框相同的编辑资格守卫。
+    if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return;
+    if (!activeNote.notebookId) {
+      // 匿名文档需要笔记本作用域；缺归属时退回选择对话框（仅引用已有文档路径）。
+      setEmbedPickerKind(kind);
+      return;
+    }
+    const kindLabel = kind === "board" ? "画板" : kind === "mindmap" ? "思维导图" : "轻量表格";
+    const notebookId = activeNote.notebookId;
+    const hostNoteId = activeNote.id;
+    anonEmbedInFlightRef.current = true;
+    void (async () => {
+      try {
+        // 插块即匿名：新建 isUnlisted=1 文档，仅以嵌入块形式存在。
+        // sheet → 后端落 note_type='sheet' + sheets 数据表（与知识树创建同构）。
+        const created = await api.createNote({
+          title: kindLabel,
+          contentFormat: kind,
+          notebookId,
+          isUnlisted: 1,
+        });
+        // 创建期间切换了笔记：放弃插入，避免把块写进另一篇笔记。
+        if (activeNoteRef.current?.id !== hostNoteId) return;
+        const markdown = `\n\n![[${kind}:${created.id}]]\n\n`;
+        const editorHandle = editorHandleRef.current;
+        const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
+        const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
+        if (inserted) {
+          editorHandle?.flushSave?.();
+          toast.success(`已插入匿名${kindLabel}`);
+        } else {
+          toast.error(`插入匿名${kindLabel}失败`);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "创建文档失败");
+      } finally {
+        anonEmbedInFlightRef.current = false;
+      }
+    })();
+  }, [pendingAnonEmbed, activeNote, effectiveLocked, isTrashed, noteIsFullHtmlDoc, canEditActiveNote]);
 
   const handleAIMermaid = useCallback(async (type: "mermaid_mindmap" | "mermaid_flowchart") => {
     if (!activeNote || aiMermaidLoading) return;
@@ -4371,7 +4424,7 @@ const moveToTrash = useCallback(async () => {
       </AnimatePresence>
       {/* HTML Ԥ�� �� �༭ģʽ�л�ȷ�ϵ��� */}
       {/* 思维导图插入复用泛化的文档嵌入选择对话框 */}
-      {/* 文档嵌入选择对话框（斜杠命令「嵌入轻量表格」/「嵌入画板」/「嵌入导图」触发） */}
+      {/* 文档嵌入选择对话框：匿名创建的回退路径（笔记无笔记本归属）与「引用已有文档」入口 */}
       <KnowledgeDocEmbedDialog
         open={embedPickerKind !== null && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
         kind={embedPickerKind ?? "sheet"}

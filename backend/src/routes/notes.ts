@@ -687,16 +687,21 @@ app.post("/", async (c) => {
     return c.json({ error: "无效的笔记颜色标记", code: "INVALID_NOTE_COLOR_MARK" }, 400);
   }
   const initialColorMark = body.colorMark === undefined ? null : normalizeNoteColorMark(body.colorMark);
-  const contentFormat = body.contentFormat === "markdown" ? "markdown"
+  const requestedContentFormat = body.contentFormat === "markdown" ? "markdown"
     : body.contentFormat === "html" ? "html"
     : body.contentFormat === "plain" ? "plain"
     : body.contentFormat === "board" ? "board"
     : body.contentFormat === "mindmap" ? "mindmap"
     : body.contentFormat === "pdf" ? "pdf"
+    : body.contentFormat === "sheet" ? "sheet"
     : "tiptap-json";
   // 匿名文档：没有知识树节点，只通过宿主笔记里的嵌入块访问。
-  // 画板与导图的嵌入插块走这条链路（isUnlisted=1）。
+  // 画板、导图与轻量表格的嵌入插块走这条链路（isUnlisted=1）。
   const isUnlisted = body.isUnlisted === true || body.isUnlisted === 1 ? 1 : 0;
+  // 轻量表格：notes 行沿用 note_type='sheet' + 独立 sheets 数据表（与知识树创建
+  // 路径完全一致），contentFormat 保持 tiptap-json，正文 content='{}'。
+  const isSheetNote = requestedContentFormat === "sheet";
+  const contentFormat = isSheetNote ? "tiptap-json" : requestedContentFormat;
   const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n"
     : contentFormat === "plain" ? ""
     : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}'
@@ -717,13 +722,32 @@ app.post("/", async (c) => {
 
   const legacyNoteCreateTx = db.transaction(() => {
     db.prepare(`
-      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat, colorMark, isUnlisted)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat, note_type, colorMark, isUnlisted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, userId, inheritedWorkspaceId, body.notebookId,
+      id, userId, inheritedWorkspaceId ?? null, body.notebookId ?? null,
       body.title || "无标题笔记", initialContent,
-      extractSearchableText(initialContent, contentFormat), contentFormat, initialColorMark, isUnlisted,
+      extractSearchableText(initialContent, contentFormat), contentFormat,
+      isSheetNote ? "sheet" : "normal", initialColorMark, isUnlisted,
     );
+    if (isSheetNote) {
+      // 与 knowledgeTreeCore.createKnowledgeChild 的 sheets 默认数据保持一致：20 行 × 8 列。
+      db.prepare(`
+        INSERT INTO sheets (noteId, userId, workspaceId, data)
+        VALUES (?, ?, ?, ?)
+      `).run(id, userId, inheritedWorkspaceId ?? null, JSON.stringify({
+        version: 1,
+        rows: Array.from({ length: 20 }, (_, index) => ({ id: `r${index + 1}`, height: 32 })),
+        columns: Array.from({ length: 8 }, (_, index) => ({
+          id: `c${index + 1}`,
+          width: 120,
+          title: String.fromCharCode(65 + index),
+          type: "text",
+          align: "left",
+        })),
+        cells: {},
+      }));
+    }
     if (isUnlisted === 0) {
       synchronizeLegacyNoteHierarchy({
         db,

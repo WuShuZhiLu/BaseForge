@@ -44,16 +44,18 @@ const BOARD_B = "22222222-2222-4222-8222-222222222222";
 const BOARD_C = "33333333-3333-4333-8333-333333333333";
 const BOARD_D = "44444444-4444-4444-8444-444444444444";
 
-test("extractEmbeddedDocumentIds dedupes board and mindmap refs", () => {
+test("extractEmbeddedDocumentIds dedupes board/mindmap/sheet refs", () => {
+  // sheet 匿名表格纳入 GC 引用扫描（与 board/mindmap 同权）。
+  const SHEET_E = "55555555-5555-4555-8555-555555555555";
   const ids = extractEmbeddedDocumentIds([
     `![[board:${BOARD_A}]]`,
     `![[mindmap:${BOARD_B.toUpperCase()}]]`,
     `![[board:${BOARD_A}]]`,
-    "![[sheet:55555555-5555-4555-8555-555555555555]]",
+    `![[sheet:${SHEET_E}]]`,
     "board:not-a-uuid",
   ].join("\n"));
 
-  assert.deepEqual(ids.sort(), [BOARD_A, BOARD_B].sort());
+  assert.deepEqual(ids.sort(), [BOARD_A, BOARD_B, SHEET_E].sort());
 });
 
 test("extractEmbeddedDocumentIds tolerates empty content", () => {

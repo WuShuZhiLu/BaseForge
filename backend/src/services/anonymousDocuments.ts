@@ -5,8 +5,8 @@ import { yDestroyDoc } from "./yjs.js";
 /**
  * 匿名文档（isUnlisted = 1）的引用扫描与回收。
  *
- * 匿名文档只通过宿主笔记里的 wiki 嵌入块（![[board:<id>]] / ![[mindmap:<id>]]）
- * 被引用，没有知识树节点。宿主删除块或笔记后，文档变成孤儿。
+ * 匿名文档只通过宿主笔记里的 wiki 嵌入块（![[board:<id>]] / ![[mindmap:<id>]] /
+ * ![[sheet:<id>]]）被引用，没有知识树节点。宿主删除块或笔记后，文档变成孤儿。
  *
  * 判定方式与附件 GC 一致：从"有主"的笔记（isUnlisted = 0）出发做引用可达性
  * 遍历，只有完全不可达的匿名文档才会被回收。这样：
@@ -17,7 +17,7 @@ import { yDestroyDoc } from "./yjs.js";
  * 宽限期（默认 24 小时）用于覆盖"先创建文档、紧接着插入块"的窗口，
  * 也避免用户误删块后短时间无法撤销。
  */
-const EMBED_REF_RE = /\b(?:board|mindmap):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
+const EMBED_REF_RE = /\b(?:board|mindmap|sheet):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
 
 /** SQLite datetime('now') 返回的是 UTC 但没有时区标记，直接 new Date 会按本地时间解析。 */
 function parseSqliteTimestamp(value: string): number {
