@@ -29,7 +29,9 @@ describe("App mind map route wiring", () => {
 
   it("keeps the URL and the mind map module in sync in both directions", () => {
     expect(appSource).toContain("replaceMindMapAppPath");
-    expect(appSource).toContain('sessionStorage.getItem("pendingOpenMindMapId")');
+    // pendingOpenMindMapId 由 MindMapEditor 独占消费（读后即删）；App 不得再读（子 effect
+    // 先于父 effect，App 端读到的一律是空值）。契约锁定单一所有者。
+    expect(appSource).not.toContain('sessionStorage.getItem("pendingOpenMindMapId")');
     // 离开导图模块时必须把 /mindmaps 从 URL 清掉，否则刷新会被旧 URL 拽回导图。
     expect(appSource).toContain('replaceAppPathState("/")');
   });

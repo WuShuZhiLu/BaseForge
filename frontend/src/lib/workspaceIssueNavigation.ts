@@ -4,7 +4,9 @@ import { pushAppPathState } from "./appPathNavigation";
 export const OPEN_NOTIFICATIONS_EVENT = "nowen:open-notifications";
 export const NOTIFICATIONS_CHANGED_EVENT = "nowen:notifications-changed";
 
-export function parseIssueAppPath(path: string): { matched: boolean; issueId: string | null } {
+export interface IssueAppRoute { matched: boolean; issueId: string | null }
+
+export function parseIssueAppPath(path: string): IssueAppRoute {
   if (/^\/issues\/?$/.test(path)) return { matched: true, issueId: null };
   const match = /^\/issues\/([a-zA-Z0-9-]+)\/?$/.exec(path);
   return { matched: Boolean(match), issueId: match?.[1] ?? null };

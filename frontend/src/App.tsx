@@ -25,7 +25,7 @@ import WorkspaceIssues from "@/components/issues/WorkspaceIssues";
 import NotificationCenter from "@/components/issues/NotificationCenter";
 import CommentManagementCenter from "@/components/CommentManagementCenter";
 import { openNoteComment } from "@/lib/noteCommentNavigation";
-import { openWorkspaceIssue } from "@/lib/workspaceIssueNavigation";
+import { openWorkspaceIssue, parseIssueAppPath, type IssueAppRoute } from "@/lib/workspaceIssueNavigation";
 import WechatClipboardBridge from "@/components/WechatClipboardBridge";
 import SharedNoteView from "@/components/SharedNoteView";
 import NotebookShareJoinView from "@/components/NotebookShareJoinView";
@@ -51,7 +51,6 @@ import { APP_PATH_CHANGED_EVENT, replaceAppPathState, resolveCurrentAppPathname 
 import { getCurrentSheetAppRoute, parseSheetAppPath, type SheetAppRoute } from "@/lib/sheetDeepLink";
 import {
   getCurrentMindMapAppRoute,
-  isMindMapId,
   parseMindMapAppPath,
   replaceMindMapAppPath,
   type MindMapAppRoute,
@@ -440,6 +439,9 @@ function AppLayout() {
   // 按 routeMindMapId 选中对应导图。与 sheet 一样，App 只订阅 URL 变化；
   // 打开动作由 pushMindMapAppPath / replaceMindMapAppPath 触发。
   const [mindMapRoute, setMindMapRoute] = useState<MindMapAppRoute>(() => getCurrentMindMapAppRoute());
+  // issues 路由：/issues 与 /issues/:id → 问题模块；:id 为详情（此前 URL 写了没人解析，
+  // 刷新丢视图、WorkspaceIssues 恒收 issueId=null 详情永不渲染）。
+  const [issueRoute, setIssueRoute] = useState<IssueAppRoute>(() => parseIssueAppPath(resolveCurrentAppPathname()));
   useEffect(() => {
     const applyRoute = () => {
       const pathname = resolveCurrentAppPathname();
@@ -447,6 +449,8 @@ function AppLayout() {
       setSheetRoute(next);
       const nextMindMapRoute = parseMindMapAppPath(pathname);
       setMindMapRoute(nextMindMapRoute);
+      const nextIssueRoute = parseIssueAppPath(pathname);
+      setIssueRoute(nextIssueRoute);
       if (next.matched && next.sheetId) {
         actions.setViewMode("all");
         actions.setActiveNote(null);
@@ -456,6 +460,11 @@ function AppLayout() {
       // sheet 优先于导图：两者路径互斥，这里只是把优先级写清楚。
       if (nextMindMapRoute.matched) {
         actions.setViewMode("mindmaps");
+        return;
+      }
+      // /issues(/:id)：详情与列表都归问题模块。
+      if (nextIssueRoute.matched) {
+        actions.setViewMode("issues");
         return;
       }
       // 模块路径（/favorites /trash /files ...）：前进/后退/刷新恢复 → 切回对应工作区视图
@@ -471,14 +480,15 @@ function AppLayout() {
     };
   }, [actions]);
   // 视图 → URL 的单向同步：
-  //   1) 在导图模块内但 URL 没跟上（例如从侧栏/导航栏直接切进来）→ 补上 /mindmaps(/ :id)；
+  //   1) 在导图模块内但 URL 没跟上（例如从侧栏/导航栏直接切进来）→ 补上 /mindmaps；
+  //      待打开的导图 id（pendingOpenMindMapId）由 MindMapEditor 独占消费（读后即删），
+  //      App 不再读取——React 子 effect 先于父 effect 执行，App 端读到的一律是已删后的空值。
   //   2) 离开导图模块时 URL 仍停在 /mindmaps/:id → 清回 "/"，否则刷新会被旧 URL 拽回导图，
   //      且下一次点同一张思维导图时 pushAppPathState 因 URL 相同被去重、事件不派发而进不去。
   useEffect(() => {
     if (state.viewMode === "mindmaps") {
       if (!mindMapRoute.matched) {
-        const pendingId = sessionStorage.getItem("pendingOpenMindMapId");
-        replaceMindMapAppPath(isMindMapId(pendingId) ? pendingId : null);
+        replaceMindMapAppPath(null);
       }
       return;
     }
@@ -496,13 +506,21 @@ function AppLayout() {
     }
   }, [sheetRoute.matched, state.activeNote, state.viewMode]);
   // 模块路径同步：徽章切模块时 URL 跟随（/favorites /trash /files ...），刷新/前进/后退可恢复。
-  // sheet / 导图深链由各自 effect 管理，这里跳过以免互相覆盖。
+  // sheet / 导图 / issues 深链由各自路由管理，这里跳过以免互相覆盖。
   useEffect(() => {
-    if (sheetRoute.matched || mindMapRoute.matched) return;
+    if (sheetRoute.matched || mindMapRoute.matched || issueRoute.matched) return;
     const target = VIEW_MODE_APP_PATHS[state.viewMode];
     if (!target) return;
     if (resolveCurrentAppPathname() !== target) replaceAppPathState(target);
-  }, [state.viewMode, sheetRoute.matched, mindMapRoute.matched]);
+  }, [state.viewMode, sheetRoute.matched, mindMapRoute.matched, issueRoute.matched]);
+  // 离开 issues 视图时把 /issues(/:id) 从 URL 清掉（对齐 sheet 模式）：
+  // 否则 URL 与视图长期不一致，刷新会被旧 URL 拽回问题模块。
+  useEffect(() => {
+    if (!issueRoute.matched) return;
+    if (state.viewMode !== "issues") {
+      replaceAppPathState("/");
+    }
+  }, [issueRoute.matched, state.viewMode]);
   // 只有「URL 命中 sheet」且「当前没有打开别的文档 / 没切到其它视图」时才占满主区。
   // 否则点知识树里的其它笔记/切视图时会被表格视图锁死（URL 仍是 /sheets/:id）。
   const isSheetView =
@@ -923,7 +941,7 @@ function AppLayout() {
       ) : state.viewMode === "issues" ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <MobileTopBar />
-          <WorkspaceIssues issueId={null} />
+          <WorkspaceIssues issueId={issueRoute.matched ? issueRoute.issueId : null} />
         </div>
       ) : isTaskView ? (
         <div className={TASK_VIEW_SHELL_CLASS}>
@@ -1094,6 +1112,7 @@ const MODULE_APP_PATHS: ReadonlyArray<readonly [string, ViewMode]> = [
   ["/diary", "diary"],
   ["/ai", "ai-chat"],
   ["/plugins", "plugins"],
+  ["/issues", "issues"],
 ];
 
 function viewModeFromAppPath(pathname: string): ViewMode | null {
@@ -1111,6 +1130,7 @@ const VIEW_MODE_APP_PATHS: Partial<Record<ViewMode, string>> = {
   diary: "/diary",
   "ai-chat": "/ai",
   plugins: "/plugins",
+  issues: "/issues",
 };
 
 function MobileTopBar() {
