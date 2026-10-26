@@ -619,6 +619,8 @@ export function markdownToPlainText(md: string): string {
   text = text.replace(/!\[\[mindmap:[0-9a-f-]{36}\]\]/gi, "思维导图");
   // 画板引用同理：摘要里给可读占位，不暴露笔记 UUID。
   text = text.replace(/!\[\[board:[0-9a-f-]{36}\]\]/gi, "画板");
+  // 轻量表格引用同理：摘要里给可读占位，不暴露笔记 UUID。
+  text = text.replace(/!\[\[sheet:[0-9a-f-]{36}\]\]/gi, "轻量表格");
   // 链接
   text = text.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
   // HTML 标签（含 <span style="color/font-size"> 这类 inline 样式包装：

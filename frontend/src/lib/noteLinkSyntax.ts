@@ -14,6 +14,7 @@ const INTERNAL_HREF_RE = /^note:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 const WIKI_LINK_RE = /(!?)\[\[(note:[0-9a-f-]{36}(?:#blk:[A-Za-z0-9_-]+)?)(?:\|((?:\\\]|[^\]])*))?\]\]/gi;
 const MINDMAP_EMBED_RE = /!\[\[(mindmap:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi;
 const BOARD_EMBED_RE = /!\[\[(board:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi;
+const SHEET_EMBED_RE = /!\[\[(sheet:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi;
 const WIKI_LINK_INPUT_TRIGGERS = ["[[", "【【"] as const;
 const WIKI_LINK_INPUT_CLOSERS = ["]]", "】】"] as const;
 
@@ -71,6 +72,9 @@ export function preprocessInternalNoteLinks(markdown: string): string {
     `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
   );
   source = source.replace(BOARD_EMBED_RE, (_match, href) =>
+    `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
+  );
+  source = source.replace(SHEET_EMBED_RE, (_match, href) =>
     `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
   );
   source = source.replace(WIKI_LINK_RE, (_match, embedPrefix, href, rawAlias) => {

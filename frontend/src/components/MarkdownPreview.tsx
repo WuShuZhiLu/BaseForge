@@ -21,6 +21,7 @@ import { NoteLinkPreviewAnchor } from "@/components/NoteLinkPreview";
 import { BlockEmbedCard } from "@/components/BlockEmbedExtension";
 import MindMapEmbedCard, { parseMindMapEmbedHref } from "@/components/MindMapEmbedCard";
 import BoardEmbedCard from "@/components/BoardEmbedCard";
+import SheetEmbedCard, { parseSheetEmbedHref } from "@/components/SheetEmbedCard";
 import { parseBoardEmbedHref } from "@/lib/boardEmbed";
 import { getGfmTaskChecked, wrapGfmTaskInlineContent } from "@/lib/gfmTaskChecked";
 import { preprocessInternalNoteLinks } from "@/lib/noteLinkSyntax";
@@ -428,6 +429,9 @@ function createComponents(
       }
       if (typeof embedHref === "string" && parseBoardEmbedHref(embedHref)) {
         return <div className="my-4"><BoardEmbedCard href={embedHref} /></div>;
+      }
+      if (typeof embedHref === "string" && parseSheetEmbedHref(embedHref)) {
+        return <div className="my-4"><SheetEmbedCard href={embedHref} /></div>;
       }
       if (typeof embedHref === "string" && embedHref.startsWith("note:")) {
         return <div className="my-4"><BlockEmbedCard href={embedHref} /></div>;
