@@ -60,7 +60,17 @@ export default function NoteDeepLinkBridge() {
   const previousViewModeRef = useRef<ViewMode>(state.viewMode);
   const pendingRouteNoteIdRef = useRef<string | null>(null);
   const routeLoadSequenceRef = useRef(0);
+  // 「笔记刚被关闭」墓碑：关闭最后一个页签后 URL 短暂仍是 /notes/:id，
+  // 此窗口内任何 applyRoute（事件或 effect 重跑）都不得把它当深链重新加载，
+  // 否则笔记被复活、pending 又拦住 URL 清理（实测 bug：关光页签后内容与
+  // URL 均残留）。popstate 除外——那是用户显式导航意图，仍应加载。
+  const noteClosedAtRef = useRef(0);
 
+  // 墓碑必须打在 render body 且先于 activeNoteRef 更新（先于所有 effect）：
+  // 同一提交里 effect-1 的 applyRoute 可能抢先跑，墓碑晚于它就拦不住复活加载。
+  if (!state.activeNote && activeNoteRef.current) {
+    noteClosedAtRef.current = Date.now();
+  }
   activeNoteRef.current = state.activeNote;
   viewModeRef.current = state.viewMode;
 
@@ -102,6 +112,18 @@ export default function NoteDeepLinkBridge() {
       if (activeNoteRef.current?.id === noteId) {
         pendingRouteNoteIdRef.current = null;
         actions.setMobileView("editor");
+        return;
+      }
+
+      // 墓碑窗口内的 /notes/:id 残留：页签刚关完，不是深链意图。
+      if (
+        Date.now() - noteClosedAtRef.current < 1500
+        && event?.type !== "popstate"
+      ) {
+        routeLoadSequenceRef.current += 1;
+        pendingRouteNoteIdRef.current = null;
+        cancelNoteLoad();
+        replaceAppPathState("/");
         return;
       }
 
