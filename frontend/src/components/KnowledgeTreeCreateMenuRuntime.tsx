@@ -264,7 +264,9 @@ export function KnowledgeTreeCreateDropdown({
     if (!menu) return;
     const closeFromPointer = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      // 子菜单是 portal 到 body 的，不在 menuRef 内——漏判会导致点子菜单项时
+      // 主菜单先被关闭、目标 unmount，click 永远无法触发（导入点不动）。
+      if (target instanceof Node && (menuRef.current?.contains(target) || importSubmenuRef.current?.contains(target))) return;
       onClose();
     };
     const closeFromKeyboard = (event: KeyboardEvent) => {

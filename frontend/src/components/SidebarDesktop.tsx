@@ -55,6 +55,16 @@ import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, set
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import {
+  importMarkdownIntoKnowledgeTree,
+  importMarkdownZipIntoKnowledgeTree,
+  importWordIntoKnowledgeTree,
+  importPdfIntoKnowledgeTree,
+  importWeChatArticleIntoKnowledgeTree,
+} from "@/components/knowledgeTreeImport";
+import type { KnowledgeTreeImportRequest } from "@/components/KnowledgeTreePanel";
+import YuqueImport from "@/components/YuqueImport";
+import { toast } from "@/lib/toast";
+import {
   KNOWLEDGE_TREE_SORT_OPTIONS,
   KNOWLEDGE_TREE_SORT_CHANGED_EVENT,
   loadKnowledgeTreeSortMode,
@@ -391,6 +401,8 @@ export default function SidebarDesktop() {
   const [joinOpen, setJoinOpen] = useState(false);
   // 知识库面板：+ 新建菜单（复用旧版 KnowledgeTreeCreateDropdown）与 ⋮ 更多菜单（排序/折叠/刷新）
   const [createMenuState, setCreateMenuState] = useState<KnowledgeTreeCreateMenuState | null>(null);
+  // Yuque 导入模态：null = 关闭；非 null = 目标笔记本 id（fallback 由 YuqueImport 处理）
+  const [yuqueImportNotebookId, setYuqueImportNotebookId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<KnowledgeTreeSortMode>(() => loadKnowledgeTreeSortMode());
   const [kbMoreOpen, setKbMoreOpen] = useState<{ x: number; y: number } | null>(null);
   const [tagsMoreOpen, setTagsMoreOpen] = useState<{ x: number; y: number } | null>(null);
@@ -553,6 +565,44 @@ export default function SidebarDesktop() {
       console.error("[SidebarDesktop] create node failed:", error);
     }
   }, []);
+
+  // 知识树「导入」：与 KnowledgeTreePanel 的导入 effect 同一套实现（文件选择器 + 入库 + 刷新）。
+  // 此前桌面树这里被接成 onImport={() => setCreateMenuState(null)} 的空壳——点导入只关菜单，什么都不发生。
+  const handleImport = useCallback(async (parentId: string | null, importKind: KnowledgeTreeImportRequest["kind"]) => {
+    setCreateMenuState(null);
+    // Yuque 走模态流程（不依赖父节点类型）
+    if (importKind === "yuque") {
+      setYuqueImportNotebookId(
+        state.activeNote?.notebookId || state.selectedNotebookId || (state.notebooks ?? [])[0]?.id || null,
+      );
+      return;
+    }
+    const parent = parentId ? nodes.find((node) => node.id === parentId) ?? null : null;
+    const options = {
+      parent,
+      nodes,
+      fallbackNotebookId: state.activeNote?.notebookId || state.selectedNotebookId || (state.notebooks ?? [])[0]?.id || null,
+    };
+    try {
+      const imported = importKind === "markdown"
+        ? await importMarkdownIntoKnowledgeTree(options)
+        : importKind === "markdown-zip"
+          ? await importMarkdownZipIntoKnowledgeTree(options)
+          : importKind === "word"
+            ? await importWordIntoKnowledgeTree(options)
+            : importKind === "pdf"
+              ? await importPdfIntoKnowledgeTree(options)
+              : await importWeChatArticleIntoKnowledgeTree(options);
+      if (!imported) return;
+      if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      void openNoteFromTab(imported.id);
+      actions.refreshNotes();
+      actions.refreshNotebooks();
+    } catch (error) {
+      toast.error((error as Error)?.message || "导入失败，请重试");
+    }
+  }, [nodes, openNoteFromTab, actions, state.activeNote?.notebookId, state.selectedNotebookId, state.notebooks]);
 
   const spaceRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -2347,8 +2397,33 @@ export default function SidebarDesktop() {
           onClose={() => setCreateMenuState(null)}
           onCreate={(parentId, kind) => void handleCreate(parentId, kind)}
           onCreateFromTemplate={() => setCreateMenuState(null)}
-          onImport={() => setCreateMenuState(null)}
+          onImport={(parentId, importKind) => void handleImport(parentId, importKind)}
         />
+      )}
+
+      {/* 知识树触发的 Yuque 导入面板（与 KnowledgeTreePanel 同款） */}
+      {yuqueImportNotebookId !== null && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setYuqueImportNotebookId(null);
+          }}
+        >
+          <div className="w-full max-w-lg max-h-[82vh] overflow-y-auto rounded-xl border border-app-border bg-app-elevated p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-tx-primary">从 Yuque 导入</span>
+              <button
+                type="button"
+                onClick={() => setYuqueImportNotebookId(null)}
+                className="rounded-md p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                aria-label="close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <YuqueImport defaultNotebookId={yuqueImportNotebookId ?? undefined} />
+          </div>
+        </div>
       )}
 
       {/* ===== 知识库 ⋮ 更多菜单（排序/折叠全部/刷新） ===== */}
