@@ -4784,7 +4784,7 @@ function OutlinePanel({
                 "flex-1 min-w-0 text-left text-[13.5px] leading-[19px] truncate transition-colors",
                 isActive
                   ? "text-tx-primary font-medium"
-                  : "text-tx-secondary",
+                  : "text-tx-secondary group-hover/o:text-tx-primary group-hover/o:font-medium",
               )}
             >
               {h.text || t('editor.untitled')}
