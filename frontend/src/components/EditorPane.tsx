@@ -1,11 +1,14 @@
-import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useRef, useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
+import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LiaThumbtackSolid } from "react-icons/lia";
+import { RiMenuFold2Line } from "react-icons/ri";
+import { GoTriangleDown, GoTriangleRight } from "react-icons/go";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TiptapEditor from "@/components/TiptapEditor";
 import EncryptedConversionEditorGuard from "@/components/EncryptedConversionEditorGuard";
@@ -98,12 +101,6 @@ import {
   shouldSkipUnchangedTitleOnlyUpdate,
 } from "@/lib/editorSyncGuards";
 import { canWriteNote } from "@/lib/notePermissions";
-import {
-  DEFAULT_OUTLINE_WIDTH,
-  clampOutlineWidth,
-  getSavedOutlineWidth,
-  persistOutlineWidth,
-} from "@/lib/outlinePanelWidth";
 import { preserveNoteSyncConflictSnapshot } from "@/lib/noteSyncSafety";
 import {
   NOTE_CONFLICT_AUTO_RESOLVED_EVENT,
@@ -174,7 +171,12 @@ function EditorPaneCore({
   // 因为长期使用极少的用户来说，每次新笔记都反向丢失偏好会很不习惯。
   const { prefs: userPrefs, setPref: setUserPref } = useUserPreferences();
   const [showOutline, setShowOutline] = useState<boolean>(() => userPrefs.outlineDefaultOpen);
-  const [outlineWidth, setOutlineWidth] = useState(getSavedOutlineWidth);
+  // 大纲总开关（会话级）：false = mini 刻度条 + 悬浮/钉住；true = 连 mini 一并隐藏、完全无痕，
+  // 仅经 ⋯ 菜单「显示大纲」唤回。切笔记不重置（隐藏是明确意图）。
+  const [outlineHidden, setOutlineHidden] = useState(false);
+  // 大纲浮层的挂载宿主（note-theme-surface 本体）：portal 进去才能继承笔记主题色，
+  // 并与正文共用同一张「纸」——否则退化成贴在纸上的一块灰卡片。
+  const [editorSurfaceEl, setEditorSurfaceEl] = useState<HTMLDivElement | null>(null);
   // 视图级只读：除了 DB 的 isLocked，还有用户偏好带来的"会话锁"。
   // 新笔记打开时如果启用了 lockOnOpen 偏好，就把当前笔记 id 加入集合，
   // 编辑器变为只读，用户需要点解锁按钮移除，从而恢复编辑能力。
@@ -205,7 +207,8 @@ function EditorPaneCore({
   const noteSwitchPending = !!noteLoadingState.pendingNoteId;
   const effectiveLocked = !!activeNote?.isLocked || isViewLocked || isTrashed || noteSwitchPending;
   const canEditActiveNote = canWriteNote(activeNote);
-  const showDesktopOutline = showOutline && !state.editorFullscreen;
+  // 大纲宿主开关：全屏专注模式或用户隐藏（outlineHidden）时整体不渲染（连 mini 刻度条都没有）。
+  const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden;
 
   // 布局模式切换（原悬浮按钮已删除，入口移到 ⋯ More 菜单）。
   // 复用 NoteWorkspaceLayoutController 的自动折叠/持久化逻辑：
@@ -227,34 +230,6 @@ function EditorPaneCore({
   };
   const compactMobileEditing = keyboardVisible && canEditActiveNote && !effectiveLocked;
 
-  const handleOutlineResizeStart = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = outlineWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const nextWidth = clampOutlineWidth(startWidth - (moveEvent.clientX - startX));
-      setOutlineWidth(nextWidth);
-      persistOutlineWidth(nextWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  }, [outlineWidth]);
-
-  const handleOutlineWidthReset = useCallback(() => {
-    setOutlineWidth(DEFAULT_OUTLINE_WIDTH);
-    persistOutlineWidth(DEFAULT_OUTLINE_WIDTH);
-  }, []);
   /** 匿名文档没有知识树/页签入口，记录来源笔记以便“返回”。 */
   useEffect(() => subscribeOpenInternalNoteLink(async ({ noteId }) => {
     const sourceNoteId = activeNoteRef.current?.id ?? null;
@@ -3595,6 +3570,21 @@ const moveToTrash = useCallback(async () => {
             </Button>
           )}
 
+          {/* 大纲显示/隐藏（桌面顶栏）：点亮 = mini 刻度条 + 悬浮浮出；钉住由面板内图钉控制 */}
+          {!state.editorFullscreen && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+              onClick={() => setOutlineHidden((hidden) => !hidden)}
+              title={outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}
+              aria-pressed={!outlineHidden}
+            >
+              <ListTree
+                size={14}
+                className={cn(outlineHidden ? "text-tx-tertiary" : "text-accent-primary")}
+              />
+            </Button>
+          )}
+
           {/* 全屏 */}
           <Button
             variant="ghost" size="icon" className="h-7 w-7 shrink-0"
@@ -3785,16 +3775,17 @@ const moveToTrash = useCallback(async () => {
                     <MessageCircle size={15} className="text-blue-500" />
                     <span>{t('editor.noteComments')}</span>
                   </button>
-                  {/* 大纲切换 */}
+                  {/* 大纲总开关：隐藏 = 连右缘 mini 刻度条一并消失（完全无痕）；
+                      显示 = mini + 悬浮浮出，钉住由面板内图钉控制 */}
                   <button
                     onClick={() => {
-                      setShowOutline((open) => !open);
+                      setOutlineHidden((hidden) => !hidden);
                       setShowDesktopMoreMenu(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
                   >
                     <ListTree size={15} className="text-tx-tertiary" />
-                    <span>{showDesktopOutline ? t('editor.hideOutline') : t('editor.showOutline')}</span>
+                    <span>{outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}</span>
                   </button>
                   {/* 反向链接 BACKLINKS-02 */}
                   <button
@@ -3913,8 +3904,14 @@ const moveToTrash = useCallback(async () => {
 
       
       {/* Editor (HTML 预览 / MD / Tiptap 三模式共用) + Outline */}
-      <div className="flex-1 flex overflow-hidden">
-        <div className="note-theme-surface flex-1 overflow-hidden relative" data-note-id={activeNote.id}>
+      <div className="flex-1 flex overflow-hidden relative">
+        <div
+          ref={setEditorSurfaceEl}
+          className="note-theme-surface flex-1 overflow-hidden relative"
+          data-note-id={activeNote.id}
+          // 只有「钉住」才让正文让位（不覆盖）；悬浮态按约定覆盖正文。
+          data-outline-open={showDesktopOutlineHost && showOutline ? "true" : "false"}
+        >
           {/* Phase 2: ʵʱЭ����������� / Զ�̸��� / Զ��ɾ�������� absolute ���㣬��ռ�ĵ���������ҳ�涶�� */}
           {false && pendingDraft ? (
             <div
@@ -4509,97 +4506,390 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
 
-      {showDesktopOutline && (
-          <OutlinePanel
-            headings={headings}
-            width={outlineWidth}
-            onSelect={(pos) => scrollToRef.current?.(pos)}
-            onClose={() => setShowOutline(false)}
-            onResizeStart={handleOutlineResizeStart}
-            onResetWidth={handleOutlineWidthReset}
-          />
-        )}
+      {/* 大纲（Yuque 式）：portal 进笔记纸面——mini 刻度条常驻右缘，悬停浮出，钉住时纸张让出右侧留白。 */}
+      {showDesktopOutlineHost && editorSurfaceEl && createPortal(
+        <OutlinePanel
+          headings={headings}
+          pinned={showOutline}
+          onPinChange={setShowOutline}
+          onHide={() => setOutlineHidden(true)}
+          onSelect={(pos) => scrollToRef.current?.(pos)}
+        />,
+        editorSurfaceEl,
+      )}
       </div>
     </motion.div>
   );
 }
 
-/* ===== ������ ===== */
+/* ===== 大纲（Yuque 式三态）===== */
+
+/* 图钉：LiaThumbtackSolid（用户指定）；钉住=品牌色（激活语义，一眼可辨）、悬浮=浅灰 */
+function UprightPinGlyph({ pinned }: { pinned: boolean }) {
+  return (
+    <LiaThumbtackSolid
+      size={16}
+      className={cn("shrink-0 transition-colors", pinned ? "text-accent-primary" : "text-tx-tertiary/80")}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* 折叠全部：RiMenuFold2Line（用户指定），大小与图钉统一；颜色跟随钉住态同深浅 */
+function CollapseAllGlyph({ pinned }: { pinned: boolean }) {
+  return (
+    <RiMenuFold2Line
+      size={16}
+      className={cn("shrink-0", pinned ? "text-tx-secondary" : "text-tx-tertiary/80")}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* ===== 大纲三态说明 =====
+ * 悬浮态：悬停期间常驻，离开即收回 mini。
+ * 钉住态：面板常驻（showOutline 用户偏好 = 「进入笔记默认钉住」）。
+ * 面板头：大纲 + 图钉（固定/悬浮切换）+ 全部折叠/展开。
+ * 条目：▼ 折叠箭头（有子级的标题才显示），当前标题左侧竖线 + 品牌色。 */
+
+/* 条目折叠箭头：GoTriangleDown/Right（用户指定，展开朝下 / 收起朝右） */
+function RowCaretGlyph({ open }: { open: boolean }) {
+  return open
+    ? <GoTriangleDown size={14} aria-hidden="true" />
+    : <GoTriangleRight size={14} aria-hidden="true" />;
+}
+
+interface OutlineNode {
+  h: NoteEditorHeading;
+  children: OutlineNode[];
+}
+
+function buildOutlineTree(headings: NoteEditorHeading[]): OutlineNode[] {
+  const roots: OutlineNode[] = [];
+  const stack: OutlineNode[] = [];
+  for (const h of headings) {
+    const node: OutlineNode = { h, children: [] };
+    while (stack.length > 0 && stack[stack.length - 1].h.level >= h.level) stack.pop();
+    if (stack.length > 0) stack[stack.length - 1].children.push(node);
+    else roots.push(node);
+    stack.push(node);
+  }
+  return roots;
+}
+
 function OutlinePanel({
   headings,
-  width,
+  pinned,
+  onPinChange,
+  onHide,
   onSelect,
-  onClose,
-  onResizeStart,
-  onResetWidth,
 }: {
   headings: NoteEditorHeading[];
-  width: number;
+  pinned: boolean;
+  onPinChange: (pinned: boolean) => void;
+  onHide: () => void;
   onSelect: (pos: number) => void;
-  onClose: () => void;
-  onResizeStart: (event: React.MouseEvent) => void;
-  onResetWidth: () => void;
 }) {
   const { t } = useTranslation();
-  return (
-    <div
-      className="relative hidden md:flex flex-none flex-col border-l border-app-border bg-app-surface/50 transition-colors"
-      style={{ width: `${width}px` }}
-    >
-      <div
-        onMouseDown={onResizeStart}
-        onDoubleClick={onResetWidth}
-        className="absolute inset-y-0 left-0 z-10 flex w-1 -translate-x-1/2 cursor-col-resize items-center justify-center hover:bg-accent-primary/30 active:bg-accent-primary/50 transition-colors group"
-        title="拖拽调整大纲宽度 / 双击恢复默认"
-      >
-        <div className="h-8 w-[2px] rounded-full bg-transparent group-hover:bg-accent-primary/60 transition-colors" />
-      </div>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-app-border">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-tx-secondary">
-          <ListTree size={13} className="text-accent-primary" />
-          <span>{t('editor.outline')}</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-0.5 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-secondary transition-colors"
-        >
-          <X size={13} />
-        </button>
-      </div>
-      <ScrollArea className="flex-1">
-        <div className="py-1">
-          {headings.length === 0 ? (
-            <div className="px-3 py-6 text-center">
-              <p className="text-[11px] text-tx-tertiary">{t('editor.noHeadings')}</p>
-              <p className="text-[10px] text-tx-tertiary mt-1">{t('editor.noHeadingsHint')}</p>
-            </div>
-          ) : (
-            headings.map((h) => (
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [spineHeight, setSpineHeight] = useState(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  const expanded = pinned || hoverOpen;
+
+  // 面板顶部 = 编辑器工具栏底边：工具栏是滚动区内的 sticky 整宽条，
+  // 大纲必须从它下方开始（绝不允许占据工具栏那一行）。
+  // 工具栏可能折成两三行、也可能由不同组件各自渲染，因此扫描表面内所有
+  // sticky 顶部元素取最大底边，而不是只认某个 data 属性。
+  const [panelTop, setPanelTop] = useState(0);
+  useLayoutEffect(() => {
+    const panel = surfaceRef.current;
+    const surface = panel?.parentElement;
+    if (!surface) return;
+    const measure = () => {
+      const surfaceRect = surface.getBoundingClientRect();
+      let bottom = surfaceRect.top;
+      surface
+        .querySelectorAll<HTMLElement>(".sticky, [class*=\"sticky\"], [data-mobile-editor-toolbar], [data-markdown-mobile-toolbar]")
+        .forEach((el) => {
+          const position = getComputedStyle(el).position;
+          if (position !== "sticky" && position !== "fixed") return;
+          const rect = el.getBoundingClientRect();
+          if (rect.top > surfaceRect.top + 8) return;
+          bottom = Math.max(bottom, rect.bottom);
+        });
+      setPanelTop(Math.max(0, Math.round(bottom - surfaceRect.top)));
+    };
+    measure();
+    const observed = Array.from(
+      surface.querySelectorAll<HTMLElement>(".sticky, [class*=\"sticky\"], [data-mobile-editor-toolbar], [data-markdown-mobile-toolbar]"),
+    );
+    const observer = new ResizeObserver(measure);
+    observed.forEach((el) => observer.observe(el));
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [expanded]);
+
+  const tree = useMemo(() => buildOutlineTree(headings), [headings]);
+
+  // 树脊线：第一条目顶（内容层 pt-1 = 4px）→ 最后一条目底；画在滚动内容层随列表滚动
+  const SPINE_TOP_IN_CONTENT = 4;
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const panel = surfaceRef.current;
+      const content = list.querySelector<HTMLElement>("[data-outline-content]");
+      const rows = list.querySelectorAll<HTMLElement>("[data-outline-row]");
+      if (!panel || !content || rows.length === 0) {
+        setSpineHeight(0);
+        return;
+      }
+      const last = rows[rows.length - 1];
+      // 脊线：第一条目顶 → 最后一条目底（绿线）
+      setSpineHeight(Math.max(0, last.offsetTop + last.offsetHeight - SPINE_TOP_IN_CONTENT));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [tree, collapsedIds, expanded, headings]);
+  const parentIds = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: OutlineNode[]) => {
+      for (const n of nodes) {
+        if (n.children.length > 0) ids.push(n.h.id);
+        walk(n.children);
+      }
+    };
+    walk(tree);
+    return ids;
+  }, [tree]);
+  const allCollapsed = parentIds.length > 0 && parentIds.every((id) => collapsedIds.has(id));
+
+  const cancelHide = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+  const scheduleHide = useCallback(() => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => setHoverOpen(false), 160);
+  }, [cancelHide]);
+
+  // 当前标题跟随：在编辑器表面容器上捕获滚动（滚动事件不冒泡，捕获阶段可从祖先接住），
+  // 取视口顶部以上最近的标题为当前项。DOM h1-h6 顺序 == headings 文档顺序，
+  // 数量对不上（特殊视图/异步渲染）时不高亮，仅影响跟随不影响跳转。
+  const surfaceRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const host = surfaceRef.current;
+    const surface = host?.parentElement;
+    if (!surface) return;
+    let raf = 0;
+    const sync = () => {
+      raf = 0;
+      if (headings.length === 0) { setActiveId(null); return; }
+      const els = surface.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
+      if (els.length !== headings.length) { setActiveId(null); return; }
+      let current: string | null = null;
+      els.forEach((el, i) => {
+        if (el.getBoundingClientRect().top <= 130) current = headings[i].id;
+      });
+      setActiveId(current ?? headings[0].id);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(sync);
+    };
+    surface.addEventListener("scroll", onScroll, true);
+    sync();
+    return () => {
+      surface.removeEventListener("scroll", onScroll, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [headings]);
+
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllCollapse = useCallback(() => {
+    setCollapsedIds(allCollapsed ? new Set() : new Set(parentIds));
+  }, [allCollapsed, parentIds]);
+
+  // 眼睛 = 彻底隐藏：连右缘 mini 刻度条一并消失（由父级 outlineHidden 承接），仅 ⋯ 菜单可唤回。
+  const hideOutline = useCallback(() => {
+    cancelHide();
+    setHoverOpen(false);
+    onHide();
+  }, [cancelHide, onHide]);
+
+  const renderNodes = (nodes: OutlineNode[], depth: number): React.ReactNode =>
+    nodes.map((node) => {
+      const { h } = node;
+      const hasKids = node.children.length > 0;
+      const isOpen = !collapsedIds.has(h.id);
+      const isActive = activeId === h.id;
+      return (
+        <React.Fragment key={h.id}>
+          <div
+            data-outline-row
+            {...(hasKids ? { "data-outline-toggle": "" } : {})}
+            className={cn(
+              "group/o relative flex items-center rounded-md py-[6px] pr-1 transition-colors",
+              !isActive && "hover:bg-app-hover/60",
+            )}
+          >
+            {/* ▼ 贴着条目文字左侧、随层级缩进；与文字同为 flex 子项，严格同行居中 */}
+            {hasKids ? (
               <button
-                key={h.id}
-                onClick={() => onSelect(h.pos)}
-                className={cn(
-                  "w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-app-hover truncate",
-                  h.level === 1 && "font-medium text-tx-primary",
-                  h.level === 2 && "text-tx-secondary",
-                  h.level === 3 && "text-tx-tertiary",
-                )}
-                style={{ paddingLeft: `${(h.level - 1) * 12 + 12}px` }}
-                title={h.text}
+                type="button"
+                onClick={() => toggleCollapse(h.id)}
+                className="flex-none w-3.5 h-[18px] flex items-center justify-center rounded text-tx-tertiary hover:text-tx-secondary transition-colors"
+                style={{ marginLeft: `${depth * 16 + 6}px` }}
+                title={isOpen ? t('editor.outlineCollapse') : t('editor.outlineExpand')}
               >
-                <span className={cn(
-                  "inline-block w-1.5 h-1.5 rounded-full mr-2 shrink-0 align-middle",
-                  h.level === 1 && "bg-accent-primary",
-                  h.level === 2 && "bg-accent-primary/50",
-                  h.level === 3 && "bg-tx-tertiary/50",
-                )} />
-                {h.text || t('editor.untitled')}
+                {isOpen
+                  ? <RowCaretGlyph open />
+                  : <RowCaretGlyph />}
               </button>
-            ))
-          )}
+            ) : (
+              <span
+                className="flex-none w-3.5"
+                style={{ marginLeft: `${depth * 16 + 6}px` }}
+              />
+            )}
+            {isActive && (
+              <span
+                className="flex-none h-3.5 w-[3px] rounded-full bg-accent-primary"
+                style={{ marginLeft: "6px" }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onSelect(h.pos)}
+              title={h.text}
+              className={cn(
+                "flex-1 min-w-0 text-left text-[13.5px] leading-[19px] truncate transition-colors",
+                isActive
+                  ? "text-tx-primary font-medium"
+                  : "text-tx-secondary",
+              )}
+            >
+              {h.text || t('editor.untitled')}
+            </button>
+          </div>
+          {hasKids && isOpen && renderNodes(node.children, depth + 1)}
+        </React.Fragment>
+      );
+    });
+
+  const showMini = !expanded && headings.length > 0;
+
+  return (
+    <>
+      {/* mini 态：右缘结构刻度条（无卡片感，只有一列短横线） */}
+      {showMini && (
+        <div
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col items-end cursor-pointer py-5 px-2"
+          onMouseEnter={() => { cancelHide(); setHoverOpen(true); }}
+          title={t('editor.outline')}
+        >
+          <div className="flex flex-col items-end gap-[10px]">
+            {headings.map((h) => (
+              <span
+                key={h.id}
+                onClick={(e) => { e.stopPropagation(); onSelect(h.pos); }}
+                className={cn(
+                  "block h-[3px] rounded-full transition-all",
+                  // 右缘对齐：所有刻度的右端在同一条竖线上，层级越深越短（向左收）
+                  h.level === 1 ? "w-5" : h.level === 2 ? "w-3" : "w-2",
+                  activeId === h.id
+                    ? "bg-accent-primary"
+                    : "bg-tx-tertiary hover:bg-accent-primary",
+                )}
+              />
+            ))}
+          </div>
         </div>
-      </ScrollArea>
-    </div>
+      )}
+
+      {/* 浮出 / 钉住态：轻浮层（半透明 + blur + 软阴影），不占布局宽度 */}
+      {/* 浮出 / 钉住态：工具栏下方的右侧窄列（240px）。
+          · 钉住：正文列已让位（data-outline-open），列里只有文字，无底色；
+          · 悬浮：盖在正文之上，需要不透明纸色才能读，左侧一条极淡竖线分隔。 */}
+      {expanded && (
+        <div
+          ref={surfaceRef}
+          className="group/outline absolute right-0 z-30 hidden md:flex w-[280px] flex-col pt-4 pb-3 pl-4 pr-3"
+          style={{
+            top: panelTop,
+            bottom: 0,
+            // 语雀式通高纸色竖条：右侧整条都是纸面，任何内容都不会漏进这条留白。
+            background: "var(--note-theme-surface, var(--color-bg))",
+          }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => { if (!pinned) scheduleHide(); }}
+        >
+          {/* 头部：标题与操作居中成组（对齐 Yuque） */}
+          <div className="group/head flex items-center justify-start gap-1.5 pt-1 pb-3 pl-6">
+            <span className="text-[13.5px] font-semibold text-tx-primary select-none">{t('editor.outline')}</span>
+            <button
+              type="button"
+              onClick={() => {
+                // 取消钉住时鼠标多半还在面板上：转入悬浮态自然过渡，移开才收回 mini
+                if (pinned) setHoverOpen(true);
+                onPinChange(!pinned);
+              }}
+              title={pinned ? t('editor.outlineUnpin') : t('editor.outlinePin')}
+              className="p-1 rounded-md text-tx-tertiary/80 hover:bg-app-hover hover:text-tx-secondary transition-colors"
+            >
+              <UprightPinGlyph pinned={pinned} />
+            </button>
+            <button
+              type="button"
+              onClick={toggleAllCollapse}
+              disabled={parentIds.length === 0}
+              title={allCollapsed ? t('editor.outlineExpandAll') : t('editor.outlineCollapseAll')}
+              aria-label={allCollapsed ? t('editor.outlineExpandAll') : t('editor.outlineCollapseAll')}
+              className="p-1 rounded-md text-tx-tertiary/80 hover:bg-app-hover hover:text-tx-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <CollapseAllGlyph pinned={pinned} />
+            </button>
+          </div>
+          <div ref={listRef} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 min-h-0">
+            <div data-outline-content className="relative pr-1 pb-2 pt-1">
+            {/* 树脊线：第一条目顶 → 最后一条目底（绿线范围），随列表滚动 */}
+            <div
+              className="absolute left-[2px] top-1 w-[2px] bg-app-border"
+              style={{ height: spineHeight }}
+            />
+              {headings.length === 0 ? (
+                <div className="px-3 py-6 text-center">
+                  <p className="text-[11px] text-tx-tertiary">{t('editor.noHeadings')}</p>
+                  <p className="text-[10px] text-tx-tertiary mt-1">{t('editor.noHeadingsHint')}</p>
+                </div>
+              ) : (
+                renderNodes(tree, 0)
+              )}
+            </div>
+          </ScrollArea>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

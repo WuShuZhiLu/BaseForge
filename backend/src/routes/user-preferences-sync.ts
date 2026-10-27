@@ -69,7 +69,7 @@ interface PreferenceState {
 
 export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
   noteTitleAsAppTitle: false,
-  outlineDefaultOpen: false,
+  outlineDefaultOpen: true,
   lockOnOpen: false,
   folderAutoLockMinutes: 15,
   folderLockOnBackground: true,
