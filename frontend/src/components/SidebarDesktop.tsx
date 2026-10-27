@@ -54,6 +54,7 @@ import { JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
+import { FaFolder, FaBook } from "react-icons/fa";
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
@@ -240,11 +241,11 @@ function subtreeHasMatch(
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   if (node.nodeType === "folder") {
-    // 根层知识库（笔记本）用 BookOpen 与普通文件夹区分
+    // 根层知识库（笔记本）用实心书本与普通实心文件夹区分
     if (isRoot && node.resourceType === "notebook") {
-      return <BookOpen size={15} className="shrink-0 text-violet-500" />;
+      return <FaBook size={14} className="shrink-0 text-accent-primary" />;
     }
-    return <Folder size={15} className="shrink-0 text-amber-500" />;
+    return <FaFolder size={14} className="shrink-0 text-amber-400" />;
   }
   // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
   if (node.noteType === "sheet") {
