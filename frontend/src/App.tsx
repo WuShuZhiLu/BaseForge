@@ -457,7 +457,10 @@ function AppLayout() {
   const mediumNoteWorkspace = adaptiveWindow.windowClass === "medium"
     && !state.editorFullscreen
     && !state.editorSplit;
-  const persistentNoteList = showDesktopNoteList || mediumNoteWorkspace;
+  // medium（窄窗口未到移动断点）不再强制弹出笔记列表：与宽屏一致尊重
+  // noteListCollapsed 布局偏好（用户实测反馈：缩小窗口时列表栏不该自己出现；
+  // 需要时经知识树「所有笔记」行 / ⋯菜单布局模式切回三栏）。
+  const persistentNoteList = showDesktopNoteList;
   const noteListWidth = mediumNoteWorkspace
     ? resolveMediumNoteListWidth(adaptiveWindow.width)
     : state.noteListWidth;
@@ -928,9 +931,9 @@ function AppLayout() {
             <div
               className={`
                 flex-col shrink-0 h-full
-                ${mediumNoteWorkspace ? "flex border-r border-app-border" : "w-full md:w-[var(--note-list-width)]"}
-                ${mediumNoteWorkspace || state.mobileView === "list" ? "flex" : "hidden"}
-                ${mediumNoteWorkspace ? "" : showDesktopNoteList ? "md:flex" : "md:hidden"}
+                ${mediumNoteWorkspace ? "border-r border-app-border" : "w-full md:w-[var(--note-list-width)]"}
+                ${state.mobileView === "list" ? "flex" : "hidden"}
+                ${showDesktopNoteList ? "md:flex" : "md:hidden"}
               `}
               style={mediumNoteWorkspace
                 ? { width: `${noteListWidth}px` }
