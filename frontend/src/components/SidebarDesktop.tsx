@@ -56,6 +56,7 @@ import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, set
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import { FaFolder, FaBook } from "react-icons/fa";
+import { LiaThumbtackSolid } from "react-icons/lia";
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
@@ -977,6 +978,44 @@ export default function SidebarDesktop() {
     if (searchScope !== "kb" || !focusRootResourceId) return searchDocs;
     return searchDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [searchDocs, searchScope, focusRootResourceId, docRootMap]);
+
+  // 搜索结果分类（用户要求）：标签 / 收藏 / 知识库·文件夹 / 文档。
+  // 收藏与文档互斥展示，避免同一篇文档在弹层里出现两次。
+  const favoriteSearchDocs = useMemo(
+    () => visibleSearchDocs.filter((doc) => doc.isFavorite === 1),
+    [visibleSearchDocs],
+  );
+  const plainSearchDocs = useMemo(
+    () => visibleSearchDocs.filter((doc) => doc.isFavorite !== 1),
+    [visibleSearchDocs],
+  );
+  // 知识库/文件夹：本地树节点匹配（文档走接口搜索，这里只匹配容器节点）。
+  const matchedTreeNodes = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return [];
+    return nodes
+      .filter((n) => !n.isDeleted && (n.nodeType === "folder" || (n.parentId === null && n.resourceType === "notebook")))
+      .filter((n) => n.title.toLowerCase().includes(keyword))
+      .slice(0, 8);
+  }, [nodes, query]);
+
+  /** 搜索结果点文件夹：展开到该节点并关闭弹层（不改变聚焦态）。 */
+  const revealTreeNode = useCallback((nodeId: string) => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const ancestors: string[] = [];
+    let cursor: KnowledgeTreeNode | undefined = byId.get(nodeId);
+    while (cursor) {
+      ancestors.push(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      for (const id of ancestors) next.add(id);
+      return next;
+    });
+    setSearchOpen(false);
+    setQuery("");
+  }, [nodes]);
 
   const searching = query.trim().length > 0;
   const docCount = useMemo(
@@ -2105,11 +2144,12 @@ export default function SidebarDesktop() {
             className="no-focus-ring min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
           />
 
-          {/* 搜索结果弹层：当前空间的标签 + 文档 */}
+          {/* 搜索结果弹层：标签 / 收藏 / 知识库·文件夹 / 文档 四类分区。
+              宽度脱离侧栏列宽（侧栏太窄会截断标题），上限受视口约束。 */}
           {searchOpen && (query.trim() || matchedTags.length > 0) && (
             <div
               ref={searchRef2}
-              className="absolute left-1 top-full z-[90] mt-1 max-h-[70vh] w-[calc(100%-8px)] overflow-y-auto rounded-[10px] border border-app-border bg-app-elevated p-1 text-left shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
+              className="absolute left-1 top-full z-[90] mt-1 max-h-[70vh] w-[min(440px,calc(100vw-24px))] overflow-y-auto rounded-[10px] border border-app-border bg-app-elevated p-1 text-left shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
               role="listbox"
             >
               {/* 搜索范围胶囊：进入知识库后默认库内，可切全空间 */}
@@ -2137,9 +2177,9 @@ export default function SidebarDesktop() {
                   </button>
                 </div>
               )}
-              {matchedTags.length === 0 && visibleSearchDocs.length === 0 && (
+              {matchedTags.length === 0 && visibleSearchDocs.length === 0 && matchedTreeNodes.length === 0 && (
                 <p className="px-2 py-3 text-center text-[11px] text-tx-tertiary">
-                  {searchFetching ? "搜索中…" : "无匹配的标签或文档"}
+                  {searchFetching ? "搜索中…" : "无匹配的标签、收藏、知识库或文档"}
                 </p>
               )}
 
@@ -2191,12 +2231,69 @@ export default function SidebarDesktop() {
                 </>
               )}
 
-              {visibleSearchDocs.length > 0 && (
+              {favoriteSearchDocs.length > 0 && (
+                <>
+                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">收藏</p>
+                  {favoriteSearchDocs.map((doc) => (
+                    <button
+                      key={`fav-${doc.id}`}
+                      type="button"
+                      role="option"
+                      onClick={() => void openSearchDoc(doc.id)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
+                    >
+                      {doc.contentFormat === "markdown" ? (
+                        <FileCode size={13} className="shrink-0 text-emerald-500" />
+                      ) : (
+                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
+                      <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {matchedTreeNodes.length > 0 && (
+                <>
+                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">知识库 / 文件夹</p>
+                  {matchedTreeNodes.map((node) => (
+                    <button
+                      key={`tree-${node.id}`}
+                      type="button"
+                      role="option"
+                      onClick={() => {
+                        if (node.nodeType === "folder") {
+                          revealTreeNode(node.id);
+                        } else {
+                          enterKb(node.id);
+                          setExpanded((current) => new Set(current).add(node.id));
+                          setSearchOpen(false);
+                          setQuery("");
+                        }
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
+                    >
+                      {node.nodeType === "folder" ? (
+                        <FaFolder size={13} className="shrink-0 text-amber-500" />
+                      ) : (
+                        <FaBook size={13} className="shrink-0 text-accent-primary" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
+                      <span className="shrink-0 text-[10px] text-tx-tertiary">
+                        {node.nodeType === "folder" ? "文件夹" : "知识库"}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {plainSearchDocs.length > 0 && (
                 <>
                   <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">
                     {focusRoot && searchScope === "kb" ? "文档 · 库内" : "文档"}
                   </p>
-                  {visibleSearchDocs.map((doc) => (
+                  {plainSearchDocs.map((doc) => (
                     <button
                       key={doc.id}
                       type="button"
