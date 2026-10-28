@@ -54,7 +54,8 @@ export const VIEW_MODE_APP_PATHS: Partial<Record<ViewMode, string>> = {
 
 export type AppRoute =
   | { kind: "home"; url: "/" }
-  | { kind: "note"; noteId: string; url: string }
+  | { kind: "note"; noteId: string; kbId?: string; url: string }
+  | { kind: "kb"; kbId: string; url: string }
   | { kind: "sheet"; sheetId: string; url: string }
   | { kind: "mindmap"; mindMapId: string | null; url: string }
   | { kind: "issue"; issueId: string | null; url: string }
@@ -62,12 +63,36 @@ export type AppRoute =
 
 export const HOME_ROUTE: AppRoute = { kind: "home", url: "/" };
 
+/** /kb/:kbNodeId（进入知识库，未指定文档）。 */
+const KB_PATH_RE = /^\/kb\/([^/]+)$/;
+/** /kb/:kbNodeId/notes/:noteId（进入知识库 + 打开其中文档）。 */
+const KB_NOTE_PATH_RE = /^\/kb\/([^/]+)\/notes\/([^/]+)$/;
+
 /**
- * 把 pathname 解析为唯一 Route。互斥路径按 note → sheet → mindmap → issue
- * → module → home 的优先级命中（各资源路径本就互斥，这里只是把优先级写死）。
+ * 把 pathname 解析为唯一 Route。互斥路径按 kb → note → sheet → mindmap →
+ * issue → module → home 的优先级命中（各资源路径本就互斥，这里只是把优先级写死）。
+ *
+ * 知识库层级（/kb/:id[...]):kbId 是知识树根节点 id（侧栏进入态的唯一真相，
+ * URL 随侧栏进入/退出变化；kb 前缀只表达侧栏上下文，与打开文档的归属解耦——
+ * 跨库打开笔记时 URL 为 /kb/:entered/notes/:other）。
  */
 export function parseAppRoute(pathname: string): AppRoute {
   const normalized = pathname.replace(/\/+$/, "") || "/";
+
+  const kbNote = normalized.match(KB_NOTE_PATH_RE);
+  if (kbNote) {
+    const [, kbId, noteId] = kbNote;
+    return {
+      kind: "note",
+      noteId: decodeURIComponent(noteId),
+      kbId: decodeURIComponent(kbId),
+      url: `/kb/${encodeURIComponent(kbId)}/notes/${encodeURIComponent(noteId)}`,
+    };
+  }
+  const kbOnly = normalized.match(KB_PATH_RE);
+  if (kbOnly) {
+    return { kind: "kb", kbId: decodeURIComponent(kbOnly[1]), url: `/kb/${encodeURIComponent(kbOnly[1])}` };
+  }
 
   const note = parseNoteAppPath(normalized);
   if (note.matched && note.noteId) {

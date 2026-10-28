@@ -12,7 +12,6 @@ import {
   resolveCurrentAppPathname,
   type AppPathChangedDetail,
 } from "@/lib/appPathNavigation";
-import { getCurrentNoteAppRoute } from "@/lib/noteDeepLink";
 import {
   NOTE_WORKSPACE_VIEWS,
   parseAppRoute,
@@ -94,7 +93,8 @@ export default function AppRouteSync() {
           request: () => api.getNote(noteId),
           onSuccess: (note) => {
             if (disposed || sequence !== routeLoadSequenceRef.current) return;
-            if (getCurrentNoteAppRoute().noteId !== noteId) return;
+            const landed = parseAppRoute(resolveCurrentAppPathname());
+            if (!(landed.kind === "note" && landed.noteId === noteId)) return;
 
             activeNoteRef.current = note;
             actions.setActiveNote(note);
@@ -105,7 +105,8 @@ export default function AppRouteSync() {
           },
           onError: (error) => {
             if (disposed || sequence !== routeLoadSequenceRef.current) return;
-            if (getCurrentNoteAppRoute().noteId !== noteId) return;
+            const landed = parseAppRoute(resolveCurrentAppPathname());
+            if (!(landed.kind === "note" && landed.noteId === noteId)) return;
 
             console.error("[app-route] failed to open routed note", { noteId, error });
             // 协调器会保留错误浮层；回列表前先清掉。
@@ -144,13 +145,18 @@ export default function AppRouteSync() {
         actions.setViewMode("issues");
         return;
       }
+      if (route.kind === "kb") {
+        // 进入知识库：主区不动（侧栏自行从 state.route 派生进入态）。
+        // 注意不可掉入下方 home 分支——popstate 回退到库态时不能清空编辑器。
+        return;
+      }
       if (route.kind === "module") {
         actions.setViewMode(route.viewMode);
         return;
       }
       // home：popstate = 用户显式后退 → 清编辑器回列表；其余（回声/他人清理）
       // 不动状态，由写侧 reconcile 决定是否把资源 URL 补回来（原 restore guard 职责）。
-      if (event?.type === "popstate") {
+      if (route.kind === "home" && event?.type === "popstate") {
         cancelNoteLoad();
         activeNoteRef.current = null;
         actions.setActiveNote(null);
@@ -209,6 +215,10 @@ export default function AppRouteSync() {
 
     const pathname = resolveCurrentAppPathname();
     const route = state.route;
+    // 知识库进入态（route 派生）：URL 保留 /kb/:k 层级
+    const enteredKbId = route.kind === "kb"
+      ? route.kbId
+      : route.kind === "note" ? route.kbId ?? null : null;
 
     const write = (target: string, mode: "push" | "replace") => {
       if (resolveCurrentAppPathname() === target) return;
@@ -233,16 +243,30 @@ export default function AppRouteSync() {
     }
 
     // (A) 笔记工作区规则（原 NoteDeepLinkBridge 写侧，原样移植）：
-    //     显式笔记导航 / URL 为根时 push /notes/:id；URL 已对或外来资源路由未
-    //     显式导航时不抢。
+    //     显式笔记导航 / URL 为根时 push 笔记路径；URL 已对或外来资源路由未
+    //     显式导航时不抢。知识库进入态（route.kind 带 kbId）时 URL 保留库层级：
+    //     /kb/:k/notes/:n——kb 前缀忠实反映侧栏进入态，与笔记归属解耦。
     if (NOTE_WORKSPACE_VIEWS.has(state.viewMode)) {
       if (activeNoteId) {
-        if (route.kind === "note" && route.noteId === activeNoteId) {
+        const urlMatches = route.kind === "note"
+          && route.noteId === activeNoteId
+          && (route.kbId ?? null) === enteredKbId;
+        if (urlMatches) {
           // URL 已正确 → 继续走后续模块规则（徽章切模块时由 (C) 接管 URL）
         } else {
           const explicitNoteNavigation = activeNoteChanged || enteredNoteWorkspace;
-          if (pathname === "/" || route.kind === "note" || explicitNoteNavigation) {
-            write(`/notes/${encodeURIComponent(activeNoteId)}`, "push");
+          if (
+            pathname === "/"
+            || route.kind === "note"
+            || route.kind === "kb"
+            || explicitNoteNavigation
+          ) {
+            write(
+              enteredKbId
+                ? `/kb/${encodeURIComponent(enteredKbId)}/notes/${encodeURIComponent(activeNoteId)}`
+                : `/notes/${encodeURIComponent(activeNoteId)}`,
+              "push",
+            );
             return;
           }
           // 其余情况保持外来 URL（/sheets、/mindmaps、/issues、模块路径）
@@ -281,7 +305,10 @@ export default function AppRouteSync() {
     ) {
       const target = VIEW_MODE_APP_PATHS[state.viewMode];
       if (target) {
-        write(target, "replace");
+        // 进入知识库时 notebook 的模块路径（"/"）必须带上库层级，否则会把
+        // 刚解析好的 /kb/:k/notes/:n 规整回 "/"，随后 (A) 再补 /notes/:n——
+        // kb 层就此丢失（刷新恢复失败的根因）。
+        write(enteredKbId && target === "/" ? `/kb/${encodeURIComponent(enteredKbId)}` : target, "replace");
         return;
       }
     }

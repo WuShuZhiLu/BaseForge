@@ -229,6 +229,10 @@ export function inferBrowserServerBaseUrl(
 
   let pathname = locationLike.pathname.replace(/\/+$/, "");
   const routeSuffix = pathname.match(/\/(?:share|notebook-share)\/[A-Za-z0-9_-]+$/)?.[0]
+    // 知识库层级路由（/kb/:id[/notes/:noteId]）：kbId 可含冒号/编码字符。
+    // 必须排在 notes 模式之前——否则 /kb/:id/notes/:noteId 只剥掉尾部 /notes/:noteId，
+    // 剩余 /kb/:id 被误判为反代前缀，进入态解析恒为 "/"。
+    || pathname.match(/\/kb\/[^/]+(?:\/notes\/[^/]+)?$/)?.[0]
     || pathname.match(/\/issues(?:\/[A-Za-z0-9-]+)?$/)?.[0]
     || pathname.match(/\/(?:notes|mindmaps|sheets)(?:\/[^/]+)?$/i)?.[0]
     || pathname.match(/\/public(?:\/[^/]+)?$/)?.[0]

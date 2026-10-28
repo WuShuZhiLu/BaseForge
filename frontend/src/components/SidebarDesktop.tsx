@@ -12,6 +12,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  ChevronRight,
   CheckCircle2,
   ChevronDown,
   Circle,
@@ -73,6 +74,7 @@ import {
   type KnowledgeTreeSortMode,
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
+import { pushAppPathState } from "@/lib/appPathNavigation";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
@@ -310,13 +312,17 @@ export default function SidebarDesktop() {
   const [tagsExpanded, setTagsExpanded] = useState<ExpandedSet>(() => new Set());
   const [tagsLoading, setTagsLoading] = useState(true);
 
-  // 专注模式
+  // 专注模式（=知识库「进入态」）：面板显示库列表 ⇄ 该库目录树的两级态。
+  // 唯一真相是 URL（/kb/:id[.../notes/:n]）：进入/退出只写 URL，由此处的
+  // route 派生 effect 回灌本地 state；刷新/前进/后退天然恢复，无需 localStorage。
   const [focusRootId, setFocusRootId] = useState<string | null>(null);
 
   // 搜索结果弹层（搜当前空间标签+文档）
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDocs, setSearchDocs] = useState<NoteListItem[]>([]);
   const [searchFetching, setSearching] = useState(false);
+  // 搜索范围：进入知识库后默认「库内」，可切「全空间」；未进入恒为全空间
+  const [searchScope, setSearchScope] = useState<"kb" | "all">("all");
   const [searchTagOpen, setSearchTagOpen] = useState<string | null>(null);
   const searchRef2 = useRef<HTMLDivElement>(null);
 
@@ -705,7 +711,7 @@ export default function SidebarDesktop() {
       // Esc 优先退专注（brief 4.5），其次关菜单/浮层，最后清空搜索
       if (rowMenu) { setRowMenu(null); return; }
       if (spaceOpen || filterOpen) { setSpaceOpen(false); setFilterOpen(false); return; }
-      if (focusRootId) { setFocusRootId(null); return; }
+      if (focusRootId) { exitKb(); return; }
       if (searchOpen) { setSearchOpen(false); return; }
       if (query) { setQuery(""); return; }
       if (renaming) setRenaming(null);
@@ -807,10 +813,61 @@ export default function SidebarDesktop() {
     return map;
   }, [nodes]);
 
+  // 进入态兜底：进入的库被删除/不存在时自动退回列表态。
+  // 必须等树加载完成（loading=false）再判定——刷新恢复时 nodes 未到，会误判
+  // 「库不存在」把刚解析好的 /kb URL 推回 "/"。
+  useEffect(() => {
+    if (!focusRootId || loading) return;
+    if (!nodes.some((n) => n.id === focusRootId && !n.isDeleted)) {
+      pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+    }
+  }, [nodes, focusRootId, state.activeNote, loading]);
+
+  // 进入态 ⇄ URL：route 是唯一真相，这里只做「读侧回灌」到本地 state。
+  // 进入/退出动作一律写 URL（enterKb/exitKb），不直接 setFocusRootId。
+  const routeKbId = state.route.kind === "kb"
+    ? state.route.kbId
+    : state.route.kind === "note" ? state.route.kbId ?? null : null;
+  useEffect(() => {
+    setFocusRootId(routeKbId);
+  }, [routeKbId]);
+
+  /** 进入知识库：写 URL（当前打开文档属于该库时带 notes 前缀，刷新可完整恢复）。 */
+  const enterKb = useCallback((kbNodeId: string) => {
+    const activeInKb = state.activeNote && docRootMap.get(state.activeNote.id) === kbNodeId;
+    pushAppPathState(
+      activeInKb && state.activeNote
+        ? `/kb/${encodeURIComponent(kbNodeId)}/notes/${encodeURIComponent(state.activeNote.id)}`
+        : `/kb/${encodeURIComponent(kbNodeId)}`,
+    );
+  }, [docRootMap, state.activeNote]);
+
+  /** 退出知识库（回库列表）：URL 落回当前文档或根。 */
+  const exitKb = useCallback(() => {
+    pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+  }, [state.activeNote]);
+
+  // 搜索范围跟随进入态：进入某库时默认库内，退出回到全空间
+  useEffect(() => {
+    setSearchScope(focusRootId ? "kb" : "all");
+  }, [focusRootId]);
+
   const rows = useMemo(
     () => buildRows(nodes, expanded, query, scope, focusRootId),
     [nodes, expanded, query, scope, focusRootId],
   );
+
+  // 知识库列表态数据：根层知识库节点（resourceType=notebook），行尾为库内文档数
+  const kbRoots = useMemo(() => {
+    const roots = childrenMap.get(null) ?? [];
+    return roots.filter((n) => !n.isDeleted);
+  }, [childrenMap]);
+
+  // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）
+  const visibleSearchDocs = useMemo(() => {
+    if (searchScope !== "kb" || !focusRootId) return searchDocs;
+    return searchDocs.filter((doc) => docRootMap.get(doc.id) === focusRootId);
+  }, [searchDocs, searchScope, focusRootId, docRootMap]);
 
   const searching = query.trim().length > 0;
   const docCount = useMemo(
@@ -1196,7 +1253,7 @@ export default function SidebarDesktop() {
     try {
       await knowledgeTreeApi.remove(nodeId, "subtree");
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      if (focusRootId === nodeId) setFocusRootId(null);
+      if (focusRootId === nodeId) exitKb();
     } catch (error) {
       console.error("[SidebarDesktop] delete node failed:", error);
     }
@@ -1227,7 +1284,7 @@ export default function SidebarDesktop() {
     const hit = nodes.find((n) => !n.isDeleted && n.nodeType !== "folder" && n.title === title);
     if (!hit) { setRowMenu(null); return; }
     if (focusRootId && !isDescendant(hit.id, focusRootId, childrenMap) && hit.id !== focusRootId) {
-      setFocusRootId(null);
+      exitKb();
     }
     // 展开全部祖先
     setExpanded((current) => {
@@ -1344,16 +1401,40 @@ export default function SidebarDesktop() {
               <div className="mx-1 mb-1 flex items-center gap-1 rounded-md bg-accent-primary/15 px-1 py-1">
                 <button
                   type="button"
-                  onClick={() => setFocusRootId(null)}
+                  onClick={exitKb}
                   title={t("sidebarNext.focusBack", { defaultValue: "返回全部知识库" })}
                   className="flex h-5 w-5 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
                 </button>
+                <FaBook size={13} className="shrink-0 text-accent-primary" />
                 <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{focusRoot.title}</span>
+                <span className="shrink-0 rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCountMap.get(focusRoot.id) ?? 0}</span>
               </div>
             )}
-            {loading ? (
+            {!focusRootId && !searching ? (
+              /* 知识库列表态：默认只显示库列表（不再铺开混合树），单击库行进入该库。
+                 进入后本区段切换为该库目录树（下方原渲染分支），← 返回见横幅。 */
+              <div className="px-0.5 pb-2">
+                {kbRoots.length === 0 ? (
+                  <p className="px-2 py-2 text-[11px] text-tx-tertiary">
+                    {t("sidebarNext.empty", { defaultValue: "暂无内容" })}
+                  </p>
+                ) : kbRoots.map((kb) => (
+                  <div
+                    key={kb.id}
+                    className="group flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-1 text-xs text-tx-primary hover:bg-app-hover"
+                    onClick={() => { enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
+                    title="点击进入知识库"
+                  >
+                    <FaBook size={14} className="shrink-0 text-accent-primary" />
+                    <span className="min-w-0 flex-1 truncate">{kb.title}</span>
+                    <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary group-hover:hidden">{docCountMap.get(kb.id) ?? 0}</span>
+                    <ChevronRight size={12} className="hidden shrink-0 text-tx-tertiary group-hover:block" />
+                  </div>
+                ))}
+              </div>
+            ) : loading ? (
               <p className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</p>
             ) : rows.length === 0 ? (
               <p className="px-2 py-2 text-[11px] text-tx-tertiary">
@@ -1399,7 +1480,7 @@ export default function SidebarDesktop() {
                       onDrop={onRowDrop(node)}
                       onDoubleClick={() => {
                         if (depth === 0 && isFolder && !focusRootId) {
-                          setFocusRootId(node.id);
+                          enterKb(node.id);
                           setExpanded((cur) => new Set(cur).add(node.id));
                         }
                       }}
@@ -1890,11 +1971,13 @@ export default function SidebarDesktop() {
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 // Esc 优先退专注，其次清空搜索（brief 4.5）
-                if (focusRootId) setFocusRootId(null);
+                if (focusRootId) exitKb();
                 else setQuery("");
               }
             }}
-            placeholder={t("sidebarNext.searchPlaceholder", { defaultValue: "搜索" })}
+            placeholder={focusRoot
+              ? t("sidebarNext.searchInKb", { defaultValue: `在「${focusRoot.title}」内搜索` })
+              : t("sidebarNext.searchPlaceholder", { defaultValue: "搜索" })}
             aria-label={t("sidebarNext.searchLabel", { defaultValue: "搜索知识库" })}
             className="no-focus-ring min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
           />
@@ -1906,7 +1989,32 @@ export default function SidebarDesktop() {
               className="absolute left-1 top-full z-[90] mt-1 max-h-[70vh] w-[calc(100%-8px)] overflow-y-auto rounded-[10px] border border-app-border bg-app-elevated p-1 text-left shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
               role="listbox"
             >
-              {matchedTags.length === 0 && searchDocs.length === 0 && (
+              {/* 搜索范围胶囊：进入知识库后默认库内，可切全空间 */}
+              {focusRoot && (
+                <div className="flex items-center gap-1 px-2 pb-1 pt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSearchScope("kb")}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] transition-colors",
+                      searchScope === "kb" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+                    )}
+                  >
+                    库内
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchScope("all")}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10px] transition-colors",
+                      searchScope === "all" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+                    )}
+                  >
+                    全空间
+                  </button>
+                </div>
+              )}
+              {matchedTags.length === 0 && visibleSearchDocs.length === 0 && (
                 <p className="px-2 py-3 text-center text-[11px] text-tx-tertiary">
                   {searchFetching ? "搜索中…" : "无匹配的标签或文档"}
                 </p>
@@ -1960,10 +2068,12 @@ export default function SidebarDesktop() {
                 </>
               )}
 
-              {searchDocs.length > 0 && (
+              {visibleSearchDocs.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">文档</p>
-                  {searchDocs.map((doc) => (
+                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">
+                    {focusRoot && searchScope === "kb" ? "文档 · 库内" : "文档"}
+                  </p>
+                  {visibleSearchDocs.map((doc) => (
                     <button
                       key={doc.id}
                       type="button"

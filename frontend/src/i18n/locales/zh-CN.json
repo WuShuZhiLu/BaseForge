@@ -3483,6 +3483,7 @@
     "refresh": "刷新",
     "searchLabel": "搜索知识库",
     "searchPlaceholder": "搜索",
+    "searchInKb": "库内搜索",
     "switchSpace": "切换空间",
     "tags": "标签",
     "nav": {

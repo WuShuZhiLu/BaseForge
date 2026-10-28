@@ -3476,6 +3476,7 @@
     "refresh": "Refresh",
     "searchLabel": "Search knowledge base",
     "searchPlaceholder": "Search",
+    "searchInKb": "Search in KB",
     "switchSpace": "Switch space",
     "tags": "Tags",
     "nav": {
