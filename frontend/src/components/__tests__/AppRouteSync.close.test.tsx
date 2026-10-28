@@ -41,7 +41,12 @@ vi.mock("@/hooks/useNoteLoader", () => ({
   useNoteLoader: () => ({ loadNote: mocks.loadNote, cancelNoteLoad: mocks.cancelNoteLoad }),
 }));
 
-vi.mock("@/lib/api", () => ({ api: { getNote: vi.fn() } }));
+vi.mock("@/lib/api", () => ({
+  api: { getNote: vi.fn() },
+  // 空间段来源：jsdom 无 localStorage 值时按 personal 处理（与真实实现一致的默认）。
+  getCurrentWorkspace: () => localStorage.getItem("nowen-current-workspace") || "personal",
+  setCurrentWorkspace: (workspaceId: string) => localStorage.setItem("nowen-current-workspace", workspaceId),
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: mocks.t }),
@@ -71,7 +76,7 @@ describe("AppRouteSync 关闭最后一个页签（activeNote → null）", () =>
     vi.clearAllMocks();
   });
 
-  it("activeNote 从笔记变为 null 时，URL 应从 /notes/:id 收回 /（无墓碑、无时间窗）", () => {
+  it("activeNote 从笔记变为 null 时，URL 应从 /notes/:id 收回 /kb/personal（无墓碑、无时间窗）", () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -84,7 +89,7 @@ describe("AppRouteSync 关闭最后一个页签（activeNote → null）", () =>
     // 关闭最后一个页签：activeNote → null（viewMode 保持 notebook）。
     renderSync(root, null, NOTE_ROUTE);
 
-    expect(window.location.pathname).toBe("/");
+    expect(window.location.pathname).toBe("/kb/personal");
 
     act(() => {
       root.unmount();
@@ -119,12 +124,12 @@ describe("AppRouteSync 关闭最后一个页签（activeNote → null）", () =>
     renderSync(root, { id: NOTE_ID }, NOTE_ROUTE);
     expect(window.location.pathname).toBe(`/notes/${NOTE_ID}`);
 
-    // 切到收藏模块：URL 应跟随 /favorites（原模块同步 effect 语义）。
-    renderSync(root, { id: NOTE_ID }, { kind: "home", url: "/" });
+    // 切到收藏模块：URL 应跟随 /favorites/:space（有空间归属的模块带空间段）。
+    renderSync(root, { id: NOTE_ID }, { kind: "home", url: "/kb" });
     mocks.state.viewMode = "favorites";
-    renderSync(root, { id: NOTE_ID }, { kind: "module", viewMode: "favorites", url: "/favorites" });
+    renderSync(root, { id: NOTE_ID }, { kind: "module", viewMode: "favorites", space: "personal", url: "/favorites/personal" });
 
-    expect(window.location.pathname).toBe("/favorites");
+    expect(window.location.pathname).toBe("/favorites/personal");
 
     act(() => {
       root.unmount();

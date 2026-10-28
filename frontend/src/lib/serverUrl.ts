@@ -229,16 +229,23 @@ export function inferBrowserServerBaseUrl(
 
   let pathname = locationLike.pathname.replace(/\/+$/, "");
   const routeSuffix = pathname.match(/\/(?:share|notebook-share)\/[A-Za-z0-9_-]+$/)?.[0]
-    // 知识库层级路由（/kb/:id[/notes/:noteId]）：kbId 可含冒号/编码字符。
-    // 必须排在 notes 模式之前——否则 /kb/:id/notes/:noteId 只剥掉尾部 /notes/:noteId，
-    // 剩余 /kb/:id 被误判为反代前缀，进入态解析恒为 "/"。
-    || pathname.match(/\/kb\/[^/]+(?:\/notes\/[^/]+)?$/)?.[0]
-    || pathname.match(/\/issues(?:\/[A-Za-z0-9-]+)?$/)?.[0]
+    // 知识库层级路由（/kb/:space[/:kbId[/notes/:noteId]]）：空间标识与 notebook id
+    // 可含冒号/编码字符。必须排在 notes 模式之前——否则长路径只剥尾部 /notes/:noteId，
+    // 剩余前缀被误判为反代前缀，进入态解析恒为 "/"。
+    || pathname.match(/\/kb\/[^/]+(?:\/[^/]+)?(?:\/notes\/[^/]+)?$/)?.[0]
+    || (pathname === "/search" ? "/search" : "")
+    || pathname.match(/\/tags\/[^/]+$/)?.[0]
+    || pathname.match(/\/tools\/[^/]+$/)?.[0]
+    || (pathname === "/login" ? "/login" : "")
+    || pathname.match(/\/settings(?:\/[^/]+)?$/)?.[0]
+    || pathname.match(/\/issues(?:\/[^/]+(?:\/[^/]+)?)?$/)?.[0]
+    // 带空间域的模块（/favorites/:space、/trash/:space）
+    || pathname.match(/\/(?:favorites|trash)\/[^/]+$/)?.[0]
     || pathname.match(/\/(?:notes|mindmaps|sheets)(?:\/[^/]+)?$/i)?.[0]
     || pathname.match(/\/public(?:\/[^/]+)?$/)?.[0]
     // 模块路径（Rail 徽章三区联动写入的 SPA 路由）：否则会被误判为反代前缀，
     // 下次导航被叠加成 /diary/tasks/ai/... 
-    || pathname.match(/\/(?:login|favorites|trash|files|shares|projects|tasks|diary|ai|plugins)$/)?.[0]
+    || pathname.match(/\/(?:login|dashboard|kb|favorites|trash|files|shares|projects|tasks|diary|ai|plugins)$/)?.[0]
     || "";
   if (routeSuffix) pathname = pathname.slice(0, -routeSuffix.length);
   if (!pathname || pathname === "/") return "";

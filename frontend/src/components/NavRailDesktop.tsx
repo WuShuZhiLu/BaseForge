@@ -37,6 +37,7 @@ import { useRailMode, type RailMode } from "@/hooks/useRailMode";
 import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
 import { cn } from "@/lib/utils";
 import SettingsModal from "@/components/SettingsModal";
+import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/appPathNavigation";
 
 type NavItemMode = Extract<
   ViewMode,
@@ -280,6 +281,31 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   }, []);
   const [me, setMe] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  // 设置弹窗当前 tab（URL /settings/:tab 驱动，见下方事件与写侧）
+  const [settingsTab, setSettingsTab] = useState<string | null>(null);
+  // 读侧：route 派生（URL 为唯一真相）——/settings(/:tab) 打开并定位 tab；
+  // 离开 /settings（popstate 回退、关闭写回）→ 关闭弹窗。
+  useEffect(() => {
+    if (state.route.kind === "settings") {
+      setSettingsTab(state.route.tab);
+      setShowSettings(true);
+    } else {
+      setShowSettings(false);
+      setSettingsTab(null);
+    }
+  }, [state.route]);
+  // 打开设置（头像菜单）：URL 跟随（记住当前 tab）
+  const openSettings = useCallback(() => {
+    const target = settingsTab ? `/settings/${settingsTab}` : "/settings";
+    setShowSettings(true);
+    pushAppPathState(target);
+  }, [settingsTab]);
+  // 关闭设置：URL 回常规路径
+  const closeSettings = useCallback(() => {
+    setShowSettings(false);
+    setSettingsTab(null);
+    replaceAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+  }, [state.activeNote]);
   const popupRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -408,7 +434,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     } else {
       await broadcastLogout("user_logout");
     }
-    window.location.reload();
+    // 登出跳转 /login（URL 与认证态一致；登录后经 redirect 或原地恢复）
+    window.location.assign(buildAppPathUrl("/login"));
   }, []);
 
   const user = me;
@@ -885,7 +912,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       {/* 底部：设置沉底 */}
       <button
         type="button"
-        onClick={() => setShowSettings(true)}
+        onClick={openSettings}
         aria-label={t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         title={showLabel ? undefined : t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         className={cn(
@@ -904,7 +931,13 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         </span>
       </button>
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal
+          key={settingsTab ?? "default"}
+          defaultTab={(settingsTab ?? "appearance") as never}
+          onClose={closeSettings}
+        />
+      )}
     </nav>
   );
 }

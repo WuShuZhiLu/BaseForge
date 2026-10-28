@@ -41,13 +41,14 @@ import { useMobileRailHidden } from "@/hooks/useMobileRailHidden";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Toaster from "@/components/Toaster";
 import { User, type ViewMode } from "@/types";
-import { getServerUrl, setServerUrl, clearServerUrl, broadcastLogout, initializeServerUrlFromRuntime } from "@/lib/api";
+import { getServerUrl, setServerUrl, clearServerUrl, broadcastLogout, initializeServerUrlFromRuntime, getCurrentWorkspace } from "@/lib/api";
 import { TASK_VIEW_SHELL_CLASS } from "@/lib/taskLayout";
 import { useReminderNotifier } from "@/components/tasks/useReminderNotifier";
 import { resolveEditorFocusLayout } from "@/lib/editorFocusLayout";
 import { useAdaptiveWindowLayout } from "@/hooks/useAdaptiveWindowLayout";
 import { resolveMediumNoteListWidth } from "@/lib/adaptiveWindowLayout";
-import { replaceAppPathState } from "@/lib/appPathNavigation";
+import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname } from "@/lib/appPathNavigation";
+import { KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { bootstrap as syncBootstrap, teardown as syncTeardown, syncNow } from "@/lib/syncEngine";
 import { realtime } from "@/lib/realtime";
 import { deleteNotes as deleteLocalNotes } from "@/lib/localStore";
@@ -430,6 +431,11 @@ function AppLayout() {
   // 打开动作由命令式 push（pushSheetAppPath / pushMindMapAppPath 等）触发，
   // AppRouteSync 消费事件并分发状态；状态 → URL 的回写也由它统一 reconcile。
   const route = state.route;
+  // 已登录访问 /login → 回应知识库根（登录页只对未认证用户有意义）。
+  // replace：/login 在历史栈中无意义，避免「后退回 /login → 又被推回 /」的原地弹回。
+  useEffect(() => {
+    if (route.kind === "login") replaceAppPathState(moduleAppPath("notebook", getCurrentWorkspace()) ?? KB_ROOT_APP_PATH);
+  }, [route.kind]);
   const sheetRoute = route.kind === "sheet" ? route : null;
   // 只有「URL 命中 sheet」且「当前没有打开别的文档 / 没切到其它视图」时才占满主区。
   // 否则点知识树里的其它笔记/切视图时会被表格视图锁死（URL 仍是 /sheets/:id）。
@@ -842,7 +848,7 @@ function AppLayout() {
           <MobileTopBar />
           <SheetEditor
             noteId={sheetRoute.sheetId}
-            onRequestClose={() => replaceAppPathState("/")}
+            onRequestClose={() => replaceAppPathState(moduleAppPath("notebook", getCurrentWorkspace()) ?? KB_ROOT_APP_PATH)}
           />
         </div>
       ) : state.viewMode === "trash" ? (
@@ -1046,6 +1052,29 @@ function AuthGate() {
     if (isAuthenticated !== null) {
       hideSplashScreen();
     }
+  }, [isAuthenticated]);
+
+  // 未登录时地址栏收敛到 /login：渲染登录页的路径都必须是 /login，否则
+  // 出现「界面是登录页、URL 还是 /」的状态不一致。原路径存入 ?redirect=
+  // （handleLogin 的白名单相对路径回跳），登录成功后回到用户原本想去的
+  // 页面。用 replace 而非 push——登录页在历史栈中无意义，避免后退回环；
+  // popstate 也收敛（后退到受保护路径时地址栏同样落回 /login）。
+  // 根路径 / 不带 redirect 参数：登录后按既有行为原地进入主界面，不整页刷新。
+  useEffect(() => {
+    if (isAuthenticated !== false) return;
+    const converge = () => {
+      const pathname = resolveCurrentAppPathname();
+      if (pathname === "/login") return;
+      const target = `${pathname}${window.location.search}`;
+      if (target === "/") {
+        replaceAppPathState("/login");
+      } else {
+        replaceAppPathState(`/login?redirect=${encodeURIComponent(target)}`);
+      }
+    };
+    converge();
+    window.addEventListener("popstate", converge);
+    return () => window.removeEventListener("popstate", converge);
   }, [isAuthenticated]);
 
   // 判断是否为客户端模式（Electron / Android / 曾配置过服务器地址）

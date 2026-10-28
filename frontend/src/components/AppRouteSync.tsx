@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
-import { api } from "@/lib/api";
+import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
 import {
   APP_PATH_CHANGED_EVENT,
   pushAppPathState,
@@ -13,9 +13,11 @@ import {
   type AppPathChangedDetail,
 } from "@/lib/appPathNavigation";
 import {
+  kbNoteAppPath,
+  KB_ROOT_APP_PATH,
+  moduleAppPath,
   NOTE_WORKSPACE_VIEWS,
   parseAppRoute,
-  VIEW_MODE_APP_PATHS,
   type AppRoute,
 } from "@/lib/appRoute";
 import { toast } from "@/lib/toast";
@@ -61,6 +63,7 @@ export default function AppRouteSync() {
   const previousActiveNoteIdRef = useRef<string | null>(state.activeNote?.id ?? null);
   const previousViewModeRef = useRef<ViewMode>(state.viewMode);
   const previousRouteKindRef = useRef<AppRoute["kind"]>(state.route.kind);
+  const previousActiveToolTabRef = useRef<string | null>(state.activeToolTab);
   const pendingRouteNoteIdRef = useRef<string | null>(null);
   const routeLoadSequenceRef = useRef(0);
   // 自回声抑制：Owner 自己刚写入的期望 URL。他人命令式 push（pushSheetAppPath
@@ -101,6 +104,8 @@ export default function AppRouteSync() {
             actions.setSelectedNotebook(note.notebookId);
             actions.setViewMode("notebook");
             actions.setMobileView("editor");
+            // 打开笔记 = 离开工具页（主区让位给编辑器），否则工具页会盖住新笔记
+            actions.setActiveToolTab(null);
             if (prefs.enableNoteTabs) actions.openNoteTab(tabFromNote(note));
           },
           onError: (error) => {
@@ -116,8 +121,9 @@ export default function AppRouteSync() {
             actions.setActiveNote(null);
             actions.setMobileView("list");
             actions.setViewMode("all");
-            replaceAppPathState("/");
-            expectedUrlRef.current = "/";
+            const kbRoot = moduleAppPath("notebook", getCurrentWorkspace()) ?? KB_ROOT_APP_PATH;
+            replaceAppPathState(kbRoot);
+            expectedUrlRef.current = kbRoot;
             const status = (error as { status?: number })?.status;
             if (status === 404 || status === 403) {
               // A 404 also hides inaccessible notes and password-protected folders.
@@ -150,6 +156,28 @@ export default function AppRouteSync() {
         // 注意不可掉入下方 home 分支——popstate 回退到库态时不能清空编辑器。
         return;
       }
+      if (route.kind === "search") {
+        // 搜索态：主区不动，query 由搜索框消费者从 state.route 回灌。
+        // 同样不可掉入 home 分支（popstate 退出搜索时不能清编辑器）。
+        return;
+      }
+      if (route.kind === "tag") {
+        // 标签展开态：主区不动，标签面板从 state.route 回灌展开。
+        return;
+      }
+      if (route.kind === "login") {
+        // /login（已登录时访问）：由 App 层的 login 回跳 effect 处理（push /）。
+        return;
+      }
+      if (route.kind === "settings") {
+        // 设置弹窗：主区不动，NavRailDesktop 从 state.route 派生开关与 tab。
+        return;
+      }
+      if (route.kind === "tool") {
+        // 工具页签：打开并激活对应页签（主区为工具页）。
+        actions.openToolTab(route.toolKey);
+        return;
+      }
       if (route.kind === "module") {
         actions.setViewMode(route.viewMode);
         return;
@@ -167,7 +195,19 @@ export default function AppRouteSync() {
 
     const applyRoute = (event?: Event) => {
       const pathname = resolveCurrentAppPathname();
-      const route = parseAppRoute(pathname);
+      // ?q= 等查询参数与 pathname 一起构成完整路由（搜索瞬态可叠加在任意路径上）
+      const searchParams = new URL(window.location.href).searchParams;
+      const route = parseAppRoute(pathname, searchParams);
+      // 空间真相归 URL：带空间域的路由把空间上下文切换到位——跨空间深链的
+      // 核心机制（/kb/:workspaceA/... 打开即落到 A 空间）。旧版树节点 id 深链
+      // （notebook: 前缀）不是合法空间标识，跳过收编，交给写侧 (A2) 规整。
+      const routeSpace = "space" in route ? route.space : null;
+      if (routeSpace && !routeSpace.startsWith("notebook:") && routeSpace !== getCurrentWorkspace()) {
+        setCurrentWorkspace(routeSpace);
+        try {
+          window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId: routeSpace } }));
+        } catch {}
+      }
       // route 镜像始终更新（视图层据其渲染），回声只跳过状态回灌。
       actions.setRoute(route);
       if (
@@ -212,20 +252,49 @@ export default function AppRouteSync() {
     previousActiveNoteIdRef.current = activeNoteId;
     previousViewModeRef.current = state.viewMode;
     previousRouteKindRef.current = state.route.kind;
+    previousActiveToolTabRef.current = state.activeToolTab;
 
     const pathname = resolveCurrentAppPathname();
     const route = state.route;
-    // 知识库进入态（route 派生）：URL 保留 /kb/:k 层级
+    // 当前空间（localStorage）：写带空间域路径时的空间段来源。
+    const currentSpace = getCurrentWorkspace();
+    // 知识库进入态（route 派生）：URL 保留库层级
     const enteredKbId = route.kind === "kb"
       ? route.kbId
       : route.kind === "note" ? route.kbId ?? null : null;
+    // 知识库模块根（带空间段）。契约测试锁定此标识。
+    const kbRootTarget = () => moduleAppPath("notebook", currentSpace) ?? KB_ROOT_APP_PATH;
 
+    // 附加参数（?q= 搜索、?scope= 筛选）：不属于路由本体，reconcile 写路由时
+    // 必须透传，否则打开笔记等导航会把它们抹掉（scope/q 刷新丢失的根因）。
+    const EXTRA_QUERY_KEYS = ["q", "scope"] as const;
     const write = (target: string, mode: "push" | "replace") => {
-      if (resolveCurrentAppPathname() === target) return;
+      const targetUrl = new URL(target, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+      for (const key of EXTRA_QUERY_KEYS) {
+        const value = currentUrl.searchParams.get(key);
+        if (value !== null && !targetUrl.searchParams.has(key)) targetUrl.searchParams.set(key, value);
+      }
+      target = `${targetUrl.pathname}${targetUrl.search}`;
+      if (resolveCurrentAppPathname() + window.location.search === target) return;
       if (mode === "push") pushAppPathState(target);
       else replaceAppPathState(target);
       expectedUrlRef.current = target;
     };
+
+        // (A0) 工具页签路由同步：activeToolTab 是工具页签的唯一状态源，URL 跟随。
+    // 放在 (A) 之前——工具页激活期间 (A) 会把常规笔记路径写回而抹掉 /tools/:key。
+    if (state.activeToolTab && route.kind !== "tool") {
+      write(`/tools/${state.activeToolTab}`, "push");
+      return;
+    }
+    if (!state.activeToolTab && route.kind === "tool") {
+      // 工具页签被关闭 → 回常规路径（下一轮 (A)/(C) 写资源路径；这里直接落位）
+      write(state.activeNote
+        ? kbNoteAppPath(currentSpace, enteredKbId, state.activeNote.id)
+        : kbRootTarget(), "replace");
+      return;
+    }
 
     // (0) note 深链加载中：URL 所有权在加载方，直到状态真正反映出来（原 pending 语义）。
     //     在 onSuccess 里清太早：React 可能尚未提交 setActiveNote，同一轮 effect 会看到
@@ -242,8 +311,31 @@ export default function AppRouteSync() {
       }
     }
 
+    // (A2) 遗留/省略形态规整：/、/dashboard（废弃误用）、/kb（短形态）以及旧版
+    //     树节点 id 深链（/kb/notebook:*）都只读不写——replace 成当前空间的
+    //     完整形态 /kb/:space（popstate 回退到遗留条目时同样规整，状态清理由
+    //     home 分支完成）。
+    if (route.kind === "home") {
+      const isLegacyRoot = pathname === "/" || pathname === "/dashboard" || pathname === KB_ROOT_APP_PATH;
+      const isLegacyNodeLink = !!route.space && route.space.startsWith("notebook:");
+      if (isLegacyRoot || isLegacyNodeLink) {
+        write(kbRootTarget(), "replace");
+        return;
+      }
+    }
+
+    // (A3) 带空间域模块的短形态（/trash、/favorites、/issues）：补当前空间段，
+    //     URL 永远完整，不留省略形态。
+    if (route.kind === "module" && route.space == null && state.viewMode === route.viewMode) {
+      const target = moduleAppPath(route.viewMode, currentSpace);
+      if (target) {
+        write(target, "replace");
+        return;
+      }
+    }
+
     // (A) 笔记工作区规则（原 NoteDeepLinkBridge 写侧，原样移植）：
-    //     显式笔记导航 / URL 为根时 push 笔记路径；URL 已对或外来资源路由未
+    //     显式笔记导航 / URL 为知识库根时 push 笔记路径；URL 已对或外来资源路由未
     //     显式导航时不抢。知识库进入态（route.kind 带 kbId）时 URL 保留库层级：
     //     /kb/:k/notes/:n——kb 前缀忠实反映侧栏进入态，与笔记归属解耦。
     if (NOTE_WORKSPACE_VIEWS.has(state.viewMode)) {
@@ -256,25 +348,20 @@ export default function AppRouteSync() {
         } else {
           const explicitNoteNavigation = activeNoteChanged || enteredNoteWorkspace;
           if (
-            pathname === "/"
+            route.kind === "home"
             || route.kind === "note"
             || route.kind === "kb"
             || explicitNoteNavigation
           ) {
-            write(
-              enteredKbId
-                ? `/kb/${encodeURIComponent(enteredKbId)}/notes/${encodeURIComponent(activeNoteId)}`
-                : `/notes/${encodeURIComponent(activeNoteId)}`,
-              "push",
-            );
+            write(kbNoteAppPath(currentSpace, enteredKbId, activeNoteId), "push");
             return;
           }
           // 其余情况保持外来 URL（/sheets、/mindmaps、/issues、模块路径）
         }
       } else if (route.kind === "note") {
-        // 工作区内无 activeNote 且 URL 是笔记残留 → 清回根（墓碑根治点：
+        // 工作区内无 activeNote 且 URL 是笔记残留 → 清回知识库模块根（墓碑根治点：
         // 关光页签的 URL 清理与状态同流，无需时间窗猜测）
-        write("/", "replace");
+        write(kbRootTarget(), "replace");
         return;
       }
     }
@@ -285,15 +372,15 @@ export default function AppRouteSync() {
       return;
     }
     if (route.kind === "mindmap" && state.viewMode !== "mindmaps") {
-      write("/", "replace");
+      write(kbRootTarget(), "replace");
       return;
     }
     if (route.kind === "sheet" && (state.activeNote || state.viewMode !== "all")) {
-      write("/", "replace");
+      write(kbRootTarget(), "replace");
       return;
     }
     if (route.kind === "issue" && state.viewMode !== "issues") {
-      write("/", "replace");
+      write(moduleAppPath("issues", route.space ?? currentSpace) ?? "/issues", "replace");
       return;
     }
 
@@ -303,16 +390,18 @@ export default function AppRouteSync() {
       (viewModeChanged || resourceRouteChanged)
       && route.kind !== "sheet" && route.kind !== "mindmap" && route.kind !== "issue"
     ) {
-      const target = VIEW_MODE_APP_PATHS[state.viewMode];
-      if (target) {
-        // 进入知识库时 notebook 的模块路径（"/"）必须带上库层级，否则会把
-        // 刚解析好的 /kb/:k/notes/:n 规整回 "/"，随后 (A) 再补 /notes/:n——
-        // kb 层就此丢失（刷新恢复失败的根因）。
-        write(enteredKbId && target === "/" ? `/kb/${encodeURIComponent(enteredKbId)}` : target, "replace");
-        return;
+      // URL 已带库层级（/kb/:space/:kbId[...]）时不规整——否则会把刚解析好的
+      // 完整形态削成模块根，kb 层就此丢失（刷新恢复失败的根因）。
+      const kbContextUrl = route.kind === "kb" || (route.kind === "note" && !!route.kbId);
+      if (!kbContextUrl) {
+        const target = moduleAppPath(state.viewMode, currentSpace);
+        if (target) {
+          write(target, "replace");
+          return;
+        }
       }
     }
-  }, [state.activeNote, state.viewMode, state.route]);
+  }, [state.activeNote, state.viewMode, state.route, state.activeToolTab]);
 
   return null;
 }

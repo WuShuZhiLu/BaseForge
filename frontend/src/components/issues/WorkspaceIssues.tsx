@@ -182,7 +182,7 @@ export default function WorkspaceIssues({ issueId }: { issueId: string | null })
               {detail.relatedNote && <button className={buttonClass} disabled={busy} onClick={() => void run(async (isCurrent) => {
                 const note = await api.getNote(detail.relatedNote!.id);
                 if (!isCurrent() || getCurrentWorkspace() !== detail.workspaceId) return;
-                pushAppPathState("/");
+                pushAppPathState(`/kb/${encodeURIComponent(getCurrentWorkspace())}`);
                 actions.setActiveNote(note);
                 actions.setViewMode("all");
                 actions.setMobileView("editor");

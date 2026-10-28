@@ -74,7 +74,8 @@ import {
   type KnowledgeTreeSortMode,
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
-import { pushAppPathState } from "@/lib/appPathNavigation";
+import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname, hasInAppForwardNavigationOccurred } from "@/lib/appPathNavigation";
+import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
@@ -302,6 +303,32 @@ export default function SidebarDesktop() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<FilterScope>("all");
+  // 树筛选 scope ⇄ URL（?scope=note|folder）：与 ?q= 同款握手（回灌置标记让写侧让位）。
+  const applyingRouteScopeRef = useRef(false);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  // 回灌只由 route 变化驱动（不得依赖 scope 本身——否则用户改 scope 后会被
+  // URL 旧值弹回，形成「切不回全部」的死锁）。
+  useEffect(() => {
+    const routeScope = state.route.scope;
+    if (routeScope !== "note" && routeScope !== "folder") return;
+    if (routeScope === scopeRef.current) return;
+    applyingRouteScopeRef.current = true;
+    setScope(routeScope);
+  }, [state.route]);
+  useEffect(() => {
+    if (applyingRouteScopeRef.current) {
+      applyingRouteScopeRef.current = false;
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const current = params.get("scope") ?? "all";
+    if (current === scope) return;
+    if (scope === "all") params.delete("scope");
+    else params.set("scope", scope);
+    const qs = params.toString();
+    replaceAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
+  }, [scope]);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [expanded, setExpanded] = useState<ExpandedSet>(() => new Set());
@@ -677,7 +704,22 @@ export default function SidebarDesktop() {
     setCurrentWorkspace(workspaceId);
     setCurrentWs(workspaceId);
     window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
-  }, []);
+    // 旧空间的文档不属于新空间：切空间即收起，避免笔记路径被写进新空间的 URL。
+    actions.setActiveNote(null);
+    actions.setMobileView("list");
+    // 空间真相归 URL：带空间域的路径上切空间 = 改写 URL 空间段，内容层级
+    // 落到新空间的同模块根（读侧回灌其余状态；旧空间的库/文档不跨空间携带）。
+    const route = state.route;
+    let target: string | null = null;
+    if (route.kind === "kb" || route.kind === "note" || route.kind === "home") {
+      target = moduleAppPath("notebook", workspaceId);
+    } else if (route.kind === "module" && route.space) {
+      target = moduleAppPath(route.viewMode, workspaceId);
+    } else if (route.kind === "issue") {
+      target = moduleAppPath("issues", workspaceId);
+    }
+    if (target) pushAppPathState(target);
+  }, [actions, state.route]);
 
   // ---- 标签默认展开：BLE（首个），其余折叠 —— 原型 r15 的默认态是首个展开 ----
   // AppContext.tags 变化（TagInput 增删标签会 setTags）时同步标签面板
@@ -750,6 +792,39 @@ export default function SidebarDesktop() {
     return () => clearTimeout(timer);
   }, [query]);
 
+  // ---- 搜索状态 ⇄ URL（?q= 叠加在当前路径上，replace 不污染历史）----
+  // 写侧：与搜索请求同防抖节奏，停止输入 250ms 后 URL 稳定为 /当前路径?q=词；
+  // 清空 → 移除 ?q=。lastUrlQRef 防止「URL 回灌 → 写侧 → 再回灌」的乒乓，
+  // 并避免首帧把直开链接 ?q= 剥掉。AI/外部工具直达入口：/search?q=…。
+  // ---- 搜索状态 ⇄ URL 握手 ----
+  // 读侧（URL → 搜索框）：仅在 state.route 变化时运行；?q= 与本地不同才回灌，
+  // 回灌前置 applyingRouteQRef 标记，写侧见标记即让位（防 StrictMode 双跑与
+  // 「回灌覆盖用户输入」两个时序坑）。
+  // 写侧（搜索框 → URL）：仅响应用户输入（标记未置位）；与 URL 现值对比相等
+  // 则跳过（首帧直开 /search?q=x 时 URL 已正确，不剥 q）。
+  const queryRef = useRef(query);
+  queryRef.current = query;
+  const applyingRouteQRef = useRef(false);
+  useEffect(() => {
+    if (!("q" in state.route)) return;
+    const routeQ = (state.route as { q?: string }).q ?? "";
+    if (routeQ === queryRef.current.trim()) return;
+    applyingRouteQRef.current = true;
+    setQuery(routeQ);
+    setSearchOpen(Boolean(routeQ.trim()));
+  }, [state.route]);
+  useEffect(() => {
+    if (applyingRouteQRef.current) {
+      applyingRouteQRef.current = false;
+      return;
+    }
+    const keyword = query.trim();
+    const currentQ = new URLSearchParams(window.location.search).get("q") ?? "";
+    if (keyword === currentQ) return;
+    const base = resolveCurrentAppPathname();
+    replaceAppPathState(keyword ? `${base}?q=${encodeURIComponent(keyword)}` : base);
+  }, [query]);
+
   const matchedTags = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return [];
@@ -800,51 +875,80 @@ export default function SidebarDesktop() {
     return counts;
   }, [nodes, childrenMap]);
 
-  /** 文档 resourceId -> 根层知识库节点 id（专注模式过滤标签文档用） */
+  /** 文档 resourceId -> 根层知识库 resourceId（notebook id，URL 外名层用 notebook 实体 id，
+   *  不用树节点 id——URL 表达「哪个库」，不表达「树里哪个格子」）。
+   *  同时反查：notebook resourceId -> 树节点 id（URL 回灌侧栏聚焦态用）。 */
   const docRootMap = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const map = new Map<string, string>();
+    const kbNodeByResourceId = new Map<string, string>();
     for (const node of nodes) {
       if (node.isDeleted || node.nodeType === "folder") continue;
       let cursor: KnowledgeTreeNode | undefined = node;
       while (cursor?.parentId) cursor = byId.get(cursor.parentId);
-      if (cursor) map.set(node.resourceId, cursor.id);
+      if (!cursor) continue;
+      map.set(node.resourceId, cursor.resourceId);
+      if (cursor.resourceType === "notebook") kbNodeByResourceId.set(cursor.resourceId, cursor.id);
     }
-    return map;
+    return { docRoot: map, kbNodeByResourceId };
   }, [nodes]);
 
-  // 进入态兜底：进入的库被删除/不存在时自动退回列表态。
-  // 必须等树加载完成（loading=false）再判定——刷新恢复时 nodes 未到，会误判
-  // 「库不存在」把刚解析好的 /kb URL 推回 "/"。
+  // 深链规范化（对齐语雀：文档 URL 始终携带知识库层级）：裸 /notes/:n 入口
+  // （刷新/外链/登录回跳——本次加载未发生应用内前进导航）且文档归属库已知时，
+  // replace 成 /kb/:k/notes/:n。popstate 回退与退出库写入的裸路径发生在导航之后
+  // （标记已置位），不重写，不破坏后退链。
   useEffect(() => {
-    if (!focusRootId || loading) return;
-    if (!nodes.some((n) => n.id === focusRootId && !n.isDeleted)) {
-      pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
-    }
-  }, [nodes, focusRootId, state.activeNote, loading]);
+    if (loading || hasInAppForwardNavigationOccurred()) return;
+    const route = state.route;
+    if (route.kind !== "note" || route.kbId) return;
+    const root = docRootMap.docRoot.get(route.noteId);
+    if (!root) return;
+    replaceAppPathState(kbNoteAppPath(getCurrentWorkspace(), root, route.noteId));
+  }, [state.route, docRootMap, loading]);
 
   // 进入态 ⇄ URL：route 是唯一真相，这里只做「读侧回灌」到本地 state。
+  // URL 里的 kbId 是 notebook id（resourceId），侧栏聚焦态用树节点 id，经反查转换；
+  // 树未加载时不动（等反查就绪），避免把刷新恢复的进入态先清后设。
   // 进入/退出动作一律写 URL（enterKb/exitKb），不直接 setFocusRootId。
   const routeKbId = state.route.kind === "kb"
     ? state.route.kbId
     : state.route.kind === "note" ? state.route.kbId ?? null : null;
-  useEffect(() => {
-    setFocusRootId(routeKbId);
-  }, [routeKbId]);
 
-  /** 进入知识库：写 URL（当前打开文档属于该库时带 notes 前缀，刷新可完整恢复）。 */
+  // 进入态兜底：URL 里的库（notebook id）被删除/不存在/无权限时自动退回列表态。
+  // 必须等树加载完成（loading=false）再判定——刷新恢复时 nodes 未到，会误判
+  // 「库不存在」把刚解析好的 /kb URL 推回知识库根。
+  //（依赖 routeKbId，必须放在其声明之后——TDZ。）
+  useEffect(() => {
+    if (loading || !routeKbId) return;
+    if (!nodes.some((n) => n.resourceId === routeKbId && n.resourceType === "notebook" && !n.isDeleted)) {
+      const ws = getCurrentWorkspace();
+      pushAppPathState(state.activeNote ? kbNoteAppPath(ws, null, state.activeNote.id) : moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
+    }
+  }, [nodes, routeKbId, state.activeNote, loading]);
+  useEffect(() => {
+    if (routeKbId && loading) return;
+    setFocusRootId(routeKbId ? docRootMap.kbNodeByResourceId.get(routeKbId) ?? null : null);
+  }, [routeKbId, docRootMap, loading]);
+
+  /** 进入知识库：写 URL（/kb/:space/:kbId；当前打开文档属于该库时带 notes 前缀，刷新可完整恢复）。 */
   const enterKb = useCallback((kbNodeId: string) => {
-    const activeInKb = state.activeNote && docRootMap.get(state.activeNote.id) === kbNodeId;
+    const kbNode = nodes.find((n) => n.id === kbNodeId);
+    const kbIdForUrl = kbNode?.resourceId ?? kbNodeId;
+    const ws = getCurrentWorkspace();
+    const activeInKb = state.activeNote && docRootMap.docRoot.get(state.activeNote.id) === kbIdForUrl;
     pushAppPathState(
       activeInKb && state.activeNote
-        ? `/kb/${encodeURIComponent(kbNodeId)}/notes/${encodeURIComponent(state.activeNote.id)}`
-        : `/kb/${encodeURIComponent(kbNodeId)}`,
+        ? kbNoteAppPath(ws, kbIdForUrl, state.activeNote.id)
+        : `/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbIdForUrl)}`,
     );
-  }, [docRootMap, state.activeNote]);
+  }, [nodes, docRootMap, state.activeNote]);
 
-  /** 退出知识库（回库列表）：URL 落回当前文档或根。 */
+  /** 退出知识库（回库列表）：URL 落回当前文档（空间内形态）或知识库模块根。 */
   const exitKb = useCallback(() => {
-    pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+    const ws = getCurrentWorkspace();
+    pushAppPathState(state.activeNote
+      ? kbNoteAppPath(ws, null, state.activeNote.id)
+      : moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
   }, [state.activeNote]);
 
   // 搜索范围跟随进入态：进入某库时默认库内，退出回到全空间
@@ -863,11 +967,16 @@ export default function SidebarDesktop() {
     return roots.filter((n) => !n.isDeleted);
   }, [childrenMap]);
 
-  // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）
+  // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）。
+  // docRoot 存的是根库 resourceId，聚焦态是节点 id——用聚焦根的 resourceId 对齐。
+  const focusRootResourceId = useMemo(
+    () => (focusRootId ? nodes.find((n) => n.id === focusRootId)?.resourceId ?? null : null),
+    [nodes, focusRootId],
+  );
   const visibleSearchDocs = useMemo(() => {
-    if (searchScope !== "kb" || !focusRootId) return searchDocs;
-    return searchDocs.filter((doc) => docRootMap.get(doc.id) === focusRootId);
-  }, [searchDocs, searchScope, focusRootId, docRootMap]);
+    if (searchScope !== "kb" || !focusRootResourceId) return searchDocs;
+    return searchDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
+  }, [searchDocs, searchScope, focusRootResourceId, docRootMap]);
 
   const searching = query.trim().length > 0;
   const docCount = useMemo(
@@ -892,11 +1001,25 @@ export default function SidebarDesktop() {
   const toggleTag = useCallback((tagId: string) => {
     setTagsExpanded((current) => {
       const next = new Set(current);
-      if (next.has(tagId)) next.delete(tagId);
-      else next.add(tagId);
+      if (next.has(tagId)) {
+        next.delete(tagId);
+        // 折叠：URL 退出标签态，回常规路径
+        pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+      } else {
+        next.add(tagId);
+        // 展开：URL 跟随（/tags/:tagId），刷新/直开可恢复该标签展开
+        pushAppPathState(`/tags/${encodeURIComponent(tagId)}`);
+      }
       return next;
     });
-  }, []);
+  }, [state.activeNote]);
+
+  // 标签回灌：route.kind==="tag" 时确保该标签展开（URL 直达 / 刷新恢复）
+  useEffect(() => {
+    if (state.route.kind !== "tag") return;
+    const tagId = state.route.tagId;
+    setTagsExpanded((current) => (current.has(tagId) ? current : new Set(current).add(tagId)));
+  }, [state.route]);
 
   /** "折叠全部文件夹"按钮：专注模式下只碰专注子树内的文件夹（brief 4.5） */
   const toggleAllFolders = useCallback(() => {
@@ -1328,16 +1451,16 @@ export default function SidebarDesktop() {
       docs: tagDocs[tag.id] ?? [],
     }));
     // 专注模式：标签只显示属于当前知识库的文档，空标签组隐藏
-    if (focusRootId) {
+    if (focusRootResourceId) {
       rows = rows
         .map((row) => ({
           ...row,
-          docs: row.docs.filter((doc) => docRootMap.get(doc.id) === focusRootId),
+          docs: row.docs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId),
         }))
         .filter((row) => row.docs.length > 0);
     }
     return rows;
-  }, [tags, tagsExpanded, tagDocs, focusRootId, docRootMap]);
+  }, [tags, tagsExpanded, tagDocs, focusRootResourceId, docRootMap]);
 
   const focusRoot = focusRootId ? nodes.find((n) => n.id === focusRootId) ?? null : null;
 
