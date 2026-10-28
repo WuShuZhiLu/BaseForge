@@ -12,13 +12,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  ChevronRight,
   CheckCircle2,
   ChevronDown,
   Circle,
   ExternalLink,
   FileCode,
   FileText,
+  Focus,
   Folder,
   Home,
   Link2,
@@ -694,6 +694,21 @@ export default function SidebarDesktop() {
     };
   }, [reload, reloadTags]);
 
+  // 单树默认展开：首次加载后把根层知识库展开（知识库内容直接可见；用户折叠后不回灌）
+  const seededExpandedRef = useRef(false);
+  useEffect(() => {
+    if (loading || seededExpandedRef.current || nodes.length === 0) return;
+    seededExpandedRef.current = true;
+    setExpanded((current) => {
+      if (current.size > 0) return current;
+      const next = new Set(current);
+      for (const node of nodes) {
+        if (!node.isDeleted && node.parentId === null && node.resourceType === "notebook") next.add(node.id);
+      }
+      return next;
+    });
+  }, [loading, nodes]);
+
   const switchSpace = useCallback((workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
     setCurrentWs(workspaceId);
@@ -910,7 +925,7 @@ export default function SidebarDesktop() {
   // 进入态 ⇄ URL：route 是唯一真相，这里只做「读侧回灌」到本地 state。
   // URL 里的 kbId 是 notebook id（resourceId），侧栏聚焦态用树节点 id，经反查转换；
   // 树未加载时不动（等反查就绪），避免把刷新恢复的进入态先清后设。
-  // 进入/退出动作一律写 URL（enterKb/exitKb），不直接 setFocusRootId。
+  // 进入/退出动作一律写 URL（openKbOverview/focusKb/exitKb），不直接 setFocusRootId。
   const routeKbId = state.route.kind === "kb"
     ? state.route.kbId
     : state.route.kind === "note" ? state.route.kbId ?? null : null;
@@ -926,31 +941,45 @@ export default function SidebarDesktop() {
       pushAppPathState(state.activeNote ? kbNoteAppPath(ws, null, state.activeNote.id) : moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
     }
   }, [nodes, routeKbId, state.activeNote, loading]);
+
+  // 库内树空间（聚焦）⇄ URL：?tree=focus 叠加在当前 kb 路径上
+  // （/kb/:space/:kbId[/:kbId/notes/:n]?tree=focus）。route 是唯一真相，这里只做
+  // 读侧回灌：聚焦目标 = URL 里的 kbId（notebook id → 树节点 id 反查）；
+  // 无参数或无 kbId = 全空间单树。树未加载时不动（等反查就绪）。
+  const routeTreeFocus = state.route.tree === "focus";
   useEffect(() => {
     if (routeKbId && loading) return;
-    setFocusRootId(routeKbId ? docRootMap.kbNodeByResourceId.get(routeKbId) ?? null : null);
-  }, [routeKbId, docRootMap, loading]);
+    if (!routeTreeFocus || !routeKbId) {
+      setFocusRootId((cur) => (cur === null ? cur : null));
+      return;
+    }
+    setFocusRootId(docRootMap.kbNodeByResourceId.get(routeKbId) ?? null);
+  }, [routeTreeFocus, routeKbId, docRootMap, loading]);
 
-  /** 进入知识库：写 URL（/kb/:space/:kbId；当前打开文档属于该库时带 notes 前缀，刷新可完整恢复）。 */
-  const enterKb = useCallback((kbNodeId: string) => {
-    const kbNode = nodes.find((n) => n.id === kbNodeId);
-    const kbIdForUrl = kbNode?.resourceId ?? kbNodeId;
+  /** 打开库 Overview：写 URL /kb/:space/:kbId（主区渲染 KbDetailPage，侧栏树不动）。 */
+  const openKbOverview = useCallback((kbResourceId: string) => {
     const ws = getCurrentWorkspace();
-    const activeInKb = state.activeNote && docRootMap.docRoot.get(state.activeNote.id) === kbIdForUrl;
-    pushAppPathState(
-      activeInKb && state.activeNote
-        ? kbNoteAppPath(ws, kbIdForUrl, state.activeNote.id)
-        : `/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbIdForUrl)}`,
-    );
-  }, [nodes, docRootMap, state.activeNote]);
+    const target = `/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbResourceId)}`;
+    if (resolveCurrentAppPathname() === target) return;
+    pushAppPathState(target);
+  }, []);
 
-  /** 退出知识库（回库列表）：URL 落回当前文档（空间内形态）或知识库模块根。 */
+  /** 聚焦知识库（库内树空间）：该库 Overview 路径叠加 ?tree=focus，侧栏只渲染该库子树。 */
+  const focusKb = useCallback((kbResourceId: string) => {
+    const ws = getCurrentWorkspace();
+    const params = new URLSearchParams(window.location.search);
+    params.set("tree", "focus");
+    pushAppPathState(`/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbResourceId)}?${params.toString()}`);
+  }, []);
+
+  /** 退出库内树空间（回全空间单树）：剥离 ?tree=focus，路径与主区保持不变。 */
   const exitKb = useCallback(() => {
-    const ws = getCurrentWorkspace();
-    pushAppPathState(state.activeNote
-      ? kbNoteAppPath(ws, null, state.activeNote.id)
-      : moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
-  }, [state.activeNote]);
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("tree")) return;
+    params.delete("tree");
+    const qs = params.toString();
+    pushAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
+  }, []);
 
   // 搜索范围跟随进入态：进入某库时默认库内，退出回到全空间
   useEffect(() => {
@@ -961,12 +990,6 @@ export default function SidebarDesktop() {
     () => buildRows(nodes, expanded, query, scope, focusRootId),
     [nodes, expanded, query, scope, focusRootId],
   );
-
-  // 知识库列表态数据：根层知识库节点（resourceType=notebook），行尾为库内文档数
-  const kbRoots = useMemo(() => {
-    const roots = childrenMap.get(null) ?? [];
-    return roots.filter((n) => !n.isDeleted);
-  }, [childrenMap]);
 
   // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）。
   // docRoot 存的是根库 resourceId，聚焦态是节点 id——用聚焦根的 resourceId 对齐。
@@ -1016,6 +1039,33 @@ export default function SidebarDesktop() {
     setSearchOpen(false);
     setQuery("");
   }, [nodes]);
+
+  // 主区 Overview 目录点文件夹 → 侧栏树展开到该节点并选中（不离开 Overview）。
+  const revealNodeFromOverview = useCallback((nodeId: string) => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const ancestors: string[] = [];
+    let cursor: KnowledgeTreeNode | undefined = byId.get(nodeId);
+    while (cursor) {
+      ancestors.push(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      for (const id of ancestors) next.add(id);
+      return next;
+    });
+    setSelectedNodeIds(new Set([nodeId]));
+    selectionAnchorRef.current = nodeId;
+  }, [nodes]);
+
+  useEffect(() => {
+    const onReveal = (event: Event) => {
+      const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (nodeId) revealNodeFromOverview(nodeId);
+    };
+    window.addEventListener("nowen:kb-reveal-node", onReveal);
+    return () => window.removeEventListener("nowen:kb-reveal-node", onReveal);
+  }, [revealNodeFromOverview]);
 
   const searching = query.trim().length > 0;
   const docCount = useMemo(
@@ -1169,10 +1219,18 @@ export default function SidebarDesktop() {
     selectionAnchorRef.current = node.id;
     if (node.nodeType === "folder") {
       selectFolder(node);
+      if (node.parentId === null && node.resourceType === "notebook") {
+        // 库根行：展开子树 + 主区 Overview（折叠交给双击/箭头，不跟随单击）
+        setExpanded((cur) => (cur.has(node.id) ? cur : new Set(cur).add(node.id)));
+        openKbOverview(node.resourceId);
+        return;
+      }
+      // 文件夹：选中 + 展开/折叠（主区不动）
+      toggleNode(node);
       return;
     }
     void openNode(node);
-  }, [selectFolder, openNode]);
+  }, [selectFolder, openNode, openKbOverview, toggleNode]);
 
   const clearSelection = useCallback(() => {
     setSelectedNodeIds(new Set());
@@ -1507,9 +1565,45 @@ export default function SidebarDesktop() {
   const sectionMap: Record<SectionId, React.ReactNode> = {
     kb: (
       <section key="kb" className="shrink-0" data-next-section="kb">
-        {/* 进入态隐藏「知识库」区块头（含折叠/计数）——进入后本区段就是该库的
-            目录树，再显示「知识库 ⌄」既重复又误导；新建入口移到顶部横幅。 */}
-        {!focusRootId && (
+        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「📘 库名 ＋ N ×」
+            （点×退出库内树空间，点库名回 Overview，＋在库内新建）。 */}
+        {focusRoot ? (
+          <div className="flex w-full items-center gap-1 px-2 py-1">
+            <FaBook size={13} className="shrink-0 text-accent-primary" />
+            <button
+              type="button"
+              onClick={() => openKbOverview(focusRoot.resourceId)}
+              title="打开库概览"
+              className="min-w-0 flex-1 truncate rounded px-0.5 py-0.5 text-left text-[12px] font-semibold text-accent-primary hover:bg-app-hover"
+            >
+              {focusRoot.title}
+            </button>
+            {!collapsedSections.has("kb") && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setCreateMenuState({ parentId: focusRoot.id, anchor: new DOMRect(rect.left, rect.top, rect.width, rect.height) });
+                  }}
+                  title={t("sidebarNext.newFolder", { defaultValue: "新建" })}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
+                >
+                  <Plus size={13} />
+                </button>
+                <span className="rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCountMap.get(focusRoot.id) ?? 0}</span>
+                <button
+                  type="button"
+                  onClick={exitKb}
+                  title={t("sidebarNext.focusExit", { defaultValue: "退出库内树空间" })}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
+                >
+                  <X size={13} />
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
         <div className="flex w-full items-center gap-1 px-2 py-1">
           <button
             type="button"
@@ -1563,85 +1657,7 @@ export default function SidebarDesktop() {
 
         {!collapsedSections.has("kb") && (
           <div className="pb-2 pl-2.5 pr-1">
-            {focusRoot && (
-              <div className="mx-1 mb-1 flex items-center gap-1 rounded-md bg-accent-primary/15 px-1 py-1">
-                <button
-                  type="button"
-                  onClick={exitKb}
-                  title={t("sidebarNext.focusBack", { defaultValue: "返回全部知识库" })}
-                  className="flex h-5 w-5 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
-                </button>
-                <FaBook size={13} className="shrink-0 text-accent-primary" />
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{focusRoot.title}</span>
-                {/* 进入态的新建入口：区块头已隐藏，新建文档必须在这里可点 */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setCreateMenuState({ parentId: focusRoot.id, anchor: new DOMRect(rect.left, rect.top, rect.width, rect.height) });
-                  }}
-                  title={t("sidebarNext.newFolder", { defaultValue: "新建" })}
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
-                >
-                  <Plus size={12} />
-                </button>
-                <span className="shrink-0 rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCountMap.get(focusRoot.id) ?? 0}</span>
-              </div>
-            )}
-            {!focusRootId && !searching ? (
-              /* 知识库列表态：单击 = 选中（高亮，右键/⋯ 可重命名/删除/新建），
-                 双击或行尾箭头 = 进入该库。进入后本区段切换为该库目录树。 */
-              <div className="px-0.5 pb-2">
-                {kbRoots.length === 0 ? (
-                  <p className="px-2 py-2 text-[11px] text-tx-tertiary">
-                    {t("sidebarNext.empty", { defaultValue: "暂无内容" })}
-                  </p>
-                ) : kbRoots.map((kb) => {
-                  const selected = selectedNodeIds.has(kb.id);
-                  return (
-                    <div
-                      key={kb.id}
-                      className={cn(
-                        "group flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-1 text-xs",
-                        selected ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
-                      )}
-                      onClick={(event) => {
-                        if (event.shiftKey || event.metaKey || event.ctrlKey) {
-                          setSelectedNodeIds((current) => {
-                            const next = new Set(current);
-                            if (next.has(kb.id)) next.delete(kb.id); else next.add(kb.id);
-                            return next;
-                          });
-                          return;
-                        }
-                        setSelectedNodeIds(new Set([kb.id]));
-                      }}
-                      onDoubleClick={() => { enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
-                      onContextMenu={(event) => {
-                        event.preventDefault();
-                        setSelectedNodeIds(new Set([kb.id]));
-                        setRowMenu({ kind: "kb-folder", nodeId: kb.id, x: event.clientX, y: event.clientY });
-                      }}
-                      title="单击选中 · 双击进入 · 右键菜单"
-                    >
-                      <FaBook size={14} className="shrink-0 text-accent-primary" />
-                      <span className="min-w-0 flex-1 truncate">{kb.title}</span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary group-hover:hidden">{docCountMap.get(kb.id) ?? 0}</span>
-                      <button
-                        type="button"
-                        onClick={(event) => { event.stopPropagation(); enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
-                        title="进入知识库"
-                        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
-                      >
-                        <ChevronRight size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : loading ? (
+            {loading ? (
               <p className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</p>
             ) : rows.length === 0 ? (
               <div className="px-2 py-2 text-[11px] text-tx-tertiary">
@@ -1683,6 +1699,7 @@ export default function SidebarDesktop() {
                 {rows.map((row) => {
                   const { node, depth, hasChildren, expanded: isExpanded } = row;
                   const isFolder = node.nodeType === "folder";
+                  const isKbRoot = node.parentId === null && node.resourceType === "notebook";
                   const isSelected = selectedNodeIds.has(node.id);
                   const isPinned = Boolean(node.isPinned);
                   const isDropInto = dropTarget?.nodeId === node.id && dropTarget.position === "into";
@@ -1700,10 +1717,8 @@ export default function SidebarDesktop() {
                       onDragLeave={() => setDropTarget((cur) => (cur?.nodeId === node.id ? null : cur))}
                       onDrop={onRowDrop(node)}
                       onDoubleClick={() => {
-                        if (depth === 0 && isFolder && !focusRootId) {
-                          enterKb(node.id);
-                          setExpanded((cur) => new Set(cur).add(node.id));
-                        }
+                        // 双击库根 = 折叠/展开（Overview 导航只跟单击）
+                        if (isKbRoot) toggleNode(node);
                       }}
                       className={cn(
                         "group flex h-8 items-center gap-1 rounded-md pr-1 text-xs transition-colors",
@@ -1756,7 +1771,7 @@ export default function SidebarDesktop() {
                           onClick={(event) => handleRowClick(event, node)}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          {fileIconFor(node, depth === 0)}
+                          {fileIconFor(node, !focusRootId && depth === 0)}
                           <span className="min-w-0 flex-1 truncate">{node.title}</span>
                           {isPinned && <Pin size={11} className="shrink-0 text-tx-tertiary" />}
                           {isFolder && (
@@ -1769,6 +1784,19 @@ export default function SidebarDesktop() {
 
                       {!isRenaming && (
                         <>
+                          {isKbRoot && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); focusKb(node.resourceId); }}
+                              title="聚焦此知识库（库内树空间）"
+                              className={cn(
+                                "h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-accent-primary group-hover:flex",
+                                isSelected && "flex",
+                              )}
+                            >
+                              <Focus size={11} />
+                            </button>
+                          )}
                           {!isFolder && (
                             <button
                               type="button"
@@ -2325,8 +2353,9 @@ export default function SidebarDesktop() {
                         if (node.nodeType === "folder") {
                           revealTreeNode(node.id);
                         } else {
-                          enterKb(node.id);
+                          // 知识库命中：展开子树 + 打开 Overview
                           setExpanded((current) => new Set(current).add(node.id));
+                          openKbOverview(node.resourceId);
                           setSearchOpen(false);
                           setQuery("");
                         }

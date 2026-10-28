@@ -152,8 +152,9 @@ export default function AppRouteSync() {
         return;
       }
       if (route.kind === "kb") {
-        // 进入知识库：主区不动（侧栏自行从 state.route 派生进入态）。
-        // 注意不可掉入下方 home 分支——popstate 回退到库态时不能清空编辑器。
+        // 库 Overview（/kb/:space/:kbId）：主区渲染 KbDetailPage（视图层按 route
+        // 直接渲染）。仅确保处于知识库工作区（刷新直达/外链恢复时 viewMode 未就位）。
+        if (!NOTE_WORKSPACE_VIEWS.has(viewModeRef.current)) actions.setViewMode("notebook");
         return;
       }
       if (route.kind === "search") {
@@ -265,9 +266,9 @@ export default function AppRouteSync() {
     // 知识库模块根（带空间段）。契约测试锁定此标识。
     const kbRootTarget = () => moduleAppPath("notebook", currentSpace) ?? KB_ROOT_APP_PATH;
 
-    // 附加参数（?q= 搜索、?scope= 筛选）：不属于路由本体，reconcile 写路由时
-    // 必须透传，否则打开笔记等导航会把它们抹掉（scope/q 刷新丢失的根因）。
-    const EXTRA_QUERY_KEYS = ["q", "scope"] as const;
+    // 附加参数（?q= 搜索、?scope= 筛选、?tree=focus 聚焦）：不属于路由本体，
+    // reconcile 写路由时必须透传，否则打开笔记等导航会把它们抹掉。
+    const EXTRA_QUERY_KEYS = ["q", "scope", "tree"] as const;
     const write = (target: string, mode: "push" | "replace") => {
       const targetUrl = new URL(target, window.location.origin);
       const currentUrl = new URL(window.location.href);
@@ -336,8 +337,9 @@ export default function AppRouteSync() {
 
     // (A) 笔记工作区规则（原 NoteDeepLinkBridge 写侧，原样移植）：
     //     显式笔记导航 / URL 为知识库根时 push 笔记路径；URL 已对或外来资源路由未
-    //     显式导航时不抢。知识库进入态（route.kind 带 kbId）时 URL 保留库层级：
-    //     /kb/:k/notes/:n——kb 前缀忠实反映侧栏进入态，与笔记归属解耦。
+    //     显式导航时不抢。route.kind === "kb"（库 Overview）不在此列——URL 已表达
+    //     「看库概览」，有打开笔记也不能把它抢写成 notes 路径（Overview 让位规则：
+    //     点文档/页签才回编辑器）。
     if (NOTE_WORKSPACE_VIEWS.has(state.viewMode)) {
       if (activeNoteId) {
         const urlMatches = route.kind === "note"
@@ -350,7 +352,6 @@ export default function AppRouteSync() {
           if (
             route.kind === "home"
             || route.kind === "note"
-            || route.kind === "kb"
             || explicitNoteNavigation
           ) {
             write(kbNoteAppPath(currentSpace, enteredKbId, activeNoteId), "push");
@@ -390,10 +391,13 @@ export default function AppRouteSync() {
       (viewModeChanged || resourceRouteChanged)
       && route.kind !== "sheet" && route.kind !== "mindmap" && route.kind !== "issue"
     ) {
-      // URL 已带库层级（/kb/:space/:kbId[...]）时不规整——否则会把刚解析好的
-      // 完整形态削成模块根，kb 层就此丢失（刷新恢复失败的根因）。
+      // URL 已带库层级（/kb/:space/:kbId[...]）时仅在笔记家族内不规整——否则会把
+      // 刚解析好的完整形态削成模块根，kb 层就此丢失（刷新恢复失败的根因）。
+      // 切到其它模块（垃圾箱/分享/文件等）是用户显式意图，必须写模块 URL，
+      // 否则从库 Overview/库内文档点 Rail 图标时 URL 不跟随。
+      const stayingInNoteFamily = state.viewMode === "notebook" || state.viewMode === "favorites";
       const kbContextUrl = route.kind === "kb" || (route.kind === "note" && !!route.kbId);
-      if (!kbContextUrl) {
+      if (!kbContextUrl || !stayingInNoteFamily) {
         const target = moduleAppPath(state.viewMode, currentSpace);
         if (target) {
           write(target, "replace");

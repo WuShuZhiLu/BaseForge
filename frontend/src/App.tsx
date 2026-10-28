@@ -18,6 +18,7 @@ import DiaryWorkspace from "@/components/DiaryWorkspace";
 import SheetEditor from "@/components/SheetEditor";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
+import KbDetailPage from "@/components/kb/KbDetailPage";
 import PmWorkspace from "@/components/PmWorkspace";
 import PluginsWorkspace from "@/components/PluginsWorkspace";
 import TrashPage from "@/features/trash/TrashPage";
@@ -920,6 +921,13 @@ function AppLayout() {
         <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden">
           <MobileTopBar />
           <PluginsWorkspace />
+        </div>
+      ) : route.kind === "kb" ? (
+        /* 库 Overview：/kb/:space/:kbId（侧栏单击库根行进入；点文档/页签回编辑器，
+           本页为虚拟页，不计入文档数、不落 notes 记录） */
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <MobileTopBar />
+          <KbDetailPage kbId={route.kbId} />
         </div>
       ) : (
         <div

@@ -1,6 +1,8 @@
 # 知识库交互设计：单树 + 库详情页
 
-> 决策者：用户。日期：2026-10-28。状态：设计已定，待实施。
+> 决策者：用户。日期：2026-10-28。状态：**v2 已定稿并实装**（列表态删除、
+> 单击库=展开+Overview、行尾聚焦按钮、`?tree=focus` 库内树空间、客户端统计聚合；
+> 单测待补）。原型基准：`.cmp/proto-kb-single-tree-v2.html`。
 > 前置事实：`aec4416ac`（知识库独立进入两级态）之前的侧栏就是单树；
 > 两级态引入了重复根行、折叠头残留、空库弹回、选中丢失等一系列结构性问题，
 > 现决定**恢复单树**，并用「库详情页」补上原单树缺少的"知识库作为独立项目"的心智。
@@ -29,16 +31,23 @@
 
 ## 1. 设计原则
 
-1. **侧栏一棵树**：根 = 知识库，子 = 文件夹 / 文档；无模式切换，无整块内容替换。
-2. **详情页在主区**：点击侧栏的知识库行 → 工作区（主区）显示该库的详情页，
-   侧栏结构不变（不聚焦、不隐藏其它库）。
+1. **侧栏一棵树**：根 = 知识库，子 = 文件夹 / 文档；**所有库初始展开**，无列表态、
+   无整块内容替换（v2 定稿：列表态删除，恒走单树渲染）。
+2. **详情页在主区**：单击侧栏知识库根行 = **展开该库子树 + 选中 + 工作区打开该库
+   详情页（Overview）**；侧栏树结构不变。
 3. **首页不计入文档数**：库详情页是虚拟页面，不是知识树节点、不是 notes 记录；
    文档数/字数统计只算该库子树内的文档节点（文件夹、导图/表格按各自类型计入文档，
    详情页本身永不计入）。
-4. **动作语义唯一**：单击 = 选中（并打开对应内容），双击/箭头 = 展开折叠，
-   右键 = 节点菜单，＋ = 在当前上下文新建。
+4. **动作语义唯一**：单击库根 = 展开子树 + Overview；单击文件夹 = 选中 + 展开/折叠
+   （主区不动）；单击文档 = 编辑器；**双击库根/行尾箭头 = 折叠**（Overview 导航只跟
+   单击）；右键 = 节点菜单（真实增删改），＋ = 在当前上下文新建。
 5. **URL 即状态**：库详情页 = `/kb/:space/:kbId`；文档 = `/kb/:space/:kbId/notes/:noteId`；
-   空间级 = `/kb/:space`。刷新/前进后退/分享天然可恢复。
+   空间级 = `/kb/:space`；**库内树空间（聚焦）= 叠加 `?tree=focus`**。
+   刷新/前进后退/分享天然可恢复。
+6. **库内树空间（v2 新增，入口收进树）**：库根行悬停时行尾出现「聚焦 ⊙」按钮，
+   单击进入聚焦（侧栏只渲染该库子树）；聚焦后树区块头从「知识库 N」变为
+   「📘 库名 ＋ N ×」——点 × 退出、点库名回 Overview、＋ 在库内新建。
+   不用横幅、不用顶部 tab 栏。
 
 ## 2. 交互模型
 
@@ -60,13 +69,15 @@
 
 | 操作 | 行为 |
 |---|---|
-| 单击知识库根行 | 选中 + 工作区打开该库**详情页**（`/kb/:space/:kbId`） |
+| 单击知识库根行 | 选中 + **展开该库子树** + 工作区打开该库**详情页**（`/kb/:space/:kbId`） |
 | 单击文件夹行 | 选中 + 展开/折叠（不改变主区） |
 | 单击文档行 | 选中 + 在编辑器打开文档（现有行为） |
-| 双击知识库根行 | 展开/折叠该库子树 |
+| 双击知识库根行 | 展开/折叠该库子树（不重复导航 Overview） |
 | 行尾箭头（chevron） | 展开/折叠 |
-| 右键任意行 | 新建文档 / 新建文件夹 / 重命名 / 删除 / 置顶（文档） |
+| 行尾「聚焦 ⊙」（悬停库根行出现） | 进入**库内树空间**（`?tree=focus`），侧栏只渲染该库子树 |
+| 右键任意行 | 新建文档 / 新建文件夹 / 重命名 / 删除 / 置顶（文档），真实生效 |
 | 区块头 ＋ | 有选中节点 → 在其下新建；无选中 → 新建知识库 |
+| 聚焦态树头「📘 库名 ×」 | × = 退出聚焦；库名 = 回 Overview；＋ = 在库内新建 |
 | 拖拽 | 现有行为保留（拖入文件夹、排序） |
 | 空库 | 树里照常显示该库根行（计数 0），点击进详情页后由详情页提供新建入口 |
 
@@ -75,10 +86,13 @@
 | URL | 主区 |
 |---|---|
 | `/kb/:space` | 文档列表（现状，medium 列表 + 编辑器） |
-| `/kb/:space/:kbId` | **库详情页**（无打开文档时） |
+| `/kb/:space/:kbId` | **库详情页（Overview）**，URL 唯一真相（有无打开笔记均渲染） |
 | `/kb/:space/:kbId/notes/:noteId` | 文档编辑器 + 面包屑（库 › 文件夹 › 文档） |
 
-> 打开文档时详情页让位给编辑器；关掉文档回到详情页（若当前库仍是最后一个选中的库）。
+> **Overview 语义（v2）**：URL 是唯一真相——`/kb/:space/:kbId` 一律渲染 Overview，
+> 有打开笔记也不能抢写回 notes 路径（AppRouteSync (A) 规则已把 `route.kind === "kb"`
+> 移出抢写条件）；点文档 / 页签才回编辑器。Overview 是虚拟页：不是 notes 记录、
+> 不计入文档数。
 
 ### 2.3 库详情页规格
 
@@ -109,27 +123,36 @@
   `buildRows` 恒走 `walk(null, 0, [])`（单树）。
 - 进入态专属 UI：返回横幅、「知识库 ⌄」隐藏逻辑、列表态库行（单击进入 / 双击进入）、
   「库内/全空间」搜索胶囊随进入态出现的行为 → 一并移除。
-- `focusRootId` 保留为**视图辅助**（如"定位到底部标签文档"时展开按需），但不再影响渲染分支。
+- `focusRootId` 在 v2 中以新形态回归：**库内树空间**由 URL `?tree=focus` 派生
+  （`state.route.tree === "focus"` + kbId 反查树节点 id），只影响侧栏渲染范围
+  （聚焦时 `buildRows` 走该库子树、隐藏库根行），不再由 routeKbId 自动触发。
 
 ### 3.2 新增的概念
 
 - `detailKbId`（由 route 派生：`route.kind === "kb" ? route.kbId : null`）：
   决定主区是否渲染库详情页；侧栏只做选中高亮，不改变树。
 - `KbDetailPage` 组件（新文件 `frontend/src/components/kb/KbDetailPage.tsx`）：
-  接收 `kbNodeId`（树节点 id，由 notebook resourceId 反查得到）+ `spaceId`。
-- 统计接口 `GET /api/knowledge-tree/:kbNodeId/stats`（见 §4）。
+  接收 `kbId`（notebook resourceId），自行加载知识树 + 笔记列表做统计/目录；
+  目录点文件夹 → `nowen:kb-reveal-node` 事件驱动侧栏展开选中（不离开 Overview）。
+- `AppRoute.tree` 查询参数：`?tree=focus` 表示库内树空间，`EXTRA_QUERY_KEYS` 随
+  reconcile 写路由透传（打开笔记不丢聚焦）。
+- 侧栏 `openKbOverview` / `focusKb` / `exitKb`：全部只写 URL（/kb/:space/:kbId、
+  追加/剥离 `?tree=focus`），state 由读侧 effect 回灌。
+- 单树默认展开：首次加载后把根层知识库节点加入 `expanded`（用户折叠后不回灌）。
+- 统计 v2 简化：**客户端聚合**（知识树子树 + `api.getNotes()` 的 contentText），
+  暂不加后端 stats 接口（§4 保留为后续演进备选，贡献者字段暂缺）。
 
 ### 3.3 文件级改动清单
 
 | 文件 | 改动 |
 |---|---|
-| `components/SidebarDesktop.tsx` | 删除两级态分支（列表态 block、进入态横幅、hide-header 条件）；单树恒渲染；单击库根行 → `pushAppPathState(/kb/:space/:resourceId)`；保留选中/右键/拖拽/搜索分类 |
-| `components/kb/KbDetailPage.tsx`（新） | 详情页：头部/统计/贡献者/简介/目录/空态 |
+| `components/SidebarDesktop.tsx` | 删除两级态分支（列表态 block、进入态横幅、hide-header 条件）；单树恒渲染；单击库根行 = 展开子树 + `pushAppPathState(/kb/:space/:resourceId)`；库根行尾聚焦 ⊙ 按钮；聚焦态树头「📘 库名 ×」；保留选中/右键/拖拽/搜索分类 |
+| `components/kb/KbDetailPage.tsx`（新） | 详情页：头部/统计/简介/目录（带时间戳）/空态；新建文档 |
 | `App.tsx` | 主区渲染分支：`route.kind === "kb"` → `KbDetailPage`；`note` → 编辑器；其它 → 列表 |
-| `components/AppRouteSync.tsx` | `/kb/:space/:kbId` 不再影响侧栏（去掉 enteredKbId 对 URL 的"库层级保护"回归测试点）；写入路径统一 `/kb/:space[/:kbId[/notes/:n]]` |
-| `lib/appRoute.ts` | 保持现有形态，`kb` 路由语义改为"打开库详情页"；注释更新 |
-| `backend/src/routes/knowledge-tree.ts` | 新增 stats 路由（§4） |
-| `components/__tests__/` | 新增：单击库行写入详情页 URL；文档数不含详情页/文件夹；空库详情页空态 |
+| `components/AppRouteSync.tsx` | (A) 抢写条件移除 `route.kind === "kb"`（Overview 不被抢写回 notes）；`EXTRA_QUERY_KEYS` 增加 `tree`；dispatchRoute kb 分支确保 viewMode |
+| `lib/appRoute.ts` | `AppRoute` 增加 `tree` 参数并随 `attachParams` 解析；kb 路由语义 = 打开库详情页 |
+| `backend/src/routes/knowledge-tree.ts` | v2 暂不改（统计走客户端聚合）；stats 路由保留为后续演进（§4） |
+| `components/__tests__/` | 待补：单击库行写入详情页 URL；聚焦参数透传；文档数不含详情页/文件夹；空库详情页空态 |
 
 ## 4. 统计口径（首页不算文档数）
 

@@ -3472,7 +3472,7 @@
     "closeAll": "全部关闭",
     "empty": "暂无内容",
     "filter": "筛选",
-    "focusBack": "返回全部知识库",
+    "focusExit": "退出库内树空间",
     "foldAll": "折叠全部文件夹",
     "foldAllTags": "折叠全部标签文档",
     "knowledgeBase": "知识库",

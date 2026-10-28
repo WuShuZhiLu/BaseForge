@@ -3465,7 +3465,7 @@
     "closeAll": "Close All",
     "empty": "Nothing here yet",
     "filter": "Filter",
-    "focusBack": "Back to all knowledge bases",
+    "focusExit": "Exit notebook tree",
     "foldAll": "Collapse all folders",
     "foldAllTags": "Collapse all tag groups",
     "knowledgeBase": "Knowledge Base",

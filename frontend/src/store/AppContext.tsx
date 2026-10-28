@@ -414,7 +414,12 @@ function reducer(state: AppState, action: Action): AppState {
       if (state.viewMode === action.payload) return state;
       return { ...state, viewMode: action.payload };
     case "SET_ROUTE":
+      // 去重须含查询附加字段（q/scope/tree）：?tree=focus 等瞬态只改 query 不改
+      // url/kind，按 url 去重会把「进入/退出库内树空间」的路由更新整个吞掉。
       return state.route.url === action.payload.url && state.route.kind === action.payload.kind
+        && state.route.q === action.payload.q
+        && state.route.scope === action.payload.scope
+        && state.route.tree === action.payload.tree
         ? state
         : { ...state, route: action.payload };
     case "SET_SEARCH_QUERY":

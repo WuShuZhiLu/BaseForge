@@ -103,8 +103,9 @@ export type AppRouteKind =
   | { kind: "issue"; space: string; issueId: string; url: string }
   | { kind: "module"; viewMode: ViewMode; space?: string | null; url: string };
 
-/** 附加查询参数：?q=（搜索）与 ?scope=（知识树筛选）可叠加在任意路由上。 */
-export type AppRoute = AppRouteKind & { q?: string; scope?: string };
+/** 附加查询参数：?q=（搜索）、?scope=（知识树筛选）与 ?tree=focus（库内树空间）
+ *  可叠加在任意路由上。 */
+export type AppRoute = AppRouteKind & { q?: string; scope?: string; tree?: string };
 
 /** 工具页签 key（与 store/AppContext 的 ToolTabKey 保持一致；PM projects 不入）。 */
 export const TOOL_TAB_KEYS = ["tasks", "diary", "ai-chat", "shares", "files", "trash"] as const;
@@ -131,13 +132,15 @@ const SPACE_MODULE_PATH_RE = /^\/(favorites|trash|issues)\/([^/]+)$/;
 /** 带空间域的 issue 资源：/issues/:space/:issueId。 */
 const SPACE_ISSUE_PATH_RE = /^\/issues\/([^/]+)\/([^/]+)$/;
 
-/** 附加查询参数：任意路由都可叠加 ?q= 与 ?scope=（搜索/筛选瞬态）。 */
-function attachParams<T extends { url: string }>(route: T, params?: URLSearchParams): T & { q?: string; scope?: string } {
+/** 附加查询参数：任意路由都可叠加 ?q=、?scope= 与 ?tree=focus（搜索/筛选/聚焦瞬态）。 */
+function attachParams<T extends { url: string }>(route: T, params?: URLSearchParams): T & { q?: string; scope?: string; tree?: string } {
   const q = params?.get("q");
   const scope = params?.get("scope");
-  let out: T & { q?: string; scope?: string } = route;
+  const tree = params?.get("tree");
+  let out: T & { q?: string; scope?: string; tree?: string } = route;
   if (q !== null && q !== undefined) out = { ...out, q };
   if (scope !== null && scope !== undefined) out = { ...out, scope };
+  if (tree !== null && tree !== undefined) out = { ...out, tree };
   return out;
 }
 

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>风格原型 · Obsidian（vault 单树+双链）</title>
+<style>
+:root{--bg:#1e1e1e;--panel:#262626;--panel-2:#303030;--border:#3b3b3b;--border-strong:#4a4a4a;--text:#dcddde;--text-2:#b3b3b3;--text-3:#7a7a7a;--accent:#a78bfa;--accent-soft:rgba(167,139,250,.16);--radius:6px;--shadow:0 2px 6px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.45);font-size:15px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.topbar{height:44px;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.logo{font-weight:700;font-size:14px;color:var(--accent)}
+.urlbar{flex:1;max-width:620px;display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--text-2)}
+.urlbar b{color:var(--accent);font-weight:600}
+.hint{margin-left:auto;font-size:12px;color:var(--text-3)}
+.layout{display:flex;height:calc(100vh - 44px)}
+.sidebar{width:300px;flex:none;background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.explorer-h{display:flex;align-items:center;gap:4px;padding:10px 12px 6px;font-size:11px;letter-spacing:.08em;color:var(--text-3)}
+.explorer-h .ops{margin-left:auto;display:flex;gap:2px}
+.explorer-h .ops button{width:22px;height:22px;border-radius:4px;color:var(--text-3);font-size:11px}
+.explorer-h .ops button:hover{background:var(--panel-2);color:var(--text)}
+.tree{flex:1;overflow-y:auto;padding:0 8px}
+.row{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:var(--radius);cursor:pointer;color:var(--text-2);font-size:13.5px;position:relative;user-select:none}
+.row:hover{background:var(--panel-2)}
+.row.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.row .tw{width:15px;flex:none;color:var(--text-3);font-size:9px;transition:transform .15s}
+.row .tw.open{transform:rotate(90deg)}
+.row .tw.ghost{visibility:hidden}
+.row .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.children.hidden{display:none}
+.side-foot{border-top:1px solid var(--border);padding:10px 12px}
+.vault-btn{display:flex;width:100%;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius);font-size:13px;color:var(--text-2)}
+.vault-btn:hover{background:var(--panel-2)}
+.vault-btn .dot{width:10px;height:10px;border-radius:3px;background:var(--accent)}
+/* 主区 */
+.main{flex:1;min-width:0;overflow-y:auto;display:flex}
+.ed-wrap{flex:1;min-width:0;display:flex;flex-direction:column}
+.crumb{display:flex;align-items:center;gap:8px;padding:10px 34px;font-size:12px;color:var(--text-3);border-bottom:1px solid var(--border)}
+.crumb .c{cursor:pointer;border-radius:4px;padding:2px 6px}
+.crumb .c:hover{background:var(--panel-2);color:var(--text)}
+.crumb .c.here{color:var(--text);font-weight:600;cursor:default}
+.crumb .sep{color:var(--border-strong)}
+.ed{flex:1;overflow-y:auto;padding:26px 40px 90px}
+.ed h1{font-size:26px;margin-bottom:4px;color:var(--text)}
+.ed .m{font-size:12px;color:var(--text-3);margin-bottom:22px}
+.ed p{font-size:14.5px;line-height:1.95;color:var(--text-2);margin-bottom:12px}
+.ed .wl{color:var(--accent);cursor:pointer;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+.ed .wl:hover{background:var(--accent-soft)}
+.ed .tagchip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;font-size:11.5px;padding:2px 10px;margin:0 4px 4px 0;cursor:pointer}
+.ed .quote{border-left:3px solid var(--accent);padding:4px 14px;color:var(--text-3);margin:12px 0;font-size:13.5px}
+/* 右侧反链/标签 */
+.rightbar{width:250px;flex:none;border-left:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:14px}
+.rb-h{font-size:11px;letter-spacing:.1em;color:var(--text-3);margin:4px 0 10px}
+.rb-item{padding:8px 10px;border-radius:var(--radius);cursor:pointer;font-size:12.5px;color:var(--text-2)}
+.rb-item:hover{background:var(--panel-2);color:var(--text)}
+.rb-item .q{font-size:11px;color:var(--text-3);margin-top:3px}
+/* 快速切换器 */
+.qs{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding-top:14vh;z-index:50}
+.qs.show{display:flex}
+.qs-box{width:520px;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow);overflow:hidden}
+.qs-box input{width:100%;border:none;outline:none;background:none;padding:14px 16px;font:inherit;color:var(--text);border-bottom:1px solid var(--border)}
+.qs-list{max-height:300px;overflow-y:auto;padding:6px}
+.qs-item{padding:8px 12px;border-radius:var(--radius);font-size:13.5px;color:var(--text-2);cursor:pointer}
+.qs-item.on,.qs-item:hover{background:var(--accent-soft);color:var(--accent)}
+.qs-item .p{font-size:11px;color:var(--text-3);margin-left:8px}
+/* vault 弹层 */
+.vs{position:fixed;left:10px;bottom:56px;width:280px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;box-shadow:var(--shadow);padding:8px;display:none;z-index:50}
+.vs.show{display:block}
+.vs .h{font-size:11px;color:var(--text-3);padding:4px 8px 8px}
+.vs-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);cursor:pointer;font-size:13px;color:var(--text-2)}
+.vs-item:hover{background:var(--accent-soft);color:var(--accent)}
+.vs-item .dot{width:10px;height:10px;border-radius:3px}
+kbd{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:4px;padding:0 5px}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:var(--accent);color:#1e1e1e;font-weight:600;font-size:13px;padding:9px 18px;border-radius:999px;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+.toast.show{opacity:.96}
+.mock-note{position:fixed;right:14px;bottom:10px;font-size:10.5px;color:var(--text-3);z-index:70}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">Obsidian · 风格原型</span>
+  <div class="urlbar" id="urlbar"></div>
+  <span class="hint">按 <kbd>Ctrl/Cmd+O</kbd> 快速切换 · 点正文里的 <b style="color:var(--accent)">[[双链]]</b> 试试</span>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="explorer-h"><span>文件管理器</span>
+      <span class="ops"><button title="新建笔记" onclick="toast('新建笔记（模拟）')">✎</button><button title="新建文件夹" onclick="toast('新建文件夹（模拟）')">＋</button><button title="折叠全部" onclick="collapseAll()">⇪</button></span></div>
+    <div class="tree" id="tree"></div>
+    <div class="side-foot"><button class="vault-btn" onclick="toggleVaults()"><span class="dot"></span><span id="vaultName">实际应用</span><span style="margin-left:auto;font-size:11px;color:var(--text-3)">切换 vault ⌄</span></button></div>
+  </aside>
+  <main class="main"><div class="ed-wrap" id="edWrap"></div><aside class="rightbar" id="rightbar"></aside></main>
+</div>
+<div class="vs" id="vsPanel"><div class="h">Vault（弱容器：每个库=本地一个文件夹，整体切换）</div><div id="vsList"></div></div>
+<div class="qs" id="qs"><div class="qs-box"><input id="qsInput" placeholder="快速切换：输入笔记名…"><div class="qs-list" id="qsList"></div></div></div>
+<div class="toast" id="toast"></div>
+<div class="mock-note">模拟行为，细节为合理推测 · 数据与其他风格原型一致 · 无库首页：MOC 笔记代替</div>
+<script>
+/* vault=库；文件夹与笔记单树混排；无首页概念 */
+const V=(id,name,color,children)=>({id,name,color,children});
+const F=(id,name,children)=>({id,name,children});
+const N=(id,name,ts,body,tags)=>({id,name,ts,body,tags:tags||[]});
+const VAULTS=[
+ V("kb-app","实际应用","#5b8def",[
+   F("f-build","编译产物",[N("n1","产物命名规范","10-27","<p>按 <b>模块-版本-哈希</b> 命名，禁止手工改名。</p><div class='quote'>baseforge-web-1.4.2-8ac31f.tar.gz</div><p>相关：<span class='wl' data-open='n2'>[[清理策略]]</span></p>")]),
+   F("f-deploy","部署",[N("n3","上线检查清单","10-27","<p>#部署 #检查单 上线前逐项确认：迁移、灰度、监控。</p><p>出问题看：<span class='wl' data-open='n4'>[[回滚手册]]</span></p>"),
+     N("n4","回滚手册","10-25","<p>先回代码再回数据，双人复核。 #部署</p><p>关联：<span class='wl' data-open='n3'>[[上线检查清单]]</span> <span class='wl' data-open='n1'>[[产物命名规范]]</span></p>")]),
+   F("f-moc","MOC",[N("n0","📌 MOC 总索引","10-27","<p>#MOC Obsidian 没有库首页——<b>惯例是自建一篇 Map of Content</b>：</p><p><span class='wl' data-open='n1'>[[产物命名规范]]</span><br><span class='wl' data-open='n2'>[[清理策略]]</span><br><span class='wl' data-open='n3'>[[上线检查清单]]</span><br><span class='wl' data-open='n4'>[[回滚手册]]</span></p>","[MOC]")]),
+   F("f-req","需求池",[N("n5","10 月需求评审结论","10-24","<p>知识库交互重构定稿。</p>")])]),
+ V("kb-work","工作笔记","#59c39a",[N("n6","周报 1028","10-28","<p>知识库重构调研完成。 #周报</p>"),N("n7","1:1 记录","10-21","<p>详情页信息架构对齐。</p>")]),
+ V("kb-design","设计","#e8a33d",[F("f-ds","组件规范",[N("n8","按钮层级","10-20","<p>主按钮每屏最多一个。 #设计</p>")]),N("n9","色彩 tokens","10-19","<p>语义色一律走 token。 #设计</p>")]),
+ V("kb-empty","空库演示","#8f8d83",[]),
+];
+const flat=[];const idx=(l,vid)=>(l||[]).forEach(n=>{n.vault=vid;flat.push(n);idx(n.children,vid)});VAULTS.forEach(v=>idx(v.children,v.id));
+const find=id=>flat.find(n=>n.id===id);
+const pathOf=id=>{const v=VAULTS.find(v=>v.id===find(id).vault);const p=[];const w=(l,acc)=>(l||[]).forEach(n=>{if(n.id===id)p.push(...acc,n);else w(n.children,[...acc,n])});w(v.children,[]);return p};
+const st={vault:VAULTS[0],cur:null,exp:new Set(["f-deploy","f-moc"]),q:""};
+const $=s=>document.querySelector(s);
+const tree=$("#tree"),edWrap=$("#edWrap"),rightbar=$("#rightbar"),urlbar=$("#urlbar"),toastEl=$("#toast");
+let tt;const toast=m=>{toastEl.textContent=m;toastEl.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>toastEl.classList.remove("show"),1800)};
+function renderUrl(){ urlbar.innerHTML=`obsidian://open?<b>vault</b>=${st.vault.name}${st.cur?`&<b>file</b>=${pathOf(st.cur.id).map(p=>encodeURIComponent(p.name)).join("/")}`:""}`; }
+function renderTree(){
+  const row=(n,d)=>{const open=st.exp.has(n.id);const on=st.cur&&st.cur.id===n.id?" on":"";
+    return `<div class="row${on}" style="margin-left:${d*14}px">
+      ${n.children?`<button class="tw ${open?"open":""}" data-tw="${n.id}">▶</button>`:`<span class="tw ghost">▶</span>`}
+      <span>${n.children?"":"📝"}</span><span class="name">${n.name}</span></div>`
+      +(n.children&&open?n.children.map(c=>row(c,d+1)).join(""):"")};
+  tree.innerHTML=st.vault.children.length?st.vault.children.map(n=>row(n,0)).join("")
+    :`<div style="padding:50px 16px;text-align:center;color:var(--text-3);font-size:12.5px">空 vault<br>Obsidian：就是一个空文件夹<br><button style="margin-top:12px;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:7px 16px;font-size:12.5px" onclick="toast('新建笔记（模拟）')">📝 新建笔记</button></div>`;
+  tree.querySelectorAll("[data-tw]").forEach(b=>b.onclick=e=>{e.stopPropagation();const i=b.dataset.tw;st.exp.has(i)?st.exp.delete(i):st.exp.add(i);renderTree()});
+  tree.querySelectorAll(".row .name").forEach(el=>el.onclick=()=>openPage(el.textContent));
+}
+function openPage(name){const n=flat.find(x=>x.name===name&&x.vault===st.vault.id);if(!n){toast("当前 vault 没有这篇笔记");return}
+  st.cur=n;if(n.children&&!st.exp.has(n.id))st.exp.add(n.id);renderTree();renderPage(n);renderUrl()}
+function renderPage(n){
+  const path=pathOf(n.id);
+  edWrap.innerHTML=`<div class="crumb">${path.map((p,i)=>`<span class="c ${i===path.length-1?"here":""}" ${i<path.length-1?`data-c="${p.name}"`:""}>${p.name}</span>`).join('<span class="sep">/</span>')}<span style="margin-left:auto">${n.ts||""}</span></div>
+    <div class="ed"><h1>${n.name}</h1><div class="m">${(n.tags||[]).map(t=>`<span class="tagchip" data-tag="${t}">#${t.replace(/[#\[\]]/g,"")}</span>`).join("")}<span style="margin-left:6px">@wushuzhilu · ${n.ts||""}</span></div>${n.body||"<p>（空笔记）</p>"}</div>`;
+  edWrap.querySelectorAll(".wl").forEach(el=>el.onclick=()=>openPage(el.dataset.open));
+  edWrap.querySelectorAll(".tagchip").forEach(el=>el.onclick=()=>toast("标签过滤（模拟）："+el.dataset.tag));
+  edWrap.querySelectorAll("[data-c]").forEach(el=>el.onclick=()=>{const f=flat.find(x=>x.name===el.dataset.c&&x.vault===st.vault.id);if(f&&f.children){st.exp.add(f.id);st.cur=null;renderTree();renderHome();renderUrl()}});
+  renderRight(n);
+}
+function renderRight(n){
+  const back=flat.filter(x=>x.body&&x.body.includes(`data-open='${n.id}'`));
+  rightbar.innerHTML=`<div class="rb-h">🔗 反向链接</div>
+    ${back.length?back.map(b=>`<div class="rb-item" data-b="${b.id}"><div>📝 ${b.name}</div><div class="q">「${b.body.replace(/<[^>]+>/g,"").slice(0,26)}…」</div></div>`).join(""):`<div style="font-size:12px;color:var(--text-3);padding:4px 2px 16px">没有笔记链接到这里</div>`}
+    <div class="rb-h" style="margin-top:18px"># 标签</div>
+    ${[...new Set(flat.filter(x=>x.vault===st.vault.id).flatMap(x=>x.tags||[]))].map(t=>`<div class="rb-item" style="color:var(--accent)">#${t.replace(/[#\[\]]/g,"")} <span style="float:right;color:var(--text-3)">${flat.filter(x=>(x.tags||[]).includes(t)).length}</span></div>`).join("")||`<div style="font-size:12px;color:var(--text-3)">无标签</div>`}
+    <div class="rb-h" style="margin-top:18px">大纲</div><div style="font-size:12px;color:var(--text-3);line-height:2">（Outline 面板位）</div>`;
+  rightbar.querySelectorAll("[data-b]").forEach(el=>el.onclick=()=>openPage(find(el.dataset.b).name));
+}
+function renderHome(){
+  edWrap.innerHTML=`<div class="ed" style="padding-top:80px;text-align:center;color:var(--text-3)"><h2 style="font-size:20px;color:var(--text-2)">📝 ${st.vault.name}</h2><p style="margin-top:10px;font-size:13.5px">左侧选一篇笔记打开<br>Obsidian 导航重心：快速切换器 + 双链/反链，而不是树或首页</p></div>`;
+  rightbar.innerHTML=`<div class="rb-h">🔗 反向链接</div><div style="font-size:12px;color:var(--text-3)">先打开一篇笔记</div>`;
+}
+function toggleVaults(){
+  const p=$("#vsPanel");p.classList.toggle("show");
+  $("#vsList").innerHTML=VAULTS.map(v=>`<div class="vs-item" data-v="${v.id}"><span class="dot" style="background:${v.color}"></span>${v.name}<span style="margin-left:auto;font-size:11px;color:var(--text-3)">${(v.children||[]).length} 项</span></div>`).join("")
+    +`<div class="vs-item" onclick="toast('打开其他 vault（模拟）')">📂 打开其他 vault</div>`;
+  p.querySelectorAll("[data-v]").forEach(el=>el.onclick=()=>{
+    st.vault=VAULTS.find(v=>v.id===el.dataset.v);st.cur=null;st.exp=new Set();
+    $("#vaultName").textContent=st.vault.name;p.classList.remove("show");
+    renderTree();renderHome();renderUrl();toast("整体切换到 vault："+st.vault.name)});
+}
+function collapseAll(){st.exp=new Set();renderTree()}
+/* 快速切换器 */
+const qs=$("#qs"),qsInput=$("#qsInput"),qsList=$("#qsList");let qsSel=0;
+function openQS(){qs.classList.add("show");qsInput.value="";qsSel=0;drawQS("");qsInput.focus()}
+function drawQS(q){
+  const hits=flat.filter(n=>!n.children&&n.vault===st.vault.id&&n.name.toLowerCase().includes(q.toLowerCase()));
+  qsList.innerHTML=hits.map((n,i)=>`<div class="qs-item ${i===qsSel?"on":""}" data-i="${i}" data-id="${n.id}">📝 ${n.name}<span class="p">${pathOf(n.id).slice(0,-1).map(p=>p.name).join("/")||"vault 根"}</span></div>`).join("")
+    ||`<div class="qs-item">无匹配</div>`;
+  qsList.querySelectorAll(".qs-item[data-id]").forEach(el=>{el.onclick=()=>{openPage(find(el.dataset.id).name);qs.classList.remove("show")};el.onmousemove=()=>{qsSel=+el.dataset.i;qsList.querySelectorAll(".qs-item").forEach(x=>x.classList.toggle("on",+x.dataset.i===qsSel))}});
+}
+qsInput.addEventListener("input",e=>{qsSel=0;drawQS(e.target.value)});
+qsInput.addEventListener("keydown",e=>{
+  const hits=flat.filter(n=>!n.children&&n.vault===st.vault.id&&n.name.toLowerCase().includes(qsInput.value.toLowerCase()));
+  if(e.key==="ArrowDown"){qsSel=Math.min(qsSel+1,hits.length-1);drawQS(qsInput.value)}
+  else if(e.key==="ArrowUp"){qsSel=Math.max(qsSel-1,0);drawQS(qsInput.value)}
+  else if(e.key==="Enter"&&hits[qsSel]){openPage(hits[qsSel].name);qs.classList.remove("show")}
+  else if(e.key==="Escape")qs.classList.remove("show");
+});
+qs.addEventListener("click",e=>{if(e.target===qs)qs.classList.remove("show")});
+document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="o"){e.preventDefault();openQS()}if(e.key==="Escape")$("#vsPanel").classList.remove("show")});
+renderTree();renderHome();renderUrl();
+</script>
+</body>
+</html>
