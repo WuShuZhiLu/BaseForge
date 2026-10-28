@@ -202,16 +202,9 @@ function buildRows(
   if (focusRootId) {
     const focusRoot = nodes.find((n) => n.id === focusRootId && !n.isDeleted);
     if (focusRoot) {
-      const isExpanded = expanded.has(focusRoot.id) || true;
-      const kids = children.get(focusRoot.id) ?? [];
-      rows.push({
-        node: focusRoot,
-        depth: 0,
-        hasChildren: kids.length > 0,
-        expanded: isExpanded,
-        ancestorIds: [],
-      });
-      walk(focusRoot.id, 1, [focusRoot.id]);
+      // 进入态不重复渲染库根行（顶部横幅已显示库名 + 返回），直接铺开子节点，
+      // depth 从 0 起——否则会出现「← 某库」与「⌄ 某库」两行同一个库。
+      walk(focusRoot.id, 0, [focusRoot.id]);
     }
   } else {
     walk(null, 0, []);
@@ -883,6 +876,13 @@ export default function SidebarDesktop() {
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const map = new Map<string, string>();
     const kbNodeByResourceId = new Map<string, string>();
+    // 根节点自身先登记：空库（无任何文档）也要能回灌聚焦态，否则进入空库时
+    // 反查落空 → focusRootId 被清成 null → 界面自动弹回列表（无法在库内新建）。
+    for (const node of nodes) {
+      if (!node.isDeleted && node.resourceType === "notebook" && node.parentId === null) {
+        kbNodeByResourceId.set(node.resourceId, node.id);
+      }
+    }
     for (const node of nodes) {
       if (node.isDeleted || node.nodeType === "folder") continue;
       let cursor: KnowledgeTreeNode | undefined = node;
@@ -1507,6 +1507,9 @@ export default function SidebarDesktop() {
   const sectionMap: Record<SectionId, React.ReactNode> = {
     kb: (
       <section key="kb" className="shrink-0" data-next-section="kb">
+        {/* 进入态隐藏「知识库」区块头（含折叠/计数）——进入后本区段就是该库的
+            目录树，再显示「知识库 ⌄」既重复又误导；新建入口移到顶部横幅。 */}
+        {!focusRootId && (
         <div className="flex w-full items-center gap-1 px-2 py-1">
           <button
             type="button"
@@ -1556,6 +1559,7 @@ export default function SidebarDesktop() {
           )}
           <span className="ml-1 rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCount}</span>
         </div>
+        )}
 
         {!collapsedSections.has("kb") && (
           <div className="pb-2 pl-2.5 pr-1">
@@ -1571,39 +1575,94 @@ export default function SidebarDesktop() {
                 </button>
                 <FaBook size={13} className="shrink-0 text-accent-primary" />
                 <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{focusRoot.title}</span>
+                {/* 进入态的新建入口：区块头已隐藏，新建文档必须在这里可点 */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setCreateMenuState({ parentId: focusRoot.id, anchor: new DOMRect(rect.left, rect.top, rect.width, rect.height) });
+                  }}
+                  title={t("sidebarNext.newFolder", { defaultValue: "新建" })}
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
+                >
+                  <Plus size={12} />
+                </button>
                 <span className="shrink-0 rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCountMap.get(focusRoot.id) ?? 0}</span>
               </div>
             )}
             {!focusRootId && !searching ? (
-              /* 知识库列表态：默认只显示库列表（不再铺开混合树），单击库行进入该库。
-                 进入后本区段切换为该库目录树（下方原渲染分支），← 返回见横幅。 */
+              /* 知识库列表态：单击 = 选中（高亮，右键/⋯ 可重命名/删除/新建），
+                 双击或行尾箭头 = 进入该库。进入后本区段切换为该库目录树。 */
               <div className="px-0.5 pb-2">
                 {kbRoots.length === 0 ? (
                   <p className="px-2 py-2 text-[11px] text-tx-tertiary">
                     {t("sidebarNext.empty", { defaultValue: "暂无内容" })}
                   </p>
-                ) : kbRoots.map((kb) => (
-                  <div
-                    key={kb.id}
-                    className="group flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-1 text-xs text-tx-primary hover:bg-app-hover"
-                    onClick={() => { enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
-                    title="点击进入知识库"
-                  >
-                    <FaBook size={14} className="shrink-0 text-accent-primary" />
-                    <span className="min-w-0 flex-1 truncate">{kb.title}</span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary group-hover:hidden">{docCountMap.get(kb.id) ?? 0}</span>
-                    <ChevronRight size={12} className="hidden shrink-0 text-tx-tertiary group-hover:block" />
-                  </div>
-                ))}
+                ) : kbRoots.map((kb) => {
+                  const selected = selectedNodeIds.has(kb.id);
+                  return (
+                    <div
+                      key={kb.id}
+                      className={cn(
+                        "group flex h-8 cursor-pointer items-center gap-1.5 rounded-md px-1 text-xs",
+                        selected ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
+                      )}
+                      onClick={(event) => {
+                        if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                          setSelectedNodeIds((current) => {
+                            const next = new Set(current);
+                            if (next.has(kb.id)) next.delete(kb.id); else next.add(kb.id);
+                            return next;
+                          });
+                          return;
+                        }
+                        setSelectedNodeIds(new Set([kb.id]));
+                      }}
+                      onDoubleClick={() => { enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        setSelectedNodeIds(new Set([kb.id]));
+                        setRowMenu({ kind: "kb-folder", nodeId: kb.id, x: event.clientX, y: event.clientY });
+                      }}
+                      title="单击选中 · 双击进入 · 右键菜单"
+                    >
+                      <FaBook size={14} className="shrink-0 text-accent-primary" />
+                      <span className="min-w-0 flex-1 truncate">{kb.title}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary group-hover:hidden">{docCountMap.get(kb.id) ?? 0}</span>
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); enterKb(kb.id); setExpanded((cur) => new Set(cur).add(kb.id)); }}
+                        title="进入知识库"
+                        className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
+                      >
+                        <ChevronRight size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : loading ? (
               <p className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</p>
             ) : rows.length === 0 ? (
-              <p className="px-2 py-2 text-[11px] text-tx-tertiary">
-                {searching
-                  ? t("sidebarNext.noMatch", { defaultValue: "无匹配的文件夹或笔记" })
-                  : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
-              </p>
+              <div className="px-2 py-2 text-[11px] text-tx-tertiary">
+                <p>
+                  {searching
+                    ? t("sidebarNext.noMatch", { defaultValue: "无匹配的文件夹或笔记" })
+                    : focusRoot
+                      ? t("sidebarNext.emptyKb", { defaultValue: "这个知识库还没有内容" })
+                      : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
+                </p>
+                {!searching && focusRoot && (
+                  <button
+                    type="button"
+                    onClick={() => void startCreateNote(focusRoot.id)}
+                    className="mt-1.5 flex items-center gap-1 rounded-md border border-dashed border-app-border px-2 py-1 text-[11px] text-tx-secondary hover:border-accent-primary hover:text-accent-primary"
+                  >
+                    <Plus size={12} />
+                    新建文档
+                  </button>
+                )}
+              </div>
             ) : (
               <div
                 ref={treeRootRef}
