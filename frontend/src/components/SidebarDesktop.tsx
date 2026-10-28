@@ -23,7 +23,6 @@ import {
   Home,
   Link2,
   ListTodo,
-  Pin,
   Play,
   BookOpen,
   PenTool,
@@ -1488,17 +1487,6 @@ export default function SidebarDesktop() {
     }
   }, [reloadTags]);
 
-  const togglePin = useCallback(async (node: KnowledgeTreeNode) => {
-    // 真实置顶排序归数据层；本批次只做标记切换（brief 4.6）
-    try {
-      const nextPin = node.isPinned ? 0 : 1;
-      await api.updateNote(node.resourceId, { isPinned: nextPin } as never);
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-    } catch (error) {
-      console.error("[SidebarDesktop] toggle pin failed:", error);
-    }
-  }, []);
-
   /** 标签文档"定位"：退专注 → 展开祖先 → 滚动 + 高亮闪烁 1.6s */
   const locateDoc = useCallback(async (title: string) => {
     const hit = nodes.find((n) => !n.isDeleted && n.nodeType !== "folder" && n.title === title);
@@ -1701,7 +1689,6 @@ export default function SidebarDesktop() {
                   const isFolder = node.nodeType === "folder";
                   const isKbRoot = node.parentId === null && node.resourceType === "notebook";
                   const isSelected = selectedNodeIds.has(node.id);
-                  const isPinned = Boolean(node.isPinned);
                   const isDropInto = dropTarget?.nodeId === node.id && dropTarget.position === "into";
                   const isDropBefore = dropTarget?.nodeId === node.id && dropTarget.position === "before";
                   const isDropAfter = dropTarget?.nodeId === node.id && dropTarget.position === "after";
@@ -1773,7 +1760,6 @@ export default function SidebarDesktop() {
                         >
                           {fileIconFor(node, !focusRootId && depth === 0)}
                           <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                          {isPinned && <Pin size={11} className="shrink-0 text-tx-tertiary" />}
                           {isFolder && (
                             <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">
                               {docCountMap.get(node.id) ?? 0}
@@ -1795,19 +1781,6 @@ export default function SidebarDesktop() {
                               )}
                             >
                               <Focus size={11} />
-                            </button>
-                          )}
-                          {!isFolder && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); void togglePin(node); }}
-                              title={isPinned ? "取消置顶" : "置顶"}
-                              className={cn(
-                                "hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex",
-                                isPinned && "flex",
-                              )}
-                            >
-                              <Pin size={11} className={cn(isPinned && "text-accent-primary")} />
                             </button>
                           )}
                           <button
@@ -2966,10 +2939,8 @@ export default function SidebarDesktop() {
           {rowMenu.kind === "kb-note" && (() => {
             const node = nodes.find((n) => n.id === rowMenu.nodeId);
             if (!node) return null;
-            const pinned = Boolean(node.isPinned);
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void togglePin(node); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">{pinned ? "取消置顶" : "置顶"}</button>
                 <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
                 <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
               </>

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   KNOWLEDGE_TREE_SORT_CHANGED_EVENT,
   applyKnowledgeTreeSort,
-  compareKnowledgeTreePinnedPriority,
+  compareKnowledgeTreeFolderPriority,
   loadKnowledgeTreeSortMode,
   planKnowledgeTreeSiblingReorder,
   resolveKnowledgeTreeDropPlacement,
@@ -128,13 +128,13 @@ describe("knowledgeTreeSort", () => {
       .toEqual(["Newer", "Older"]);
   });
 
-  it("keeps folders first and pinned documents ahead of regular documents", () => {
+  it("keeps folders first", () => {
     const folder = node("folder", "Folder", 2);
-    const pinned = node("pinned", "Pinned", 3, { nodeType: "note", resourceType: "note", isPinned: 1 });
-    const regular = node("regular", "Regular", 0, { nodeType: "note", resourceType: "note" });
+    const first = node("first", "First", 3, { nodeType: "note", resourceType: "note" });
+    const second = node("second", "Second", 0, { nodeType: "note", resourceType: "note" });
 
-    expect([regular, pinned, folder].sort(compareKnowledgeTreePinnedPriority).map((item) => item.id))
-      .toEqual(["folder", "pinned", "regular"]);
+    expect([first, second, folder].sort(compareKnowledgeTreeFolderPriority).map((item) => item.id))
+      .toEqual(["folder", "first", "second"]);
   });
 
   it("persists the selected mode and broadcasts both UI and tree refresh events", () => {

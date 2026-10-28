@@ -62,11 +62,11 @@ describe("desktop knowledge tree browsing mode", () => {
 
   it("keeps desktop quick-browse hover rows limited to create and more actions", () => {
     expect(quickPanelSource).toContain('const desktopHoverHidden = variant === "desktop" ? "[@media(hover:hover)]:group-hover:hidden" : "";');
-    expect(quickPanelSource.match(/desktopHoverHidden/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(quickPanelSource.match(/desktopHoverHidden/g)?.length).toBeGreaterThanOrEqual(5);
   });
 
-  it("applies pinned priority while building recursive tree sibling groups", () => {
-    expect(treePanelSource).toContain("compareKnowledgeTreePinnedPriority(a, b)");
+  it("keeps folders first while building recursive tree sibling groups", () => {
+    expect(treePanelSource).toContain("compareKnowledgeTreeFolderPriority(a, b)");
   });
 
   it("shows the current workspace notebook count in both desktop tree modes", () => {

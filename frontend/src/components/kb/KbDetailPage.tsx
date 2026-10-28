@@ -77,7 +77,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
       map.set(node.parentId, arr);
     }
     for (const arr of map.values()) {
-      arr.sort((a, b) => (b.isPinned ?? 0) - (a.isPinned ?? 0) || a.sortOrder - b.sortOrder);
+      arr.sort((a, b) => a.sortOrder - b.sortOrder);
     }
     return map;
   }, [nodes]);

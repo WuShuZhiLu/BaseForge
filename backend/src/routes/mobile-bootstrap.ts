@@ -144,7 +144,7 @@ function listNotes(userId: string, workspaceId: string | null, unlockHeader?: st
     FROM notes
     LEFT JOIN users ON users.id = notes.userId
     WHERE ${scopeSql} AND notes.isTrashed = 0 AND notes.isUnlisted = 0
-    ORDER BY notes.isPinned DESC, notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC
+    ORDER BY notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC
   `).all(userId, scopeParam) as Array<{ id: string; [key: string]: unknown }>;
 
   // The normal /api/notes collection is guarded by knowledgeCapabilityGuard,

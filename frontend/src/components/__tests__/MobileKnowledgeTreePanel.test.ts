@@ -40,12 +40,11 @@ describe("MobileKnowledgeTreePanel product contract", () => {
     expect(mobileSource).toContain("onMove={setMovingNode}");
   });
 
-  it("keeps pinned documents first, then opened documents before updatedAt-only fallback documents", () => {
+  it("keeps opened documents before updatedAt-only fallback documents", () => {
     expect(mobileSource).toContain("upsertMobileKnowledgeTreeRecentEntry");
-    expect(helperSource).toContain("const pinnedDocuments = documents");
     expect(helperSource).toContain("const openedDocuments = documents");
     expect(helperSource).toContain("const fallbackDocuments = documents");
-    expect(helperSource).toContain("return [...pinnedDocuments, ...openedDocuments, ...fallbackDocuments]");
+    expect(helperSource).toContain("return [...openedDocuments, ...fallbackDocuments]");
     expect(helperSource).toContain('return "updated-desc"');
   });
 

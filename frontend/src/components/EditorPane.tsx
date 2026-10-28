@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
+import { Star, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import { RiMenuFold2Line } from "react-icons/ri";
@@ -199,7 +199,7 @@ function EditorPaneCore({
    * 当前视图级有效锁定状态：DB 的 isLocked **加** 用户偏好带来的"会话锁"。
    *
    * 它影响所有"只读即禁用"判断：编辑器 editable、删除按钮、AI 写作、移动到回收站。
-   * Y.Doc 协作笔记优先，但 togglePin / 收藏等元素仍然走 isLocked
+   * Y.Doc 协作笔记优先，但收藏等元素仍然走 isLocked
    * 判断。会话锁也应阻止用户在"被保护笔记"上偷偷 pin / 收藏。
    */
   const isViewLocked = !!activeNote && viewLockedIds.has(activeNote.id);
@@ -2000,14 +2000,6 @@ function EditorPaneCore({
     actions.updateNoteInList({ id: updated.id, isFavorite: updated.isFavorite });
   }, [activeNote, actions]);
 
-  const togglePin = useCallback(async () => {
-    if (!activeNote || activeNote.isTrashed) return;
-    haptic.light();
-    const updated = await api.updateNote(activeNote.id, { isPinned: activeNote.isPinned ? 0 : 1 } as any);
-    actions.setActiveNote(updated);
-    actions.updateNoteInList({ id: updated.id, isPinned: updated.isPinned });
-  }, [activeNote, actions]);
-
   // 笔记色标：写入后同步列表/Tab/知识树三处视图。
   const setNoteColorMark = useCallback(async (colorMark: NoteColorMark | null) => {
     if (!activeNote || activeNote.isTrashed || !canWriteNote(activeNote)) return;
@@ -2895,7 +2887,6 @@ const moveToTrash = useCallback(async () => {
               : isViewLocked
                 ? <Lock size={13} className="text-tx-tertiary shrink-0" />
                 : null}
-            {activeNote.isPinned ? <Pin size={13} className="text-accent-primary fill-accent-primary shrink-0" /> : null}
             <span className="truncate text-sm font-semibold text-tx-primary">
               {activeNote.title || t('editor.untitled')}
             </span>
@@ -2992,15 +2983,6 @@ const moveToTrash = useCallback(async () => {
                   >
                     {effectiveLocked ? <Lock size={15} className="text-orange-500" /> : <Unlock size={15} className="text-tx-tertiary" />}
                     <span>{effectiveLocked ? t('editor.unlockTooltip') : t('editor.lockTooltip')}</span>
-                  </button>
-                  <div className="h-px bg-app-border mx-2 my-0.5" />
-                  <button
-                    onClick={() => { togglePin(); setShowMobileMenu(false); }}
-                    disabled={!!activeNote.isLocked || isTrashed}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors disabled:opacity-40"
-                  >
-                    <Pin size={15} className={cn(activeNote.isPinned ? "text-accent-primary fill-accent-primary" : "text-tx-tertiary")} />
-                    <span>{activeNote.isPinned ? t('editor.unpinTooltip') : t('editor.pinTooltip')}</span>
                   </button>
                   <div className="h-px bg-app-border mx-2 my-0.5" />
                   {/* �ƶ��ʼǱ� */}
@@ -3529,13 +3511,6 @@ const moveToTrash = useCallback(async () => {
               {effectiveLocked
                 ? <Lock size={14} className={activeNote.isLocked ? "text-orange-500" : "text-tx-tertiary"} />
                 : <Unlock size={14} />}
-            </Button>
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7 rounded-md"
-              onClick={togglePin}
-              title={activeNote.isPinned ? t('editor.unpinTooltip') : t('editor.pinTooltip')}
-            >
-              <Pin size={14} className={cn(activeNote.isPinned && "text-accent-primary fill-accent-primary")} />
             </Button>
             <Button
               variant="ghost" size="icon" className="h-7 w-7 rounded-md"

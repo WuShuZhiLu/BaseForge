@@ -4,7 +4,6 @@ export interface SortableNoteLike {
   id: string;
   notebookId: string;
   isLocked?: number;
-  isPinned?: number;
   sortOrder?: number;
 }
 
@@ -33,8 +32,6 @@ export function reorderNotesWithinNotebook<T extends SortableNoteLike>(
   if (!source || !target) return null;
   if (source.isLocked === 1 || target.isLocked === 1) return null;
   if (source.notebookId !== target.notebookId) return null;
-  const sourcePinned = source.isPinned === 1 ? 1 : 0;
-  if ((target.isPinned === 1 ? 1 : 0) !== sourcePinned) return null;
 
   const next = notes.filter((note) => note.id !== sourceId);
   const targetIdx = next.findIndex((note) => note.id === targetId);
@@ -44,10 +41,7 @@ export function reorderNotesWithinNotebook<T extends SortableNoteLike>(
   next.splice(insertIdx, 0, source);
 
   const items = next
-    .filter((note) => (
-      note.notebookId === source.notebookId
-      && (note.isPinned === 1 ? 1 : 0) === sourcePinned
-    ))
+    .filter((note) => note.notebookId === source.notebookId)
     .map((note, index) => ({ id: note.id, sortOrder: index }));
   const sortOrderById = new Map(items.map((item) => [item.id, item.sortOrder]));
 

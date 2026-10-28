@@ -128,9 +128,8 @@ app.get("/", (c) => {
   const dateFrom = c.req.query("dateFrom"); // YYYY-MM-DD
   const dateTo = c.req.query("dateTo");     // YYYY-MM-DD
   // 排序：sortBy ∈ {manual, updatedAt, createdAt, title}；sortOrder ∈ {asc, desc}
-  // - manual（默认）：保持历史行为 isPinned DESC, sortOrder ASC, updatedAt DESC，
-  //   保留拖拽排序结果；
-  // - 其他字段：忽略 sortOrder 字段（不影响置顶），按选定字段方向排序，置顶仍优先；
+  // - manual（默认）：sortOrder ASC, updatedAt DESC，保留拖拽排序结果；
+  // - 其他字段：忽略 sortOrder 字段，按选定字段方向排序；
   //   title 排序对中文用 NOCASE 仅做大小写不敏感，中文按 UTF-8 字节序——可接受。
   const sortByRaw = c.req.query("sortBy");
   const sortOrderRaw = c.req.query("sortOrder");
@@ -264,17 +263,16 @@ app.get("/", (c) => {
   }
 
   // 拼接 ORDER BY：
-  //   - 置顶笔记永远在最前（不参与按字段排序），符合"置顶=固定置顶"语义；
   //   - manual 模式回退到历史行为；
   //   - title 用 COLLATE NOCASE 让 ABC/abc 不分大小写；中文为 UTF-8 字节序，足够稳定；
   //   - 兜底再加 id 让相等键的顺序不抖动。
   if (sortBy === "manual") {
-    query += " ORDER BY notes.isPinned DESC, notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC";
+    query += " ORDER BY notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC";
   } else if (sortBy === "title") {
-    query += ` ORDER BY notes.isPinned DESC, notes.title COLLATE NOCASE ${sortDir}, notes.id ASC`;
+    query += ` ORDER BY notes.title COLLATE NOCASE ${sortDir}, notes.id ASC`;
   } else {
     // updatedAt | createdAt
-    query += ` ORDER BY notes.isPinned DESC, notes.${sortBy} ${sortDir}, notes.id ASC`;
+    query += ` ORDER BY notes.${sortBy} ${sortDir}, notes.id ASC`;
   }
   const notes = db.prepare(query).all(...params) as Array<Record<string, unknown>>;
   if (useKnowledgeTreeScope && !includeDescendants) {

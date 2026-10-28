@@ -40,7 +40,7 @@ React 18 · TypeScript · Vite 5 · Tiptap 3 · Tailwind · Hono 4 · SQLite(FTS
 | | Emoji 图标 | ✅ |
 | | 折叠/展开 | ✅ |
 | **笔记管理** | 笔记列表/排序/筛选 | ✅ |
-| | 收藏/置顶/锁定 | ✅ |
+| | 收藏/锁定 | ✅ |
 | | 回收站 + 恢复 | ✅ |
 | | 版本历史 | ✅ |
 | | 导出（Markdown/PDF/图片/Word） | ✅ |

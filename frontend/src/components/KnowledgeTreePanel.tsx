@@ -12,7 +12,6 @@ import {
   Loader2,
   LockKeyhole,
   MoreHorizontal,
-  Pin,
   Plus,
   RefreshCw,
   Search,
@@ -94,7 +93,7 @@ import {
 } from "@/lib/knowledgeTreeStats";
 import { toast } from "@/lib/toast";
 import {
-  compareKnowledgeTreePinnedPriority,
+  compareKnowledgeTreeFolderPriority,
   KNOWLEDGE_TREE_SORT_OPTIONS,
   loadKnowledgeTreeSortMode,
   planKnowledgeTreeSiblingReorder,
@@ -138,7 +137,7 @@ function buildChildren(nodes: KnowledgeTreeNode[]) {
   }
   for (const siblings of result.values()) {
     siblings.sort((a, b) => (
-      compareKnowledgeTreePinnedPriority(a, b)
+      compareKnowledgeTreeFolderPriority(a, b)
       || a.sortOrder - b.sortOrder
       || a.title.localeCompare(b.title)
       || a.id.localeCompare(b.id)
@@ -742,7 +741,7 @@ export function KnowledgeTreePanel({
 
   const patchNoteStatus = useCallback((
     nodeId: string,
-    patch: Partial<Pick<KnowledgeTreeNode, "isPinned" | "isFavorite" | "isLocked">>,
+    patch: Partial<Pick<KnowledgeTreeNode, "isFavorite" | "isLocked">>,
   ) => {
     setNodes((current) => current.map((node) => (
       node.id === nodeId ? { ...node, ...patch } : node
@@ -1042,7 +1041,7 @@ export function KnowledgeTreePanel({
       && (source.parentId ?? null) === (target.parentId ?? null)
       && Boolean(source.sharedRootId) === Boolean(target.sharedRootId)
       && (!source.sharedRootId || source.sharedRootId === target.sharedRootId)
-      && compareKnowledgeTreePinnedPriority(source, target) === 0,
+      && compareKnowledgeTreeFolderPriority(source, target) === 0,
     );
   };
 
@@ -1084,7 +1083,7 @@ export function KnowledgeTreePanel({
       return;
     }
     if (!canReorderWithTarget(sourceId, target)) {
-      toast.error("文件夹、置顶笔记和普通笔记请在各自分组内排序");
+      toast.error("文件夹和文档请在各自分组内排序");
       return;
     }
     const plan = planKnowledgeTreeSiblingReorder(nodes, sourceId, target.id, placement);
@@ -1346,15 +1345,6 @@ export function KnowledgeTreePanel({
                 data-knowledge-tree-first-level-note-count=""
               >
                 {firstLevelNoteCount}
-              </span>
-            )}
-            {node.resourceType === "note" && node.isPinned === 1 && (
-              <span
-                className="flex shrink-0 items-center text-accent-primary"
-                title="已置顶"
-                aria-label="已置顶"
-              >
-                <Pin size={11} className="fill-current" aria-hidden="true" />
               </span>
             )}
             {node.resourceType === "note" && node.isFavorite === 1 && (

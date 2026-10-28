@@ -19,8 +19,6 @@ import {
   LockKeyhole,
   MoreHorizontal,
   Pencil,
-  Pin,
-  PinOff,
   Plus,
   Printer,
   Search,
@@ -77,7 +75,7 @@ import { useApp, useAppActions } from "@/store/AppContext";
 import type { Notebook } from "@/types";
 
 type LoadedNote = Awaited<ReturnType<typeof api.getNote>>;
-type NoteStatusPatch = Partial<Pick<LoadedNote, "isPinned" | "isFavorite" | "isLocked">>;
+type NoteStatusPatch = Partial<Pick<LoadedNote, "isFavorite" | "isLocked">>;
 
 export interface KnowledgeTreeNodeMenuProps {
   menu: ContextMenuState;
@@ -150,12 +148,6 @@ export function buildKnowledgeTreeNodeMenuItems(
 
     if (isOwned && capabilities.canEdit) {
       flags.push(
-        {
-          id: "toggle_pin",
-          label: note?.isPinned === 1 ? "取消置顶" : "置顶",
-          icon: note?.isPinned === 1 ? <PinOff size={14} /> : <Pin size={14} />,
-          disabled: !note,
-        },
         {
           id: "toggle_favorite",
           label: note?.isFavorite === 1 ? "取消收藏" : "收藏",
@@ -684,7 +676,6 @@ export default function KnowledgeTreeNodeMenu({
         case "import_markdown_zip": await importMarkdownZip(); break;
         case "import_word": await importWord(); break;
         case "import_url": await importUrl(); break;
-        case "toggle_pin": await patchNote({ isPinned: note?.isPinned === 1 ? 0 : 1 }); break;
         case "toggle_favorite": await patchNote({ isFavorite: note?.isFavorite === 1 ? 0 : 1 }); break;
         case "toggle_lock": await patchNote({ isLocked: note?.isLocked === 1 ? 0 : 1 }); break;
         case "convert_format": await convertFormat(); break;

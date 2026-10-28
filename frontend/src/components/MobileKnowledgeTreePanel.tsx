@@ -15,7 +15,6 @@ import {
   Loader2,
   LockKeyhole,
   MoreHorizontal,
-  Pin,
   Plus,
   RefreshCw,
   Search,
@@ -604,7 +603,7 @@ export default function MobileKnowledgeTreePanel({
 
   const patchNoteStatus = useCallback((
     nodeId: string,
-    patch: Partial<Pick<KnowledgeTreeNode, "isPinned" | "isFavorite" | "isLocked">>,
+    patch: Partial<Pick<KnowledgeTreeNode, "isFavorite" | "isLocked">>,
   ) => {
     setNodes((current) => current.map((node) => node.id === nodeId ? { ...node, ...patch } : node));
   }, []);
@@ -1058,9 +1057,6 @@ rememberOpened(created.id);
                 >
                   {firstLevelNoteCount}
                 </span>
-              )}
-              {node.resourceType === "note" && node.isPinned === 1 && (
-                <Pin size={11} className={cn("shrink-0 fill-current text-accent-primary", desktopHoverHidden)} />
               )}
               {node.resourceType === "note" && node.isFavorite === 1 && (
                 <Star size={11} className={cn("shrink-0 fill-current text-amber-400", desktopHoverHidden)} />
