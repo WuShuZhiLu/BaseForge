@@ -29,6 +29,7 @@ import {
   reorderKnowledgeNodes,
   restoreKnowledgeNode,
 } from "../services/knowledgeTree.js";
+import { knowledgeNodeStats } from "../services/knowledgeTreeStats.js";
 
 const app = new Hono();
 
@@ -103,6 +104,24 @@ app.get("/", (c) => {
         includeDeleted: c.req.query("includeDeleted") === "1",
       }),
     });
+  } catch (error) {
+    return mapError(c, error);
+  }
+});
+
+/**
+ * 库 Overview 统计（/knowledge-tree/:nodeId/stats）。
+ * 服务端聚合替代前端全量拉 notes：口径见 services/knowledgeTreeStats.ts 头注释。
+ * 权限沿用知识树读权限；节点不存在与无权限一律 404，避免泄露存在性。
+ */
+app.get("/:nodeId/stats", (c) => {
+  try {
+    const nodeId = c.req.param("nodeId");
+    const access = resolveKnowledgeNodeAccess(nodeId, userIdOf(c));
+    if (!access.capabilities.canView) {
+      return c.json({ error: "知识库不存在", code: "KNOWLEDGE_NODE_NOT_FOUND" }, 404);
+    }
+    return c.json(knowledgeNodeStats(nodeId));
   } catch (error) {
     return mapError(c, error);
   }

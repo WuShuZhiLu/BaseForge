@@ -12,12 +12,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FaBook, FaFolder } from "react-icons/fa";
 import { FileCode, FileText, Plus, Table2 } from "lucide-react";
 
-import { api, getCurrentWorkspace } from "@/lib/api";
+import { getCurrentWorkspace } from "@/lib/api";
 import {
   knowledgeTreeApi,
+  type KnowledgeNodeStats,
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
-import type { NoteListItem } from "@/types";
+import { api } from "@/lib/api";
 import { pushAppPathState } from "@/lib/appPathNavigation";
 import { kbNoteAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
@@ -36,7 +37,8 @@ const isFolderNode = (node: KnowledgeTreeNode) => node.nodeType === "folder";
 export default function KbDetailPage({ kbId }: { kbId: string }) {
   const [nodes, setNodes] = useState<KnowledgeTreeNode[] | null>(null);
   const [notebooks, setNotebooks] = useState<Map<string, string> | null>(null);
-  const [notes, setNotes] = useState<Map<string, NoteListItem> | null>(null);
+  // 统计走服务端聚合（文档数/字数/最近更新/贡献者）：不再全量拉 notes 本地累加。
+  const [stats, setStats] = useState<KnowledgeNodeStats | null>(null);
   const [tocOpen, setTocOpen] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
 
@@ -45,9 +47,6 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     knowledgeTreeApi.list()
       .then((res) => { if (!cancelled) setNodes(res.nodes); })
       .catch(() => { if (!cancelled) setNodes([]); });
-    api.getNotes()
-      .then((items) => { if (!cancelled) setNotes(new Map(items.map((n) => [n.id, n]))); })
-      .catch(() => { if (!cancelled) setNotes(new Map()); });
     api.getNotebooks()
       .then((items) => { if (!cancelled) setNotebooks(new Map(items.map((nb) => [nb.id, nb.description ?? ""]))); })
       .catch(() => { if (!cancelled) setNotebooks(new Map()); });
@@ -82,16 +81,14 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     return map;
   }, [nodes]);
 
-  // 目录时间戳 = 子树内该节点及子孙的最大 updatedAt
+  // 目录时间戳 = 子树内该节点及子孙的最大 updatedAt（节点自身的 updatedAt 由触发器随笔记更新）
   const subtreeUpdatedAt = useMemo(() => {
     const map = new Map<string, string>();
     if (!kbNode) return map;
     const walk = (id: string): string => {
       let latest = "";
       for (const child of childrenMap.get(id) ?? []) {
-        const childLatest = isFolderNode(child)
-          ? walk(child.id)
-          : notes?.get(child.resourceId)?.updatedAt ?? child.updatedAt;
+        const childLatest = isFolderNode(child) ? walk(child.id) : child.updatedAt;
         if (childLatest > latest) latest = childLatest;
         map.set(child.id, childLatest);
       }
@@ -99,30 +96,33 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     };
     walk(kbNode.id);
     return map;
-  }, [kbNode, childrenMap, notes]);
+  }, [kbNode, childrenMap]);
 
-  // 统计口径：只算子树内非 folder 节点；本页不计入
-  const stats = useMemo(() => {
+  // 统计：优先服务端聚合（含字数/贡献者）；接口不可用时回落到树数据本地计数
+  const localStats = useMemo(() => {
     if (!kbNode) return null;
     let docCount = 0;
-    let charCount = 0;
     let updatedAt = kbNode.updatedAt;
     const walk = (id: string) => {
       for (const child of childrenMap.get(id) ?? []) {
-        if (isFolderNode(child)) {
-          walk(child.id);
-          continue;
-        }
+        if (child.updatedAt > updatedAt) updatedAt = child.updatedAt;
+        if (isFolderNode(child)) { walk(child.id); continue; }
         docCount += 1;
-        const note = notes?.get(child.resourceId);
-        charCount += note ? note.contentText?.length ?? 0 : 0;
-        const ts = note?.updatedAt ?? child.updatedAt;
-        if (ts > updatedAt) updatedAt = ts;
       }
     };
     walk(kbNode.id);
-    return { docCount, charCount, updatedAt };
-  }, [kbNode, childrenMap, notes]);
+    return { docCount, updatedAt };
+  }, [kbNode, childrenMap]);
+
+  const kbNodeId = kbNode?.id ?? null;
+  useEffect(() => {
+    if (!kbNodeId) { setStats(null); return; }
+    let cancelled = false;
+    knowledgeTreeApi.stats(kbNodeId)
+      .then((res) => { if (!cancelled) setStats(res); })
+      .catch(() => { if (!cancelled) setStats(null); });
+    return () => { cancelled = true; };
+  }, [kbNodeId]);
 
   const openDoc = useCallback((node: KnowledgeTreeNode) => {
     const ws = getCurrentWorkspace();
@@ -229,7 +229,13 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   }
 
   const description = notebooks?.get(kbId) ?? "";
-  const isEmpty = stats?.docCount === 0;
+  // 统计展示：服务端优先，本地树数据兜底（接口不可用时字数显示为 —）
+  const docCount = stats?.docCount ?? localStats?.docCount ?? 0;
+  const charCount = stats?.charCount ?? null;
+  const updatedAt = stats?.updatedAt || localStats?.updatedAt || "";
+  const contributors = stats?.contributors ?? [];
+  const isEmpty = docCount === 0;
+  const avatarColors = ["#2563eb", "#0891b2", "#7c3aed"];
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -241,12 +247,33 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[22px] font-semibold text-tx-primary">{kbNode.title}</h1>
-            {stats && (
-              <p className="mt-1.5 text-[12.5px] text-tx-tertiary">
-                <b className="text-tx-secondary">{stats.docCount}</b> 文档
-                · <b className="text-tx-secondary">{stats.charCount}</b> 字
-                · 更新于 {fmtTs(stats.updatedAt) || "—"}
-              </p>
+            <p className="mt-1.5 text-[12.5px] text-tx-tertiary">
+              <b className="text-tx-secondary">{docCount}</b> 文档
+              {charCount !== null && <> · <b className="text-tx-secondary">{charCount}</b> 字</>}
+              · 更新于 {fmtTs(updatedAt) || "—"}
+            </p>
+            {contributors.length > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-[12px] text-tx-tertiary">
+                <div className="flex items-center">
+                  {contributors.map((contributor, index) => (
+                    <span
+                      key={contributor.userId}
+                      title={`${contributor.displayName || contributor.username} · ${contributor.docCount} 篇`}
+                      className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-app-bg text-[10px] font-medium text-white"
+                      style={{
+                        marginLeft: index === 0 ? 0 : -7,
+                        background: avatarColors[index % avatarColors.length],
+                      }}
+                    >
+                      {(contributor.displayName || contributor.username).slice(0, 1).toUpperCase()}
+                    </span>
+                  ))}
+                </div>
+                <span>
+                  @{contributors[0].displayName || contributors[0].username}
+                  {contributors.length > 1 ? ` 等 ${contributors.length} 人` : ""} 参与编写
+                </span>
+              </div>
             )}
           </div>
           <button
