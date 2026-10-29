@@ -359,6 +359,20 @@ export default function AppRouteSync() {
       }
     }
 
+    // (A1) 切回知识库：恢复到上次位置（聚焦的库 / 打开的文档）而不是一律回库根。
+    //     必须排在 (A) 之前：从回收站等模块切回时 activeNote 仍在，(A) 会先写一条
+    //     丢掉库层级与 ?tree=focus 的笔记路径并 return，聚焦态就无法恢复。
+    if (
+      state.viewMode === "notebook"
+      && viewModeChanged
+      && route.kind === "module"
+      && lastNotebookPathRef.current
+      && lastNotebookPathRef.current !== `${pathname}${window.location.search}`
+    ) {
+      write(lastNotebookPathRef.current, "replace");
+      return;
+    }
+
     // (A) 笔记工作区规则（原 NoteDeepLinkBridge 写侧，原样移植）：
     //     显式笔记导航 / URL 为知识库根时 push 笔记路径；URL 已对或外来资源路由未
     //     显式导航时不抢。route.kind === "kb"（库 Overview）不在此列——URL 已表达
@@ -421,18 +435,6 @@ export default function AppRouteSync() {
       // 否则从库 Overview/库内文档点 Rail 图标时 URL 不跟随。
       const stayingInNoteFamily = state.viewMode === "notebook" || state.viewMode === "favorites";
       const kbContextUrl = route.kind === "kb" || (route.kind === "note" && !!route.kbId);
-      // 切回知识库时恢复到上次位置（聚焦的库 / 打开的文档），而不是一律回库根。
-      // 只在「刚从别的模块切进来」时触发，且 URL 还停在模块路径上（避免循环）。
-      if (
-        state.viewMode === "notebook"
-        && viewModeChanged
-        && route.kind === "module"
-        && lastNotebookPathRef.current
-        && lastNotebookPathRef.current !== `${pathname}${window.location.search}`
-      ) {
-        write(lastNotebookPathRef.current, "replace");
-        return;
-      }
       if (!kbContextUrl || !stayingInNoteFamily) {
         const target = moduleAppPath(state.viewMode, currentSpace);
         if (target) {
