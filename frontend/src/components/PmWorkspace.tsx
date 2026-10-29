@@ -35,6 +35,7 @@ import PmOverviewPage from "@/components/pm/PmOverviewPage";
 import PmSettingsPage from "@/components/pm/PmSettingsPage";
 import { setPmActiveProject, setPmModule, usePmUi } from "@/lib/pmUiStore";
 import { DEFAULT_PM_TYPE_CONFIG, type PmGitSource, type PmProject, type PmWorkItem, type PmWorkItemPriority, type PmWorkItemStatus, type PmWorkItemType } from "@/types";
+import { confirm } from "@/components/ui/confirm";
 
 type StatusKey = "todo" | "doing" | "review" | "done";
 
@@ -541,13 +542,24 @@ export default function PmWorkspace() {
   }, [reloadProjects]);
 
   const deleteProject = useCallback(async (project: PmProject) => {
-    if (!window.confirm(`删除项目「${project.name}」及其全部工作项？此操作不可撤销。`)) return;
+    const ok = await confirm({
+      title: `删除项目「${project.name}」？`,
+      description: "及其全部工作项，此操作不可撤销。",
+      confirmText: "删除项目",
+      danger: true,
+    });
+    if (!ok) return;
     await api.deletePmProject(project.id);
     await reloadProjects();
   }, [reloadProjects]);
 
   const deleteItem = useCallback(async (item: PmWorkItem) => {
-    if (!window.confirm(`删除工作项「${item.title}」？`)) return;
+    const ok = await confirm({
+      title: `删除工作项「${item.title}」？`,
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     await api.deletePmWorkItem(item.id);
     setDetailId("");
     refreshCurrent();
