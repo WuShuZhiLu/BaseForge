@@ -12,6 +12,8 @@ type NavigationModuleId = "notifications" | "favorites" | "files" | "diary" | "t
 type TaskCenterOptionalModuleId = "inbox" | "my-day" | "planner" | "habits" | "stats";
 type NoteTheme = "default" | "paper" | "minimal" | "eye-care";
 type CodeBlockTheme =
+  // auto = 跟随昼夜：浅色取 GitHub Light，深色取 GitHub Dark
+  | "auto"
   | "github-dark"
   | "github-light"
   | "dracula"
@@ -83,7 +85,7 @@ export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
   markdownDefaultViewMode: "source",
   remoteImagePasteMode: "localize",
   defaultEditorMode: "tiptap",
-  codeBlockTheme: "github-dark",
+  codeBlockTheme: "auto",
   codeBlockCollapseMode: "long",
   noteTheme: "default",
   noteListTitleOnly: false,
@@ -95,13 +97,14 @@ export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_SYNCED_USER_PREFERENCES) as PreferenceKey[];
-/** 默认值版本：v2 = 「进入笔记默认钉住大纲」由 true 改为 false（存量记录一次性迁移） */
-const PREFERENCE_DEFAULTS_REVISION = 2;
+/** 默认值版本：v2 = 大纲默认不钉住；v3 = 代码块默认跟随昼夜（auto） */
+const PREFERENCE_DEFAULTS_REVISION = 3;
 const PREFERENCE_KEY_SET = new Set<string>(PREFERENCE_KEYS);
 const NAVIGATION_MODULE_ORDER: NavigationModuleId[] = ["notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares"];
 const NAVIGATION_MODULE_IDS = new Set<string>(NAVIGATION_MODULE_ORDER);
 const TASK_CENTER_OPTIONAL_MODULE_IDS = new Set<string>(["inbox", "my-day", "planner", "habits", "stats"]);
 const CODE_BLOCK_THEMES = new Set<CodeBlockTheme>([
+  "auto",
   "github-dark",
   "github-light",
   "dracula",
@@ -249,12 +252,17 @@ export function readPreferenceState(userId: string): PreferenceState {
     const revision = typeof meta.revision === "number" && Number.isInteger(meta.revision) && meta.revision > 0 ? meta.revision : 1;
     const fieldUpdatedAt = parseFieldUpdatedAt(meta.fieldUpdatedAt);
     const prefs = normalizeSyncedUserPreferences(raw);
-    // 默认值迁移（一次性）：旧默认「进入笔记默认钉住大纲」= true 曾随升级全量 seed 进存量
-    // 记录，无法区分「用户改的」与「默认写进去的」，故按默认值版本号重新落一次新默认；
-    // 用户此后手动开启会被保留（版本号已升级，不再重跑）。
+    // 默认值迁移（一次性）：旧默认曾随升级全量 seed 进存量记录，无法区分「用户改的」
+    // 与「默认写进去的」，故按默认值版本号逐版重新落一次新默认；用户此后手动修改会被
+    // 保留（版本号已升级，不再重跑）。
     const defaultsRevision = typeof meta.defaultsRevision === "number" && Number.isInteger(meta.defaultsRevision) ? meta.defaultsRevision : 1;
     if (defaultsRevision < PREFERENCE_DEFAULTS_REVISION) {
-      prefs.outlineDefaultOpen = DEFAULT_SYNCED_USER_PREFERENCES.outlineDefaultOpen;
+      // v2：大纲默认不再钉住
+      if (defaultsRevision < 2) prefs.outlineDefaultOpen = DEFAULT_SYNCED_USER_PREFERENCES.outlineDefaultOpen;
+      // v3：代码块旧默认 github-dark 改为「跟随昼夜」的 auto
+      if (defaultsRevision < 3 && prefs.codeBlockTheme === "github-dark") {
+        prefs.codeBlockTheme = DEFAULT_SYNCED_USER_PREFERENCES.codeBlockTheme;
+      }
       try {
         getDb()
           .prepare("UPDATE user_preferences SET preferencesJson = ? WHERE userId = ?")

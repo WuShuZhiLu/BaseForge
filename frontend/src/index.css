@@ -458,7 +458,9 @@ body {
 }
 
 /* --- 涓婚锛欸itHub Light --- */
-html[data-code-theme="github-light"] {
+/* 默认主题（auto）在浅色模式下取 GitHub Light；深色模式不写覆盖，回落到 :root 的 GitHub Dark。 */
+html[data-code-theme="github-light"],
+html[data-code-theme="auto"]:not(.dark) {
   --code-bg: #f6f8fa;
   --code-fg: #24292f;
   --code-toolbar-bg: #eaeef2;
