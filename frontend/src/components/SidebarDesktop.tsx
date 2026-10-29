@@ -2601,15 +2601,17 @@ export default function SidebarDesktop() {
               >
                 {sectionMap[sectionId]}
               </div>
-              {/* 高度调节把手：展开态才显示 */}
+              {/* 高度调节把手：细抓握条，悬停才显形（避免常驻一条硬边线） */}
               {!collapsed && (
                 <div
                   role="separator"
                   aria-orientation="horizontal"
-                  className="group/hr flex h-2.5 cursor-row-resize items-center justify-center border-t border-app-border transition-colors hover:bg-accent-primary/20"
-                  title="拖拽调整面板高度"
+                  className="group/hr flex h-2 cursor-row-resize items-center justify-center border-t border-app-border/50"
+                  title="拖拽调整面板高度 / 双击恢复"
                   onPointerDown={(e) => startSectionResize(sectionId, e)}
-                />
+                >
+                  <span className="h-[3px] w-9 rounded-full bg-tx-tertiary/0 transition-colors duration-150 group-hover/hr:bg-tx-tertiary/40" />
+                </div>
               )}
             </div>
           );
@@ -2826,11 +2828,11 @@ export default function SidebarDesktop() {
         )}
       </div>
 
-      {/* ===== 调宽把手（批次 C） ===== */}
+      {/* ===== 调宽把手（批次 C）：细抓握条，悬停显形 ===== */}
       <div
         role="separator"
         aria-orientation="vertical"
-        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-accent-primary/40"
+        className="group/vr absolute right-0 top-0 z-10 flex h-full w-1.5 cursor-col-resize items-center justify-center"
         title="拖拽调整侧边栏宽度 / 双击恢复默认"
         onPointerDown={(e) => {
           e.preventDefault();
@@ -2852,7 +2854,9 @@ export default function SidebarDesktop() {
           setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
           try { localStorage.setItem("nowen-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
         }}
-      />
+      >
+        <span className="h-8 w-[3px] rounded-full bg-tx-tertiary/0 transition-colors duration-150 group-hover/vr:bg-tx-tertiary/40" />
+      </div>
 
       {/* ===== 知识库 + 新建菜单（复用旧版 KnowledgeTreeCreateDropdown） ===== */}
       {createMenuState && (
@@ -2910,7 +2914,7 @@ export default function SidebarDesktop() {
             <MenuSeparator />
             <MenuItem
               icon={isAnyFolderExpanded(nodes, expanded) ? ChevronsDownUp : ChevronsUpDown}
-              label={isAnyFolderExpanded(nodes, expanded) ? "折叠全部文件夹" : "展开全部文件夹"}
+              label={isAnyFolderExpanded(nodes, expanded) ? "折叠全部" : "展开全部"}
               onClick={() => { toggleAllFolders(); setKbMoreOpen(null); }}
             />
             <MenuItem
