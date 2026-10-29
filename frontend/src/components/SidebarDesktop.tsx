@@ -11,21 +11,29 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowUpDown,
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Circle,
   ExternalLink,
   FileCode,
+  FilePlus2,
   FileText,
   Focus,
   Folder,
+  FolderPlus,
   Home,
   Link2,
+  Locate,
   ListTodo,
+  Pencil,
   Play,
   BookOpen,
   PenTool,
+  Pin,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -43,6 +51,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { useApp, useAppActions } from "@/store/AppContext";
+import { MenuItem, MenuLabel, MenuSeparator, MenuSurface } from "@/components/ui/menu";
+import { confirm } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -1275,6 +1285,7 @@ export default function SidebarDesktop() {
   }, [selectedNodeIds.size, clearSelection]);
 
 
+
   const activeNoteId = state.activeNote?.id ?? null;
   const openTabs = state.openNoteTabs;
 
@@ -1494,6 +1505,42 @@ export default function SidebarDesktop() {
       console.error("[SidebarDesktop] delete node failed:", error);
     }
   }, [focusRootId]);
+
+  // 选中节点的键盘快捷键：F2 重命名 / Delete 删除（与行菜单右侧提示一致）。
+  // 必须放在 deleteNode 声明之后——依赖数组在渲染期求值，提前引用即 TDZ。
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "F2" && event.key !== "Delete") return;
+      if (selectedNodeIds.size !== 1) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      if ((active as HTMLElement | null)?.isContentEditable) return;
+      // 浮层/对话框打开时不抢键（菜单内的 Delete 属于菜单自身语义）
+      if (document.querySelector("[role=dialog], [role=menu]")) return;
+      const nodeId = [...selectedNodeIds][0];
+      const node = nodes.find((n) => n.id === nodeId && !n.isDeleted);
+      if (!node) return;
+      if (event.key === "F2") {
+        event.preventDefault();
+        setRenaming({ kind: "kb", id: node.id, value: node.title });
+        return;
+      }
+      event.preventDefault();
+      void (async () => {
+        const ok = await confirm({
+          title: `删除「${node.title}」`,
+          description: node.nodeType === "folder"
+            ? "该文件夹（知识库）下的子文件夹与文档会一起删除。"
+            : "删除后可在回收站恢复。",
+          confirmText: "删除",
+          danger: true,
+        });
+        if (ok) await deleteNode(node.id);
+      })();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedNodeIds, nodes, deleteNode]);
 
   const deleteTag = useCallback(async (tagId: string) => {
     try {
@@ -2233,7 +2280,7 @@ export default function SidebarDesktop() {
           className="absolute inset-x-1.5 top-full z-[60] mt-1 flex max-h-[min(460px,calc(100vh-88px))] flex-col overflow-hidden rounded-lg border border-app-border bg-app-elevated text-left shadow-[0_10px_28px_rgba(15,23,42,0.14)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.5)]"
         >
           {/* 筛选条：类型 chips（三列网格，窄侧栏也全部可见、不折行错位） */}
-          <div className="shrink-0 border-b border-app-border px-1.5 pb-1.5 pt-1.5">
+          <div className="shrink-0 border-b border-app-border px-2 pb-2 pt-1.5">
               {focusRoot && (
                 <div className="mb-1.5 flex items-center gap-1">
                   <span className="mr-0.5 text-[10px] text-tx-tertiary">范围</span>
@@ -2259,7 +2306,7 @@ export default function SidebarDesktop() {
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-0.5 rounded-md bg-app-bg p-0.5">
+              <div className="grid grid-cols-3 gap-1 rounded-lg border border-app-border/60 bg-app-panel p-1">
                 {FILTER_SCOPE_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -2267,10 +2314,10 @@ export default function SidebarDesktop() {
                     aria-pressed={scope === opt.value}
                     onClick={() => setScope(opt.value)}
                     className={cn(
-                      "flex h-6 items-center justify-center rounded-[5px] text-[11.5px] leading-none transition-colors",
+                      "flex h-7 items-center justify-center rounded-md text-[11.5px] leading-none transition-colors",
                       scope === opt.value
                         ? "bg-app-elevated font-medium text-accent-primary shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
-                        : "text-tx-tertiary hover:text-tx-secondary",
+                        : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
                     )}
                   >
                     {opt.label}
@@ -2282,9 +2329,12 @@ export default function SidebarDesktop() {
           {/* 结果区（滚动） */}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
             {!query.trim() ? (
-              <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-tx-tertiary">
-                输入关键词搜索标签、收藏、知识库与文档
-              </p>
+              <div className="flex flex-col items-center gap-1.5 px-3 py-7 text-center">
+                <Search size={16} className="text-tx-tertiary/70" />
+                <p className="text-[11.5px] leading-relaxed text-tx-tertiary">
+                  输入关键词搜索标签、收藏、知识库与文档
+                </p>
+              </div>
             ) : (
               <>
                 {(searchSections.tags && matchedTags.length > 0) === false
@@ -2844,42 +2894,31 @@ export default function SidebarDesktop() {
       {kbMoreOpen && (
         <>
           <div className="fixed inset-0 z-[95]" onPointerDown={() => setKbMoreOpen(null)} />
-          <div
-            className="fixed z-[100] min-w-[150px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          <MenuSurface
+            className="fixed z-[100] w-[188px]"
             style={{ left: kbMoreOpen.x, top: kbMoreOpen.y }}
-            role="menu"
           >
-            <div className="px-2 pb-1 pt-1 text-[10px] text-tx-tertiary">排序方式</div>
+            <MenuLabel>排序方式</MenuLabel>
             {KNOWLEDGE_TREE_SORT_OPTIONS.map((option) => (
-              <button
+              <MenuItem
                 key={option.value}
-                type="button"
-                role="menuitem"
+                label={option.label}
+                checked={sortMode === option.value}
                 onClick={() => { applySortMode(option.value); setKbMoreOpen(null); }}
-                className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-              >
-                <span className="flex-1">{option.label}</span>
-                {sortMode === option.value && <Check size={12} className="text-accent-primary" />}
-              </button>
+              />
             ))}
-            <div className="my-1 border-t border-app-border" />
-            <button
-              type="button"
-              role="menuitem"
+            <MenuSeparator />
+            <MenuItem
+              icon={isAnyFolderExpanded(nodes, expanded) ? ChevronsDownUp : ChevronsUpDown}
+              label={isAnyFolderExpanded(nodes, expanded) ? "折叠全部文件夹" : "展开全部文件夹"}
               onClick={() => { toggleAllFolders(); setKbMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              {isAnyFolderExpanded(nodes, expanded) ? "折叠全部文件夹" : "展开全部文件夹"}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
+            />
+            <MenuItem
+              icon={RefreshCw}
+              label="刷新"
               onClick={() => { void reload(); setKbMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              刷新
-            </button>
-          </div>
+            />
+          </MenuSurface>
         </>
       )}
 
@@ -2887,28 +2926,22 @@ export default function SidebarDesktop() {
       {tagsMoreOpen && (
         <>
           <div className="fixed inset-0 z-[95]" onPointerDown={() => setTagsMoreOpen(null)} />
-          <div
-            className="fixed z-[100] min-w-[150px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          <MenuSurface
+            className="fixed z-[100] w-[188px]"
             style={{ left: tagsMoreOpen.x, top: tagsMoreOpen.y }}
-            role="menu"
           >
-            <button
-              type="button"
-              role="menuitem"
+            <MenuLabel>标签</MenuLabel>
+            <MenuItem
+              icon={tags.some((tg) => tagsExpanded.has(tg.id)) ? ChevronsDownUp : ChevronsUpDown}
+              label={tags.some((tg) => tagsExpanded.has(tg.id)) ? "折叠全部标签文档" : "展开全部标签文档"}
               onClick={() => { toggleAllTagDocs(); setTagsMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              {tags.some((tg) => tagsExpanded.has(tg.id)) ? "折叠全部标签文档" : "展开全部标签文档"}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
+            />
+            <MenuItem
+              icon={RefreshCw}
+              label="刷新"
               onClick={() => { void reloadTags(); setTagsMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              刷新
-            </button>
-          </div>
+            />
+          </MenuSurface>
         </>
       )}
 
@@ -2934,16 +2967,16 @@ export default function SidebarDesktop() {
 
       {/* ===== 行级 ⋮ 菜单（fixed 挂 body 语义，此处挂 aside 根部 fixed 等价） ===== */}
       {rowMenu && (
-        <div
+        <MenuSurface
           ref={menuRef}
-          className="fixed z-[100] min-w-[140px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          className="fixed z-[100]"
           style={menuStyle}
-          role="menu"
         >
           {rowMenu.kind === "sec-kb" && (
             <>
-              <button type="button" role="menuitem" onClick={() => { setRowMenu(null); expandAllFolders(); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">全部展开</button>
-              <button type="button" role="menuitem" onClick={() => { setRowMenu(null); collapseAllFolders(); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">全部折叠</button>
+              <MenuLabel>知识库</MenuLabel>
+              <MenuItem icon={ChevronsUpDown} label="全部展开" onClick={() => { setRowMenu(null); expandAllFolders(); }} />
+              <MenuItem icon={ChevronsDownUp} label="全部折叠" onClick={() => { setRowMenu(null); collapseAllFolders(); }} />
             </>
           )}
           {rowMenu.kind === "kb-folder" && (() => {
@@ -2951,10 +2984,11 @@ export default function SidebarDesktop() {
             if (!node) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void startCreateNote(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">新建文档</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void startCreateFolder(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">新建子文件夹</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={FilePlus2} label="新建文档" onClick={() => { setRowMenu(null); void startCreateNote(node.id); }} />
+                <MenuItem icon={FolderPlus} label="新建子文件夹" onClick={() => { setRowMenu(null); void startCreateFolder(node.id); }} />
+                <MenuSeparator />
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
             );
           })()}
@@ -2963,8 +2997,9 @@ export default function SidebarDesktop() {
             if (!node) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
             );
           })()}
@@ -2973,8 +3008,9 @@ export default function SidebarDesktop() {
             if (!tag) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "tag", id: tag.id, value: tag.name }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteTag(tag.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={Pencil} label="重命名" onClick={() => { setRowMenu(null); setRenaming({ kind: "tag", id: tag.id, value: tag.name }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除标签" danger onClick={() => { setRowMenu(null); void deleteTag(tag.id); }} />
               </>
             );
           })()}
@@ -2983,13 +3019,14 @@ export default function SidebarDesktop() {
             if (!doc) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => void locateDoc(doc.title)} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">定位</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: doc.id, value: doc.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(doc.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={Locate} label="在树中定位" onClick={() => void locateDoc(doc.title)} />
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: doc.id, value: doc.title }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(doc.id); }} />
               </>
             );
           })()}
-        </div>
+        </MenuSurface>
       )}
     </aside>
   );

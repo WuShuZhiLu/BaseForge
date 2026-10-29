@@ -292,22 +292,28 @@ export function KnowledgeTreeCreateDropdown({
       ref={menuRef}
       role="menu"
       aria-label={menu.parentId ? t("sidebarNext.createUnder", { defaultValue: "在当前节点下新建" }) : t("sidebarNext.createAtRoot", { defaultValue: "在根目录新建" })}
-      className="fixed z-[420] overflow-y-auto overscroll-contain rounded-lg border border-app-border bg-app-bg p-1 shadow-xl"
+      className="fixed z-[420] overflow-y-auto overscroll-contain rounded-xl border border-app-border bg-app-elevated p-1.5 text-[12.5px] shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
       style={position || { left: 8, top: 8, width: CREATE_MENU_WIDTH, visibility: "hidden" }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       {menu.parentId === null ? (
         /* 根级（未选中任何节点）：只能新建知识库 */
-        <button
-          type="button"
-          role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
-          onClick={() => onCreate(null, "folder")}
-        >
-          <Folder size={15} className="text-amber-500" />
-          <span>{t("sidebarNext.newKnowledgeBase", { defaultValue: "新建知识库" })}</span>
-        </button>
+        <>
+          <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">根目录</div>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
+            onClick={() => onCreate(null, "folder")}
+          >
+            <Folder size={14} className="shrink-0 text-tx-tertiary" />
+            <span className="min-w-0 flex-1 truncate">{t("sidebarNext.newKnowledgeBase", { defaultValue: "新建知识库" })}</span>
+          </button>
+        </>
       ) : (<>
+      <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">
+        {menu.parentId ? t("sidebarNext.createUnder", { defaultValue: "在当前节点下新建" }) : t("sidebarNext.createAtRoot", { defaultValue: "在根目录新建" })}
+      </div>
       {CREATE_ITEMS.map((item) => {
         const Icon = item.icon;
         return (
@@ -315,11 +321,11 @@ export function KnowledgeTreeCreateDropdown({
             key={item.kind}
             type="button"
             role="menuitem"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+            className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
             onClick={() => onCreate(menu.parentId, item.kind)}
           >
             <Icon
-              size={15}
+              size={14}
               className={item.kind === "markdown" ? "text-emerald-500" : item.kind === "board" ? "text-teal-500" : "text-accent-primary"}
             />
             <span>{item.label}</span>
@@ -329,29 +335,29 @@ export function KnowledgeTreeCreateDropdown({
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
         onClick={() => onCreateFromTemplate(menu.parentId)}
       >
-        <LayoutTemplate size={15} className="text-violet-500" />
+        <LayoutTemplate size={14} className="text-violet-500" />
         <span>从模板新建</span>
       </button>
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
         onClick={() => onCreate(menu.parentId, FOLDER_CREATE_ITEM.kind)}
       >
-        <Folder size={15} className="text-amber-500" />
+        <Folder size={14} className="text-amber-500" />
         <span>{FOLDER_CREATE_ITEM.label}</span>
       </button>
       {menu.parentId !== null && onCreateSheet && (
         <button
           type="button"
         role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
           onClick={() => onCreateSheet(menu.parentId)}
         >
-          <Table2 size={15} className="text-sky-500" />
+          <Table2 size={14} className="text-sky-500" />
           <span>轻量表格</span>
         </button>
       )}
@@ -359,10 +365,10 @@ export function KnowledgeTreeCreateDropdown({
         <button
           type="button"
           role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
           onClick={() => onCreateEncrypted(menu.parentId)}
         >
-          <Lock size={15} className="text-accent-primary" />
+          <Lock size={14} className="text-accent-primary" />
           <span>加密笔记</span>
         </button>
       )}
@@ -373,29 +379,33 @@ export function KnowledgeTreeCreateDropdown({
         role="menuitem"
         aria-haspopup="menu"
         aria-expanded={Boolean(importSubmenu)}
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
         onClick={(event) => {
           const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
           setImportSubmenu((current) => current ? null : { anchor: new DOMRect(rect.right - 4, rect.top, rect.width, rect.height) });
         }}
       >
-        <CloudDownload size={15} className="text-sky-500" />
+        <CloudDownload size={14} className="text-sky-500" />
         <span>导入</span>
         <ChevronDown size={13} className={cn("ml-auto shrink-0 -rotate-90 text-tx-tertiary", importSubmenu && "rotate-0")} />
       </button>
-      <p className="border-t border-app-border px-2.5 pb-1 pt-2 text-[10px] text-tx-tertiary">
-        也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
-      </p>
+      <div className="mt-1 flex items-start gap-1.5 border-t border-app-border px-2 pb-1 pt-2">
+        <span className="mt-[1px] shrink-0 text-[10.5px] leading-4 text-tx-tertiary">ⓘ</span>
+        <p className="min-w-0 text-[10.5px] leading-4 text-tx-tertiary">
+          也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
+        </p>
+      </div>
       </>)}
       {importSubmenu && createPortal(
         <div
           ref={importSubmenuRef}
           role="menu"
           aria-label="导入"
-          className="fixed z-[421] max-h-[60vh] overflow-y-auto rounded-lg border border-app-border bg-app-bg p-1 shadow-xl"
+          className="fixed z-[421] max-h-[60vh] min-w-[252px] overflow-y-auto overscroll-contain rounded-xl border border-app-border bg-app-elevated p-1.5 text-[12.5px] shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
           style={importSubmenuPosition || { left: importSubmenu.anchor.right + 4, top: importSubmenu.anchor.top, visibility: importSubmenuPosition ? undefined : "hidden" }}
           onPointerDown={(event) => event.stopPropagation()}
         >
+          <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">导入</div>
           {IMPORT_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -403,15 +413,15 @@ export function KnowledgeTreeCreateDropdown({
                 key={item.kind}
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+                className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
                 onClick={() => {
                   setImportSubmenu(null);
                   onImport(menu.parentId, item.kind);
                 }}
               >
                 <Icon
-                  size={15}
-                  className={item.kind === "markdown"
+                  size={14}
+                  className={cn("shrink-0", item.kind === "markdown"
                     ? "text-emerald-500"
                     : item.kind === "markdown-zip"
                       ? "text-amber-500"
@@ -419,9 +429,9 @@ export function KnowledgeTreeCreateDropdown({
                         ? "text-violet-500"
                         : item.kind === "pdf"
                           ? "text-red-500"
-                          : "text-sky-500"}
+                          : "text-sky-500")}
                 />
-                <span>{item.label}</span>
+                <span className="min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
               </button>
             );
           })}
