@@ -26,6 +26,7 @@ import {
 } from "@/lib/noteTransferApi";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { confirm } from "@/components/ui/confirm";
 
 function normalizeWorkspaceId(value: string | null | undefined): string | null {
   return !value || value === "personal" ? null : value;
@@ -259,10 +260,13 @@ export default function NoteTransferCenter() {
   const handleExecute = async () => {
     if (!preview?.canExecute) return;
     if (mode === "move") {
-      const confirmed = window.confirm(
-        `移动会先在目标空间创建副本并校验，然后把源空间中的 ${selectedIds.size} 篇笔记放入回收站。是否继续？`,
-      );
-      if (!confirmed) return;
+      const ok = await confirm({
+        title: `移动已选 ${selectedIds.size} 篇笔记？`,
+        description: "会先在目标空间创建副本并校验，然后把源空间中的这些笔记放入回收站。",
+        confirmText: "移动",
+        danger: true,
+      });
+      if (!ok) return;
     }
     setExecuting(true);
     setError("");

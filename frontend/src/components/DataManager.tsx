@@ -59,6 +59,7 @@ import type { VersionHistorySettings, Workspace } from "@/types";
 import { getVersionHistorySettings, primeVersionHistorySettingsCache } from "@/lib/versionSnapshot";
 import { openTaskDataTransfer } from "@/lib/taskDataTransferBridge";
 import { runFullBackupJob } from "@/lib/fullBackupJobClient";
+import { confirm } from "@/components/ui/confirm";
 
 // ============================================================================
 // 一级 Tab：scope —— 个人空间 / 工作区 / 系统
@@ -1997,15 +1998,16 @@ export default function DataManager() {
                         }
 
                         const pkg = dryResult.package;
-                        const confirmed = window.confirm(
-                          t('note.nowenPackageImportConfirmTitle') + "\n\n" +
-                          t('note.nowenPackageImportConfirmDesc', {
+                        const ok = await confirm({
+                          title: t('note.nowenPackageImportConfirmTitle'),
+                          description: t('note.nowenPackageImportConfirmDesc', {
                             notes: pkg?.counts?.notes || 0,
                             attachments: pkg?.counts?.attachments || 0,
-                          })
-                        );
+                          }),
+                          confirmText: t('note.nowenPackageImport'),
+                        });
 
-                        if (!confirmed) return;
+                        if (!ok) return;
 
                         toast.info(t('note.nowenPackageImportDryRun'));
                         const result = await api.importNowenPackage(file);

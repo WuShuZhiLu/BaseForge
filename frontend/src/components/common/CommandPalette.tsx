@@ -31,6 +31,7 @@ import type { SearchResult } from "@/types";
 import SearchCenter from "@/components/SearchCenter";
 import MobileDrawerUxBridge from "@/components/MobileDrawerUxBridge";
 import { pluginApi } from "@/lib/pluginApi";
+import { alert } from "@/components/ui/confirm";
 
 export interface CommandPaletteProps {
   open: boolean;
@@ -181,7 +182,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
       return (contribution.commands || []).filter((command) => paletteIds.has(command.id)).map((command): WorkspaceCommand => ({
         id: command.id, label: command.title, description: command.category ? `插件 · ${command.category}` : `插件 · ${contribution.pluginId}`,
         keywords: ["插件", contribution.pluginId, command.category || ""], icon: <Puzzle size={16} />,
-        run: () => { void pluginApi.execute(contribution.pluginId, command.action, state.activeNote ? { noteId: state.activeNote.id } : {}).catch((error) => window.alert(error instanceof Error ? error.message : String(error))); },
+        run: () => { void pluginApi.execute(contribution.pluginId, command.action, state.activeNote ? { noteId: state.activeNote.id } : {}).catch((error) => { void alert({ title: "插件命令执行失败", description: error instanceof Error ? error.message : String(error) }); }); },
       }));
     });
     return [...commands, ...declared].map((command) => {
