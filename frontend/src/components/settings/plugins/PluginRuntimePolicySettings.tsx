@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { pluginApi } from "@/lib/pluginApi";
+import { confirm } from "@/components/ui/confirm";
 
 export function PluginRuntimePolicySettings({ onPolicyChange }: { onPolicyChange?: (allowed: boolean | null) => void }) {
   const { t } = useTranslation();
@@ -14,7 +15,13 @@ export function PluginRuntimePolicySettings({ onPolicyChange }: { onPolicyChange
     return () => { active = false; };
   }, [onPolicyChange]);
   const change = async (enabled: boolean) => {
-    if (enabled && !window.confirm(t("plugins.runtimePolicy.confirm"))) return;
+    if (enabled) {
+      const ok = await confirm({
+        title: t("plugins.runtimePolicy.confirm"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setBusy(true); setError("");
     try { const policy = await pluginApi.setRuntimePolicy(enabled); setAllowed(policy.allowNodeRuntime); onPolicyChange?.(policy.allowNodeRuntime); }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
