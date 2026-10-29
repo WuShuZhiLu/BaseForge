@@ -19,6 +19,7 @@ import { buildXmindContent, buildZip, downloadBlob } from "@/lib/mindmapExport";
 import { markdownToMindMapData, mindMapDataToMarkdown } from "@/lib/mindmapTransform";
 import { computeLayoutBounds, fitMindMapToViewport, isValidViewport } from "@/lib/mindmapViewport";
 import { dispatchDocumentMindMapChanged } from "@/lib/documentMindMapRuntime";
+import { confirm } from "@/components/ui/confirm";
 import {
   buildMindMapDeepLinkUrl,
   pushMindMapAppPath,
@@ -2879,15 +2880,20 @@ export default function MindMapCenter({
     URL.revokeObjectURL(url);
   }, [listContextMenu, loadMapData, buildXmindContent]);
 
-  const requestEmbeddedClose = useCallback(() => {
+  const requestEmbeddedClose = useCallback(async () => {
     if (!onRequestClose) return;
     const hasUnsaved =
       isSaving ||
       embeddedSaveRunningRef.current ||
       embeddedPendingSaveRef.current !== null ||
       embeddedSaveConflictRef.current;
-    if (hasUnsaved && !window.confirm("思维导图还有未完成的保存或冲突处理，确定关闭编辑窗口吗？")) {
-      return;
+    if (hasUnsaved) {
+      const ok = await confirm({
+        title: "思维导图还有未完成的保存或冲突处理，确定关闭编辑窗口吗？",
+        confirmText: "关闭",
+        danger: true,
+      });
+      if (!ok) return;
     }
     onRequestClose();
   }, [isSaving, onRequestClose]);
@@ -2910,7 +2916,7 @@ export default function MindMapCenter({
       ) {
         return;
       }
-      requestEmbeddedClose();
+      void requestEmbeddedClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -3127,7 +3133,7 @@ export default function MindMapCenter({
                   <>
                     <div className="w-px h-4 bg-app-border mx-0.5" />
                     <button
-                      onClick={requestEmbeddedClose}
+                      onClick={() => void requestEmbeddedClose()}
                       className={MT.toolbarBtn}
                       title={embeddedMode ? "关闭文档内编辑" : "关闭思维导图"}
                       aria-label={embeddedMode ? "关闭文档内思维导图编辑" : "关闭思维导图"}

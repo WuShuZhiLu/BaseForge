@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AlertTriangle, Eye, EyeOff, KeyRound, Loader2, X } from "lucide-react";
 
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
+import { confirm } from "@/components/ui/confirm";
 
 export default function FolderPasswordDialog({
   node,
@@ -68,7 +69,13 @@ export default function FolderPasswordDialog({
 
   const removePassword = async () => {
     if (saving || !protectedFolder || !currentPassword) return;
-    if (!window.confirm("确定取消此文件夹的密码保护吗？取消后，拥有查看权限的成员无需密码即可访问。")) return;
+    const ok = await confirm({
+      title: "取消此文件夹的密码保护？",
+      description: "取消后，拥有查看权限的成员无需密码即可访问。",
+      confirmText: "取消保护",
+      danger: true,
+    });
+    if (!ok) return;
     setSaving(true);
     setError("");
     try {
