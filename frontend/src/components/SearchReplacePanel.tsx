@@ -21,17 +21,8 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/react";
 import { useTranslation } from "react-i18next";
-import {
-  Search,
-  X,
-  ChevronUp,
-  ChevronDown,
-  CaseSensitive,
-  WholeWord,
-  Regex,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { DocFindBar } from "./DocFindBar";
 import {
   getSearchNavigationIndex,
   isSearchNavigationUpdate,
@@ -403,156 +394,27 @@ export function SearchReplacePanel({
   if (!open) return null;
 
   return (
-    <div
-      className="absolute top-2 right-3 z-30 flex flex-col gap-1.5 bg-app-elevated border border-app-border rounded-lg shadow-lg p-2 w-[340px] max-w-[calc(100vw-1.5rem)]"
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      {/* 第一行：查找输入 + 命中计数 + 上下导航 + 关闭 */}
-      <div className="flex items-center gap-1">
-        <Search size={14} className="text-tx-secondary shrink-0 ml-1" />
-        <input
-          ref={queryInputRef}
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={onQueryKeyDown}
-          placeholder={t("searchReplace.findPlaceholder") || "查找"}
-          className={cn(
-            "flex-1 min-w-0 px-2 py-1 text-sm bg-app-surface border border-app-border rounded focus:outline-none focus:ring-1 focus:ring-accent-primary",
-            regexInvalid && "border-red-500 focus:ring-red-500",
-          )}
-        />
-        <span className="text-xs text-tx-secondary tabular-nums px-1 shrink-0 min-w-[42px] text-center">
-          {regexInvalid
-            ? "!"
-            : matchCount === 0
-              ? "0/0"
-              : `${activeIndex + 1}/${matchCount}`}
-        </span>
-        <button
-          type="button"
-          onClick={goPrev}
-          disabled={matchCount === 0}
-          title={t("searchReplace.prev") || "上一个 (Shift+Enter)"}
-          className="p-1 rounded hover:bg-app-hover text-tx-secondary disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronUp size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={goNext}
-          disabled={matchCount === 0}
-          title={t("searchReplace.next") || "下一个 (Enter)"}
-          className="p-1 rounded hover:bg-app-hover text-tx-secondary disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <ChevronDown size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          title={t("searchReplace.close") || "关闭 (Esc)"}
-          className="p-1 rounded hover:bg-app-hover text-tx-secondary"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      {/* 第二行：选项开关 + 展开替换 */}
-      <div className="flex items-center gap-0.5 px-1">
-        <ToggleBtn
-          active={caseSensitive}
-          onClick={() => setCaseSensitive((v) => !v)}
-          title={t("searchReplace.caseSensitive") || "区分大小写"}
-        >
-          <CaseSensitive size={14} />
-        </ToggleBtn>
-        <ToggleBtn
-          active={wholeWord}
-          onClick={() => setWholeWord((v) => !v)}
-          title={t("searchReplace.wholeWord") || "全字匹配"}
-        >
-          <WholeWord size={14} />
-        </ToggleBtn>
-        <ToggleBtn
-          active={useRegex}
-          onClick={() => setUseRegex((v) => !v)}
-          title={t("searchReplace.regex") || "正则表达式"}
-        >
-          <Regex size={14} />
-        </ToggleBtn>
-        {editable && (
-          <button
-            type="button"
-            onClick={() => setShowReplace((v) => !v)}
-            className="ml-auto text-xs text-tx-secondary hover:text-tx-primary px-2 py-0.5 rounded hover:bg-app-hover"
-          >
-            {showReplace
-              ? t("searchReplace.hideReplace") || "收起替换"
-              : t("searchReplace.showReplace") || "替换…"}
-          </button>
-        )}
-      </div>
-
-      {/* 第三行：替换输入 + 替换按钮（仅展开时显示） */}
-      {editable && showReplace && (
-        <div className="flex items-center gap-1">
-          <span className="w-[14px] shrink-0 ml-1" />
-          <input
-            type="text"
-            value={replaceWith}
-            onChange={(e) => setReplaceWith(e.target.value)}
-            onKeyDown={onReplaceKeyDown}
-            placeholder={t("searchReplace.replacePlaceholder") || "替换为"}
-            className="flex-1 min-w-0 px-2 py-1 text-sm bg-app-surface border border-app-border rounded focus:outline-none focus:ring-1 focus:ring-accent-primary"
-          />
-          <button
-            type="button"
-            onClick={replaceCurrent}
-            disabled={matchCount === 0}
-            className="px-2 py-1 text-xs rounded hover:bg-app-hover text-tx-primary disabled:opacity-30 disabled:cursor-not-allowed"
-            title={t("searchReplace.replace") || "替换 (Enter)"}
-          >
-            {t("searchReplace.replace") || "替换"}
-          </button>
-          <button
-            type="button"
-            onClick={replaceAll}
-            disabled={matchCount === 0}
-            className="px-2 py-1 text-xs rounded bg-accent-primary/10 hover:bg-accent-primary/20 text-accent-primary disabled:opacity-30 disabled:cursor-not-allowed"
-            title={t("searchReplace.replaceAll") || "全部替换 (Ctrl+Enter)"}
-          >
-            {t("searchReplace.replaceAll") || "全部"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToggleBtn({
-  active,
-  onClick,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "p-1 rounded transition-colors",
-        active
-          ? "bg-accent-primary/20 text-accent-primary"
-          : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-      )}
-    >
-      {children}
-    </button>
+    <DocFindBar
+      query={query}
+      onQueryChange={setQuery}
+      replaceWith={replaceWith}
+      onReplaceWithChange={setReplaceWith}
+      matchCount={matchCount}
+      activeIndex={activeIndex}
+      caseSensitive={caseSensitive}
+      wholeWord={wholeWord}
+      useRegex={useRegex}
+      onToggleCaseSensitive={() => setCaseSensitive((v) => !v)}
+      onToggleWholeWord={() => setWholeWord((v) => !v)}
+      onToggleRegex={() => setUseRegex((v) => !v)}
+      showReplace={showReplace}
+      onToggleReplace={() => setShowReplace((v) => !v)}
+      onNext={goNext}
+      onPrev={goPrev}
+      onReplace={replaceCurrent}
+      onReplaceAll={replaceAll}
+      onClose={onClose}
+      editable={editable}
+    />
   );
 }

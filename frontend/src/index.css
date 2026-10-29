@@ -402,21 +402,25 @@ body {
  *   .search-match         鈥斺€?鎵€鏈夊懡涓?
  *   .search-match-active  鈥斺€?褰撳墠閫変腑鐨勫懡涓紙鏇撮矞鏄庯級
  * 鐢ㄦ祬榛勫簳 + 鍦嗚锛岄伩寮€ light/dark 閮戒笉鍒虹溂銆?*/
+/* 查找命中高亮：富文本与 Markdown 共用同一组变量 */
+:root {
+  --find-hit: rgba(47, 111, 237, 0.16);
+  --find-hit-active: rgba(47, 111, 237, 0.34);
+  --find-hit-ring: rgba(47, 111, 237, 0.55);
+}
+.dark {
+  --find-hit: rgba(96, 148, 247, 0.26);
+  --find-hit-active: rgba(118, 166, 255, 0.45);
+  --find-hit-ring: rgba(147, 185, 255, 0.7);
+}
 .ProseMirror .search-match {
-  background-color: rgba(250, 204, 21, 0.45); /* yellow-400 / 45% */
+  background-color: var(--find-hit);
   border-radius: 2px;
 }
 .ProseMirror .search-match-active {
-  background-color: rgba(249, 115, 22, 0.65); /* orange-500 / 65% */
-  outline: 1px solid rgba(234, 88, 12, 0.85);
+  background-color: var(--find-hit-active);
+  box-shadow: inset 0 0 0 1px var(--find-hit-ring);
   border-radius: 2px;
-}
-.dark .ProseMirror .search-match {
-  background-color: rgba(202, 138, 4, 0.55);
-}
-.dark .ProseMirror .search-match-active {
-  background-color: rgba(234, 88, 12, 0.8);
-  outline-color: rgba(251, 146, 60, 0.95);
 }
 
 /* ===== Code Block锛堣嚜瀹氫箟 NodeView锛氬伐鍏锋爮 + 璇硶楂樹寒锛?=====

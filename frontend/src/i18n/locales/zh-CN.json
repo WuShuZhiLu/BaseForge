@@ -687,7 +687,11 @@
     "hideReplace": "收起替换",
     "replace": "替换",
     "replaceAll": "全部替换",
-    "replacedCount": "已替换 {{count}} 处"
+    "replacedCount": "已替换 {{count}} 处",
+    "noMatch": "无匹配",
+    "regexInvalid": "正则表达式无效",
+    "nextHint": "Enter 下一个",
+    "replaceAllHint": "Alt+Enter 全部替换"
   },
   "slash": {
     "catHeadings": "标题",

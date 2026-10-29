@@ -672,7 +672,11 @@
     "hideReplace": "Hide replace",
     "replace": "Replace",
     "replaceAll": "Replace all",
-    "replacedCount": "Replaced {{count}} occurrence(s)"
+    "replacedCount": "Replaced {{count}} occurrence(s)",
+    "noMatch": "No results",
+    "regexInvalid": "Invalid regular expression",
+    "nextHint": "Enter for next",
+    "replaceAllHint": "Alt+Enter replaces all"
   },
   "slash": {
     "catHeadings": "Headings",
