@@ -145,6 +145,7 @@ import { isVideoFile, uploadMediaAttachment, type MediaUploadResult } from "@/li
 import type { NoteEditorHandle, NoteEditorHeading, NoteEditorProps } from "@/components/editors/types";
 import type { FormatMenuPayload } from "@/lib/desktopBridge";
 import { NoteLinkMenu, type NoteSearchResult, type NoteLinkBlockItem, type NoteLinkSelectionOptions } from "@/components/NoteLinkExtension";
+import { createMarkdownFindPanel } from "@/components/MarkdownDocFindPanel";
 import { buildWikiNoteLink, detectActiveWikiNoteQuery } from "@/lib/noteLinkSyntax";
 import { getMarkdownDailyRecordSlashCommands } from "@/components/daily-records/markdownDailyRecordSlashCommands";
 import { consumeBlockNavigation, subscribeBlockNavigation } from "@/lib/blockNavigation";
@@ -292,232 +293,37 @@ const nowenMdHighlight = HighlightStyle.define([
   { tag: t.list, color: "var(--color-accent-primary, #3b82f6)" },
 ]);
 
-/** �༭�� DOM �������⣨���� / �ߴ� / ��ɫ�� */
+
+/**
+ * 查找面板相关主题：
+ *   - CM 的 panel 容器改为浮层（inset:0 + pointer-events:none），不参与文档流，
+ *     正文不会因为打开查找而整体下移；面板本身（DocFindBar）自行定位在右上角。
+ *   - 命中高亮统一到 --find-hit / --find-hit-active，与富文本侧 .search-match 共用。
+ */
 const searchPanelTheme = EditorView.theme({
+  "&": { position: "relative" },
   ".cm-panels": {
-    color: "var(--color-text-primary, #111827)",
-    backgroundColor: "transparent",
-  },
-  ".cm-panels-top": {
-    borderBottom: "1px solid var(--color-border, #e5e7eb)",
-  },
-  ".cm-panel.cm-search": {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    flexWrap: "wrap",
-    columnGap: "8px",
-    rowGap: "10px",
-    padding: "12px 54px 12px 16px",
-    backgroundColor: "var(--color-elevated, #ffffff)",
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
-    fontSize: "13px",
-    lineHeight: "1",
-  },
-  ".cm-panel.cm-search label": {
-    position: "relative",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "34px",
-    margin: "0",
-    padding: "0 11px",
-    border: "1px solid var(--color-border, #e5e7eb)",
-    borderRadius: "999px",
-    color: "var(--color-text-secondary, #6b7280)",
-    backgroundColor: "var(--color-bg, #ffffff)",
-    whiteSpace: "nowrap",
-    cursor: "pointer",
-    userSelect: "none",
-    transition: "border-color 140ms ease, background-color 140ms ease, color 140ms ease, box-shadow 140ms ease",
-  },
-  ".cm-panel.cm-search label:hover": {
-    color: "var(--color-text-primary, #111827)",
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-hover, #f3f4f6)",
-  },
-  ".cm-panel.cm-search label:has(input:checked)": {
-    color: "var(--color-accent-primary, #3b82f6)",
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-active, #e0e7ff)",
-    boxShadow: "inset 0 0 0 1px rgba(59, 130, 246, 0.08)",
-  },
-  ".cm-panel.cm-search label:has(input:focus-visible)": {
-    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.18)",
-  },
-  ".cm-panel.cm-search input[type=text]": {
-    boxSizing: "border-box",
-    flex: "0 1 260px",
-    width: "clamp(190px, 24vw, 260px)",
-    height: "36px",
-    margin: "0",
-    padding: "0 12px",
-    border: "1px solid var(--color-border, #e5e7eb)",
-    borderRadius: "10px",
-    outline: "none",
-    appearance: "none",
-    color: "var(--color-text-primary, #111827)",
-    backgroundColor: "var(--color-bg, #ffffff)",
-    font: "inherit",
-    lineHeight: "normal",
-    transition: "border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease",
-  },
-  ".cm-panel.cm-search input[type=text]::placeholder": {
-    color: "var(--color-text-tertiary, #9ca3af)",
-  },
-  ".cm-panel.cm-search input[type=text]:focus": {
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-elevated, #ffffff)",
-    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.16)",
-  },
-  ".cm-panel.cm-search button": {
-    boxSizing: "border-box",
-    minHeight: "34px",
-    margin: "0",
-    padding: "0 12px",
-    border: "1px solid var(--color-border, #e5e7eb)",
-    borderRadius: "9px",
-    appearance: "none",
-    color: "var(--color-text-secondary, #6b7280)",
-    backgroundColor: "var(--color-bg, #ffffff)",
-    backgroundImage: "none",
-    font: "inherit",
-    fontWeight: "500",
-    lineHeight: "1",
-    cursor: "pointer",
-    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-    transition: "transform 120ms ease, background-color 140ms ease, color 140ms ease, border-color 140ms ease, box-shadow 140ms ease",
-  },
-  ".cm-panel.cm-search button:hover": {
-    color: "var(--color-text-primary, #111827)",
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-hover, #f3f4f6)",
-    boxShadow: "0 3px 8px rgba(15, 23, 42, 0.08)",
-  },
-  ".cm-panel.cm-search button:active": {
-    transform: "translateY(1px)",
-    boxShadow: "none",
-  },
-  ".cm-panel.cm-search button:focus-visible": {
-    outline: "none",
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.16)",
-  },
-  ".cm-panel.cm-search input[name=search]": {
-    order: "1",
-  },
-  ".cm-panel.cm-search button[name=prev]": {
-    order: "2",
-  },
-  ".cm-panel.cm-search button[name=next]": {
-    order: "3",
-  },
-  ".cm-panel.cm-search button[name=select]": {
-    order: "4",
-    color: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-active, #e0e7ff)",
-    borderColor: "transparent",
-  },
-  ".cm-panel.cm-search label:has(input[name=case])": {
-    order: "5",
-  },
-  ".cm-panel.cm-search label:has(input[name=re])": {
-    order: "6",
-  },
-  ".cm-panel.cm-search label:has(input[name=word])": {
-    order: "7",
-  },
-  ".cm-panel.cm-search input[name=replace]": {
-    order: "9",
-  },
-  ".cm-panel.cm-search button[name=replace]": {
-    order: "10",
-    color: "var(--color-accent-primary, #3b82f6)",
-  },
-  ".cm-panel.cm-search button[name=replaceAll]": {
-    order: "11",
-    color: "#ffffff",
-    borderColor: "var(--color-accent-primary, #3b82f6)",
-    backgroundColor: "var(--color-accent-primary, #3b82f6)",
-    boxShadow: "0 3px 8px rgba(59, 130, 246, 0.2)",
-  },
-  ".cm-panel.cm-search button[name=replaceAll]:hover": {
-    color: "#ffffff",
-    backgroundColor: "var(--color-accent-primary, #3b82f6)",
-    boxShadow: "0 5px 12px rgba(59, 130, 246, 0.28)",
-  },
-  ".cm-panel.cm-search button[name=close]": {
     position: "absolute",
-    top: "12px",
-    right: "14px",
-    width: "34px",
-    minWidth: "34px",
-    height: "34px",
-    padding: "0",
-    borderColor: "transparent",
-    borderRadius: "50%",
-    color: "var(--color-text-tertiary, #9ca3af)",
+    top: "0",
+    left: "0",
+    right: "0",
+    height: "0",
+    overflow: "visible",
+    zIndex: "40",
     backgroundColor: "transparent",
-    boxShadow: "none",
-    fontSize: "20px",
-    fontWeight: "400",
-    lineHeight: "1",
-  },
-  ".cm-panel.cm-search button[name=close]:hover": {
-    color: "var(--color-text-primary, #111827)",
-    borderColor: "transparent",
-    backgroundColor: "var(--color-hover, #f3f4f6)",
-    boxShadow: "none",
-  },
-  ".cm-panel.cm-search input[type=checkbox]": {
-    position: "absolute",
-    width: "1px",
-    height: "1px",
-    margin: "0",
-    opacity: "0",
+    border: "none",
     pointerEvents: "none",
   },
-  ".cm-panel.cm-search br": {
-    order: "8",
-    display: "flex",
-    flexBasis: "100%",
-    width: "100%",
-    height: "1px",
-    margin: "0",
-    border: "0",
-    backgroundColor: "var(--color-border, #e5e7eb)",
-  },
+  ".cm-panels > *": { pointerEvents: "auto" },
+  ".cm-panels-top": { borderBottom: "none" },
   ".cm-searchMatch": {
-    borderRadius: "3px",
-    backgroundColor: "rgba(59, 130, 246, 0.16)",
-    boxShadow: "inset 0 -1px 0 rgba(59, 130, 246, 0.55)",
+    borderRadius: "2px",
+    backgroundColor: "var(--find-hit, rgba(47, 111, 237, 0.16))",
+    boxShadow: "none",
   },
   ".cm-searchMatch.cm-searchMatch-selected": {
-    backgroundColor: "rgba(245, 158, 11, 0.26)",
-    boxShadow: "inset 0 -2px 0 rgba(245, 158, 11, 0.78)",
-  },
-  "@media (max-width: 760px)": {
-    ".cm-panel.cm-search": {
-      columnGap: "6px",
-      rowGap: "8px",
-      padding: "10px 46px 10px 10px",
-    },
-    ".cm-panel.cm-search input[type=text]": {
-      flexBasis: "100%",
-      width: "100%",
-      maxWidth: "none",
-    },
-    ".cm-panel.cm-search button[name=prev], .cm-panel.cm-search button[name=next], .cm-panel.cm-search button[name=select]": {
-      flex: "1 1 auto",
-    },
-    ".cm-panel.cm-search label": {
-      flex: "1 1 auto",
-      padding: "0 9px",
-    },
-    ".cm-panel.cm-search button[name=close]": {
-      top: "11px",
-      right: "8px",
-    },
+    backgroundColor: "var(--find-hit-active, rgba(47, 111, 237, 0.34))",
+    boxShadow: "inset 0 0 0 1px rgba(47, 111, 237, 0.55)",
   },
 });
 
@@ -1439,7 +1245,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         rectangularSelection(),
         crosshairCursor(),
         highlightActiveLine(),
-        search({ top: true }),
+        search({ top: true, createPanel: createMarkdownFindPanel }),
         highlightSelectionMatches(),
         EditorView.lineWrapping,
         ...internalMarkdownMarkerExtensions,
