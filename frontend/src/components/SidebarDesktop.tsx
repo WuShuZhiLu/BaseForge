@@ -2109,9 +2109,14 @@ export default function SidebarDesktop() {
                 type="button"
                 title={`取消所有收藏（${starDocs.length} 条）`}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-accent-danger"
-                onClick={() => {
+                onClick={async () => {
                   if (starDocs.length === 0) return;
-                  if (!window.confirm(`确定取消全部 ${starDocs.length} 条收藏吗？`)) return;
+                  const ok = await confirm({
+                    title: "取消全部收藏",
+                    description: `将取消 ${starDocs.length} 条文档的收藏，文档本身不受影响。`,
+                    confirmText: "取消收藏",
+                  });
+                  if (!ok) return;
                   Promise.all(starDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)))
                     .then(() => {
                       reloadStar();
