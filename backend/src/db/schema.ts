@@ -711,6 +711,26 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_notebook_members_user ON notebook_members(userId);
     CREATE INDEX IF NOT EXISTS idx_notebook_share_links_notebook ON notebook_share_links(notebookId);
     CREATE INDEX IF NOT EXISTS idx_notebook_share_links_token ON notebook_share_links(token);
+
+    -- 附件分享链接（只读可控分享：密码/过期/次数上限；isActive=0 关闭但保留设置）
+    CREATE TABLE IF NOT EXISTS attachment_shares (
+      id TEXT PRIMARY KEY,
+      attachmentId TEXT NOT NULL,
+      ownerId TEXT NOT NULL,
+      shareToken TEXT NOT NULL UNIQUE,
+      password TEXT,
+      expiresAt TEXT,
+      maxViews INTEGER,
+      viewCount INTEGER NOT NULL DEFAULT 0,
+      isActive INTEGER NOT NULL DEFAULT 1,
+      credentialVersion INTEGER NOT NULL DEFAULT 1,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (attachmentId) REFERENCES attachments(id) ON DELETE CASCADE,
+      FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_attachment_shares_attachment ON attachment_shares(attachmentId);
+    CREATE INDEX IF NOT EXISTS idx_attachment_shares_owner ON attachment_shares(ownerId);
   `);
 
   // ==============================================================

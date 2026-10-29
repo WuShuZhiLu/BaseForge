@@ -60,6 +60,7 @@ import {
   Sparkles,
   Link2,
   Globe,
+  Share2,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
 import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
@@ -73,7 +74,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useApp, useAppActions } from "@/store/AppContext";
+import { useAppActions } from "@/store/AppContext";
 import { toast } from "@/lib/toast";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
 import { copyText } from "@/lib/clipboard";
@@ -87,6 +88,11 @@ import {
 } from "@/lib/imageHostFormats";
 import AttachmentDetailDrawer from "@/components/attachmentDetail/AttachmentDetailDrawer";
 import FileUploadDialog from "@/components/FileUploadDialog";
+import {
+  attachmentShareApi,
+  buildAttachmentShareUrl,
+  type AttachmentShare,
+} from "@/lib/attachmentShareApi";
 
 // ---------------------------------------------------------------------------
 // 工具：文件大小可读化 / MIME → 图标 / 时间格式化
@@ -253,7 +259,6 @@ function invalidateFileListCache(): void {
 
 export default function FileManager() {
   const { t } = useTranslation();
-  const { state } = useApp();
   const actions = useAppActions();
 
   // 列表状态
@@ -305,7 +310,7 @@ export default function FileManager() {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      try { localStorage.setItem("nowen-file-collapsed-groups", JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem("nowen-file-collapsed-groups", JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }, []);
@@ -324,6 +329,12 @@ export default function FileManager() {
   // 详情抽屉
   // detailId 为 null 时抽屉关闭；非 null 由 AttachmentDetailDrawer 自己加载详情。
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  // 附件分享对话框：shareTargetId 非空时打开（列表行"分享"按钮 / 详情抽屉头部入口）。
+  const [shareTargetId, setShareTargetId] = useState<string | null>(null);
+  const openShareById = useCallback((id: string) => setShareTargetId(id), []);
+  const openShare = useCallback((item: FileItem) => setShareTargetId(item.id), []);
+  const closeShare = useCallback(() => setShareTargetId(null), []);
 
   // 上传
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -464,9 +475,9 @@ export default function FileManager() {
         total: res.total,
         ts: Date.now(),
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] list failed:", err);
-      toast.error(err?.message || "加载文件列表失败");
+      toast.error(err instanceof Error ? err.message : "加载文件列表失败");
     } finally {
       setLoading(false);
     }
@@ -523,9 +534,9 @@ export default function FileManager() {
       try {
         window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "cleanup-orphans" } }));
       } catch { /* ignore */ }
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] cleanup failed:", err);
-      toast.error(err?.message || "清理失败");
+      toast.error(err instanceof Error ? err.message : "清理失败");
     } finally {
       setCleaningUp(false);
     }
@@ -637,8 +648,8 @@ export default function FileManager() {
       await api.saveAttachmentToRemote(remoteSaveSourceId, remoteSaveDlg.attachmentId, remoteSavePath);
       setRemoteSaveDlg(null);
       toast.success("已保存到远程源");
-    } catch (err: any) {
-      setRemoteSaveMsg(err?.message || "保存到远程失败");
+    } catch (err) {
+      setRemoteSaveMsg(err instanceof Error ? err.message : "保存到远程失败");
     } finally {
       setRemoteSaving(false);
     }
@@ -661,9 +672,9 @@ export default function FileManager() {
         // 如果当前打开的就是这个详情，顺手关掉
         setDetailId((cur) => (cur === id ? null : cur));
         afterDelete(id);
-      } catch (err: any) {
+      } catch (err) {
         console.error("[FileManager] delete failed:", err);
-        toast.error(err?.message || "删除失败");
+        toast.error(err instanceof Error ? err.message : "删除失败");
       }
     },
     [afterDelete],
@@ -770,9 +781,9 @@ export default function FileManager() {
       } else {
         loadList();
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] batch delete failed:", err);
-      toast.error(err?.message || "批量删除失败");
+      toast.error(err instanceof Error ? err.message : "批量删除失败");
     } finally {
       setBatchDeleting(false);
     }
@@ -796,10 +807,10 @@ export default function FileManager() {
         try {
           await api.files.upload(f);
           ok++;
-        } catch (err: any) {
+        } catch (err) {
           console.error("[FileManager] upload failed:", err);
           fail++;
-          toast.error(`${f.name}: ${err?.message || "上传失败"}`);
+          toast.error(`${f.name}: ${err instanceof Error ? err.message : "上传失败"}`);
         }
       }
       setUploading(false);
@@ -934,9 +945,9 @@ export default function FileManager() {
         // 宿主不处理侧栏选中态，这里保留（非视图切换动作）。
         actions.setSelectedNotebook(note.notebookId);
         navigateToolPage({ kind: "note", noteId });
-      } catch (err: any) {
+      } catch (err) {
         console.error("[FileManager] jumpToNote failed:", err);
-        toast.error(err?.message || "跳转失败");
+        toast.error(err instanceof Error ? err.message : "跳转失败");
       }
     },
     [actions],
@@ -998,9 +1009,9 @@ export default function FileManager() {
     setDownloadingId(item.id);
     try {
       await downloadAttachment(resolveAttachmentUrl(item.url), item.filename || `file-${item.id}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] download failed:", err);
-      toast.error(`下载失败: ${err?.message || "未知错误"}`);
+      toast.error(`下载失败: ${err instanceof Error ? err.message : "未知错误"}`);
     } finally {
       setDownloadingId((id) => (id === item.id ? null : id));
     }
@@ -1704,6 +1715,7 @@ export default function FileManager() {
                             onDownload={downloadItem}
                             onDelete={afterDelete}
                             onSaveRemote={openRemoteSave}
+                            onShare={openShare}
                             copiedId={copiedId}
                             downloadingId={downloadingId}
                             selectionMode={selectionMode}
@@ -1739,6 +1751,7 @@ export default function FileManager() {
                  onDownload={downloadItem}
                  onDelete={handleDelete}
                  onSaveRemote={openRemoteSave}
+                onShare={openShare}
                 copiedId={copiedId}
                 downloadingId={downloadingId}
                 selectionMode={selectionMode}
@@ -1802,7 +1815,8 @@ export default function FileManager() {
 
       {/* 详情抽屉：复用型 AttachmentDetailDrawer（编辑器场景同款）。
           - 加载/下载/复制外链/重命名/删除 全部组件内部自管；
-          - 列表层只接 onAfterDelete / onAfterRename 做本地同步。 */}
+          - 列表层只接 onAfterDelete / onAfterRename 做本地同步。
+          - extraHeaderActions 注入"分享"入口（抽屉组件文件不在本模块改动范围）。 */}
       <AnimatePresence>
         {detailId && (
           <AttachmentDetailDrawer
@@ -1813,7 +1827,23 @@ export default function FileManager() {
             onAfterRename={afterRename}
             showDelete
             isImageHostMode={isImageHostMode}
+            extraHeaderActions={(
+              <button
+                className="p-1.5 rounded-md text-tx-tertiary hover:text-tx-primary hover:bg-app-hover"
+                onClick={() => openShareById(detailId)}
+                title="分享"
+              >
+                <Share2 size={14} />
+              </button>
+            )}
           />
+        )}
+      </AnimatePresence>
+
+      {/* 附件分享对话框 */}
+      <AnimatePresence>
+        {shareTargetId && (
+          <AttachmentShareDialog attachmentId={shareTargetId} onClose={closeShare} />
         )}
       </AnimatePresence>
 
@@ -2175,6 +2205,7 @@ function ListView({
   onDownload,
   onDelete,
   onSaveRemote,
+  onShare,
   copiedId,
   downloadingId,
   selectionMode,
@@ -2188,6 +2219,7 @@ function ListView({
   onDownload: (item: FileItem) => void;
   onDelete: (id: string) => void;
   onSaveRemote: (item: FileItem) => void;
+  onShare: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
@@ -2319,6 +2351,16 @@ function ListView({
                       {copiedId === it.id ? <Check size={12} /> : <Copy size={12} />}
                     </button>
                     <button
+                      className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onShare(it);
+                      }}
+                      title="分享"
+                    >
+                      <Share2 size={12} />
+                    </button>
+                    <button
                       className="p-1 rounded hover:bg-red-500/10 text-tx-tertiary hover:text-red-500 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -2336,5 +2378,294 @@ function ListView({
         </tbody>
       </table>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 子组件：附件分享对话框（只读可控分享：密码/过期/次数；关闭=失效但保留设置）
+// ---------------------------------------------------------------------------
+/** 提取 unknown 异常的可读信息（避免 any，风格与文件内 toast 用法一致）。 */
+function errMsg(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback;
+}
+
+function AttachmentShareDialog({ attachmentId, onClose }: { attachmentId: string; onClose: () => void }) {
+  const [share, setShare] = useState<AttachmentShare | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  // 表单输入：空值 = 不修改该字段（密码框永不回显明文）
+  const [passwordInput, setPasswordInput] = useState("");
+  const [expiresDaysInput, setExpiresDaysInput] = useState("");
+  const [maxViewsInput, setMaxViewsInput] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const rows = await attachmentShareApi.list();
+        if (!alive) return;
+        setShare(rows.find((r) => r.attachmentId === attachmentId) || null);
+      } catch (e) {
+        toast.error(errMsg(e, "加载分享信息失败"));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [attachmentId]);
+
+  const buildPatchFromInputs = () => {
+    const patch: Record<string, unknown> = {};
+    if (passwordInput.trim()) patch.password = passwordInput.trim();
+    const days = Number(expiresDaysInput);
+    if (expiresDaysInput.trim() !== "" && Number.isFinite(days) && days > 0) {
+      patch.expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+    }
+    const views = Number(maxViewsInput);
+    if (maxViewsInput.trim() !== "" && Number.isInteger(views) && views > 0) {
+      patch.maxViews = views;
+    }
+    return patch;
+  };
+
+  const handleOpen = async () => {
+    setBusy(true);
+    try {
+      const input: Record<string, unknown> = {};
+      if (passwordInput.trim()) input.password = passwordInput.trim();
+      const days = Number(expiresDaysInput);
+      if (expiresDaysInput.trim() !== "" && Number.isFinite(days) && days > 0) {
+        input.expiresAt = new Date(Date.now() + days * 86_400_000).toISOString();
+      }
+      const views = Number(maxViewsInput);
+      if (maxViewsInput.trim() !== "" && Number.isInteger(views) && views > 0) {
+        input.maxViews = views;
+      }
+      const created = await attachmentShareApi.open(attachmentId, input);
+      setShare(created);
+      setPasswordInput(""); setExpiresDaysInput(""); setMaxViewsInput("");
+      toast.success("分享已开启");
+    } catch (e) {
+      toast.error(errMsg(e, "开启分享失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!share) return;
+    const patch = buildPatchFromInputs();
+    if (Object.keys(patch).length === 0) {
+      toast.info("请至少填写一项要修改的设置");
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await attachmentShareApi.update(share.id, patch);
+      setShare(updated);
+      setPasswordInput(""); setExpiresDaysInput(""); setMaxViewsInput("");
+      toast.success("分享设置已更新");
+    } catch (e) {
+      toast.error(errMsg(e, "更新失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleActive = async () => {
+    if (!share) return;
+    setBusy(true);
+    try {
+      const updated = await attachmentShareApi.update(share.id, { isActive: !share.isActive });
+      setShare(updated);
+      toast.success(updated.isActive ? "分享已重新开启" : "分享已关闭，链接立即失效");
+    } catch (e) {
+      toast.error(errMsg(e, "操作失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    if (!share) return;
+    setBusy(true);
+    try {
+      setShare(await attachmentShareApi.update(share.id, { password: null }));
+      toast.success("访问密码已移除");
+    } catch (e) {
+      toast.error(errMsg(e, "操作失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClearExpiry = async () => {
+    if (!share) return;
+    setBusy(true);
+    try {
+      setShare(await attachmentShareApi.update(share.id, { expiresAt: null }));
+      toast.success("已恢复为永久有效");
+    } catch (e) {
+      toast.error(errMsg(e, "操作失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleResetViews = async () => {
+    if (!share) return;
+    setBusy(true);
+    try {
+      setShare(await attachmentShareApi.update(share.id, { resetViews: true }));
+      toast.success("查看次数已重置");
+    } catch (e) {
+      toast.error(errMsg(e, "操作失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!share) return;
+    const ok = await confirmDialog({
+      title: "彻底删除分享链接",
+      description: "删除后链接立即失效，设置不再保留。确定删除？",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await attachmentShareApi.remove(share.id);
+      setShare(null);
+      setPasswordInput(""); setExpiresDaysInput(""); setMaxViewsInput("");
+      toast.success("分享链接已删除");
+    } catch (e) {
+      toast.error(errMsg(e, "删除失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const shareUrl = share ? buildAttachmentShareUrl(share.shareToken) : "";
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[60] bg-zinc-900/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+        className="fixed z-[60] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-md bg-app-surface border border-app-border rounded-xl shadow-2xl p-4"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-tx-primary">分享文件</h3>
+          <button className="p-1.5 rounded-md text-tx-tertiary hover:text-tx-primary hover:bg-app-hover" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8 text-tx-tertiary">
+            <Loader2 size={16} className="animate-spin mr-2" />加载中…
+          </div>
+        ) : !share ? (
+          <>
+            <p className="text-xs text-tx-tertiary mb-3">开启后任何人可通过链接只读下载此文件，可随时关闭或删除。</p>
+            <div className="space-y-2">
+              <Input
+                type="password" placeholder="访问密码（可选，至少 4 位）"
+                value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+              />
+              <Input
+                type="number" min={1} placeholder="有效天数（可选，留空永久有效）"
+                value={expiresDaysInput} onChange={(e) => setExpiresDaysInput(e.target.value)}
+              />
+              <Input
+                type="number" min={1} placeholder="查看次数上限（可选）"
+                value={maxViewsInput} onChange={(e) => setMaxViewsInput(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button size="sm" variant="outline" onClick={onClose}>取消</Button>
+              <Button size="sm" disabled={busy} onClick={handleOpen}>
+                {busy ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Share2 size={14} className="mr-1" />}
+                开启分享
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2 mb-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded", share.isActive ? "bg-green-500/10 text-green-600" : "bg-zinc-500/10 text-tx-tertiary")}>
+                  {share.isActive ? "生效中" : "已关闭"}
+                </span>
+                {share.hasPassword && <span className="px-1.5 py-0.5 rounded bg-accent-primary/10 text-accent-primary">需密码</span>}
+                <span className="text-tx-tertiary">
+                  已查看 {share.viewCount}{share.maxViews ? ` / ${share.maxViews}` : ""} 次
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Input readOnly value={shareUrl} className="text-xs flex-1" onFocus={(e) => e.currentTarget.select()} />
+                <Button
+                  size="sm" variant="outline" className="shrink-0"
+                  onClick={async () => {
+                    try {
+                      await copyText(shareUrl);
+                      toast.success("链接已复制");
+                    } catch { toast.error("复制失败"); }
+                  }}
+                >
+                  <Copy size={12} className="mr-1" />复制
+                </Button>
+              </div>
+              {share.expiresAt && (
+                <p className="text-xs text-tx-tertiary">
+                  过期时间：{formatLocalTime(share.expiresAt)}
+                </p>
+              )}
+            </div>
+
+            {/* 修改设置：留空 = 不修改 */}
+            <div className="space-y-2 border-t border-app-border pt-3">
+              <Input
+                type="password" placeholder={share.hasPassword ? "修改密码（留空保持不变）" : "设置访问密码（可选）"}
+                value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Input
+                  type="number" min={1} placeholder="有效天数"
+                  value={expiresDaysInput} onChange={(e) => setExpiresDaysInput(e.target.value)}
+                />
+                <Input
+                  type="number" min={1} placeholder="次数上限"
+                  value={maxViewsInput} onChange={(e) => setMaxViewsInput(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={busy} onClick={handleSave}>保存设置</Button>
+                {share.hasPassword && (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={handleRemovePassword}>移除密码</Button>
+                )}
+                {share.expiresAt && (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={handleClearExpiry}>恢复永久有效</Button>
+                )}
+                {share.viewCount > 0 && (
+                  <Button size="sm" variant="outline" disabled={busy} onClick={handleResetViews}>重置次数</Button>
+                )}
+                <Button size="sm" variant="outline" disabled={busy} onClick={handleToggleActive}>
+                  {share.isActive ? "关闭分享" : "重新开启"}
+                </Button>
+                <Button size="sm" variant="outline" className="text-red-500 hover:text-red-500" disabled={busy} onClick={handleDelete}>
+                  <Trash2 size={12} className="mr-1" />删除
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </>
   );
 }

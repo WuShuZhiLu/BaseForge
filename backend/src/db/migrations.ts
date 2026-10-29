@@ -9,6 +9,7 @@ import { pmMigration } from "./pmMigration.js";
 import { pmTagsMigration } from "./pmTagsMigration.js";
 import { pmItemNoMigration } from "./pmItemNoMigration.js";
 import { pmM3Migration } from "./pmM3Migration.js";
+import { attachmentShareMigration } from "./attachmentShareMigration.js";
 /**
  * Compatibility wrapper around the historical migration list.
  *
@@ -429,6 +430,7 @@ export const MIGRATIONS: Migration[] = [
   pmTagsMigration,
   pmItemNoMigration,
   pmM3Migration,
+  attachmentShareMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
