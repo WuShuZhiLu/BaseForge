@@ -25,8 +25,8 @@ export interface CodeBlockThemeMeta {
 }
 
 export const CODE_BLOCK_THEMES: CodeBlockThemeMeta[] = [
-  // 「默认」不写死色值：由浅色 / 深色模式分别取 GitHub Light / GitHub Dark（见 index.css 的 data-code-theme）。
-  { id: "auto", label: "默认（跟随主题）", preview: { bg: "linear-gradient(135deg, #f6f8fa 50%, #0d1117 50%)", fg: "#8b949e", accent: "#3b82f6" } },
+  // 默认项不写死色值：浅色 / 深色模式分别取 GitHub Light / GitHub Dark（见 index.css 的 data-code-theme）。
+  { id: "auto", label: "默认", preview: { bg: "linear-gradient(135deg, #f6f8fa 50%, #0d1117 50%)", fg: "#8b949e", accent: "#3b82f6" } },
   { id: "github-dark", label: "GitHub Dark", preview: { bg: "#0d1117", fg: "#c9d1d9", accent: "#ff7b72" } },
   { id: "github-light", label: "GitHub Light", preview: { bg: "#f6f8fa", fg: "#24292f", accent: "#cf222e" } },
   { id: "one-dark", label: "One Dark", preview: { bg: "#282c34", fg: "#abb2bf", accent: "#c678dd" } },
