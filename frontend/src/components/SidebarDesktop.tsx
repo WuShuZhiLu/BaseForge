@@ -689,20 +689,9 @@ export default function SidebarDesktop() {
     };
   }, [reload, reloadTags]);
 
-  // 单树默认展开：首次加载后把根层知识库展开（知识库内容直接可见；用户折叠后不回灌）
-  const seededExpandedRef = useRef(false);
-  useEffect(() => {
-    if (loading || seededExpandedRef.current || nodes.length === 0) return;
-    seededExpandedRef.current = true;
-    setExpanded((current) => {
-      if (current.size > 0) return current;
-      const next = new Set(current);
-      for (const node of nodes) {
-        if (!node.isDeleted && node.parentId === null && node.resourceType === "notebook") next.add(node.id);
-      }
-      return next;
-    });
-  }, [loading, nodes]);
+  // 树默认全部折叠：不自动展开任何知识库。此前首次加载会把所有根层知识库
+  // 一次性展开（v2 的「根层默认展开」），进来就是一大片展开状态，很吵；
+  // 现在只在你点开某个库时展开它（单击根行/双击/深链回灌各自即时展开）。
 
   const switchSpace = useCallback((workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
@@ -1205,8 +1194,19 @@ export default function SidebarDesktop() {
     }
     // 统一走协调器链路（此前裸 getNote + setActiveNote 绕过加载协调器与页签治理）
     actions.setSelectedKnowledgeTreeParent(node.parentId);
+    // URL 必须跟随这篇文档「自己所属的库」，而不是上一个库（否则 A 库路径 + B 库文档，
+    // 切库连续点文档时 URL 错乱、聚焦态也跟着错）。?tree=focus 一并保留。
+    const ws = getCurrentWorkspace();
+    const rootKb = docRootMap.docRoot.get(node.resourceId) ?? null;
+    if (rootKb) {
+      // 聚焦态以地址栏为准：state.route 是异步回灌的，刚点完聚焦立刻点文档会读到旧值，
+      // 导致写 URL 时把 ?tree=focus 丢掉（切走再回来聚焦就没了）。
+      const focusedNow = new URLSearchParams(window.location.search).get("tree") === "focus";
+      const target = `${kbNoteAppPath(ws, rootKb, node.resourceId)}${focusedNow ? "?tree=focus" : ""}`;
+      if (`${resolveCurrentAppPathname()}${window.location.search}` !== target) pushAppPathState(target);
+    }
     await openNoteFromTab(node.resourceId);
-  }, [actions, openNoteFromTab, selectFolder]);
+  }, [actions, openNoteFromTab, selectFolder, docRootMap]);
 
   /** 统一行点击：ctrl/meta=多选切换，shift=范围选，普通=单选 */
   const handleRowClick = useCallback((event: React.MouseEvent, node: KnowledgeTreeNode) => {
@@ -2476,7 +2476,14 @@ export default function SidebarDesktop() {
         onClick={(event) => {
           // 点侧栏空白（非行/按钮/面板头）= 清空选中
           const target = event.target as HTMLElement;
-          if (!target.closest("[data-next-row], button, input, .sbx-row, .sbx-view")) clearSelection();
+          if (target.closest("[data-next-row], button, input, .sbx-row, .sbx-view")) return;
+          clearSelection();
+          // 空白点击代表「不针对任何库」：库 Overview 的 URL 要退回空间根，
+          // 否则主区还显示着某个库，与"什么都没选"的状态自相矛盾。
+          if (state.route.kind === "kb") {
+            const ws = getCurrentWorkspace();
+            pushAppPathState(moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
+          }
         }}
       >
         {/* 多选浮动工具条：批量删除（知识树内） */}

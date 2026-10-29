@@ -99,6 +99,8 @@ interface AppState {
   openToolTabs: ToolTabKey[];
   /** 当前激活的工具页签；null 表示主区显示笔记/其它视图。 */
   activeToolTab: ToolTabKey | null;
+  /** 路由文档打开失败（不存在/无权限）：主区显示「打不开」状态页，不跳转、不丢 URL。 */
+  noteLoadError: { noteId: string; status?: number; message?: string } | null;
   /** 桌面端编辑区分屏：V1 支持一个副分屏，主分屏仍跟随 activeNote。 */
   editorSplit: EditorSplitState | null;
 }
@@ -148,6 +150,7 @@ type Action =
   | { type: "OPEN_TOOL_TAB"; payload: ToolTabKey }
   | { type: "CLOSE_TOOL_TAB"; payload: ToolTabKey }
   | { type: "SET_ACTIVE_TOOL_TAB"; payload: ToolTabKey | null }
+  | { type: "SET_NOTE_LOAD_ERROR"; payload: { noteId: string; status?: number; message?: string } | null }
   | { type: "CLOSE_NOTE_TAB"; payload: string }
   | { type: "UPDATE_NOTE_TAB"; payload: Partial<OpenNoteTab> & { id: string } }
   | { type: "REMOVE_NOTE_TAB"; payload: string }
@@ -295,6 +298,7 @@ const initialState: AppState = {
   openNoteTabs: loadSavedOpenNoteTabs(),
   openToolTabs: [],
   activeToolTab: null,
+  noteLoadError: null,
   editorSplit: null,
 };
 
@@ -405,6 +409,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "SET_ACTIVE_TOOL_TAB":
       return state.activeToolTab === action.payload ? state : { ...state, activeToolTab: action.payload };
+    case "SET_NOTE_LOAD_ERROR":
+      return { ...state, noteLoadError: action.payload };
     case "SET_SIDEBAR_PANEL":
       return state.sidebarPanel === action.payload
         ? state
@@ -757,6 +763,7 @@ export function useAppActions() {
     openToolTab: (key: ToolTabKey) => dispatch({ type: "OPEN_TOOL_TAB", payload: key }),
     closeToolTab: (key: ToolTabKey) => dispatch({ type: "CLOSE_TOOL_TAB", payload: key }),
     setActiveToolTab: (key: ToolTabKey | null) => dispatch({ type: "SET_ACTIVE_TOOL_TAB", payload: key }),
+    setNoteLoadError: (payload: { noteId: string; status?: number; message?: string } | null) => dispatch({ type: "SET_NOTE_LOAD_ERROR", payload }),
     closeNoteTab: (id: string) => dispatch({ type: "CLOSE_NOTE_TAB", payload: id }),
     updateNoteTab: (v: Partial<OpenNoteTab> & { id: string }) => dispatch({ type: "UPDATE_NOTE_TAB", payload: v }),
     removeNoteTab: (id: string) => dispatch({ type: "REMOVE_NOTE_TAB", payload: id }),

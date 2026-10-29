@@ -69,6 +69,17 @@ export default function AppRouteSync() {
   // 自回声抑制：Owner 自己刚写入的期望 URL。他人命令式 push（pushSheetAppPath
   // 等）与 popstate 不等于该值，正常走意图分发。
   const expectedUrlRef = useRef<string>(resolveCurrentAppPathname());
+  // 知识库上下文（聚焦库 / 打开文档）的最近位置：切到其它功能再切回来时恢复用。
+  const lastNotebookPathRef = useRef<string | null>(null);
+  const lastNotebookPathKey = () => `nowen:last-kb-path:${getCurrentWorkspace()}`;
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(lastNotebookPathKey());
+      if (saved && saved.startsWith("/kb/")) lastNotebookPathRef.current = saved;
+    } catch { /* ignore */ }
+    // 只在挂载时读一次（后续由路由变化写入）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   activeNoteRef.current = state.activeNote;
   viewModeRef.current = state.viewMode;
@@ -114,23 +125,19 @@ export default function AppRouteSync() {
             if (!(landed.kind === "note" && landed.noteId === noteId)) return;
 
             console.error("[app-route] failed to open routed note", { noteId, error });
-            // 协调器会保留错误浮层；回列表前先清掉。
             cancelNoteLoad();
             pendingRouteNoteIdRef.current = null;
             activeNoteRef.current = null;
             actions.setActiveNote(null);
             actions.setMobileView("list");
-            actions.setViewMode("all");
-            const kbRoot = moduleAppPath("notebook", getCurrentWorkspace()) ?? KB_ROOT_APP_PATH;
-            replaceAppPathState(kbRoot);
-            expectedUrlRef.current = kbRoot;
+            // 不再 toast + 跳回库根：保留 URL 与上下文，由主区渲染「打不开」状态页，
+            // 让用户看清状态并自己决定返回还是重试（分享链接场景刷新也不会丢位置）。
             const status = (error as { status?: number })?.status;
-            if (status === 404 || status === 403) {
-              // A 404 also hides inaccessible notes and password-protected folders.
-              toast.info(t("noteList.routeUnavailableHint"));
-            } else {
-              toast.error(error instanceof Error ? error.message : t("noteList.loadErrorTitle"));
-            }
+            actions.setNoteLoadError?.({
+              noteId,
+              status,
+              message: error instanceof Error ? error.message : undefined,
+            });
           },
         });
         return;
@@ -211,6 +218,17 @@ export default function AppRouteSync() {
       }
       // route 镜像始终更新（视图层据其渲染），回声只跳过状态回灌。
       actions.setRoute(route);
+      // 离开文档路由时清掉「打不开」状态页，避免它粘在主区
+      if (route.kind !== "note") actions.setNoteLoadError?.(null);
+      // 记住知识库上下文（聚焦的库 / 打开的文档）：切到回收站、插件等功能再切回来时
+      // 用它恢复上次位置，而不是一律回到知识库根。按空间分别存。
+      // 停在库根时也要记录（否则记忆会停留在更早的库/文档，切回来跳到旧位置）。
+      if (route.kind === "kb" || route.kind === "note"
+        || (route.kind === "module" && route.viewMode === "notebook")) {
+        const remembered = `${pathname}${window.location.search}`;
+        lastNotebookPathRef.current = remembered;
+        try { localStorage.setItem(lastNotebookPathKey(), remembered); } catch {}
+      }
       if (
         event?.type === APP_PATH_CHANGED_EVENT
         && (event as CustomEvent<AppPathChangedDetail>).detail?.appPath === expectedUrlRef.current
@@ -273,6 +291,8 @@ export default function AppRouteSync() {
       const targetUrl = new URL(target, window.location.origin);
       const currentUrl = new URL(window.location.href);
       for (const key of EXTRA_QUERY_KEYS) {
+        // ?tree=focus 只属于知识库路径：切到回收站/插件等模块时应当丢弃
+        if (key === "tree" && !target.startsWith("/kb/")) continue;
         const value = currentUrl.searchParams.get(key);
         if (value !== null && !targetUrl.searchParams.has(key)) targetUrl.searchParams.set(key, value);
       }
@@ -306,6 +326,10 @@ export default function AppRouteSync() {
         && route.kind === "note"
         && route.noteId === pendingRouteNoteIdRef.current
       ) {
+        pendingRouteNoteIdRef.current = null;
+      } else if (route.kind === "note" && route.noteId !== pendingRouteNoteIdRef.current) {
+        // 导航已被新的笔记替代（快速连点 A→B）：A 的加载不会再完成，锁必须让位，
+        // 否则后续所有 URL 写入都被这里 return 掉，界面表现为「切一下就卡住」。
         pendingRouteNoteIdRef.current = null;
       } else {
         return;
@@ -397,6 +421,18 @@ export default function AppRouteSync() {
       // 否则从库 Overview/库内文档点 Rail 图标时 URL 不跟随。
       const stayingInNoteFamily = state.viewMode === "notebook" || state.viewMode === "favorites";
       const kbContextUrl = route.kind === "kb" || (route.kind === "note" && !!route.kbId);
+      // 切回知识库时恢复到上次位置（聚焦的库 / 打开的文档），而不是一律回库根。
+      // 只在「刚从别的模块切进来」时触发，且 URL 还停在模块路径上（避免循环）。
+      if (
+        state.viewMode === "notebook"
+        && viewModeChanged
+        && route.kind === "module"
+        && lastNotebookPathRef.current
+        && lastNotebookPathRef.current !== `${pathname}${window.location.search}`
+      ) {
+        write(lastNotebookPathRef.current, "replace");
+        return;
+      }
       if (!kbContextUrl || !stayingInNoteFamily) {
         const target = moduleAppPath(state.viewMode, currentSpace);
         if (target) {
