@@ -1058,8 +1058,37 @@ export function KnowledgeTreePanel({
       || (source.workspaceId ?? null) !== (target.workspaceId ?? null)
       || (source.sharedRootId ?? null) !== (target.sharedRootId ?? null)
       || !isFolderUnlocked(target, unlockedFolderIds)
+      || target.nodeType !== "folder"
     ) return false;
     return !descendantsOf(source.id, allChildren).has(target.id);
+  };
+
+  // 根层落点：树空白区拖放 = 移到当前空间根层；共享根内容只能在其共享根内移动。
+  const canDropIntoRoot = (sourceId: string) => {
+    const source = nodes.find((node) => node.id === sourceId);
+    return Boolean(
+      source
+      && source.access.capabilities.canMove
+      && !isSharedRoot(source)
+      && !source.sharedRootId,
+    );
+  };
+
+  const dropToRoot = async (sourceId: string) => {
+    if (!canDropIntoRoot(sourceId)) {
+      toast.error("无法移动到根层");
+      return;
+    }
+    try {
+      await knowledgeTreeApi.move(sourceId, { parentId: null });
+      await reload();
+      emitTreeChanged("node-moved");
+      actions.refreshNotebooks();
+      actions.refreshNotes();
+      toast.success("已移动到根层");
+    } catch (requestError) {
+      toast.error((requestError as Error)?.message || "移动失败");
+    }
   };
 
   const canDropWithTarget = (
@@ -1241,14 +1270,19 @@ export function KnowledgeTreePanel({
             variant === "mobile" ? "rounded-sm" : "rounded-md",
             active && "bg-app-active text-tx-primary",
             selected && "bg-accent-primary/10 text-tx-primary ring-1 ring-inset ring-accent-primary/25",
-            treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "before"
-              && "before:absolute before:inset-x-0 before:top-0 before:z-10 before:h-0.5 before:bg-accent-primary",
-            treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "after"
-              && "after:absolute after:inset-x-0 after:bottom-0 after:z-10 after:h-0.5 after:bg-accent-primary",
             treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "inside"
-              && "bg-accent-primary/10 text-tx-primary ring-1 ring-inset ring-accent-primary/50",
+              && "bg-accent-primary/20 text-tx-primary ring-1 ring-inset ring-accent-primary",
           )}
-          style={{ paddingLeft: `${depth * treeIndent + treeInset}px` }}
+          style={{
+            paddingLeft: `${depth * treeIndent + treeInset}px`,
+            // 落点阴影与侧边栏区段拖拽一致：上/下半区内阴影表达 before/after。
+            boxShadow:
+              treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "before"
+                ? "inset 0 14px 18px -12px rgba(59,130,246,0.55)"
+                : treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "after"
+                  ? "inset 0 -14px 18px -12px rgba(59,130,246,0.55)"
+                  : undefined,
+          }}
           draggable={!query.trim() && node.access.capabilities.canMove && !isSharedRoot(node)}
           onDragStart={(event) => {
             draggedTreeNodeIdRef.current = node.id;
@@ -1274,6 +1308,7 @@ export function KnowledgeTreePanel({
                 : { nodeId: node.id, placement }
             ));
           }}
+          onDragLeave={() => setTreeDropTarget((current) => (current?.nodeId === node.id ? null : current))}
           onDrop={(event) => {
             if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
             event.preventDefault();
@@ -1624,6 +1659,25 @@ export function KnowledgeTreePanel({
       <div
         className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-1 pb-3"
         data-swipe-blocker="knowledge-tree-scroll"
+        onDragOver={(event) => {
+          // 行内 dragover 已 preventDefault/stopPropagation；只有空白区才走到这里作根层落点。
+          if (event.defaultPrevented) return;
+          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+          const sourceId = draggedTreeNodeIdRef.current || "";
+          if (!sourceId || !canDropIntoRoot(sourceId)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          if (event.defaultPrevented) return;
+          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+          const sourceId = event.dataTransfer.getData("application/x-nowen-tree-node") || draggedTreeNodeIdRef.current || "";
+          if (!sourceId || !canDropIntoRoot(sourceId)) return;
+          event.preventDefault();
+          setTreeDropTarget(null);
+          draggedTreeNodeIdRef.current = null;
+          void dropToRoot(sourceId);
+        }}
         onClick={(event) => {
           const target = event.target as HTMLElement;
           if (!target.closest("[data-knowledge-tree-select-id]")) clearSelection();

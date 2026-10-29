@@ -2621,7 +2621,7 @@ export default function NoteList() {
           icon: <Download size={14} />,
           children: [
             { id: "export_md", label: t("noteList.exportAsMarkdown") || "Markdown", icon: <Download size={14} /> },
-            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）", icon: <Download size={14} /> },
+            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP", icon: <Download size={14} /> },
             { id: "export_pdf", label: t("noteList.exportAsPDF") || "PDF", icon: <Printer size={14} /> },
             { id: "export_png", label: t("note.exportAsPng") || "图片 PNG", icon: <ImageIcon size={14} /> },
             { id: "export_jpg", label: t("note.exportAsJpg") || "图片 JPG", icon: <ImageIcon size={14} /> },

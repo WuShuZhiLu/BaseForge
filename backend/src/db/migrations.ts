@@ -11,6 +11,7 @@ import { pmItemNoMigration } from "./pmItemNoMigration.js";
 import { pmM3Migration } from "./pmM3Migration.js";
 import { anonymousDocumentsMigration } from "./anonymousDocumentsMigration.js";
 import { mindmapDocsMigration } from "./mindmapDocsMigration.js";
+import { notebookIsFavoriteMigration } from "./notebookIsFavoriteMigration.js";
 /**
  * Compatibility wrapper around the historical migration list.
  *
@@ -433,6 +434,7 @@ export const MIGRATIONS: Migration[] = [
   pmM3Migration,
   anonymousDocumentsMigration,
   mindmapDocsMigration,
+  notebookIsFavoriteMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(

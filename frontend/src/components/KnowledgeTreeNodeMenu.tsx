@@ -62,7 +62,7 @@ import {
   exportNoteAsImage,
 } from "@/lib/exportService";
 import type { KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
-import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
+import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import {
   convertNoteContent,
   getNoteFormatConversionTarget,
@@ -104,7 +104,7 @@ function separator(id: string): ContextMenuItem {
 function exportChildren(): ContextMenuItem[] {
   return [
     { id: "export_note_md", label: "Markdown", icon: <Download size={14} /> },
-    { id: "export_note_md_zip", label: "Markdown + 附件（ZIP）", icon: <Download size={14} /> },
+    { id: "export_note_md_zip", label: "Markdown + 附件 ZIP", icon: <Download size={14} /> },
     { id: "export_note_pdf", label: "PDF", icon: <Printer size={14} /> },
     { id: "export_note_png", label: "PNG", icon: <ImageIcon size={14} /> },
     { id: "export_note_jpg", label: "JPG", icon: <ImageIcon size={14} /> },
@@ -123,7 +123,7 @@ function createChildren(): ContextMenuItem[] {
 function importChildren(): ContextMenuItem[] {
   return [
     { id: "import_markdown", label: "Markdown", icon: <FileCode size={14} /> },
-    { id: "import_markdown_zip", label: "Markdown + 附件（ZIP）", icon: <FileArchive size={14} /> },
+    { id: "import_markdown_zip", label: "Markdown + 附件 ZIP", icon: <FileArchive size={14} /> },
     { id: "import_word", label: "Word 文档", icon: <FileType2 size={14} /> },
     { id: "import_url", label: "公众号文章", icon: <Link2 size={14} /> },
   ];
@@ -234,6 +234,14 @@ export function buildKnowledgeTreeNodeMenuItems(
   }
 
   const management: ContextMenuItem[] = [];
+  // 知识库（根层 notebook）收藏：与文档收藏同一菜单语义，落 notebooks.isFavorite
+  if (isNotebook && node.parentId === null && capabilities.canEdit) {
+    management.push({
+      id: "toggle_favorite",
+      label: node.isFavorite === 1 ? "取消收藏" : "收藏",
+      icon: node.isFavorite === 1 ? <StarOff size={14} /> : <Star size={14} />,
+    });
+  }
   if (isNotebook && capabilities.canEdit) {
     management.push({ id: "change_icon", label: "修改图标", icon: <MoreHorizontal size={14} /> });
   }
@@ -676,7 +684,15 @@ export default function KnowledgeTreeNodeMenu({
         case "import_markdown_zip": await importMarkdownZip(); break;
         case "import_word": await importWord(); break;
         case "import_url": await importUrl(); break;
-        case "toggle_favorite": await patchNote({ isFavorite: note?.isFavorite === 1 ? 0 : 1 }); break;
+        case "toggle_favorite":
+          if (node.resourceType === "notebook") {
+            await knowledgeTreeApi.update(node.id, { isFavorite: node.isFavorite === 1 ? 0 : 1 });
+            window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+            toast.success(node.isFavorite === 1 ? "已取消收藏" : "已收藏");
+            break;
+          }
+          await patchNote({ isFavorite: note?.isFavorite === 1 ? 0 : 1 });
+          break;
         case "toggle_lock": await patchNote({ isLocked: note?.isLocked === 1 ? 0 : 1 }); break;
         case "convert_format": await convertFormat(); break;
         case "save_as_template": await saveAsTemplate(); break;

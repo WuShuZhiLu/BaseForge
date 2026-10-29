@@ -18,6 +18,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Circle,
+  Ellipsis,
   ExternalLink,
   FileCode,
   FilePlus2,
@@ -558,7 +559,9 @@ export default function SidebarDesktop() {
         folder: "新建文件夹", note: "新建文档", markdown: "新建 Markdown",
         mindmap: "新建思维导图", sheet: "新建表格", plain: "新建纯文本", board: "新建画板",
       };
-      const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title: titles[kind] });
+      // 根级新建的 folder 即知识库（新建菜单根级只有「新建知识库」一项），默认名不能是「新建文件夹」
+      const title = kind === "folder" && parentId === null ? "新建知识库" : titles[kind];
+      const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致
@@ -739,10 +742,18 @@ export default function SidebarDesktop() {
   }, [spaceOpen, rowMenu, focusRootId, query, renaming, searchOpen]);
 
   // ---- 重命名 input 自动聚焦 ----
+  // 全选只在进入重命名时执行一次：onChange 每次按键都生成新 renaming 对象，
+  // 若 effect 依赖整个 renaming，会每次输入都重跑 select()（输入一字即全选被覆盖）。
+  const renameSelectKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (renaming) {
-      requestAnimationFrame(() => renameInputRef.current?.select());
+    if (!renaming) {
+      renameSelectKeyRef.current = null;
+      return;
     }
+    const key = `${renaming.kind}:${renaming.id}`;
+    if (renameSelectKeyRef.current === key) return;
+    renameSelectKeyRef.current = key;
+    requestAnimationFrame(() => renameInputRef.current?.select());
   }, [renaming]);
 
   // ---- 搜索弹层：防抖搜当前空间文档 + 本地过滤标签 ----
@@ -977,6 +988,16 @@ export default function SidebarDesktop() {
     if (!focusRootResourceId) return starDocs;
     return starDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [starDocs, focusRootResourceId, docRootMap]);
+
+  // 收藏区段的根层知识库：树节点 isFavorite=1 的知识库（notebook 收藏落 notebooks 表），
+  // 同样跟随聚焦范围——聚焦某库时只显示该库自身的收藏项
+  const visibleStarKbs = useMemo(() => {
+    const kbs = nodes.filter(
+      (n) => !n.isDeleted && n.parentId === null && n.resourceType === "notebook" && n.isFavorite === 1,
+    );
+    if (!focusRootResourceId) return kbs;
+    return kbs.filter((kb) => kb.resourceId === focusRootResourceId);
+  }, [nodes, focusRootResourceId]);
 
   // 收藏模块：当前笔记不在（可见）收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
   // 走协调器（缓存优先 + 意图守卫）但保持原语义：只预载 activeNote，不切视图、不开页签。
@@ -1442,7 +1463,7 @@ export default function SidebarDesktop() {
   // ---- 行级菜单动作 ----
   const startCreateFolder = useCallback(async (parentId: string | null) => {
     try {
-      const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: "新建文件夹" });
+      const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: parentId === null ? "新建知识库" : "新建文件夹" });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) {
         // 父折叠则展开
@@ -1601,6 +1622,8 @@ export default function SidebarDesktop() {
   }, [tags, tagsExpanded, tagDocs, focusRootResourceId, docRootMap]);
 
   const focusRoot = focusRootId ? nodes.find((n) => n.id === focusRootId) ?? null : null;
+  // 收藏区段总数（文档 + 知识库）
+  const starTotal = visibleStarDocs.length + visibleStarKbs.length;
 
   // ---- 区段渲染顺序 ----
   const sectionMap: Record<SectionId, React.ReactNode> = {
@@ -1688,7 +1711,7 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                <Ellipsis size={13} />
               </button>
             </>
           )}
@@ -1793,18 +1816,41 @@ export default function SidebarDesktop() {
                       </button>
 
                       {isRenaming ? (
-                        <input
-                          ref={renameInputRef}
-                          value={renaming.value}
-                          onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
-                          }}
-                          onBlur={() => void commitRename()}
-                          className="min-w-0 flex-1 rounded border border-accent-primary bg-app-bg px-1 text-xs text-tx-primary outline-none"
-                          autoFocus
-                        />
+                        <>
+                          <input
+                            ref={renameInputRef}
+                            value={renaming.value}
+                            onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
+                            }}
+                            onBlur={() => void commitRename()}
+                            className="min-w-0 flex-1 rounded border border-accent-primary/60 bg-app-bg px-1.5 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+                            autoFocus
+                          />
+                          {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void commitRename()}
+                            title="确认"
+                            aria-label="确认重命名"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-accent-primary/10"
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setRenaming(null)}
+                            title="取消"
+                            aria-label="取消重命名"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -1827,7 +1873,7 @@ export default function SidebarDesktop() {
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); focusKb(node.resourceId); }}
-                              title="聚焦此知识库（库内树空间）"
+                              title="聚焦此知识库"
                               className={cn(
                                 "h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-accent-primary group-hover:flex",
                                 isSelected && "flex",
@@ -1850,7 +1896,7 @@ export default function SidebarDesktop() {
                             title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                             className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                           >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                            <Ellipsis size={13} />
                           </button>
                         </>
                       )}
@@ -1894,7 +1940,7 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                <Ellipsis size={13} />
               </button>
             </>
           )}
@@ -1928,18 +1974,41 @@ export default function SidebarDesktop() {
                         <ChevronDown size={13} className={cn("transition-transform", !tagOpen && "-rotate-90")} />
                       </button>
                       {isRenaming ? (
-                        <input
-                          ref={renameInputRef}
-                          value={renaming.value}
-                          onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
-                          }}
-                          onBlur={() => void commitRename()}
-                          className="min-w-0 flex-1 rounded border border-accent-primary bg-app-bg px-1 text-xs text-tx-primary outline-none"
-                          autoFocus
-                        />
+                        <>
+                          <input
+                            ref={renameInputRef}
+                            value={renaming.value}
+                            onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
+                            }}
+                            onBlur={() => void commitRename()}
+                            className="min-w-0 flex-1 rounded border border-accent-primary/60 bg-app-bg px-1.5 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+                            autoFocus
+                          />
+                          {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void commitRename()}
+                            title="确认"
+                            aria-label="确认重命名"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-accent-primary/10"
+                          >
+                            <Check size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setRenaming(null)}
+                            title="取消"
+                            aria-label="取消重命名"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                          >
+                            <X size={12} />
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -1964,7 +2033,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                          <Ellipsis size={13} />
                         </button>
                       )}
                     </div>
@@ -1996,7 +2065,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                          <Ellipsis size={13} />
                         </button>
                       </div>
                     ))}
@@ -2113,19 +2182,22 @@ export default function SidebarDesktop() {
             <>
               <button
                 type="button"
-                title={`取消所有收藏（${visibleStarDocs.length} 条）`}
+                title={`取消所有收藏，共 ${starTotal} 条`}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-accent-danger"
                 onClick={async () => {
-                  if (visibleStarDocs.length === 0) return;
+                  if (starTotal === 0) return;
                   const ok = await confirm({
                     title: "取消全部收藏",
                     description: focusRootResourceId
-                      ? `将取消当前知识库内 ${visibleStarDocs.length} 条文档的收藏，文档本身不受影响。`
-                      : `将取消 ${visibleStarDocs.length} 条文档的收藏，文档本身不受影响。`,
+                      ? `将取消当前知识库内 ${starTotal} 项的收藏，文档与知识库本身不受影响。`
+                      : `将取消 ${starTotal} 项的收藏，文档与知识库本身不受影响。`,
                     confirmText: "取消收藏",
                   });
                   if (!ok) return;
-                  Promise.all(visibleStarDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)))
+                  Promise.all([
+                    ...visibleStarDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)),
+                    ...visibleStarKbs.map((kb) => knowledgeTreeApi.update(kb.id, { isFavorite: 0 })),
+                  ])
                     .then(() => {
                       reloadStar();
                       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
@@ -2135,37 +2207,69 @@ export default function SidebarDesktop() {
               >
                 <Star size={13} />
               </button>
-              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{visibleStarDocs.length}</span>
+              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{starTotal}</span>
             </>
           )}
         </div>
         {!collapsedSections.has("star") && (
           <div className="pb-1">
-            {visibleStarDocs.length === 0 ? (
+            {starTotal === 0 ? (
               <p className="px-6 py-1 text-xs text-tx-tertiary">暂无收藏</p>
-            ) : visibleStarDocs.map((doc) => (
-              <div
-                key={doc.id}
-                className="sbx-row group"
-                onClick={() => { void openNoteFromTab(doc.id); }}
-              >
-                <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
-                <span className="min-w-0 flex-1">
-                  <div className="truncate text-xs text-tx-primary">{doc.title}</div>
-                  <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
-                </span>
-                <span className="sbx-acts">
-                  <button
-                    type="button"
-                    title="取消收藏"
-                    onClick={(e) => { e.stopPropagation(); api.updateNote(doc.id, { isFavorite: 0 } as never).then(() => reloadStar()).catch(() => undefined); }}
-                    className="sbx-btn"
+            ) : (
+              <>
+                {visibleStarKbs.map((kb) => (
+                  <div
+                    key={`kb-${kb.id}`}
+                    className="sbx-row group"
+                    onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <Star size={12} className="text-amber-400" fill="currentColor" />
-                  </button>
-                </span>
-              </div>
-            ))}
+                    <span className="sbx-ico"><FaBook size={14} className="text-accent-primary" /></span>
+                    <span className="min-w-0 flex-1">
+                      <div className="truncate text-xs text-tx-primary">{kb.title}</div>
+                      <div className="sbx-sub">知识库</div>
+                    </span>
+                    <span className="sbx-acts">
+                      <button
+                        type="button"
+                        title="取消收藏"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          knowledgeTreeApi.update(kb.id, { isFavorite: 0 })
+                            .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+                            .catch(() => undefined);
+                        }}
+                        className="sbx-btn"
+                      >
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+                {visibleStarDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="sbx-row group"
+                    onClick={() => { void openNoteFromTab(doc.id); }}
+                  >
+                    <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
+                    <span className="min-w-0 flex-1">
+                      <div className="truncate text-xs text-tx-primary">{doc.title}</div>
+                      <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
+                    </span>
+                    <span className="sbx-acts">
+                      <button
+                        type="button"
+                        title="取消收藏"
+                        onClick={(e) => { e.stopPropagation(); api.updateNote(doc.id, { isFavorite: 0 } as never).then(() => reloadStar()).catch(() => undefined); }}
+                        className="sbx-btn"
+                      >
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </section>
@@ -2491,6 +2595,8 @@ export default function SidebarDesktop() {
           const target = event.target as HTMLElement;
           if (target.closest("[data-next-row], button, input, .sbx-row, .sbx-view")) return;
           clearSelection();
+          // 聚焦态（库内树空间）点空白只清选中，不退出聚焦
+          if (focusRootId) return;
           // 空白点击代表「不针对任何库」：库 Overview 的 URL 要退回空间根，
           // 否则主区还显示着某个库，与"什么都没选"的状态自相矛盾。
           if (state.route.kind === "kb") {

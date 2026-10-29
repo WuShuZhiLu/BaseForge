@@ -191,7 +191,7 @@ export const knowledgeTreeApi = {
     });
   },
 
-  update(nodeId: string, input: { title?: string; isExpanded?: boolean }) {
+  update(nodeId: string, input: { title?: string; isExpanded?: boolean; isFavorite?: number }) {
     return request<KnowledgeTreeNode | { success: true }>(
       `/nodes/${encodeURIComponent(nodeId)}?${workspaceQuery()}`,
       { method: "PATCH", body: JSON.stringify(input) },

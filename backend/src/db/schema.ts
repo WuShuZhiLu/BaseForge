@@ -192,6 +192,7 @@ function initSchema(db: Database.Database) {
       isExpanded INTEGER DEFAULT 1,
       isDeleted INTEGER NOT NULL DEFAULT 0,
       deletedAt TEXT,
+      isFavorite INTEGER NOT NULL DEFAULT 0,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
