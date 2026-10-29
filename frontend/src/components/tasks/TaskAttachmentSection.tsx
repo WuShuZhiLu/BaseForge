@@ -17,6 +17,7 @@ import {
 import type { Task } from "@/types";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { confirm } from "@/components/ui/confirm";
 import {
   listTaskAttachments,
   removeTaskAttachment,
@@ -135,7 +136,12 @@ export default function TaskAttachmentSection({ task }: { task: Pick<Task, "id" 
       toast.error("该附件仍被任务标题或详情引用，请先移除正文中的对应图片后再删除");
       return;
     }
-    if (!window.confirm(`确定删除附件“${item.filename}”吗？`)) return;
+    const ok = await confirm({
+      title: `删除附件“${item.filename}”？`,
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     setDeletingId(item.id);
     try {
       await removeTaskAttachment(item.id, task.id);

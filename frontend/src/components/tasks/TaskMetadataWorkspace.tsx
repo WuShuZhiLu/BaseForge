@@ -23,6 +23,7 @@ import { api } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { Task, TaskProject } from "@/types";
+import { confirm } from "@/components/ui/confirm";
 import {
   createTaskLabel,
   createTaskSavedView,
@@ -355,10 +356,12 @@ export function TaskMetadataWorkspace({ children }: { children: React.ReactNode 
   };
 
   const removeLabel = async (label: TaskLabel) => {
-    const confirmed = window.confirm(
-      zh ? `删除标签「${label.name}」？任务不会被删除。` : `Delete “${label.name}”? Tasks will remain.`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: zh ? `删除标签「${label.name}」？` : `Delete “${label.name}”?`,
+      description: zh ? "任务不会被删除。" : "Tasks will remain.",
+      confirmText: zh ? "删除" : "Delete",
+    });
+    if (!ok) return;
     try {
       await deleteTaskLabel(label.id);
       setFilters((current) => ({
@@ -427,10 +430,11 @@ export function TaskMetadataWorkspace({ children }: { children: React.ReactNode 
 
   const removeView = async (id: string) => {
     const view = snapshot.views.find((item) => item.id === id);
-    const confirmed = window.confirm(
-      zh ? `删除视图「${view?.name || ""}」？` : `Delete view “${view?.name || ""}”?`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: zh ? `删除视图「${view?.name || ""}」？` : `Delete view “${view?.name || ""}”?`,
+      confirmText: zh ? "删除" : "Delete",
+    });
+    if (!ok) return;
     try {
       await deleteTaskSavedView(id);
       if (activeViewId === id) clearFilters();
