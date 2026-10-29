@@ -385,7 +385,6 @@ body {
   padding-left: 1rem;
   margin: 1rem 0;
   color: var(--pm-blockquote-text);
-  font-style: italic;
 }
 
 .ProseMirror code {

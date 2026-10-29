@@ -287,7 +287,7 @@ const nowenMdHighlight = HighlightStyle.define([
   { tag: t.link, color: "var(--color-accent-primary, #3b82f6)", textDecoration: "underline" },
   { tag: t.url, color: "var(--color-accent-primary, #3b82f6)" },
   { tag: t.monospace, fontFamily: "ui-monospace, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace" },
-  { tag: t.quote, fontStyle: "italic", color: "var(--color-text-secondary, #64748b)" },
+  { tag: t.quote, color: "var(--color-text-secondary, #64748b)" },
   { tag: t.processingInstruction, color: "var(--color-text-tertiary, #94a3b8)" },
   { tag: t.list, color: "var(--color-accent-primary, #3b82f6)" },
 ]);
