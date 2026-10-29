@@ -1764,7 +1764,7 @@ export const api = {
    * 搜索笔记（用于笔记引用）
    * 只返回当前用户有权限访问的笔记
    */
-  searchNotes: async (query: string, limit: number = 10): Promise<Array<{ id: string; title: string; notebookId: string; updatedAt: string }>> => {
+  searchNotes: async (query: string, limit: number = 10): Promise<Array<{ id: string; title: string; notebookId: string; updatedAt: string; isFavorite: number }>> => {
     if (!query.trim()) return [];
     const params = new URLSearchParams();
     params.set("q", query.trim());
@@ -1774,11 +1774,13 @@ export const api = {
     return items
       .filter((item: { resourceType?: string }) => item?.resourceType !== "mindmap" && item?.resourceType !== "sheet")
       .slice(0, limit)
-      .map((item: { id: string; title: string; notebookId: string; updatedAt: string }) => ({
-      id: item.id,
-      title: item.title,
-      notebookId: item.notebookId,
+      .map((item: { id: string; title: string; notebookId: string; updatedAt: string; isFavorite?: number | boolean }) => ({
+        id: item.id,
+        title: item.title,
+        notebookId: item.notebookId,
         updatedAt: item.updatedAt,
+        // 收藏筛选依赖该字段（后端 /search 已返回），不能在此丢掉
+        isFavorite: Number(item.isFavorite ?? 0),
       }));
   },
   /**

@@ -85,7 +85,18 @@ const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MAX_WIDTH = 420;
 
-type FilterScope = "all" | "folder" | "note";
+/** 搜索筛选范围（头部漏斗）：限制搜索结果的类型；收藏/标签 = 只在已收藏/已加标签的文档里搜 */
+type FilterScope = "all" | "notebook" | "document" | "folder" | "favorite" | "tag";
+const FILTER_SCOPE_VALUES: FilterScope[] = ["all", "notebook", "document", "folder", "favorite", "tag"];
+/** 搜索结果面板内置的类型筛选（chips） */
+const FILTER_SCOPE_OPTIONS: Array<{ value: FilterScope; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "notebook", label: "知识库" },
+  { value: "document", label: "文档" },
+  { value: "folder", label: "文件夹" },
+  { value: "favorite", label: "收藏" },
+  { value: "tag", label: "标签" },
+];
 
 /** 区段顺序（可拖拽排序，持久化到 localStorage）。收藏作为知识库面板的一个区段（功能太少，不设独立面板） */
 type SectionId = "kb" | "tags" | "editors" | "star";
@@ -131,25 +142,19 @@ function buildChildrenMap(nodes: KnowledgeTreeNode[], sortMode?: KnowledgeTreeSo
 }
 
 /**
- * 可见性引擎（brief 4.3）。
+ * 可见性引擎（brief 4.3）。头部筛选（FilterScope）只作用于搜索弹层，不再生效于树。
  * @param focusRootId 专注模式根节点 id；非空时只遍历该子树。
  */
 function buildRows(
   nodes: KnowledgeTreeNode[],
   expanded: ExpandedSet,
   query: string,
-  scope: FilterScope,
   focusRootId: string | null,
 ): FlatRow[] {
   const children = buildChildrenMap(nodes);
   const keyword = query.trim().toLowerCase();
   const searching = keyword.length > 0;
 
-  const matchesScope = (node: KnowledgeTreeNode): boolean => {
-    if (scope === "all") return true;
-    const isFolder = node.nodeType === "folder";
-    return scope === "folder" ? isFolder : !isFolder;
-  };
   const matchesKeyword = (node: KnowledgeTreeNode): boolean =>
     !searching || node.title.toLowerCase().includes(keyword);
 
@@ -166,30 +171,13 @@ function buildRows(
 
       if (searching) {
         // 搜索：忽略折叠态，自身或后代命中即显示，路径自动展开
-        const subtreeHit = matchesKeyword(node) && matchesScope(node);
-        const descendantHit = subtreeHasMatch(node.id, children, keyword, scope);
+        const subtreeHit = matchesKeyword(node);
+        const descendantHit = subtreeHasMatch(node.id, children, keyword);
         if (!subtreeHit && !descendantHit) continue;
         sawVisible = true;
         rows.push({ node, depth, hasChildren, expanded: true, ancestorIds });
         walk(node.id, depth + 1, [...ancestorIds, node.id]);
         continue;
-      }
-
-      // 无关键词：scope 过滤（文件夹作为路径保留，但"仅笔记"下无可见文档的空文件夹剔除）
-      const self = matchesScope(node);
-      if (scope === "note" && !self) {
-        // 文件夹只有在其子树内存在文档时才保留
-        if (subtreeHasMatch(node.id, children, "", "note")) {
-          sawVisible = true;
-          rows.push({ node, depth, hasChildren, expanded: isExpanded, ancestorIds });
-          if (isExpanded) walk(node.id, depth + 1, [...ancestorIds, node.id]);
-        }
-        continue;
-      }
-      if (scope === "folder" && !self && !hasChildren) continue;
-      if (scope === "folder" && !self) {
-        // 仅文件夹模式：含子文件夹的文件夹保留
-        if (!subtreeHasMatch(node.id, children, "", "folder")) continue;
       }
 
       sawVisible = true;
@@ -209,27 +197,22 @@ function buildRows(
     walk(null, 0, []);
   }
 
-  // scope=note 无关键词时空文件夹已被 walk 内剔除；scope=folder 空叶子文件夹同理。
   void sawVisible;
   return rows;
 }
 
-/** 子树内是否存在匹配节点（用于搜索命中路径与 scope 下的路径保留）。 */
+/** 子树内是否存在关键词匹配节点（用于搜索命中路径保留）。 */
 function subtreeHasMatch(
   nodeId: string,
   children: Map<string | null, KnowledgeTreeNode[]>,
   keyword: string,
-  scope: FilterScope,
 ): boolean {
   const k = keyword.trim().toLowerCase();
   const stack = [...(children.get(nodeId) ?? [])];
   while (stack.length) {
     const cur = stack.pop()!;
     if (cur.isDeleted) continue;
-    const isFolder = cur.nodeType === "folder";
-    const scopeHit = scope === "all" || (scope === "folder" ? isFolder : !isFolder);
-    const kwHit = !k || cur.title.toLowerCase().includes(k);
-    if (scopeHit && kwHit) return true;
+    if (k && cur.title.toLowerCase().includes(k)) return true;
     stack.push(...(children.get(cur.id) ?? []));
   }
   return false;
@@ -296,7 +279,8 @@ export default function SidebarDesktop() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<FilterScope>("all");
-  // 树筛选 scope ⇄ URL（?scope=note|folder）：与 ?q= 同款握手（回灌置标记让写侧让位）。
+  // 搜索筛选 scope ⇄ URL（?scope=all|notebook|document|folder|favorite|tag）：
+  // 与 ?q= 同款握手（回灌置标记让写侧让位）。遗留值 note/folder 中 note 已并入 document。
   const applyingRouteScopeRef = useRef(false);
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
@@ -304,10 +288,13 @@ export default function SidebarDesktop() {
   // URL 旧值弹回，形成「切不回全部」的死锁）。
   useEffect(() => {
     const routeScope = state.route.scope;
-    if (routeScope !== "note" && routeScope !== "folder") return;
-    if (routeScope === scopeRef.current) return;
+    const normalized: FilterScope | null =
+      routeScope === "note" || routeScope === "document" ? "document"
+        : FILTER_SCOPE_VALUES.includes(routeScope as FilterScope) ? (routeScope as FilterScope)
+          : null;
+    if (!normalized || normalized === scopeRef.current) return;
     applyingRouteScopeRef.current = true;
-    setScope(routeScope);
+    setScope(normalized);
   }, [state.route]);
   useEffect(() => {
     if (applyingRouteScopeRef.current) {
@@ -323,7 +310,6 @@ export default function SidebarDesktop() {
     replaceAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
   }, [scope]);
   const [spaceOpen, setSpaceOpen] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
   const [expanded, setExpanded] = useState<ExpandedSet>(() => new Set());
 
   // 标签树状态
@@ -344,7 +330,6 @@ export default function SidebarDesktop() {
   // 搜索范围：进入知识库后默认「库内」，可切「全空间」；未进入恒为全空间
   const [searchScope, setSearchScope] = useState<"kb" | "all">("all");
   const [searchTagOpen, setSearchTagOpen] = useState<string | null>(null);
-  const searchRef2 = useRef<HTMLDivElement>(null);
 
   // 行级菜单
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
@@ -632,8 +617,9 @@ export default function SidebarDesktop() {
   }, [nodes, openNoteFromTab, actions, state.activeNote?.notebookId, state.selectedNotebookId, state.notebooks]);
 
   const spaceRef = useRef<HTMLDivElement>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchPopupRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const treeRootRef = useRef<HTMLDivElement>(null);
@@ -747,20 +733,19 @@ export default function SidebarDesktop() {
 
   // ---- 浮层关闭 ----
   useEffect(() => {
-    if (!spaceOpen && !filterOpen && !rowMenu && !searchOpen) return;
+    if (!spaceOpen && !rowMenu && !searchOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!spaceRef.current?.contains(target)) setSpaceOpen(false);
-      if (!filterRef.current?.contains(target)) setFilterOpen(false);
       if (!menuRef.current?.contains(target)) setRowMenu(null);
-      // 搜索弹层：点弹层外（含搜索框本身外）关闭
-      if (!searchRef2.current?.contains(target) && !searchRef.current?.contains(target)) setSearchOpen(false);
+      // 搜索弹层（portal 挂 body）：点弹层与搜索框之外关闭
+      if (!searchPopupRef.current?.contains(target) && !searchContainerRef.current?.contains(target)) setSearchOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       // Esc 优先退专注（brief 4.5），其次关菜单/浮层，最后清空搜索
       if (rowMenu) { setRowMenu(null); return; }
-      if (spaceOpen || filterOpen) { setSpaceOpen(false); setFilterOpen(false); return; }
+      if (spaceOpen) { setSpaceOpen(false); return; }
       if (focusRootId) { exitKb(); return; }
       if (searchOpen) { setSearchOpen(false); return; }
       if (query) { setQuery(""); return; }
@@ -772,7 +757,7 @@ export default function SidebarDesktop() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [spaceOpen, filterOpen, rowMenu, focusRootId, query, renaming, searchOpen]);
+  }, [spaceOpen, rowMenu, focusRootId, query, renaming, searchOpen]);
 
   // ---- 重命名 input 自动聚焦 ----
   useEffect(() => {
@@ -791,14 +776,20 @@ export default function SidebarDesktop() {
     }
     setSearchOpen(true);
     setSearching(true);
+    // 在途请求作废标记：快速连续输入时旧响应不能覆盖新结果
+    let stale = false;
     const timer = setTimeout(() => {
       api.searchNotes(keyword, 20)
-        .then((items) => setSearchDocs(items as NoteListItem[]))
-        .catch(() => setSearchDocs([]))
-        .finally(() => setSearching(false));
+        .then((items) => { if (!stale) setSearchDocs(items as NoteListItem[]); })
+        .catch(() => { if (!stale) setSearchDocs([]); })
+        .finally(() => { if (!stale) setSearching(false); });
     }, 250);
-    return () => clearTimeout(timer);
+    return () => { stale = true; clearTimeout(timer); };
   }, [query]);
+
+  // ---- 搜索面板 ----
+  // 面板以 absolute 悬在头部下方、四边距 6px：宽度天然等于侧栏宽，不会越过侧栏压到编辑区。
+  // （之前用 absolute + 定宽/portal 测距，既溢宽又多一层 JS，已移除）
 
   // ---- 搜索状态 ⇄ URL（?q= 叠加在当前路径上，replace 不污染历史）----
   // 写侧：与搜索请求同防抖节奏，停止输入 250ms 后 URL 稳定为 /当前路径?q=词；
@@ -986,8 +977,9 @@ export default function SidebarDesktop() {
   }, [focusRootId]);
 
   const rows = useMemo(
-    () => buildRows(nodes, expanded, query, scope, focusRootId),
-    [nodes, expanded, query, scope, focusRootId],
+    // 头部筛选（scope）只作用于搜索弹层，知识树始终展示全部节点类型
+    () => buildRows(nodes, expanded, query, focusRootId),
+    [nodes, expanded, query, focusRootId],
   );
 
   // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）。
@@ -1001,25 +993,50 @@ export default function SidebarDesktop() {
     return searchDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [searchDocs, searchScope, focusRootResourceId, docRootMap]);
 
-  // 搜索结果分类（用户要求）：标签 / 收藏 / 知识库·文件夹 / 文档。
+  // 搜索结果分类（头部筛选控制分区显隐与文档集合）：标签 / 收藏 / 知识库·文件夹 / 文档。
   // 收藏与文档互斥展示，避免同一篇文档在弹层里出现两次。
+  // favorite/tag 筛选 = 只在已收藏/已加标签的文档里搜（树节点自带 isFavorite；
+  // 有标签文档集合由标签面板已加载的 tagDocs 汇总）。
+  const taggedDocIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const docs of Object.values(tagDocs)) {
+      for (const doc of docs) set.add(doc.id);
+    }
+    return set;
+  }, [tagDocs]);
   const favoriteSearchDocs = useMemo(
-    () => visibleSearchDocs.filter((doc) => doc.isFavorite === 1),
-    [visibleSearchDocs],
+    () => (scope === "tag" ? [] : visibleSearchDocs.filter((doc) => doc.isFavorite === 1)),
+    [visibleSearchDocs, scope],
   );
-  const plainSearchDocs = useMemo(
-    () => visibleSearchDocs.filter((doc) => doc.isFavorite !== 1),
-    [visibleSearchDocs],
-  );
+  const plainSearchDocs = useMemo(() => {
+    let docs = visibleSearchDocs.filter((doc) => doc.isFavorite !== 1);
+    if (scope === "favorite") docs = visibleSearchDocs.filter((doc) => doc.isFavorite === 1);
+    else if (scope === "tag") docs = docs.filter((doc) => taggedDocIds.has(doc.id));
+    return docs;
+  }, [visibleSearchDocs, scope, taggedDocIds]);
   // 知识库/文件夹：本地树节点匹配（文档走接口搜索，这里只匹配容器节点）。
+  // 筛选 scope：知识库=仅根层库，文件夹=仅非根层文件夹，文档/收藏/标签=不显示容器。
   const matchedTreeNodes = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return [];
+    if (scope === "document" || scope === "favorite" || scope === "tag") return [];
     return nodes
-      .filter((n) => !n.isDeleted && (n.nodeType === "folder" || (n.parentId === null && n.resourceType === "notebook")))
+      .filter((n) => {
+        if (n.isDeleted) return false;
+        if (scope === "notebook") return n.nodeType === "folder" && n.parentId === null && n.resourceType === "notebook";
+        if (scope === "folder") return n.nodeType === "folder" && !(n.parentId === null && n.resourceType === "notebook");
+        return n.nodeType === "folder" || (n.parentId === null && n.resourceType === "notebook");
+      })
       .filter((n) => n.title.toLowerCase().includes(keyword))
       .slice(0, 8);
-  }, [nodes, query]);
+  }, [nodes, query, scope]);
+  // 弹层分区显隐（随筛选 scope）：全部=四类都看；单档=只看对应类
+  const searchSections = useMemo(() => ({
+    tags: scope === "all" || scope === "tag",
+    favorite: scope === "all" || scope === "favorite",
+    tree: matchedTreeNodes.length > 0,
+    docs: scope !== "notebook" && scope !== "folder",
+  }), [scope, matchedTreeNodes.length]);
 
   /** 搜索结果点文件夹：展开到该节点并关闭弹层（不改变聚焦态）。 */
   const revealTreeNode = useCallback((nodeId: string) => {
@@ -2118,7 +2135,7 @@ export default function SidebarDesktop() {
       style={{ width: sidebarWidth }}
       data-next-sidebar=""
     >
-      {/* ===== 头部：位置 + 搜索 + 筛选（48px，三区通栏线对齐） ===== */}
+      {/* ===== 头部：位置 + 搜索（筛选内置在搜索结果面板内）（48px，三区通栏线对齐） ===== */}
       <header className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2.5">
         <div ref={spaceRef} className="relative shrink-0">
           <button
@@ -2177,6 +2194,7 @@ export default function SidebarDesktop() {
 
         {/* 搜索：照抄原型 .sb-search（26px 高、透明边框、聚焦实底+accent 边框）；仅知识库视图有语义 */}
         <div
+          ref={searchContainerRef}
           hidden={sidebarView !== "kb"}
           className={cn(
             "relative flex h-[26px] min-w-0 flex-1 items-center gap-1.5 rounded-md border border-transparent px-2",
@@ -2189,7 +2207,7 @@ export default function SidebarDesktop() {
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => { if (query.trim()) setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 // Esc 优先退专注，其次清空搜索（brief 4.5）
@@ -2203,23 +2221,27 @@ export default function SidebarDesktop() {
             aria-label={t("sidebarNext.searchLabel", { defaultValue: "搜索知识库" })}
             className="no-focus-ring min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
           />
+        </div>
 
-          {/* 搜索结果弹层：标签 / 收藏 / 知识库·文件夹 / 文档 四类分区。
-              宽度脱离侧栏列宽（侧栏太窄会截断标题），上限受视口约束。 */}
-          {searchOpen && (query.trim() || matchedTags.length > 0) && (
-            <div
-              ref={searchRef2}
-              className="absolute left-1 top-full z-[90] mt-1 max-h-[70vh] w-[min(440px,calc(100vw-24px))] overflow-y-auto rounded-[10px] border border-app-border bg-app-elevated p-1 text-left shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
-              role="listbox"
-            >
-              {/* 搜索范围胶囊：进入知识库后默认库内，可切全空间 */}
+      {/* ===== 搜索结果面板：贴边悬于树之上（宽度 = 侧栏，绝不越界压编辑区）。
+          类型筛选（全部/知识库/文档/文件夹/收藏/标签）内嵌在面板顶部，不占头部按钮。 ===== */}
+      {sidebarView === "kb" && searchOpen && (
+        <div
+          ref={searchPopupRef}
+          role="dialog"
+          aria-label={t("sidebarNext.searchLabel", { defaultValue: "搜索知识库" })}
+          className="absolute inset-x-1.5 top-full z-[60] mt-1 flex max-h-[min(460px,calc(100vh-88px))] flex-col overflow-hidden rounded-lg border border-app-border bg-app-elevated text-left shadow-[0_10px_28px_rgba(15,23,42,0.14)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.5)]"
+        >
+          {/* 筛选条：类型 chips（三列网格，窄侧栏也全部可见、不折行错位） */}
+          <div className="shrink-0 border-b border-app-border px-1.5 pb-1.5 pt-1.5">
               {focusRoot && (
-                <div className="flex items-center gap-1 px-2 pb-1 pt-1.5">
+                <div className="mb-1.5 flex items-center gap-1">
+                  <span className="mr-0.5 text-[10px] text-tx-tertiary">范围</span>
                   <button
                     type="button"
                     onClick={() => setSearchScope("kb")}
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] transition-colors",
+                      "rounded-full px-2 py-0.5 text-[10.5px] leading-4 transition-colors",
                       searchScope === "kb" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
                     )}
                   >
@@ -2229,7 +2251,7 @@ export default function SidebarDesktop() {
                     type="button"
                     onClick={() => setSearchScope("all")}
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] transition-colors",
+                      "rounded-full px-2 py-0.5 text-[10.5px] leading-4 transition-colors",
                       searchScope === "all" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
                     )}
                   >
@@ -2237,15 +2259,53 @@ export default function SidebarDesktop() {
                   </button>
                 </div>
               )}
-              {matchedTags.length === 0 && visibleSearchDocs.length === 0 && matchedTreeNodes.length === 0 && (
-                <p className="px-2 py-3 text-center text-[11px] text-tx-tertiary">
-                  {searchFetching ? "搜索中…" : "无匹配的标签、收藏、知识库或文档"}
-                </p>
-              )}
+              <div className="grid grid-cols-3 gap-0.5 rounded-md bg-app-bg p-0.5">
+                {FILTER_SCOPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={scope === opt.value}
+                    onClick={() => setScope(opt.value)}
+                    className={cn(
+                      "flex h-6 items-center justify-center rounded-[5px] text-[11.5px] leading-none transition-colors",
+                      scope === opt.value
+                        ? "bg-app-elevated font-medium text-accent-primary shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
+                        : "text-tx-tertiary hover:text-tx-secondary",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+          </div>
 
-              {matchedTags.length > 0 && (
+          {/* 结果区（滚动） */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
+            {!query.trim() ? (
+              <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-tx-tertiary">
+                输入关键词搜索标签、收藏、知识库与文档
+              </p>
+            ) : (
+              <>
+                {(searchSections.tags && matchedTags.length > 0) === false
+                  && (searchSections.favorite && favoriteSearchDocs.length > 0) === false
+                  && searchSections.tree === false
+                  && (searchSections.docs && plainSearchDocs.length > 0) === false && (
+                  <p className="px-2 py-6 text-center text-[11px] text-tx-tertiary">
+                    {searchFetching
+                      ? "搜索中…"
+                      : scope === "notebook" ? "无匹配的知识库"
+                        : scope === "folder" ? "无匹配的文件夹"
+                          : scope === "document" ? "无匹配的文档"
+                            : scope === "favorite" ? "收藏中无匹配的文档"
+                              : scope === "tag" ? "已加标签的文档中无匹配"
+                                : "无匹配的标签、收藏、知识库或文档"}
+                  </p>
+                )}
+
+              {searchSections.tags && matchedTags.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">标签</p>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">标签</p>
                   {matchedTags.map((tag) => {
                     const tagOpen = searchTagOpen === tag.id;
                     const docs = tagDocs[tag.id] ?? [];
@@ -2291,9 +2351,9 @@ export default function SidebarDesktop() {
                 </>
               )}
 
-              {favoriteSearchDocs.length > 0 && (
+              {searchSections.favorite && favoriteSearchDocs.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">收藏</p>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">收藏</p>
                   {favoriteSearchDocs.map((doc) => (
                     <button
                       key={`fav-${doc.id}`}
@@ -2314,9 +2374,9 @@ export default function SidebarDesktop() {
                 </>
               )}
 
-              {matchedTreeNodes.length > 0 && (
+              {searchSections.tree && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">知识库 / 文件夹</p>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">知识库 / 文件夹</p>
                   {matchedTreeNodes.map((node) => (
                     <button
                       key={`tree-${node.id}`}
@@ -2341,18 +2401,15 @@ export default function SidebarDesktop() {
                         <FaBook size={13} className="shrink-0 text-accent-primary" />
                       )}
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
-                      <span className="shrink-0 text-[10px] text-tx-tertiary">
-                        {node.nodeType === "folder" ? "文件夹" : "知识库"}
-                      </span>
                     </button>
                   ))}
                 </>
               )}
 
-              {plainSearchDocs.length > 0 && (
+              {searchSections.docs && plainSearchDocs.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">
-                    {focusRoot && searchScope === "kb" ? "文档 · 库内" : "文档"}
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">
+                    {focusRoot && searchScope === "kb" ? "文档 · 库内" : scope === "favorite" ? "收藏的文档" : scope === "tag" ? "带标签的文档" : "文档"}
                   </p>
                   {plainSearchDocs.map((doc) => (
                     <button
@@ -2372,46 +2429,11 @@ export default function SidebarDesktop() {
                   ))}
                 </>
               )}
-            </div>
-          )}
-        </div>
-
-        <div ref={filterRef} className="relative shrink-0" hidden={sidebarView !== "kb"}>
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            aria-expanded={filterOpen}
-            title={t("sidebarNext.filter", { defaultValue: "筛选" })}
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-              scope !== "all" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+              </>
             )}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-          </button>
-
-          {filterOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg">
-              {([
-                ["all", "全部"],
-                ["folder", "仅文件夹"],
-                ["note", "仅笔记"],
-              ] as Array<[FilterScope, string]>).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { setScope(value); setFilterOpen(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
-                >
-                  <span className="flex-1">{label}</span>
-                  {scope === value && <Check size={12} className="text-accent-primary" />}
-                </button>
-              ))}
-            </div>
-          )}
+          </div>
         </div>
+      )}
       </header>
 
       {/* ===== 三面板容器（kb 固定置顶；其余区段头 HTML5 拖拽排序；折叠在原位收起；面板高度可拖拽） ===== */}
