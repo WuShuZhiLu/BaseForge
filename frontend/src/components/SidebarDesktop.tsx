@@ -51,6 +51,7 @@ import { useTranslation } from "react-i18next";
 
 import { useApp, useAppActions } from "@/store/AppContext";
 import { MenuItem, MenuLabel, MenuSeparator, MenuSurface } from "@/components/ui/menu";
+import { SplitView } from "@/components/ui/split-view";
 import { confirm } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -1364,7 +1365,7 @@ export default function SidebarDesktop() {
   // 由目标板块的"上/下半内阴影高亮"表达落点；松手时 onSectionDrop 一次性提交顺序。
   // （旧 previewOrder 重排渲染会在换位时移除被拖板块 DOM，导致原生拖影中断、面板闪没。）
 
-  // ---- 面板高度（VS Code 式：把手拖拽定高，body 内部滚动；双击把手清除定高） ----
+  // ---- 面板高度：交给 SplitView（尺寸和恒等于容器高度，折叠份额按比例分给其它组）----
   const [sectionHeights, setSectionHeights] = useState<Partial<Record<SectionId, number>>>(() => {
     try {
       const saved = localStorage.getItem("nowen-next-sidebar-section-heights");
@@ -1375,23 +1376,6 @@ export default function SidebarDesktop() {
 
   useEffect(() => {
     try { localStorage.setItem("nowen-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
-  }, [sectionHeights]);
-
-  const startSectionResize = useCallback((sectionId: SectionId, e: React.PointerEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = sectionHeights[sectionId]
-      ?? (e.currentTarget.previousElementSibling?.getBoundingClientRect().height ?? 240);
-    const onMove = (moveEvent: PointerEvent) => {
-      const next = Math.max(96, Math.min(800, startHeight + (moveEvent.clientY - startY)));
-      setSectionHeights((cur) => ({ ...cur, [sectionId]: next }));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
   }, [sectionHeights]);
 
   // ---- kb 树拖拽 ----
@@ -2568,51 +2552,35 @@ export default function SidebarDesktop() {
             })()}
           </div>
         )}
-        {sidebarView === "kb" && !openPluginPanel && safeOrder.map((sectionId) => {
-          const collapsed = collapsedSections.has(sectionId);
-          const rawHeight = sectionHeights[sectionId];
-          // 定高 clamp 到当前可视空间：保证所有区段头都留在视口内，任何面板都不会被挤出屏幕
-          const bodyHeight = rawHeight && panelScrollRef.current
-            ? Math.max(96, Math.min(rawHeight, panelScrollRef.current.clientHeight - 160))
-            : rawHeight;
-          // 拖拽视觉：被拖板块整块半透明（=被拿起）；
-          // 目标板块按指针在上/下半显示上/下内阴影（=落点预示，阴影随上下移动）
-          const isDraggingThis = reorderActive === sectionId;
-          const isDropTarget = reorderActive && sectionDropHint?.id === sectionId;
-          const shadowClass = isDropTarget
-            ? sectionDropHint.after
-              ? "shadow-[inset_0_-14px_18px_-12px_rgba(59,130,246,0.55)]"
-              : "shadow-[inset_0_14px_18px_-12px_rgba(59,130,246,0.55)]"
-            : undefined;
-          return (
-            <div
-              key={sectionId}
-              onDragOver={onSectionDragOver(sectionId)}
-              onDrop={onSectionDrop(sectionId)}
-              className={cn(shadowClass, isDraggingThis && "opacity-40")}
-            >
-              {/* 区段体：定高时内部滚动（VS Code 式），否则自然高度由外层统一滚动 */}
-              <div
-                className={cn(
-                  !collapsed && bodyHeight ? "overflow-y-auto" : undefined,
-                )}
-                style={!collapsed && bodyHeight ? { height: bodyHeight } : undefined}
-              >
-                {sectionMap[sectionId]}
-              </div>
-              {/* 高度调节把手：展开态才显示 */}
-              {!collapsed && (
+        {sidebarView === "kb" && !openPluginPanel && (
+          <SplitView
+            itemIds={safeOrder as string[]}
+            sizes={sectionHeights as Record<string, number>}
+            onSizesChange={(next) => setSectionHeights(next as Partial<Record<SectionId, number>>)}
+            collapsedIds={collapsedSections as ReadonlySet<string>}
+            renderItem={(id) => {
+              const sectionId = id as SectionId;
+              // 拖拽视觉：被拖板块整块半透明（=被拿起）；
+              // 目标板块按指针在上/下半显示上/下内阴影（=落点预示，阴影随上下移动）
+              const isDraggingThis = reorderActive === sectionId;
+              const isDropTarget = reorderActive && sectionDropHint?.id === sectionId;
+              const shadowClass = isDropTarget
+                ? sectionDropHint.after
+                  ? "shadow-[inset_0_-14px_18px_-12px_rgba(59,130,246,0.55)]"
+                  : "shadow-[inset_0_14px_18px_-12px_rgba(59,130,246,0.55)]"
+                : undefined;
+              return (
                 <div
-                  role="separator"
-                  aria-orientation="horizontal"
-                  className="group/hr flex h-2.5 cursor-row-resize items-center justify-center border-t border-app-border transition-colors hover:bg-accent-primary/20"
-                  title="拖拽调整面板高度"
-                  onPointerDown={(e) => startSectionResize(sectionId, e)}
-                />
-              )}
-            </div>
-          );
-        })}
+                  onDragOver={onSectionDragOver(sectionId)}
+                  onDrop={onSectionDrop(sectionId)}
+                  className={cn("h-full min-h-0 overflow-y-auto", shadowClass, isDraggingThis && "opacity-40")}
+                >
+                  {sectionMap[sectionId]}
+                </div>
+              );
+            }}
+          />
+        )}
 
         {/* ===== 回收站视图 ===== */}
         {sidebarView === "trash" && (
