@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
-import { Star, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
+import { Star, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft, Columns2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import { RiMenuFold2Line } from "react-icons/ri";
@@ -3186,7 +3186,7 @@ const moveToTrash = useCallback(async () => {
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors"
                   >
                     <Download size={15} className="text-tx-tertiary" />
-                    <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）"}</span>
+                    <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP"}</span>
                   </button>
                   <button
                     onClick={() => { setShowMobileMenu(false); handleExportPDF(); }}
@@ -3676,6 +3676,18 @@ const moveToTrash = useCallback(async () => {
                       <span>拆分文档</span>
                     </button>
                   )}
+                  {/* 分屏显示：左右分屏，右侧挂当前文档（打开另一文档落到左侧主屏，可经副屏「提升」按钮调换左右） */}
+                  <button
+                    onClick={() => {
+                      if (!activeNote) return;
+                      actions.splitEditor({ noteId: activeNote.id, direction: "right" });
+                      setShowDesktopMoreMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
+                  >
+                    <Columns2 size={15} className="text-tx-tertiary" />
+                    <span>{t("editorTabs.splitRight")}</span>
+                  </button>
 
                   {/* 布局模式切换（原悬浮按钮已删除，入口移到此处） */}
                   <div className="px-3 py-2">
@@ -4142,7 +4154,7 @@ const moveToTrash = useCallback(async () => {
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
           >
             <Download size={15} className="text-tx-tertiary" />
-            <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）"}</span>
+            <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP"}</span>
           </button>
           <button
             role="menuitem"
