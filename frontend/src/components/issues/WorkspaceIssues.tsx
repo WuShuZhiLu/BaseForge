@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
+import { confirm } from "@/components/ui/confirm";
 import { openWorkspaceIssue, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/workspaceIssueNavigation";
 import { pushAppPathState } from "@/lib/appPathNavigation";
 import { useVisibleViewport } from "@/hooks/useVisibleViewport";
@@ -199,7 +200,7 @@ export default function WorkspaceIssues({ issueId }: { issueId: string | null })
                 <textarea className={fieldClass} rows={3} maxLength={20000} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} aria-label={t("issues.reply")} />
                 <button className={buttonClass} disabled={busy || !commentDraft.trim()}>{t("issues.save")}</button> <button className={buttonClass} type="button" disabled={busy} onClick={() => setEditingComment(null)}>{t("issues.cancel")}</button>
               </form> : <Content text={item.content} />}
-              {item.canEdit && editingComment !== item.id && <div className="flex gap-2"><button className={buttonClass} disabled={busy} onClick={() => { setEditingComment(item.id); setCommentDraft(item.content); }}>{t("issues.edit")}</button><button className={buttonClass} disabled={busy} onClick={() => { if (window.confirm(t("issues.confirmDelete"))) void run(() => api.issues.deleteComment(issueId, item.id)); }}>{t("issues.delete")}</button></div>}
+              {item.canEdit && editingComment !== item.id && <div className="flex gap-2"><button className={buttonClass} disabled={busy} onClick={() => { setEditingComment(item.id); setCommentDraft(item.content); }}>{t("issues.edit")}</button><button className={buttonClass} disabled={busy} onClick={async () => { const ok = await confirm({ title: t("issues.confirmDelete"), confirmText: t("issues.delete"), danger: true }); if (ok) void run(() => api.issues.deleteComment(issueId, item.id)); }}>{t("issues.delete")}</button></div>}
             </article>)}
             {activity.items.length < activity.total && <button className={buttonClass} disabled={busy} onClick={() => void more()}>{t("issues.more")}</button>}
             {detail.canComment ? <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); void run(() => api.issues.comment(issueId, reply), () => setReply("")); }}>
