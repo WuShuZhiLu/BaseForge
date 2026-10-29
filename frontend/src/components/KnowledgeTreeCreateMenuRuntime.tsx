@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
 } from "lucide-react";
+import { FaBook } from "react-icons/fa";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -306,7 +307,7 @@ export function KnowledgeTreeCreateDropdown({
             className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
             onClick={() => onCreate(null, "folder")}
           >
-            <Folder size={14} className="shrink-0 text-tx-tertiary" />
+            <FaBook size={13} className="shrink-0 text-accent-primary" />
             <span className="min-w-0 flex-1 truncate">{t("sidebarNext.newKnowledgeBase", { defaultValue: "新建知识库" })}</span>
           </button>
         </>

@@ -24,7 +24,6 @@ import {
   FileText,
   Focus,
   Folder,
-  FolderPlus,
   Home,
   Link2,
   Locate,
@@ -2306,7 +2305,7 @@ export default function SidebarDesktop() {
                   </button>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-1 rounded-lg border border-app-border/60 bg-app-panel p-1">
+              <div className="grid grid-cols-3 gap-1 rounded-lg border border-app-border bg-app-surface p-1">
                 {FILTER_SCOPE_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -2330,7 +2329,7 @@ export default function SidebarDesktop() {
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
             {!query.trim() ? (
               <div className="flex flex-col items-center gap-1.5 px-3 py-7 text-center">
-                <Search size={16} className="text-tx-tertiary/70" />
+                <Search size={16} className="text-tx-tertiary opacity-60" />
                 <p className="text-[11.5px] leading-relaxed text-tx-tertiary">
                   输入关键词搜索标签、收藏、知识库与文档
                 </p>
@@ -2601,17 +2600,15 @@ export default function SidebarDesktop() {
               >
                 {sectionMap[sectionId]}
               </div>
-              {/* 高度调节把手：细抓握条，悬停才显形（避免常驻一条硬边线） */}
+              {/* 高度调节把手：展开态才显示 */}
               {!collapsed && (
                 <div
                   role="separator"
                   aria-orientation="horizontal"
-                  className="group/hr flex h-2 cursor-row-resize items-center justify-center border-t border-app-border/50"
-                  title="拖拽调整面板高度 / 双击恢复"
+                  className="group/hr flex h-2.5 cursor-row-resize items-center justify-center border-t border-app-border transition-colors hover:bg-accent-primary/20"
+                  title="拖拽调整面板高度"
                   onPointerDown={(e) => startSectionResize(sectionId, e)}
-                >
-                  <span className="h-[3px] w-9 rounded-full bg-tx-tertiary/0 transition-colors duration-150 group-hover/hr:bg-tx-tertiary/40" />
-                </div>
+                />
               )}
             </div>
           );
@@ -2828,11 +2825,11 @@ export default function SidebarDesktop() {
         )}
       </div>
 
-      {/* ===== 调宽把手（批次 C）：细抓握条，悬停显形 ===== */}
+      {/* ===== 调宽把手（批次 C） ===== */}
       <div
         role="separator"
         aria-orientation="vertical"
-        className="group/vr absolute right-0 top-0 z-10 flex h-full w-1.5 cursor-col-resize items-center justify-center"
+        className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize transition-colors hover:bg-accent-primary/40"
         title="拖拽调整侧边栏宽度 / 双击恢复默认"
         onPointerDown={(e) => {
           e.preventDefault();
@@ -2854,9 +2851,7 @@ export default function SidebarDesktop() {
           setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
           try { localStorage.setItem("nowen-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
         }}
-      >
-        <span className="h-8 w-[3px] rounded-full bg-tx-tertiary/0 transition-colors duration-150 group-hover/vr:bg-tx-tertiary/40" />
-      </div>
+      />
 
       {/* ===== 知识库 + 新建菜单（复用旧版 KnowledgeTreeCreateDropdown） ===== */}
       {createMenuState && (
@@ -2988,8 +2983,17 @@ export default function SidebarDesktop() {
             if (!node) return null;
             return (
               <>
-                <MenuItem icon={FilePlus2} label="新建文档" onClick={() => { setRowMenu(null); void startCreateNote(node.id); }} />
-                <MenuItem icon={FolderPlus} label="新建子文件夹" onClick={() => { setRowMenu(null); void startCreateFolder(node.id); }} />
+                {/* 与区块头 ＋ 同一个菜单：列出全部新建格式（富文本/Markdown/纯文本/
+                    画板/导图/模板/文件夹/表格/加密/导入），不再另写一套简化版 */}
+                <MenuItem
+                  icon={FilePlus2}
+                  label="新建…"
+                  onClick={() => {
+                    const anchor = new DOMRect(rowMenu.x, rowMenu.y, 0, 0);
+                    setRowMenu(null);
+                    setCreateMenuState({ parentId: node.id, anchor });
+                  }}
+                />
                 <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
