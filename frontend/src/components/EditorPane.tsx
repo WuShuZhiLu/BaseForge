@@ -207,8 +207,12 @@ function EditorPaneCore({
   const noteSwitchPending = !!noteLoadingState.pendingNoteId;
   const effectiveLocked = !!activeNote?.isLocked || isViewLocked || isTrashed || noteSwitchPending;
   const canEditActiveNote = canWriteNote(activeNote);
-  // 大纲宿主开关：全屏专注模式或用户隐藏（outlineHidden）时整体不渲染（连 mini 刻度条都没有）。
-  const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden;
+  // 大纲只属于「富文本 / Markdown」类文档：board / mindmap / pdf / plain 没有标题层级，
+  // 不渲染右缘刻度条与面板，也不显示顶栏/⋯ 菜单里的大纲开关（否则是空面板 + 假入口）。
+  const noteFormat = activeNote?.contentFormat ?? "tiptap-json";
+  const outlineSupported = !["board", "mindmap", "pdf", "plain"].includes(noteFormat);
+  // 大纲宿主开关：全屏专注、用户隐藏（outlineHidden）或文档类型不支持时整体不渲染（连 mini 刻度条都没有）。
+  const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden && outlineSupported;
 
   // 布局模式切换（原悬浮按钮已删除，入口移到 ⋯ More 菜单）。
   // 复用 NoteWorkspaceLayoutController 的自动折叠/持久化逻辑：
@@ -3545,8 +3549,9 @@ const moveToTrash = useCallback(async () => {
             </Button>
           )}
 
-          {/* 大纲显示/隐藏（桌面顶栏）：点亮 = mini 刻度条 + 悬浮浮出；钉住由面板内图钉控制 */}
-          {!state.editorFullscreen && (
+          {/* 大纲显示/隐藏（桌面顶栏）：点亮 = mini 刻度条 + 悬浮浮出；钉住由面板内图钉控制。
+              仅富文本/Markdown 文档有此入口（其它类型没有标题层级）。 */}
+          {!state.editorFullscreen && outlineSupported && (
             <Button
               variant="ghost" size="icon" className="h-7 w-7 shrink-0"
               onClick={() => setOutlineHidden((hidden) => !hidden)}
@@ -3751,17 +3756,19 @@ const moveToTrash = useCallback(async () => {
                     <span>{t('editor.noteComments')}</span>
                   </button>
                   {/* 大纲总开关：隐藏 = 连右缘 mini 刻度条一并消失（完全无痕）；
-                      显示 = mini + 悬浮浮出，钉住由面板内图钉控制 */}
-                  <button
-                    onClick={() => {
-                      setOutlineHidden((hidden) => !hidden);
-                      setShowDesktopMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
-                  >
-                    <ListTree size={15} className="text-tx-tertiary" />
-                    <span>{outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}</span>
-                  </button>
+                      显示 = mini + 悬浮浮出，钉住由面板内图钉控制。仅富文本/Markdown。 */}
+                  {outlineSupported && (
+                    <button
+                      onClick={() => {
+                        setOutlineHidden((hidden) => !hidden);
+                        setShowDesktopMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
+                    >
+                      <ListTree size={15} className="text-tx-tertiary" />
+                      <span>{outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}</span>
+                    </button>
+                  )}
                   {/* 反向链接 BACKLINKS-02 */}
                   <button
                     onClick={() => {

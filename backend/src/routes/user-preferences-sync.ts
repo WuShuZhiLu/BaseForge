@@ -53,6 +53,8 @@ interface StoredPreferenceMeta {
   version: 2;
   revision: number;
   fieldUpdatedAt: FieldUpdatedAt;
+  /** 已应用过的「默认值版本」（缺省 = 1）：用于默认值变更时的一次性迁移 */
+  defaultsRevision?: number;
 }
 
 interface StoredPreferenceDocument extends SyncedUserPreferences {
@@ -69,7 +71,7 @@ interface PreferenceState {
 
 export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
   noteTitleAsAppTitle: false,
-  outlineDefaultOpen: true,
+  outlineDefaultOpen: false,
   lockOnOpen: false,
   folderAutoLockMinutes: 15,
   folderLockOnBackground: true,
@@ -93,6 +95,8 @@ export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
 };
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_SYNCED_USER_PREFERENCES) as PreferenceKey[];
+/** 默认值版本：v2 = 「进入笔记默认钉住大纲」由 true 改为 false（存量记录一次性迁移） */
+const PREFERENCE_DEFAULTS_REVISION = 2;
 const PREFERENCE_KEY_SET = new Set<string>(PREFERENCE_KEYS);
 const NAVIGATION_MODULE_ORDER: NavigationModuleId[] = ["notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares"];
 const NAVIGATION_MODULE_IDS = new Set<string>(NAVIGATION_MODULE_ORDER);
@@ -243,11 +247,27 @@ export function readPreferenceState(userId: string): PreferenceState {
     const raw = isObject(parsed) ? parsed : {};
     const meta = isObject(raw.__meta) ? raw.__meta : {};
     const revision = typeof meta.revision === "number" && Number.isInteger(meta.revision) && meta.revision > 0 ? meta.revision : 1;
+    const fieldUpdatedAt = parseFieldUpdatedAt(meta.fieldUpdatedAt);
+    const prefs = normalizeSyncedUserPreferences(raw);
+    // 默认值迁移（一次性）：旧默认「进入笔记默认钉住大纲」= true 曾随升级全量 seed 进存量
+    // 记录，无法区分「用户改的」与「默认写进去的」，故按默认值版本号重新落一次新默认；
+    // 用户此后手动开启会被保留（版本号已升级，不再重跑）。
+    const defaultsRevision = typeof meta.defaultsRevision === "number" && Number.isInteger(meta.defaultsRevision) ? meta.defaultsRevision : 1;
+    if (defaultsRevision < PREFERENCE_DEFAULTS_REVISION) {
+      prefs.outlineDefaultOpen = DEFAULT_SYNCED_USER_PREFERENCES.outlineDefaultOpen;
+      try {
+        getDb()
+          .prepare("UPDATE user_preferences SET preferencesJson = ? WHERE userId = ?")
+          .run(serializeStoredPreferences(prefs, revision, fieldUpdatedAt), userId);
+      } catch {
+        // 写回失败不阻断读取：下次仍会按旧版默认再迁移一次
+      }
+    }
     return {
-      prefs: normalizeSyncedUserPreferences(raw),
+      prefs,
       hasPreferences: true,
       revision,
-      fieldUpdatedAt: parseFieldUpdatedAt(meta.fieldUpdatedAt),
+      fieldUpdatedAt,
       updatedAt: row.updatedAt || null,
     };
   } catch {
@@ -293,8 +313,13 @@ function validatePatch(input: unknown): { patch: PreferencePatch; errors: string
   return { patch, errors };
 }
 
-function serializeStoredPreferences(prefs: SyncedUserPreferences, revision: number, fieldUpdatedAt: FieldUpdatedAt): string {
-  const document: StoredPreferenceDocument = { ...prefs, __meta: { version: 2, revision, fieldUpdatedAt } };
+function serializeStoredPreferences(
+  prefs: SyncedUserPreferences,
+  revision: number,
+  fieldUpdatedAt: FieldUpdatedAt,
+  defaultsRevision: number = PREFERENCE_DEFAULTS_REVISION,
+): string {
+  const document: StoredPreferenceDocument = { ...prefs, __meta: { version: 2, revision, fieldUpdatedAt, defaultsRevision } };
   return JSON.stringify(document);
 }
 

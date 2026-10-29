@@ -31,7 +31,7 @@ interface UserPreferences {
 
 const DEFAULT_PREFS: UserPreferences = {
   noteTitleAsAppTitle: false,
-  outlineDefaultOpen: true,
+  outlineDefaultOpen: false,
   lockOnOpen: false,
   showNotesInNotebookTree: false,
   readingDensity: "cozy",

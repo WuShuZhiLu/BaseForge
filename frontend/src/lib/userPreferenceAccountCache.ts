@@ -70,7 +70,7 @@ export interface StorageLike {
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   noteTitleAsAppTitle: false,
-  outlineDefaultOpen: true,
+  outlineDefaultOpen: false,
   lockOnOpen: false,
   folderAutoLockMinutes: 15,
   folderLockOnBackground: true,
