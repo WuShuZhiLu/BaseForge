@@ -1102,6 +1102,23 @@
       "delete": "删除工作区"
     }
   },
+  "workspaceMembers": {
+    "addMemberPlaceholder": "搜索用户名、昵称或邮箱，添加已有用户…",
+    "searching": "搜索中…",
+    "noUsersFound": "未找到可添加的用户",
+    "addUser": "添加",
+    "memberAdded": "已添加「{{username}}」",
+    "alreadyMember": "该用户已是成员",
+    "addFailed": "添加失败",
+    "transferOwnership": "转让 Owner",
+    "transferOwnershipConfirm": "确定将 Owner 转让给「{{username}}」吗？转让后您将变为管理员。",
+    "ownershipTransferred": "Owner 已转让",
+    "transferFailed": "转让失败",
+    "resetInvite": "重置邀请码",
+    "resetInviteConfirm": "重置后会生成新的邀请码，旧邀请码立即失效。确定重置吗？",
+    "inviteReset": "邀请码已重置",
+    "resetFailed": "重置失败"
+  },
   "workspaceManagement": {
     "title": "工作区管理",
     "description": "查看并管理系统内全部工作区，管理员可跨用户编辑、删除任意工作区",

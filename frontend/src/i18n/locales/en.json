@@ -1087,6 +1087,23 @@
       "delete": "Delete workspace"
     }
   },
+  "workspaceMembers": {
+    "addMemberPlaceholder": "Search username, display name, or email to add an existing user…",
+    "searching": "Searching…",
+    "noUsersFound": "No users found to add",
+    "addUser": "Add",
+    "memberAdded": "Added {{username}}",
+    "alreadyMember": "User is already a member",
+    "addFailed": "Failed to add member",
+    "transferOwnership": "Transfer ownership",
+    "transferOwnershipConfirm": "Transfer ownership to {{username}}? You will become an admin afterwards.",
+    "ownershipTransferred": "Ownership transferred",
+    "transferFailed": "Transfer failed",
+    "resetInvite": "Reset invite code",
+    "resetInviteConfirm": "A new code will be generated and the old one stops working immediately. Reset this invite code?",
+    "inviteReset": "Invite code reset",
+    "resetFailed": "Reset failed"
+  },
   "workspaceManagement": {
     "title": "Workspace Management",
     "description": "Browse and manage all workspaces. Admins can edit or delete any workspace across users.",

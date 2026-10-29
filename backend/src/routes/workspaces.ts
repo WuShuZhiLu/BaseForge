@@ -10,13 +10,16 @@
  *   DELETE /api/workspaces/:id            - 删除工作区（owner / 系统管理员）
  *
  *   GET    /api/workspaces/:id/members    - 成员列表（系统管理员旁路）
+ *   POST   /api/workspaces/:id/members    - 站内搜索添加成员（owner/admin / 系统管理员）
  *   PUT    /api/workspaces/:id/members/:userId  - 修改成员角色（owner/admin / 系统管理员）
  *   DELETE /api/workspaces/:id/members/:userId  - 移除成员（owner/admin / 系统管理员）
  *   POST   /api/workspaces/:id/leave      - 主动退出工作区
+ *   POST   /api/workspaces/:id/transfer-ownership - 转让 Owner（owner / 系统管理员）
  *
  *   POST   /api/workspaces/:id/invites    - 生成邀请码（owner/admin / 系统管理员）
  *   GET    /api/workspaces/:id/invites    - 查看邀请码列表（owner/admin / 系统管理员）
  *   DELETE /api/workspaces/:id/invites/:inviteId - 撤销邀请码
+ *   POST   /api/workspaces/:id/invites/:inviteId/reset - 重置邀请码（旧码立即失效）
  *   POST   /api/workspaces/join           - 使用邀请码加入
  *
  * 系统管理员（users.role='admin'）通过 requireWorkspaceRole 内的旁路逻辑，
@@ -254,6 +257,36 @@ app.get("/:id/members", (c) => {
   return c.json(members);
 });
 
+// 站内搜索添加成员（owner/admin；目标用户只能来自 GET /api/users/search 的已注册用户）
+app.post("/:id/members", requireWorkspaceRole("admin"), async (c) => {
+  const db = getDb();
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { userId, role } = body as { userId: string; role: WorkspaceRole };
+
+  if (!userId || typeof userId !== "string") return c.json({ error: "缺少用户 ID" }, 400);
+
+  // owner 只能经转让产生，不能在这里直接授予
+  const validRoles: WorkspaceRole[] = ["admin", "editor", "commenter", "viewer"];
+  if (!validRoles.includes(role)) {
+    return c.json({ error: "无效的角色" }, 400);
+  }
+
+  const ws = db.prepare("SELECT id FROM workspaces WHERE id = ?").get(id);
+  if (!ws) return c.json({ error: "工作区不存在" }, 404);
+
+  // 与 GET /api/users/search 口径一致：目标用户必须存在且未被禁用
+  const user = db.prepare("SELECT id FROM users WHERE id = ? AND isDisabled = 0").get(userId);
+  if (!user) return c.json({ error: "用户不存在或已被禁用" }, 404);
+
+  // 幂等：已是成员时直接成功返回，不重复插入
+  const existing = workspaceMembersRepository.getRole(id, userId);
+  if (existing) return c.json({ success: true, alreadyMember: true });
+
+  workspaceMembersRepository.create(id, userId, role);
+  return c.json({ success: true }, 201);
+});
+
 // 修改成员角色（仅 owner/admin）
 app.put("/:id/members/:userId", requireWorkspaceRole("admin"), async (c) => {
   const db = getDb();
@@ -313,6 +346,48 @@ app.post("/:id/leave", (c) => {
   return c.json({ success: true });
 });
 
+// 转让 Owner（仅 owner；转让后原 owner 降为 admin，保证"至少保留一个 Owner"）
+app.post("/:id/transfer-ownership", requireWorkspaceRole("owner"), async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { toUserId } = body as { toUserId: string };
+
+  if (!toUserId || typeof toUserId !== "string") return c.json({ error: "缺少目标用户" }, 400);
+  if (toUserId === userId) return c.json({ error: "不能转让给自己" }, 400);
+
+  const ws = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as Record<string, any> | undefined;
+  if (!ws) return c.json({ error: "工作区不存在" }, 404);
+
+  // 目标必须是当前成员
+  const target = workspaceMembersRepository.getRole(id, toUserId);
+  if (!target) return c.json({ error: "目标用户不是该工作区成员" }, 404);
+  // 复用"不能修改 owner 角色"的语义：目标已是 owner 时拒绝，防止重复转让
+  if (target.role === "owner") {
+    return c.json({ error: "不能修改 owner 的角色" }, 400);
+  }
+
+  // 降级对象取当前持有 owner 角色的成员（正常路径即请求者本人；
+  // 系统管理员旁路时请求者不是成员，按实际 owner 降级才能维持"恰好一个 Owner"）
+  const currentOwner = db
+    .prepare("SELECT userId FROM workspace_members WHERE workspaceId = ? AND role = 'owner'")
+    .get(id) as { userId: string } | undefined;
+
+  const tx = db.transaction(() => {
+    workspaceMembersRepository.updateRole(id, toUserId, "owner");
+    if (currentOwner) workspaceMembersRepository.updateRole(id, currentOwner.userId, "admin");
+    // ownerId 是 canonical owner 判定（knowledgeTreeCore 权限预设、删除空间时的内容归属
+    // 均读 workspaces.ownerId），必须与 workspace_members.role 同步更新
+    db.prepare("UPDATE workspaces SET ownerId = ? WHERE id = ?").run(toUserId, id);
+  });
+  tx();
+  ws.ownerId = toUserId;
+
+  broadcastWorkspaceProfileUpdated(id, normalizeWorkspaceRow(ws));
+  return c.json({ success: true });
+});
+
 // ===================== 邀请码 =====================
 
 app.post("/:id/invites", requireWorkspaceRole("admin"), async (c) => {
@@ -357,6 +432,15 @@ app.delete("/:id/invites/:inviteId", requireWorkspaceRole("admin"), (c) => {
   const inviteId = c.req.param("inviteId");
   workspaceInvitesRepository.delete(inviteId, id);
   return c.json({ success: true });
+});
+
+// 重置邀请码：换新 code 并清零使用次数，旧码立即失效
+app.post("/:id/invites/:inviteId/reset", requireWorkspaceRole("admin"), (c) => {
+  const id = c.req.param("id");
+  const inviteId = c.req.param("inviteId");
+  const changes = workspaceInvitesRepository.reset(inviteId, id, generateInviteCode());
+  if (!changes) return c.json({ error: "邀请码不存在" }, 404);
+  return c.json(workspaceInvitesRepository.getById(inviteId));
 });
 
 // 使用邀请码加入（独立端点，不需要 workspaceId 参数）

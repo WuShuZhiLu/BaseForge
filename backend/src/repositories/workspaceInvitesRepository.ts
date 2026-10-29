@@ -110,6 +110,22 @@ export const workspaceInvitesRepository = {
   },
 
   /**
+   * 重置邀请码：换新 code 并清零使用次数（旧码立即失效）。
+   *
+   * @param inviteId 邀请 ID
+   * @param workspaceId 工作区 ID
+   * @param newCode 新邀请码
+   * @returns 更新的行数
+   */
+  reset(inviteId: string, workspaceId: string, newCode: string): number {
+    const db = getDb();
+    const result = db
+      .prepare("UPDATE workspace_invites SET code = ?, \"useCount\" = 0 WHERE id = ? AND \"workspaceId\" = ?")
+      .run(newCode, inviteId, workspaceId);
+    return result.changes;
+  },
+
+  /**
    * 转移邀请创建者（用户迁移时使用）。
    *
    * @param fromUserId 源用户 ID

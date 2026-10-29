@@ -68,7 +68,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
         ...workspace,
         icon: workspace.icon || DEFAULT_WORKSPACE_ICON,
       })));
-    } catch (e: any) {
+    } catch (e) {
       console.error("[WorkspaceSwitcher] load failed", e);
     }
   }, []);
@@ -89,7 +89,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
     api
       .getMe()
       .then((u) => {
-        if (!cancelled) setIsAdmin((u as any)?.role === "admin");
+        if (!cancelled) setIsAdmin(u?.role === "admin");
       })
       .catch(() => {
         if (!cancelled) setIsAdmin(false);
@@ -463,8 +463,8 @@ function CreateWorkspaceDialog({
       const ws = await api.createWorkspace({ name: name.trim(), description, icon });
       toast.success(copy("团队空间创建成功", "Team workspace created"));
       onCreated(ws);
-    } catch (e: any) {
-      toast.error(e.message || copy("创建失败", "Create failed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : copy("创建失败", "Create failed"));
     } finally {
       setLoading(false);
     }
@@ -537,8 +537,8 @@ export function JoinWorkspaceDialog({
         toast.success(`已加入团队空间：${res.workspace?.name}`);
         onJoined(res.workspace!.id);
       }
-    } catch (e: any) {
-      toast.error(e.message || "加入失败");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "加入失败");
     } finally {
       setLoading(false);
     }
@@ -606,8 +606,8 @@ function EditWorkspaceDialog({
       const saved = await api.updateWorkspace(workspace.id, payload);
       toast.success(t("workspaceManagement.saveSuccess", "已保存"));
       onSaved(saved);
-    } catch (e: any) {
-      toast.error(e?.message || t("workspaceManagement.saveFailed", "保存失败"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceManagement.saveFailed", "保存失败"));
     } finally {
       setLoading(false);
     }
@@ -674,8 +674,8 @@ function DeleteWorkspaceDialog({
       await api.deleteWorkspace(workspace.id);
       toast.success(t("workspaceManagement.deleteSuccess", "已删除"));
       onDeleted();
-    } catch (e: any) {
-      toast.error(e?.message || t("workspaceManagement.deleteFailed", "删除失败"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceManagement.deleteFailed", "删除失败"));
       setLoading(false);
     }
   };

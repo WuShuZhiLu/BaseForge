@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Trash2, Plus, ChevronDown } from "lucide-react";
+import { Copy, Trash2, Plus, ChevronDown, Search, Crown, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import {
   WorkspaceRole,
   WorkspaceFeatures,
   WORKSPACE_FEATURE_META,
+  UserPublicInfo,
 } from "@/types";
 import { Modal } from "@/components/WorkspaceSwitcher";
 import { toast } from "@/lib/toast";
@@ -44,6 +45,11 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
   const [tab, setTab] = useState<"members" | "invites" | "features">("members");
   const [loading, setLoading] = useState(true);
   const [showCreateInvite, setShowCreateInvite] = useState(false);
+  // 站内搜索添加成员：搜索结果里过滤掉已是成员的用户
+  const [addQuery, setAddQuery] = useState("");
+  const [addResults, setAddResults] = useState<UserPublicInfo[]>([]);
+  const [addSearching, setAddSearching] = useState(false);
+  const [addRole, setAddRole] = useState<WorkspaceRole>("editor");
 
   const locale = i18n.resolvedLanguage || i18n.language;
   const isManager = workspace?.role === "owner" || workspace?.role === "admin";
@@ -75,8 +81,8 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
           // 后端暂不可用时，降级为 null，不阻断成员管理。
         }
       }
-    } catch (e: any) {
-      toast.error(e.message || t("workspaceMembers.loadFailed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -86,13 +92,87 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
     loadAll();
   }, [workspaceId]);
 
+  // 站内用户搜索（防抖 250ms），复用 GET /api/users/search——天然只能搜到已注册用户
+  useEffect(() => {
+    if (!isManager) return;
+    const q = addQuery.trim();
+    let cancelled = false;
+    setAddSearching(true);
+    const timer = window.setTimeout(() => {
+      api.searchUsers(q || undefined)
+        .then((users) => {
+          if (!cancelled) setAddResults(users);
+        })
+        .catch(() => {
+          if (!cancelled) setAddResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setAddSearching(false);
+        });
+    }, q ? 250 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [addQuery, isManager]);
+
+  const addableResults = addResults.filter(
+    (u) => !members.some((m) => m.userId === u.id),
+  );
+
+  const handleAddMember = async (user: UserPublicInfo) => {
+    try {
+      const res = await api.addWorkspaceMember(workspaceId, user.id, addRole);
+      toast.success(
+        res.alreadyMember
+          ? t("workspaceMembers.alreadyMember")
+          : t("workspaceMembers.memberAdded", { username: user.username }),
+      );
+      setAddQuery("");
+      loadAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.addFailed"));
+    }
+  };
+
+  const handleTransferOwnership = async (userId: string, username: string) => {
+    const ok = await confirmDialog({
+      title: t("workspaceMembers.transferOwnershipConfirm", { username }),
+      confirmText: t("workspaceMembers.transferOwnership"),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api.transferWorkspaceOwnership(workspaceId, userId);
+      toast.success(t("workspaceMembers.ownershipTransferred"));
+      loadAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.transferFailed"));
+    }
+  };
+
+  const handleResetInvite = async (inviteId: string) => {
+    const ok = await confirmDialog({
+      title: t("workspaceMembers.resetInviteConfirm"),
+      confirmText: t("workspaceMembers.resetInvite"),
+    });
+    if (!ok) return;
+    try {
+      await api.resetWorkspaceInvite(workspaceId, inviteId);
+      toast.success(t("workspaceMembers.inviteReset"));
+      loadAll();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.resetFailed"));
+    }
+  };
+
   const handleRoleChange = async (userId: string, role: WorkspaceRole) => {
     try {
       await api.updateWorkspaceMember(workspaceId, userId, role);
       toast.success(t("workspaceMembers.roleUpdated"));
       loadAll();
-    } catch (e: any) {
-      toast.error(e.message || t("workspaceMembers.updateFailed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.updateFailed"));
     }
   };
 
@@ -107,8 +187,8 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
       await api.removeWorkspaceMember(workspaceId, userId);
       toast.success(t("workspaceMembers.removed"));
       loadAll();
-    } catch (e: any) {
-      toast.error(e.message || t("workspaceMembers.removeFailed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.removeFailed"));
     }
   };
 
@@ -123,8 +203,8 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
       await api.deleteWorkspaceInvite(workspaceId, inviteId);
       toast.success(t("workspaceMembers.inviteRevoked"));
       loadAll();
-    } catch (e: any) {
-      toast.error(e.message || t("workspaceMembers.actionFailed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.actionFailed"));
     }
   };
 
@@ -145,9 +225,9 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
           detail: { workspaceId, features: saved },
         }),
       );
-    } catch (e: any) {
+    } catch (e) {
       setFeatures(prev);
-      toast.error(e?.message || t("workspaceMembers.saveFailed"));
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.saveFailed"));
     }
   };
 
@@ -179,7 +259,52 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
           </div>
 
           {tab === "members" && (
-            <div className="space-y-1 flex-1 min-h-0 overflow-auto">
+            <div className="flex flex-col flex-1 min-h-0">
+              {isManager && (
+                <div className="shrink-0 pb-3 mb-2 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <Input
+                      value={addQuery}
+                      onChange={(e) => setAddQuery(e.target.value)}
+                      placeholder={t("workspaceMembers.addMemberPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  {addQuery.trim() && (
+                    <div className="mt-2 border border-border rounded divide-y divide-border max-h-44 overflow-auto">
+                      {addSearching ? (
+                        <div className="p-2 text-xs text-muted-foreground">
+                          {t("workspaceMembers.searching")}
+                        </div>
+                      ) : addableResults.length === 0 ? (
+                        <div className="p-2 text-xs text-muted-foreground">
+                          {t("workspaceMembers.noUsersFound")}
+                        </div>
+                      ) : (
+                        addableResults.map((u) => (
+                          <div key={u.id} className="flex items-center gap-2 p-2">
+                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
+                              {u.username.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0 text-sm truncate">
+                              {u.username}
+                              {u.displayName && u.displayName !== u.username && (
+                                <span className="ml-1 text-xs text-muted-foreground">{u.displayName}</span>
+                              )}
+                            </div>
+                            <RoleSelect value={addRole} onChange={setAddRole} />
+                            <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={() => handleAddMember(u)}>
+                              {t("workspaceMembers.addUser")}
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="space-y-1 flex-1 min-h-0 overflow-auto">
               {members.map((m) => {
                 const joinedDate = new Date(m.joinedAt).toLocaleDateString(locale);
                 return (
@@ -211,6 +336,15 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
                         {t(`workspaceMembers.roles.${m.role}`)}
                       </span>
                     )}
+                    {isOwner && m.role !== "owner" && (
+                      <button
+                        onClick={() => handleTransferOwnership(m.userId, m.username)}
+                        className="p-1.5 rounded hover:bg-accent text-muted-foreground"
+                        title={t("workspaceMembers.transferOwnership")}
+                      >
+                        <Crown className="w-4 h-4" />
+                      </button>
+                    )}
                     {isManager && m.role !== "owner" && (
                       <button
                         onClick={() => handleRemove(m.userId, m.username)}
@@ -223,6 +357,7 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
 
@@ -245,6 +380,7 @@ export default function MembersPanel({ workspaceId, onClose }: Props) {
                     key={inv.id}
                     invite={inv}
                     onDelete={() => handleDeleteInvite(inv.id)}
+                    onReset={() => handleResetInvite(inv.id)}
                   />
                 ))}
               </div>
@@ -436,9 +572,11 @@ function RoleSelect({
 function InviteItem({
   invite,
   onDelete,
+  onReset,
 }: {
   invite: WorkspaceInvite;
   onDelete: () => void;
+  onReset: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage || i18n.language;
@@ -488,6 +626,13 @@ function InviteItem({
         title={t("workspaceMembers.copy")}
       >
         <Copy className="w-4 h-4" />
+      </button>
+      <button
+        onClick={onReset}
+        className="p-1.5 rounded hover:bg-accent"
+        title={t("workspaceMembers.resetInvite")}
+      >
+        <RefreshCw className="w-4 h-4" />
       </button>
       <button
         onClick={onDelete}
@@ -578,8 +723,8 @@ function CreateInviteDialog({
       });
       toast.success(t("workspaceMembers.inviteGenerated"));
       onCreated();
-    } catch (e: any) {
-      toast.error(e.message || t("workspaceMembers.createFailed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceMembers.createFailed"));
     } finally {
       setLoading(false);
     }
