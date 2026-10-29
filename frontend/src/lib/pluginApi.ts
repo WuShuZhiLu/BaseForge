@@ -201,13 +201,13 @@ export const pluginApi = {
   registrySources: () => request<RegistrySource[]>("/plugins/ecosystem/sources"),
   setRegistrySource: (source: Pick<RegistrySource, "id" | "name" | "indexUrl" | "registryKeyId" | "registryPublicKey"> & { enabled?: boolean }) => request<RegistrySource[]>("/plugins/ecosystem/sources", { method: "PUT", body: JSON.stringify(source) }),
   registryCatalog: async (source = "official-v2") => {
-    const index = await request<{ extensions: Array<Omit<RegistryPlugin, "latestVersion"> & { versions: Array<{ version: string; runtime?: InstalledPlugin["runtime"] }> }> }>(`/plugins/ecosystem/catalog?source=${encodeURIComponent(source)}`);
+    const index = await request<{ extensions: Array<Omit<RegistryPlugin, "latestVersion"> & { versions: Array<{ version: string; runtime?: InstalledPlugin["runtime"]; publishedAt?: string; permissions?: string[]; channel?: string }> }> }>(`/plugins/ecosystem/catalog?source=${encodeURIComponent(source)}`);
     return index.extensions.map((extension) => {
       const latest = [...extension.versions].sort((left, right) => right.version.localeCompare(left.version, undefined, { numeric: true }))[0];
       return { ...extension, latestVersion: latest?.version || "", runtime: latest?.runtime };
     });
   },
-  installFromRegistry: (sourceId: string, pluginId: string, version?: string) => contributionMutation(request("/plugins/ecosystem/install", { method: "POST", body: JSON.stringify({ sourceId, pluginId, version }) })),
+  installFromRegistry: (sourceId: string, pluginId: string, version?: string) => contributionMutation(request<{ success: true; plugin: InstalledPlugin }>("/plugins/ecosystem/install", { method: "POST", body: JSON.stringify({ sourceId, pluginId, version }) })),
   getRuntimePolicy: () => request<{ allowNodeRuntime: boolean }>("/plugins/policy"),
   setRuntimePolicy: (allowNodeRuntime: boolean) => contributionMutation(request<{ allowNodeRuntime: boolean }>("/plugins/policy", { method: "PUT", body: JSON.stringify({ allowNodeRuntime }) })),
   getDeveloperMode: () => request<{ enabled: boolean; available: boolean }>("/plugins/developer-mode"),

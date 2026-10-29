@@ -1,24 +1,38 @@
 /**
- * PluginsWorkspace —— 插件模块工作区（VSCode 扩展详情式）
+ * PluginsWorkspace —— 插件模块工作区（VS Code 扩展详情式）
  *
  * 三分区模型：插件徽章 → 侧栏插件列表 + 本工作区详情页。
- * 默认空白（提示从侧栏选择插件）；点击侧栏插件项 → 显示插件详情
- * （名称/描述/版本/启停状态 + 打开侧栏面板 / 在主区打开）。
+ * 详情源归一为三类，信息架构统一：
+ * - builtin：官方内置插件（builtin registry），页内启停 + 打开面板/主区；
+ * - installed：已安装第三方插件（GET /plugins），管理员启停/回滚/卸载；
+ * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
+ * 页内 Tab 分组（内置/已安装/市场）；侧栏点击内置插件 → nowen:plugin-selected 直达详情。
  *
- * 选中状态经 localStorage + nowen:plugin-selected 事件与侧栏共享；
+ * 选中状态经 localStorage + nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
  * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
+ * README/Changelog/Dependencies 区块在 Registry V2 索引提供数据前隐藏。
  */
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ArrowLeft,
   ClipboardList,
+  Download,
+  ExternalLink,
   FolderOpen,
   ListTodo,
+  Loader2,
   PenLine,
   Puzzle,
+  RotateCcw,
+  ShieldCheck,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
 import { useAppActions } from "@/store/AppContext";
+import { pluginApi, type InstalledPlugin, type PluginPermissionRow } from "@/lib/pluginApi";
+import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import {
   BUILTIN_PLUGINS,
   isBuiltinPluginEnabled,
@@ -30,6 +44,36 @@ import {
 const SELECTED_KEY = "nowen-plugins-workspace-selected";
 const PLUGIN_SELECTED_EVENT = "nowen:plugin-selected";
 const BUILTIN_CHANGED_EVENT = "nowen:builtin-plugins-changed";
+/** 市场目录默认源（与设置页 PluginSettingsTab 保持一致） */
+const MARKET_SOURCE_ID = "official-v2";
+
+type DetailSource = "builtin" | "installed" | "catalog";
+type GroupKey = DetailSource;
+type CatalogExtension = Awaited<ReturnType<typeof pluginApi.registryCatalog>>[number];
+
+/** 与设置页 PluginSettingsTab 的 permissionLabels 保持一致（就地复制，避免耦合设置页组件） */
+const PERMISSION_LABELS: Record<string, string> = {
+  "notes:read": "读取笔记", "notes:write": "创建和修改笔记",
+  "notebooks:read": "读取笔记本", "notebooks:write": "创建和修改笔记本",
+  "tags:read": "读取标签", "tags:write": "创建和修改标签",
+  "tasks:read": "读取任务", "tasks:write": "创建和修改任务",
+  "attachments:read": "读取附件信息", "attachments:write": "创建和修改附件",
+  "plugin-storage:read": "读取插件自己的数据", "plugin-storage:write": "保存插件自己的数据",
+  "capture:write": "抓取公网 HTTPS 文章和图片，保存到有写入权限的笔记本",
+  "external:fetch": "访问声明的外部网络服务", "secrets:use": "使用你配置的连接密钥（插件看不到原值）",
+  "diary:read": "读取日记", "diary:write": "创建和修改日记",
+  "mindmaps:read": "读取思维导图", "mindmaps:write": "创建和修改思维导图",
+};
+
+const INSTALLED_STATUS_LABELS: Record<InstalledPlugin["status"], string> = {
+  quarantined: "待确认", disabled: "已禁用", enabled: "已启用", error: "运行错误", incompatible: "不兼容",
+};
+
+const GROUP_TABS: Array<[GroupKey, string]> = [
+  ["builtin", "内置"],
+  ["installed", "已安装"],
+  ["catalog", "市场"],
+];
 
 function iconFor(plug: BuiltinPluginDef, size: number) {
   switch (plug.icon) {
@@ -42,8 +86,422 @@ function iconFor(plug: BuiltinPluginDef, size: number) {
   }
 }
 
-export default function PluginsWorkspace() {
+function sortVersionsDesc<T extends { version: string }>(versions: T[]): T[] {
+  return [...versions].sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
+}
+
+function formatDay(iso?: string | null): string {
+  return iso ? iso.slice(0, 10) : "";
+}
+
+function permissionLabel(permission: string): string {
+  return PERMISSION_LABELS[permission] || permission;
+}
+
+function Badge({ tone = "neutral", children }: { tone?: "ok" | "warn" | "bad" | "info" | "neutral"; children: React.ReactNode }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px]",
+        tone === "ok" && "bg-emerald-500/15 text-emerald-600",
+        tone === "warn" && "bg-amber-500/15 text-amber-600",
+        tone === "bad" && "bg-red-500/15 text-red-600",
+        tone === "info" && "bg-indigo-500/15 text-indigo-600",
+        tone === "neutral" && "bg-zinc-500/15 text-tx-secondary",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-4 rounded-lg border border-app-border bg-app-surface p-4">
+      <h3 className="text-sm font-semibold text-tx-primary">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function DetailHeader({ icon, name, uniqueId, version, badges, description }: {
+  icon: React.ReactNode;
+  name: string;
+  uniqueId: string;
+  version: string;
+  badges: React.ReactNode;
+  description: string;
+}) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="truncate text-lg font-semibold text-tx-primary">{name}</h2>
+          {badges}
+        </div>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-tx-tertiary">{uniqueId}</p>
+        <p className="mt-1 text-sm text-tx-secondary">{description}</p>
+        <p className="mt-1 text-xs text-tx-tertiary">v{version}</p>
+      </div>
+    </div>
+  );
+}
+
+function OverviewSection({ description, repository, homepage, license, publishedAt }: {
+  description: string;
+  repository?: string;
+  homepage?: string;
+  license?: string;
+  publishedAt?: string;
+}) {
+  const links: Array<[string, string]> = [];
+  if (repository) links.push(["仓库", repository]);
+  if (homepage) links.push(["主页", homepage]);
+  if (license) links.push(["许可证", license]);
+  return (
+    <SectionCard title="概述">
+      <p className="mt-1 text-sm text-tx-secondary">{description || "暂无说明"}</p>
+      {(links.length > 0 || publishedAt) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-tx-tertiary">
+          {links.map(([label, href]) => (
+            <a key={label} href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-accent-primary hover:underline">
+              {label}<ExternalLink size={11} />
+            </a>
+          ))}
+          {publishedAt && <span>发布于 {formatDay(publishedAt)}</span>}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+function PermissionList({ rows, emptyText }: { rows: PluginPermissionRow[] | string[]; emptyText: string }) {
+  if (!rows.length) return <p className="mt-2 text-xs text-tx-tertiary">{emptyText}</p>;
+  const items = (rows as Array<PluginPermissionRow | string>).map((row) =>
+    typeof row === "string" ? { permission: row, granted: true } : row,
+  );
+  return (
+    <ul className="mt-2 space-y-1">
+      {items.map((item) => (
+        <li key={item.permission} className="flex items-baseline gap-2 text-xs text-tx-secondary">
+          <ShieldCheck size={12} className={cn("mt-0.5 shrink-0", item.granted ? "text-emerald-500" : "text-amber-500")} />
+          <span>{permissionLabel(item.permission)}</span>
+          <span className="ml-auto shrink-0 font-mono text-[10px] text-tx-tertiary">{item.permission}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function VersionHistory({ versions, current }: { versions: Array<{ version: string; date?: string; note?: string }>; current: string }) {
+  if (!versions.length) return null;
+  return (
+    <SectionCard title="版本历史">
+      <ul className="mt-2 space-y-1">
+        {versions.map((item) => (
+          <li
+            key={item.version}
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2 py-1 text-xs",
+              item.version === current ? "bg-indigo-500/10 text-indigo-600" : "text-tx-secondary",
+            )}
+          >
+            <span className="font-mono">v{item.version}</span>
+            {item.date && <span className="text-tx-tertiary">{formatDay(item.date)}</span>}
+            {item.note && <span className="truncate text-tx-tertiary">{item.note}</span>}
+            {item.version === current && <span className="ml-auto text-[10px]">当前版本</span>}
+          </li>
+        ))}
+      </ul>
+    </SectionCard>
+  );
+}
+
+function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
   const actions = useAppActions();
+  const enabled = isBuiltinPluginEnabled(plug.id);
+
+  const toggleEnabled = () => {
+    setBuiltinPluginDisabled(plug.id, enabled);
+    window.dispatchEvent(new CustomEvent(BUILTIN_CHANGED_EVENT));
+  };
+
+  return (
+    <div>
+      <DetailHeader
+        icon={iconFor(plug, 28)}
+        name={plug.name}
+        uniqueId={`官方内置 · ${plug.id}`}
+        version={plug.version}
+        description={plug.description}
+        badges={
+          <>
+            <Badge tone="info">官方内置</Badge>
+            <Badge tone={enabled ? "ok" : "neutral"}>{enabled ? "已启用" : "已停用"}</Badge>
+          </>
+        }
+      />
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleEnabled}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            enabled
+              ? "border border-app-border bg-app-surface text-tx-primary hover:bg-app-hover"
+              : "bg-accent-primary text-white hover:opacity-90",
+          )}
+        >
+          {enabled ? "停用" : "启用"}
+        </button>
+        {enabled && (
+          <>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-plugin-panel", { detail: { id: plug.id } }))}
+              className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
+            >
+              打开侧栏面板
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                // 嵌入型插件（远程文件）无独立主区 → 进文件管理的远程文件页
+                if (plug.embedded) {
+                  window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
+                  actions.setViewMode("files");
+                  return;
+                }
+                if (plug.viewMode === "remote-files") {
+                  actions.setViewMode("files");
+                  return;
+                }
+                actions.setViewMode(plug.viewMode);
+              }}
+              className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
+            >
+              在主区打开
+            </button>
+          </>
+        )}
+      </div>
+      <SectionCard title="功能与贡献">
+        <ul className="mt-2 space-y-1 text-xs text-tx-secondary">
+          <li>· 侧栏迷你面板：{plug.sidebarPanel.title}（知识库视图内嵌）</li>
+          <li>· 主区视图：{plug.embedded ? "无（嵌入文件管理）" : plug.viewMode}</li>
+          <li>· 停用后入口消失，数据始终保留</li>
+        </ul>
+      </SectionCard>
+    </div>
+  );
+}
+
+/** 已安装插件的功能贡献归一列表：commands/settings/menus/automationTemplates/noteTemplates/promptPacks/noteThemes/uiComponents */
+function installedContributionGroups(plugin: InstalledPlugin): Array<[string, string[]]> {
+  const c = plugin.contributes || {};
+  const groups: Array<[string, string[]]> = [
+    ["命令", (c.commands || []).map((item) => item.title || item.id)],
+    ["设置项", (c.settings || []).map((item) => item.title || item.key)],
+    ["菜单", (c.menus || []).map((item) => `${item.location} → ${item.command}`)],
+    ["Automation 模板", (c.automationTemplates || []).map((item) => item.title || item.id)],
+    ["笔记模板", (c.noteTemplates || []).map((item) => item.name || item.id)],
+    ["提示词包", (c.promptPacks || []).map((item) => item.name || item.id)],
+    ["笔记主题", (c.noteThemes || []).map((item) => item.name || item.id)],
+    ["UI 组件", (c.uiComponents || []).map((item) => item.label || item.id)],
+  ];
+  return groups.filter(([, items]) => items.length > 0);
+}
+
+function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollback, onUninstall }: {
+  plugin: InstalledPlugin;
+  isAdmin: boolean;
+  busy: boolean;
+  actionError: string;
+  onToggle: (plugin: InstalledPlugin) => void;
+  onRollback: (plugin: InstalledPlugin) => void;
+  onUninstall: (plugin: InstalledPlugin) => void;
+}) {
+  const presentation = getPluginRuntimePresentation(plugin);
+  const groups = installedContributionGroups(plugin);
+  const currentVersion = plugin.versions?.find((item) => item.version === plugin.version);
+  return (
+    <div>
+      <DetailHeader
+        icon={<Puzzle size={28} className="text-tx-tertiary" />}
+        name={plugin.name}
+        uniqueId={plugin.id}
+        version={plugin.version}
+        description={plugin.description}
+        badges={
+          <>
+            <Badge tone={plugin.status === "enabled" ? "ok" : plugin.status === "error" ? "bad" : "warn"}>
+              {INSTALLED_STATUS_LABELS[plugin.status]}
+            </Badge>
+            <Badge tone="neutral">{plugin.trustLevel}</Badge>
+            {plugin.signatureState === "verified" && <Badge tone="ok">签名已验证</Badge>}
+            <Badge tone="neutral">{presentation.runtimeLabel} · {presentation.executionLabel}</Badge>
+          </>
+        }
+      />
+      {(plugin.repository || plugin.homepage || plugin.license || currentVersion?.installedAt) && (
+        <OverviewSection
+          description={plugin.description}
+          repository={plugin.repository}
+          homepage={plugin.homepage}
+          license={plugin.license}
+          publishedAt={currentVersion?.installedAt}
+        />
+      )}
+      <SectionCard title="功能与贡献">
+        {groups.length ? (
+          <ul className="mt-2 space-y-2 text-xs text-tx-secondary">
+            {groups.map(([label, items]) => (
+              <li key={label}>
+                <span className="font-medium text-tx-primary">{label}（{items.length}）</span>
+                <span className="ml-2">{items.join("、")}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-xs text-tx-tertiary">未声明功能贡献</p>
+        )}
+      </SectionCard>
+      <SectionCard title="权限">
+        <PermissionList
+          rows={plugin.permissions}
+          emptyText={presentation.declarative ? "零数据权限（Manifest 安装阶段强制）" : "不请求数据权限"}
+        />
+      </SectionCard>
+      <VersionHistory
+        versions={(plugin.versions || []).map((item) => ({ version: item.version, date: item.installedAt, note: item.trustLevel }))}
+        current={plugin.version}
+      />
+      <SectionCard title="操作">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {isAdmin ? (
+            <>
+              {plugin.status === "enabled" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onToggle(plugin)}
+                  className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
+                >
+                  禁用
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onToggle(plugin)}
+                  className="rounded-md bg-accent-primary px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                >
+                  {presentation.enableLabel}
+                </button>
+              )}
+              {plugin.previousVersion && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onRollback(plugin)}
+                  className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
+                >
+                  <RotateCcw size={13} />回滚到 v{plugin.previousVersion}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onUninstall(plugin)}
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+              >
+                <Trash2 size={13} />卸载
+              </button>
+            </>
+          ) : (
+            <p className="text-xs text-tx-tertiary">启停 / 回滚 / 卸载为管理员操作，请前往 设置 → 扩展生态。</p>
+          )}
+        </div>
+        {actionError && <p role="alert" className="mt-2 text-xs text-red-600">{actionError}</p>}
+      </SectionCard>
+    </div>
+  );
+}
+
+function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionError, onInstall }: {
+  extension: CatalogExtension;
+  isAdmin: boolean;
+  nodeRuntimeAllowed: boolean | null;
+  busy: boolean;
+  actionError: string;
+  onInstall: (extension: CatalogExtension) => void;
+}) {
+  const latest = sortVersionsDesc(extension.versions)[0];
+  // 与 PluginMarketplaceInstallButton 相同的策略门槛：Node Runtime 插件需管理员先放行
+  const needsPolicy = extension.runtime === "node-action" && nodeRuntimeAllowed !== true;
+  const permissions = latest?.permissions || [];
+  return (
+    <div>
+      <DetailHeader
+        icon={<Puzzle size={28} className="text-tx-tertiary" />}
+        name={extension.name}
+        uniqueId={extension.id}
+        version={extension.latestVersion}
+        description={extension.description || "暂无说明"}
+        badges={
+          <>
+            <Badge tone="info">市场</Badge>
+            <Badge tone="neutral">{extension.trustLevel || "community"}</Badge>
+            {latest?.runtime && <Badge tone="neutral">{latest.runtime}</Badge>}
+          </>
+        }
+      />
+      {(extension.repository || latest?.publishedAt) && (
+        <OverviewSection
+          description={extension.description || ""}
+          repository={extension.repository}
+          publishedAt={latest?.publishedAt}
+        />
+      )}
+      {permissions.length > 0 && (
+        <SectionCard title="权限">
+          <PermissionList rows={permissions} emptyText="不请求数据权限" />
+        </SectionCard>
+      )}
+      <VersionHistory
+        versions={sortVersionsDesc(extension.versions).map((item) => ({ version: item.version, date: item.publishedAt }))}
+        current={extension.latestVersion}
+      />
+      <SectionCard title="操作">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {isAdmin ? (
+            <button
+              type="button"
+              disabled={busy || needsPolicy}
+              onClick={() => onInstall(extension)}
+              className="inline-flex items-center gap-1 rounded-md bg-accent-primary px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
+            >
+              <Download size={13} />{busy ? "正在安装" : "安装"}
+            </button>
+          ) : (
+            <p className="text-xs text-tx-tertiary">安装为管理员操作，请前往 设置 → 扩展生态。</p>
+          )}
+          {isAdmin && needsPolicy && (
+            <p className="text-xs text-amber-600">
+              {nodeRuntimeAllowed === null ? "正在读取 Runtime 策略" : "此插件需要 Node Runtime，请先在 设置 → 扩展生态 放行"}
+            </p>
+          )}
+        </div>
+        {actionError && <p role="alert" className="mt-2 text-xs text-red-600">{actionError}</p>}
+      </SectionCard>
+    </div>
+  );
+}
+
+export default function PluginsWorkspace() {
   const [selectedId, setSelectedId] = useState<BuiltinPluginId | null>(() => {
     try {
       const raw = localStorage.getItem(SELECTED_KEY);
@@ -52,13 +510,37 @@ export default function PluginsWorkspace() {
       return null;
     }
   });
+  // 页内分组 Tab + 非内置插件选中态（不持久化；侧栏仅联动内置插件）
+  const [group, setGroup] = useState<GroupKey>("builtin");
+  const [installedSelection, setInstalledSelection] = useState<string | null>(null);
+  const [catalogSelection, setCatalogSelection] = useState<string | null>(null);
   // 启停状态变化时重渲染（本组件与侧栏都可改）
   const [version, setVersion] = useState(0);
+  // 已安装 / 市场数据（null = 尚未加载）
+  const [installed, setInstalled] = useState<InstalledPlugin[] | null>(null);
+  const [catalog, setCatalog] = useState<CatalogExtension[] | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [nodeRuntimeAllowed, setNodeRuntimeAllowed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  const refreshInstalled = useCallback(async () => {
+    try {
+      setInstalled(await pluginApi.list());
+    } catch {
+      setInstalled([]);
+    }
+  }, []);
 
   useEffect(() => {
     const onSelect = (event: Event) => {
       const id = (event as CustomEvent<{ id: string }>).detail?.id;
-      if (id && BUILTIN_PLUGINS.some((p) => p.id === id)) setSelectedId(id as BuiltinPluginId);
+      if (id && BUILTIN_PLUGINS.some((p) => p.id === id)) {
+        setSelectedId(id as BuiltinPluginId);
+        setGroup("builtin");
+      }
     };
     const onChanged = () => setVersion((v) => v + 1);
     window.addEventListener(PLUGIN_SELECTED_EVENT, onSelect);
@@ -69,105 +551,284 @@ export default function PluginsWorkspace() {
     };
   }, []);
 
-  const plug = selectedId ? BUILTIN_PLUGINS.find((p) => p.id === selectedId) ?? null : null;
-  const enabled = plug ? isBuiltinPluginEnabled(plug.id) : false;
+  useEffect(() => {
+    let cancelled = false;
+    api.getMe()
+      .then((user) => { if (!cancelled) setIsAdmin((user as { role?: string })?.role === "admin"); })
+      .catch(() => { if (!cancelled) setIsAdmin(false); });
+    void refreshInstalled();
+    return () => { cancelled = true; };
+  }, [refreshInstalled]);
 
-  const toggleEnabled = () => {
-    if (!plug) return;
-    setBuiltinPluginDisabled(plug.id, enabled);
-    window.dispatchEvent(new CustomEvent(BUILTIN_CHANGED_EVENT));
+  // 市场目录懒加载：首次切到市场 Tab 时拉取；管理员同时读取 Runtime 策略（安装门槛用）
+  useEffect(() => {
+    if (group !== "catalog") return;
+    if (isAdmin) {
+      pluginApi.getRuntimePolicy()
+        .then((policy) => setNodeRuntimeAllowed(policy.allowNodeRuntime))
+        .catch(() => setNodeRuntimeAllowed(false));
+    }
+    if (catalog !== null || catalogLoading || catalogError) return;
+    setCatalogLoading(true);
+    pluginApi.registryCatalog(MARKET_SOURCE_ID)
+      .then((extensions) => { setCatalog(extensions); setCatalogError(""); })
+      .catch((error) => setCatalogError(error instanceof Error ? error.message : String(error)))
+      .finally(() => setCatalogLoading(false));
+  }, [group, isAdmin, catalog, catalogLoading, catalogError]);
+
+  const plug = selectedId ? BUILTIN_PLUGINS.find((p) => p.id === selectedId) ?? null : null;
+  const installedPlug = group === "installed" && installedSelection && installed
+    ? installed.find((p) => p.id === installedSelection) ?? null
+    : null;
+  const marketExt = group === "catalog" && catalogSelection && catalog
+    ? catalog.find((e) => e.id === catalogSelection) ?? null
+    : null;
+  const detail = group === "builtin" && plug ? { source: "builtin" as const, plug }
+    : group === "installed" && installedPlug ? { source: "installed" as const, plug: installedPlug }
+      : group === "catalog" && marketExt ? { source: "catalog" as const, ext: marketExt }
+        : null;
+
+  const selectBuiltin = (id: BuiltinPluginId) => {
+    try { localStorage.setItem(SELECTED_KEY, id); } catch { /* ignore */ }
+    setSelectedId(id);
+    setGroup("builtin");
   };
+
+  const clearActionState = () => {
+    setActionError("");
+    setVersion((v) => v + 1);
+  };
+
+  const runInstalledAction = async (plugin: InstalledPlugin, operation: () => Promise<unknown>) => {
+    setBusy(true);
+    setActionError("");
+    try {
+      await operation();
+      await refreshInstalled();
+      clearActionState();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleInstalled = (plugin: InstalledPlugin) => {
+    const presentation = getPluginRuntimePresentation(plugin);
+    if (plugin.status === "enabled") {
+      void runInstalledAction(plugin, () => pluginApi.disable(plugin.id));
+      return;
+    }
+    // 与设置页一致：启用前先授予声明的全部权限（可执行插件需权限确认）
+    void runInstalledAction(plugin, async () => {
+      if (presentation.requiresPermissionConfirmation) {
+        await pluginApi.grant(plugin.id, plugin.permissions.map((item) => item.permission));
+      }
+      await pluginApi.enable(plugin.id);
+    });
+  };
+
+  const rollbackInstalled = (plugin: InstalledPlugin) => {
+    if (!window.confirm(`回滚到 ${plugin.previousVersion}？插件数据不会回滚。`)) return;
+    void runInstalledAction(plugin, () => pluginApi.rollback(plugin.id, plugin.previousVersion || undefined));
+  };
+
+  const uninstallInstalled = (plugin: InstalledPlugin) => {
+    if (!window.confirm(`确定卸载 ${plugin.name}？`)) return;
+    void runInstalledAction(plugin, async () => {
+      await pluginApi.uninstall(plugin.id);
+      if (installedSelection === plugin.id) setInstalledSelection(null);
+    });
+  };
+
+  const installCatalog = (extension: CatalogExtension) => {
+    setBusy(true);
+    setActionError("");
+    pluginApi.installFromRegistry(MARKET_SOURCE_ID, extension.id, extension.latestVersion)
+      .then(async (result) => {
+        await refreshInstalled();
+        setInstalledSelection(result.plugin.id);
+        setGroup("installed");
+        clearActionState();
+      })
+      .catch((error) => setActionError(error instanceof Error ? error.message : String(error)))
+      .finally(() => setBusy(false));
+  };
+
+  const backToList = () => {
+    if (group === "builtin") setSelectedId(null);
+    if (group === "installed") setInstalledSelection(null);
+    if (group === "catalog") setCatalogSelection(null);
+    clearActionState();
+  };
+
+  const switchGroup = (next: GroupKey) => {
+    setGroup(next);
+    clearActionState();
+  };
+
+  const tab = (key: GroupKey) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => switchGroup(key)}
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+        group === key ? "bg-accent-primary text-white" : "border border-app-border bg-app-surface text-tx-secondary hover:bg-app-hover",
+      )}
+    >
+      {GROUP_TABS.find(([id]) => id === key)?.[1]}
+    </button>
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-app-bg">
-      {!plug ? (
-        <div className="flex flex-1 items-center justify-center p-8">
-          <div className="max-w-sm text-center">
-            <Puzzle size={44} className="mx-auto mb-3 text-tx-tertiary" />
-            <h2 className="text-base font-semibold text-tx-primary">插件</h2>
-            <p className="mt-1 text-sm text-tx-secondary">从左侧选择一个插件，查看详细信息。</p>
-          </div>
-        </div>
-      ) : (
-        <div className="mx-auto w-full max-w-2xl p-6" key={`${plug.id}-${version}`}>
-          <div className="flex items-start gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface">
-              {iconFor(plug, 28)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-lg font-semibold text-tx-primary">{plug.name}</h2>
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px]",
-                    enabled ? "bg-emerald-500/15 text-emerald-600" : "bg-zinc-500/15 text-tx-secondary",
-                  )}
-                >
-                  {enabled ? "已启用" : "已停用"}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-tx-secondary">{plug.description}</p>
-              <p className="mt-1 text-xs text-tx-tertiary">
-                v{plug.version} · 官方内置 · 侧栏面板：{plug.sidebarPanel.title}
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div className="mx-auto w-full max-w-2xl p-6">
+        <div className="flex items-center gap-2">
+          {detail ? (
             <button
               type="button"
-              onClick={toggleEnabled}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                enabled
-                  ? "border border-app-border bg-app-surface text-tx-primary hover:bg-app-hover"
-                  : "bg-accent-primary text-white hover:opacity-90",
-              )}
+              onClick={backToList}
+              className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
             >
-              {enabled ? "停用" : "启用"}
+              <ArrowLeft size={12} />返回列表
             </button>
-            {enabled && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-plugin-panel", { detail: { id: plug.id } }))}
-                  className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
-                >
-                  打开侧栏面板
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // 嵌入型插件（远程文件）无独立主区 → 进文件管理的远程文件页
-                    if (plug.embedded) {
-                      window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
-                      actions.setViewMode("files");
-                      return;
-                    }
-                    if (plug.viewMode === "remote-files") {
-                      actions.setViewMode("files");
-                      return;
-                    }
-                    actions.setViewMode(plug.viewMode);
-                  }}
-                  className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
-                >
-                  在主区打开
-                </button>
-              </>
+          ) : <span />}
+          <span className="flex-1" />
+          {GROUP_TABS.map(([key]) => tab(key))}
+        </div>
+
+        {detail?.source === "builtin" && <div className="mt-6" key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
+        {detail?.source === "installed" && (
+          <div className="mt-6">
+            <InstalledDetail
+              plugin={detail.plug}
+              isAdmin={isAdmin}
+              busy={busy}
+              actionError={actionError}
+              onToggle={toggleInstalled}
+              onRollback={rollbackInstalled}
+              onUninstall={uninstallInstalled}
+            />
+          </div>
+        )}
+        {detail?.source === "catalog" && (
+          <div className="mt-6">
+            <CatalogDetail
+              extension={detail.ext}
+              isAdmin={isAdmin}
+              nodeRuntimeAllowed={nodeRuntimeAllowed}
+              busy={busy}
+              actionError={actionError}
+              onInstall={installCatalog}
+            />
+          </div>
+        )}
+
+        {!detail && (
+          <div className="mt-6">
+            <div className="mb-4 flex items-start gap-3">
+              <Puzzle size={32} className="mt-1 text-tx-tertiary" />
+              <div>
+                <h2 className="text-base font-semibold text-tx-primary">插件</h2>
+                <p className="mt-1 text-sm text-tx-secondary">从左侧或下方选择一个插件，查看详细信息。</p>
+              </div>
+            </div>
+
+            {group === "builtin" && (
+              <div className="space-y-2">
+                {BUILTIN_PLUGINS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => selectBuiltin(item.id)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
+                      {iconFor(item, 18)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
+                      <span className="block truncate text-xs text-tx-tertiary">v{item.version} · {item.description}</span>
+                    </span>
+                    <Badge tone={isBuiltinPluginEnabled(item.id) ? "ok" : "neutral"}>
+                      {isBuiltinPluginEnabled(item.id) ? "已启用" : "已停用"}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {group === "installed" && (
+              installed === null ? (
+                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载已安装插件</div>
+              ) : installed.length ? (
+                <div className="space-y-2">
+                  {installed.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { setInstalledSelection(item.id); clearActionState(); }}
+                      className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
+                        <Puzzle size={16} className="text-tx-tertiary" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
+                        <span className="block truncate font-mono text-[11px] text-tx-tertiary">{item.id} · v{item.version}</span>
+                      </span>
+                      <Badge tone={item.status === "enabled" ? "ok" : item.status === "error" ? "bad" : "warn"}>
+                        {INSTALLED_STATUS_LABELS[item.status]}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
+                  尚未安装第三方插件，可到「市场」浏览。
+                </div>
+              )
+            )}
+
+            {group === "catalog" && (
+              catalogLoading ? (
+                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载市场目录</div>
+              ) : catalogError ? (
+                <div className="rounded-lg border border-red-200 bg-red-500/5 px-4 py-8 text-center text-sm text-red-600">
+                  <div className="font-medium">市场目录加载失败</div>
+                  <div className="mt-1 text-xs opacity-80">{catalogError}</div>
+                </div>
+              ) : catalog && catalog.length ? (
+                <div className="space-y-2">
+                  {catalog.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { setCatalogSelection(item.id); clearActionState(); }}
+                      className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
+                        <Puzzle size={16} className="text-tx-tertiary" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
+                        <span className="block truncate font-mono text-[11px] text-tx-tertiary">{item.id} · v{item.latestVersion}</span>
+                        {item.description && <span className="block truncate text-xs text-tx-tertiary">{item.description}</span>}
+                      </span>
+                      <Badge tone="neutral">{item.trustLevel || "community"}</Badge>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
+                  Registry 暂无可显示插件。
+                </div>
+              )
             )}
           </div>
-
-          <div className="mt-8 rounded-lg border border-app-border bg-app-surface p-4">
-            <h3 className="text-sm font-semibold text-tx-primary">功能与贡献</h3>
-            <ul className="mt-2 space-y-1 text-xs text-tx-secondary">
-              <li>· 侧栏迷你面板：{plug.sidebarPanel.title}（知识库视图内嵌）</li>
-              <li>· 主区视图：{plug.embedded ? "无（嵌入文件管理）" : plug.viewMode}</li>
-              <li>· 停用后入口消失，数据始终保留</li>
-            </ul>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
