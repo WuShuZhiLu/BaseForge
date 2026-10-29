@@ -334,7 +334,6 @@ export default function VersionHistoryPanel({ noteId, noteTitle, onRestore, onCl
   const filterTabs: Array<{ key: VersionFilterTab; labelKey: string }> = [
     { key: "all", labelKey: "versions.tabAll" },
     { key: "manual", labelKey: "versions.tabManual" },
-    { key: "auto", labelKey: "versions.tabAuto" },
   ];
 
   return (

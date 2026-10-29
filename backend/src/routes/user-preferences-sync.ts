@@ -82,7 +82,7 @@ export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
   editorFontSize: 0,
   showNoteListUpdatedTime: true,
   enableNoteTabs: false,
-  markdownDefaultViewMode: "source",
+  markdownDefaultViewMode: "preview",
   remoteImagePasteMode: "localize",
   defaultEditorMode: "tiptap",
   codeBlockTheme: "auto",

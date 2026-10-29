@@ -79,7 +79,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   editorFontSize: 0,
   showNoteListUpdatedTime: true,
   enableNoteTabs: false,
-  markdownDefaultViewMode: "source",
+  markdownDefaultViewMode: "preview",
   remoteImagePasteMode: "localize",
   defaultEditorMode: "tiptap",
   codeBlockTheme: "auto",
