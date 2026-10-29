@@ -192,6 +192,8 @@ interface SearchReplacePanelProps {
   onClose: () => void;
   /** 是否允许替换（只读模式可隐藏替换输入框） */
   editable?: boolean;
+  /** 打开时直接展开替换行并聚焦替换框（Ctrl+H 场景） */
+  initialShowReplace?: boolean;
 }
 
 export function SearchReplacePanel({
@@ -199,6 +201,7 @@ export function SearchReplacePanel({
   open,
   onClose,
   editable = true,
+  initialShowReplace = false,
 }: SearchReplacePanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -209,7 +212,7 @@ export function SearchReplacePanel({
   const [showReplace, setShowReplace] = useState(false);
   const [matchCount, setMatchCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const queryInputRef = useRef<HTMLInputElement>(null);
+  const [truncated, setTruncated] = useState(false);
   const scrollFrameRef = useRef<number | null>(null);
 
   // 派发查询到 PM 插件
@@ -231,6 +234,8 @@ export function SearchReplacePanel({
       if (s) {
         setMatchCount(s.matches.length);
         setActiveIndex(s.activeIndex);
+        // 运行时壳在插件 state 里提供 truncated（原版类型未声明），可选读取
+        setTruncated((s as { truncated?: boolean }).truncated === true);
       }
     },
     [editor],
@@ -274,9 +279,12 @@ export function SearchReplacePanel({
     dispatchQuery({ query, caseSensitive, wholeWord, useRegex });
   }, [query, caseSensitive, wholeWord, useRegex, open, dispatchQuery]);
 
-  // 打开时聚焦 + 把当前选区文本带进去
+  // 打开时把当前选区文本带进去；initialShowReplace 时展开替换行（聚焦由 DocFindBar autoFocus 负责）
+  const wasOpenRef = useRef(false);
   useEffect(() => {
     if (open) {
+      wasOpenRef.current = true;
+      if (initialShowReplace) setShowReplace(true);
       if (editor) {
         const { from, to } = editor.state.selection;
         if (from < to) {
@@ -284,12 +292,13 @@ export function SearchReplacePanel({
           if (selected && selected.length < 100) setQuery(selected);
         }
       }
-      requestAnimationFrame(() => {
-        queryInputRef.current?.focus();
-        queryInputRef.current?.select();
-      });
     } else {
-      // 关闭时清空装饰
+      // 只在真正的关闭跃迁（true→false）时清理并归还焦点；
+      // 首次挂载（open=false）不动焦点，避免抢走标题输入等其他焦点流。
+      if (!wasOpenRef.current) return;
+      wasOpenRef.current = false;
+      // 关闭时清空查询词与装饰（替换词 / 开关 / 展开态保留，组件未卸载）
+      setQuery("");
       if (editor) {
         const view = editor.view;
         try {
@@ -298,10 +307,18 @@ export function SearchReplacePanel({
           // 脏 doc 场景：忽略即可，下次正常 dispatch 时再清
           console.warn("[SearchReplacePanel] clear-on-close dispatch failed:", e);
         }
+        // 焦点归还编辑器（rAF 下一帧执行，保留滚动位置）
+        requestAnimationFrame(() => editor.view.focus());
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // 面板已打开时再次触发 Ctrl+H（open 不变、effect 不重跑）：也要展开替换行，
+  // 焦点随后由 DocFindBar 随 focusTarget/showReplace 变化落到替换框。
+  useEffect(() => {
+    if (open && initialShowReplace) setShowReplace(true);
+  }, [open, initialShowReplace]);
 
   const goNext = useCallback(() => {
     if (!editor) return;
@@ -329,11 +346,18 @@ export function SearchReplacePanel({
     if (!s) return;
     const m = s.matches[activeIndex];
     if (!m) return;
+    // 正则模式：按匹配原文展开替换串（$1、$& 等），非正则保持纯文本
+    const regex = useRegex ? buildRegex({ query, caseSensitive, wholeWord, useRegex }) : null;
+    const insertText = regex
+      ? editor.state.doc
+          .textBetween(m.from, m.to, "\n")
+          .replace(new RegExp(regex.source, regex.flags.replace("g", "")), replaceWith)
+      : replaceWith;
     editor
       .chain()
       .focus()
       .setTextSelection({ from: m.from, to: m.to })
-      .insertContent(replaceWith)
+      .insertContent(insertText)
       .run();
     // 替换后重新走查询，自动跳到下一个
     requestAnimationFrame(() => {
@@ -345,11 +369,21 @@ export function SearchReplacePanel({
     if (!editor || matchCount === 0) return;
     const s = searchReplacePluginKey.getState(editor.state);
     if (!s) return;
-    // 倒序替换，避免位置偏移
-    const sorted = [...s.matches].sort((a, b) => b.from - a.from);
+    // 倒序替换避免位置偏移；正则模式下先统一取好匹配文本与展开结果，再链式替换
+    const regex = useRegex ? buildRegex({ query, caseSensitive, wholeWord, useRegex }) : null;
+    const sorted = [...s.matches]
+      .sort((a, b) => b.from - a.from)
+      .map((m) => ({
+        ...m,
+        insertText: regex
+          ? editor.state.doc
+              .textBetween(m.from, m.to, "\n")
+              .replace(new RegExp(regex.source, regex.flags.replace("g", "")), replaceWith)
+          : replaceWith,
+      }));
     const chain = editor.chain().focus();
     sorted.forEach((m) => {
-      chain.setTextSelection({ from: m.from, to: m.to }).insertContent(replaceWith);
+      chain.setTextSelection({ from: m.from, to: m.to }).insertContent(m.insertText);
     });
     chain.run();
     const replaced = sorted.length;
@@ -358,28 +392,6 @@ export function SearchReplacePanel({
       dispatchQuery({ query, caseSensitive, wholeWord, useRegex });
     });
   }, [editor, matchCount, replaceWith, query, caseSensitive, wholeWord, useRegex, dispatchQuery, t]);
-
-  const onQueryKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (e.shiftKey) goPrev();
-      else goNext();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  };
-
-  const onReplaceKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) replaceAll();
-      else replaceCurrent();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  };
 
   const regexInvalid = useMemo(() => {
     if (!useRegex || !query) return false;
@@ -415,6 +427,8 @@ export function SearchReplacePanel({
       onReplaceAll={replaceAll}
       onClose={onClose}
       editable={editable}
+      truncated={truncated}
+      focusTarget={initialShowReplace ? "replace" : "query"}
     />
   );
 }

@@ -14,11 +14,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { EditorView, type Command, type Panel, type ViewUpdate } from "@codemirror/view";
 import {
   closeSearchPanel,
+  openSearchPanel,
   findNext,
   findPrevious,
   getSearchQuery,
   replaceAll as cmReplaceAll,
   replaceNext as cmReplaceNext,
+  searchPanelOpen,
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
@@ -30,6 +32,25 @@ import { DocFindBar } from "./DocFindBar";
 const MATCH_LIMIT = 500;
 /** 打开面板时预填的选区文本长度上限 */
 const PREFILL_LIMIT = 100;
+
+/** 模块级标志：openMarkdownFindWithReplace 置位，供下一次面板构造时读取 */
+let openWithReplace = false;
+/** 当前存活的面板实例（按 view 区分）：面板已打开时 Ctrl+H 直接驱动它，而不是依赖重建 */
+const activePanels = new WeakMap<EditorView, MarkdownDocFindPanel>();
+
+/**
+ * 打开查找面板并直接进入替换框。
+ * 面板已打开时 openSearchPanel 不会重建面板（构造函数不执行、标志不被消费，
+ * 会留下脏标志污染下次普通打开），此时直接驱动现有面板展开替换行。
+ */
+export function openMarkdownFindWithReplace(view: EditorView): boolean {
+  if (searchPanelOpen(view.state)) {
+    activePanels.get(view)?.enterReplaceMode();
+    return true;
+  }
+  openWithReplace = true;
+  return openSearchPanel(view);
+}
 
 interface PanelState {
   query: string;
@@ -50,23 +71,30 @@ export class MarkdownDocFindPanel implements Panel {
   private activeIndex = -1;
   private destroyed = false;
   private mountTimer: number | null = null;
+  /** 本次打开是否直接聚焦替换框（由 openMarkdownFindWithReplace 置位） */
+  private focusReplace = false;
 
   constructor(view: EditorView) {
     this.view = view;
     const existing = getSearchQuery(view.state);
     const { from, to } = view.state.selection.main;
     const selected = from < to ? view.state.sliceDoc(from, to) : "";
+    // 读取打开标志后立即复位，避免影响下次普通打开
+    const withReplace = openWithReplace;
+    openWithReplace = false;
+    this.focusReplace = withReplace;
     this.state = {
       query: selected && selected.length <= PREFILL_LIMIT ? selected : existing.search,
       replaceWith: existing.replace,
       caseSensitive: existing.caseSensitive,
       wholeWord: existing.wholeWord,
       useRegex: existing.regexp,
-      showReplace: Boolean(existing.replace),
+      showReplace: withReplace || Boolean(existing.replace),
     };
     this.dom = document.createElement("div");
     this.dom.className = "nowen-doc-find-panel";
     this.root = createRoot(this.dom);
+    activePanels.set(view, this);
     this.recount();
     this.render();
   }
@@ -99,11 +127,25 @@ export class MarkdownDocFindPanel implements Panel {
 
   destroy() {
     this.destroyed = true;
+    if (activePanels.get(this.view) === this) activePanels.delete(this.view);
     if (this.mountTimer !== null) {
       window.clearTimeout(this.mountTimer);
       this.mountTimer = null;
     }
     this.root.unmount();
+  }
+
+  /** 面板已打开时再次触发 Ctrl+H：展开替换行并聚焦替换框（不重建面板，不产生脏标志） */
+  enterReplaceMode() {
+    this.focusReplace = true;
+    if (this.state.showReplace) {
+      // 已展开：DocFindBar 的聚焦 effect 依赖未变化，直接聚焦兜底
+      this.render();
+      this.dom.querySelector<HTMLInputElement>("input[data-replace-input]")?.focus();
+      return;
+    }
+    // 展开 → DocFindBar 的聚焦 effect 随 showReplace/focusTarget 变化落到替换框
+    this.patch({ showReplace: true });
   }
 
   /** 把状态写回 CM：高亮、选区与后续导航都基于它 */
@@ -209,6 +251,7 @@ export class MarkdownDocFindPanel implements Panel {
         onClose={() => closeSearchPanel(this.view)}
         editable={editable}
         truncated={this.truncated}
+        focusTarget={this.focusReplace ? "replace" : "query"}
       />
     );
   }

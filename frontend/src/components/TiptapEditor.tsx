@@ -106,7 +106,7 @@ import {
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, Trash2,
   FileType, Check, AlertCircle, Info, ArrowUp, Copy, Link as LinkIcon,
   ExternalLink, Unlink2, Workflow, Sigma, BookOpen, Download, Phone,
-  Type, Palette, Eraser, Paintbrush, ChevronDown, ChevronUp, Search, Upload, FolderSearch, ClipboardPlus,
+  Type, Palette, Eraser, Paintbrush, ChevronDown, ChevronUp, Upload, FolderSearch, ClipboardPlus,
   MoreHorizontal, Plus,
   // 表格气泡菜单图标
   Rows3, Columns3, Merge, Split, Heading, BrainCircuit,
@@ -5402,8 +5402,10 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   // 内容不在顶端（>4px）时给 sticky 工具栏加底部阴影，
   // 让其视觉上「浮」于内容之上——跟 Notion / Bear / Craft 等主流移动端编辑器一致。
   const [toolbarShadow, setToolbarShadow] = useState(false);
-  // 查找替换面板开关；Ctrl/Cmd+F 切换。
+  // 查找替换面板开关；Ctrl/Cmd+F / Ctrl/Cmd+H 打开。
   const [searchOpen, setSearchOpen] = useState(false);
+  // Ctrl/Cmd+H 打开时要求直接展开替换行并聚焦替换框；Ctrl+F / 工具栏按钮打开时复位
+  const [openWithReplace, setOpenWithReplace] = useState(false);
   const perfRenderSnapshot = isPhaseAPerfEnabled() ? {
     note,
     onUpdate,
@@ -5551,19 +5553,22 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     el.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // 全局 Ctrl/Cmd+F 快捷键打开查找面板，避免与浏览器原生查找冲突
+  // 全局 Ctrl/Cmd+F / Ctrl/Cmd+H 快捷键打开查找面板，避免与浏览器原生查找冲突
   // 仅当焦点在编辑器容器内时才拦截，最大限度尊重用户在标题输入框等其他地方的习惯。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
-        const root = scrollContainerRef.current?.parentElement;
-        const active = document.activeElement;
-        const inEditor = root && active instanceof Node && root.contains(active);
-        // 编辑器内 / 已打开搜索面板 时才接管，避免影响全局浏览器查找
-        if (inEditor || searchOpen) {
-          e.preventDefault();
-          setSearchOpen(true);
-        }
+      const withMod = e.ctrlKey || e.metaKey;
+      const isFind = withMod && (e.key === "f" || e.key === "F");
+      const isReplace = withMod && (e.key === "h" || e.key === "H");
+      if (!isFind && !isReplace) return;
+      const root = scrollContainerRef.current?.parentElement;
+      const active = document.activeElement;
+      const inEditor = root && active instanceof Node && root.contains(active);
+      // 编辑器内 / 已打开搜索面板 时才接管，避免影响全局浏览器查找
+      if (inEditor || searchOpen) {
+        e.preventDefault();
+        setOpenWithReplace(isReplace);
+        setSearchOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -6023,16 +6028,6 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           <AlignRight size={iconSize} />
         </ToolbarButton>
 
-        <span className="hidden md:inline-flex">
-          <ToolbarButton
-            onClick={() => setSearchOpen((v) => !v)}
-            isActive={searchOpen}
-            title={t('searchReplace.toolbarTitle') || '查找替换 (Ctrl+F)'}
-          >
-            <Search size={iconSize} />
-          </ToolbarButton>
-        </span>
-
         {/* 表格操作按钮（仅在光标在表格内时显示） */}
         {editor.isActive('table') && (
           <>
@@ -6114,6 +6109,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           editable={editable}
+          initialShowReplace={openWithReplace}
         />
       )}
 

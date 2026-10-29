@@ -145,7 +145,7 @@ import { isVideoFile, uploadMediaAttachment, type MediaUploadResult } from "@/li
 import type { NoteEditorHandle, NoteEditorHeading, NoteEditorProps } from "@/components/editors/types";
 import type { FormatMenuPayload } from "@/lib/desktopBridge";
 import { NoteLinkMenu, type NoteSearchResult, type NoteLinkBlockItem, type NoteLinkSelectionOptions } from "@/components/NoteLinkExtension";
-import { createMarkdownFindPanel } from "@/components/MarkdownDocFindPanel";
+import { createMarkdownFindPanel, openMarkdownFindWithReplace } from "@/components/MarkdownDocFindPanel";
 import { buildWikiNoteLink, detectActiveWikiNoteQuery } from "@/lib/noteLinkSyntax";
 import { getMarkdownDailyRecordSlashCommands } from "@/components/daily-records/markdownDailyRecordSlashCommands";
 import { consumeBlockNavigation, subscribeBlockNavigation } from "@/lib/blockNavigation";
@@ -1272,6 +1272,8 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         keymap.of([
           ...closeBracketsKeymap,
           ...defaultKeymap,
+          // Mod-h：打开查找面板并直接聚焦替换框
+          { key: "Mod-h", run: openMarkdownFindWithReplace },
           ...searchKeymap,
           ...historyKeymap,
           ...foldKeymap,

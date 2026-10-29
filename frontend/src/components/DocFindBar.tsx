@@ -42,6 +42,8 @@ export interface DocFindBarProps {
   truncated?: boolean;
   /** 挂载时自动聚焦查询框（浮层每次打开都会重新挂载） */
   autoFocus?: boolean;
+  /** 自动聚焦目标：查询框或替换框（替换行未展开时回退查询框） */
+  focusTarget?: "query" | "replace";
   className?: string;
 }
 
@@ -68,23 +70,30 @@ export function DocFindBar({
   editable = true,
   truncated = false,
   autoFocus = true,
+  focusTarget = "query",
   className,
 }: DocFindBarProps) {
   const { t } = useTranslation();
   const queryInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
 
-  // 每次打开（挂载）聚焦并全选查询词，便于直接覆盖输入。
+  // 打开浮层（挂载）时按 focusTarget 聚焦，展开替换行时把焦点移入替换框；聚焦后全选文本。
   // CodeMirror 的 panel 可能在本帧结束时才挂到 document 上，此时 focus() 无效，
   // 所以未插入文档前逐帧重试几次。
+  const mountedRef = useRef(false);
   useEffect(() => {
     if (!autoFocus) return;
+    const justExpanded = mountedRef.current && showReplace;
+    mountedRef.current = true;
     let cancelled = false;
     let attempts = 0;
     let frame = 0;
     const tryFocus = () => {
       if (cancelled) return;
-      const el = queryInputRef.current;
+      const el =
+        (justExpanded || focusTarget === "replace") && showReplace
+          ? replaceInputRef.current
+          : queryInputRef.current;
       if (el && el.isConnected) {
         el.focus();
         el.select();
@@ -100,7 +109,7 @@ export function DocFindBar({
       cancelled = true;
       cancelAnimationFrame(frame);
     };
-  }, [autoFocus]);
+  }, [autoFocus, focusTarget, showReplace]);
 
   const regexInvalid = useMemo(() => {
     if (!useRegex || !query) return false;
@@ -145,7 +154,7 @@ export function DocFindBar({
       aria-label={t("searchReplace.toolbarTitle")}
       onMouseDown={(e) => e.stopPropagation()}
       className={cn(
-        "absolute right-3 top-3 z-30 flex w-[362px] max-w-[calc(100vw-1.5rem)] flex-col gap-1.5",
+        "absolute right-2 top-2 z-30 flex w-[362px] max-w-[calc(100vw-1.5rem)] flex-col gap-1.5 sm:right-3 sm:top-3",
         "rounded-xl border border-app-border bg-app-elevated p-2 shadow-[0_1px_2px_rgba(24,24,20,0.05),0_10px_28px_-10px_rgba(24,24,20,0.18)]",
         className,
       )}
@@ -167,7 +176,7 @@ export function DocFindBar({
             onChange={(e) => onQueryChange(e.target.value)}
             onKeyDown={onQueryKeyDown}
             placeholder={t("searchReplace.findPlaceholder")}
-            className="min-w-0 flex-1 bg-transparent text-[13.5px] text-tx-primary outline-none placeholder:text-tx-tertiary"
+            className="no-focus-ring min-w-0 flex-1 bg-transparent text-[13.5px] text-tx-primary outline-none placeholder:text-tx-tertiary"
           />
           <span
             className={cn(
@@ -246,11 +255,12 @@ export function DocFindBar({
             <input
               ref={replaceInputRef}
               type="text"
+              data-replace-input=""
               value={replaceWith}
               onChange={(e) => onReplaceWithChange(e.target.value)}
               onKeyDown={onReplaceKeyDown}
               placeholder={t("searchReplace.replacePlaceholder")}
-              className="min-w-0 flex-1 bg-transparent text-[13.5px] text-tx-primary outline-none placeholder:text-tx-tertiary"
+              className="no-focus-ring min-w-0 flex-1 bg-transparent text-[13.5px] text-tx-primary outline-none placeholder:text-tx-tertiary"
             />
           </div>
           <button
@@ -265,6 +275,8 @@ export function DocFindBar({
             type="button"
             onClick={onReplaceAll}
             disabled={!replaceEnabled}
+            title={t("searchReplace.replaceAllCount", { count: matchCount })}
+            aria-label={t("searchReplace.replaceAllCount", { count: matchCount })}
             className="h-7 shrink-0 rounded-lg bg-accent-primary px-2.5 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-35"
           >
             {t("searchReplace.replaceAll")}
