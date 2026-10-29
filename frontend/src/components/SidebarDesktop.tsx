@@ -511,26 +511,6 @@ export default function SidebarDesktop() {
   const openNoteFromTab = useTabNoteOpener();
   const { loadNote, cancelNoteLoad } = useNoteLoader();
 
-  // 收藏模块：当前笔记不在收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
-  // 走协调器（缓存优先 + 意图守卫）但保持原语义：只预载 activeNote，不切视图、不开页签。
-  useEffect(() => {
-    if (state.viewMode !== "favorites" || starDocs.length === 0) return;
-    const activeId = state.activeNote?.id;
-    if (activeId && starDocs.some((d) => d.id === activeId)) return;
-    const first = starDocs[0];
-    void loadNote({
-      noteId: first.id,
-      summary: { title: first.title ?? "", notebookId: first.notebookId ?? "", contentFormat: first.contentFormat },
-      request: () => api.getNote(first.id),
-      onSuccess: (note) => actions.setActiveNote(note),
-    }).then((result) => {
-      // 收藏列表可能是陈旧数据（笔记已删）：404 静默收场，不弹错误浮层
-      if (result?.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {
-        cancelNoteLoad();
-      }
-    });
-  }, [state.viewMode, state.activeNote?.id, starDocs, loadNote, cancelNoteLoad, actions]);
-
   // 收藏区段数据：收藏已并入知识库面板区段（不再是独立视图），挂载与笔记变更时刷新
   const reloadStar = useCallback(() => {
     api.getNotes({ isFavorite: "1" }).then((items) => setStarDocs(items)).catch(() => undefined);
@@ -991,6 +971,32 @@ export default function SidebarDesktop() {
     if (searchScope !== "kb" || !focusRootResourceId) return searchDocs;
     return searchDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [searchDocs, searchScope, focusRootResourceId, docRootMap]);
+
+  // 收藏区段跟随聚焦范围：聚焦某个库时只保留该库内的收藏
+  const visibleStarDocs = useMemo(() => {
+    if (!focusRootResourceId) return starDocs;
+    return starDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
+  }, [starDocs, focusRootResourceId, docRootMap]);
+
+  // 收藏模块：当前笔记不在（可见）收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
+  // 走协调器（缓存优先 + 意图守卫）但保持原语义：只预载 activeNote，不切视图、不开页签。
+  useEffect(() => {
+    if (state.viewMode !== "favorites" || visibleStarDocs.length === 0) return;
+    const activeId = state.activeNote?.id;
+    if (activeId && visibleStarDocs.some((d) => d.id === activeId)) return;
+    const first = visibleStarDocs[0];
+    void loadNote({
+      noteId: first.id,
+      summary: { title: first.title ?? "", notebookId: first.notebookId ?? "", contentFormat: first.contentFormat },
+      request: () => api.getNote(first.id),
+      onSuccess: (note) => actions.setActiveNote(note),
+    }).then((result) => {
+      // 收藏列表可能是陈旧数据（笔记已删）：404 静默收场，不弹错误浮层
+      if (result?.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {
+        cancelNoteLoad();
+      }
+    });
+  }, [state.viewMode, state.activeNote?.id, visibleStarDocs, loadNote, cancelNoteLoad, actions]);
 
   // 搜索结果分类（头部筛选控制分区显隐与文档集合）：标签 / 收藏 / 知识库·文件夹 / 文档。
   // 收藏与文档互斥展示，避免同一篇文档在弹层里出现两次。
@@ -2107,17 +2113,19 @@ export default function SidebarDesktop() {
             <>
               <button
                 type="button"
-                title={`取消所有收藏（${starDocs.length} 条）`}
+                title={`取消所有收藏（${visibleStarDocs.length} 条）`}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-accent-danger"
                 onClick={async () => {
-                  if (starDocs.length === 0) return;
+                  if (visibleStarDocs.length === 0) return;
                   const ok = await confirm({
                     title: "取消全部收藏",
-                    description: `将取消 ${starDocs.length} 条文档的收藏，文档本身不受影响。`,
+                    description: focusRootResourceId
+                      ? `将取消当前知识库内 ${visibleStarDocs.length} 条文档的收藏，文档本身不受影响。`
+                      : `将取消 ${visibleStarDocs.length} 条文档的收藏，文档本身不受影响。`,
                     confirmText: "取消收藏",
                   });
                   if (!ok) return;
-                  Promise.all(starDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)))
+                  Promise.all(visibleStarDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)))
                     .then(() => {
                       reloadStar();
                       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
@@ -2127,15 +2135,15 @@ export default function SidebarDesktop() {
               >
                 <Star size={13} />
               </button>
-              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{starDocs.length}</span>
+              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{visibleStarDocs.length}</span>
             </>
           )}
         </div>
         {!collapsedSections.has("star") && (
           <div className="pb-1">
-            {starDocs.length === 0 ? (
+            {visibleStarDocs.length === 0 ? (
               <p className="px-6 py-1 text-xs text-tx-tertiary">暂无收藏</p>
-            ) : starDocs.map((doc) => (
+            ) : visibleStarDocs.map((doc) => (
               <div
                 key={doc.id}
                 className="sbx-row group"
