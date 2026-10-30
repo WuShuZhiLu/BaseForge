@@ -198,7 +198,7 @@ export const knowledgeTreeApi = {
     );
   },
 
-  move(nodeId: string, input: { parentId: string | null; sortOrder?: number }) {
+  move(nodeId: string, input: { parentId: string | null; sortOrder?: number; beforeId?: string; afterId?: string }) {
     return request<KnowledgeTreeNode>(`/nodes/${encodeURIComponent(nodeId)}/move`, {
       method: "PUT",
       body: JSON.stringify(input),

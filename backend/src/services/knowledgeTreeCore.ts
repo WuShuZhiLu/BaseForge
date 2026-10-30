@@ -440,6 +440,10 @@ export function moveKnowledgeNode(input: {
   nodeId: string;
   parentId: string | null;
   sortOrder?: number;
+  /** 插到该兄弟节点之前（与 parentId 同级，二选一）。 */
+  beforeId?: string;
+  /** 插到该兄弟节点之后（与 parentId 同级，二选一）。 */
+  afterId?: string;
   db?: Database.Database;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
@@ -475,6 +479,27 @@ export function moveKnowledgeNode(input: {
   if (input.parentId === node.id || (input.parentId && isDescendant(db, node.id, input.parentId))) {
     throw new KnowledgeTreeError("KNOWLEDGE_TREE_CYCLE", 400, "不能移动到自身或自己的后代节点");
   }
+  // 知识库是根级节点：只允许在根层重排，不能被拖进其它知识库/文件夹（否则会从根列表消失）
+  if (node.resourceType === "notebook" && node.parentId === null && input.parentId !== null) {
+    throw new KnowledgeTreeError(
+      "KNOWLEDGE_ROOT_NOTEBOOK_MOVE_FORBIDDEN",
+      400,
+      "知识库是根级节点，不能移动到其它知识库或文件夹内",
+    );
+  }
+  const anchorId = input.beforeId ?? input.afterId ?? null;
+  if (input.beforeId && input.afterId) {
+    throw new KnowledgeTreeError("KNOWLEDGE_MOVE_ANCHOR_CONFLICT", 400, "beforeId 与 afterId 只能二选一");
+  }
+  const anchorNode = anchorId ? requireNode(db, anchorId) : null;
+  if (anchorNode) {
+    if ((anchorNode.parentId ?? null) !== input.parentId) {
+      throw new KnowledgeTreeError("KNOWLEDGE_MOVE_ANCHOR_SCOPE_MISMATCH", 400, "目标节点不在同一父级下");
+    }
+    if (anchorNode.scopeKey !== node.scopeKey) {
+      throw new KnowledgeTreeError("KNOWLEDGE_TREE_SCOPE_MISMATCH", 400, "不能跨空间移动内容");
+    }
+  }
   const targetAccess = resolveTargetAccess(db, input.parentId, input.actorUserId, node.workspaceId);
   if (!targetAccess.capabilities.canCreate && !targetAccess.capabilities.canMove) {
     throw new KnowledgeTreeError("KNOWLEDGE_CAPABILITY_FORBIDDEN", 403, "没有移动到目标位置的权限", { required: "canCreate" });
@@ -494,13 +519,30 @@ export function moveKnowledgeNode(input: {
       SET parentId = ?, sortOrder = ?, updatedAt = datetime('now')
       WHERE id = ?
     `).run(input.parentId, nextSort, node.id);
+    // 指定插到某兄弟之前/之后：把该父级下的兄弟按 sortOrder 重新编号（0..n-1），
+    // 让"拖到目标上半/下半"真的落在指定位置，而不是追加到父级末尾。
+    if (anchorId) {
+      const siblings = db.prepare(`
+        SELECT id FROM knowledge_tree_nodes
+         WHERE scopeKey = ? AND isDeleted = 0 AND id <> ?
+           AND ((parentId IS NULL AND ? IS NULL) OR parentId = ?)
+         ORDER BY sortOrder, id
+      `).all(node.scopeKey, node.id, input.parentId, input.parentId) as Array<{ id: string }>;
+      const ordered = siblings.map((row) => row.id);
+      const anchorIndex = ordered.indexOf(anchorId);
+      if (anchorIndex >= 0) {
+        ordered.splice(input.beforeId ? anchorIndex : anchorIndex + 1, 0, node.id);
+        const updateSort = db.prepare("UPDATE knowledge_tree_nodes SET sortOrder = ? WHERE id = ?");
+        ordered.forEach((id, index) => updateSort.run(index, id));
+      }
+    }
     recordHistory(db, {
       nodeId: node.id,
       action: "move",
       actorUserId: input.actorUserId,
       fromParentId,
       toParentId: input.parentId,
-      metadata: { sortOrder: nextSort },
+      metadata: { sortOrder: nextSort, anchorId, position: input.beforeId ? "before" : input.afterId ? "after" : null },
     });
   });
   transaction();

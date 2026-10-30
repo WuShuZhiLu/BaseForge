@@ -1402,8 +1402,9 @@ export default function SidebarDesktop() {
     canDropInto: (row) => row.node.nodeType === "folder",
     // 禁止移入自身子树（target 在 source 子树内则整行都不接）
     canDrop: (source, target) => !isDescendant(target.node.id, source.node.id, childrenMap),
-    // 行内重命名时不可拿起
-    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id),
+    // 行内重命名时不可拿起；知识库是根级节点，不允许被拖走（只能留在根层）
+    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id)
+      && !(row.node.parentId === null && row.node.resourceType === "notebook"),
     onDrop: ({ sourceId, targetId, position }) => {
       const target = targetId ? rows.find((row) => row.node.id === targetId)?.node : undefined;
       void (async () => {
@@ -1413,9 +1414,15 @@ export default function SidebarDesktop() {
             await knowledgeTreeApi.move(sourceId, { parentId: target.id });
             // 折叠文件夹自动展开
             setExpanded((cur) => new Set(cur).add(target.id));
+          } else if (target) {
+            // 前/后插入：交给后端按锚点重排兄弟 sortOrder（只传 parentId 会被追加到末尾）
+            await knowledgeTreeApi.move(sourceId, {
+              parentId: target.parentId ?? null,
+              ...(position === "before" ? { beforeId: target.id } : { afterId: target.id }),
+            });
           } else {
-            // 前/后插入：parentId 与目标一致；空白区（root）= 移到根层末尾
-            await knowledgeTreeApi.move(sourceId, { parentId: target?.parentId ?? null });
+            // 空白区 = 移到根层末尾
+            await knowledgeTreeApi.move(sourceId, { parentId: null });
           }
           window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
         } catch (error) {

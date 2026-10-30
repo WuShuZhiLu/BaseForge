@@ -254,6 +254,8 @@ app.put("/nodes/:nodeId/move", async (c) => {
       nodeId: c.req.param("nodeId"),
       parentId: typeof body.parentId === "string" && body.parentId ? body.parentId : null,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : undefined,
+      beforeId: typeof body.beforeId === "string" && body.beforeId ? body.beforeId : undefined,
+      afterId: typeof body.afterId === "string" && body.afterId ? body.afterId : undefined,
     });
     return c.json(node);
   } catch (error) {
