@@ -1271,7 +1271,8 @@ export function KnowledgeTreePanel({
             active && "bg-app-active text-tx-primary",
             selected && "bg-accent-primary/10 text-tx-primary ring-1 ring-inset ring-accent-primary/25",
             treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "inside"
-              && "bg-accent-primary/20 text-tx-primary ring-1 ring-inset ring-accent-primary",
+              // 落点用虚线描边 + 轻底色，与选中态（实线 ring）区分，避免拖拽时误以为在选中
+              && "bg-accent-primary/10 text-tx-primary outline outline-1 outline-dashed -outline-offset-2 outline-accent-primary/60",
           )}
           style={{
             paddingLeft: `${depth * treeIndent + treeInset}px`,
