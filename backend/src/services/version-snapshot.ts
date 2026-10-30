@@ -1,142 +1,111 @@
 /**
- * 版本历史 v2 —— 自动快照定时服务
+ * 版本历史 v2 —— 版本维护定时服务
  *
  * 参考 calendar-export.ts 的启动模式：进程内单实例 setInterval，随服务启动注册
  * （index.ts startVersionSnapshotScheduler）。每轮：
- *   1) 读取 version_history_settings；
- *   2) 粗筛「updatedAt 晚于最新版本 createdAt」的未删除笔记（分批），
- *      JS 侧做精确判断：最新版本距今 ≥ interval 分钟且当前内容 hash ≠ 最新版本
- *      hash 时，用 createTypedVersion(kind='auto', changeType='edit') 落一条版本；
- *   3) 遇到 contentHash 为 NULL 的旧版本顺带回填（惰性回填）；
- *   4) 每日一次执行保留策略（只清 auto，manual 永不参与）并清扫悬空附件引用。
+ *   1) 惰性回填旧版本 NULL contentHash（支撑相邻同内容合并的去重判定）；
+ *   2) 每日一次执行保留策略（auto/manual 分别清理，release 永不参与）并清扫悬空附件引用。
+ *
+ * 【产品决策 2026-10-30】版本记录只允许三个显式入口：点「已同步」按钮、Ctrl+S、前端定时保存。
+ * 原后端兜底自动快照（发现"笔记内容比最新版本新且距今超过 autoVersionIntervalMinutes"就补一条
+ * auto 快照）已永久停用——它导致用户刚打完字 1 分钟内就冒出一条「自动记录」。调度器不再创建
+ * 任何快照，仅保留上述维护逻辑。
  */
 
 import { getDb } from "../db/schema";
 import fs from "node:fs";
 import path from "node:path";
-import { computeContentHash, noteVersionsRepository } from "../repositories/noteVersionsRepository";
+import { noteVersionsRepository } from "../repositories/noteVersionsRepository";
 import { readVersionHistorySettings } from "./version-history-settings";
 import { getAttachmentsDir as getStorageAttachmentsDir } from "./attachment-storage";
 
 const TICK_INTERVAL_MS = 60_000;
 const FIRST_RUN_DELAY_MS = 15_000;
-const SCAN_BATCH_SIZE = 200;
+const BACKFILL_BATCH_SIZE = 200;
 
 let schedulerIntervalHandle: ReturnType<typeof setInterval> | null = null;
 let isRoundRunning = false;
 let lastRetentionRunDate: string | null = null;
 
-interface SnapshotCandidateRow {
-  id: string;
-  userId: string;
-  title: string | null;
-  content: string | null;
-  contentText: string | null;
-  contentFormat: string | null;
-  version: number;
-  lastVersionId: string;
-  lastContentHash: string | null;
-  lastCreatedAt: string;
-}
-
-/** SQLite datetime('now') / JS ISO 两种形态都能解析；与 notes.ts 合并窗口同规则。 */
-function parseSqliteTimestamp(value: string): number {
-  const normalized = /Z$|[+-]\d{2}:?\d{2}$/.test(value) ? value : value.replace(" ", "T") + "Z";
-  return new Date(normalized).getTime();
-}
-
-export async function runVersionSnapshotOnce(): Promise<{ scanned: number; created: number; backfilled: number }> {
-  const settings = readVersionHistorySettings();
-  const intervalMs = settings.autoVersionIntervalMinutes * 60 * 1000;
+export function runVersionSnapshotOnce(): { backfilled: number } {
   const db = getDb();
 
-  // 粗筛：只处理「已有版本且 updatedAt 晚于最新版本 createdAt」的未删除笔记。
-  // 没有任何版本的笔记不参与（首条版本由保存/手动路径产生），避免首轮全库灌版本。
+  // 惰性回填：只处理 contentHash 为 NULL 的旧版本，不再创建任何快照。
   const rows = db
-    .prepare(
-      `SELECT n.id, n."userId" AS userId, n.title, n.content, n."contentText" AS contentText,
-              n."contentFormat" AS contentFormat, n.version,
-              v.id AS lastVersionId, v."contentHash" AS lastContentHash, v."createdAt" AS lastCreatedAt
-       FROM notes n
-       JOIN note_versions v ON v.id = (
-         SELECT nv.id FROM note_versions nv WHERE nv."noteId" = n.id ORDER BY nv."createdAt" DESC, nv.id DESC LIMIT 1
-       )
-       WHERE n."isTrashed" = 0 AND n.updatedAt > v."createdAt"
-       ORDER BY n.updatedAt DESC
-       LIMIT ?`,
-    )
-    .all(SCAN_BATCH_SIZE) as SnapshotCandidateRow[];
+    .prepare(`SELECT id FROM note_versions WHERE "contentHash" IS NULL LIMIT ?`)
+    .all(BACKFILL_BATCH_SIZE) as Array<{ id: string }>;
 
-  let created = 0;
   let backfilled = 0;
-
   for (const row of rows) {
-    // 1) 回填旧版本 NULL hash
-    let lastHash = row.lastContentHash;
-    if (!lastHash) {
-      lastHash = noteVersionsRepository.ensureContentHash(row.lastVersionId);
-      if (lastHash) backfilled += 1;
-    }
-
-    // 2) hash 去重：当前内容指纹与最新版本一致则跳过
-    const currentHash = computeContentHash({
-      title: row.title,
-      content: row.content,
-      contentText: row.contentText,
-      contentFormat: row.contentFormat,
-    });
-    if (lastHash && lastHash === currentHash) continue;
-
-    // 3) 间隔判断：最新版本距今不足 interval 分钟则跳过（等下一轮）
-    const lastTs = parseSqliteTimestamp(row.lastCreatedAt);
-    if (Number.isFinite(lastTs) && Date.now() - lastTs < intervalMs) continue;
-
-    // 4) 落一条 auto 快照（记录的是笔记当前内容）
-    noteVersionsRepository.createTypedVersion({
-      noteId: row.id,
-      userId: row.userId,
-      kind: "auto",
-      changeType: "edit",
-      snapshot: {
-        title: row.title ?? "",
-        content: row.content ?? "",
-        contentText: row.contentText ?? "",
-        contentFormat: row.contentFormat || "tiptap-json",
-        version: row.version,
-      },
-    });
-    created += 1;
+    if (noteVersionsRepository.ensureContentHash(row.id)) backfilled += 1;
   }
 
-  return { scanned: rows.length, created, backfilled };
+  return { backfilled };
 }
 
 /**
- * 立即按当前保留策略清理一次（POST /api/versions/cleanup 与每日任务共用入口）。
- * mode='forever' 时只做悬空引用清扫。
+ * 立即按当前保留策略清理一次（POST /api/settings/version-history/cleanup 与每日任务共用入口）。
+ * - auto 按 settings.retention 清理，manual（Ctrl+S 记录）按 settings.manualRetention 清理；
+ * - release 永不参与清理与合并；
+ * - 各步骤独立容错：单步失败只记入 failed 并告警，不影响其它步骤与主流程；
+ * - mode='forever' 时仍执行相邻同内容合并与悬空引用清扫。
  */
-export function runVersionRetentionNow(): { deleted: number; freedBytes: number; enqueuedAttachments: number } {
+export function runVersionRetentionNow(): { deleted: number; freedBytes: number; enqueuedAttachments: number; failed: string[] } {
   const settings = readVersionHistorySettings();
-  let result = { deleted: 0, freedBytes: 0, freedAttachmentIds: [] as string[] };
+  let deleted = 0;
+  let freedBytes = 0;
+  const freedAttachmentIds = new Set<string>();
+  const failed: string[] = [];
+
+  const runStep = (name: string, fn: () => { deleted: number; freedBytes: number; freedAttachmentIds: string[] }): void => {
+    try {
+      const result = fn();
+      deleted += result.deleted;
+      freedBytes += result.freedBytes;
+      for (const id of result.freedAttachmentIds) freedAttachmentIds.add(id);
+    } catch (error) {
+      failed.push(name);
+      console.warn(`[version-snapshot] retention step ${name} failed:`, error instanceof Error ? error.message : error);
+    }
+  };
+
+  // 相邻同内容记录合并（同 source 同 hash 只留最新一条；release 豁免）
+  runStep("merge-adjacent", () => {
+    const merged = noteVersionsRepository.mergeAdjacentSameContent();
+    return { deleted: merged.merged, freedBytes: 0, freedAttachmentIds: merged.freedAttachmentIds };
+  });
+
   if (settings.retention.mode === "count") {
-    result = noteVersionsRepository.pruneAutoVersionsByCount(settings.retention.count);
+    runStep("auto-count", () => noteVersionsRepository.pruneVersionsBySourceCount("auto", settings.retention.count));
   } else if (settings.retention.mode === "days") {
-    result = noteVersionsRepository.pruneAutoVersionsByDays(settings.retention.days);
+    runStep("auto-days", () => noteVersionsRepository.pruneVersionsBySourceDays("auto", settings.retention.days));
   }
+
+  if (settings.manualRetention.mode === "count") {
+    runStep("manual-count", () => noteVersionsRepository.pruneVersionsBySourceCount("manual", settings.manualRetention.count));
+  } else if (settings.manualRetention.mode === "days") {
+    runStep("manual-days", () => noteVersionsRepository.pruneVersionsBySourceDays("manual", settings.manualRetention.days));
+  }
+
   // P2 存储配额：auto 总字节超过配额时按最旧优先清理（不受 mode=forever 限制）
   if (settings.storageQuotaMb > 0) {
-    const quotaResult = noteVersionsRepository.pruneAutoVersionsOverQuota(settings.storageQuotaMb * 1024 * 1024);
-    result.deleted += quotaResult.deleted;
-    result.freedBytes += quotaResult.freedBytes;
-    result.freedAttachmentIds.push(...quotaResult.freedAttachmentIds);
+    runStep("auto-quota", () => noteVersionsRepository.pruneAutoVersionsOverQuota(settings.storageQuotaMb * 1024 * 1024));
   }
-  const danglingSwept = noteVersionsRepository.deleteDanglingAttachmentRefs();
-  if (result.deleted > 0 || danglingSwept > 0 || result.freedAttachmentIds.length > 0) {
+
+  let danglingSwept = 0;
+  try {
+    danglingSwept = noteVersionsRepository.deleteDanglingAttachmentRefs();
+  } catch (error) {
+    failed.push("dangling-sweep");
+    console.warn("[version-snapshot] dangling refs sweep failed:", error instanceof Error ? error.message : error);
+  }
+
+  if (deleted > 0 || danglingSwept > 0 || freedAttachmentIds.size > 0 || failed.length > 0) {
     console.log(
-      `[version-snapshot] retention mode=${settings.retention.mode} deleted=${result.deleted} freedBytes=${result.freedBytes} danglingRefsSwept=${danglingSwept} attachmentsQueuedForGc=${result.freedAttachmentIds.length}`,
+      `[version-snapshot] retention mode=${settings.retention.mode}/${settings.manualRetention.mode} deleted=${deleted} freedBytes=${freedBytes} danglingRefsSwept=${danglingSwept} attachmentsQueuedForGc=${freedAttachmentIds.size} failed=[${failed.join(",")}]`,
     );
   }
-  return { deleted: result.deleted, freedBytes: result.freedBytes, enqueuedAttachments: result.freedAttachmentIds.length };
+  return { deleted, freedBytes, enqueuedAttachments: freedAttachmentIds.size, failed };
 }
 
 /**
@@ -187,11 +156,11 @@ async function runSchedulerRound(): Promise<void> {
   if (isRoundRunning) return;
   isRoundRunning = true;
   try {
-    const stats = await runVersionSnapshotOnce();
-    if (stats.created > 0 || stats.backfilled > 0) {
-      console.log(
-        `[version-snapshot] round scanned=${stats.scanned} created=${stats.created} backfilled=${stats.backfilled}`,
-      );
+    // 产品决策（2026-10-30）：版本记录只来自三个显式入口——「已同步」按钮、Ctrl+S、前端定时保存。
+    // 后端兜底自动快照已永久停用，这里只做 hash 惰性回填 + 每日清理/GC，不创建任何快照。
+    const stats = runVersionSnapshotOnce();
+    if (stats.backfilled > 0) {
+      console.log(`[version-snapshot] round backfilled=${stats.backfilled}`);
     }
 
     // 每日一次保留策略 + GC 扫尾（进程内以日期判重）

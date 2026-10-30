@@ -13,6 +13,7 @@ import { anonymousDocumentsMigration } from "./anonymousDocumentsMigration.js";
 import { mindmapDocsMigration } from "./mindmapDocsMigration.js";
 import { notebookIsFavoriteMigration } from "./notebookIsFavoriteMigration.js";
 import { markdownDefaultPreviewMigration } from "./markdownDefaultPreviewMigration.js";
+import { versionSourceMigration } from "./versionSourceMigration.js";
 /**
  * Compatibility wrapper around the historical migration list.
  *
@@ -437,6 +438,7 @@ export const MIGRATIONS: Migration[] = [
   mindmapDocsMigration,
   notebookIsFavoriteMigration,
   markdownDefaultPreviewMigration,
+  versionSourceMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(

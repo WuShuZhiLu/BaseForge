@@ -224,6 +224,24 @@ CREATE TABLE IF NOT EXISTS version_attachment_refs (
 );
 
 -- ============================================================
+-- 版本来源标记 (v134 / version-source-marker) —— 幂等块
+-- note_versions 增加 source（auto=定时 / manual=Ctrl+S 保存 / release=发版）。
+-- 存量回填：kind='auto' 保持 auto，其余回填 manual。
+-- SQLite 侧迁移见 versionSourceMigration.ts。
+-- ============================================================
+DO $$
+BEGIN
+  IF to_regclass('public.note_versions') IS NOT NULL THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='note_versions' AND column_name='source') THEN
+      ALTER TABLE note_versions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+    END IF;
+    UPDATE note_versions SET source = 'auto' WHERE kind = 'auto' AND source <> 'auto';
+    UPDATE note_versions SET source = 'manual' WHERE source NOT IN ('auto', 'manual', 'release');
+  END IF;
+END
+$$;
+
+-- ============================================================
 -- 版本历史 v2 P2 附件 GC 队列 (v125 / version-gc-queue) —— 幂等块
 -- ============================================================
 CREATE TABLE IF NOT EXISTS version_gc_queue (
