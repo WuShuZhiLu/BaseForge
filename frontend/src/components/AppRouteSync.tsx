@@ -273,7 +273,9 @@ export default function AppRouteSync() {
     previousRouteKindRef.current = state.route.kind;
     previousActiveToolTabRef.current = state.activeToolTab;
 
-    const pathname = resolveCurrentAppPathname();
+    // 尾随斜杠规整：地址栏 /kb/ 与 /kb 视为同一路径，否则 (A2) 的短形态补全
+    // 会因字符串不等被跳过，URL 停留在 /kb/ 而视图已是 /kb/:space。
+    const pathname = resolveCurrentAppPathname().replace(/\/+$/, "") || "/";
     const route = state.route;
     // 当前空间（localStorage）：写带空间域路径时的空间段来源。
     const currentSpace = getCurrentWorkspace();
