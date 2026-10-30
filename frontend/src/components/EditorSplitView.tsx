@@ -28,6 +28,7 @@ import {
   resolveEditorSplitReferenceSide,
   saveEditorSplitRatio,
   shouldActivateSplitPane,
+  type EditorSplitReferenceSide,
 } from "@/lib/editorWorkspaceLayout";
 import {
   applyEditorUpdateToNote,
@@ -47,6 +48,34 @@ const SPLIT_PANE_ACTIVATION_IGNORE_SELECTOR = [
   "textarea",
   "[role='button']",
 ].join(", ");
+
+type PaneScrollSnapshot = Array<{ index: number; top: number }>;
+
+/** 一栏内所有可滚动元素（编辑器/代码块/大纲各自可能是滚动容器），按 DOM 顺序取。 */
+function collectPaneScrollables(role: "main" | "reference"): HTMLElement[] {
+  if (typeof document === "undefined") return [];
+  const root = document.querySelector<HTMLElement>(`[data-editor-split-pane="${role}"]`);
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>("*"))
+    .filter((el) => el.scrollHeight > el.clientHeight + 8);
+}
+
+function readPaneScroll(role: "main" | "reference"): PaneScrollSnapshot {
+  return collectPaneScrollables(role)
+    .map((el, index) => ({ index, top: el.scrollTop }))
+    .filter((item) => item.top > 0);
+}
+
+function writePaneScroll(role: "main" | "reference", snapshot: PaneScrollSnapshot): void {
+  if (snapshot.length === 0) return;
+  const scrollables = collectPaneScrollables(role);
+  for (const item of snapshot) {
+    const el = scrollables[item.index];
+    if (!el) continue;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max > 0) el.scrollTop = Math.min(item.top, max);
+  }
+}
 
 export default function EditorSplitView() {
   const { state } = useApp();
@@ -176,32 +205,48 @@ export default function EditorSplitView() {
   }, [commitSplitRatio, split]);
 
   /**
-   * 焦点跟随：把参考栏文档设为主编辑文档。
-   * 参考栏位置随之翻转 —— 两栏文档留在原地，只交换“谁是主编辑栏”，
-   * 否则会看起来像两份文档左右对调。
+   * 交换两栏文档（焦点跟随 / ⇄ 调换共用）。
+   *
+   * 焦点切换会让两栏编辑器按新文档重建（主栏由 EditorPane(activeNote) 渲染），
+   * 重建后滚动位置归零。这里先按栏抓一份可滚动元素的 scrollTop，交换完成后再按
+   * 「文档现在所在的栏」恢复，避免用户只是点了一下另一栏就丢失阅读位置。
    */
-  const promoteReferencePane = useCallback((paneNote: Note) => {
+  const switchSplitPanes = useCallback((paneNote: Note, referenceSide: EditorSplitReferenceSide) => {
     if (!split || !state.activeNote) return;
     if (!shouldActivateSplitPane(paneNote.id, state.activeNote.id)) return;
+    const mainSnapshot = readPaneScroll("main");
+    const referenceSnapshot = readPaneScroll("reference");
     actions.splitEditor({
       noteId: state.activeNote.id,
       direction: split.direction,
-      referenceSide: flipEditorSplitReferenceSide(split.referenceSide),
+      referenceSide,
     });
     actions.setActiveNote(paneNote);
+    // 交换后：原主文档 → 参考栏；原参考文档 → 主栏
+    const restore = () => {
+      writePaneScroll("reference", mainSnapshot);
+      writePaneScroll("main", referenceSnapshot);
+    };
+    requestAnimationFrame(() => {
+      restore();
+      requestAnimationFrame(restore);
+    });
+    window.setTimeout(restore, 150);
+    window.setTimeout(restore, 400);
   }, [actions, split, state.activeNote]);
+
+  /**
+   * 焦点跟随：把参考栏文档设为主编辑文档。
+   * 参考栏位置随之翻转 —— 两栏文档留在原地，只交换“谁是主编辑栏”。
+   */
+  const promoteReferencePane = useCallback((paneNote: Note) => {
+    switchSplitPanes(paneNote, flipEditorSplitReferenceSide(split?.referenceSide));
+  }, [split, switchSplitPanes]);
 
   /** 交换左右（ArrowLeftRight）：两栏文档互换位置，参考栏留在原侧。 */
   const swapSplitPanes = useCallback((paneNote: Note) => {
-    if (!split || !state.activeNote) return;
-    if (!shouldActivateSplitPane(paneNote.id, state.activeNote.id)) return;
-    actions.splitEditor({
-      noteId: state.activeNote.id,
-      direction: split.direction,
-      referenceSide: resolveEditorSplitReferenceSide(split.referenceSide),
-    });
-    actions.setActiveNote(paneNote);
-  }, [actions, split, state.activeNote]);
+    switchSplitPanes(paneNote, resolveEditorSplitReferenceSide(split?.referenceSide));
+  }, [split, switchSplitPanes]);
 
   const handleReferencePaneClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!split || event.button !== 0) return;
