@@ -68,12 +68,26 @@ export interface ChoiceOptions extends ConfirmOptions {
   choices: ChoiceOption[];
 }
 
+/** 单按钮提示框选项（替代 window.alert：只有一个「确定」） */
+export interface AlertOptions {
+  title: string;
+  description?: React.ReactNode;
+  /** 确认按钮文案，默认 "确定" */
+  confirmText?: string;
+}
+
 type StackItem =
   | {
       kind: "confirm";
       id: number;
       options: ConfirmOptions;
       resolve: (ok: boolean) => void;
+    }
+  | {
+      kind: "alert";
+      id: number;
+      options: AlertOptions;
+      resolve: (ok: null) => void;
     }
   | {
       kind: "prompt";
@@ -120,6 +134,22 @@ function setDispatcher(d: Dispatcher | null) {
 export function confirm(options: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     const item: Omit<StackItem, "id"> = { kind: "confirm", options, resolve };
+    if (dispatcher) {
+      dispatcher.push(item);
+      return;
+    }
+    pending.push(item);
+  });
+}
+
+/**
+ * 命令式 alert。返回 Promise<void>，弹窗关闭后 resolve。
+ * 用法：
+ *   void alert({ title: "保存失败", description: message });
+ */
+export function alert(options: AlertOptions): Promise<void> {
+  return new Promise((resolve) => {
+    const item: Omit<StackItem, "id"> = { kind: "alert", options, resolve: () => resolve() };
     if (dispatcher) {
       dispatcher.push(item);
       return;
@@ -266,7 +296,11 @@ function DialogShell({
   onCancel: () => void;
   onConfirm: (value?: string) => void;
 }) {
-  const { title, description, confirmText, cancelText, danger } = item.options;
+  const options = item.options as ConfirmOptions;
+  const { title, description, confirmText, cancelText } = options;
+  // alert 没有取消/危险语义，只渲染一个按钮
+  const isAlert = item.kind === "alert";
+  const danger = isAlert ? false : options.danger;
 
   // prompt 专属
   const isPrompt = item.kind === "prompt";
@@ -405,15 +439,17 @@ function DialogShell({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-3 bg-app-bg/40 border-t border-app-border">
-          <Button
-            ref={cancelBtnRef}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-          >
-            {cancelText || "取消"}
-          </Button>
+          {!isAlert && (
+            <Button
+              ref={cancelBtnRef}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+            >
+              {cancelText || "取消"}
+            </Button>
+          )}
           {isChoice ? (
             choiceOpts!.choices.map((choice) => (
               <Button

@@ -15,6 +15,9 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/knowledgeTreeApi", () => ({ knowledgeTreeApi: apiMocks }));
 
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
+
 const protectedFolder = {
   id: "folder:protected",
   title: "受保护文件夹",
@@ -34,7 +37,7 @@ describe("FolderPasswordDialog", () => {
     apiMocks.removeFolderPassword.mockReset().mockResolvedValue({ success: true, isPasswordProtected: false });
     apiMocks.setFolderPassword.mockReset();
     apiMocks.unlockFolder.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMocks.confirm.mockResolvedValue(true);
   });
 
   afterEach(() => {

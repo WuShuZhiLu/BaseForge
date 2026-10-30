@@ -63,6 +63,7 @@ import { TextSelection, NodeSelection } from "@tiptap/pm/state";
 import { CellSelection } from "@tiptap/pm/tables";
 import { markdownToSimpleHtml } from "@/lib/importService";
 import { repairTiptapJson } from "@/lib/tiptapSchemaRepair";
+import { EditorToolbarPortal, useEditorToolbarSlot } from "@/components/CollapsibleEditorToolbar";
 import { markdownToHtml as mdToFullHtml, detectFormat as detectContentFormat, tiptapJsonToMarkdown } from "@/lib/contentFormat";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { findInternalMarkdownMarkerRanges } from "@/lib/markdownUserContent";
@@ -106,7 +107,7 @@ import {
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, Trash2,
   FileType, Check, AlertCircle, Info, ArrowUp, Copy, Link as LinkIcon,
   ExternalLink, Unlink2, Workflow, Sigma, BookOpen, Download, Phone,
-  Type, Palette, Eraser, Paintbrush, ChevronDown, ChevronUp, Search, Upload, FolderSearch, ClipboardPlus,
+  Type, Palette, Eraser, Paintbrush, ChevronDown, ChevronUp, Upload, FolderSearch, ClipboardPlus,
   MoreHorizontal, Plus,
   // 表格气泡菜单图标
   Rows3, Columns3, Merge, Split, Heading, BrainCircuit,
@@ -3123,6 +3124,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       }
 
       // P0: 调度时快照 noteId，防止 debounce 期间切换笔记导致写错目标
+      // 只有用户真正在编辑器里输入（有焦点）才调度保存；打开文档时的 Yjs 回放/程序化
+      // 写入不算改动，否则重开文档会莫名显示待保存。
+      if (!editor.view.hasFocus()) return;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         debounceTimer.current = null;
@@ -3291,6 +3295,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       title,
       _noteId: noteRef.current.id,
       _saveGeneration: ++saveGenerationRef.current,
+      _flush: true,
     });
     try {
       toast.success(t('tiptap.saved') || 'Saved');
@@ -5402,8 +5407,15 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   // 内容不在顶端（>4px）时给 sticky 工具栏加底部阴影，
   // 让其视觉上「浮」于内容之上——跟 Notion / Bear / Craft 等主流移动端编辑器一致。
   const [toolbarShadow, setToolbarShadow] = useState(false);
-  // 查找替换面板开关；Ctrl/Cmd+F 切换。
+  /**
+   * 分屏宿主接管时返回全宽工具栏的落点（null = 就地渲染）。
+   * 只影响桌面端 expanded 工具栏；compact 工具栏永远留在编辑器内。
+   */
+  const desktopToolbarSlot = useEditorToolbarSlot();
+  // 查找替换面板开关；Ctrl/Cmd+F / Ctrl/Cmd+H 打开。
   const [searchOpen, setSearchOpen] = useState(false);
+  // Ctrl/Cmd+H 打开时要求直接展开替换行并聚焦替换框；Ctrl+F / 工具栏按钮打开时复位
+  const [openWithReplace, setOpenWithReplace] = useState(false);
   const perfRenderSnapshot = isPhaseAPerfEnabled() ? {
     note,
     onUpdate,
@@ -5551,19 +5563,22 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
     el.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  // 全局 Ctrl/Cmd+F 快捷键打开查找面板，避免与浏览器原生查找冲突
+  // 全局 Ctrl/Cmd+F / Ctrl/Cmd+H 快捷键打开查找面板，避免与浏览器原生查找冲突
   // 仅当焦点在编辑器容器内时才拦截，最大限度尊重用户在标题输入框等其他地方的习惯。
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
-        const root = scrollContainerRef.current?.parentElement;
-        const active = document.activeElement;
-        const inEditor = root && active instanceof Node && root.contains(active);
-        // 编辑器内 / 已打开搜索面板 时才接管，避免影响全局浏览器查找
-        if (inEditor || searchOpen) {
-          e.preventDefault();
-          setSearchOpen(true);
-        }
+      const withMod = e.ctrlKey || e.metaKey;
+      const isFind = withMod && (e.key === "f" || e.key === "F");
+      const isReplace = withMod && (e.key === "h" || e.key === "H");
+      if (!isFind && !isReplace) return;
+      const root = scrollContainerRef.current?.parentElement;
+      const active = document.activeElement;
+      const inEditor = root && active instanceof Node && root.contains(active);
+      // 编辑器内 / 已打开搜索面板 时才接管，避免影响全局浏览器查找
+      if (inEditor || searchOpen) {
+        e.preventDefault();
+        setOpenWithReplace(isReplace);
+        setSearchOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -5703,6 +5718,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
             <ChevronDown size={16} className={cn("transition-transform", mobileToolbarExpanded && "rotate-180")} />
           </ToolbarButton>
         </div>
+        {/* 桌面格式工具栏：分屏宿主接管时整块 portal 到全宽位置（内部结构不变）；
+            没有宿主就原地渲染，行为与之前完全一致。compact（移动端）永远留在原地。 */}
+        <EditorToolbarPortal target={desktopToolbarSlot}>
         <div
           ref={outlineToolbarRef}
           data-mobile-editor-toolbar="expanded"
@@ -6023,16 +6041,6 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           <AlignRight size={iconSize} />
         </ToolbarButton>
 
-        <span className="hidden md:inline-flex">
-          <ToolbarButton
-            onClick={() => setSearchOpen((v) => !v)}
-            isActive={searchOpen}
-            title={t('searchReplace.toolbarTitle') || '查找替换 (Ctrl+F)'}
-          >
-            <Search size={iconSize} />
-          </ToolbarButton>
-        </span>
-
         {/* 表格操作按钮（仅在光标在表格内时显示） */}
         {editor.isActive('table') && (
           <>
@@ -6101,6 +6109,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           {toolbarExpanded ? <ChevronUp size={iconSize} /> : <ChevronDown size={iconSize} />}
         </ToolbarButton>
       </div>
+        </EditorToolbarPortal>
 
       {/* 折叠态已移除：改为同容器内 flex-nowrap/flex-wrap 切换 */}
       </>
@@ -6114,6 +6123,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           editable={editable}
+          initialShowReplace={openWithReplace}
         />
       )}
 
@@ -6915,16 +6925,18 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 // 也会选到更深的栏内块，避免柄出现在整个分栏或单栏上。
                 id: "prioritizeColumn",
                 evaluate: ({ node, $pos, depth }: any) => {
+                  // 顶层 atom 块（画板/导图/表格嵌入等）depth 会传 $pos.depth+1，
+                  // $pos.node(d) 越界返回 undefined——必须守卫，否则评分抛异常导致柄消失
                   let inColumn = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "column") {
+                    if ($pos.node(d)?.type?.name === "column") {
                       inColumn = true;
                       break;
                     }
                   }
                   if (!inColumn) return 0;
                   // column 容器扣分；栏内块（paragraph 等）不扣分 → 栏内块胜出。
-                  return node.type.name === "column" ? 600 : 0;
+                  return node?.type?.name === "column" ? 600 : 0;
                 },
               },
               {
@@ -6937,13 +6949,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 evaluate: ({ node, $pos, depth }: any) => {
                   let inCallout = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "callout") {
+                    if ($pos.node(d)?.type?.name === "callout") {
                       inCallout = true;
                       break;
                     }
                   }
                   if (!inCallout) return 0;
-                  return node.type.name === "callout" ? 0 : 600;
+                  return node?.type?.name === "callout" ? 0 : 600;
                 },
               },
               {
@@ -6956,13 +6968,13 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                 evaluate: ({ node, $pos, depth }: any) => {
                   let inDetails = false;
                   for (let d = depth; d >= 1; d--) {
-                    if ($pos.node(d).type.name === "details") {
+                    if ($pos.node(d)?.type?.name === "details") {
                       inDetails = true;
                       break;
                     }
                   }
                   if (!inDetails) return 0;
-                  return node.type.name === "details" ? 0 : 600;
+                  return node?.type?.name === "details" ? 0 : 600;
                 },
               },
             ],

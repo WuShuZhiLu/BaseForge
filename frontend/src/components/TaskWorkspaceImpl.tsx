@@ -57,6 +57,7 @@ import { consumePendingTaskNotificationTaskId } from "@/lib/taskNotifications";
 import { TASK_NOTIFICATION_OPEN_EVENT } from "@/lib/taskNotificationSchedule";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { isTaskCenterModuleVisible } from "@/lib/navigationVisibility";
+import { confirm } from "@/components/ui/confirm";
 
 export function formatLocalDateKey(date = new Date()): string {
   const y = date.getFullYear();
@@ -586,7 +587,11 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
   const handleDelete = async (id: string) => {
     const descendantIds = getDescendantIds(id, tasks);
     if (descendantIds.length > 1) {
-      const ok = window.confirm(t("tasks.confirmDeleteWithChildren", { count: descendantIds.length - 1 }));
+      const ok = await confirm({
+        title: t("tasks.confirmDeleteWithChildren", { count: descendantIds.length - 1 }),
+        confirmText: t("common.delete"),
+        danger: true,
+      });
       if (!ok) return;
     }
     setTasks((prev) => prev.filter((t) => !descendantIds.includes(t.id)));
@@ -679,7 +684,11 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
   };
 
   const handleDeleteProject = async (id: string) => {
-    const ok = window.confirm(t("tasks.deleteProjectConfirm"));
+    const ok = await confirm({
+      title: t("tasks.deleteProjectConfirm"),
+      confirmText: t("tasks.deleteProject"),
+      danger: true,
+    });
     if (!ok) return;
     await deleteProject(id);
     if (selectedProjectId === id) setSelectedProjectId(null);
@@ -736,7 +745,11 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
       }
     }
     if (idsToRemove.size > ids.length) {
-      const ok = window.confirm(t("tasks.confirmDeleteWithChildren", { count: idsToRemove.size - ids.length }));
+      const ok = await confirm({
+        title: t("tasks.confirmDeleteWithChildren", { count: idsToRemove.size - ids.length }),
+        confirmText: t("common.delete"),
+        danger: true,
+      });
       if (!ok) return;
     }
     setTasks((prev) => prev.filter((t) => !idsToRemove.has(t.id)));

@@ -6,6 +6,7 @@
  * 支持源：WebDAV（完整）、百度网盘（实验性，access_token 手动配置）；SMB 后续版本。
  */
 import React, { useCallback, useEffect, useState } from "react";
+import { alert, confirm } from "@/components/ui/confirm";
 import {
   ChevronRight,
   Cloud,
@@ -219,7 +220,12 @@ function SourceManager(props: {
   }, [draft]);
 
   const removeSource = useCallback(async (source: RemoteSourcePublic) => {
-    if (!window.confirm(`删除远程源「${source.name}」？仅删除本地配置，不影响远程文件。`)) return;
+    const ok = await confirm({
+      title: `删除远程源「${source.name}」？`,
+      description: "仅删除本地配置，不影响远程文件。",
+      confirmText: "删除",
+    });
+    if (!ok) return;
     try {
       await api.deleteRemoteFileSource(source.id);
       onChanged();
@@ -647,7 +653,7 @@ export default function RemoteFilesPanel() {
       setEditorText(res.content);
     } catch (err: any) {
       setEditorText("");
-      window.alert(err?.message || "读取失败");
+      void alert({ title: "读取远程文件失败", description: err?.message || "读取失败" });
       setOpenPath("");
     } finally {
       setEditorLoading(false);
@@ -662,7 +668,7 @@ export default function RemoteFilesPanel() {
       setDirty(false);
       void loadList(activeId, cwd);
     } catch (err: any) {
-      window.alert(err?.message || "写回失败");
+      void alert({ title: "写回远程文件失败", description: err?.message || "写回失败" });
     } finally {
       setSaving(false);
     }
@@ -766,13 +772,19 @@ export default function RemoteFilesPanel() {
       setNewFolderName("");
       void loadList(activeId, cwd);
     } catch (err: any) {
-      window.alert(err?.message || "创建目录失败");
+      void alert({ title: "创建目录失败", description: err?.message || "创建目录失败" });
     }
   }, [activeId, cwd, newFolderName, loadList]);
 
   const removeEntry = useCallback(async (entry: RemoteFileEntry) => {
     if (!activeId) return;
-    if (!window.confirm(`删除远程${entry.isFolder ? "目录" : "文件"}「${entry.name}」？此操作不可撤销。`)) return;
+    const ok = await confirm({
+      title: `删除远程${entry.isFolder ? "目录" : "文件"}「${entry.name}」？`,
+      description: "此操作不可撤销。",
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteRemoteFile(activeId, entry.path);
       if (openPath === entry.path || openPath.startsWith(`${entry.path}/`)) {
@@ -782,7 +794,7 @@ export default function RemoteFilesPanel() {
       }
       void loadList(activeId, cwd);
     } catch (err: any) {
-      window.alert(err?.message || "删除失败");
+      void alert({ title: "删除远程条目失败", description: err?.message || "删除失败" });
     }
   }, [activeId, cwd, openPath, loadList]);
 
@@ -797,7 +809,7 @@ export default function RemoteFilesPanel() {
       setRenameTarget(null);
       void loadList(activeId, cwd);
     } catch (err: any) {
-      window.alert(err?.message || "重命名失败");
+      void alert({ title: "重命名失败", description: err?.message || "重命名失败" });
     }
   }, [activeId, renameTarget, renameValue, loadList]);
 

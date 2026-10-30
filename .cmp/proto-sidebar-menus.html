@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>侧栏弹层设计 · 菜单规范</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#fafafa; --elevated:#ffffff; --border:#e4e4e7; --border-soft:rgba(228,228,231,.6);
+    --text:#18181b; --text2:#52525b; --text3:#a1a1aa; --hover:#f4f4f5;
+    --accent:#2563eb; --soft:rgba(37,99,235,.13); --danger:#dc2626; --danger-soft:rgba(239,68,68,.10);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px;background:#f4f4f5;font:13px/1.55 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--text)}
+  h1{font-size:14px;margin:0 0 4px}
+  .sub{font-size:11.5px;color:#71717a;margin:0 0 18px}
+  .grid{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+  .cell{display:flex;flex-direction:column;gap:8px}
+  .cap{font-size:11.5px;color:#52525b}
+  .cap b{color:#18181b}
+  .stage{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;min-width:250px;display:flex;justify-content:center}
+
+  /* 菜单容器规范：圆角 12 / 内边距 6 / 最小宽 192 / 柔和投影 */
+  .menu{width:200px;background:var(--elevated);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
+  .label{padding:4px 8px 4px;font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+  .item{display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:8px;color:var(--text);font-size:12.5px;cursor:default}
+  .item:hover{background:var(--hover)}
+  .item .ico{width:14px;display:flex;justify-content:center;color:var(--text3);flex:none}
+  .item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .hint{font-size:10.5px;color:var(--text3)}
+  .item .check{color:var(--accent);font-size:11px}
+  .item.danger{color:var(--danger)}
+  .item.danger .ico{color:var(--danger)}
+  .item.danger:hover{background:var(--danger-soft)}
+  .sep{height:1px;background:var(--border);margin:4px 0}
+
+  /* 筛选弹层 */
+  .filter{width:236px;background:var(--elevated);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14);overflow:hidden}
+  .frow{display:flex;align-items:center;gap:6px;padding:8px 8px 6px}
+  .pill{font-size:10.5px;padding:1px 8px;border-radius:999px;color:var(--text3)}
+  .pill.on{background:var(--soft);color:var(--accent);font-weight:500}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:0 8px 8px;padding:4px;border:1px solid var(--border-soft);border-radius:10px;background:var(--panel)}
+  .seg button{height:28px;border:0;background:transparent;border-radius:6px;font-size:11.5px;color:var(--text2);font:inherit;font-size:11.5px}
+  .seg button.on{background:var(--elevated);color:var(--accent);font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.10)}
+  .empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px 12px;border-top:1px solid var(--border)}
+  .empty .ico{color:#c4c4c8;font-size:15px}
+  .empty p{margin:0;font-size:11.5px;color:var(--text3);text-align:center}
+  .arrow{color:var(--accent);font-size:11px}
+  .before{background:#fff;border:1px dashed #d4d4d8;border-radius:10px;padding:10px 12px;font-size:11.5px;color:#71717a;width:236px}
+  .before .it{padding:3px 0;font-size:12px;color:#3f3f46}
+  .before .bad{color:#dc2626}
+</style>
+</head>
+<body>
+  <h1>侧栏弹层重做 · 统一菜单规范</h1>
+  <p class="sub">容器：圆角 12 / 内边距 6 / 最小宽 192 / 柔和投影 &nbsp;·&nbsp; 行：高 32 / 图标 14 次要色 / 文字 12.5 &nbsp;·&nbsp; 分组标题 10.5 大写 &nbsp;·&nbsp; 危险行红字红图标 + 红底悬停</p>
+
+  <div class="grid">
+    <!-- 1 行菜单 -->
+    <div class="cell">
+      <div class="cap"><b>① 行级菜单</b>（文件夹行右键）</div>
+      <div class="stage">
+        <div class="menu">
+          <div class="item"><span class="ico">📄</span><span class="t">新建文档</span></div>
+          <div class="item"><span class="ico">📁</span><span class="t">新建子文件夹</span></div>
+          <div class="sep"></div>
+          <div class="item"><span class="ico">✎</span><span class="t">重命名</span><span class="hint">F2</span></div>
+          <div class="item danger"><span class="ico">🗑</span><span class="t">删除</span><span class="hint">Del</span></div>
+        </div>
+      </div>
+      <div class="before">
+        <div style="font-size:10.5px;color:#a1a1aa;margin-bottom:4px">改前</div>
+        <div class="it">新建文档</div><div class="it">新建子文件夹</div><div class="it">重命名</div><div class="it bad">删除</div>
+      </div>
+    </div>
+
+    <!-- 2 排序菜单 -->
+    <div class="cell">
+      <div class="cap"><b>② 排序 / 更多菜单</b>（知识库 ⋯）</div>
+      <div class="stage">
+        <div class="menu">
+          <div class="label">排序方式</div>
+          <div class="item"><span class="t">手动排序</span><span class="check">✓</span></div>
+          <div class="item"><span class="t">名称 A–Z</span></div>
+          <div class="item"><span class="t">名称 Z–A</span></div>
+          <div class="item"><span class="t">最近更新</span></div>
+          <div class="item"><span class="t">最近创建</span></div>
+          <div class="sep"></div>
+          <div class="item"><span class="ico">⇕</span><span class="t">折叠全部文件夹</span></div>
+          <div class="item"><span class="ico">↻</span><span class="t">刷新</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 新建菜单 -->
+    <div class="cell">
+      <div class="cap"><b>③ 新建菜单</b>（区块头 ＋ · 根级）</div>
+      <div class="stage">
+        <div class="menu">
+          <div class="label">根目录</div>
+          <div class="item"><span class="ico">📁</span><span class="t">新建知识库</span><span class="hint">Enter</span></div>
+        </div>
+      </div>
+      <div class="before">
+        <div style="font-size:10.5px;color:#a1a1aa;margin-bottom:4px">改前：单个白卡片、无分组、无提示</div>
+        <div class="it">📁 新建知识库</div>
+      </div>
+    </div>
+
+    <!-- 4 筛选弹层 -->
+    <div class="cell">
+      <div class="cap"><b>④ 搜索筛选</b>（分段控件 + 空态）</div>
+      <div class="stage">
+        <div class="filter">
+          <div class="frow"><span style="font-size:10px;color:#a1a1aa">范围</span><span class="pill on">库内</span><span class="pill">全空间</span></div>
+          <div class="seg">
+            <button>全部</button><button class="on">知识库</button><button>文档</button>
+            <button>文件夹</button><button>收藏</button><button>标签</button>
+          </div>
+          <div class="empty">
+            <span class="ico">⌕</span>
+            <p>输入关键词搜索标签、收藏、知识库与文档</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

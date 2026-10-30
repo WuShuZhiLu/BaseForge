@@ -12,6 +12,12 @@ interface Props {
   filename: string;
   /** 容器高度类，与其他子组件 API 保持一致 */
   heightClass?: string;
+  /**
+   * 受控页码（1 起始）。传入后翻页由外部驱动（PDF 文档编辑器的批注跳页用）；
+   * 不传则组件内部自管页码。用户点击翻页按钮时通过 onPageChange 上报。
+   */
+  page?: number;
+  onPageChange?: (page: number) => void;
 }
 
 /** 给 url 加 inline=1，告诉后端走 inline 渲染而不是 attachment 下载 */
@@ -25,14 +31,21 @@ function toInlineUrl(url: string): string {
   return base + (base.includes("?") ? "&" : "?") + "inline=1" + hash;
 }
 
-export default function AttachmentPdfPreview({ url, filename, heightClass }: Props) {
+export default function AttachmentPdfPreview({ url, filename, heightClass, page, onPageChange }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const documentRef = useRef<PDFDocumentProxy | null>(null);
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
+  const [internalPage, setInternalPage] = useState(1);
+  const pageNumber = page ?? internalPage;
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [error, setError] = useState("");
+
+  const changePage = (next: number) => {
+    const clamped = next;
+    if (page === undefined) setInternalPage(clamped);
+    onPageChange?.(clamped);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +53,7 @@ export default function AttachmentPdfPreview({ url, filename, heightClass }: Pro
     let loadedDocument: PDFDocumentProxy | null = null;
 
     setDocument(null);
-    setPageNumber(1);
+    setInternalPage(1);
     setLoading(true);
     setError("");
 
@@ -178,7 +191,7 @@ export default function AttachmentPdfPreview({ url, filename, heightClass }: Pro
           type="button"
           aria-label="上一页"
           disabled={pageNumber <= 1 || rendering}
-          onClick={() => setPageNumber((value) => Math.max(1, value - 1))}
+          onClick={() => changePage(Math.max(1, pageNumber - 1))}
           className="rounded p-1 text-tx-secondary hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft size={16} />
@@ -190,7 +203,7 @@ export default function AttachmentPdfPreview({ url, filename, heightClass }: Pro
           type="button"
           aria-label="下一页"
           disabled={pageNumber >= document.numPages || rendering}
-          onClick={() => setPageNumber((value) => Math.min(document.numPages, value + 1))}
+          onClick={() => changePage(Math.min(document.numPages, pageNumber + 1))}
           className="rounded p-1 text-tx-secondary hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight size={16} />

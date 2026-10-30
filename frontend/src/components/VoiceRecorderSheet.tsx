@@ -8,6 +8,7 @@ import { VoiceRecorderSession, recordedVoiceFile, formatVoiceDuration, type Reco
 import { voiceRecordingExtension } from "@/lib/voiceRecordingMime";
 import { createVoiceMemoDraft, voiceMemoDraftStore, type VoiceMemoDraft } from "@/lib/voiceMemoDraftStore";
 import { voiceMemoScope, type VoiceMemoRequest } from "@/lib/voiceMemo";
+import { confirm } from "@/components/ui/confirm";
 
 export default function VoiceRecorderSheet() {
   const { t } = useTranslation();
@@ -161,10 +162,10 @@ export default function VoiceRecorderSheet() {
         {state === "requesting-permission" && <p role="status">{t("voice.permission")}</p>}
         {(state === "processing" || state === "uploading") && <p role="status">{t(`voice.${state}`)}</p>}
         {current && state !== "uploading" && <><button type="button" className={button} onClick={() => void upload(current)}>{t("voice.retry")}</button><button type="button" className={button} onClick={() => download(current)}>{t("voice.download")}</button></>}
-        {active && <button type="button" className={button} onClick={() => { if (window.confirm(t("voice.cancelConfirm"))) void sessionRef.current?.cancel().then(close); }}>{t("voice.cancel")}</button>}
+        {active && <button type="button" className={button} onClick={async () => { const ok = await confirm({ title: t("voice.cancelConfirm"), danger: true }); if (ok) void sessionRef.current?.cancel().then(close); }}>{t("voice.cancel")}</button>}
         {!active && state !== "processing" && state !== "uploading" && <button type="button" className={button} onClick={() => { if (current && state === "saved") void voiceMemoDraftStore.remove(current.id).then(close); else close(); }}><X className="mr-1 inline" size={14} />{t("voice.close")}</button>}
       </div>
-      {!active && state !== "uploading" && drafts.filter((draft) => draft.id !== current?.id).map((draft) => <div key={draft.id} className="mt-4 rounded-lg border border-app-border p-3 text-sm"><p>{new Date(draft.createdAt).toLocaleString()} · {formatVoiceDuration(draft.durationMs)}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className={button} onClick={() => void upload(draft)}>{t("voice.retry")}</button><button type="button" className={button} onClick={() => download(draft)}>{t("voice.download")}</button><button type="button" className={button} onClick={() => { if (window.confirm(t("voice.discardConfirm"))) void voiceMemoDraftStore.remove(draft.id).then(refreshDrafts); }}>{t("voice.discard")}</button></div></div>)}
+      {!active && state !== "uploading" && drafts.filter((draft) => draft.id !== current?.id).map((draft) => <div key={draft.id} className="mt-4 rounded-lg border border-app-border p-3 text-sm"><p>{new Date(draft.createdAt).toLocaleString()} · {formatVoiceDuration(draft.durationMs)}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className={button} onClick={() => void upload(draft)}>{t("voice.retry")}</button><button type="button" className={button} onClick={() => download(draft)}>{t("voice.download")}</button><button type="button" className={button} onClick={async () => { const ok = await confirm({ title: t("voice.discardConfirm"), confirmText: t("voice.discard"), danger: true }); if (ok) void voiceMemoDraftStore.remove(draft.id).then(refreshDrafts); }}>{t("voice.discard")}</button></div></div>)}
     </section>
   </div>, document.body);
 }

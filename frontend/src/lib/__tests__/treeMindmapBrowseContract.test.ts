@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 /**
  * B-4 树内「浏览所有导图」契约（.cmp/COLLAB-BOARD.md 第二节 A 指派批次）：
  *  - 入口：树面板头部 ⋯「更多目录操作」菜单新增「浏览所有导图」（勾选态 = 浏览视图开关）；
- *  - 只做筛选展示：仅按 nodeType === "mindmap" 过滤，不改数据结构、不做迁移；
- *  - 点击条目走现有开笔记链路（openDocument：导图走 /mindmaps/:id 深链）；
+ *  - 只做筛选展示：导图归一后按 contentFormat === "mindmap" 过滤笔记节点；
+ *  - 点击条目走现有开笔记链路（openDocument：导图文档按笔记打开）；
  *  - 移动端树面板不加该入口（B3 未启动，移动端禁改）。
  */
 
@@ -25,8 +25,8 @@ describe("B-4 树内「浏览所有导图」", () => {
     expect(PANEL).toContain("setMindmapBrowseOpen((current) => !current)");
   });
 
-  it("只按 nodeType === \"mindmap\" 过滤（不改数据结构、不做迁移）", () => {
-    expect(PANEL).toContain('nodes.filter((node) => node.nodeType === "mindmap")');
+  it("按 contentFormat === \"mindmap\" 过滤归一后的导图文档节点", () => {
+    expect(PANEL).toContain('nodes.filter((node) => node.contentFormat === "mindmap")');
   });
 
   it("浏览视图在树面板体内渲染，点击走 openDocument 现有链路", () => {

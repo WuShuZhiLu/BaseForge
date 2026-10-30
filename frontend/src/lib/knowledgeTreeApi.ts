@@ -69,6 +69,22 @@ export interface KnowledgePermissionRow {
   updatedAt: string;
 }
 
+/** 库 Overview 贡献者（服务端 /:nodeId/stats 返回）。 */
+export interface KnowledgeContributor {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  docCount: number;
+}
+
+/** 库 Overview 统计。口径：文档数=子树非 folder 节点；字数为 contentText 去空白后的长度。 */
+export interface KnowledgeNodeStats {
+  docCount: number;
+  charCount: number;
+  updatedAt: string;
+  contributors: KnowledgeContributor[];
+}
+
 export interface KnowledgeTreeResponse {
   nodes: KnowledgeTreeNode[];
   /** 仅本次在线请求有效，不能随树快照持久化。旧服务端不返回此字段。 */
@@ -145,7 +161,13 @@ export const knowledgeTreeApi = {
     return request<{ nodes: KnowledgeTreeNode[] }>(`/shared-with-me?${workspaceQuery()}`).then(withDisplaySort);
   },
 
-  create(input: { parentId: string | null; nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet"; title: string; sheetData?: SheetDataModel }) {
+  /** 库 Overview 统计（服务端聚合：文档数/字数/最近更新/贡献者）。
+   *  口径见 backend/src/services/knowledgeTreeStats.ts；替代前端全量拉 notes 本地累加。 */
+  stats(nodeId: string) {
+    return request<KnowledgeNodeStats>(`/${encodeURIComponent(nodeId)}/stats?${workspaceQuery()}`);
+  },
+
+  create(input: { parentId: string | null; nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board"; title: string; sheetData?: SheetDataModel }) {
     return request<KnowledgeTreeNode>(`/nodes?${workspaceQuery()}`, {
       method: "POST",
       body: JSON.stringify(input),
@@ -161,7 +183,7 @@ export const knowledgeTreeApi = {
 
   createForWorkspace(
     workspaceId: string,
-    input: { parentId: string | null; nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet"; title: string },
+    input: { parentId: string | null; nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board"; title: string },
   ) {
     return request<KnowledgeTreeNode>(`/nodes?${workspaceQuery(false, workspaceId)}`, {
       method: "POST",
@@ -169,14 +191,14 @@ export const knowledgeTreeApi = {
     });
   },
 
-  update(nodeId: string, input: { title?: string; isExpanded?: boolean }) {
+  update(nodeId: string, input: { title?: string; isExpanded?: boolean; isFavorite?: number }) {
     return request<KnowledgeTreeNode | { success: true }>(
       `/nodes/${encodeURIComponent(nodeId)}?${workspaceQuery()}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
   },
 
-  move(nodeId: string, input: { parentId: string | null; sortOrder?: number }) {
+  move(nodeId: string, input: { parentId: string | null; sortOrder?: number; beforeId?: string; afterId?: string }) {
     return request<KnowledgeTreeNode>(`/nodes/${encodeURIComponent(nodeId)}/move`, {
       method: "PUT",
       body: JSON.stringify(input),

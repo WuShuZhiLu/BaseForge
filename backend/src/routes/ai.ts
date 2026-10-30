@@ -582,7 +582,7 @@ ai.post("/ask", async (c) => {
         const userParams = workspaceId === null ? [userId] : [];
         const notes = db.prepare(`
           SELECT id, title, contentText FROM notes
-          WHERE rowid IN (${placeholders}) AND ${userClause}${wsClause} AND isTrashed = 0 ${nbClause ? `AND ${nbClause}` : ``}
+          WHERE rowid IN (${placeholders}) AND ${userClause}${wsClause} AND isTrashed = 0 AND isUnlisted = 0 ${nbClause ? `AND ${nbClause}` : ``}
           ORDER BY updatedAt DESC
           LIMIT 5
         `).all(...rowids, ...userParams, ...wsParams, ...nbParams) as { id: string; title: string; contentText: string }[];
@@ -614,7 +614,7 @@ ai.post("/ask", async (c) => {
       const userParams = workspaceId === null ? [userId] : [];
       const notes = db.prepare(`
         SELECT id, title, contentText FROM notes
-        WHERE ${userClause}${wsClause} AND isTrashed = 0 ${nbClause ? `AND ${nbClause}` : ``} AND (${likeClauses})
+        WHERE ${userClause}${wsClause} AND isTrashed = 0 AND isUnlisted = 0 ${nbClause ? `AND ${nbClause}` : ``} AND (${likeClauses})
         ORDER BY updatedAt DESC
         LIMIT 5
       `).all(...userParams, ...wsParams, ...nbParams, ...likeParams) as { id: string; title: string; contentText: string }[];
@@ -640,7 +640,7 @@ ai.post("/ask", async (c) => {
       const userParams = workspaceId === null ? [userId] : [];
       const notes = db.prepare(`
         SELECT id, title, contentText FROM notes
-        WHERE ${userClause}${wsClause} AND isTrashed = 0 ${nbClause ? `AND ${nbClause}` : ``}
+        WHERE ${userClause}${wsClause} AND isTrashed = 0 AND isUnlisted = 0 ${nbClause ? `AND ${nbClause}` : ``}
         ORDER BY updatedAt DESC
         LIMIT 5
       `).all(...userParams, ...wsParams, ...nbParams) as { id: string; title: string; contentText: string }[];

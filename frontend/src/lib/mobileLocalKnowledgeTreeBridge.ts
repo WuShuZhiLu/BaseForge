@@ -311,16 +311,22 @@ export function installMobileLocalKnowledgeTreeBridge(
       return findNode(`notebook:${id}`, workspaceId);
     }
 
-    if (input.nodeType === "mindmap") {
-      if (!db) throw localOnlyUnsupported("设备本地脑图目录尚未就绪");
-      if (effectiveWorkspaceId) throw localOnlyUnsupported("设备本地脑图暂不支持工作区");
-      await ensureMobileLocalMindMapTree(db);
-      const map = await api.createMindMap({ title: input.title.trim() || "无标题导图" });
-      await db.run("INSERT INTO mobile_local_mindmap_tree (mindmapId,parentId) VALUES (?,?)", [map.id, parent?.id ?? null]);
-      return findNode(`mindmap:${map.id}`, workspaceId);
-    }
-
     if (!parent) throw localOnlyUnsupported("根级文档需要先创建文件夹");
+    // 导图归一后就是笔记文档（contentFormat="mindmap"，正文存 MindMapData JSON），
+    // 与 markdown/tiptap 同走本地 notes + 笔记同步链路，不再写本地 mindmaps 表。
+    if (input.nodeType === "mindmap") {
+      const mapTitle = input.title.trim() || "无标题导图";
+      await repository.notes.create({
+        id,
+        workspaceId: effectiveWorkspaceId,
+        notebookId: parent.resourceId,
+        title: mapTitle,
+        contentFormat: "mindmap",
+        content: JSON.stringify({ root: { id: "root", text: mapTitle, children: [] } }),
+        contentText: "",
+      });
+      return findNode(`note:${id}`, workspaceId);
+    }
     const contentFormat = input.nodeType === "markdown" ? "markdown" : "tiptap-json";
     await repository.notes.create({
       id,

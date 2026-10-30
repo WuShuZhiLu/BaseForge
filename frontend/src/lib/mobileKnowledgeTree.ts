@@ -1,5 +1,5 @@
 import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
-import { compareKnowledgeTreePinnedPriority } from "@/lib/knowledgeTreeSort";
+import { compareKnowledgeTreeFolderPriority } from "@/lib/knowledgeTreeSort";
 
 export type MobileKnowledgeTreeSortMode =
   | "updated-desc"
@@ -44,8 +44,8 @@ export function compareMobileKnowledgeTreeNodes(
   b: KnowledgeTreeNode,
   mode: MobileKnowledgeTreeSortMode,
 ): number {
-  const pinnedPriority = compareKnowledgeTreePinnedPriority(a, b);
-  if (pinnedPriority !== 0) return pinnedPriority;
+  const folderPriority = compareKnowledgeTreeFolderPriority(a, b);
+  if (folderPriority !== 0) return folderPriority;
 
   let result = 0;
   switch (mode) {
@@ -160,29 +160,15 @@ export function buildMobileKnowledgeTreeRecentNodes(
     return documents
       .slice()
       .sort((a, b) => (
-        compareKnowledgeTreePinnedPriority(a, b)
-        || timestamp(b.updatedAt) - timestamp(a.updatedAt)
+        timestamp(b.updatedAt) - timestamp(a.updatedAt)
         || compareTitle(a, b)
         || a.id.localeCompare(b.id)
       ))
       .slice(0, limit);
   }
 
-  const compareRecentDocuments = (a: KnowledgeTreeNode, b: KnowledgeTreeNode) => {
-    const aOpenedAt = openedAtByNode.get(a.id);
-    const bOpenedAt = openedAtByNode.get(b.id);
-    if (aOpenedAt !== undefined && bOpenedAt === undefined) return -1;
-    if (aOpenedAt === undefined && bOpenedAt !== undefined) return 1;
-    return (bOpenedAt || 0) - (aOpenedAt || 0)
-      || timestamp(b.updatedAt) - timestamp(a.updatedAt)
-      || compareTitle(a, b)
-      || a.id.localeCompare(b.id);
-  };
-  const pinnedDocuments = documents
-    .filter((node) => node.isPinned === 1)
-    .sort(compareRecentDocuments);
   const openedDocuments = documents
-    .filter((node) => node.isPinned !== 1 && openedAtByNode.has(node.id))
+    .filter((node) => openedAtByNode.has(node.id))
     .sort((a, b) => (
       (openedAtByNode.get(b.id) || 0) - (openedAtByNode.get(a.id) || 0)
       || timestamp(b.updatedAt) - timestamp(a.updatedAt)
@@ -190,14 +176,14 @@ export function buildMobileKnowledgeTreeRecentNodes(
       || a.id.localeCompare(b.id)
     ));
   const fallbackDocuments = documents
-    .filter((node) => node.isPinned !== 1 && !openedAtByNode.has(node.id))
+    .filter((node) => !openedAtByNode.has(node.id))
     .sort((a, b) => (
       timestamp(b.updatedAt) - timestamp(a.updatedAt)
       || compareTitle(a, b)
       || a.id.localeCompare(b.id)
     ));
 
-  return [...pinnedDocuments, ...openedDocuments, ...fallbackDocuments].slice(0, limit);
+  return [...openedDocuments, ...fallbackDocuments].slice(0, limit);
 }
 
 function getLocalStorage(): Storage | null {

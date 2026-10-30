@@ -29,6 +29,7 @@ import {
   reorderKnowledgeNodes,
   restoreKnowledgeNode,
 } from "../services/knowledgeTree.js";
+import { knowledgeNodeStats } from "../services/knowledgeTreeStats.js";
 
 const app = new Hono();
 
@@ -96,13 +97,50 @@ app.get("/roles", (c) => c.json({
 
 app.get("/", (c) => {
   try {
-    return c.json({
-      nodes: listKnowledgeTree({
-        userId: userIdOf(c),
-        workspaceId: workspaceIdOf(c),
-        includeDeleted: c.req.query("includeDeleted") === "1",
-      }),
+    const nodes = listKnowledgeTree({
+      userId: userIdOf(c),
+      workspaceId: workspaceIdOf(c),
+      includeDeleted: c.req.query("includeDeleted") === "1",
     });
+    // 树 listing 的 isFavorite 仅覆盖 note（favorites 表按 noteId 键控）；
+    // 知识库收藏落 notebooks.isFavorite（PATCH 的 isFavorite 分支），这里补齐给前端。
+    const db = getDb();
+    const notebookResourceIds = nodes
+      .filter((node) => node.resourceType === "notebook")
+      .map((node) => node.resourceId);
+    const favoriteMap = new Map<string, number>();
+    for (let offset = 0; offset < notebookResourceIds.length; offset += 500) {
+      const chunk = notebookResourceIds.slice(offset, offset + 500);
+      const placeholders = chunk.map(() => "?").join(",");
+      const rows = db.prepare(`SELECT id, isFavorite FROM notebooks WHERE id IN (${placeholders})`)
+        .all(...chunk) as Array<{ id: string; isFavorite: number }>;
+      for (const row of rows) {
+        if (row.isFavorite) favoriteMap.set(row.id, 1);
+      }
+    }
+    return c.json({
+      nodes: nodes.map((node) => (
+        node.resourceType === "notebook" ? { ...node, isFavorite: favoriteMap.get(node.resourceId) ?? 0 } : node
+      )),
+    });
+  } catch (error) {
+    return mapError(c, error);
+  }
+});
+
+/**
+ * 库 Overview 统计（/knowledge-tree/:nodeId/stats）。
+ * 服务端聚合替代前端全量拉 notes：口径见 services/knowledgeTreeStats.ts 头注释。
+ * 权限沿用知识树读权限；节点不存在与无权限一律 404，避免泄露存在性。
+ */
+app.get("/:nodeId/stats", (c) => {
+  try {
+    const nodeId = c.req.param("nodeId");
+    const access = resolveKnowledgeNodeAccess(nodeId, userIdOf(c));
+    if (!access.capabilities.canView) {
+      return c.json({ error: "知识库不存在", code: "KNOWLEDGE_NODE_NOT_FOUND" }, 404);
+    }
+    return c.json(knowledgeNodeStats(nodeId));
   } catch (error) {
     return mapError(c, error);
   }
@@ -125,7 +163,7 @@ app.post("/nodes", async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const nodeType = body.nodeType;
-    if (!["folder", "note", "markdown", "word", "mindmap", "sheet"].includes(nodeType)) {
+    if (!["folder", "note", "markdown", "word", "mindmap", "sheet", "plain", "board"].includes(nodeType)) {
       return c.json({ error: "不支持的节点类型", code: "KNOWLEDGE_NODE_TYPE_UNSUPPORTED" }, 400);
     }
     const parentId = typeof body.parentId === "string" && body.parentId ? body.parentId : null;
@@ -162,11 +200,18 @@ app.patch("/nodes/:nodeId", async (c) => {
     const isExpanded = typeof body.isExpanded === "boolean" || body.isExpanded === 0 || body.isExpanded === 1
       ? Number(Boolean(body.isExpanded))
       : undefined;
+    const isFavorite = typeof body.isFavorite === "boolean" || body.isFavorite === 0 || body.isFavorite === 1
+      ? Number(Boolean(body.isFavorite))
+      : undefined;
     if (title !== undefined && !hasKnowledgeCapability(access, "canEdit")) {
       return c.json({ error: "没有重命名权限", code: "KNOWLEDGE_CAPABILITY_FORBIDDEN", required: "canEdit" }, 403);
     }
     if (isExpanded !== undefined && !access.capabilities.canView) {
       return c.json({ error: "权限不足", code: "KNOWLEDGE_CAPABILITY_FORBIDDEN", required: "canView" }, 403);
+    }
+    // 收藏是内容标记（与文档收藏同级），按 canEdit 把关；仅知识库（notebook）落库
+    if (isFavorite !== undefined && !hasKnowledgeCapability(access, "canEdit")) {
+      return c.json({ error: "没有收藏权限", code: "KNOWLEDGE_CAPABILITY_FORBIDDEN", required: "canEdit" }, 403);
     }
     const node = db.prepare("SELECT resourceType, resourceId FROM knowledge_tree_nodes WHERE id = ? AND isDeleted = 0")
       .get(nodeId) as { resourceType: string; resourceId: string } | undefined;
@@ -178,9 +223,8 @@ app.patch("/nodes/:nodeId", async (c) => {
           db.prepare("UPDATE notebooks SET name = ?, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
         } else if (node.resourceType === "note") {
           db.prepare("UPDATE notes SET title = ?, version = version + 1, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
-        } else if (node.resourceType === "mindmap") {
-          db.prepare("UPDATE mindmaps SET title = ?, updatedAt = datetime('now') WHERE id = ?").run(title, node.resourceId);
         }
+        // 导图已归一为 notes 行（contentFormat="mindmap"），走上面的 note 分支。
       }
       if (isExpanded !== undefined) {
         db.prepare("UPDATE knowledge_tree_nodes SET isExpanded = ?, updatedAt = datetime('now') WHERE id = ?")
@@ -188,6 +232,10 @@ app.patch("/nodes/:nodeId", async (c) => {
         if (node.resourceType === "notebook") {
           db.prepare("UPDATE notebooks SET isExpanded = ? WHERE id = ?").run(isExpanded, node.resourceId);
         }
+      }
+      if (isFavorite !== undefined && node.resourceType === "notebook") {
+        db.prepare("UPDATE notebooks SET isFavorite = ?, updatedAt = datetime('now') WHERE id = ?")
+          .run(isFavorite, node.resourceId);
       }
     })();
     const refreshed = listKnowledgeTree({ userId: userIdOf(c), workspaceId: workspaceIdOf(c) })
@@ -206,6 +254,8 @@ app.put("/nodes/:nodeId/move", async (c) => {
       nodeId: c.req.param("nodeId"),
       parentId: typeof body.parentId === "string" && body.parentId ? body.parentId : null,
       sortOrder: typeof body.sortOrder === "number" ? body.sortOrder : undefined,
+      beforeId: typeof body.beforeId === "string" && body.beforeId ? body.beforeId : undefined,
+      afterId: typeof body.afterId === "string" && body.afterId ? body.afterId : undefined,
     });
     return c.json(node);
   } catch (error) {

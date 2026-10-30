@@ -348,7 +348,7 @@ sharedRouter.get("/notebook-public/:token/tree", (c) => {
     WHERE notebookId IN (SELECT id FROM tree)
       AND isTrashed = 0
       AND isLocked = 0
-    ORDER BY isPinned DESC, sortOrder ASC, updatedAt DESC
+    ORDER BY sortOrder ASC, updatedAt DESC
   `).all(p.notebookId);
 
   return c.json({ notebooks, notes });

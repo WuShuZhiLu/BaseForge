@@ -6,6 +6,9 @@ import { AccountLoginHistoryList } from "@/components/AccountLoginHistory";
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 const switchHarness = vi.hoisted(() => ({ switchAccountLogin: vi.fn() }));
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
 
 vi.mock("@/lib/accountLoginSwitch", () => ({
   switchAccountLogin: switchHarness.switchAccountLogin,
@@ -82,7 +85,7 @@ describe("账号登录历史列表", () => {
   });
 
   it("可单独删除一条历史记录", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMocks.confirm.mockResolvedValue(true);
     const host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);

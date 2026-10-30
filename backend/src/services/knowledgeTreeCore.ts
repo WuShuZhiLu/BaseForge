@@ -1,6 +1,7 @@
 import { validateSheetData } from "./sheetData.js";
 import type Database from "better-sqlite3";
 import { v4 as uuid } from "uuid";
+import { defaultMindmapContent } from "../lib/mindmapData.js";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -254,7 +255,7 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board";
   title: string;
   encryptedContent?: string;
   encryptedNoteId?: string;
@@ -285,7 +286,9 @@ export function createKnowledgeChild(input: {
         ? "无标题导图"
         : input.nodeType === "sheet"
           ? "无标题表格"
-          : "无标题笔记"
+          : input.nodeType === "board"
+            ? "无标题画板"
+            : "无标题笔记"
   );
   const key = expectedScope;
   const sortOrder = maxSortOrder(db, key, input.parentId);
@@ -301,20 +304,30 @@ export function createKnowledgeChild(input: {
       `).run(notebookId, resourceOwnerUserId, normalizedWorkspaceId, physicalParentId, title, sortOrder);
       createdNode = nodeForResource(db, "notebook", notebookId);
     } else if (input.nodeType === "mindmap") {
+      // 导图归一：与 markdown/plain/board 同走 notes 行（contentFormat="mindmap"），
+      // 正文存 MindMapData JSON；不再写独立 mindmaps 表。
+      const notebookId = nearestNotebookContainer(db, input.parentId);
+      if (!notebookId) {
+        throw new KnowledgeTreeError("KNOWLEDGE_TREE_NOTE_CONTAINER_REQUIRED", 400, "根级文档需要先创建文件夹");
+      }
       const mindmapId = uuid();
-      db.prepare("INSERT INTO mindmaps (id, userId, workspaceId, title, data) VALUES (?, ?, ?, ?, ?)")
-        .run(mindmapId, resourceOwnerUserId, normalizedWorkspaceId, title,
-          JSON.stringify({ root: { id: "root", text: title, children: [] } }));
-      createdNode = nodeForResource(db, "mindmap", mindmapId);
+      db.prepare(`
+        INSERT INTO notes (
+          id, userId, workspaceId, notebookId, title, content, contentText,
+          contentFormat, note_type, sortOrder
+        ) VALUES (?, ?, ?, ?, ?, ?, '', 'mindmap', 'normal', ?)
+      `).run(mindmapId, resourceOwnerUserId, normalizedWorkspaceId, notebookId, title,
+        defaultMindmapContent(title), sortOrder);
+      createdNode = nodeForResource(db, "note", mindmapId);
     } else {
       const notebookId = nearestNotebookContainer(db, input.parentId);
       if (!notebookId) {
         throw new KnowledgeTreeError("KNOWLEDGE_TREE_NOTE_CONTAINER_REQUIRED", 400, "根级文档需要先创建文件夹");
       }
       const noteId = input.encryptedContent && input.encryptedNoteId ? input.encryptedNoteId : uuid();
-      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : "tiptap-json";
+      const contentFormat = input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : "tiptap-json";
       const noteType = input.nodeType === "word" ? "word" : input.nodeType === "sheet" ? "sheet" : "normal";
-      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : "{}");
+      const content = input.encryptedContent || (contentFormat === "markdown" ? `# ${title}\n\n` : contentFormat === "plain" ? "" : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}' : "{}");
       db.prepare(`
         INSERT INTO notes (
           id, userId, workspaceId, notebookId, title, content, contentText,
@@ -370,7 +383,7 @@ export function createKnowledgeChild(input: {
     ...row,
     title,
     childCount: 0,
-    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "folder" || input.nodeType === "mindmap" ? undefined : "tiptap-json",
+    contentFormat: input.encryptedContent ? "encrypted-note-v1" : input.nodeType === "markdown" ? "markdown" : input.nodeType === "plain" ? "plain" : input.nodeType === "board" ? "board" : input.nodeType === "mindmap" ? "mindmap" : input.nodeType === "folder" ? undefined : "tiptap-json",
     noteType: input.nodeType === "sheet" ? "sheet" : input.nodeType === "word" ? "word" : undefined,
     access: resolveKnowledgeNodeAccess(row.id, input.actorUserId, db),
   };
@@ -427,6 +440,10 @@ export function moveKnowledgeNode(input: {
   nodeId: string;
   parentId: string | null;
   sortOrder?: number;
+  /** 插到该兄弟节点之前（与 parentId 同级，二选一）。 */
+  beforeId?: string;
+  /** 插到该兄弟节点之后（与 parentId 同级，二选一）。 */
+  afterId?: string;
   db?: Database.Database;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
@@ -462,6 +479,27 @@ export function moveKnowledgeNode(input: {
   if (input.parentId === node.id || (input.parentId && isDescendant(db, node.id, input.parentId))) {
     throw new KnowledgeTreeError("KNOWLEDGE_TREE_CYCLE", 400, "不能移动到自身或自己的后代节点");
   }
+  // 知识库是根级节点：只允许在根层重排，不能被拖进其它知识库/文件夹（否则会从根列表消失）
+  if (node.resourceType === "notebook" && node.parentId === null && input.parentId !== null) {
+    throw new KnowledgeTreeError(
+      "KNOWLEDGE_ROOT_NOTEBOOK_MOVE_FORBIDDEN",
+      400,
+      "知识库是根级节点，不能移动到其它知识库或文件夹内",
+    );
+  }
+  const anchorId = input.beforeId ?? input.afterId ?? null;
+  if (input.beforeId && input.afterId) {
+    throw new KnowledgeTreeError("KNOWLEDGE_MOVE_ANCHOR_CONFLICT", 400, "beforeId 与 afterId 只能二选一");
+  }
+  const anchorNode = anchorId ? requireNode(db, anchorId) : null;
+  if (anchorNode) {
+    if ((anchorNode.parentId ?? null) !== input.parentId) {
+      throw new KnowledgeTreeError("KNOWLEDGE_MOVE_ANCHOR_SCOPE_MISMATCH", 400, "目标节点不在同一父级下");
+    }
+    if (anchorNode.scopeKey !== node.scopeKey) {
+      throw new KnowledgeTreeError("KNOWLEDGE_TREE_SCOPE_MISMATCH", 400, "不能跨空间移动内容");
+    }
+  }
   const targetAccess = resolveTargetAccess(db, input.parentId, input.actorUserId, node.workspaceId);
   if (!targetAccess.capabilities.canCreate && !targetAccess.capabilities.canMove) {
     throw new KnowledgeTreeError("KNOWLEDGE_CAPABILITY_FORBIDDEN", 403, "没有移动到目标位置的权限", { required: "canCreate" });
@@ -481,13 +519,30 @@ export function moveKnowledgeNode(input: {
       SET parentId = ?, sortOrder = ?, updatedAt = datetime('now')
       WHERE id = ?
     `).run(input.parentId, nextSort, node.id);
+    // 指定插到某兄弟之前/之后：把该父级下的兄弟按 sortOrder 重新编号（0..n-1），
+    // 让"拖到目标上半/下半"真的落在指定位置，而不是追加到父级末尾。
+    if (anchorId) {
+      const siblings = db.prepare(`
+        SELECT id FROM knowledge_tree_nodes
+         WHERE scopeKey = ? AND isDeleted = 0 AND id <> ?
+           AND ((parentId IS NULL AND ? IS NULL) OR parentId = ?)
+         ORDER BY sortOrder, id
+      `).all(node.scopeKey, node.id, input.parentId, input.parentId) as Array<{ id: string }>;
+      const ordered = siblings.map((row) => row.id);
+      const anchorIndex = ordered.indexOf(anchorId);
+      if (anchorIndex >= 0) {
+        ordered.splice(input.beforeId ? anchorIndex : anchorIndex + 1, 0, node.id);
+        const updateSort = db.prepare("UPDATE knowledge_tree_nodes SET sortOrder = ? WHERE id = ?");
+        ordered.forEach((id, index) => updateSort.run(index, id));
+      }
+    }
     recordHistory(db, {
       nodeId: node.id,
       action: "move",
       actorUserId: input.actorUserId,
       fromParentId,
       toParentId: input.parentId,
-      metadata: { sortOrder: nextSort },
+      metadata: { sortOrder: nextSort, anchorId, position: input.beforeId ? "before" : input.afterId ? "after" : null },
     });
   });
   transaction();

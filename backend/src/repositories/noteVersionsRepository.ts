@@ -22,6 +22,11 @@ function getAdapter() {
   return new SqliteAdapter(getDb());
 }
 
+/** 快照来源：auto=定时快照，manual=Ctrl+S 保存，release=用户「保存为版本」 */
+export type VersionSource = "auto" | "manual" | "release";
+
+export const VERSION_SOURCES: VersionSource[] = ["auto", "manual", "release"];
+
 /** note_versions 记录（列表视图，不含 content/contentText） */
 export interface NoteVersionListItem {
   id: string;
@@ -33,8 +38,10 @@ export interface NoteVersionListItem {
   changeSummary: string | null;
   createdAt: string;
   username: string | null;
-  /** 版本历史 v2：auto=自动备份，manual=手动备份 */
-  kind: "auto" | "manual";
+  /** 旧口径列，v134 起与 source 同值（auto|manual|release），供旧客户端兼容 */
+  kind: VersionSource;
+  /** 版本来源（v134）：auto=定时，manual=Ctrl+S 保存，release=发版 */
+  source: VersionSource;
   label: string | null;
   description: string | null;
   contentBytes: number;
@@ -53,7 +60,8 @@ export interface NoteVersionRecord {
   changeType: string;
   changeSummary: string | null;
   createdAt: string;
-  kind: "auto" | "manual";
+  kind: VersionSource;
+  source: VersionSource;
   label: string | null;
   description: string | null;
   contentHash: string | null;
@@ -70,22 +78,23 @@ export const noteVersionsRepository = {
    * @param offset 偏移量
    * @returns 版本列表
    */
-  listByNoteId(noteId: string, limit: number, offset: number, kind?: "auto" | "manual"): NoteVersionListItem[] {
+  listByNoteId(noteId: string, limit: number, offset: number, kind?: VersionSource, source?: VersionSource): NoteVersionListItem[] {
     const db = getDb();
     const kindClause = kind ? " AND nv.kind = ?" : "";
+    const sourceClause = source ? " AND nv.source = ?" : "";
     return db
       .prepare(
         `SELECT nv.id, nv."noteId", nv."userId", nv.title, nv.version, nv."changeType", nv."changeSummary", nv."createdAt",
-                nv.kind, nv.label, nv.description,
+                nv.kind, nv.source, nv.label, nv.description,
                 COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS contentBytes,
                 u.username
          FROM note_versions nv
          LEFT JOIN users u ON nv."userId" = u.id
-         WHERE nv."noteId" = ?${kindClause}
+         WHERE nv."noteId" = ?${kindClause}${sourceClause}
          ORDER BY nv.version DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(...(kind ? [noteId, kind, limit, offset] : [noteId, limit, offset])) as NoteVersionListItem[];
+      .all(...[noteId, ...(kind ? [kind] : []), ...(source ? [source] : []), limit, offset]) as NoteVersionListItem[];
   },
 
   /**
@@ -94,12 +103,13 @@ export const noteVersionsRepository = {
    * @param noteId 笔记 ID
    * @returns 版本总数
    */
-  countByNoteId(noteId: string, kind?: "auto" | "manual"): number {
+  countByNoteId(noteId: string, kind?: VersionSource, source?: VersionSource): number {
     const db = getDb();
     const kindClause = kind ? " AND kind = ?" : "";
+    const sourceClause = source ? " AND source = ?" : "";
     const row = db
-      .prepare(`SELECT COUNT(*) as count FROM note_versions WHERE "noteId" = ?${kindClause}`)
-      .get(...(kind ? [noteId, kind] : [noteId])) as { count: number };
+      .prepare(`SELECT COUNT(*) as count FROM note_versions WHERE "noteId" = ?${kindClause}${sourceClause}`)
+      .get(...[noteId, ...(kind ? [kind] : []), ...(source ? [source] : [])]) as { count: number };
     return row.count;
   },
 
@@ -253,7 +263,7 @@ export const noteVersionsRepository = {
     return db
       .prepare(
         `SELECT id, "noteId", "userId", title, content, "contentText", "contentFormat", version,
-                "changeType", "changeSummary", "createdAt", kind, label, description
+                "changeType", "changeSummary", "createdAt", kind, source, label, description
          FROM note_versions
          WHERE "noteId" IN (${placeholders})`,
       )
@@ -433,6 +443,8 @@ export const noteVersionsRepository = {
     noteId: string;
     userId: string;
     kind: "auto" | "manual";
+    /** 快照来源（v134）：不传时按 kind 推导（auto→auto，manual→manual） */
+    source?: VersionSource;
     changeType: "edit" | "guest_edit" | "restore";
     label?: string;
     description?: string;
@@ -454,10 +466,11 @@ export const noteVersionsRepository = {
       contentText: input.snapshot.contentText,
       contentFormat,
     });
+    const source: VersionSource = input.source ?? (input.kind === "auto" ? "auto" : "manual");
     db.transaction(() => {
       db.prepare(
-        `INSERT INTO note_versions (id, "noteId", "userId", title, content, "contentText", "contentFormat", version, "changeType", "changeSummary", kind, label, description, "contentHash")
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO note_versions (id, "noteId", "userId", title, content, "contentText", "contentFormat", version, "changeType", "changeSummary", kind, source, label, description, "contentHash")
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         input.noteId,
@@ -469,7 +482,8 @@ export const noteVersionsRepository = {
         input.snapshot.version,
         input.changeType,
         input.changeSummary ?? null,
-        input.kind,
+        source,
+        source,
         input.label ?? null,
         input.description ?? null,
         contentHash,
@@ -507,9 +521,10 @@ export const noteVersionsRepository = {
 
   getLatestVersionByNoteId(noteId: string): { id: string; contentHash: string | null; createdAt: string } | undefined {
     const db = getDb();
-    // createdAt 优先：保存路径移除后 version 可能并列（快照不递增 note.version），version DESC 只作次序参考
+    // createdAt 优先：保存路径移除后 version 可能并列（快照不递增 note.version）。
+    // createdAt 只精确到秒，同秒内并列时用 rowid（插入顺序）决胜，id 是随机 uuid 不可用作次序。
     return db
-      .prepare('SELECT id, "contentHash", "createdAt" FROM note_versions WHERE "noteId" = ? ORDER BY "createdAt" DESC, id DESC LIMIT 1')
+      .prepare('SELECT id, "contentHash", "createdAt" FROM note_versions WHERE "noteId" = ? ORDER BY "createdAt" DESC, rowid DESC LIMIT 1')
       .get(noteId) as { id: string; contentHash: string | null; createdAt: string } | undefined;
   },
 
@@ -530,7 +545,7 @@ export const noteVersionsRepository = {
     return { deleted, freedAttachmentIds };
   },
 
-  /** 批量删除（仅 kind=auto 生效，manual 跳过计数）。 */
+  /** 批量删除（仅 source=auto 生效，manual/release 跳过计数）。 */
   deleteAutoVersionsByIds(noteId: string, ids: string[]): { deleted: number; skipped: number; freedAttachmentIds: string[] } {
     const db = getDb();
     if (ids.length === 0) return { deleted: 0, skipped: 0, freedAttachmentIds: [] };
@@ -538,13 +553,13 @@ export const noteVersionsRepository = {
     let skipped = 0;
     const freed = new Set<string>();
     db.transaction(() => {
-      const select = db.prepare('SELECT kind FROM note_versions WHERE id = ? AND "noteId" = ?');
+      const select = db.prepare('SELECT source FROM note_versions WHERE id = ? AND "noteId" = ?');
       const selectRefs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?');
       const deleteRefs = db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?');
       const deleteRow = db.prepare("DELETE FROM note_versions WHERE id = ?");
       for (const id of ids) {
-        const row = select.get(id, noteId) as { kind: string } | undefined;
-        if (!row || row.kind !== "auto") {
+        const row = select.get(id, noteId) as { source: string } | undefined;
+        if (!row || row.source !== "auto") {
           skipped += 1;
           continue;
         }
@@ -559,19 +574,19 @@ export const noteVersionsRepository = {
     return { deleted, skipped, freedAttachmentIds };
   },
 
-  /** 清空某笔记版本历史（语义：仅清 auto，manual 保留并计数）。 */
+  /** 清空某笔记版本历史（语义：仅清 auto，manual/release 保留并计数）。 */
   clearAutoByNoteId(noteId: string): { deleted: number; skippedManual: number; freedAttachmentIds: string[] } {
     const db = getDb();
     let deleted = 0;
     let skippedManual = 0;
     const freed = new Set<string>();
     db.transaction(() => {
-      const rows = db.prepare('SELECT id, kind FROM note_versions WHERE "noteId" = ?').all(noteId) as Array<{ id: string; kind: string }>;
+      const rows = db.prepare('SELECT id, source FROM note_versions WHERE "noteId" = ?').all(noteId) as Array<{ id: string; source: string }>;
       const selectRefs = db.prepare('SELECT "attachmentId" FROM version_attachment_refs WHERE "versionId" = ?');
       const deleteRefs = db.prepare('DELETE FROM version_attachment_refs WHERE "versionId" = ?');
       const deleteRow = db.prepare("DELETE FROM note_versions WHERE id = ?");
       for (const row of rows) {
-        if (row.kind === "manual") {
+        if (row.source !== "auto") {
           skippedManual += 1;
           continue;
         }
@@ -594,38 +609,84 @@ export const noteVersionsRepository = {
     return row.total;
   },
 
-  /** 保留策略：每笔记保留最近 N 条 auto，其余删除。 */
-  pruneAutoVersionsByCount(keepRecent: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+  /** 保留策略：每笔记保留最近 N 条指定来源（auto/manual）版本，其余删除；release 不参与。 */
+  pruneVersionsBySourceCount(source: "auto" | "manual", keepRecent: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
     const db = getDb();
     const doomed = db
       .prepare(
         `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
          FROM note_versions nv
-         WHERE nv.kind = 'auto'
+         WHERE nv.source = ?
            AND nv.id NOT IN (
              SELECT v2.id FROM note_versions v2
-             WHERE v2."noteId" = nv."noteId" AND v2.kind = 'auto'
+             WHERE v2."noteId" = nv."noteId" AND v2.source = ?
              ORDER BY v2.version DESC, v2."createdAt" DESC
              LIMIT ?
            )`,
       )
-      .all(Math.max(0, keepRecent)) as Array<{ id: string; bytes: number }>;
+      .all(source, source, Math.max(0, keepRecent)) as Array<{ id: string; bytes: number }>;
     const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
     return { deleted: result.deleted, freedBytes: doomed.reduce((sum, row) => sum + row.bytes, 0), freedAttachmentIds: result.freedAttachmentIds };
   },
 
-  /** 保留策略：删除 N 天前的 auto 版本。 */
-  pruneAutoVersionsByDays(days: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+  /** 保留策略：删除 N 天前的指定来源（auto/manual）版本；release 不参与。 */
+  pruneVersionsBySourceDays(source: "auto" | "manual", days: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
     const db = getDb();
     const doomed = db
       .prepare(
         `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
          FROM note_versions nv
-         WHERE nv.kind = 'auto' AND nv."createdAt" < datetime('now', ?)`,
+         WHERE nv.source = ? AND nv."createdAt" < datetime('now', ?)`,
       )
-      .all(`-${Math.max(1, Math.round(days))} days`) as Array<{ id: string; bytes: number }>;
+      .all(source, `-${Math.max(1, Math.round(days))} days`) as Array<{ id: string; bytes: number }>;
     const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
     return { deleted: result.deleted, freedBytes: doomed.reduce((sum, row) => sum + row.bytes, 0), freedAttachmentIds: result.freedAttachmentIds };
+  },
+
+  /** 保留策略：每笔记保留最近 N 条 auto，其余删除。 */
+  pruneAutoVersionsByCount(keepRecent: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+    return noteVersionsRepository.pruneVersionsBySourceCount("auto", keepRecent);
+  },
+
+  /** 保留策略：删除 N 天前的 auto 版本。 */
+  pruneAutoVersionsByDays(days: number): { deleted: number; freedBytes: number; freedAttachmentIds: string[] } {
+    return noteVersionsRepository.pruneVersionsBySourceDays("auto", days);
+  },
+
+  /**
+   * 相邻同内容记录合并：同一笔记内，source 相同（auto/manual）且 contentHash 相同的
+   * 相邻记录只保留最新一条，其余删除；release 记录永不合并删除。
+   * 不传 noteId 时全库执行（保留策略兜底）；用于防御「同内容重复提交」造成的堆积。
+   */
+  mergeAdjacentSameContent(noteId?: string): { merged: number; freedAttachmentIds: string[] } {
+    const db = getDb();
+    const scopeClause = noteId ? 'AND "noteId" = ?' : "";
+    const params = noteId ? [noteId] : [];
+    // 每条「存在同 source 同 hash 且更新一条兄弟记录」的行都该删（连续重复段只留最新）
+    const doomed = db
+      .prepare(
+        `SELECT v1.id FROM note_versions v1
+         WHERE v1.source IN ('auto', 'manual') AND v1."contentHash" IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM note_versions v2
+             WHERE v2."noteId" = v1."noteId"
+               AND v2.source = v1.source
+               AND v2."contentHash" = v1."contentHash"
+               AND (v2."createdAt" > v1."createdAt" OR (v2."createdAt" = v1."createdAt" AND v2.rowid > v1.rowid))
+           )${scopeClause}`,
+      )
+      .all(...params) as Array<{ id: string }>;
+    const result = deleteVersionRowsWithRefs(db, doomed.map((row) => row.id));
+    return { merged: result.deleted, freedAttachmentIds: result.freedAttachmentIds };
+  },
+
+  /** 更新版本来源（release 标记/取消共用）；noteId 不匹配时无操作。kind 与 source 同步写。 */
+  setVersionSource(noteId: string, versionId: string, source: VersionSource): boolean {
+    const db = getDb();
+    const result = db
+      .prepare('UPDATE note_versions SET source = ?, kind = ? WHERE id = ? AND "noteId" = ?')
+      .run(source, source, versionId, noteId);
+    return result.changes > 0;
   },
 
   /** P2 存储配额：auto 总字节超过 quotaBytes 时按最旧优先删除，直到回到配额内。 */
@@ -638,14 +699,14 @@ export const noteVersionsRepository = {
     // 分批删最旧的 auto，直到总量回到配额内（防单事务过长；上限 1000 批防死循环）
     for (let round = 0; round < 1000; round += 1) {
       const total = db
-        .prepare(`SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) AS total FROM note_versions WHERE kind = 'auto'`)
+        .prepare(`SELECT COALESCE(SUM(LENGTH(CAST(content AS BLOB))), 0) AS total FROM note_versions WHERE source = 'auto'`)
         .get() as { total: number };
       if (total.total <= quotaBytes) break;
       const doomed = db
         .prepare(
           `SELECT nv.id, COALESCE(LENGTH(CAST(nv.content AS BLOB)), 0) AS bytes
            FROM note_versions nv
-           WHERE nv.kind = 'auto'
+           WHERE nv.source = 'auto'
            ORDER BY nv."createdAt" ASC, nv.id ASC
            LIMIT 1`,
         )

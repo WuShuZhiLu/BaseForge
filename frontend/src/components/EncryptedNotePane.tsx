@@ -15,6 +15,7 @@ import { EncryptedContentSession } from "@/lib/encryptedNotes/sessionClient";
 import { EncryptedContentError, type EncryptedContentEnvelope } from "@/lib/encryptedNotes/envelope";
 import { ENCRYPTED_NOTE_FORMAT, ENCRYPTED_NOTE_LEAVE_EVENT, readEncryptedNoteDocument, validateEncryptedNotePlaintext } from "@/lib/encryptedNotes/noteDocument";
 import { useEncryptedAutoLock } from "@/lib/encryptedNotes/useAutoLock";
+import { confirm } from "@/components/ui/confirm";
 
 type Session = { envelope: EncryptedContentEnvelope; baseEnvelope: EncryptedContentEnvelope; initialContent: string };
 const AUTOSAVE_DELAY_MS = 800;
@@ -232,7 +233,7 @@ export default function EncryptedNotePane({ note }: { note: Note }) {
       <p className="text-center text-sm text-tx-secondary">{t("encryptedNote.enterPassword")}</p>
       <input aria-label={t("encryptedUi.password")} placeholder={t("encryptedNote.passwordPlaceholder")} type="password" autoComplete="off" value={passphrase} disabled={busy} onChange={(event) => setPassphrase(event.target.value)} className="w-full rounded border border-app-border bg-app-bg p-2" />
       <Button type="submit" disabled={native || busy || !passphrase}>{busy ? t("encryptedNote.verifying") : t("encryptedUi.unlock")}</Button>
-      {lockFailed && <Button disabled={busy} type="button" variant="ghost" onClick={() => { if (window.confirm(t("encryptedUi.discardConfirm"))) void lock(true); }}>{t("encryptedNote.discardAndLock")}</Button>}
+      {lockFailed && <Button disabled={busy} type="button" variant="ghost" onClick={async () => { const ok = await confirm({ title: t("encryptedUi.discardConfirm"), confirmText: t("encryptedNote.discardAndLock"), danger: true }); if (ok) void lock(true); }}>{t("encryptedNote.discardAndLock")}</Button>}
       <p className="text-center text-xs text-tx-secondary">{t("encryptedUi.forgotPassword")}</p>
     </form> : <>
       {session.envelope.originalFormat === "markdown"

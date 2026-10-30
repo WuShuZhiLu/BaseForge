@@ -37,6 +37,7 @@ export const noteLinksRepository = {
         WHERE nl.targetNoteId = ?
           AND nl.userId = ?
           AND n.isTrashed = 0
+          AND n.isUnlisted = 0
         ORDER BY n.updatedAt DESC
         LIMIT ?
       `).all(targetNoteId, _userId, limit) as BacklinkItem[];

@@ -195,9 +195,6 @@ export function selectNotesFromBootstrap(
   const sortBy = url.searchParams.get("sortBy") || "manual";
   const direction = url.searchParams.get("sortOrder") === "asc" ? 1 : -1;
   notes.sort((a, b) => {
-    const pinned = Number(b.isPinned || 0) - Number(a.isPinned || 0);
-    if (pinned !== 0) return pinned;
-
     if (sortBy === "title") {
       return compareText(a.title, b.title) * direction || String(a.id).localeCompare(String(b.id));
     }

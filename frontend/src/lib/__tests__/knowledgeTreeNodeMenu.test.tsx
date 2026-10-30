@@ -88,7 +88,6 @@ describe("knowledge tree node menu", () => {
       "duplicate",
       "note_create_menu",
       "sep-note-primary",
-      "toggle_pin",
       "toggle_favorite",
       "rename",
       "move",
@@ -101,7 +100,6 @@ describe("knowledge tree node menu", () => {
       "open",
       "split_right",
       "split_down",
-      "toggle_pin",
       "toggle_favorite",
       "toggle_lock",
       "share_note",
@@ -140,7 +138,7 @@ describe("knowledge tree node menu", () => {
     });
     const actions = ids(buildKnowledgeTreeNodeMenuItems(readonly, null));
     expect(actions).toEqual(expect.arrayContaining(["open", "split_right", "export_note_md"]));
-    expect(actions).not.toEqual(expect.arrayContaining(["toggle_pin", "toggle_favorite", "toggle_lock", "move", "delete"]));
+    expect(actions).not.toEqual(expect.arrayContaining(["toggle_favorite", "toggle_lock", "move", "delete"]));
     expect(actions).not.toContain("share_note");
   });
 

@@ -123,7 +123,7 @@ describe("EditorPane save safety", () => {
     );
     const emitSave = sourceBetween(
       markdownEditorSource,
-      "const emitSave = useCallback(() => {",
+      "const emitSave = useCallback((immediate = false) => {",
       "const scheduleSave = useCallback",
     );
 

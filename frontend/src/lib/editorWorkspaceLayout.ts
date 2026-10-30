@@ -1,9 +1,16 @@
 export type EditorWorkspaceMode = "focus" | "split" | "fullscreen";
 export type EditorSplitDirection = "right" | "down";
+/** 参考栏（副栏）相对主栏沿分屏轴的位置：end=右侧/下方（默认），start=左侧/上方。 */
+export type EditorSplitReferenceSide = "start" | "end";
 
 /** The legacy middle note-list column no longer has a keyboard toggle. */
 export const EDITOR_LAYOUT_TOGGLE_SHORTCUT_LABEL = "";
 const SPLIT_RATIO_STORAGE_PREFIX = "nowen.editorSplit.ratio";
+
+/** 分隔条双击恢复的默认比例（主栏 50%）。 */
+export const EDITOR_SPLIT_DEFAULT_RATIO = 0.5;
+/** 分隔条键盘微调步长。 */
+export const EDITOR_SPLIT_RATIO_STEP = 0.02;
 
 export interface ShortcutLikeEvent {
   key: string;
@@ -69,4 +76,29 @@ export function saveEditorSplitRatio(
     // Storage can be unavailable in privacy mode; the in-memory ratio still works.
   }
   return normalized;
+}
+
+/** 归一化参考栏位置：缺省（历史状态）为 end。 */
+export function resolveEditorSplitReferenceSide(
+  side: EditorSplitReferenceSide | null | undefined,
+): EditorSplitReferenceSide {
+  return side === "start" ? "start" : "end";
+}
+
+/**
+ * 焦点切换（点副栏抬头/正文把该栏文档设为主文档）时翻转参考栏位置：
+ * 两栏的文档留在原地，只交换“谁是主编辑栏”，避免内容对调。
+ */
+export function flipEditorSplitReferenceSide(
+  side: EditorSplitReferenceSide | null | undefined,
+): EditorSplitReferenceSide {
+  return resolveEditorSplitReferenceSide(side) === "start" ? "end" : "start";
+}
+
+/** 该栏文档是否还需要被激活成全局 activeNote（同文档时无需动作）。 */
+export function shouldActivateSplitPane(
+  paneNoteId: string | null | undefined,
+  activeNoteId: string | null | undefined,
+): boolean {
+  return Boolean(paneNoteId) && paneNoteId !== activeNoteId;
 }

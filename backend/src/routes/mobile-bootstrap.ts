@@ -37,14 +37,14 @@ type UserPreferences = {
 
 const DEFAULT_PREFS: UserPreferences = {
   noteTitleAsAppTitle: false,
-  outlineDefaultOpen: false,
+  outlineDefaultOpen: true,
   lockOnOpen: false,
   showNotesInNotebookTree: false,
   readingDensity: "cozy",
   editorFontSize: 0,
   showNoteListUpdatedTime: true,
   enableNoteTabs: false,
-  markdownDefaultViewMode: "source",
+  markdownDefaultViewMode: "preview",
   remoteImagePasteMode: "localize",
   showNoteListDividers: false,
 };
@@ -143,8 +143,8 @@ function listNotes(userId: string, workspaceId: string | null, unlockHeader?: st
       users.username AS creatorName
     FROM notes
     LEFT JOIN users ON users.id = notes.userId
-    WHERE ${scopeSql} AND notes.isTrashed = 0
-    ORDER BY notes.isPinned DESC, notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC
+    WHERE ${scopeSql} AND notes.isTrashed = 0 AND notes.isUnlisted = 0
+    ORDER BY notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC
   `).all(userId, scopeParam) as Array<{ id: string; [key: string]: unknown }>;
 
   // The normal /api/notes collection is guarded by knowledgeCapabilityGuard,

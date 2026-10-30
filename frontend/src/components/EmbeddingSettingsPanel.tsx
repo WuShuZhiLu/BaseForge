@@ -33,6 +33,7 @@ import {
   type EmbeddingCredentialSource,
 } from "@/lib/embeddingProfileSelection";
 import { cn } from "@/lib/utils";
+import { confirm } from "@/components/ui/confirm";
 
 interface AISettingsResponse {
   ai_provider: string;
@@ -421,7 +422,8 @@ export default function EmbeddingSettingsPanel() {
       setMessage({ type: "warning", text: status?.embedding?.error || copy.notConfigured });
       return;
     }
-    if (!window.confirm(copy.rebuildConfirm)) return;
+    const ok = await confirm({ title: copy.rebuildConfirm, confirmText: copy.rebuild });
+    if (!ok) return;
     setRebuilding(true);
     setMessage(null);
     try {

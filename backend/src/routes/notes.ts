@@ -35,6 +35,7 @@ import { deleteAttachmentFilesByNoteIds, extractInlineBase64Images } from "./att
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import { syncNoteLinks, getBacklinks } from "../lib/noteLinks";
 import { syncNoteBlocks } from "../lib/noteBlocks";
+import { defaultMindmapContent } from "../lib/mindmapData";
 import {
   readAuthoritativeNoteContent,
   readBlockAuthorityHistory,
@@ -60,6 +61,7 @@ import {
   TransientPersistedImageSourceError,
 } from "../lib/noteContentAttachmentIdentity";
 import { duplicateNote, DuplicateNoteError } from "../services/noteDuplicates";
+import { sweepOrphanAnonymousNotes } from "../services/anonymousDocuments.js";
 
 const app = new Hono();
 
@@ -126,9 +128,8 @@ app.get("/", (c) => {
   const dateFrom = c.req.query("dateFrom"); // YYYY-MM-DD
   const dateTo = c.req.query("dateTo");     // YYYY-MM-DD
   // 排序：sortBy ∈ {manual, updatedAt, createdAt, title}；sortOrder ∈ {asc, desc}
-  // - manual（默认）：保持历史行为 isPinned DESC, sortOrder ASC, updatedAt DESC，
-  //   保留拖拽排序结果；
-  // - 其他字段：忽略 sortOrder 字段（不影响置顶），按选定字段方向排序，置顶仍优先；
+  // - manual（默认）：sortOrder ASC, updatedAt DESC，保留拖拽排序结果；
+  // - 其他字段：忽略 sortOrder 字段，按选定字段方向排序；
   //   title 排序对中文用 NOCASE 仅做大小写不敏感，中文按 UTF-8 字节序——可接受。
   const sortByRaw = c.req.query("sortBy");
   const sortOrderRaw = c.req.query("sortOrder");
@@ -153,7 +154,7 @@ app.get("/", (c) => {
     CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
     notes.isLocked, notes.isArchived, notes.isTrashed, notes.version, notes.sortOrder,
     notes.createdAt, notes.updatedAt,
-    notes.contentFormat, notes.colorMark,
+    notes.contentFormat, notes.colorMark, notes.isUnlisted,
     (SELECT tree.parentId
        FROM knowledge_tree_nodes tree
       WHERE tree.resourceType = 'note' AND tree.resourceId = notes.id AND tree.isDeleted = 0
@@ -162,7 +163,7 @@ app.get("/", (c) => {
     users.username AS creatorName
     FROM notes
     LEFT JOIN users ON users.id = notes.userId
-    WHERE 1=1`;
+    WHERE notes.isUnlisted = 0`;
   const params: any[] = [userId];
   const useKnowledgeTreeScope =
     hasKnowledgeTreeScope
@@ -262,17 +263,16 @@ app.get("/", (c) => {
   }
 
   // 拼接 ORDER BY：
-  //   - 置顶笔记永远在最前（不参与按字段排序），符合"置顶=固定置顶"语义；
   //   - manual 模式回退到历史行为；
   //   - title 用 COLLATE NOCASE 让 ABC/abc 不分大小写；中文为 UTF-8 字节序，足够稳定；
   //   - 兜底再加 id 让相等键的顺序不抖动。
   if (sortBy === "manual") {
-    query += " ORDER BY notes.isPinned DESC, notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC";
+    query += " ORDER BY notes.sortOrder ASC, notes.updatedAt DESC, notes.id ASC";
   } else if (sortBy === "title") {
-    query += ` ORDER BY notes.isPinned DESC, notes.title COLLATE NOCASE ${sortDir}, notes.id ASC`;
+    query += ` ORDER BY notes.title COLLATE NOCASE ${sortDir}, notes.id ASC`;
   } else {
     // updatedAt | createdAt
-    query += ` ORDER BY notes.isPinned DESC, notes.${sortBy} ${sortDir}, notes.id ASC`;
+    query += ` ORDER BY notes.${sortBy} ${sortDir}, notes.id ASC`;
   }
   const notes = db.prepare(query).all(...params) as Array<Record<string, unknown>>;
   if (useKnowledgeTreeScope && !includeDescendants) {
@@ -546,9 +546,9 @@ app.get("/:id", (c) => {
   const favExpr = `CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite`;
   const selectCols = slim
     ? `id, userId, notebookId, workspaceId, title, isPinned, ${favExpr}, isLocked,
-       isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark`
+       isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark, isUnlisted`
     : `id, userId, notebookId, workspaceId, title, content, contentText, isPinned, ${favExpr},
-       isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark`;
+       isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark, isUnlisted`;
   const note = db.prepare(`SELECT ${selectCols} FROM notes WHERE id = ?`).get(userId, id) as any;
   if (!note) return c.json({ error: "Note not found" }, 404);
 
@@ -685,10 +685,27 @@ app.post("/", async (c) => {
     return c.json({ error: "无效的笔记颜色标记", code: "INVALID_NOTE_COLOR_MARK" }, 400);
   }
   const initialColorMark = body.colorMark === undefined ? null : normalizeNoteColorMark(body.colorMark);
-  const contentFormat = body.contentFormat === "markdown" ? "markdown"
+  const requestedContentFormat = body.contentFormat === "markdown" ? "markdown"
     : body.contentFormat === "html" ? "html"
+    : body.contentFormat === "plain" ? "plain"
+    : body.contentFormat === "board" ? "board"
+    : body.contentFormat === "mindmap" ? "mindmap"
+    : body.contentFormat === "pdf" ? "pdf"
+    : body.contentFormat === "sheet" ? "sheet"
     : "tiptap-json";
-  const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n" : "{}";
+  // 匿名文档：没有知识树节点，只通过宿主笔记里的嵌入块访问。
+  // 画板、导图与轻量表格的嵌入插块走这条链路（isUnlisted=1）。
+  const isUnlisted = body.isUnlisted === true || body.isUnlisted === 1 ? 1 : 0;
+  // 轻量表格：notes 行沿用 note_type='sheet' + 独立 sheets 数据表（与知识树创建
+  // 路径完全一致），contentFormat 保持 tiptap-json，正文 content='{}'。
+  const isSheetNote = requestedContentFormat === "sheet";
+  const contentFormat = isSheetNote ? "tiptap-json" : requestedContentFormat;
+  const defaultContent = contentFormat === "markdown" ? "# 无标题 Markdown\n\n"
+    : contentFormat === "plain" ? ""
+    : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}'
+    : contentFormat === "mindmap" ? defaultMindmapContent(body.title || "无标题导图")
+    : contentFormat === "pdf" ? '{"attachmentId":null,"annotations":[]}'
+    : "{}";
   let initialContent = typeof body.content === "string" ? body.content : defaultContent;
   try {
     initialContent = stabilizePersistedNoteContent(initialContent, contentFormat);
@@ -703,20 +720,41 @@ app.post("/", async (c) => {
 
   const legacyNoteCreateTx = db.transaction(() => {
     db.prepare(`
-      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat, colorMark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO notes (id, userId, workspaceId, notebookId, title, content, contentText, contentFormat, note_type, colorMark, isUnlisted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, userId, inheritedWorkspaceId, body.notebookId,
+      id, userId, inheritedWorkspaceId ?? null, body.notebookId ?? null,
       body.title || "无标题笔记", initialContent,
-      extractSearchableText(initialContent, contentFormat), contentFormat, initialColorMark,
+      extractSearchableText(initialContent, contentFormat), contentFormat,
+      isSheetNote ? "sheet" : "normal", initialColorMark, isUnlisted,
     );
-    synchronizeLegacyNoteHierarchy({
-      db,
-      noteId: id,
-      actorUserId: userId,
-      reason: "create",
-      parentMode: "resource",
-    });
+    if (isSheetNote) {
+      // 与 knowledgeTreeCore.createKnowledgeChild 的 sheets 默认数据保持一致：20 行 × 8 列。
+      db.prepare(`
+        INSERT INTO sheets (noteId, userId, workspaceId, data)
+        VALUES (?, ?, ?, ?)
+      `).run(id, userId, inheritedWorkspaceId ?? null, JSON.stringify({
+        version: 1,
+        rows: Array.from({ length: 20 }, (_, index) => ({ id: `r${index + 1}`, height: 32 })),
+        columns: Array.from({ length: 8 }, (_, index) => ({
+          id: `c${index + 1}`,
+          width: 120,
+          title: String.fromCharCode(65 + index),
+          type: "text",
+          align: "left",
+        })),
+        cells: {},
+      }));
+    }
+    if (isUnlisted === 0) {
+      synchronizeLegacyNoteHierarchy({
+        db,
+        noteId: id,
+        actorUserId: userId,
+        reason: "create",
+        parentMode: "resource",
+      });
+    }
   });
   try {
     legacyNoteCreateTx();
@@ -793,7 +831,7 @@ app.post("/", async (c) => {
   const note = db.prepare(`
     SELECT id, userId, notebookId, workspaceId, title, content, contentText, isPinned,
       CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
-      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark
+      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark, isUnlisted
     FROM notes WHERE id = ?
   `).get(userId, id);
   logAudit(userId, "note", "create", { noteId: id, title: body.title }, { targetType: "note", targetId: id });
@@ -1020,6 +1058,11 @@ app.put("/:id", async (c) => {
   const previousTitleRow = typeof body.title === "string"
     ? db.prepare("SELECT title FROM notes WHERE id = ?").get(id) as { title: string } | undefined
     : undefined;
+  // 匿名文档没有知识树节点：普通内容/元数据更新不能顺手把它"同步"进树。
+  // 升级为有名文档走 POST /:id/promote。
+  const isUnlistedNote = (db.prepare("SELECT isUnlisted FROM notes WHERE id = ?").get(id) as
+    | { isUnlisted: number }
+    | undefined)?.isUnlisted === 1;
   const fields: string[] = [];
   const params: any[] = [];
 
@@ -1155,10 +1198,12 @@ app.put("/:id", async (c) => {
         | undefined)?.version ?? null
     : null;
 
-  const needsLegacyHierarchySync = body.notebookId !== undefined
+  const needsLegacyHierarchySync = !isUnlistedNote && (
+    body.notebookId !== undefined
     || body.sortOrder !== undefined
     || body.isTrashed !== undefined
-    || body.contentFormat !== undefined;
+    || body.contentFormat !== undefined
+  );
 
   if (hasNoteColumnChange) {
     fields.push("version = version + 1");
@@ -1253,6 +1298,9 @@ app.put("/:id", async (c) => {
     } catch (e) {
       console.warn("[notes.put] syncNoteLinks failed:", e instanceof Error ? e.message : e);
     }
+    if (!isUnlistedNote) {
+      sweepOrphanAnonymousNotes(db);
+    }
   }
 
   if (previousTitleRow && typeof body.title === "string" && previousTitleRow.title !== body.title) {
@@ -1268,7 +1316,7 @@ app.put("/:id", async (c) => {
   const note = db.prepare(`
     SELECT id, userId, notebookId, workspaceId, title, content, contentText, isPinned,
       CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
-      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark
+      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark, isUnlisted
     FROM notes WHERE id = ?
   `).get(userId, id);
 
@@ -1380,6 +1428,112 @@ app.put("/:id", async (c) => {
 
   const responseNote = presentNoteForResponse(db, c, note);
   return c.json({ ...responseNote as any, tags });
+});
+
+// 匿名文档升级为独立文档：命名 + 进入知识树（默认放在原 notebook 根下）。
+app.post("/:id/promote", async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const id = c.req.param("id");
+  const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+
+  const { permission } = resolveNotePermission(id, userId);
+  if (!hasPermission(permission, "write")) {
+    return c.json({ error: "笔记不存在或无权限", code: "NOT_FOUND" }, 404);
+  }
+  const note = db.prepare(`
+    SELECT id, title, notebookId, workspaceId, isUnlisted, isLocked, isTrashed
+    FROM notes WHERE id = ?
+  `).get(id) as {
+    id: string;
+    title: string;
+    notebookId: string;
+    workspaceId: string | null;
+    isUnlisted: number;
+    isLocked: number;
+    isTrashed: number;
+  } | undefined;
+  if (!note) return c.json({ error: "笔记不存在", code: "NOT_FOUND" }, 404);
+  if (note.isLocked === 1) return c.json({ error: "Note is locked", code: "NOTE_LOCKED" }, 403);
+  if (note.isTrashed === 1) return c.json({ error: "笔记已在回收站", code: "NOTE_TRASHED" }, 400);
+
+  let notebookId = note.notebookId;
+  if (typeof body.notebookId === "string" && body.notebookId) {
+    const target = db.prepare("SELECT workspaceId, isDeleted FROM notebooks WHERE id = ?").get(body.notebookId) as
+      | { workspaceId: string | null; isDeleted: number }
+      | undefined;
+    if (!target || target.isDeleted === 1) {
+      return c.json({ error: "目标笔记本不存在或已删除", code: "NOTEBOOK_NOT_FOUND" }, 404);
+    }
+    if ((target.workspaceId || null) !== (note.workspaceId || null)) {
+      return c.json({ error: "不能跨工作区升级文档", code: "CROSS_WORKSPACE_MOVE_FORBIDDEN" }, 400);
+    }
+    const targetPerm = resolveNotebookPermission(body.notebookId, userId);
+    if (!hasPermission(targetPerm.permission, "write")) {
+      return c.json({ error: "您对目标笔记本无权限", code: "FORBIDDEN" }, 403);
+    }
+    notebookId = body.notebookId;
+  }
+
+  const title = typeof body.title === "string" && body.title.trim()
+    ? body.title.trim()
+    : note.title || "未命名文档";
+
+  if (note.isUnlisted === 0) {
+    // 幂等：已经是有名文档，直接返回当前状态（标题仍按请求更新）。
+    if (title !== note.title || notebookId !== note.notebookId) {
+      db.prepare("UPDATE notes SET title = ?, notebookId = ?, version = version + 1, updatedAt = datetime('now') WHERE id = ?")
+        .run(title, notebookId, id);
+      synchronizeLegacyNoteHierarchy({ db, noteId: id, actorUserId: userId, reason: "metadata", parentMode: "preserve" });
+    }
+  } else {
+    const tx = db.transaction(() => {
+      db.prepare(`
+        UPDATE notes
+           SET isUnlisted = 0, title = ?, notebookId = ?, version = version + 1, updatedAt = datetime('now')
+         WHERE id = ?
+      `).run(title, notebookId, id);
+      synchronizeLegacyNoteHierarchy({
+        db,
+        noteId: id,
+        actorUserId: userId,
+        reason: "create",
+        parentMode: "resource",
+      });
+    });
+    tx();
+  }
+
+  const updated = db.prepare(`
+    SELECT id, userId, notebookId, workspaceId, title, content, contentText, isPinned,
+      CASE WHEN EXISTS(SELECT 1 FROM favorites f WHERE f.noteId = notes.id AND f.userId = ?) THEN 1 ELSE 0 END AS isFavorite,
+      isLocked, isArchived, isTrashed, version, sortOrder, createdAt, updatedAt, trashedAt, contentFormat, colorMark, isUnlisted
+    FROM notes WHERE id = ?
+  `).get(userId, id);
+
+  try {
+    broadcastNoteUpdated(id, {
+      version: (updated as any)?.version,
+      updatedAt: (updated as any)?.updatedAt,
+      title: (updated as any)?.title,
+      actorUserId: userId,
+    });
+    broadcastToUser(userId, {
+      type: "note:list-updated" as any,
+      note: {
+        id,
+        title: (updated as any)?.title,
+        updatedAt: (updated as any)?.updatedAt,
+        version: (updated as any)?.version,
+        notebookId: (updated as any)?.notebookId,
+        isUnlisted: 0,
+        isTrashed: 0,
+      },
+      actorUserId: userId,
+    } as any);
+  } catch { /* realtime 失败不影响升级结果 */ }
+
+  return c.json({ ...(updated as any), tags: [] });
 });
 
 // BACKLINKS-02: 获取笔记的反向链接（哪些笔记引用了当前笔记）
@@ -1716,6 +1870,9 @@ app.delete("/:id", (c) => {
   } catch { /* ignore */ }
 
   db.prepare("DELETE FROM notes WHERE id = ?").run(id);
+
+  // 宿主笔记永久删除后，回收不再被任何笔记引用的匿名文档（宽限期见服务）。
+  sweepOrphanAnonymousNotes(db);
 
   // TAG-PRUNE-UNUSED-ON-NOTE-DELETE-01: 永久删除笔记后清理未使用的标签
   // 删除该用户下没有任何笔记引用的标签（只删除个人空间标签，不删除工作区标签）

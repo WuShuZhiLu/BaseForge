@@ -497,7 +497,7 @@ export default function ContextMenu({
           icon: <Download size={14} />,
           children: [
             { id: "export_md", label: t("noteList.exportAsMarkdown") || "Markdown", icon: <Download size={14} /> },
-            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）", icon: <Download size={14} /> },
+            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP", icon: <Download size={14} /> },
             { id: "export_pdf", label: t("noteList.exportAsPDF") || "PDF", icon: <Printer size={14} /> },
             { id: "export_png", label: t("note.exportAsPng") || "PNG", icon: <ImageIcon size={14} /> },
             { id: "export_jpg", label: t("note.exportAsJpg") || "JPG", icon: <ImageIcon size={14} /> },

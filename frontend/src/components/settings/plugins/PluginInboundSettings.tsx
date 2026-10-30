@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { getBaseUrl } from "@/lib/api.impl";
 import { pluginApi, type InstalledPlugin } from "@/lib/pluginApi";
+import { confirm } from "@/components/ui/confirm";
 
 export function PluginInboundSettings({ plugin }: { plugin: InstalledPlugin }) {
   const { t } = useTranslation();
@@ -15,7 +16,14 @@ export function PluginInboundSettings({ plugin }: { plugin: InstalledPlugin }) {
     return () => { active = false; };
   }, [plugin.id]);
   const change = async (hookId: string, remove: boolean) => {
-    if (configured.includes(hookId) && !window.confirm(t(remove ? "plugins.inbound.revokeConfirm" : "plugins.inbound.rotateConfirm"))) return;
+    if (configured.includes(hookId)) {
+      const ok = await confirm({
+        title: t(remove ? "plugins.inbound.revokeConfirm" : "plugins.inbound.rotateConfirm"),
+        confirmText: t(remove ? "plugins.inbound.revoke" : "plugins.inbound.rotate"),
+        danger: remove,
+      });
+      if (!ok) return;
+    }
     setBusy(true); setError("");
     try {
       if (remove) { await pluginApi.removeInboundWebhook(plugin.id, hookId); setUrls((current) => { const next = { ...current }; delete next[hookId]; return next; }); }

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>风格原型 · Notion（单树混排）</title>
+<style>
+:root{--bg:#f7f7f5;--panel:#fff;--border:#e9e9e7;--border-strong:#dcdcda;--text:#37352f;--text-2:#5f5e5b;--text-3:#9b9a97;--brand:#37352f;--accent:#2383e2;--amber:#e8a33d;--radius:6px;--shadow:0 1px 2px rgba(15,15,15,.06),0 4px 14px rgba(15,15,15,.08);font-size:15px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.topbar{height:44px;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.logo{font-weight:700;font-size:14px}
+.urlbar{flex:1;max-width:620px;display:flex;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--text-2)}
+.urlbar b{color:var(--accent);font-weight:600}
+.hint{margin-left:auto;font-size:12px;color:var(--text-3)}
+.layout{display:flex;height:calc(100vh - 44px)}
+.sidebar{width:300px;flex:none;background:#fbfbfa;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.side-top{padding:10px 12px}
+.sb-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 8px;border-radius:var(--radius);font-size:13.5px;color:var(--text-2);cursor:pointer}
+.sb-item:hover{background:#efefee}
+.searchbox{display:flex;align-items:center;gap:8px;height:30px;padding:0 8px;border-radius:var(--radius);font-size:13.5px;color:var(--text-3);cursor:pointer;border:1px solid var(--border);background:var(--panel)}
+.searchbox:hover{background:#efefee}
+.searchbox input{border:none;outline:none;background:none;flex:1;font:inherit;color:var(--text)}
+.side-scroll{flex:1;overflow-y:auto;padding:6px 12px 12px}
+.sec-h{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;font-size:11.5px;font-weight:600;letter-spacing:.06em;color:var(--text-3);cursor:pointer;border-radius:var(--radius)}
+.sec-h:hover{background:#efefee}
+.sec-h .ar{font-size:9px;transition:transform .15s}
+.sec-h .ar.open{transform:rotate(90deg)}
+.row{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px;border-radius:var(--radius);cursor:pointer;color:var(--text-2);font-size:13.5px;position:relative;user-select:none}
+.row:hover{background:#efefee}
+.row.on{background:#e8e8e6;color:var(--text);font-weight:500}
+.row .tw{width:16px;flex:none;color:var(--text-3);font-size:9px;transition:transform .15s}
+.row .tw.open{transform:rotate(90deg)}
+.row .tw.ghost{visibility:hidden}
+.row .ico{flex:none;width:18px;text-align:center;font-size:14px}
+.row .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .acts{display:none;gap:2px}
+.row:hover .acts{display:flex}
+.row .acts button{width:20px;height:20px;border-radius:4px;color:var(--text-3);font-size:12px;display:flex;align-items:center;justify-content:center}
+.row .acts button:hover{background:#e3e3e1;color:var(--text)}
+.children.hidden{display:none}
+.side-foot{border-top:1px solid var(--border);padding:8px 12px;display:flex;gap:6px}
+.side-foot .sb-item{flex:1;font-size:12px}
+/* 主区 */
+.main{flex:1;min-width:0;overflow-y:auto;background:var(--panel)}
+.nbar{position:sticky;top:0;display:flex;align-items:center;gap:8px;padding:8px 44px;background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(6px);font-size:12.5px;color:var(--text-3);z-index:5}
+.nbar .c{cursor:pointer;border-radius:4px;padding:2px 6px}
+.nbar .c:hover{background:#efefee;color:var(--text)}
+.nbar .c.here{color:var(--text);font-weight:600;cursor:default}
+.nbar .c.here:hover{background:none}
+.nbar .sep{color:var(--border-strong)}
+.nbar .ops{margin-left:auto;display:flex;gap:6px;color:var(--text-3);font-size:13px}
+.page{max-width:720px;margin:0 auto;padding:20px 48px 100px}
+.pg-ico{font-size:56px;padding-top:14px}
+.pg-cover{height:130px;border-radius:4px;margin:-20px -48px 0;background:linear-gradient(120deg,#c7d8f5,#e8d5f0 60%,#f5e3c7)}
+.pg-title{font-size:32px;font-weight:700;margin:8px 0 4px;outline:none}
+.pg-title.untitled{color:var(--text-3);font-weight:400}
+.pg-props{display:flex;gap:14px;font-size:11.5px;color:var(--text-3);border-bottom:1px solid var(--border);padding:8px 0 10px;margin-bottom:18px}
+.pg-body p{font-size:14.5px;line-height:1.9;color:var(--text-2);margin-bottom:10px}
+.pg-body h2{font-size:17px;margin:22px 0 8px}
+.pg-body .callout{background:#f1f1ef;border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--text-2);margin:12px 0}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.subcard{border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:center}
+.subcard:hover{background:#f7f7f5;border-color:var(--border-strong)}
+.subcard .e{font-size:18px}
+.subcard b{font-size:13.5px;display:block}
+.subcard .s{font-size:11px;color:var(--text-3)}
+.db-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:18px 0 0}
+.db-tabs button{padding:6px 12px;font-size:12.5px;color:var(--text-3);border-radius:6px 6px 0 0;border-bottom:2px solid transparent}
+.db-tabs button.on{color:var(--text);border-bottom-color:var(--text);font-weight:600}
+table.db{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.db th{text-align:left;font-size:11px;color:var(--text-3);border-bottom:1px solid var(--border);padding:7px 10px;font-weight:500}
+table.db td{border-bottom:1px solid var(--border);padding:8px 10px;color:var(--text-2)}
+table.db tr:hover td{background:#f7f7f5}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.bcol{background:#f7f7f5;border-radius:var(--radius);padding:10px}
+.bcol h4{font-size:11.5px;color:var(--text-3);margin-bottom:8px}
+.bcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:12.5px;margin-bottom:6px;cursor:pointer}
+.bcard:hover{border-color:var(--border-strong)}
+.cal{margin-top:12px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;font-size:11px}
+.cal .d{aspect-ratio:1.4;background:#f7f7f5;border-radius:4px;padding:4px;color:var(--text-3)}
+.cal .ev{background:var(--accent);color:#fff;border-radius:3px;padding:1px 4px;font-size:10px;margin-top:2px;display:inline-block}
+.empty-hint{color:var(--text-3);font-size:13px;margin-top:8px}
+kbd{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;background:var(--bg);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#37352f;color:#fff;font-size:13px;padding:9px 18px;border-radius:999px;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+.toast.show{opacity:.94}
+.mock-note{position:fixed;right:14px;bottom:10px;font-size:10.5px;color:var(--text-3);z-index:70}
+.ctx{position:fixed;z-index:50;min-width:160px;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:5px;display:none}
+.ctx.show{display:block}
+.ctx button{display:flex;width:100%;gap:9px;padding:6px 11px;border-radius:5px;font-size:13px;color:var(--text-2)}
+.ctx button:hover{background:#efefee}
+.ctx .sep{height:1px;background:var(--border);margin:4px 8px}
+.ctx button.danger{color:#c2453a}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="logo">⬛ Notion · 风格原型</span>
+  <div class="urlbar" id="urlbar"></div>
+  <span class="hint">单击=展开+打开页面 · 无库详情页 · <kbd>右键</kbd>行看菜单</span>
+</div>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="side-top">
+      <div class="searchbox">🔍<input id="q" placeholder="搜索 / Ctrl K"></div>
+      <div class="sb-item" onclick="toast('新建页面（模拟）')">✏️ 新建页面 <span style="margin-left:auto;font-size:11px;color:var(--text-3)">N</span></div>
+    </div>
+    <div class="side-scroll" id="tree"></div>
+    <div class="side-foot"><div class="sb-item" onclick="toast('垃圾桶（模拟）')">🗑️</div><div class="sb-item" onclick="toast('设置（模拟）')">⚙️</div></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="ctx" id="ctx"></div>
+<div class="toast" id="toast"></div>
+<div class="mock-note">模拟行为，细节为合理推测 · 数据与其他风格原型一致</div>
+<script>
+/* 库=teamspace（顶层节点，与普通页面同级混排） */
+const T=(id,e,name,children)=>({id,e,name,children,ts:"10-2x"});
+const F=(id,name,children)=>({id,name,children,ts:"10-2x"});
+const N=(id,name,ts,body)=>({id,name,ts,body});
+const TS=[
+ T("kb-app","🚀","实际应用",[
+   F("f-build","编译产物",[N("n1","产物命名规范","10-27","<p>按 <b>模块-版本-哈希</b> 命名。</p><blockquote>baseforge-web-1.4.2-8ac31f.tar.gz</blockquote>"),N("n2","清理策略","10-26","<p>保留最近 20 个版本。</p>")]),
+   F("f-deploy","部署",[N("n3","上线检查清单","10-27","<p>迁移、灰度、监控。</p>"),N("n4","回滚手册","10-25","<p>先回代码再回数据。</p>")]),
+   F("f-req","需求池",[N("n5","10 月需求评审结论","10-24","<p>知识库交互重构定稿。</p>"),N("n5b","10 月需求池看板","10-24","")])]),
+ T("kb-work","📝","工作笔记",[N("n6","周报 1028","10-28","<p>知识库重构调研完成。</p>"),N("n7","1:1 记录","10-21","<p>详情页信息架构对齐。</p>")]),
+ T("kb-design","🎨","设计",[F("f-ds","组件规范",[N("n8","按钮层级","10-20","<p>主按钮每屏最多一个。</p>")]),N("n9","色彩 tokens","10-19","<p>语义色走 token。</p>")]),
+ T("kb-empty","📭","空库演示",[]),
+];
+const FAV=["n3"];
+const cnt=n=>n.children?n.children.reduce((s,c)=>s+cnt(c),0):1;
+const slug=id=>{let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))>>>0;return (""+h).padStart(10,"7d3f9a2b1c").slice(0,10)};
+const st={open:new Set(["kb-app","f-deploy","kb-work"]),cur:null,sec:{ts:true,pr:true,fav:true},q:""};
+const $=s=>document.querySelector(s);
+const tree=$("#tree"),main=$("#main"),urlbar=$("#urlbar"),toastEl=$("#toast"),ctx=$("#ctx");
+let tt;const toast=m=>{toastEl.textContent=m;toastEl.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>toastEl.classList.remove("show"),1800)};
+const all=[];const idx=l=>(l||[]).forEach(n=>{all.push(n);idx(n.children)});idx(TS);
+const find=id=>all.find(n=>n.id===id);
+const pathOf=id=>{const p=[];const w=(l,acc)=>(l||[]).forEach(n=>{if(n.id===id)p.push(...acc,n);else w(n.children,[...acc,n])});w(TS,[]);return p};
+function renderUrl(){ urlbar.innerHTML = st.cur
+  ? `notion.so/<b>${encodeURIComponent(st.cur.name)}-`+slug(st.cur.id)+`</b> <span style="color:var(--text-3)">（ID 为真正主键，改名不失效）</span>`
+  : `notion.so/ <span style="color:var(--text-3)">（无选中）</span>`; }
+function renderTree(){
+  const match=n=>!st.q||n.name.toLowerCase().includes(st.q);
+  const row=(n,d,sec)=>{const open=st.open.has(n.id);const on=st.cur&&st.cur.id===n.id?" on":"";
+    return `<div class="row${on}" style="margin-left:${d*14}px" oncontextmenu="showCtx(event,'${n.id}')">
+      ${n.children?`<button class="tw ${open?"open":""}" data-tw="${n.id}">▶</button>`:`<span class="tw ghost">▶</span>`}
+      <span class="ico">${n.e||(n.children?"📁":"📄")}</span><span class="name">${n.name}</span>
+      <span class="acts">${n.children?`<button data-add="${n.id}">＋</button>`:""}<button data-menu="${n.id}">⋯</button></span></div>`
+      +(n.children&&open?sec(n.children,d+1):"")};
+  const walk=(l,d)=>l.filter(match).map(n=>row(n,d,walk)).join("");
+  const secs=[["fav","⭐ 收藏",FAV.map(id=>find(id)).filter(Boolean)],
+    ["ts","🔲 团队协作区",TS],["pr","🔒 私人页面",[]]];
+  tree.innerHTML=secs.map(([k,label,list])=>{
+    const open=st.sec[k];
+    return `<div class="sec-h" data-sec="${k}"><span class="ar ${open?"open":""}">▶</span>${label}${k!=="fav"?`<span style="margin-left:auto;font-weight:400">${list.length}</span>`:""}</div>`
+      +(open?(k==="fav"?list.map(n=>row(n,0,walk)).join(""):walk(list,0))||(k==="pr"?`<div class="sb-item" style="padding-left:26px" onclick="toast('新建私人页（模拟）')">＋ 新建私人页</div>`:""):"");
+  }).join("");
+  tree.querySelectorAll("[data-sec]").forEach(h=>h.onclick=()=>{st.sec[h.dataset.sec]=!st.sec[h.dataset.sec];renderTree()});
+  tree.querySelectorAll("[data-tw]").forEach(b=>b.onclick=e=>{e.stopPropagation();const i=b.dataset.tw;st.open.has(i)?st.open.delete(i):st.open.add(i);renderTree()});
+  tree.querySelectorAll("[data-add]").forEach(b=>b.onclick=e=>{e.stopPropagation();toast("＋ 悬停快捷新建（模拟）")});
+  tree.querySelectorAll(".row").forEach(r=>r.onclick=()=>openPage(r.querySelector(".name").textContent));
+}
+$("#q").addEventListener("input",e=>{st.q=e.target.value.trim().toLowerCase();renderTree()});
+function openPage(name){const n=all.find(x=>x.name===name);if(!n)return;st.cur=n;if(n.children&&!st.open.has(n.id))st.open.add(n.id);renderTree();renderPage(n);renderUrl()}
+function renderPage(n){
+  const path=pathOf(n.id);
+  main.innerHTML=`<div class="nbar">${path.map((p,i)=>`<span class="c" data-p="${p.id}">${p.e||""} ${p.name}</span>`).join('<span class="sep">/</span>')}
+    <span class="ops">✎ 分享 ⭐ ⋯</span></div>
+  ${n.children?`<div class="pg-cover" style="max-width:calc(100% - 0px);margin-left:-48px;margin-right:-48px"></div>`:""}
+  <div class="page">
+    <div class="pg-ico">${n.e||(n.children?"📁":"📄")}</div>
+    <div class="pg-title ${"untitled-false"}">${n.name}</div>
+    <div class="pg-props"><span>👨‍👩‍👧 wushuzhilu</span><span>🕘 ${n.ts}</span><span>💬 0</span></div>
+    <div class="pg-body">${pageBody(n)}</div>
+  </div>`;
+  main.querySelectorAll("[data-p]").forEach(el=>el.onclick=()=>openPage(find(el.dataset.p).name));
+  main.querySelectorAll("[data-sub]").forEach(el=>el.onclick=()=>openPage(find(el.dataset.sub).name));
+  main.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{st.dbview=b.dataset.tab;renderPage(n)});
+  main.querySelectorAll("[data-row]").forEach(el=>el.onclick=()=>openPage(find(el.dataset.row).name));
+}
+let dbview="table";
+function pageBody(n){
+  if(!n.children) return n.body||`<p class="empty-hint">输入 <kbd>/</kbd> 唤起块菜单…（空页面 · Notion 无空库引导页，就是普通空页面）</p>`;
+  const subs=n.children;
+  let extra="";
+  if(n.id==="f-req"){
+    extra=`<h2>📦 需求池（database 示意）</h2>
+      <div class="db-tabs">${["table","board","cal"].map(v=>`<button data-tab="${v}" class="${dbview===v?"on":""}">${{table:"☰ Table",board:"▦ Board",cal:"📅 Calendar"}[v]}</button>`).join("")}</div>`
+      +(dbview==="table"?`<table class="db"><tr><th>名称</th><th>状态</th><th>更新</th></tr>${subs.map(s=>`<tr data-row="${s.id}"><td>📄 ${s.name}</td><td>🟢 已评审</td><td>${s.ts}</td></tr>`).join("")}</table>`
+        :dbview==="board"?`<div class="board">${["待评审","已评审","已排期"].map((c,i)=>`<div class="bcol"><h4>${c}</h4>${i===1?subs.map(s=>`<div class="bcard" data-row="${s.id}">📄 ${s.name}</div>`).join(""):`<div style="font-size:11px;color:var(--text-3)">（空）</div>`}</div>`).join("")}</div>`
+        :`<div class="cal">${Array.from({length:28},(_,i)=>`<div class="d">${i+1}${i===23?`<span class="ev">评审</span>`:""}</div>`).join("")}</div>`);
+  }
+  return `<div class="callout">Notion 心智：${n.e||"文件夹"} <b>${n.name}</b> 也是普通页面 —— 没有独立"库详情页"，子页面直接以卡片块铺在正文里。</div>
+    <div class="subgrid">${subs.map(s=>`<div class="subcard" data-sub="${s.id}"><span class="e">${s.e||(s.children?"📁":"📄")}</span><div><b>${s.name}</b><span class="s">${s.children?cnt(s)+" 页":s.ts}</span></div></div>`).join("")}</div>`+extra;
+}
+function showCtx(e,id){e.preventDefault();e.stopPropagation();
+  const n=find(id);
+  ctx.innerHTML=`<button onclick="toast('新建子页面（模拟）')">＋ 新建子页面</button><button onclick="toast('重命名（模拟）')">✏️ 重命名</button>
+    <button onclick="fav('${id}')">⭐ 收藏/取消</button><div class="sep"></div><button class="danger" onclick="toast('删除（模拟）')">🗑️ 删除</button>`;
+  ctx.classList.add("show");ctx.style.left=Math.min(e.clientX,innerWidth-180)+"px";ctx.style.top=Math.min(e.clientY,innerHeight-200)+"px";
+  ctx.dataset.id=id;
+}
+function fav(id){const i=FAV.indexOf(id);i<0?FAV.push(id):FAV.splice(i,1);renderTree();toast(i<0?"已加入收藏区":"已移出收藏区")}
+function hideCtx(){ctx.classList.remove("show")}
+document.addEventListener("click",e=>{if(!e.target.closest(".ctx"))hideCtx()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")hideCtx()});
+renderTree();renderUrl();
+</script>
+</body>
+</html>

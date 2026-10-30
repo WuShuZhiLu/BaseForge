@@ -225,6 +225,7 @@ export function installSyncOutboxCaptureTriggers(db: Parameters<Migration["up"]>
     const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as Array<{ name: string }>;
     const hasThemeId = noteColumns.some((column) => column.name === "themeId");
     const hasColorMark = noteColumns.some((column) => column.name === "colorMark");
+    const hasIsUnlisted = noteColumns.some((column) => column.name === "isUnlisted");
     const notePayload = (ref: string) => `json_object(
       'id', ${ref}.id,
       'notebookId', ${ref}.notebookId,
@@ -240,6 +241,7 @@ export function installSyncOutboxCaptureTriggers(db: Parameters<Migration["up"]>
       'trashedAt', ${ref}.trashedAt,
       ${hasThemeId ? `'themeId', ${ref}.themeId,` : ""}
       ${hasColorMark ? `'colorMark', ${ref}.colorMark,` : ""}
+      ${hasIsUnlisted ? `'isUnlisted', ${ref}.isUnlisted,` : ""}
       'sortOrder', ${ref}.sortOrder,
       'version', ${ref}.version,
       'createdAt', ${ref}.createdAt,

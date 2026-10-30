@@ -103,11 +103,13 @@ export function repairKnowledgeResourceProjectionIfStale(
   try {
     if (resourceType === "note") {
       const note = db.prepare(`
-        SELECT id, userId, workspaceId, notebookId, isTrashed
+        SELECT id, userId, workspaceId, notebookId, isTrashed, isUnlisted
         FROM notes
         WHERE id = ?
-      `).get(resourceId) as NoteRow | undefined;
+      `).get(resourceId) as (NoteRow & { isUnlisted?: number }) | undefined;
       if (!note) return false;
+      // 匿名文档按设计没有知识树投影；权限解析不能顺手把它补进树里。
+      if (note.isUnlisted === 1) return false;
 
       const projection = projections[0];
       if (projection && projectionMatches(db, projection, {

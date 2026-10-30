@@ -30,15 +30,28 @@ html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .nowe
   line-height: var(--pm-p-line-height);
 }
 
+/* 大纲展开（钉住 / 悬浮）：只让「正文列」让出右侧留白，**不动滚动容器**——
+ * 编辑器工具栏是滚动区内的 sticky 整宽条，给容器加内边距会把它一起挤窄。
+ * 做法：正文元素宽度 = 容器宽 - 留白宽，左右仍 auto → 在剩余空间里继续居中；
+ * 工具栏始终整宽，大纲永远在工具栏下方。加深一级选择器避免被上面的
+ * margin/width 规则覆盖。 */
+.note-theme-surface.note-theme-surface[data-outline-open="true"] .ProseMirror,
+.note-theme-surface.note-theme-surface[data-outline-open="true"] .nowen-md-preview,
+.note-theme-surface.note-theme-surface[data-outline-open="true"] .nowen-md-editor .cm-content {
+  width: calc(100% - var(--outline-gutter-width, 264px));
+  max-width: var(--note-theme-content-width);
+  margin-left: auto;
+  margin-right: auto;
+  transition: width 0.2s ease;
+}
+
 html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .ProseMirror a,
 html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .nowen-md-preview a,
 .note-theme-surface[data-note-theme] .ProseMirror a,
 .note-theme-surface[data-note-theme] .nowen-md-preview a {
   color: var(--note-theme-accent);
   text-decoration-color: currentColor;
-}
-
-html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .ProseMirror a:hover,
+}html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .ProseMirror a:hover,
 html[data-note-theme]:not([data-note-theme="default"]) .note-theme-surface .nowen-md-preview a:hover,
 .note-theme-surface[data-note-theme] .ProseMirror a:hover,
 .note-theme-surface[data-note-theme] .nowen-md-preview a:hover {

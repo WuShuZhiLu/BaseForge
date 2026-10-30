@@ -3,15 +3,14 @@ import { FileCode, FileText, Lock, Pin, Star, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useApp, useAppActions, type OpenNoteTab } from "@/store/AppContext";
 import { toolTabMeta } from "@/components/toolTabs";
-import { api } from "@/lib/api";
+import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { cn } from "@/lib/utils";
-import { toast } from "@/lib/toast";
 
 /**
- * 「打开的」面板内容（内容层 v1 · 新实现；旧文件 SidebarOpenEditorsContent 保留待删）——**仅内容**，标题/计数/折叠/动作由 SidebarPanelShell 提供。
+ * 「打开的」面板内容（内容层 v1）——**仅内容**，标题/计数/折叠/动作由 SidebarPanelShell 提供。
  *
- * 来源：原 SidebarOpenEditors 的自带头部已移除（面板框架统一头部）；
- * 明细功能不变：切换 / 关闭页签、右键关闭其他/全部、图标态（置顶/锁定/Markdown/收藏）。
+ * 明细功能：切换 / 关闭页签、右键关闭其他/全部、图标态（置顶/锁定/Markdown/收藏）。
+ * 打开笔记统一走 useTabNoteOpener（加载协调器链路，与深链/列表一致）。
  * 监听 nowen:sidebar-panel-refresh 以响应壳头 ⟳。
  */
 
@@ -46,32 +45,18 @@ export default function OpenEditorsPanel() {
   const openTabs = state.openNoteTabs ?? [];
   const toolTabs = state.openToolTabs ?? [];
 
-  const openNote = useCallback(
-    async (noteId: string) => {
-      try {
-        const note = await api.getNote(noteId);
-        if (!note) return;
-        actions.setActiveNote(note);
-        actions.setSelectedNotebook(note.notebookId);
-        actions.setViewMode("notebook");
-        actions.setActiveToolTab(null);
-        actions.openNoteTab({
-          id: note.id,
-          title: note.title,
-          notebookId: note.notebookId,
-          workspaceId: note.workspaceId,
-          contentFormat: note.contentFormat,
-          isLocked: note.isLocked,
-          isTrashed: note.isTrashed,
-          updatedAt: note.updatedAt,
-        });
-        actions.setMobileView("editor");
-      } catch {
-        toast.error(t("sidebar.panelOpenFailed"));
-      }
-    },
-    [actions, t],
-  );
+  const openNote = useTabNoteOpener();
+
+  const closeTab = useCallback((tabId: string) => {
+    const closingActive = state.activeNote?.id === tabId;
+    const nextTab = closingActive ? getNextTabAfterClose(openTabs, tabId) : null;
+    actions.closeNoteTab(tabId);
+    if (!closingActive) return;
+    // 关闭的是当前编辑器：切到相邻页签；没有页签则清空编辑区，
+    // 让 AppRouteSync 的写侧 reconcile 一并把 URL 从 /notes/:id 收回 "/"。
+    if (nextTab) void openNote(nextTab.id);
+    else actions.setActiveNote(null);
+  }, [actions, openNote, openTabs, state.activeNote?.id]);
 
   const closeOthers = useCallback(
     (tab: OpenNoteTab) => {
@@ -125,7 +110,7 @@ export default function OpenEditorsPanel() {
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                actions.closeNoteTab(tab.id);
+                closeTab(tab.id);
               }}
               aria-label={`${t("editorTabs.close")}：${title}`}
               title={t("editorTabs.close")}
@@ -181,7 +166,7 @@ export default function OpenEditorsPanel() {
             type="button"
             className="flex w-full items-center px-3 py-1.5 text-left text-[12.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
             onClick={() => {
-              actions.closeNoteTab(menu.tabId);
+              closeTab(menu.tabId);
               setMenu(null);
             }}
           >

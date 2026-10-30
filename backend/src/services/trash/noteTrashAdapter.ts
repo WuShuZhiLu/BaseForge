@@ -8,6 +8,7 @@ import { emitWebhook } from "../webhook.js";
 import { logAudit } from "../audit.js";
 import { broadcastNoteDeleted } from "../realtime.js";
 import { KnowledgeTreeError } from "../knowledgeTree.js";
+import { sweepOrphanAnonymousNotes } from "../anonymousDocuments.js";
 
 // Shared by the legacy note endpoint and the unified trash lifecycle.
 export function permanentlyDeleteNote(id: string, userId: string, deferReclaim = false): number {
@@ -60,6 +61,9 @@ export function permanentlyDeleteNote(id: string, userId: string, deferReclaim =
   } catch { /* ignore */ }
 
   db.prepare("DELETE FROM notes WHERE id = ?").run(id);
+
+  // 宿主笔记永久删除后，回收不再被任何笔记引用的匿名文档（宽限期见服务）。
+  sweepOrphanAnonymousNotes(db);
 
   // TAG-PRUNE-UNUSED-ON-NOTE-DELETE-01: 永久删除笔记后清理未使用的标签
   // 删除该用户下没有任何笔记引用的标签（只删除个人空间标签，不删除工作区标签）

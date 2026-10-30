@@ -159,7 +159,7 @@ export class NativeLocalRepository implements LocalRepository {
       ON nt.scopeKey=n.scopeKey AND nt.noteId=n.id
       WHERE n.scopeKey=? AND n.isTrashed=0 AND n.isArchived=0 AND nt.tagId IN (${placeholders})
       GROUP BY n.scopeKey,n.id HAVING COUNT(DISTINCT nt.tagId)=?
-      ORDER BY n.isPinned DESC,n.updatedAt DESC LIMIT ?`,[scopeKey,...uniqueTagIds,uniqueTagIds.length,Math.max(1,limit)]);
+      ORDER BY n.updatedAt DESC LIMIT ?`,[scopeKey,...uniqueTagIds,uniqueTagIds.length,Math.max(1,limit)]);
   }
 
   async searchNotes(query:string,limit=100):Promise<Array<{
@@ -372,7 +372,7 @@ export class NativeLocalRepository implements LocalRepository {
     values.push(Math.max(1, query.limit ?? 500), Math.max(0, query.offset ?? 0));
     return await this.db.query<NoteListItem>(`
       SELECT ${NOTE_LIST_COLUMNS} FROM notes n WHERE ${where.join(" AND ")}
-      ORDER BY n.isPinned DESC, n.updatedAt DESC LIMIT ? OFFSET ?
+      ORDER BY n.updatedAt DESC LIMIT ? OFFSET ?
     `, values);
   }
 

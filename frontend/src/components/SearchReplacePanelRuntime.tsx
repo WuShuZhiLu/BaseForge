@@ -19,7 +19,7 @@ interface SearchMatch {
   to: number;
 }
 
-interface RuntimeSearchState {
+export interface RuntimeSearchState {
   query: string;
   caseSensitive: boolean;
   wholeWord: boolean;
@@ -192,20 +192,20 @@ export function createSearchReplaceExtension() {
               }
 
               if (tr.docChanged && previous.query) {
-                if (!realtimeDecorationsEnabled()) {
-                  const matches = mapMatches(tr, previous.matches);
-                  const activeIndex = matches.length === 0
-                    ? -1
-                    : Math.min(previous.activeIndex < 0 ? 0 : previous.activeIndex, matches.length - 1);
-                  return {
-                    ...previous,
-                    matches,
-                    activeIndex,
-                    stale: true,
-                    deco: buildDecoSet(tr.doc, matches, activeIndex),
-                  };
-                }
-                return { ...previous, ...scan(tr.doc, previous) };
+                // 为什么防抖：实时模式下大文档连续输入若逐事务全文扫描（scan）会卡顿。
+                // apply 必须保持纯函数，不能在这里起定时器：这里只把已有命中用映射平移并标记 stale，
+                // 由 view() 里的防抖定时器在停顿约 200ms 后统一安排一次全量扫描。
+                const matches = mapMatches(tr, previous.matches);
+                const activeIndex = matches.length === 0
+                  ? -1
+                  : Math.min(previous.activeIndex < 0 ? 0 : previous.activeIndex, matches.length - 1);
+                return {
+                  ...previous,
+                  matches,
+                  activeIndex,
+                  stale: true,
+                  deco: buildDecoSet(tr.doc, matches, activeIndex),
+                };
               }
 
               return {
@@ -220,11 +220,50 @@ export function createSearchReplaceExtension() {
             },
           },
           view(view) {
-            return {
-              destroy: subscribeEditorRuntime(() => {
+            const unsubscribe = subscribeEditorRuntime(() => {
+              if (view.isDestroyed) return;
+              view.dispatch(view.state.tr.setMeta(runtimeSearchPluginKey, { runtimeRefresh: true }));
+            });
+            let rescanTimer: ReturnType<typeof setTimeout> | null = null;
+            // 定时器句柄放在 view 闭包里（插件 state 不可变，不能存进去）；
+            // 停顿期内每来一个新的文档变更事务就重置定时器，只在停顿约 200ms 后合并扫描一次。
+            const scheduleRescan = () => {
+              if (rescanTimer !== null) clearTimeout(rescanTimer);
+              rescanTimer = setTimeout(() => {
+                rescanTimer = null;
                 if (view.isDestroyed) return;
-                view.dispatch(view.state.tr.setMeta(runtimeSearchPluginKey, { runtimeRefresh: true }));
-              }),
+                const state = runtimeSearchPluginKey.getState(view.state);
+                if (!state?.stale || !state.query) return;
+                view.dispatch(view.state.tr.setMeta(runtimeSearchPluginKey, {
+                  query: state.query,
+                  caseSensitive: state.caseSensitive,
+                  wholeWord: state.wholeWord,
+                  useRegex: state.useRegex,
+                }));
+              }, 200);
+            };
+            return {
+              update(currentView, prevState) {
+                if (currentView.state.doc === prevState.doc) return;
+                const state = runtimeSearchPluginKey.getState(currentView.state);
+                if (!state?.stale) {
+                  if (rescanTimer !== null) {
+                    clearTimeout(rescanTimer);
+                    rescanTimer = null;
+                  }
+                  return;
+                }
+                // 轻量模式不安排全量重扫，保持原行为
+                if (!realtimeDecorationsEnabled()) return;
+                scheduleRescan();
+              },
+              destroy() {
+                if (rescanTimer !== null) {
+                  clearTimeout(rescanTimer);
+                  rescanTimer = null;
+                }
+                unsubscribe();
+              },
             };
           },
         }),

@@ -37,6 +37,7 @@ import { useRailMode, type RailMode } from "@/hooks/useRailMode";
 import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
 import { cn } from "@/lib/utils";
 import SettingsModal from "@/components/SettingsModal";
+import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/appPathNavigation";
 
 type NavItemMode = Extract<
   ViewMode,
@@ -280,6 +281,31 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   }, []);
   const [me, setMe] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  // 设置弹窗当前 tab（URL /settings/:tab 驱动，见下方事件与写侧）
+  const [settingsTab, setSettingsTab] = useState<string | null>(null);
+  // 读侧：route 派生（URL 为唯一真相）——/settings(/:tab) 打开并定位 tab；
+  // 离开 /settings（popstate 回退、关闭写回）→ 关闭弹窗。
+  useEffect(() => {
+    if (state.route.kind === "settings") {
+      setSettingsTab(state.route.tab);
+      setShowSettings(true);
+    } else {
+      setShowSettings(false);
+      setSettingsTab(null);
+    }
+  }, [state.route]);
+  // 打开设置（头像菜单）：URL 跟随（记住当前 tab）
+  const openSettings = useCallback(() => {
+    const target = settingsTab ? `/settings/${settingsTab}` : "/settings";
+    setShowSettings(true);
+    pushAppPathState(target);
+  }, [settingsTab]);
+  // 关闭设置：URL 回常规路径
+  const closeSettings = useCallback(() => {
+    setShowSettings(false);
+    setSettingsTab(null);
+    replaceAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+  }, [state.activeNote]);
   const popupRef = useRef<HTMLDivElement>(null);
   const avatarBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -408,21 +434,15 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     } else {
       await broadcastLogout("user_logout");
     }
-    window.location.reload();
+    // 登出跳转 /login（URL 与认证态一致；登录后经 redirect 或原地恢复）
+    window.location.assign(buildAppPathUrl("/login"));
   }, []);
 
   const user = me;
   const displayName = user?.displayName || user?.username || "用户";
   const initials = initialsOf(user?.displayName || user?.username);
 
-  const renderItem = (item: NavItem, index = 0, group: "core" | "plugins" = "core") => {
-    // 链式反应：尺寸/间距变化按序号依次延迟；颜色（hover/激活）保持即时响应
-    const sizeDelay = `${Math.min(index, 12) * 45}ms`;
-    const staggerStyle = {
-      transitionProperty: "width, height, gap, background-color, color",
-      transitionDuration: "200ms, 200ms, 200ms, 150ms, 150ms",
-      transitionDelay: `${sizeDelay}, ${sizeDelay}, ${sizeDelay}, 0ms, 0ms`,
-    } as React.CSSProperties;
+  const renderItem = (item: NavItem, group: "core" | "plugins" = "core") => {
     if (item.mode === "plugins") {
       // 插件：切侧栏到插件管理视图（原型 FR-IA-02 语义）
       const plugActive = activeMode === "plugins";
@@ -430,17 +450,16 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         <button
           key={item.mode}
           type="button"
-          style={staggerStyle}
           onClick={() => (railCustom.pluginGroupCollapsed ? setPluginGroupMenuOpen(true) : navigate("plugins"))}
           onContextMenu={(e) => { e.preventDefault(); setBadgeMenu({ x: e.clientX, y: e.clientY, item }); }}
           aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
           title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
           className={cn(
-            "group relative flex shrink-0 items-center justify-center rounded-md",
+            "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
             plugActive
               ? "bg-accent-primary/12 text-accent-primary dark:bg-accent-primary/14"
               : "text-tx-secondary hover:bg-[rgba(17,24,39,0.06)] hover:text-tx-primary dark:hover:bg-[rgba(255,255,255,0.07)]",
-            showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
+            showLabel ? "w-[52px] flex-col gap-[3px]" : "w-9",
           )}
         >
           {item.icon(showLabel ? 19 : 21)}
@@ -466,7 +485,6 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       <button
         key={item.mode}
         type="button"
-        style={staggerStyle}
         draggable
         onDragStart={onBadgeDragStart(item.mode, group)}
         onDragOver={onBadgeDragOver(item.mode, group)}
@@ -478,13 +496,13 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         aria-label={t(item.titleKey, { defaultValue: item.titleDefault })}
         title={showLabel ? undefined : t(item.titleKey, { defaultValue: item.titleDefault })}
         className={cn(
-          "group relative flex shrink-0 items-center justify-center rounded-md",
+          "group relative flex h-11 shrink-0 items-center justify-center rounded-md transition-colors",
           dropShadowClass,
           isDraggingThis && "opacity-60",
           active
             ? "bg-accent-primary/12 text-accent-primary dark:bg-accent-primary/14"
             : "text-tx-secondary hover:bg-[rgba(17,24,39,0.06)] hover:text-tx-primary dark:hover:bg-[rgba(255,255,255,0.07)]",
-          showLabel ? "h-11 w-[52px] flex-col gap-[3px]" : "h-9 w-9",
+          showLabel ? "w-[52px] flex-col gap-[3px]" : "w-9",
         )}
       >
         {item.icon(showLabel ? 19 : 21)}
@@ -537,7 +555,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             if (isBadgeHidden(item.mode)) continue;
             rows.push(item);
           }
-          return rows.map((item, index) => renderItem(item, index, "core"));
+          return rows.map((item) => renderItem(item, "core"));
         })()}
         {/* 固定分割线：上=核心徽章组，下=插件徽章组（位置不随排序变化） */}
         <div className={cn("my-2 h-px shrink-0 border-t border-app-border", showLabel ? "w-10" : "w-8")} />
@@ -556,8 +574,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           }
           return (
             <>
-              {PLUGIN_ITEMS.map((item, index) => renderItem(item, index, "plugins"))}
-              {rows.map((item, index) => renderItem(item, index + 1, "plugins"))}
+              {PLUGIN_ITEMS.map((item) => renderItem(item, "plugins"))}
+              {rows.map((item) => renderItem(item, "plugins"))}
             </>
           );
         })()}
@@ -822,12 +840,6 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
                 </span>
               )}
             </button>
-            <div className="flex w-full items-center gap-2 rounded-md bg-app-hover px-2.5 py-1.5 text-left text-xs text-tx-primary">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-primary/12 text-[9px] font-semibold text-accent-primary dark:bg-accent-primary/14">
-                {initials}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{displayName}（当前）</span>
-            </div>
             <button
               type="button"
               role="menuitem"
@@ -900,7 +912,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       {/* 底部：设置沉底 */}
       <button
         type="button"
-        onClick={() => setShowSettings(true)}
+        onClick={openSettings}
         aria-label={t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         title={showLabel ? undefined : t("sidebarNext.nav.settings", { defaultValue: "设置" })}
         className={cn(
@@ -919,7 +931,13 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         </span>
       </button>
 
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsModal
+          key={settingsTab ?? "default"}
+          defaultTab={(settingsTab ?? "appearance") as never}
+          onClose={closeSettings}
+        />
+      )}
     </nav>
   );
 }

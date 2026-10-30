@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原型 · 文档内查找/替换（统一浮层）</title>
+<style>
+:root{
+  --app-bg:#f7f7f6; --app-surface:#fff; --app-elevated:#fff; --app-hover:#f1f1ef; --app-active:#e8e8e5;
+  --border:#e3e2de; --border-strong:#d5d4cf;
+  --tx-1:#25241f; --tx-2:#6b6960; --tx-3:#9b9890;
+  --accent:#2f6fed; --accent-soft:rgba(47,111,237,.10); --accent-softer:rgba(47,111,237,.06);
+  --danger:#d64545;
+  --radius-card:12px; --radius-ctl:8px;
+  --shadow-card:0 1px 2px rgba(24,24,20,.05), 0 10px 28px -10px rgba(24,24,20,.18);
+  font-size:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif;background:var(--app-bg);color:var(--tx-1)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 64px}
+h1{font-size:19px;font-weight:650;letter-spacing:-.01em}
+h1 small{font-weight:400;font-size:13px;color:var(--tx-3);margin-left:10px}
+.lead{margin-top:8px;font-size:13px;line-height:1.7;color:var(--tx-2);max-width:820px}
+.sect{margin-top:34px}
+.sect>h2{font-size:13px;font-weight:650;color:var(--tx-2);letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.sect>h2::after{content:"";flex:1;height:1px;background:var(--border)}
+.note{margin-top:6px;font-size:12px;color:var(--tx-3);line-height:1.7}
+
+/* ---------- 场景容器 ---------- */
+.stage{margin-top:14px;position:relative;background:var(--app-surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;height:412px}
+.stage-label{position:absolute;left:12px;top:10px;z-index:1;font-size:11px;color:var(--tx-3);background:var(--app-hover);border-radius:999px;padding:2px 8px}
+.doc{padding:56px 44px 0;max-width:640px;height:100%;overflow:hidden}
+.doc h3{font-size:20px}
+.doc p{margin-top:12px;font-size:13.5px;line-height:1.85;color:var(--tx-2)}
+.doc .mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;background:var(--app-hover);border-radius:4px;padding:1px 4px;color:var(--tx-1)}
+
+/* ---------- FindBar（新） ---------- */
+.findbar{
+  position:absolute;top:12px;right:16px;width:362px;z-index:5;
+  background:var(--app-elevated);border:1px solid var(--border-strong);
+  border-radius:var(--radius-card);box-shadow:var(--shadow-card);
+  padding:8px;display:flex;flex-direction:column;gap:6px;
+}
+.fb-row{display:flex;align-items:center;gap:6px}
+.fb-input-wrap{
+  flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:32px;
+  padding:0 8px 0 9px;background:var(--app-surface);
+  border:1px solid var(--border);border-radius:var(--radius-ctl);
+  transition:border-color .12s, box-shadow .12s;
+}
+.fb-input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-softer)}
+.fb-input-wrap.is-empty{border-color:var(--border)}
+.fb-input-wrap.is-miss{border-color:var(--danger);box-shadow:0 0 0 3px rgba(214,69,69,.08)}
+.fb-input-wrap svg{flex:none;color:var(--tx-3)}
+.fb-input-wrap input{flex:1;min-width:0;border:none;outline:none;background:none;font-size:13.5px;color:var(--tx-1)}
+.fb-input-wrap input::placeholder{color:var(--tx-3)}
+.fb-count{flex:none;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--tx-3);padding-left:2px;white-space:nowrap}
+.fb-count b{color:var(--tx-2);font-weight:600}
+.fb-count.is-miss{color:var(--danger);font-weight:600}
+.fb-ico{
+  flex:none;width:28px;height:28px;display:grid;place-items:center;border-radius:var(--radius-ctl);
+  color:var(--tx-2);transition:background .12s,color .12s;
+}
+.fb-ico:hover{background:var(--app-hover);color:var(--tx-1)}
+.fb-ico[disabled]{opacity:.32;cursor:default;background:none}
+.fb-sep{width:1px;height:16px;background:var(--border);margin:0 1px;flex:none}
+.fb-toggle{
+  flex:none;height:28px;min-width:28px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  border-radius:var(--radius-ctl);color:var(--tx-2);font-size:11.5px;
+  transition:background .12s,color .12s;
+}
+.fb-toggle:hover{background:var(--app-hover);color:var(--tx-1)}
+.fb-toggle[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.fb-toggle svg{flex:none}
+.fb-spacer{flex:1}
+.fb-btn{
+  flex:none;height:28px;padding:0 10px;border-radius:var(--radius-ctl);
+  font-size:12.5px;color:var(--tx-2);transition:background .12s,color .12s;
+}
+.fb-btn:hover{background:var(--app-hover);color:var(--tx-1)}
+.fb-btn[disabled]{opacity:.35;cursor:default;background:none}
+.fb-btn-primary{
+  background:var(--accent);color:#fff;font-weight:550;
+}
+.fb-btn-primary:hover{background:#2a63d6;color:#fff}
+.fb-hint{font-size:11px;color:var(--tx-3);padding:0 2px}
+.fb-error{font-size:11px;color:var(--danger);padding:0 2px}
+.fb-replace-row .fb-input-wrap{height:32px}
+/* 折叠态：替换行隐藏 */
+
+/* 命中高亮 */
+mark.hit{background:rgba(47,111,237,.16);color:inherit;border-radius:2px;padding:0 1px}
+mark.hit-now{background:rgba(47,111,237,.34);box-shadow:inset 0 0 0 1px rgba(47,111,237,.55);border-radius:2px;padding:0 1px}
+
+/* ---------- 改造前 ---------- */
+.before-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.card-slot{background:var(--app-surface);border:1px solid var(--border);border-radius:14px;padding:14px;position:relative}
+.card-slot h4{font-size:12px;font-weight:600;color:var(--tx-2)}
+.card-slot .tag{position:absolute;right:12px;top:12px;font-size:10.5px;color:var(--danger);background:rgba(214,69,69,.08);border-radius:999px;padding:2px 8px}
+.old-rt{width:340px;margin-top:12px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.10);padding:8px;display:flex;flex-direction:column;gap:6px}
+.old-rt-row{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--tx-2)}
+.old-rt-input{flex:1;border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:13px;color:var(--tx-3)}
+.old-rt-chip{width:22px;height:22px;border-radius:4px;display:grid;place-items:center;font-size:10px;color:var(--tx-2);background:var(--app-hover)}
+.old-md{margin-top:12px;border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--tx-2);background:#fafafa}
+.old-md-input{border:1px solid #8a8a8a;border-radius:2px;padding:2px 4px;font-size:12px;min-width:120px;color:var(--tx-1)}
+.old-md-btn{border:1px solid var(--border-strong);border-radius:4px;padding:2px 8px;background:#fff;color:var(--tx-2)}
+.old-md-btn.pick{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.old-md-primary{background:var(--accent);color:#fff;border-radius:4px;padding:3px 10px}
+.old-md label{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;color:var(--tx-2)}
+.old-md input[type=text]{border:1px solid var(--border-strong);border-radius:2px;padding:2px 4px;font-size:12px;width:96px}
+
+/* ---------- 规格表 ---------- */
+.spec{margin-top:14px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--app-surface)}
+.spec table{width:100%;border-collapse:collapse;font-size:12.5px}
+.spec th,.spec td{text-align:left;padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+.spec th{background:#fbfbfa;font-weight:600;color:var(--tx-2);font-size:11.5px;letter-spacing:.02em}
+.spec tr:last-child td{border-bottom:none}
+.spec td code{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;background:var(--app-hover);border-radius:4px;padding:1px 5px}
+.spec td:first-child{white-space:nowrap;color:var(--tx-2)}
+.states{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}
+.states .stage{height:150px;margin-top:0}
+.states .findbar{width:100%;position:static;margin:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>文档内查找 / 替换 · 统一浮层<small>proto-doc-find</small></h1>
+  <p class="lead">
+    现状：富文本走自研小浮卡（340px、两行挤在一起），Markdown 走 CodeMirror 原生 searchPanel（横条、原生 checkbox、按钮层级相反）。
+    同一功能两副面孔，且都不符合本项目设计语言。改版目标：<b>一套组件、一个位置、三档视觉层级</b>。
+  </p>
+
+  <div class="sect">
+    <h2>A · 富文本编辑器（默认态）</h2>
+    <p class="note">浮层固定右上角，脱离文档流。行 1 只放「输入 + 计数 + 导航 + 更多」；选项收进行 2 的 chip；替换默认不展开。</p>
+    <div class="stage">
+      <span class="stage-label">富文本 / Tiptap</span>
+      <div class="doc">
+        <h3>BaseForge 使用指南</h3>
+        <p>把压缩包解压后，将需要烧录的设备程序放入 <span class="mono">bin/</span> 以备用。如图所示，存在四个固定内容不变。</p>
+        <p>BaseForge 是一个 <mark class="hit">open-source</mark>、self-hosted 的<span class="hit hit-now">知识</span>库，数据完全在你的掌控之中。</p>
+      </div>
+
+      <div class="findbar" role="dialog" aria-label="查找">
+        <div class="fb-row">
+          <div class="fb-input-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" value="知识" placeholder="查找" aria-label="查找内容">
+            <span class="fb-count"><b>2</b>/7</span>
+          </div>
+          <button class="fb-ico" title="上一个 (Shift+Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+          </button>
+          <button class="fb-ico" title="下一个 (Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <span class="fb-sep"></span>
+          <button class="fb-ico" title="展开替换 (Ctrl+H)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11l-3-3"/><path d="M20 17H9l3 3"/></svg>
+          </button>
+          <button class="fb-ico" title="关闭 (Esc)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="fb-row">
+          <button class="fb-toggle" aria-pressed="false" title="区分大小写">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 18 7.5 6l4.5 12"/><path d="M4.6 14h5.8"/><path d="M20 18v-5.5a2.5 2.5 0 0 0-5 0V18"/><path d="M20 14.2c-2.6-.6-5 .3-5 1.9 0 1.2 1.1 2.1 2.6 2.1 1.4 0 2.4-.8 2.4-2"/></svg>
+          </button>
+          <button class="fb-toggle" aria-pressed="false" title="全字匹配">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 18 7 6l4 12"/><path d="M4.4 14h5.2"/><path d="M20 8h-6"/><path d="M17 8v10"/></svg>
+          </button>
+          <button class="fb-toggle" aria-pressed="true" title="正则表达式">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4v7"/><path d="m9 5.5 5 4"/><path d="m14 5.5-5 4"/><circle cx="17.5" cy="14.5" r="1.6"/></svg>
+          </button>
+          <span class="fb-spacer"></span>
+          <span class="fb-hint">Enter 下一个 · Esc 关闭</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>B · Markdown 编辑器（替换展开态）</h2>
+    <p class="note">与 A 完全同一个组件、同一位置、同一尺寸。Markdown 侧不再把原生的横条插进文档流（正文不再被顶下一行）。</p>
+    <div class="stage">
+      <span class="stage-label">Markdown / CodeMirror</span>
+      <div class="doc">
+        <h3>Welcome to BaseForge</h3>
+        <p>BaseForge is an <mark class="hit">open-source</mark>, self-hosted <mark class="hit hit-now">knowledge</mark> base, collaborative notebook, and task workspace.</p>
+        <p><span class="mono">## Start here</span><br>1. Create a notebook, folder, or note from the <mark class="hit">knowledge</mark> tree.</p>
+      </div>
+
+      <div class="findbar" role="dialog" aria-label="查找与替换">
+        <div class="fb-row">
+          <div class="fb-input-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" value="knowledge" placeholder="查找" aria-label="查找内容">
+            <span class="fb-count"><b>2</b>/3</span>
+          </div>
+          <button class="fb-ico" title="上一个 (Shift+Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+          </button>
+          <button class="fb-ico" title="下一个 (Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <span class="fb-sep"></span>
+          <button class="fb-ico" style="background:var(--accent-soft);color:var(--accent)" title="收起替换">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11l-3-3"/><path d="M20 17H9l3 3"/></svg>
+          </button>
+          <button class="fb-ico" title="关闭 (Esc)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="fb-row">
+          <button class="fb-toggle" aria-pressed="false" title="区分大小写"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 18 7.5 6l4.5 12"/><path d="M4.6 14h5.8"/><path d="M20 18v-5.5a2.5 2.5 0 0 0-5 0V18"/><path d="M20 14.2c-2.6-.6-5 .3-5 1.9 0 1.2 1.1 2.1 2.6 2.1 1.4 0 2.4-.8 2.4-2"/></svg></button>
+          <button class="fb-toggle" aria-pressed="false" title="全字匹配"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 18 7 6l4 12"/><path d="M4.4 14h5.2"/><path d="M20 8h-6"/><path d="M17 8v10"/></svg></button>
+          <button class="fb-toggle" aria-pressed="false" title="正则表达式"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4v7"/><path d="m9 5.5 5 4"/><path d="m14 5.5-5 4"/><circle cx="17.5" cy="14.5" r="1.6"/></svg></button>
+          <span class="fb-spacer"></span>
+          <span class="fb-hint">Alt+Enter 全部替换</span>
+        </div>
+        <div class="fb-row fb-replace-row">
+          <div class="fb-input-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h11l-3-3"/><path d="M20 17H9l3 3"/></svg>
+            <input type="text" placeholder="替换为" aria-label="替换为">
+          </div>
+          <button class="fb-btn" disabled>替换</button>
+          <button class="fb-btn fb-btn-primary" disabled>全部</button>
+        </div>
+        <div class="fb-error" hidden></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>C · 三种边界态</h2>
+    <p class="note">空查询：导航与替换禁用（32% 透明度，不消失）。无匹配：输入框转红 + 计数改文案，不用 `0/0`。非法正则：额外一行 11px 红字说明。</p>
+    <div class="states">
+      <div class="stage">
+        <span class="stage-label">空查询</span>
+        <div class="findbar">
+          <div class="fb-row">
+            <div class="fb-input-wrap is-empty">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="text" placeholder="查找">
+            </div>
+            <button class="fb-ico" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
+            <button class="fb-ico" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+            <span class="fb-sep"></span>
+            <button class="fb-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="stage-label">无匹配</span>
+        <div class="findbar">
+          <div class="fb-row">
+            <div class="fb-input-wrap is-miss">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="text" value="不存在的词">
+              <span class="fb-count is-miss">无匹配</span>
+            </div>
+            <button class="fb-ico" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></button>
+            <button class="fb-ico" disabled><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+            <span class="fb-sep"></span>
+            <button class="fb-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="stage-label">非法正则</span>
+        <div class="findbar">
+          <div class="fb-row">
+            <div class="fb-input-wrap is-miss">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="text" value="[a-">
+              <span class="fb-count is-miss">!</span>
+            </div>
+            <span class="fb-sep"></span>
+            <button class="fb-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+          </div>
+          <div class="fb-row"><button class="fb-toggle" aria-pressed="true" title="正则表达式"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14 4v7"/><path d="m9 5.5 5 4"/><path d="m14 5.5-5 4"/><circle cx="17.5" cy="14.5" r="1.6"/></svg></button><span class="fb-error">正则表达式无效：未闭合的字符组</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>D · 改造前</h2>
+    <div class="before-grid">
+      <div class="card-slot">
+        <span class="tag">两行挤在一起</span>
+        <h4>富文本 · 自研 340px 小浮卡</h4>
+        <div class="old-rt">
+          <div class="old-rt-row">
+            <span>⌕</span>
+            <span class="old-rt-input">查找</span>
+            <span>0/0</span><span>⌃</span><span>⌄</span><span>×</span>
+          </div>
+          <div class="old-rt-row" style="padding-left:4px">
+            <span class="old-rt-chip">Aa</span><span class="old-rt-chip">ab</span><span class="old-rt-chip">.*</span>
+            <span style="margin-left:auto;font-size:12px;color:var(--tx-3)">替换…</span>
+          </div>
+        </div>
+        <p class="note" style="margin-top:10px">图标按钮实际点击区仅 22px；开关与「替换…」文字按钮混排；计数与输入框只是并排，没有内嵌关系；`shadow-lg + border` 在浅色底上发灰。</p>
+      </div>
+      <div class="card-slot">
+        <span class="tag">原生控件风格</span>
+        <h4>Markdown · CodeMirror 原生 searchPanel</h4>
+        <div class="old-md">
+          <input class="old-md-input" value="工作笔记">
+          <span class="old-md-btn">上一个</span><span class="old-md-btn">下一个</span>
+          <span class="old-md-btn pick">全部</span>
+          <label><input type="checkbox"> 区分大小写</label>
+          <label><input type="checkbox"> 正则</label>
+          <label><input type="checkbox"> 全词匹配</label>
+          <input type="text" value="替换">
+          <span class="old-md-btn">替换</span><span class="old-md-primary">全部替换</span>
+          <span style="margin-left:auto">×</span>
+        </div>
+        <p class="note" style="margin-top:10px">插入文档流顶部，打开时正文整体下移；原生 checkbox / 方角按钮 / 浏览器默认 focus 环；「全部」胶囊的选中语义与「全部替换」主按钮语义打架；一行塞 10 个控件，窄屏换行错乱。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>E · 规格</h2>
+    <div class="spec">
+      <table>
+        <tr><th>项</th><th>取值</th><th>说明</th></tr>
+        <tr><td>浮层尺寸</td><td>宽 <code>360px</code>·<code>min(360px, 100vw - 24px)</code>；高随行数 88 / 126 / 164</td><td>三行：查找 / 选项 / 替换；替换收起时高 88</td></tr>
+        <tr><td>定位</td><td><code>top 12px</code> · <code>right 16px</code>·<code>z-30</code></td><td>绝对定位脱离文档流，Markdown 侧也不推进正文</td></tr>
+        <tr><td>卡片</td><td>圆角 <code>12px</code> · 内边距 <code>8px</code> · 行距 <code>6px</code> · 描边 <code>--border-strong</code></td><td>阴影 <code>0 1px 2px rgba(24,24,20,.05), 0 10px 28px -10px rgba(24,24,20,.18)</code>，单层柔和投影替代 shadow-lg</td></tr>
+        <tr><td>输入框</td><td>高 <code>32px</code> · 圆角 <code>8px</code> · 字号 <code>13.5px</code> · 左右内距 <code>9/8px</code></td><td>左内嵌 14px 搜索图标；右侧内嵌计数，与输入同一容器</td></tr>
+        <tr><td>图标按钮</td><td><code>28×28</code> · 圆角 <code>8px</code> · 图标 <code>15px</code></td><td>满足 28px 可点最小尺寸（原 22px）；hover <code>--app-hover</code></td></tr>
+        <tr><td>分组</td><td>分隔线 <code>1×16px</code>，两侧 <code>1px</code> 间距</td><td>左组＝输入与导航，右组＝替换开关与关闭</td></tr>
+        <tr><td>选项 chip</td><td>高 <code>28px</code> · 圆角 <code>8px</code> · 选中 <code>accent 10%</code> 底 + accent 文字</td><td>Aa / ab / .* 三个，`aria-pressed` 表达状态</td></tr>
+        <tr><td>替换按钮</td><td>「替换」幽灵按钮 · 「全部」实心主按钮</td><td>语义分级：单次＝次要，全部＝主操作，且「全部」带确认文案「将替换 N 处」</td></tr>
+        <tr><td>计数</td><td><code>tabular-nums</code> 11.5px；当前项加粗</td><td>`2/7`；无匹配显示「无匹配」（红），非法正则显示 `!` + 下方行内错误</td></tr>
+        <tr><td>命中高亮</td><td>普通 <code>accent 16%</code>；当前 <code>accent 34%</code> + 1px 内描边</td><td>PM 装饰类与 CM 的 <code>cm-searchMatch</code> 共用同一组变量</td></tr>
+        <tr><td>禁用态</td><td>透明度 <code>32%</code></td><td>空查询时导航与替换禁用而非隐藏，避免布局跳动</td></tr>
+        <tr><td>移动端</td><td>宽度 <code>100vw - 24px</code>，贴顶 <code>top 8px</code>；命中数 ≥3 时选项行可折叠</td><td>不覆盖软键盘区域</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>F · 交互与快捷键</h2>
+    <div class="spec">
+      <table>
+        <tr><th>触发</th><th>行为</th></tr>
+        <tr><td><code>Ctrl/Cmd+F</code></td><td>打开浮层并聚焦输入；若编辑器有 ≤100 字选区，预填该文本并自动选中</td></tr>
+        <tr><td><code>Ctrl/Cmd+H</code></td><td>打开并直接展开替换行，焦点落在替换输入</td></tr>
+        <tr><td><code>Enter</code> / <code>Shift+Enter</code></td><td>下一个 / 上一个；到达末尾循环回第一个</td></tr>
+        <tr><td><code>Alt+Enter</code></td><td>全部替换（需二次确认，提示「将替换 N 处」）</td></tr>
+        <tr><td><code>Tab</code> / <code>Shift+Tab</code></td><td>在输入框与 9 个按钮间循环，焦点环统一为 <code>0 0 0 3px accent/6%</code></td></tr>
+        <tr><td><code>Esc</code></td><td>关闭浮层、清除命中高亮、焦点还给编辑器（保留滚动位置）</td></tr>
+        <tr><td>关闭后重开</td><td>同一编辑器内记住「替换行是否展开」与三个选项开关；查询词随关闭清空</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="sect">
+    <h2>G · 落地方式</h2>
+    <p class="note">
+      1. 新建 <code>components/DocFindBar.tsx</code>：纯受控 UI（value / matchCount / activeIndex / options / callbacks），不含搜索逻辑。<br>
+      2. <code>SearchReplacePanel.tsx</code> 保留 ProseMirror 装饰扩展，删掉 JSX，改为渲染 <code>DocFindBar</code>。<br>
+      3. Markdown 侧把 <code>@codemirror/search</code> 的 <code>search({createPanel})</code> 换成自定义 panel：panel 内挂一个 React root 渲染同一个 <code>DocFindBar</code>，命中态由 <code>SearchQuery</code> 的 matches 驱动。<br>
+      4. 命中高亮统一到 CSS 变量（<code>--find-hit</code> / <code>--find-hit-active</code>），PM 的 <code>.search-match</code> 与 CM 的 <code>.cm-searchMatch</code> 同时引用。<br>
+      5. 现有 i18n 键 <code>searchReplace.*</code> 全部复用，新增仅「无匹配」「正则表达式无效」两条。
+    </p>
+  </div>
+</div>
+</body>
+</html>

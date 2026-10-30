@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { markNewNoteForImmediateEdit } from "@/lib/newNoteImmediateEdit";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-import { useNoteLoader } from "@/hooks/useNoteLoader";
+import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import type { Notebook, NoteListItem } from "@/types";
 import { EditorToolbarExpandSlot } from "@/components/CollapsibleEditorToolbar";
 import { buildNoteDeepLinkUrl } from "@/lib/noteDeepLink";
@@ -43,10 +43,18 @@ type DragInsertTarget = {
   edge: "before" | "after";
 } | null;
 
-function getNextTabAfterClose(tabs: OpenNoteTab[], closingId: string): OpenNoteTab | null {
-  const index = tabs.findIndex((tab) => tab.id === closingId);
-  if (index === -1) return null;
-  return tabs[index + 1] || tabs[index - 1] || null;
+export interface NoteTabsBarProps {
+  /**
+   * 本栏当前文档 id（页签高亮 / “当前”语义）。
+   * 缺省为全局 `state.activeNote?.id`（主栏）；分屏参考栏传入自己的文档 id。
+   */
+  currentNoteId?: string | null;
+  /** 点击页签时如何打开；缺省走全局 openNote（切换 activeNote）。 */
+  onSelectTab?: (noteId: string) => void;
+  /** 参考栏模式：隐藏工具页签与新建入口，只保留本栏页签与溢出列表。 */
+  compact?: boolean;
+  /** 右端附加控件（分屏参考栏的只读 / 设为主文档 / 关闭等）。 */
+  trailing?: React.ReactNode;
 }
 
 function escapeMarkdownLinkText(text: string): string {
@@ -168,12 +176,26 @@ function NoteTabVisual({
   );
 }
 
-export default function NoteTabsBar() {
+export default function NoteTabsBar({
+  currentNoteId,
+  onSelectTab,
+  compact = false,
+  trailing,
+}: NoteTabsBarProps = {}) {
   const { state } = useApp();
   const actions = useAppActions();
-  const { loadNote, cancelNoteLoad } = useNoteLoader();
+  const openNote = useTabNoteOpener();
   const { t } = useTranslation();
   const { openNoteTabs, activeNote, noteLoading } = state;
+  /** 本栏“当前”文档：主栏跟随 activeNote，分屏参考栏用自己的文档 id。 */
+  const currentId = currentNoteId ?? activeNote?.id ?? null;
+  const openTab = useCallback((noteId: string) => {
+    if (onSelectTab) {
+      onSelectTab(noteId);
+      return;
+    }
+    void openNote(noteId);
+  }, [onSelectTab, openNote]);
   const noteLoadingState = state.noteLoadingState ?? { pendingNoteId: null };
   const [contextMenu, setContextMenu] = useState<TabContextMenuState>(null);
   const [createMenu, setCreateMenu] = useState<CreateMenuState>(null);
@@ -212,59 +234,25 @@ export default function NoteTabsBar() {
     return openNoteTabs.find((tab) => tab.id === contextMenu.tabId) || null;
   }, [contextMenu, openNoteTabs]);
 
-  const openNote = useCallback(async (noteId: string) => {
-    if (activeNote?.id === noteId) {
-      if (noteLoadingState.pendingNoteId && noteLoadingState.pendingNoteId !== noteId) {
-        cancelNoteLoad();
-      }
-      return;
-    }
-    try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
-    const targetTab = openNoteTabs.find((tab) => tab.id === noteId);
-    await loadNote({
-      noteId,
-      summary: {
-        title: targetTab?.title || t("editorTabs.noTitle"),
-        notebookId: targetTab?.notebookId || "",
-        contentFormat: targetTab?.contentFormat,
-      },
-      request: () => api.getNote(noteId),
-      onSuccess: (note) => {
-        const existingTab = openNoteTabs.find((tab) => tab.id === note.id);
-        actions.setActiveNote(note);
-        actions.setMobileView("editor");
-        actions.openNoteTab({
-          id: note.id,
-          title: note.title,
-          notebookId: note.notebookId,
-          workspaceId: note.workspaceId,
-          contentFormat: note.contentFormat,
-          isLocked: note.isLocked,
-          isTrashed: note.isTrashed,
-          updatedAt: note.updatedAt,
-          pinned: existingTab?.pinned,
-        });
-      },
-    });
-  }, [actions, activeNote?.id, cancelNoteLoad, loadNote, noteLoadingState.pendingNoteId, openNoteTabs, t]);
-
   const closeTab = useCallback((noteId: string) => {
-    const closingActive = activeNote?.id === noteId;
-    const nextTab = closingActive ? getNextTabAfterClose(openNoteTabs, noteId) : null;
+    const closingCurrent = currentId === noteId;
+    const nextTab = closingCurrent ? getNextTabAfterClose(openNoteTabs, noteId) : null;
     actions.closeNoteTab(noteId);
-    if (!closingActive) return;
+    if (!closingCurrent) return;
     if (nextTab) {
-      void openNote(nextTab.id);
-    } else {
+      // 分屏参考栏关闭当前页签：把该栏切到相邻页签，而不是收起整块分屏。
+      if (onSelectTab) onSelectTab(nextTab.id);
+      else void openNote(nextTab.id);
+    } else if (!onSelectTab) {
       actions.setActiveNote(null);
     }
-  }, [actions, activeNote?.id, openNote, openNoteTabs]);
+  }, [actions, currentId, onSelectTab, openNote, openNoteTabs]);
 
   const ensureTargetActive = useCallback((tab: OpenNoteTab) => {
-    if (activeNote?.id !== tab.id) {
-      void openNote(tab.id);
+    if (currentId !== tab.id) {
+      openTab(tab.id);
     }
-  }, [activeNote?.id, openNote]);
+  }, [currentId, openTab]);
 
   const closeOtherTabs = useCallback((tab: OpenNoteTab) => {
     actions.setNoteTabs([tab]);
@@ -277,10 +265,10 @@ export default function NoteTabsBar() {
     const nextTabs = side === "left"
       ? openNoteTabs.slice(targetIndex)
       : openNoteTabs.slice(0, targetIndex + 1);
-    const activeKept = !!activeNote && nextTabs.some((item) => item.id === activeNote.id);
+    const activeKept = !!currentId && nextTabs.some((item) => item.id === currentId);
     actions.setNoteTabs(nextTabs);
     if (!activeKept) ensureTargetActive(tab);
-  }, [actions, activeNote, ensureTargetActive, openNoteTabs]);
+  }, [actions, currentId, ensureTargetActive, openNoteTabs]);
 
   const closeAllTabs = useCallback(() => {
     actions.clearNoteTabs();
@@ -509,7 +497,7 @@ export default function NoteTabsBar() {
     });
     if (measuredWidths.size !== openNoteTabs.length) return;
 
-    const activeId = activeNote?.id && measuredWidths.has(activeNote.id) ? activeNote.id : null;
+    const activeId = currentId && measuredWidths.has(currentId) ? currentId : null;
     const nextVisible = new Set<string>();
     let usedWidth = 0;
 
@@ -534,7 +522,7 @@ export default function NoteTabsBar() {
       .filter((tab) => nextVisible.has(tab.id))
       .map((tab) => tab.id);
     setVisibleTabIds((current) => sameTabIds(current, orderedIds) ? current : orderedIds);
-  }, [activeNote?.id, openNoteTabs]);
+  }, [currentId, openNoteTabs]);
 
   useLayoutEffect(() => {
     recomputeVisibleTabs();
@@ -561,23 +549,26 @@ export default function NoteTabsBar() {
   }, [tabListMenu]);
 
   useEffect(() => {
+    // 分屏时两栏各挂一条页签栏：Ctrl+W 只由主栏（未接管打开行为的那条）处理，
+    // 否则一次按键会把主栏和参考栏的文档一起关掉。
+    if (onSelectTab) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "w") return;
       if (isEditableTarget(event.target)) return;
-      if (!activeNote || openNoteTabs.length === 0) return;
+      if (!currentId || openNoteTabs.length === 0) return;
       event.preventDefault();
-      closeTab(activeNote.id);
+      closeTab(currentId);
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [activeNote, closeTab, openNoteTabs.length]);
+  }, [closeTab, currentId, onSelectTab, openNoteTabs.length]);
 
   const visibleIdSet = new Set(visibleTabIds);
-  if (activeNote?.id) visibleIdSet.add(activeNote.id);
+  if (currentId) visibleIdSet.add(currentId);
   const visibleTabs = openNoteTabs.filter((tab) => visibleIdSet.has(tab.id));
   const overflowTabs = openNoteTabs.filter((tab) => !visibleIdSet.has(tab.id));
-  const activeTab = activeNote
-    ? openNoteTabs.find((tab) => tab.id === activeNote.id) || null
+  const activeTab = currentId
+    ? openNoteTabs.find((tab) => tab.id === currentId) || null
     : null;
   const tabListTabs = overflowTabs.length > 0
     ? [activeTab, ...overflowTabs].filter((tab): tab is OpenNoteTab => !!tab)
@@ -601,7 +592,7 @@ export default function NoteTabsBar() {
     >
       <div ref={tabsViewportRef} className="flex min-w-0 flex-1 items-stretch overflow-hidden px-2">
         {visibleTabs.map((tab) => {
-          const active = activeNote?.id === tab.id;
+          const active = currentId === tab.id;
           const title = tab.title || t("editorTabs.noTitle");
           return (
             <button
@@ -613,7 +604,7 @@ export default function NoteTabsBar() {
                   e.preventDefault();
                   return;
                 }
-                void openNote(tab.id);
+                openTab(tab.id);
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -681,7 +672,11 @@ export default function NoteTabsBar() {
                 title={title}
                 active={active}
                 loading={active && noteLoading}
-                colorMark={active ? activeNote?.colorMark : state.notes?.find((note) => note.id === tab.id)?.colorMark}
+                colorMark={active
+                  ? (activeNote?.id === tab.id
+                    ? activeNote.colorMark
+                    : state.notes?.find((note) => note.id === tab.id)?.colorMark ?? null)
+                  : state.notes?.find((note) => note.id === tab.id)?.colorMark}
                 closeLabel={t("editorTabs.close")}
                 onClose={(e) => {
                   e.stopPropagation();
@@ -693,8 +688,9 @@ export default function NoteTabsBar() {
         })}
 
         {/* 工具页签（方案 B · B2）：与笔记页签**同一行**，不新增顶栏。
-            由侧栏底部工具条 / 页面入口打开；点 chip 切换、点 ✕ 关闭。 */}
-        {(state.openToolTabs?.length ?? 0) > 0 && (
+            由侧栏底部工具条 / 页面入口打开；点 chip 切换、点 ✕ 关闭。
+            分屏参考栏（compact）只服务本栏文档，不重复承载全局工具页签。 */}
+        {!compact && (state.openToolTabs?.length ?? 0) > 0 && (
           <div className="my-1 mr-1 flex shrink-0 items-center gap-1" data-tool-tab-strip="">
             <span className="h-4 w-px shrink-0 bg-app-border/70" aria-hidden />
             {(state.openToolTabs ?? []).map((key) => {
@@ -736,22 +732,24 @@ export default function NoteTabsBar() {
           </div>
         )}
 
-        <button
-          ref={newTabButtonRef}
-          type="button"
-          className="my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-50"
-          onClick={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setContextMenu(null);
-            setCreateNotebookMenu(null);
-            setCreateMenu((menu) => menu ? null : { x: rect.left, y: rect.bottom + 6 });
-          }}
-          disabled={creating}
-          title={t("editorTabs.newDocument")}
-          aria-label={t("editorTabs.newDocument")}
-        >
-          <Plus size={16} className={creating ? "animate-pulse" : undefined} />
-        </button>
+        {!compact && (
+          <button
+            ref={newTabButtonRef}
+            type="button"
+            className="my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setContextMenu(null);
+              setCreateNotebookMenu(null);
+              setCreateMenu((menu) => menu ? null : { x: rect.left, y: rect.bottom + 6 });
+            }}
+            disabled={creating}
+            title={t("editorTabs.newDocument")}
+            aria-label={t("editorTabs.newDocument")}
+          >
+            <Plus size={16} className={creating ? "animate-pulse" : undefined} />
+          </button>
+        )}
       </div>
 
       <div
@@ -760,7 +758,7 @@ export default function NoteTabsBar() {
         aria-hidden="true"
       >
         {openNoteTabs.map((tab) => {
-          const active = activeNote?.id === tab.id;
+          const active = currentId === tab.id;
           const title = tab.title || t("editorTabs.noTitle");
           return (
             <div
@@ -782,6 +780,7 @@ export default function NoteTabsBar() {
 
       <div className="pointer-events-none w-8 shrink-0 bg-gradient-to-r from-transparent to-app-surface/80" />
       <div className="flex shrink-0 items-center border-l border-app-border/70 px-1">
+        {trailing}
         <EditorToolbarExpandSlot location="tabs" />
         <button
           ref={tabListTriggerRef}
@@ -891,7 +890,7 @@ export default function NoteTabsBar() {
           </div>
           <div className="max-h-[min(28rem,calc(100vh-6rem))] overflow-y-auto py-1">
             {tabListTabs.map((tab) => {
-              const active = activeNote?.id === tab.id;
+              const active = currentId === tab.id;
               const title = tab.title || t("editorTabs.noTitle");
               return (
                 <div
@@ -906,7 +905,7 @@ export default function NoteTabsBar() {
                     className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left text-sm text-tx-secondary transition-colors hover:text-tx-primary"
                     onClick={() => {
                       setTabListMenu(null);
-                      void openNote(tab.id);
+                      openTab(tab.id);
                     }}
                     aria-current={active ? "page" : undefined}
                     data-note-tab-id={tab.id}

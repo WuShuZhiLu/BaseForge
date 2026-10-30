@@ -337,13 +337,15 @@ export class HostApiBroker {
   private async mindmaps(context: PluginExecutionContext, operation: string, args: JsonObject): Promise<unknown> {
     ensureMindmapSchema();
     const db = getDb();
+    // 导图归一后正文存 notes（contentFormat="mindmap"），保持插件 API 的行结构不变。
+    const mindmapDocColumns = "n.id, n.userId, n.workspaceId, n.title, n.content AS data, n.isFavorite AS starred, n.createdAt, n.updatedAt";
     if (operation === "get") {
-      const row = db.prepare("SELECT * FROM mindmaps WHERE id=?").get(requireString(args.id ?? args.mindmapId, "mindmapId")) as JsonObject | undefined;
+      const row = db.prepare(`SELECT ${mindmapDocColumns} FROM notes n WHERE n.id=? AND n.contentFormat='mindmap' AND n.isTrashed=0`).get(requireString(args.id ?? args.mindmapId, "mindmapId")) as JsonObject | undefined;
       if (!row || (row.userId !== context.userId && !allowedWorkspace(row.workspaceId, context.userId))) forbidden("无权读取该思维导图");
       return row;
     }
     if (operation === "list") {
-      const rows = db.prepare("SELECT id,userId,workspaceId,title,starred,folderId,createdAt,updatedAt FROM mindmaps ORDER BY updatedAt DESC LIMIT 500").all() as JsonObject[];
+      const rows = db.prepare(`SELECT ${mindmapDocColumns} FROM notes n WHERE n.contentFormat='mindmap' AND n.isTrashed=0 AND n.isUnlisted=0 ORDER BY n.updatedAt DESC LIMIT 500`).all() as JsonObject[];
       return rows.filter((row) => row.userId === context.userId || allowedWorkspace(row.workspaceId, context.userId)).slice(0, Math.max(1, Math.min(100, Number(args.limit) || 50)));
     }
     if (operation === "create") {
