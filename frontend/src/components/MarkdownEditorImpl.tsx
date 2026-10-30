@@ -547,6 +547,12 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
   const collabUndoManagerRef = useRef<Y.UndoManager | null>(null);
   const [encryptedRegion, setEncryptedRegion] = useState<{ source?: string; initialContent?: { plaintext: string; format: "markdown" }; commit: (source: string) => void } | null>(null);
   useEffect(() => { setEncryptedRegion(null); }, [note.id]);
+  // 切换笔记时按「默认打开方式」重置视图模式：viewMode 是 useState，组件在同一
+  // 编辑器实例内被复用（note.id 变化不重新挂载），不重置就会沿用上一篇的模式——
+  // 表现为「默认预览设了也没用，切进来还是源码」。
+  useEffect(() => {
+    setViewMode(normalizeMarkdownViewModeForMobile(defaultViewMode, isMobileMarkdownViewport()));
+  }, [note.id, defaultViewMode]);
   const openEncryptedRegion = () => {
     const view = viewRef.current;
     if (!view || !editable || isGuest || note.isTrashed) return;

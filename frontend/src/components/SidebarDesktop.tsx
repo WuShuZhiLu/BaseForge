@@ -345,8 +345,9 @@ export default function SidebarDesktop() {
   // 行级菜单
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
 
-  // 重命名（行内 input）
-  const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string } | null>(null);
+  // 重命名（行内 input）。isNew = 刚新建、正处于"先建后改名"流程：
+  // 这种情况下取消/清空名字要真正把节点删掉，否则"取消"只是个装饰按钮。
+  const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string; isNew?: boolean } | null>(null);
 
   // 区段折叠 + 排序（折叠状态持久化）
   const SECTION_COLLAPSED_KEY = "nowen-next-sidebar-sections-collapsed";
@@ -564,8 +565,9 @@ export default function SidebarDesktop() {
       const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
-      // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致
-      setRenaming({ kind: "kb", id: created.id, value: created.title });
+      // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致。
+      // isNew 标记让"取消/清空名字"能真正撤销这次创建。
+      setRenaming({ kind: "kb", id: created.id, value: created.title, isNew: true });
     } catch (error) {
       console.error("[SidebarDesktop] create node failed:", error);
     }
@@ -1489,10 +1491,21 @@ export default function SidebarDesktop() {
 
   const commitRename = useCallback(async () => {
     if (!renaming) return;
-    const { kind, id, value } = renaming;
+    const { kind, id, value, isNew } = renaming;
     const trimmed = value.trim();
     setRenaming(null);
-    if (!trimmed) return;
+    if (!trimmed) {
+      // 新建流程里留空 = 放弃这次创建（删掉刚建的节点）；普通重命名留空 = 保持原名
+      if (isNew) {
+        try {
+          await knowledgeTreeApi.remove(id, "subtree");
+          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        } catch (error) {
+          console.error("[SidebarDesktop] discard new node failed:", error);
+        }
+      }
+      return;
+    }
     try {
       if (kind === "kb") {
         await knowledgeTreeApi.update(id, { title: trimmed });
@@ -1505,6 +1518,16 @@ export default function SidebarDesktop() {
       console.error("[SidebarDesktop] rename failed:", error);
     }
   }, [renaming, reloadTags]);
+
+  /** 取消重命名：新建流程下等同于撤销这次创建（删除刚建的节点），否则仅退出改名。 */
+  const cancelRename = useCallback(() => {
+    const current = renaming;
+    setRenaming(null);
+    if (!current?.isNew) return;
+    void knowledgeTreeApi.remove(current.id, "subtree")
+      .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+      .catch((error) => console.error("[SidebarDesktop] discard new node failed:", error));
+  }, [renaming]);
 
   const deleteNode = useCallback(async (nodeId: string) => {
     try {
@@ -1711,7 +1734,7 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <Ellipsis size={13} />
+                <Ellipsis size={15} strokeWidth={2} />
               </button>
             </>
           )}
@@ -1785,7 +1808,8 @@ export default function SidebarDesktop() {
                       }}
                       className={cn(
                         "group flex h-8 items-center gap-1 rounded-md pr-1 text-xs transition-colors",
-                        isSelected ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
+                        // 重命名时不要蓝色选中底：会和输入框边框叠成一坨蓝色
+                        isSelected && !isRenaming ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
                         isDragSource && "opacity-40",
                         isFlash && "animate-pulse bg-accent-primary/25",
                         isDropInto && "bg-accent-primary/20 ring-1 ring-accent-primary",
@@ -1823,10 +1847,10 @@ export default function SidebarDesktop() {
                             onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelRename(); }
                             }}
                             onBlur={() => void commitRename()}
-                            className="min-w-0 flex-1 rounded border border-accent-primary/60 bg-app-bg px-1.5 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+                            className="no-focus-ring h-[26px] min-w-0 flex-1 rounded-lg border border-accent-primary bg-app-bg px-2 text-[12px] text-tx-primary outline-none transition-colors"
                             autoFocus
                           />
                           {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
@@ -1836,19 +1860,19 @@ export default function SidebarDesktop() {
                             onClick={() => void commitRename()}
                             title="确认"
                             aria-label="确认重命名"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-accent-primary/10"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-accent-primary transition-colors hover:bg-app-hover"
                           >
-                            <Check size={12} />
+                            <Check size={13} />
                           </button>
                           <button
                             type="button"
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => setRenaming(null)}
+                            onClick={cancelRename}
                             title="取消"
                             aria-label="取消重命名"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
                           >
-                            <X size={12} />
+                            <X size={13} />
                           </button>
                         </>
                       ) : (
@@ -1896,7 +1920,7 @@ export default function SidebarDesktop() {
                             title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                             className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                           >
-                            <Ellipsis size={13} />
+                            <Ellipsis size={15} strokeWidth={2} />
                           </button>
                         </>
                       )}
@@ -1940,7 +1964,7 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <Ellipsis size={13} />
+                <Ellipsis size={15} strokeWidth={2} />
               </button>
             </>
           )}
@@ -1981,10 +2005,10 @@ export default function SidebarDesktop() {
                             onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelRename(); }
                             }}
                             onBlur={() => void commitRename()}
-                            className="min-w-0 flex-1 rounded border border-accent-primary/60 bg-app-bg px-1.5 py-1 text-xs text-tx-primary outline-none focus:border-accent-primary"
+                            className="no-focus-ring h-[26px] min-w-0 flex-1 rounded-lg border border-accent-primary bg-app-bg px-2 text-[12px] text-tx-primary outline-none transition-colors"
                             autoFocus
                           />
                           {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
@@ -1994,19 +2018,19 @@ export default function SidebarDesktop() {
                             onClick={() => void commitRename()}
                             title="确认"
                             aria-label="确认重命名"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-accent-primary hover:bg-accent-primary/10"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-accent-primary transition-colors hover:bg-app-hover"
                           >
-                            <Check size={12} />
+                            <Check size={13} />
                           </button>
                           <button
                             type="button"
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => setRenaming(null)}
+                            onClick={cancelRename}
                             title="取消"
                             aria-label="取消重命名"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
                           >
-                            <X size={12} />
+                            <X size={13} />
                           </button>
                         </>
                       ) : (
@@ -2033,7 +2057,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <Ellipsis size={13} />
+                          <Ellipsis size={15} strokeWidth={2} />
                         </button>
                       )}
                     </div>
@@ -2065,7 +2089,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <Ellipsis size={13} />
+                          <Ellipsis size={15} strokeWidth={2} />
                         </button>
                       </div>
                     ))}
