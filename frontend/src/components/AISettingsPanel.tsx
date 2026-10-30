@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { confirm } from "@/components/ui/confirm";
 import PluginPromptPackSettingsSection from "@/components/settings/PluginPromptPackSettingsSection";
 import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
 import {
@@ -308,7 +309,8 @@ export default function AISettingsPanel() {
       setMessage({ type: "error", text: copy.atLeastOne });
       return;
     }
-    if (!window.confirm(copy.deleteConfirm)) return;
+    const ok = await confirm({ title: copy.deleteConfirm, confirmText: copy.delete, danger: true });
+    if (!ok) return;
     setSaving(true);
     try {
       const result = await aiProfiles.remove(selectedId);

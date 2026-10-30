@@ -20,6 +20,7 @@ export type RemoteImagePasteMode = "localize" | "ask" | "keep-remote";
 export type EditorMode = "md" | "tiptap";
 export type FolderAutoLockMinutes = 0 | 5 | 15 | 30 | 60;
 export type CodeBlockThemeId =
+  | "auto"
   | "github-dark"
   | "github-light"
   | "dracula"
@@ -78,10 +79,10 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   editorFontSize: 0,
   showNoteListUpdatedTime: true,
   enableNoteTabs: false,
-  markdownDefaultViewMode: "source",
+  markdownDefaultViewMode: "preview",
   remoteImagePasteMode: "localize",
   defaultEditorMode: "tiptap",
-  codeBlockTheme: "github-dark",
+  codeBlockTheme: "auto",
   codeBlockCollapseMode: "long",
   noteTheme: "default",
   noteListTitleOnly: false,
@@ -102,6 +103,7 @@ const LEGACY_SHOW_TIME_KEY = "nowen.noteList.showTime";
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_USER_PREFERENCES) as Array<keyof UserPreferences>;
 const CODE_BLOCK_THEMES = new Set<CodeBlockThemeId>([
+  "auto",
   "github-dark",
   "github-light",
   "dracula",

@@ -85,26 +85,30 @@ export default function SheetEmbedCard({ href }: { href: string }) {
     <div
       data-sheet-embed=""
       data-sheet-id={sheetId}
-      className="overflow-hidden rounded-xl border border-app-border bg-app-surface"
+      className="embed-block-wrapper min-w-0 max-w-full"
       onKeyDown={(event) => event.stopPropagation()}
     >
-      <div className="flex items-center gap-2 border-b border-app-border bg-app-hover/60 px-3 py-2">
-        <Table2 size={14} className="shrink-0 text-sky-500" />
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-tx-primary">{title}</span>
-        <button
-          type="button"
-          contentEditable={false}
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            pushSheetAppPath(sheetId);
-          }}
-          title="打开表格编辑器"
-        >
-          <ExternalLink size={12} />
-          打开
-        </button>
+      <div className="embed-block-toolbar" contentEditable={false}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Table2 size={14} className="embed-block-icon" />
+          <span className="embed-block-title">{title}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            contentEditable={false}
+            className="embed-block-tool-btn"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              pushSheetAppPath(sheetId);
+            }}
+            title="打开表格编辑器"
+          >
+            <ExternalLink size={12} />
+            打开
+          </button>
+        </div>
       </div>
       {loading ? (
         <div className="flex h-24 items-center justify-center gap-2 text-xs text-tx-tertiary">

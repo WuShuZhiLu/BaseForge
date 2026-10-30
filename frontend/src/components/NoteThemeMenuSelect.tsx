@@ -3,6 +3,7 @@ import { Palette } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { getNoteAppearance, setNoteAppearance } from "@/lib/noteAppearance";
+import { alert } from "@/components/ui/confirm";
 import {
   listAvailableNoteThemes,
   subscribePluginNoteThemes,
@@ -60,7 +61,7 @@ export default function NoteThemeMenuSelect({ noteId, disabled = false }: { note
             const saved = await setNoteAppearance(noteId, next);
             setThemeId(saved.themeId);
           } catch (error) {
-            window.alert(error instanceof Error ? error.message : String(error));
+            void alert({ title: "保存笔记外观失败", description: error instanceof Error ? error.message : String(error) });
           } finally {
             setSaving(false);
           }

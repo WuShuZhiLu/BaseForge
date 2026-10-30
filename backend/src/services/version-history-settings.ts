@@ -24,7 +24,10 @@ export interface VersionHistoryRetentionSettings {
 export interface VersionHistorySettings {
   autoVersionIntervalMinutes: number;
   sessionEndSnapshot: boolean;
+  /** auto（定时快照）保留策略 */
   retention: VersionHistoryRetentionSettings;
+  /** manual（Ctrl+S 保存记录）保留策略（v134）：release 永不参与清理 */
+  manualRetention: VersionHistoryRetentionSettings;
   /** P2 存储配额（MB）：auto 版本总字节超过该值时按最旧优先清理；0 = 不限制 */
   storageQuotaMb: number;
 }
@@ -33,6 +36,7 @@ export const DEFAULT_VERSION_HISTORY_SETTINGS: VersionHistorySettings = {
   autoVersionIntervalMinutes: 30,
   sessionEndSnapshot: true,
   retention: { mode: "forever", count: 50, days: 90 },
+  manualRetention: { mode: "forever", count: 100, days: 180 },
   storageQuotaMb: 0,
 };
 
@@ -81,6 +85,7 @@ function sanitize(raw: unknown): VersionHistorySettings {
     autoVersionIntervalMinutes: sanitizeInterval(source.autoVersionIntervalMinutes),
     sessionEndSnapshot: sanitizeSessionFlag(source.sessionEndSnapshot),
     retention: sanitizeRetention(source.retention),
+    manualRetention: sanitizeRetention(source.manualRetention),
     storageQuotaMb: sanitizeQuotaMb(source.storageQuotaMb),
   };
 }
@@ -114,6 +119,7 @@ export function writeVersionHistorySettings(patch: unknown): VersionHistorySetti
   const current = readVersionHistorySettings();
   const source = (patch && typeof patch === "object" ? patch : {}) as Record<string, unknown>;
   const patchRetention = (source.retention && typeof source.retention === "object" ? source.retention : {}) as Record<string, unknown>;
+  const patchManualRetention = (source.manualRetention && typeof source.manualRetention === "object" ? source.manualRetention : {}) as Record<string, unknown>;
   const merged = sanitize({
     autoVersionIntervalMinutes:
       source.autoVersionIntervalMinutes !== undefined
@@ -127,6 +133,11 @@ export function writeVersionHistorySettings(patch: unknown): VersionHistorySetti
       mode: patchRetention.mode !== undefined ? patchRetention.mode : current.retention.mode,
       count: patchRetention.count !== undefined ? patchRetention.count : current.retention.count,
       days: patchRetention.days !== undefined ? patchRetention.days : current.retention.days,
+    },
+    manualRetention: {
+      mode: patchManualRetention.mode !== undefined ? patchManualRetention.mode : current.manualRetention.mode,
+      count: patchManualRetention.count !== undefined ? patchManualRetention.count : current.manualRetention.count,
+      days: patchManualRetention.days !== undefined ? patchManualRetention.days : current.manualRetention.days,
     },
   });
   systemSettingsRepository.set(VERSION_HISTORY_SETTINGS_KEY, JSON.stringify(merged));

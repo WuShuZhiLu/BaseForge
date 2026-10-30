@@ -21,6 +21,7 @@ import {
   repairSearchContentText,
 } from "../lib/searchIndex";
 import { ensureSearchNotebookExclusionsTable } from "../services/searchNotebookExclusions";
+import { collectMindmapTexts } from "../lib/mindmapData";
 import searchExclusionsRouter from "./search-exclusions";
 
 const app = new Hono();
@@ -312,7 +313,9 @@ function fetchFtsTermCandidates(
         WHERE notes_search_fts MATCH ?
 AND ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
+AND COALESCE(n.contentFormat, 'tiptap-json') <> 'mindmap'
         ORDER BY bm25(notes_search_fts, 8.0, 1.0), n.id ASC
         LIMIT ? OFFSET ?
       `).all(
@@ -353,6 +356,7 @@ function fetchMetadataTermCandidates(
         JOIN notebooks nb ON nb.id = n.notebookId
         WHERE ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
 AND instr(nowen_search_normalize(COALESCE(t.name, '')), ?) > 0
 
@@ -365,6 +369,7 @@ AND instr(nowen_search_normalize(COALESCE(t.name, '')), ?) > 0
         JOIN notebooks nb ON nb.id = n.notebookId
         WHERE ${scope.sql}
 AND n.isTrashed = 0
+AND n.isUnlisted = 0
 AND nb.isDeleted = 0
 AND (
   instr(nowen_search_normalize(COALESCE(a.filename, '')), ?) > 0
@@ -407,7 +412,9 @@ function fetchLiteralTermCandidates(
       JOIN notebooks nb ON nb.id = n.notebookId
       WHERE ${scope.sql}
         AND n.isTrashed = 0
+        AND n.isUnlisted = 0
         AND nb.isDeleted = 0
+        AND COALESCE(n.contentFormat, 'tiptap-json') <> 'mindmap'
         AND (
 instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
 OR instr(nowen_search_normalize(COALESCE(n.contentText, '')), ?) > 0
@@ -531,6 +538,7 @@ function fetchFtsScores(
         AND ${scope.sql}
         AND n.id IN (${placeholders})
         AND n.isTrashed = 0
+        AND n.isUnlisted = 0
         AND nb.isDeleted = 0
       ORDER BY score
     `).all(searchTerm, ...scope.params, ...ids) as Array<{ id: string; score: number }>;
@@ -590,6 +598,7 @@ function fetchCandidateRows(
     WHERE n.id IN (${placeholders})
       AND ${scope.sql}
       AND n.isTrashed = 0
+      AND n.isUnlisted = 0
       AND nb.isDeleted = 0
     ORDER BY n.updatedAt DESC
   `).all(userId, ...ids, ...scope.params) as SearchRow[];
@@ -700,33 +709,9 @@ type MindMapSearchRow = {
   workspaceId: string | null;
   title: string;
   data: string;
+  notebookId: string;
   updatedAt: string;
 };
-
-function parseMindMapSearchValues(raw: string): string[] {
-  try {
-    const parsed = JSON.parse(raw) as { root?: unknown };
-    const root = parsed && typeof parsed === "object" && "root" in parsed ? parsed.root : parsed;
-    const values: string[] = [];
-    const stack: unknown[] = root ? [root] : [];
-    let visited = 0;
-    while (stack.length > 0 && visited < 20_000) {
-      const current = stack.pop();
-      visited += 1;
-      if (!current || typeof current !== "object" || Array.isArray(current)) continue;
-      const node = current as { text?: unknown; children?: unknown };
-      if (typeof node.text === "string" && node.text) values.push(node.text);
-      if (Array.isArray(node.children)) {
-        for (let index = node.children.length - 1; index >= 0; index -= 1) {
-          stack.push(node.children[index]);
-        }
-      }
-    }
-    return values;
-  } catch {
-    return [];
-  }
-}
 
 function fetchMindMapResults(
   db: Database.Database,
@@ -740,29 +725,31 @@ function fetchMindMapResults(
 
   const workspaceScope = workspaceId && workspaceId !== "personal";
   const scopeSql = workspaceScope
-    ? "m.workspaceId = ?"
-    : "m.workspaceId IS NULL AND m.userId = ?";
+    ? "n.workspaceId = ?"
+    : "n.workspaceId IS NULL AND n.userId = ?";
   const scopeParams = workspaceScope ? [workspaceId] : [userId];
   const termSql = normalizedTerms
     .map(() => `(
-      instr(nowen_search_normalize(COALESCE(m.title, '')), ?) > 0
-      OR instr(nowen_search_normalize(COALESCE(m.data, '')), ?) > 0
+      instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
+      OR instr(nowen_search_normalize(COALESCE(n.content, '')), ?) > 0
     )`)
     .join(" AND ");
   const termParams = normalizedTerms.flatMap((term) => [term, term]);
 
+  // 导图归一后正文存 notes（contentFormat="mindmap"）；结果保留 mindmap 资源类型供 UI 展示。
   const rows = db.prepare(`
-    SELECT m.id, m.userId, m.workspaceId, m.title, m.data, m.updatedAt
-    FROM mindmaps m
+    SELECT n.id, n.userId, n.workspaceId, n.title, n.content AS data, n.notebookId, n.updatedAt
+    FROM notes n
     WHERE ${scopeSql}
+      AND n.contentFormat = 'mindmap' AND n.isTrashed = 0 AND n.isUnlisted = 0
       AND ${termSql}
-    ORDER BY m.updatedAt DESC, m.id ASC
+    ORDER BY n.updatedAt DESC, n.id ASC
     LIMIT 200
   `).all(...scopeParams, ...termParams) as MindMapSearchRow[];
 
   return rows
     .filter((row) => {
-      const access = resolveResourceKnowledgeAccess("mindmap", row.id, userId, db);
+      const access = resolveResourceKnowledgeAccess("note", row.id, userId, db);
       return hasKnowledgeCapability(access, "canView");
     })
     .map((row): SearchResultWithScore | null => {
@@ -774,7 +761,7 @@ function fetchMindMapResults(
       const matchingValues: string[] = [];
       let contentExact = false;
 
-      for (const rawValue of parseMindMapSearchValues(row.data)) {
+      for (const rawValue of collectMindmapTexts(row.data)) {
         const normalized = normalizeSearchText(rawValue);
         if (!normalized) continue;
         let matched = false;
@@ -816,7 +803,7 @@ function fetchMindMapResults(
         resourceType: "mindmap",
         id: row.id,
         userId: row.userId,
-        notebookId: "",
+        notebookId: row.notebookId,
         workspaceId: row.workspaceId,
         title: row.title,
         updatedAt: row.updatedAt,
@@ -923,6 +910,7 @@ function fetchSheetResults(
     WHERE ${scope.sql}
       AND n.note_type = 'sheet'
       AND n.isTrashed = 0
+      AND n.isUnlisted = 0
       AND nb.isDeleted = 0
       AND ${termSql}
     ORDER BY n.updatedAt DESC, n.id ASC

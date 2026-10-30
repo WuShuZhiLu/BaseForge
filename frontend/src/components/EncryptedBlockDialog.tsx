@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "./ui/button";
+import { confirm } from "@/components/ui/confirm";
 import EncryptedNoteRichTextEditor from "./EncryptedNoteRichTextEditor";
 import { runEncryptedContentOperation } from "@/lib/encryptedNotes/workerClient";
 import { EncryptedContentSession } from "@/lib/encryptedNotes/sessionClient";
@@ -68,11 +69,22 @@ export default function EncryptedBlockDialog({ source, initialContent, onCommit,
       if (operation.current === controller) { operation.current = null; if (mounted.current) { setBusy(false); setSecuring(false); } }
     }
   }
-  function close() { if (!busy && (!(dirty || draft || lockFailed) || window.confirm(t("encryptedUi.discardConfirm")))) onClose(); }
+  async function close() {
+    if (busy) return;
+    if (dirty || draft || lockFailed) {
+      const ok = await confirm({
+        title: t("encryptedUi.discardConfirm"),
+        confirmText: t("encryptedUi.close"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onClose();
+  }
   useEffect(() => {
     const scope = getOfflineQueueStorageKey();
     const leave = (event: BeforeUnloadEvent) => { if (dirty || draft || busy || lockFailed) { event.preventDefault(); event.returnValue = ""; } };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); close(); } };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); void close(); } };
     const account = () => { if (getOfflineQueueStorageKey() !== scope) { operation.current?.abort(); cryptoSession.current?.close(); cryptoSession.current = null; recovery.current = null; onClose(); } };
     const navigation = (event: Event) => { if (dirty || draft || busy || lockFailed) event.preventDefault(); else onClose(); };
     window.addEventListener("beforeunload", leave); window.addEventListener("keydown", escape);
@@ -142,7 +154,7 @@ export default function EncryptedBlockDialog({ source, initialContent, onCommit,
         : <EncryptedNoteRichTextEditor initialContent={initialBody} editable={Boolean(onCommit) && !busy} onChange={setBody} />
         : <Button type="submit" form={passwordFormId} disabled={native || busy || (!envelope && !lockFailed) || !password}>{busy ? t("encryptedUi.unlocking") : t("encryptedUi.unlock")}</Button>}
       <div className="flex gap-2">{unlocked && onCommit && <Button disabled={native || busy || (isNew ? !hasStrongNewPassphrase(password) || password !== confirmation : !cryptoSession.current)} onClick={() => void perform(true)}>{busy ? t("encryptedBlock.encrypting") : initialContent && isNew ? t("encryptedBlock.encrypt") : t("encryptedUi.save")}</Button>}
-        <Button disabled={busy} variant="outline" onClick={close}>{t("encryptedUi.close")}</Button></div>
+        <Button disabled={busy} variant="outline" onClick={() => void close()}>{t("encryptedUi.close")}</Button></div>
       {!onCommit && <p className="text-xs text-tx-secondary">{t("encryptedUi.readOnly")}</p>}
     </section>
   </div>, document.body);

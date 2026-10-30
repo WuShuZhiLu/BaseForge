@@ -43,6 +43,7 @@ import { clearLocalIdMap, clearQueue, getQueueLength } from "@/lib/offlineQueue"
 import { AccountLoginHistoryDialog } from "@/components/AccountLoginHistory";
 import { isAccountLoginHistorySupported } from "@/lib/accountLoginHistory";
 import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/workspaceIssueNavigation";
+import { confirm } from "@/components/ui/confirm";
 
 type NavGroup = "workspace" | "modules" | "tools";
 
@@ -166,13 +167,12 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
 
     const queuedCount = getQueueLength();
     if (queuedCount > 0) {
-      const confirmed = window.confirm(
-        t(
-          "sidebar.switchToLocalConfirmWithQueue",
-          "切回本地离线模式？当前云端账号还有未同步操作，切换后这些待同步操作会被丢弃，云端数据不会被删除。",
-        ),
-      );
-      if (!confirmed) return;
+      const ok = await confirm({
+        title: t("sidebar.switchToLocalConfirmWithQueue"),
+        confirmText: t("sidebar.switchToLocal"),
+        danger: true,
+      });
+      if (!ok) return;
     }
 
     const result = await switchDesktopToFull();

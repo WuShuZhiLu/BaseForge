@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -1115,7 +1115,7 @@ type ImportNotePayload = {
   title: string;
   content: string;
   contentText: string;
-  contentFormat?: "tiptap-json" | "markdown" | "html";
+  contentFormat?: "tiptap-json" | "markdown" | "html" | "plain";
   createdAt?: string;
   updatedAt?: string;
   notebookName?: string;
@@ -1795,6 +1795,8 @@ export const api = {
     }
     return request<Note>("/notes", { method: "POST", body: JSON.stringify(payload) });
   },
+  promoteNote: (id: string, data: { title?: string; notebookId?: string } = {}) =>
+    request<Note>(`/notes/${id}/promote`, { method: "POST", body: JSON.stringify(data) }),
   duplicateNote: (id: string, options?: { placement: "sibling" | "child" }) =>
     request<Note & {
       tags: Tag[];
@@ -1865,7 +1867,7 @@ export const api = {
    * 搜索笔记（用于笔记引用）
    * 只返回当前用户有权限访问的笔记
    */
-  searchNotes: async (query: string, limit: number = 10): Promise<Array<{ id: string; title: string; notebookId: string; updatedAt: string }>> => {
+  searchNotes: async (query: string, limit: number = 10): Promise<Array<{ id: string; title: string; notebookId: string; updatedAt: string; isFavorite: number }>> => {
     if (!query.trim()) return [];
     const params = new URLSearchParams();
     params.set("q", query.trim());
@@ -1875,11 +1877,13 @@ export const api = {
     return items
       .filter((item: { resourceType?: string }) => item?.resourceType !== "mindmap" && item?.resourceType !== "sheet")
       .slice(0, limit)
-      .map((item: { id: string; title: string; notebookId: string; updatedAt: string }) => ({
-      id: item.id,
-      title: item.title,
-      notebookId: item.notebookId,
+      .map((item: { id: string; title: string; notebookId: string; updatedAt: string; isFavorite?: number | boolean }) => ({
+        id: item.id,
+        title: item.title,
+        notebookId: item.notebookId,
         updatedAt: item.updatedAt,
+        // 收藏筛选依赖该字段（后端 /search 已返回），不能在此丢掉
+        isFavorite: Number(item.isFavorite ?? 0),
       }));
   },
   /**
@@ -3633,8 +3637,8 @@ export const api = {
   getSharedNoteIds: () => request<string[]>("/shares/status/batch"),
 
   // 版本历史
-  getNoteVersions: (noteId: string, limit = 20, offset = 0, kind?: "auto" | "manual") =>
-    request<{ versions: NoteVersion[]; total: number; contentBytesTotal?: number }>(`/shares/note/${noteId}/versions?limit=${limit}&offset=${offset}${kind ? `&kind=${kind}` : ""}`),
+  getNoteVersions: (noteId: string, limit = 20, offset = 0, kind?: "auto" | "manual", source?: "auto" | "manual" | "release") =>
+    request<{ versions: NoteVersion[]; total: number; contentBytesTotal?: number }>(`/shares/note/${noteId}/versions?limit=${limit}&offset=${offset}${kind ? `&kind=${kind}` : ""}${source ? `&source=${source}` : ""}`),
   getNoteVersion: (noteId: string, versionId: string) =>
     request<NoteVersion>(`/shares/note/${noteId}/versions/${versionId}`),
   restoreNoteVersion: (noteId: string, versionId: string) => {
@@ -3738,8 +3742,25 @@ export const api = {
   deleteRemoteNoteLink: (sourceId: string, remotePath: string) =>
     request<{ success: boolean }>("/remote-files/links/delete", { method: "POST", body: JSON.stringify({ sourceId, remotePath }) }),
   // v2 契约端点（VERSION_V2_BRIEF 固定契约表）：手动版本 / 副本 / 单删 / 批量删 / auto 快照 / 全局清理 / 设置读写
+  // v134 语义：该端点恒产 source=release（用户「保存为版本」），release 不参与自动清理
   saveNoteVersion: (noteId: string, data: { label?: string; description?: string } = {}) =>
     request<NoteVersion>(`/shares/note/${noteId}/versions`, { method: "POST", body: JSON.stringify(data) }),
+  /**
+   * v134（迁移 134 契约定稿）：保存为版本（release）。
+   * POST /shares/note/:noteId/versions body { label?, description? } → 返回 source="release" 的 NoteVersion。
+   * 与 saveNoteVersion 同端点，此处显式表达 release 语义供面板调用。
+   */
+  saveNoteReleaseVersion: (noteId: string, data: { label?: string; description?: string } = {}) =>
+    request<NoteVersion>(`/shares/note/${noteId}/versions`, { method: "POST", body: JSON.stringify({ ...data, kind: "release" }) }),
+  /** v134：将已有版本标记为发版（release） */
+  releaseNoteVersion: (noteId: string, versionId: string) =>
+    request<NoteVersion>(`/shares/note/${noteId}/versions/${versionId}/release`, { method: "POST" }),
+  /** v134：取消发版（DELETE 同路径；取消后回落为 manual，参与 manual 保留策略） */
+  unreleaseNoteVersion: (noteId: string, versionId: string) =>
+    request<NoteVersion>(`/shares/note/${noteId}/versions/${versionId}/release`, { method: "DELETE" }),
+  /** v134：服务端行级对比（需两个版本 id）；前端在接口失败或目标是「当前内容」时降级本地 LCS */
+  getNoteVersionDiff: (noteId: string, aId: string, bId: string) =>
+    request<VersionDiffResult>(`/shares/note/${noteId}/versions/diff?a=${encodeURIComponent(aId)}&b=${encodeURIComponent(bId)}`),
   duplicateNoteFromVersion: (noteId: string, versionId: string) =>
     request<Note>(`/shares/note/${noteId}/versions/${versionId}/duplicate`, { method: "POST" }),
   deleteNoteVersion: (noteId: string, versionId: string) =>
@@ -3749,9 +3770,9 @@ export const api = {
   /** 会话结束快照（auto；内容未变时 created=false，幂等） */
   snapshotNoteVersion: (noteId: string) =>
     request<{ created: boolean }>(`/shares/note/${noteId}/versions/snapshot`, { method: "POST" }),
-  /** 全局立即清理（POST /api/settings/version-history/cleanup）：按保留策略清 auto 版本 */
+  /** 全局立即清理（POST /api/settings/version-history/cleanup）：按保留策略清 auto/manual 版本；failed 为单步清理失败的步骤名（空数组=全部成功） */
   cleanupNoteVersions: () =>
-    request<{ deleted: number; freedBytes: number }>("/settings/version-history/cleanup", { method: "POST" }),
+    request<{ deleted: number; freedBytes: number; failed?: string[] }>("/settings/version-history/cleanup", { method: "POST" }),
   /** 版本历史设置（认证子路径，独立于公开品牌 GET /api/settings） */
   getVersionHistorySettings: () =>
     request<{ versionHistory?: VersionHistorySettings }>("/settings/version-history"),

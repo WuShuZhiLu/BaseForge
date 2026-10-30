@@ -9,6 +9,12 @@ import { pmMigration } from "./pmMigration.js";
 import { pmTagsMigration } from "./pmTagsMigration.js";
 import { pmItemNoMigration } from "./pmItemNoMigration.js";
 import { pmM3Migration } from "./pmM3Migration.js";
+import { anonymousDocumentsMigration } from "./anonymousDocumentsMigration.js";
+import { mindmapDocsMigration } from "./mindmapDocsMigration.js";
+import { notebookIsFavoriteMigration } from "./notebookIsFavoriteMigration.js";
+import { markdownDefaultPreviewMigration } from "./markdownDefaultPreviewMigration.js";
+import { versionSourceMigration } from "./versionSourceMigration.js";
+// 本分支（space-and-plugins）的两条迁移：与 main 的 130/131 撞号，重新编号为 135/136
 import { attachmentShareMigration } from "./attachmentShareMigration.js";
 import { workspaceAvatarMigration } from "./workspaceAvatarMigration.js";
 /**
@@ -431,6 +437,11 @@ export const MIGRATIONS: Migration[] = [
   pmTagsMigration,
   pmItemNoMigration,
   pmM3Migration,
+  anonymousDocumentsMigration,
+  mindmapDocsMigration,
+  notebookIsFavoriteMigration,
+  markdownDefaultPreviewMigration,
+  versionSourceMigration,
   attachmentShareMigration,
   workspaceAvatarMigration,
 ].sort((a, b) => a.version - b.version);

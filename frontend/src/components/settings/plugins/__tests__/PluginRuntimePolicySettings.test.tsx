@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn() }));
 vi.mock("@/lib/pluginApi", () => ({ pluginApi: { getRuntimePolicy: mocks.get, setRuntimePolicy: mocks.set } }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
 import { PluginRuntimePolicySettings } from "../PluginRuntimePolicySettings";
 
 describe("administrator Node Runtime policy", () => {
@@ -13,7 +15,7 @@ describe("administrator Node Runtime policy", () => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.clearAllMocks(); mocks.get.mockResolvedValue({ allowNodeRuntime: false });
     mocks.set.mockImplementation(async (enabled) => ({ allowNodeRuntime: enabled }));
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMocks.confirm.mockResolvedValue(true);
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
@@ -22,12 +24,12 @@ describe("administrator Node Runtime policy", () => {
 
   it("keeps the secure default and requires confirmation to enable the policy", async () => {
     await render(); expect(host.querySelector("input")!.checked).toBe(false);
-    vi.mocked(window.confirm).mockReturnValue(false); await click();
+    confirmMocks.confirm.mockResolvedValueOnce(false); await click();
     expect(mocks.set).not.toHaveBeenCalled(); expect(host.querySelector("input")!.checked).toBe(false);
-    vi.mocked(window.confirm).mockReturnValue(true); await click();
+    confirmMocks.confirm.mockResolvedValueOnce(true); await click();
     expect(mocks.set).toHaveBeenCalledWith(true); expect(host.querySelector("input")!.checked).toBe(true);
     await click(); expect(mocks.set).toHaveBeenLastCalledWith(false);
-    expect(window.confirm).toHaveBeenCalledTimes(2);
+    expect(confirmMocks.confirm).toHaveBeenCalledTimes(2);
   });
 
   it("shows a rejected policy update without changing the checkbox", async () => {

@@ -23,8 +23,8 @@ describe("EditorPane native Markdown collaboration", () => {
 
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
-    expect(editorPaneSource.slice(start, end)).toContain(
-      "key={collabYDoc ? `md-native-y-${activeNote.id}` : `md-native-${activeNote.id}`}",
+    expect(editorPaneSource.slice(start, end)).toMatch(
+      /key=\{collabYDoc \? `md-native-y-\$\{activeNote\.id\}[^`]*` : `md-native-\$\{activeNote\.id\}[^`]*`\}/,
     );
     expect(editorPaneSource.slice(start, end)).toContain("yDoc={collabYDoc}");
   });

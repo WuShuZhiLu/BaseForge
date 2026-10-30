@@ -66,11 +66,9 @@ describe("knowledge tree sidebar contract", () => {
     expect(noteList).toContain('includeDescendants: "0"');
   });
 
-  it("keeps pinned and favorite note states visible beside the tree title", () => {
+  it("keeps favorite note state visible beside the tree title", () => {
     const panel = source("../../components/KnowledgeTreePanel.tsx");
-    expect(panel).toContain('aria-label="已置顶"');
     expect(panel).toContain('aria-label="已收藏"');
-    expect(panel).toContain("node.isPinned === 1");
     expect(panel).toContain("node.isFavorite === 1");
   });
 
@@ -140,7 +138,6 @@ describe("knowledge tree sidebar contract", () => {
     expect(panel).toContain("{firstLevelNoteCount}");
     expect(panel).toContain('aria-label={`在“${node.title}”下新建文档`}');
     expect(panel).toContain('title="更多"');
-    expect(panel).toContain('aria-label="已置顶"');
     expect(panel).toContain('aria-label="已收藏"');
   });
 });

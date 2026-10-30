@@ -140,6 +140,7 @@ export function listSharedKnowledgeTree(input: {
     LEFT JOIN mindmaps mm ON node.resourceType = 'mindmap' AND mm.id = node.resourceId
     LEFT JOIN files file ON node.resourceType = 'file' AND file.id = node.resourceId
     WHERE node.isDeleted = 0
+      AND (node.resourceType <> 'note' OR COALESCE(note.isUnlisted, 0) = 0)
     ORDER BY shared_tree.sharedRootId, shared_tree.sharedDepth, node.sortOrder,
              lower(${TITLE_EXPRESSION}), node.id
   `).all(

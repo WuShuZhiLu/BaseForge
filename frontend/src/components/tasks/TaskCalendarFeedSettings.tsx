@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { api, getBaseUrl } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { confirm } from "@/components/ui/confirm";
 
 interface CalendarFeed {
   id: string;
@@ -87,7 +88,8 @@ export function TaskCalendarFeedSettings() {
   }, [t]);
 
   const handleDisable = useCallback(async () => {
-    if (!window.confirm(t("tasks.calendarFeed.confirmDisable"))) return;
+    const ok = await confirm({ title: t("tasks.calendarFeed.confirmDisable") });
+    if (!ok) return;
     try {
       setActionLoading("disable");
       const res = await api.taskCalendarFeed.update({ enabled: false });
@@ -114,7 +116,8 @@ export function TaskCalendarFeedSettings() {
   }, [t]);
 
   const handleRotate = useCallback(async () => {
-    if (!window.confirm(t("tasks.calendarFeed.confirmRotate"))) return;
+    const ok = await confirm({ title: t("tasks.calendarFeed.confirmRotate") });
+    if (!ok) return;
     try {
       setActionLoading("rotate");
       await api.taskCalendarFeed.rotateToken();

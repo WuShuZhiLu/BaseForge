@@ -102,21 +102,26 @@ test.before(async () => {
     "markdown",
     "# Historical note\n\nhistoricalrepairkeyword",
   );
-  db().prepare("INSERT INTO mindmaps (id, userId, title, data) VALUES (?, ?, ?, ?)")
-    .run(
-      MINDMAP_ID,
-      OWNER_ID,
-      "知识星图 唯一脑图检索词",
-      JSON.stringify({
-        root: {
-          id: "root",
-          text: "知识星图",
-          children: [
-            { id: "node-1", text: "Agent 编排中的唯一脑图节点词", children: [] },
-          ],
-        },
-      }),
-    );
+  // 导图归一后正文存 notes（contentFormat="mindmap"），树节点由 notes 投影触发器自动建立。
+  db().prepare(`
+    INSERT INTO notes (id, userId, notebookId, title, content, contentText, contentFormat)
+    VALUES (?, ?, ?, ?, ?, ?, 'mindmap')
+  `).run(
+    MINDMAP_ID,
+    OWNER_ID,
+    NOTEBOOK_ID,
+    "知识星图 唯一脑图检索词",
+    JSON.stringify({
+      root: {
+        id: "root",
+        text: "知识星图",
+        children: [
+          { id: "node-1", text: "Agent 编排中的唯一脑图节点词", children: [] },
+        ],
+      },
+    }),
+    "知识星图 Agent 编排中的唯一脑图节点词",
+  );
 
   insertNote(SHEET_ID, "服务器清单", "", "tiptap-json", "{}");
   db().prepare("UPDATE notes SET note_type = 'sheet' WHERE id = ?").run(SHEET_ID);
@@ -241,7 +246,7 @@ test("mindmap titles participate in global search without leaking inaccessible m
   assert.equal(result.resourceType, "mindmap");
   assert.equal(result.contentFormat, "mindmap");
   assert.equal(result.matchedField, "title");
-  assert.equal(result.notebookId, "");
+  assert.equal(result.notebookId, NOTEBOOK_ID);
   assert.match(result.titleHtml, /<mark>唯一脑图检索词<\/mark>/);
 
   const other = await search(OTHER_ID, "唯一脑图检索词");

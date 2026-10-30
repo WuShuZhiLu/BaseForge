@@ -22,6 +22,9 @@ const {
   resolveConflictMock: vi.fn(),
 }));
 
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
+
 vi.mock("@/lib/syncLocalApi", () => ({
   SYNC_CONFLICT_ENTITY_TYPES: [
     "notebook",
@@ -109,7 +112,7 @@ describe("冲突中心批量处理", () => {
       resolution: "keep-local",
       remainingConflicts: 0,
     });
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    confirmMocks.confirm.mockResolvedValue(true);
   });
 
   afterEach(() => {

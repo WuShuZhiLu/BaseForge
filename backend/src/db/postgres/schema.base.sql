@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS notebooks (
     "isExpanded" BOOLEAN DEFAULT true,
     "isDeleted" BOOLEAN NOT NULL DEFAULT false,
     "deletedAt" TIMESTAMPTZ,
+    "isFavorite" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "workspaceId" TEXT

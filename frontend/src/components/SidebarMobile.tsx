@@ -101,7 +101,7 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
   useEffect(() => {
     const id = state.sidebarPanel;
     if (!id) return;
-    updateSidebarPanel(id as never, { visible: true, collapsed: false });
+    updateSidebarPanel(id, { visible: true, collapsed: false });
   }, [state.sidebarPanel]);
   const { siteConfig } = useSiteSettings();
   const [railMode, setRailMode] = useRailMode();

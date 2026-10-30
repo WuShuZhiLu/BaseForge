@@ -12,7 +12,6 @@ import {
   Loader2,
   LockKeyhole,
   MoreHorizontal,
-  Pin,
   Plus,
   RefreshCw,
   Search,
@@ -39,8 +38,8 @@ import KnowledgeTreePermissionsDialog from "@/components/KnowledgeTreePermission
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
-  importSpreadsheetIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
+  importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
@@ -94,7 +93,7 @@ import {
 } from "@/lib/knowledgeTreeStats";
 import { toast } from "@/lib/toast";
 import {
-  compareKnowledgeTreePinnedPriority,
+  compareKnowledgeTreeFolderPriority,
   KNOWLEDGE_TREE_SORT_OPTIONS,
   loadKnowledgeTreeSortMode,
   planKnowledgeTreeSiblingReorder,
@@ -138,7 +137,7 @@ function buildChildren(nodes: KnowledgeTreeNode[]) {
   }
   for (const siblings of result.values()) {
     siblings.sort((a, b) => (
-      compareKnowledgeTreePinnedPriority(a, b)
+      compareKnowledgeTreeFolderPriority(a, b)
       || a.sortOrder - b.sortOrder
       || a.title.localeCompare(b.title)
       || a.id.localeCompare(b.id)
@@ -280,7 +279,7 @@ export interface KnowledgeTreeInlineCreateRequest {
 export interface KnowledgeTreeImportRequest {
   requestId: number;
   parentId: string | null;
-  kind: "markdown" | "markdown-zip" | "word" | "wechat" | "yuque" | "spreadsheet" | "spreadsheet";
+  kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque";
 }
 
 export interface KnowledgeTreeTemplateCreateRequest {
@@ -345,7 +344,7 @@ export function KnowledgeTreePanel({
   } | null>(null);
   const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [compactDesktopToolbar, setCompactDesktopToolbar] = useState(false);
-  // B-4 浏览所有导图：只按 nodeType === "mindmap" 过滤展示（不改数据结构、不做迁移）。
+  // B-4 浏览所有导图：导图归一后是 contentFormat="mindmap" 的笔记节点，按格式过滤展示。
   const [mindmapBrowseOpen, setMindmapBrowseOpen] = useState(false);
   const [treeDropTarget, setTreeDropTarget] = useState<{
     nodeId: string;
@@ -404,9 +403,11 @@ export function KnowledgeTreePanel({
           .map((node) => node.id),
       );
       setNodes(merged);
+      // 知识库默认全折叠：服务端的 isExpanded 只作为节点元数据，
+      // 不再用于首次展开，避免每次打开应用都自动摊开根层文件夹。
       initializeKnowledgeTreeExpansion(
         requestExpansionScope,
-        merged.filter((node) => expandableNodeIds.has(node.id) && Boolean(node.isExpanded)).map((node) => node.id),
+        [],
         expandableNodeIds,
         sharedResult.status === "fulfilled",
       );
@@ -510,7 +511,7 @@ export function KnowledgeTreePanel({
   ));
   const firstLevelNoteCounts = useMemo(() => buildFirstLevelNoteCounts(visibleNodes), [visibleNodes]);
   const filteredNodes = useMemo(() => filterKnowledgeTreeNodes(visibleNodes, query), [visibleNodes, query]);
-  const mindmapNodes = useMemo(() => nodes.filter((node) => node.nodeType === "mindmap"), [nodes]);
+  const mindmapNodes = useMemo(() => nodes.filter((node) => node.contentFormat === "mindmap"), [nodes]);
   const children = useMemo(() => buildChildren(filteredNodes), [filteredNodes]);
   const effectiveExpanded = query.trim() ? new Set(filteredNodes.map((node) => node.id)) : expanded;
   const expandableFolderIds = visibleNodes.filter((node) => (
@@ -644,12 +645,7 @@ export function KnowledgeTreePanel({
       pushSheetAppPath(node.resourceId);
       return;
     }
-    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
-    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
-    if (node.resourceType === "mindmap") {
-      pushMindMapAppPath(node.resourceId);
-      return;
-    }
+    // 导图归一后是 resourceType="note" 的文档节点，直接按笔记打开（EditorPane 导图分支）。
     if (node.resourceType !== "note") return;
     rememberOpened(node.id);
     try {
@@ -745,7 +741,7 @@ export function KnowledgeTreePanel({
 
   const patchNoteStatus = useCallback((
     nodeId: string,
-    patch: Partial<Pick<KnowledgeTreeNode, "isPinned" | "isFavorite" | "isLocked">>,
+    patch: Partial<Pick<KnowledgeTreeNode, "isFavorite" | "isLocked">>,
   ) => {
     setNodes((current) => current.map((node) => (
       node.id === nodeId ? { ...node, ...patch } : node
@@ -845,9 +841,11 @@ export function KnowledgeTreePanel({
             ? await importMarkdownZipIntoKnowledgeTree(options)
             : importRequest.kind === "word"
               ? await importWordIntoKnowledgeTree(options)
-              : importRequest.kind === "wechat"
+              : importRequest.kind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : importRequest.kind === "wechat"
  ? await importWeChatArticleIntoKnowledgeTree(options)
- : await importSpreadsheetIntoKnowledgeTree(options);
+ : null;
         if (!imported) return;
         revealCreatedKnowledgeTreeNote(parent?.id || null);
         activateNote(imported, parent?.id || null);
@@ -965,11 +963,7 @@ export function KnowledgeTreePanel({
       toast.success("已创建文件夹");
       return;
     }
-    // 建完自动打开：导图/表格走各自深链（上游同款行为）。
-    if (snapshot.kind === "mindmap") {
-      pushMindMapAppPath(created.resourceId);
-      return;
-    }
+    // 建完自动打开：表格走深链；导图归一后是笔记文档，走通用笔记打开。
     if (snapshot.kind === "sheet") {
       pushSheetAppPath(created.resourceId);
       return;
@@ -1047,7 +1041,7 @@ export function KnowledgeTreePanel({
       && (source.parentId ?? null) === (target.parentId ?? null)
       && Boolean(source.sharedRootId) === Boolean(target.sharedRootId)
       && (!source.sharedRootId || source.sharedRootId === target.sharedRootId)
-      && compareKnowledgeTreePinnedPriority(source, target) === 0,
+      && compareKnowledgeTreeFolderPriority(source, target) === 0,
     );
   };
 
@@ -1064,8 +1058,37 @@ export function KnowledgeTreePanel({
       || (source.workspaceId ?? null) !== (target.workspaceId ?? null)
       || (source.sharedRootId ?? null) !== (target.sharedRootId ?? null)
       || !isFolderUnlocked(target, unlockedFolderIds)
+      || target.nodeType !== "folder"
     ) return false;
     return !descendantsOf(source.id, allChildren).has(target.id);
+  };
+
+  // 根层落点：树空白区拖放 = 移到当前空间根层；共享根内容只能在其共享根内移动。
+  const canDropIntoRoot = (sourceId: string) => {
+    const source = nodes.find((node) => node.id === sourceId);
+    return Boolean(
+      source
+      && source.access.capabilities.canMove
+      && !isSharedRoot(source)
+      && !source.sharedRootId,
+    );
+  };
+
+  const dropToRoot = async (sourceId: string) => {
+    if (!canDropIntoRoot(sourceId)) {
+      toast.error("无法移动到根层");
+      return;
+    }
+    try {
+      await knowledgeTreeApi.move(sourceId, { parentId: null });
+      await reload();
+      emitTreeChanged("node-moved");
+      actions.refreshNotebooks();
+      actions.refreshNotes();
+      toast.success("已移动到根层");
+    } catch (requestError) {
+      toast.error((requestError as Error)?.message || "移动失败");
+    }
   };
 
   const canDropWithTarget = (
@@ -1089,7 +1112,7 @@ export function KnowledgeTreePanel({
       return;
     }
     if (!canReorderWithTarget(sourceId, target)) {
-      toast.error("文件夹、置顶笔记和普通笔记请在各自分组内排序");
+      toast.error("文件夹和文档请在各自分组内排序");
       return;
     }
     const plan = planKnowledgeTreeSiblingReorder(nodes, sourceId, target.id, placement);
@@ -1247,14 +1270,19 @@ export function KnowledgeTreePanel({
             variant === "mobile" ? "rounded-sm" : "rounded-md",
             active && "bg-app-active text-tx-primary",
             selected && "bg-accent-primary/10 text-tx-primary ring-1 ring-inset ring-accent-primary/25",
-            treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "before"
-              && "before:absolute before:inset-x-0 before:top-0 before:z-10 before:h-0.5 before:bg-accent-primary",
-            treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "after"
-              && "after:absolute after:inset-x-0 after:bottom-0 after:z-10 after:h-0.5 after:bg-accent-primary",
             treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "inside"
-              && "bg-accent-primary/10 text-tx-primary ring-1 ring-inset ring-accent-primary/50",
+              && "bg-accent-primary/20 text-tx-primary ring-1 ring-inset ring-accent-primary",
           )}
-          style={{ paddingLeft: `${depth * treeIndent + treeInset}px` }}
+          style={{
+            paddingLeft: `${depth * treeIndent + treeInset}px`,
+            // 落点阴影与侧边栏区段拖拽一致：上/下半区内阴影表达 before/after。
+            boxShadow:
+              treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "before"
+                ? "inset 0 14px 18px -12px rgba(59,130,246,0.55)"
+                : treeDropTarget?.nodeId === node.id && treeDropTarget.placement === "after"
+                  ? "inset 0 -14px 18px -12px rgba(59,130,246,0.55)"
+                  : undefined,
+          }}
           draggable={!query.trim() && node.access.capabilities.canMove && !isSharedRoot(node)}
           onDragStart={(event) => {
             draggedTreeNodeIdRef.current = node.id;
@@ -1280,6 +1308,7 @@ export function KnowledgeTreePanel({
                 : { nodeId: node.id, placement }
             ));
           }}
+          onDragLeave={() => setTreeDropTarget((current) => (current?.nodeId === node.id ? null : current))}
           onDrop={(event) => {
             if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
             event.preventDefault();
@@ -1351,15 +1380,6 @@ export function KnowledgeTreePanel({
                 data-knowledge-tree-first-level-note-count=""
               >
                 {firstLevelNoteCount}
-              </span>
-            )}
-            {node.resourceType === "note" && node.isPinned === 1 && (
-              <span
-                className="flex shrink-0 items-center text-accent-primary"
-                title="已置顶"
-                aria-label="已置顶"
-              >
-                <Pin size={11} className="fill-current" aria-hidden="true" />
               </span>
             )}
             {node.resourceType === "note" && node.isFavorite === 1 && (
@@ -1639,6 +1659,25 @@ export function KnowledgeTreePanel({
       <div
         className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-1 pb-3"
         data-swipe-blocker="knowledge-tree-scroll"
+        onDragOver={(event) => {
+          // 行内 dragover 已 preventDefault/stopPropagation；只有空白区才走到这里作根层落点。
+          if (event.defaultPrevented) return;
+          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+          const sourceId = draggedTreeNodeIdRef.current || "";
+          if (!sourceId || !canDropIntoRoot(sourceId)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          if (event.defaultPrevented) return;
+          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+          const sourceId = event.dataTransfer.getData("application/x-nowen-tree-node") || draggedTreeNodeIdRef.current || "";
+          if (!sourceId || !canDropIntoRoot(sourceId)) return;
+          event.preventDefault();
+          setTreeDropTarget(null);
+          draggedTreeNodeIdRef.current = null;
+          void dropToRoot(sourceId);
+        }}
         onClick={(event) => {
           const target = event.target as HTMLElement;
           if (!target.closest("[data-knowledge-tree-select-id]")) clearSelection();

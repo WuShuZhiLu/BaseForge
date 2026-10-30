@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), remove: vi.fn(
 vi.mock("@/lib/pluginApi", () => ({ pluginApi: { inboundWebhooks: mocks.list, createInboundWebhook: mocks.create, removeInboundWebhook: mocks.remove } }));
 vi.mock("@/lib/api.impl", () => ({ getBaseUrl: () => "https://note.example.com/api" }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
 import { PluginInboundSettings } from "../PluginInboundSettings";
 
 const plugin = { id: "example.capture", status: "enabled", contributes: { inboundWebhooks: [{ id: "receiver", path: "receiver", action: "receive", methods: ["GET", "POST"], maxBodyBytes: 262144 }] } } as InstalledPlugin;
@@ -19,7 +21,7 @@ describe("inbound callback configuration", () => {
     mocks.list.mockResolvedValue([]);
     mocks.create.mockResolvedValue({ path: "/api/plugin-inbound/example.capture/receiver/token" });
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMocks.confirm.mockResolvedValue(true);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
   const render = async (value = plugin) => { await act(async () => root.render(<PluginInboundSettings plugin={value} />)); };
@@ -36,9 +38,9 @@ describe("inbound callback configuration", () => {
 
   it("requires confirmation for rotation/revocation and clears revoked URLs", async () => {
     mocks.list.mockResolvedValue([{ hookId: "receiver" }]); await render();
-    vi.mocked(window.confirm).mockReturnValue(false); await click("plugins.inbound.rotate");
+    confirmMocks.confirm.mockResolvedValueOnce(false); await click("plugins.inbound.rotate");
     expect(mocks.create).not.toHaveBeenCalled();
-    vi.mocked(window.confirm).mockReturnValue(true); await click("plugins.inbound.rotate");
+    confirmMocks.confirm.mockResolvedValue(true); await click("plugins.inbound.rotate");
     mocks.list.mockResolvedValue([]); await click("plugins.inbound.revoke");
     expect(mocks.remove).toHaveBeenCalledWith(plugin.id, "receiver"); expect(host.querySelector("input")).toBeNull();
   });

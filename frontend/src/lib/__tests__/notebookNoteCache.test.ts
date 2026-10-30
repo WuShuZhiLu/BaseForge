@@ -4,7 +4,6 @@ import {
   directNotebookNotes,
   moveNoteInNotebookCache,
   sortNotebookNotes,
-  syncPinnedStateToNotebookCache,
   upsertNoteInNotebookCache,
 } from "@/lib/notebookNoteCache";
 import type { NoteListItem } from "@/types";
@@ -88,47 +87,5 @@ describe("notebook note cache", () => {
     const sorted = sortNotebookNotes(notes, { by: "name", dir: "asc" });
 
     expect(sorted.map((n) => n.id)).toEqual(["aweb", "bb", "cert"]);
-  });
-
-  it("keeps pinned notes first in manual mode while retaining sortOrder within groups", () => {
-    const notes = [
-      { ...note("n1", "target"), sortOrder: 0 },
-      { ...note("n2", "target"), sortOrder: 1, isPinned: 1 },
-      { ...note("n3", "target"), sortOrder: 2 },
-    ];
-
-    expect(
-      sortNotebookNotes(notes, { by: "manual", dir: "desc" }).map((n) => n.id),
-    ).toEqual(["n2", "n1", "n3"]);
-  });
-
-  it("restores manual sortOrder after unpinning", () => {
-    const notes = [
-      { ...note("n1", "target"), sortOrder: 0 },
-      { ...note("n2", "target"), sortOrder: 1, isPinned: 0 },
-      { ...note("n3", "target"), sortOrder: 2 },
-    ];
-
-    expect(
-      sortNotebookNotes(notes, { by: "manual", dir: "desc" }).map((n) => n.id),
-    ).toEqual(["n1", "n2", "n3"]);
-  });
-
-  it("synchronizes pin changes into cached notebook rows without replacing unchanged caches", () => {
-    const cache = new Map<string, NoteListItem[]>([
-      ["target", [note("n1", "target"), note("n2", "target")]],
-    ]);
-
-    const next = syncPinnedStateToNotebookCache(cache, [
-      { ...note("n1", "target"), isPinned: 1 },
-      note("n2", "target"),
-    ]);
-
-    expect(next).not.toBe(cache);
-    expect(next.get("target")?.map((n) => n.isPinned)).toEqual([1, 0]);
-    expect(syncPinnedStateToNotebookCache(next, [
-      { ...note("n1", "target"), isPinned: 1 },
-      note("n2", "target"),
-    ])).toBe(next);
   });
 });

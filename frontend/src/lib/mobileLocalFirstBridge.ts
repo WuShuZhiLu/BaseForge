@@ -235,7 +235,7 @@ export function installMobileLocalFirstBridge(
   };
   target.search = (query: string) => searchNotes(query);
   target.searchNotes = async (query: string, limit = 10) => (await searchNotes(query, limit))
-    .map(({ id, title, notebookId, updatedAt }) => ({ id, title, notebookId, updatedAt }));
+    .map(({ id, title, notebookId, updatedAt, isFavorite }) => ({ id, title, notebookId, updatedAt, isFavorite }));
 
   target.attachments.upload = async (noteId: string, file: File) => {
     const id = newLocalId();

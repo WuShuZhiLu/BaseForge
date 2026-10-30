@@ -185,10 +185,10 @@ function applyTag(db: Database.Database, input: ApplyMutationInput): number | nu
  */
 function applyNote(db: Database.Database, input: ApplyMutationInput): number | null {
   const existing = db.prepare(`
-    SELECT version, themeId, colorMark, content, contentFormat FROM notes WHERE id = ? AND workspaceId IS ?
+    SELECT version, themeId, colorMark, content, contentFormat, isUnlisted FROM notes WHERE id = ? AND workspaceId IS ?
       AND (? IS NOT NULL OR userId = ?)
   `).get(input.entityId, workspaceIdOf(input), workspaceIdOf(input), input.userId) as
-    | { version: number; themeId: string | null; colorMark: string | null; content: string; contentFormat: string }
+    | { version: number; themeId: string | null; colorMark: string | null; content: string; contentFormat: string; isUnlisted: number }
     | undefined;
 
   if (input.operation === "delete") {
@@ -218,7 +218,7 @@ function applyNote(db: Database.Database, input: ApplyMutationInput): number | n
       UPDATE notes SET
         notebookId = ?, title = ?, content = ?, contentText = ?, contentFormat = ?,
         isPinned = ?, isFavorite = ?, isLocked = ?, isArchived = ?, isTrashed = ?,
-        trashedAt = ?, themeId = ?, colorMark = ?, sortOrder = ?, version = ?, updatedAt = datetime('now')
+        trashedAt = ?, themeId = ?, colorMark = ?, isUnlisted = ?, sortOrder = ?, version = ?, updatedAt = datetime('now')
       WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)
     `).run(
       str(p.notebookId),
@@ -238,6 +238,9 @@ function applyNote(db: Database.Database, input: ApplyMutationInput): number | n
       Object.prototype.hasOwnProperty.call(p, "colorMark")
         ? normalizeNoteColorMark(p.colorMark)
         : existing.colorMark,
+      Object.prototype.hasOwnProperty.call(p, "isUnlisted")
+        ? bit(p.isUnlisted)
+        : existing.isUnlisted,
       num(p.sortOrder),
       nextVersion,
       input.entityId,
@@ -254,7 +257,7 @@ function applyNote(db: Database.Database, input: ApplyMutationInput): number | n
     INSERT INTO notes (
       id, userId, notebookId, workspaceId, title, content, contentText, contentFormat,
       isPinned, isFavorite, isLocked, isArchived, isTrashed, trashedAt,
-      themeId, colorMark, version, sortOrder, createdAt, updatedAt
+      themeId, colorMark, isUnlisted, version, sortOrder, createdAt, updatedAt
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
               COALESCE(?, datetime('now')), datetime('now'))
   `).run(
@@ -274,6 +277,7 @@ function applyNote(db: Database.Database, input: ApplyMutationInput): number | n
     p.trashedAt ?? null,
     normalizeNoteThemeId(p.themeId),
     normalizeNoteColorMark(p.colorMark),
+    bit(p.isUnlisted),
     version,
     num(p.sortOrder),
     p.createdAt ?? null,

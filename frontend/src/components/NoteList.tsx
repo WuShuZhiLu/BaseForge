@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pin, PinOff, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette } from "lucide-react";
+import { Plus, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
@@ -30,7 +30,6 @@ import { confirm, prompt } from "@/components/ui/confirm";
 import { highlightTextNode, sanitizeSearchHtml, stripSearchMarks } from "@/lib/searchHighlight";
 import { noteListPreview } from "@/lib/noteListPresentation";
 import { getNoteListDragHint, reorderNotesWithinNotebook, shouldUseHtmlNoteDragging } from "@/lib/noteManualSort";
-import { sortNotesPinnedFirst } from "@/lib/notePinnedOrder";
 import { resolveExternalDropNotebookId } from "@/lib/notebookExternalDropTarget";
 import {
   loadNoteWorkspaceLayoutMode,
@@ -1108,8 +1107,6 @@ const NoteCard = React.memo(function NoteCard({
                   ? ""
                   : note.isFavorite === 1
                   ? "bg-amber-400"
-                  : note.isPinned === 1
-                  ? "bg-accent-primary/50"
                   : "bg-transparent group-hover:bg-app-border"
               )} style={!isSelected && !isActive && colorMarkHex ? { backgroundColor: colorMarkHex } : undefined} />
 
@@ -1153,6 +1150,10 @@ const NoteCard = React.memo(function NoteCard({
               <span className="text-[10px] px-1 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 leading-none" title={t('note.format.markdown')}>
                 {t('note.format.markdownShort')}
               </span>
+            ) : note.contentFormat === "board" ? (
+              <span className="text-[10px] px-1 py-0.5 rounded border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 leading-none" title="画板文档">
+                画板
+              </span>
             ) : (
               <span className="text-[10px] px-1 py-0.5 rounded border border-app-border bg-app-hover text-tx-tertiary leading-none" title={t('note.format.richText')}>
                 {t('note.format.richTextShort')}
@@ -1160,7 +1161,6 @@ const NoteCard = React.memo(function NoteCard({
             )}
             {isShared && <Share2 size={11} className="text-emerald-500" />}
             {note.isLocked === 1 && <Lock size={11} className="text-orange-500" />}
-            {note.isPinned === 1 && <Pin size={11} className="text-accent-primary" />}
             {note.isFavorite === 1 && <Star size={11} className="text-amber-400 fill-amber-400" />}
           </div>
         </div>
@@ -1802,18 +1802,17 @@ export default function NoteList() {
   // 字段）不重新拉列表，导致被编辑笔记的 updatedAt 更新了却没挪位置——看起来排序没生效。
   // 这里用 useMemo 派生一份 sortedNotes，每次 state.notes 变化都重算顺序。
   const sortedNotes = useMemo(() => {
-    // 搜索视图保留 FTS 相关性，只按置顶状态做稳定分组。
+    // 搜索视图保留 FTS 相关性。
     if (state.viewMode === "search") {
-      return sortNotesPinnedFirst(state.notes);
+      return state.notes;
     }
     if (sortPref.by === "manual") {
-      return sortNotesPinnedFirst(
-        state.notes,
+      return [...state.notes].sort(
         (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0),
       );
     }
     const dir = sortPref.dir === "asc" ? 1 : -1;
-    return sortNotesPinnedFirst(state.notes, (a, b) => {
+    return [...state.notes].sort((a, b) => {
       if (sortPref.by === "title") {
         const cmp = (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" });
         return cmp * dir || a.id.localeCompare(b.id);
@@ -2530,11 +2529,6 @@ export default function NoteList() {
     if (bulkMode) {
       return [
         {
-          id: "toggle_pin",
-          label: targetNote.isPinned === 1 ? t('noteList.unpin') : t('noteList.pin'),
-          icon: targetNote.isPinned === 1 ? <PinOff size={14} /> : <Pin size={14} />,
-        },
-        {
           id: "toggle_fav",
           label: targetNote.isFavorite === 1 ? t('noteList.unfavorite') : t('noteList.favorite'),
           icon: targetNote.isFavorite === 1 ? <StarOff size={14} /> : <Star size={14} />,
@@ -2591,11 +2585,6 @@ export default function NoteList() {
         })),
       },
       {
-        id: "toggle_pin",
-        label: targetNote.isPinned === 1 ? t('noteList.unpin') : t('noteList.pin'),
-        icon: targetNote.isPinned === 1 ? <PinOff size={14} /> : <Pin size={14} />,
-      },
-      {
         id: "toggle_fav",
         label: targetNote.isFavorite === 1 ? t('noteList.unfavorite') : t('noteList.favorite'),
         icon: targetNote.isFavorite === 1 ? <StarOff size={14} /> : <Star size={14} />,
@@ -2632,7 +2621,7 @@ export default function NoteList() {
           icon: <Download size={14} />,
           children: [
             { id: "export_md", label: t("noteList.exportAsMarkdown") || "Markdown", icon: <Download size={14} /> },
-            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）", icon: <Download size={14} /> },
+            { id: "export_md_zip", label: t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP", icon: <Download size={14} /> },
             { id: "export_pdf", label: t("noteList.exportAsPDF") || "PDF", icon: <Printer size={14} /> },
             { id: "export_png", label: t("note.exportAsPng") || "图片 PNG", icon: <ImageIcon size={14} /> },
             { id: "export_jpg", label: t("note.exportAsJpg") || "图片 JPG", icon: <ImageIcon size={14} /> },
@@ -2889,16 +2878,6 @@ export default function NoteList() {
           toast.success("已保存为模板");
         } catch (error: any) {
           toast.error(error?.message || "保存模板失败");
-        }
-        break;
-      }
-      case "toggle_pin": {
-        haptic.light();
-        const newVal = targetNote.isPinned === 1 ? 0 : 1;
-        await api.updateNote(targetId, { isPinned: newVal } as any);
-        actions.updateNoteInList({ id: targetId, isPinned: newVal });
-        if (state.activeNote?.id === targetId) {
-          actions.setActiveNote({ ...state.activeNote, isPinned: newVal });
         }
         break;
       }
@@ -3383,7 +3362,7 @@ export default function NoteList() {
     }
     const source = sortedNotes.find((note) => note.id === dragNoteId);
     const target = sortedNotes.find((note) => note.id === noteId);
-    if (!source || !target || (source.isPinned === 1) !== (target.isPinned === 1)) {
+    if (!source || !target) {
       e.dataTransfer.dropEffect = "none";
       if (dragOverNoteId) setDragOverNoteId(null);
       return;

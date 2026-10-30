@@ -11,35 +11,50 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowUpDown,
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Circle,
+  Ellipsis,
   ExternalLink,
   FileCode,
+  Columns2,
+  FilePlus2,
   FileText,
+  Focus,
   Folder,
   Home,
   Link2,
+  Locate,
   ListTodo,
-  Pin,
+  Pencil,
   Play,
   BookOpen,
+  PenTool,
+  Pin,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  Table2,
   Sparkles,
   Star,
   Trash2,
   Upload,
   Users,
+  Waypoints,
   X,
   XCircle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { useApp, useAppActions } from "@/store/AppContext";
+import { MenuItem, MenuLabel, MenuSeparator, MenuSurface } from "@/components/ui/menu";
+import { SplitView } from "@/components/ui/split-view";
+import { confirm } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
@@ -52,6 +67,18 @@ import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
+import { FaFolder, FaBook } from "react-icons/fa";
+import { LiaThumbtackSolid } from "react-icons/lia";
+import {
+  importMarkdownIntoKnowledgeTree,
+  importMarkdownZipIntoKnowledgeTree,
+  importWordIntoKnowledgeTree,
+  importPdfIntoKnowledgeTree,
+  importWeChatArticleIntoKnowledgeTree,
+} from "@/components/knowledgeTreeImport";
+import type { KnowledgeTreeImportRequest } from "@/components/KnowledgeTreePanel";
+import YuqueImport from "@/components/YuqueImport";
+import { toast } from "@/lib/toast";
 import {
   KNOWLEDGE_TREE_SORT_OPTIONS,
   KNOWLEDGE_TREE_SORT_CHANGED_EVENT,
@@ -60,17 +87,49 @@ import {
   type KnowledgeTreeSortMode,
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
+import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname, hasInAppForwardNavigationOccurred } from "@/lib/appPathNavigation";
+import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
+import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
+import { useNoteLoader } from "@/hooks/useNoteLoader";
+import { useSortableDrag } from "@/hooks/useSortableDrag";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_DEFAULT_WIDTH = 260;
 const SIDEBAR_MAX_WIDTH = 420;
 
-type FilterScope = "all" | "folder" | "note";
+/** 搜索筛选范围（头部漏斗）：限制搜索结果的类型；收藏/标签 = 只在已收藏/已加标签的文档里搜 */
+type FilterScope = "all" | "notebook" | "document" | "folder" | "favorite" | "tag";
+const FILTER_SCOPE_VALUES: FilterScope[] = ["all", "notebook", "document", "folder", "favorite", "tag"];
+/** 搜索结果面板内置的类型筛选（chips） */
+const FILTER_SCOPE_OPTIONS: Array<{ value: FilterScope; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "notebook", label: "知识库" },
+  { value: "document", label: "文档" },
+  { value: "folder", label: "文件夹" },
+  { value: "favorite", label: "收藏" },
+  { value: "tag", label: "标签" },
+];
 
 /** 区段顺序（可拖拽排序，持久化到 localStorage）。收藏作为知识库面板的一个区段（功能太少，不设独立面板） */
 type SectionId = "kb" | "tags" | "editors" | "star";
 const SECTION_ORDER_KEY = "nowen-next-sidebar-sections";
+/** 区段排序拖拽专用 dataTransfer 类型：与知识树行拖拽（text/plain）区分，互不误触。 */
+const SECTION_DRAG_TYPE = "application/x-nowen-sidebar-section";
+/** 区段全集（同时也是缺失区段的补位顺序）。 */
+const SECTION_IDS: SectionId[] = ["kb", "tags", "editors", "star"];
+
+/**
+ * 区段顺序归一化：过滤脏数据、补齐缺失区段。
+ * 归一是必须的——localStorage 里的旧顺序只有三个区段（收藏是后加的），
+ * 直接拿它算插入下标会 indexOf("star") === -1，落点被算成 0（跑到最上方）。
+ */
+function normalizeSectionOrder(order: readonly SectionId[]): SectionId[] {
+  const valid = order.filter((id) => SECTION_IDS.includes(id));
+  for (const id of SECTION_IDS) if (!valid.includes(id)) valid.push(id);
+  return valid;
+}
 
 type ExpandedSet = Set<string>;
 
@@ -111,26 +170,65 @@ function buildChildrenMap(nodes: KnowledgeTreeNode[], sortMode?: KnowledgeTreeSo
   return children;
 }
 
+/** 根级知识库节点（无父级 + notebook 资源）：只能在根层内重排，不能被拖入其它库/文件夹。 */
+function isRootNotebookNode(node: KnowledgeTreeNode): boolean {
+  return node.parentId === null && node.resourceType === "notebook";
+}
+
 /**
- * 可见性引擎（brief 4.3）。
+ * 拖拽落点的本地乐观重排：与后端 move 的锚点语义保持一致——
+ * 把源节点挂到目标父级下，再把该父级兄弟按 0..n-1 重新编号（无锚点 = 落到末尾）。
+ *
+ * 为什么要本地先算：松手到 reload 回来之间有一次网络往返，树在这段时间里仍然
+ * 按旧顺序渲染（拖拽期间不做预演重排），表现为"松手后先弹回旧位置、稍后再跳到新位置"。
+ * 本地按同一套规则先摆好，reload 回来的服务端顺序与之一致，就不会再跳。
+ */
+function applyOptimisticMove(
+  nodes: KnowledgeTreeNode[],
+  sourceId: string,
+  parentId: string | null,
+  anchor: { id: string; position: "before" | "after" } | null,
+): KnowledgeTreeNode[] {
+  const source = nodes.find((node) => node.id === sourceId);
+  if (!source) return nodes;
+  const siblings = nodes
+    .filter((node) => !node.isDeleted && node.id !== sourceId && (node.parentId ?? null) === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+  const anchorIndex = anchor ? siblings.findIndex((node) => node.id === anchor.id) : -1;
+  const insertIndex = anchor && anchorIndex >= 0
+    ? (anchor.position === "before" ? anchorIndex : anchorIndex + 1)
+    : siblings.length;
+  const ordered = [
+    ...siblings.slice(0, insertIndex),
+    source,
+    ...siblings.slice(insertIndex),
+  ];
+  const nextSort = new Map(ordered.map((node, index) => [node.id, index] as const));
+  return nodes.map((node) => {
+    const sortOrder = nextSort.get(node.id);
+    const nextParentId = node.id === sourceId ? parentId : node.parentId;
+    if (sortOrder === undefined) {
+      return nextParentId === node.parentId ? node : { ...node, parentId: nextParentId };
+    }
+    if (sortOrder === node.sortOrder && nextParentId === node.parentId) return node;
+    return { ...node, parentId: nextParentId, sortOrder };
+  });
+}
+
+/**
+ * 可见性引擎（brief 4.3）。头部筛选（FilterScope）只作用于搜索弹层，不再生效于树。
  * @param focusRootId 专注模式根节点 id；非空时只遍历该子树。
  */
 function buildRows(
   nodes: KnowledgeTreeNode[],
   expanded: ExpandedSet,
   query: string,
-  scope: FilterScope,
   focusRootId: string | null,
 ): FlatRow[] {
   const children = buildChildrenMap(nodes);
   const keyword = query.trim().toLowerCase();
   const searching = keyword.length > 0;
 
-  const matchesScope = (node: KnowledgeTreeNode): boolean => {
-    if (scope === "all") return true;
-    const isFolder = node.nodeType === "folder";
-    return scope === "folder" ? isFolder : !isFolder;
-  };
   const matchesKeyword = (node: KnowledgeTreeNode): boolean =>
     !searching || node.title.toLowerCase().includes(keyword);
 
@@ -147,30 +245,13 @@ function buildRows(
 
       if (searching) {
         // 搜索：忽略折叠态，自身或后代命中即显示，路径自动展开
-        const subtreeHit = matchesKeyword(node) && matchesScope(node);
-        const descendantHit = subtreeHasMatch(node.id, children, keyword, scope);
+        const subtreeHit = matchesKeyword(node);
+        const descendantHit = subtreeHasMatch(node.id, children, keyword);
         if (!subtreeHit && !descendantHit) continue;
         sawVisible = true;
         rows.push({ node, depth, hasChildren, expanded: true, ancestorIds });
         walk(node.id, depth + 1, [...ancestorIds, node.id]);
         continue;
-      }
-
-      // 无关键词：scope 过滤（文件夹作为路径保留，但"仅笔记"下无可见文档的空文件夹剔除）
-      const self = matchesScope(node);
-      if (scope === "note" && !self) {
-        // 文件夹只有在其子树内存在文档时才保留
-        if (subtreeHasMatch(node.id, children, "", "note")) {
-          sawVisible = true;
-          rows.push({ node, depth, hasChildren, expanded: isExpanded, ancestorIds });
-          if (isExpanded) walk(node.id, depth + 1, [...ancestorIds, node.id]);
-        }
-        continue;
-      }
-      if (scope === "folder" && !self && !hasChildren) continue;
-      if (scope === "folder" && !self) {
-        // 仅文件夹模式：含子文件夹的文件夹保留
-        if (!subtreeHasMatch(node.id, children, "", "folder")) continue;
       }
 
       sawVisible = true;
@@ -182,42 +263,30 @@ function buildRows(
   if (focusRootId) {
     const focusRoot = nodes.find((n) => n.id === focusRootId && !n.isDeleted);
     if (focusRoot) {
-      const isExpanded = expanded.has(focusRoot.id) || true;
-      const kids = children.get(focusRoot.id) ?? [];
-      rows.push({
-        node: focusRoot,
-        depth: 0,
-        hasChildren: kids.length > 0,
-        expanded: isExpanded,
-        ancestorIds: [],
-      });
-      walk(focusRoot.id, 1, [focusRoot.id]);
+      // 进入态不重复渲染库根行（顶部横幅已显示库名 + 返回），直接铺开子节点，
+      // depth 从 0 起——否则会出现「← 某库」与「⌄ 某库」两行同一个库。
+      walk(focusRoot.id, 0, [focusRoot.id]);
     }
   } else {
     walk(null, 0, []);
   }
 
-  // scope=note 无关键词时空文件夹已被 walk 内剔除；scope=folder 空叶子文件夹同理。
   void sawVisible;
   return rows;
 }
 
-/** 子树内是否存在匹配节点（用于搜索命中路径与 scope 下的路径保留）。 */
+/** 子树内是否存在关键词匹配节点（用于搜索命中路径保留）。 */
 function subtreeHasMatch(
   nodeId: string,
   children: Map<string | null, KnowledgeTreeNode[]>,
   keyword: string,
-  scope: FilterScope,
 ): boolean {
   const k = keyword.trim().toLowerCase();
   const stack = [...(children.get(nodeId) ?? [])];
   while (stack.length) {
     const cur = stack.pop()!;
     if (cur.isDeleted) continue;
-    const isFolder = cur.nodeType === "folder";
-    const scopeHit = scope === "all" || (scope === "folder" ? isFolder : !isFolder);
-    const kwHit = !k || cur.title.toLowerCase().includes(k);
-    if (scopeHit && kwHit) return true;
+    if (k && cur.title.toLowerCase().includes(k)) return true;
     stack.push(...(children.get(cur.id) ?? []));
   }
   return false;
@@ -225,11 +294,25 @@ function subtreeHasMatch(
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   if (node.nodeType === "folder") {
-    // 根层知识库（笔记本）用 BookOpen 与普通文件夹区分
+    // 根层知识库（笔记本）用实心书本与普通实心文件夹区分
     if (isRoot && node.resourceType === "notebook") {
-      return <BookOpen size={15} className="shrink-0 text-violet-500" />;
+      return <FaBook size={14} className="shrink-0 text-accent-primary" />;
     }
-    return <Folder size={15} className="shrink-0 text-amber-500" />;
+    return <FaFolder size={14} className="shrink-0 text-amber-400" />;
+  }
+  // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
+  if (node.noteType === "sheet") {
+    return <Table2 size={15} className="shrink-0 text-emerald-500" />;
+  }
+  if (node.contentFormat === "board") {
+    return <PenTool size={15} className="shrink-0 text-teal-500" />;
+  }
+  // 导图归一后是 contentFormat="mindmap" 的笔记节点；nodeType/resourceType 判断保留给遗留数据。
+  if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") {
+    return <Waypoints size={15} className="shrink-0 text-violet-500" />;
+  }
+  if (node.contentFormat === "pdf") {
+    return <FileText size={15} className="shrink-0 text-red-500" />;
   }
   if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
     return <FileCode size={15} className="shrink-0 text-emerald-500" />;
@@ -254,13 +337,6 @@ interface RowMenuState {
   y: number;
 }
 
-interface DragState {
-  /** 被拖拽节点 id（kb 树） */
-  nodeId?: string;
-  /** 区段拖拽排序 */
-  sectionId?: SectionId;
-}
-
 export default function SidebarDesktop() {
   const { t } = useTranslation();
   const { state } = useApp();
@@ -270,8 +346,37 @@ export default function SidebarDesktop() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<FilterScope>("all");
+  // 搜索筛选 scope ⇄ URL（?scope=all|notebook|document|folder|favorite|tag）：
+  // 与 ?q= 同款握手（回灌置标记让写侧让位）。遗留值 note/folder 中 note 已并入 document。
+  const applyingRouteScopeRef = useRef(false);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  // 回灌只由 route 变化驱动（不得依赖 scope 本身——否则用户改 scope 后会被
+  // URL 旧值弹回，形成「切不回全部」的死锁）。
+  useEffect(() => {
+    const routeScope = state.route.scope;
+    const normalized: FilterScope | null =
+      routeScope === "note" || routeScope === "document" ? "document"
+        : FILTER_SCOPE_VALUES.includes(routeScope as FilterScope) ? (routeScope as FilterScope)
+          : null;
+    if (!normalized || normalized === scopeRef.current) return;
+    applyingRouteScopeRef.current = true;
+    setScope(normalized);
+  }, [state.route]);
+  useEffect(() => {
+    if (applyingRouteScopeRef.current) {
+      applyingRouteScopeRef.current = false;
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const current = params.get("scope") ?? "all";
+    if (current === scope) return;
+    if (scope === "all") params.delete("scope");
+    else params.set("scope", scope);
+    const qs = params.toString();
+    replaceAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
+  }, [scope]);
   const [spaceOpen, setSpaceOpen] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
   const [expanded, setExpanded] = useState<ExpandedSet>(() => new Set());
 
   // 标签树状态
@@ -280,21 +385,25 @@ export default function SidebarDesktop() {
   const [tagsExpanded, setTagsExpanded] = useState<ExpandedSet>(() => new Set());
   const [tagsLoading, setTagsLoading] = useState(true);
 
-  // 专注模式
+  // 专注模式（=知识库「进入态」）：面板显示库列表 ⇄ 该库目录树的两级态。
+  // 唯一真相是 URL（/kb/:id[.../notes/:n]）：进入/退出只写 URL，由此处的
+  // route 派生 effect 回灌本地 state；刷新/前进/后退天然恢复，无需 localStorage。
   const [focusRootId, setFocusRootId] = useState<string | null>(null);
 
   // 搜索结果弹层（搜当前空间标签+文档）
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchDocs, setSearchDocs] = useState<NoteListItem[]>([]);
   const [searchFetching, setSearching] = useState(false);
+  // 搜索范围：进入知识库后默认「库内」，可切「全空间」；未进入恒为全空间
+  const [searchScope, setSearchScope] = useState<"kb" | "all">("all");
   const [searchTagOpen, setSearchTagOpen] = useState<string | null>(null);
-  const searchRef2 = useRef<HTMLDivElement>(null);
 
   // 行级菜单
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
 
-  // 重命名（行内 input）
-  const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string } | null>(null);
+  // 重命名（行内 input）。isNew = 刚新建、正处于"先建后改名"流程：
+  // 这种情况下取消/清空名字要真正把节点删掉，否则"取消"只是个装饰按钮。
+  const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string; isNew?: boolean } | null>(null);
 
   // 区段折叠 + 排序（折叠状态持久化）
   const SECTION_COLLAPSED_KEY = "nowen-next-sidebar-sections-collapsed";
@@ -326,20 +435,11 @@ export default function SidebarDesktop() {
   const [sectionOrder, setSectionOrder] = useState<SectionId[]>(() => {
     try {
       const saved = localStorage.getItem(SECTION_ORDER_KEY);
-      if (saved === "kb,tags,editors" || saved === "kb,editors,tags" || saved === "tags,kb,editors" ||
-          saved === "tags,editors,kb" || saved === "editors,kb,tags" || saved === "editors,tags,kb") {
-        return saved.split(",") as SectionId[];
-      }
+      // 旧数据只有三个区段（收藏是后加的），补齐交给归一化，不要在这里写死排列。
+      if (saved) return normalizeSectionOrder(saved.split(",") as SectionId[]);
     } catch { /* ignore */ }
-    return ["kb", "tags", "editors"];
+    return ["kb", "tags", "editors", "star"];
   });
-
-  // 拖拽
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const [dropTarget, setDropTarget] = useState<{
-    nodeId: string;
-    position: "before" | "after" | "into";
-  } | null>(null);
 
   // 定位高亮
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -374,6 +474,8 @@ export default function SidebarDesktop() {
   const [manageOpen, setManageOpen] = useState(false);
   // 知识库面板：+ 新建菜单（复用旧版 KnowledgeTreeCreateDropdown）与 ⋮ 更多菜单（排序/折叠/刷新）
   const [createMenuState, setCreateMenuState] = useState<KnowledgeTreeCreateMenuState | null>(null);
+  // Yuque 导入模态：null = 关闭；非 null = 目标笔记本 id（fallback 由 YuqueImport 处理）
+  const [yuqueImportNotebookId, setYuqueImportNotebookId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<KnowledgeTreeSortMode>(() => loadKnowledgeTreeSortMode());
   const [kbMoreOpen, setKbMoreOpen] = useState<{ x: number; y: number } | null>(null);
   const [tagsMoreOpen, setTagsMoreOpen] = useState<{ x: number; y: number } | null>(null);
@@ -456,13 +558,9 @@ export default function SidebarDesktop() {
     if (v && sidebarView !== v) applySidebarView(v);
   }, [state.viewMode, sidebarView, applySidebarView]);
 
-  // 收藏模块：当前笔记不在收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）
-  useEffect(() => {
-    if (state.viewMode !== "favorites" || starDocs.length === 0) return;
-    const activeId = state.activeNote?.id;
-    if (activeId && starDocs.some((d) => d.id === activeId)) return;
-    api.getNote(starDocs[0].id).then((note) => actions.setActiveNote(note)).catch(() => {});
-  }, [state.viewMode, state.activeNote?.id, starDocs]);
+  // 统一打开链路：页签/知识树/搜索/收藏的笔记打开共用 openNoteFromTab（协调器 + 404 自愈）
+  const openNoteFromTab = useTabNoteOpener();
+  const { loadNote, cancelNoteLoad } = useNoteLoader();
 
   // 收藏区段数据：收藏已并入知识库面板区段（不再是独立视图），挂载与笔记变更时刷新
   const reloadStar = useCallback(() => {
@@ -504,38 +602,87 @@ export default function SidebarDesktop() {
   }, []);
 
   /** + 新建菜单的统一创建入口（复用旧版节点创建语义） */
-  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet") => {
+  const handleCreate = useCallback(async (parentId: string | null, kind: "folder" | "note" | "markdown" | "mindmap" | "sheet" | "plain" | "board") => {
     setCreateMenuState(null);
     try {
       const titles: Record<string, string> = {
         folder: "新建文件夹", note: "新建文档", markdown: "新建 Markdown",
-        mindmap: "新建思维导图", sheet: "新建表格",
+        mindmap: "新建思维导图", sheet: "新建表格", plain: "新建纯文本", board: "新建画板",
       };
-      await knowledgeTreeApi.create({ parentId, nodeType: kind, title: titles[kind] });
+      // 根级新建的 folder 即知识库（新建菜单根级只有「新建知识库」一项），默认名不能是「新建文件夹」
+      const title = kind === "folder" && parentId === null ? "新建知识库" : titles[kind];
+      const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
+      // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致。
+      // isNew 标记让"取消/清空名字"能真正撤销这次创建。
+      setRenaming({ kind: "kb", id: created.id, value: created.title, isNew: true });
     } catch (error) {
       console.error("[SidebarDesktop] create node failed:", error);
     }
   }, []);
 
+  // 知识树「导入」：与 KnowledgeTreePanel 的导入 effect 同一套实现（文件选择器 + 入库 + 刷新）。
+  // 此前桌面树这里被接成 onImport={() => setCreateMenuState(null)} 的空壳——点导入只关菜单，什么都不发生。
+  const handleImport = useCallback(async (parentId: string | null, importKind: KnowledgeTreeImportRequest["kind"]) => {
+    setCreateMenuState(null);
+    // Yuque 走模态流程（不依赖父节点类型）
+    if (importKind === "yuque") {
+      setYuqueImportNotebookId(
+        state.activeNote?.notebookId || state.selectedNotebookId || (state.notebooks ?? [])[0]?.id || null,
+      );
+      return;
+    }
+    const parent = parentId ? nodes.find((node) => node.id === parentId) ?? null : null;
+    const options = {
+      parent,
+      nodes,
+      fallbackNotebookId: state.activeNote?.notebookId || state.selectedNotebookId || (state.notebooks ?? [])[0]?.id || null,
+    };
+    try {
+      const imported = importKind === "markdown"
+        ? await importMarkdownIntoKnowledgeTree(options)
+        : importKind === "markdown-zip"
+          ? await importMarkdownZipIntoKnowledgeTree(options)
+          : importKind === "word"
+            ? await importWordIntoKnowledgeTree(options)
+            : importKind === "pdf"
+              ? await importPdfIntoKnowledgeTree(options)
+              : await importWeChatArticleIntoKnowledgeTree(options);
+      if (!imported) return;
+      if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      void openNoteFromTab(imported.id);
+      actions.refreshNotes();
+      actions.refreshNotebooks();
+    } catch (error) {
+      toast.error((error as Error)?.message || "导入失败，请重试");
+    }
+  }, [nodes, openNoteFromTab, actions, state.activeNote?.notebookId, state.selectedNotebookId, state.notebooks]);
+
   const spaceRef = useRef<HTMLDivElement>(null);
-  const filterRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchPopupRef = useRef<HTMLDivElement | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const treeRootRef = useRef<HTMLDivElement>(null);
   const panelScrollRef = useRef<HTMLDivElement>(null);
 
   // ---- 数据加载 ----
+  // 并发 reload 的序号：只认最新一次请求的结果，避免早发出的旧响应后到、
+  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 nowen:knowledge-tree-changed 会同时触发 reload）。
+  const reloadSeqRef = useRef(0);
   const reload = useCallback(async () => {
+    const seq = ++reloadSeqRef.current;
     try {
       const response = await knowledgeTreeApi.list();
+      if (seq !== reloadSeqRef.current) return;
       setNodes(Array.isArray(response?.nodes) ? response.nodes : []);
     } catch (error) {
       console.error("[SidebarDesktop] knowledge tree load failed:", error);
     } finally {
-      setLoading(false);
+      if (seq === reloadSeqRef.current) setLoading(false);
     }
   }, []);
 
@@ -581,25 +728,30 @@ export default function SidebarDesktop() {
     };
   }, [reload, reloadTags]);
 
+  // 树默认全部折叠：不自动展开任何知识库。此前首次加载会把所有根层知识库
+  // 一次性展开（v2 的「根层默认展开」），进来就是一大片展开状态，很吵；
+  // 现在只在你点开某个库时展开它（单击根行/双击/深链回灌各自即时展开）。
+
   const switchSpace = useCallback((workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
     setCurrentWs(workspaceId);
     window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
-  }, []);
-
-  // ---- 默认展开：根层知识库 ----
-  useEffect(() => {
-    if (!nodes.length) return;
-    setExpanded((current) => {
-      if (current.size > 0) return current;
-      const next: ExpandedSet = new Set();
-      for (const node of nodes) {
-        if (node.isDeleted) continue;
-        if (node.parentId === null && node.nodeType === "folder") next.add(node.id);
-      }
-      return next;
-    });
-  }, [nodes]);
+    // 旧空间的文档不属于新空间：切空间即收起，避免笔记路径被写进新空间的 URL。
+    actions.setActiveNote(null);
+    actions.setMobileView("list");
+    // 空间真相归 URL：带空间域的路径上切空间 = 改写 URL 空间段，内容层级
+    // 落到新空间的同模块根（读侧回灌其余状态；旧空间的库/文档不跨空间携带）。
+    const route = state.route;
+    let target: string | null = null;
+    if (route.kind === "kb" || route.kind === "note" || route.kind === "home") {
+      target = moduleAppPath("notebook", workspaceId);
+    } else if (route.kind === "module" && route.space) {
+      target = moduleAppPath(route.viewMode, workspaceId);
+    } else if (route.kind === "issue") {
+      target = moduleAppPath("issues", workspaceId);
+    }
+    if (target) pushAppPathState(target);
+  }, [actions, state.route]);
 
   // ---- 标签默认展开：BLE（首个），其余折叠 —— 原型 r15 的默认态是首个展开 ----
   // AppContext.tags 变化（TagInput 增删标签会 setTags）时同步标签面板
@@ -619,21 +771,20 @@ export default function SidebarDesktop() {
 
   // ---- 浮层关闭 ----
   useEffect(() => {
-    if (!spaceOpen && !filterOpen && !rowMenu && !searchOpen) return;
+    if (!spaceOpen && !rowMenu && !searchOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!spaceRef.current?.contains(target)) setSpaceOpen(false);
-      if (!filterRef.current?.contains(target)) setFilterOpen(false);
       if (!menuRef.current?.contains(target)) setRowMenu(null);
-      // 搜索弹层：点弹层外（含搜索框本身外）关闭
-      if (!searchRef2.current?.contains(target) && !searchRef.current?.contains(target)) setSearchOpen(false);
+      // 搜索弹层（portal 挂 body）：点弹层与搜索框之外关闭
+      if (!searchPopupRef.current?.contains(target) && !searchContainerRef.current?.contains(target)) setSearchOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       // Esc 优先退专注（brief 4.5），其次关菜单/浮层，最后清空搜索
       if (rowMenu) { setRowMenu(null); return; }
-      if (spaceOpen || filterOpen) { setSpaceOpen(false); setFilterOpen(false); return; }
-      if (focusRootId) { setFocusRootId(null); return; }
+      if (spaceOpen) { setSpaceOpen(false); return; }
+      if (focusRootId) { exitKb(); return; }
       if (searchOpen) { setSearchOpen(false); return; }
       if (query) { setQuery(""); return; }
       if (renaming) setRenaming(null);
@@ -644,13 +795,21 @@ export default function SidebarDesktop() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [spaceOpen, filterOpen, rowMenu, focusRootId, query, renaming, searchOpen]);
+  }, [spaceOpen, rowMenu, focusRootId, query, renaming, searchOpen]);
 
   // ---- 重命名 input 自动聚焦 ----
+  // 全选只在进入重命名时执行一次：onChange 每次按键都生成新 renaming 对象，
+  // 若 effect 依赖整个 renaming，会每次输入都重跑 select()（输入一字即全选被覆盖）。
+  const renameSelectKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (renaming) {
-      requestAnimationFrame(() => renameInputRef.current?.select());
+    if (!renaming) {
+      renameSelectKeyRef.current = null;
+      return;
     }
+    const key = `${renaming.kind}:${renaming.id}`;
+    if (renameSelectKeyRef.current === key) return;
+    renameSelectKeyRef.current = key;
+    requestAnimationFrame(() => renameInputRef.current?.select());
   }, [renaming]);
 
   // ---- 搜索弹层：防抖搜当前空间文档 + 本地过滤标签 ----
@@ -663,13 +822,52 @@ export default function SidebarDesktop() {
     }
     setSearchOpen(true);
     setSearching(true);
+    // 在途请求作废标记：快速连续输入时旧响应不能覆盖新结果
+    let stale = false;
     const timer = setTimeout(() => {
       api.searchNotes(keyword, 20)
-        .then((items) => setSearchDocs(items as NoteListItem[]))
-        .catch(() => setSearchDocs([]))
-        .finally(() => setSearching(false));
+        .then((items) => { if (!stale) setSearchDocs(items as NoteListItem[]); })
+        .catch(() => { if (!stale) setSearchDocs([]); })
+        .finally(() => { if (!stale) setSearching(false); });
     }, 250);
-    return () => clearTimeout(timer);
+    return () => { stale = true; clearTimeout(timer); };
+  }, [query]);
+
+  // ---- 搜索面板 ----
+  // 面板以 absolute 悬在头部下方、四边距 6px：宽度天然等于侧栏宽，不会越过侧栏压到编辑区。
+  // （之前用 absolute + 定宽/portal 测距，既溢宽又多一层 JS，已移除）
+
+  // ---- 搜索状态 ⇄ URL（?q= 叠加在当前路径上，replace 不污染历史）----
+  // 写侧：与搜索请求同防抖节奏，停止输入 250ms 后 URL 稳定为 /当前路径?q=词；
+  // 清空 → 移除 ?q=。lastUrlQRef 防止「URL 回灌 → 写侧 → 再回灌」的乒乓，
+  // 并避免首帧把直开链接 ?q= 剥掉。AI/外部工具直达入口：/search?q=…。
+  // ---- 搜索状态 ⇄ URL 握手 ----
+  // 读侧（URL → 搜索框）：仅在 state.route 变化时运行；?q= 与本地不同才回灌，
+  // 回灌前置 applyingRouteQRef 标记，写侧见标记即让位（防 StrictMode 双跑与
+  // 「回灌覆盖用户输入」两个时序坑）。
+  // 写侧（搜索框 → URL）：仅响应用户输入（标记未置位）；与 URL 现值对比相等
+  // 则跳过（首帧直开 /search?q=x 时 URL 已正确，不剥 q）。
+  const queryRef = useRef(query);
+  queryRef.current = query;
+  const applyingRouteQRef = useRef(false);
+  useEffect(() => {
+    if (!("q" in state.route)) return;
+    const routeQ = (state.route as { q?: string }).q ?? "";
+    if (routeQ === queryRef.current.trim()) return;
+    applyingRouteQRef.current = true;
+    setQuery(routeQ);
+    setSearchOpen(Boolean(routeQ.trim()));
+  }, [state.route]);
+  useEffect(() => {
+    if (applyingRouteQRef.current) {
+      applyingRouteQRef.current = false;
+      return;
+    }
+    const keyword = query.trim();
+    const currentQ = new URLSearchParams(window.location.search).get("q") ?? "";
+    if (keyword === currentQ) return;
+    const base = resolveCurrentAppPathname();
+    replaceAppPathState(keyword ? `${base}?q=${encodeURIComponent(keyword)}` : base);
   }, [query]);
 
   const matchedTags = useMemo(() => {
@@ -679,29 +877,11 @@ export default function SidebarDesktop() {
   }, [tags, query]);
 
   const openSearchDoc = useCallback(async (docId: string) => {
-    try {
-      const note = await api.getNote(docId);
-      if (!note) return;
-      actions.setActiveNote(note);
-      actions.setSelectedNotebook(note.notebookId);
-      actions.setViewMode("notebook");
-      actions.openNoteTab({
-        id: note.id,
-        title: note.title,
-        notebookId: note.notebookId,
-        workspaceId: note.workspaceId,
-        contentFormat: note.contentFormat,
-        isLocked: note.isLocked,
-        isTrashed: note.isTrashed,
-        updatedAt: note.updatedAt,
-      });
-      actions.setMobileView("editor");
-      setSearchOpen(false);
-      setQuery("");
-    } catch (error) {
-      console.error("[SidebarDesktop] open search doc failed:", error);
-    }
-  }, [actions]);
+    // 统一走协调器链路（此前裸 getNote + setActiveNote 绕过加载协调器与页签治理）
+    setSearchOpen(false);
+    setQuery("");
+    await openNoteFromTab(docId);
+  }, [openNoteFromTab]);
 
   // 标签文档懒加载（弹层内展开标签时拉一次）
   const tagDocsForSearch = useCallback(async (tagId: string) => {
@@ -740,23 +920,250 @@ export default function SidebarDesktop() {
     return counts;
   }, [nodes, childrenMap]);
 
-  /** 文档 resourceId -> 根层知识库节点 id（专注模式过滤标签文档用） */
+  /** 文档 resourceId -> 根层知识库 resourceId（notebook id，URL 外名层用 notebook 实体 id，
+   *  不用树节点 id——URL 表达「哪个库」，不表达「树里哪个格子」）。
+   *  同时反查：notebook resourceId -> 树节点 id（URL 回灌侧栏聚焦态用）。 */
   const docRootMap = useMemo(() => {
     const byId = new Map(nodes.map((n) => [n.id, n]));
     const map = new Map<string, string>();
+    const kbNodeByResourceId = new Map<string, string>();
+    // 根节点自身先登记：空库（无任何文档）也要能回灌聚焦态，否则进入空库时
+    // 反查落空 → focusRootId 被清成 null → 界面自动弹回列表（无法在库内新建）。
+    for (const node of nodes) {
+      if (!node.isDeleted && node.resourceType === "notebook" && node.parentId === null) {
+        kbNodeByResourceId.set(node.resourceId, node.id);
+      }
+    }
     for (const node of nodes) {
       if (node.isDeleted || node.nodeType === "folder") continue;
       let cursor: KnowledgeTreeNode | undefined = node;
       while (cursor?.parentId) cursor = byId.get(cursor.parentId);
-      if (cursor) map.set(node.resourceId, cursor.id);
+      if (!cursor) continue;
+      map.set(node.resourceId, cursor.resourceId);
+      if (cursor.resourceType === "notebook") kbNodeByResourceId.set(cursor.resourceId, cursor.id);
     }
-    return map;
+    return { docRoot: map, kbNodeByResourceId };
   }, [nodes]);
 
+  // 深链规范化（对齐语雀：文档 URL 始终携带知识库层级）：裸 /notes/:n 入口
+  // （刷新/外链/登录回跳——本次加载未发生应用内前进导航）且文档归属库已知时，
+  // replace 成 /kb/:k/notes/:n。popstate 回退与退出库写入的裸路径发生在导航之后
+  // （标记已置位），不重写，不破坏后退链。
+  useEffect(() => {
+    if (loading || hasInAppForwardNavigationOccurred()) return;
+    const route = state.route;
+    if (route.kind !== "note" || route.kbId) return;
+    const root = docRootMap.docRoot.get(route.noteId);
+    if (!root) return;
+    replaceAppPathState(kbNoteAppPath(getCurrentWorkspace(), root, route.noteId));
+  }, [state.route, docRootMap, loading]);
+
+  // 进入态 ⇄ URL：route 是唯一真相，这里只做「读侧回灌」到本地 state。
+  // URL 里的 kbId 是 notebook id（resourceId），侧栏聚焦态用树节点 id，经反查转换；
+  // 树未加载时不动（等反查就绪），避免把刷新恢复的进入态先清后设。
+  // 进入/退出动作一律写 URL（openKbOverview/focusKb/exitKb），不直接 setFocusRootId。
+  const routeKbId = state.route.kind === "kb"
+    ? state.route.kbId
+    : state.route.kind === "note" ? state.route.kbId ?? null : null;
+
+  // 进入态兜底：URL 里的库（notebook id）被删除/不存在/无权限时自动退回列表态。
+  // 必须等树加载完成（loading=false）再判定——刷新恢复时 nodes 未到，会误判
+  // 「库不存在」把刚解析好的 /kb URL 推回知识库根。
+  //（依赖 routeKbId，必须放在其声明之后——TDZ。）
+  useEffect(() => {
+    if (loading || !routeKbId) return;
+    if (!nodes.some((n) => n.resourceId === routeKbId && n.resourceType === "notebook" && !n.isDeleted)) {
+      const ws = getCurrentWorkspace();
+      pushAppPathState(state.activeNote ? kbNoteAppPath(ws, null, state.activeNote.id) : moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
+    }
+  }, [nodes, routeKbId, state.activeNote, loading]);
+
+  // 库内树空间（聚焦）⇄ URL：?tree=focus 叠加在当前 kb 路径上
+  // （/kb/:space/:kbId[/:kbId/notes/:n]?tree=focus）。route 是唯一真相，这里只做
+  // 读侧回灌：聚焦目标 = URL 里的 kbId（notebook id → 树节点 id 反查）；
+  // 无参数或无 kbId = 全空间单树。树未加载时不动（等反查就绪）。
+  const routeTreeFocus = state.route.tree === "focus";
+  useEffect(() => {
+    if (routeKbId && loading) return;
+    if (!routeTreeFocus || !routeKbId) {
+      setFocusRootId((cur) => (cur === null ? cur : null));
+      return;
+    }
+    setFocusRootId(docRootMap.kbNodeByResourceId.get(routeKbId) ?? null);
+  }, [routeTreeFocus, routeKbId, docRootMap, loading]);
+
+  /** 打开库 Overview：写 URL /kb/:space/:kbId（主区渲染 KbDetailPage，侧栏树不动）。 */
+  const openKbOverview = useCallback((kbResourceId: string) => {
+    const ws = getCurrentWorkspace();
+    const target = `/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbResourceId)}`;
+    if (resolveCurrentAppPathname() === target) return;
+    pushAppPathState(target);
+  }, []);
+
+  /** 聚焦知识库（库内树空间）：该库 Overview 路径叠加 ?tree=focus，侧栏只渲染该库子树。 */
+  const focusKb = useCallback((kbResourceId: string) => {
+    const ws = getCurrentWorkspace();
+    const params = new URLSearchParams(window.location.search);
+    params.set("tree", "focus");
+    pushAppPathState(`/kb/${encodeURIComponent(ws)}/${encodeURIComponent(kbResourceId)}?${params.toString()}`);
+  }, []);
+
+  /** 退出库内树空间（回全空间单树）：剥离 ?tree=focus，路径与主区保持不变。 */
+  const exitKb = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("tree")) return;
+    params.delete("tree");
+    const qs = params.toString();
+    pushAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
+  }, []);
+
+  // 搜索范围跟随进入态：进入某库时默认库内，退出回到全空间
+  useEffect(() => {
+    setSearchScope(focusRootId ? "kb" : "all");
+  }, [focusRootId]);
+
   const rows = useMemo(
-    () => buildRows(nodes, expanded, query, scope, focusRootId),
-    [nodes, expanded, query, scope, focusRootId],
+    // 头部筛选（scope）只作用于搜索弹层，知识树始终展示全部节点类型
+    () => buildRows(nodes, expanded, query, focusRootId),
+    [nodes, expanded, query, focusRootId],
   );
+
+  // 搜索结果范围过滤：进入知识库后默认只显示该库命中的文档（弹层胶囊可切全空间）。
+  // docRoot 存的是根库 resourceId，聚焦态是节点 id——用聚焦根的 resourceId 对齐。
+  const focusRootResourceId = useMemo(
+    () => (focusRootId ? nodes.find((n) => n.id === focusRootId)?.resourceId ?? null : null),
+    [nodes, focusRootId],
+  );
+  const visibleSearchDocs = useMemo(() => {
+    if (searchScope !== "kb" || !focusRootResourceId) return searchDocs;
+    return searchDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
+  }, [searchDocs, searchScope, focusRootResourceId, docRootMap]);
+
+  // 收藏区段跟随聚焦范围：聚焦某个库时只保留该库内的收藏
+  const visibleStarDocs = useMemo(() => {
+    if (!focusRootResourceId) return starDocs;
+    return starDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
+  }, [starDocs, focusRootResourceId, docRootMap]);
+
+  // 收藏区段的根层知识库：树节点 isFavorite=1 的知识库（notebook 收藏落 notebooks 表），
+  // 同样跟随聚焦范围——聚焦某库时只显示该库自身的收藏项
+  const visibleStarKbs = useMemo(() => {
+    const kbs = nodes.filter(
+      (n) => !n.isDeleted && n.parentId === null && n.resourceType === "notebook" && n.isFavorite === 1,
+    );
+    if (!focusRootResourceId) return kbs;
+    return kbs.filter((kb) => kb.resourceId === focusRootResourceId);
+  }, [nodes, focusRootResourceId]);
+
+  // 收藏模块：当前笔记不在（可见）收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
+  // 走协调器（缓存优先 + 意图守卫）但保持原语义：只预载 activeNote，不切视图、不开页签。
+  useEffect(() => {
+    if (state.viewMode !== "favorites" || visibleStarDocs.length === 0) return;
+    const activeId = state.activeNote?.id;
+    if (activeId && visibleStarDocs.some((d) => d.id === activeId)) return;
+    const first = visibleStarDocs[0];
+    void loadNote({
+      noteId: first.id,
+      summary: { title: first.title ?? "", notebookId: first.notebookId ?? "", contentFormat: first.contentFormat },
+      request: () => api.getNote(first.id),
+      onSuccess: (note) => actions.setActiveNote(note),
+    }).then((result) => {
+      // 收藏列表可能是陈旧数据（笔记已删）：404 静默收场，不弹错误浮层
+      if (result?.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {
+        cancelNoteLoad();
+      }
+    });
+  }, [state.viewMode, state.activeNote?.id, visibleStarDocs, loadNote, cancelNoteLoad, actions]);
+
+  // 搜索结果分类（头部筛选控制分区显隐与文档集合）：标签 / 收藏 / 知识库·文件夹 / 文档。
+  // 收藏与文档互斥展示，避免同一篇文档在弹层里出现两次。
+  // favorite/tag 筛选 = 只在已收藏/已加标签的文档里搜（树节点自带 isFavorite；
+  // 有标签文档集合由标签面板已加载的 tagDocs 汇总）。
+  const taggedDocIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const docs of Object.values(tagDocs)) {
+      for (const doc of docs) set.add(doc.id);
+    }
+    return set;
+  }, [tagDocs]);
+  const favoriteSearchDocs = useMemo(
+    () => (scope === "tag" ? [] : visibleSearchDocs.filter((doc) => doc.isFavorite === 1)),
+    [visibleSearchDocs, scope],
+  );
+  const plainSearchDocs = useMemo(() => {
+    let docs = visibleSearchDocs.filter((doc) => doc.isFavorite !== 1);
+    if (scope === "favorite") docs = visibleSearchDocs.filter((doc) => doc.isFavorite === 1);
+    else if (scope === "tag") docs = docs.filter((doc) => taggedDocIds.has(doc.id));
+    return docs;
+  }, [visibleSearchDocs, scope, taggedDocIds]);
+  // 知识库/文件夹：本地树节点匹配（文档走接口搜索，这里只匹配容器节点）。
+  // 筛选 scope：知识库=仅根层库，文件夹=仅非根层文件夹，文档/收藏/标签=不显示容器。
+  const matchedTreeNodes = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    if (!keyword) return [];
+    if (scope === "document" || scope === "favorite" || scope === "tag") return [];
+    return nodes
+      .filter((n) => {
+        if (n.isDeleted) return false;
+        if (scope === "notebook") return n.nodeType === "folder" && n.parentId === null && n.resourceType === "notebook";
+        if (scope === "folder") return n.nodeType === "folder" && !(n.parentId === null && n.resourceType === "notebook");
+        return n.nodeType === "folder" || (n.parentId === null && n.resourceType === "notebook");
+      })
+      .filter((n) => n.title.toLowerCase().includes(keyword))
+      .slice(0, 8);
+  }, [nodes, query, scope]);
+  // 弹层分区显隐（随筛选 scope）：全部=四类都看；单档=只看对应类
+  const searchSections = useMemo(() => ({
+    tags: scope === "all" || scope === "tag",
+    favorite: scope === "all" || scope === "favorite",
+    tree: matchedTreeNodes.length > 0,
+    docs: scope !== "notebook" && scope !== "folder",
+  }), [scope, matchedTreeNodes.length]);
+
+  /** 搜索结果点文件夹：展开到该节点并关闭弹层（不改变聚焦态）。 */
+  const revealTreeNode = useCallback((nodeId: string) => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const ancestors: string[] = [];
+    let cursor: KnowledgeTreeNode | undefined = byId.get(nodeId);
+    while (cursor) {
+      ancestors.push(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      for (const id of ancestors) next.add(id);
+      return next;
+    });
+    setSearchOpen(false);
+    setQuery("");
+  }, [nodes]);
+
+  // 主区 Overview 目录点文件夹 → 侧栏树展开到该节点并选中（不离开 Overview）。
+  const revealNodeFromOverview = useCallback((nodeId: string) => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const ancestors: string[] = [];
+    let cursor: KnowledgeTreeNode | undefined = byId.get(nodeId);
+    while (cursor) {
+      ancestors.push(cursor.id);
+      cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      for (const id of ancestors) next.add(id);
+      return next;
+    });
+    setSelectedNodeIds(new Set([nodeId]));
+    selectionAnchorRef.current = nodeId;
+  }, [nodes]);
+
+  useEffect(() => {
+    const onReveal = (event: Event) => {
+      const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
+      if (nodeId) revealNodeFromOverview(nodeId);
+    };
+    window.addEventListener("nowen:kb-reveal-node", onReveal);
+    return () => window.removeEventListener("nowen:kb-reveal-node", onReveal);
+  }, [revealNodeFromOverview]);
 
   const searching = query.trim().length > 0;
   const docCount = useMemo(
@@ -781,11 +1188,25 @@ export default function SidebarDesktop() {
   const toggleTag = useCallback((tagId: string) => {
     setTagsExpanded((current) => {
       const next = new Set(current);
-      if (next.has(tagId)) next.delete(tagId);
-      else next.add(tagId);
+      if (next.has(tagId)) {
+        next.delete(tagId);
+        // 折叠：URL 退出标签态，回常规路径
+        pushAppPathState(state.activeNote ? `/notes/${encodeURIComponent(state.activeNote.id)}` : "/");
+      } else {
+        next.add(tagId);
+        // 展开：URL 跟随（/tags/:tagId），刷新/直开可恢复该标签展开
+        pushAppPathState(`/tags/${encodeURIComponent(tagId)}`);
+      }
       return next;
     });
-  }, []);
+  }, [state.activeNote]);
+
+  // 标签回灌：route.kind==="tag" 时确保该标签展开（URL 直达 / 刷新恢复）
+  useEffect(() => {
+    if (state.route.kind !== "tag") return;
+    const tagId = state.route.tagId;
+    setTagsExpanded((current) => (current.has(tagId) ? current : new Set(current).add(tagId)));
+  }, [state.route]);
 
   /** "折叠全部文件夹"按钮：专注模式下只碰专注子树内的文件夹（brief 4.5） */
   const toggleAllFolders = useCallback(() => {
@@ -849,28 +1270,26 @@ export default function SidebarDesktop() {
       selectFolder(node);
       return;
     }
-    try {
-      const note = await api.getNote(node.resourceId);
-      if (!note) return;
-      actions.setActiveNote(note);
-      actions.setSelectedNotebook(note.notebookId);
-      actions.setSelectedKnowledgeTreeParent(node.parentId);
-      actions.setViewMode("notebook");
-      actions.openNoteTab({
-        id: note.id,
-        title: note.title,
-        notebookId: note.notebookId,
-        workspaceId: note.workspaceId,
-        contentFormat: note.contentFormat,
-        isLocked: note.isLocked,
-        isTrashed: note.isTrashed,
-        updatedAt: note.updatedAt,
-      });
-      actions.setMobileView("editor");
-    } catch (error) {
-      console.error("[SidebarDesktop] open node failed:", error);
+    // 表格走深链；导图归一后是笔记文档（contentFormat="mindmap"），直接当笔记打开
+    if (node.noteType === "sheet") {
+      pushSheetAppPath(node.resourceId);
+      return;
     }
-  }, [actions, toggleNode]);
+    // 统一走协调器链路（此前裸 getNote + setActiveNote 绕过加载协调器与页签治理）
+    actions.setSelectedKnowledgeTreeParent(node.parentId);
+    // URL 必须跟随这篇文档「自己所属的库」，而不是上一个库（否则 A 库路径 + B 库文档，
+    // 切库连续点文档时 URL 错乱、聚焦态也跟着错）。?tree=focus 一并保留。
+    const ws = getCurrentWorkspace();
+    const rootKb = docRootMap.docRoot.get(node.resourceId) ?? null;
+    if (rootKb) {
+      // 聚焦态以地址栏为准：state.route 是异步回灌的，刚点完聚焦立刻点文档会读到旧值，
+      // 导致写 URL 时把 ?tree=focus 丢掉（切走再回来聚焦就没了）。
+      const focusedNow = new URLSearchParams(window.location.search).get("tree") === "focus";
+      const target = `${kbNoteAppPath(ws, rootKb, node.resourceId)}${focusedNow ? "?tree=focus" : ""}`;
+      if (`${resolveCurrentAppPathname()}${window.location.search}` !== target) pushAppPathState(target);
+    }
+    await openNoteFromTab(node.resourceId);
+  }, [actions, openNoteFromTab, selectFolder, docRootMap]);
 
   /** 统一行点击：ctrl/meta=多选切换，shift=范围选，普通=单选 */
   const handleRowClick = useCallback((event: React.MouseEvent, node: KnowledgeTreeNode) => {
@@ -909,10 +1328,18 @@ export default function SidebarDesktop() {
     selectionAnchorRef.current = node.id;
     if (node.nodeType === "folder") {
       selectFolder(node);
+      if (node.parentId === null && node.resourceType === "notebook") {
+        // 库根行：展开子树 + 主区 Overview（折叠交给双击/箭头，不跟随单击）
+        setExpanded((cur) => (cur.has(node.id) ? cur : new Set(cur).add(node.id)));
+        openKbOverview(node.resourceId);
+        return;
+      }
+      // 文件夹：选中 + 展开/折叠（主区不动）
+      toggleNode(node);
       return;
     }
     void openNode(node);
-  }, [selectFolder, openNode]);
+  }, [selectFolder, openNode, openKbOverview, toggleNode]);
 
   const clearSelection = useCallback(() => {
     setSelectedNodeIds(new Set());
@@ -941,6 +1368,7 @@ export default function SidebarDesktop() {
   }, [selectedNodeIds.size, clearSelection]);
 
 
+
   const activeNoteId = state.activeNote?.id ?? null;
   const openTabs = state.openNoteTabs;
 
@@ -958,13 +1386,8 @@ export default function SidebarDesktop() {
     try { localStorage.setItem(SECTION_ORDER_KEY, sectionOrder.join(",")); } catch { /* ignore */ }
   }, [sectionOrder]);
 
-  // 渲染兜底：顺序数组保证恰好包含全部三个区段（localStorage 脏数据/未来增删区段时不丢面板）
-  const safeOrder = useMemo<SectionId[]>(() => {
-    const all: SectionId[] = ["kb", "tags", "editors", "star"];
-    const valid = sectionOrder.filter((s) => all.includes(s));
-    for (const id of all) if (!valid.includes(id)) valid.push(id);
-    return valid;
-  }, [sectionOrder]);
+  // 渲染兜底：顺序数组保证恰好包含全部四个区段（localStorage 脏数据/未来增删区段时不丢面板）
+  const safeOrder = useMemo<SectionId[]>(() => normalizeSectionOrder(sectionOrder), [sectionOrder]);
 
   // ---- 区段排序（pointer 实现而非 HTML5 DnD：区段头按下拖动，松手时按当前指针位置落位） ----
   // 拖拽视觉反馈：正在拖拽的区段 id（HTML5 DnD）
@@ -972,8 +1395,10 @@ export default function SidebarDesktop() {
 
   // ---- 区段排序：HTML5 DnD（原生拖影），从区段头空白处启动；button 上按下不启动 ----
   const onSectionDragStart = useCallback((id: SectionId) => (event: React.DragEvent) => {
-    if (id === "kb") return;
     event.dataTransfer.setData("text/plain", id);
+    // 专用类型：让区段拖拽和知识树行拖拽（也用 text/plain）互相区分，
+    // 否则拖一行文档经过别的区段头会被当成区段排序。
+    event.dataTransfer.setData(SECTION_DRAG_TYPE, id);
     event.dataTransfer.effectAllowed = "move";
     setReorderActive(id);
   }, []);
@@ -987,9 +1412,8 @@ export default function SidebarDesktop() {
   const [sectionDropHint, setSectionDropHint] = useState<{ id: SectionId; after: boolean } | null>(null);
 
   const onSectionDragOver = useCallback((id: SectionId) => (event: React.DragEvent) => {
-    if (id === "kb") return;
-    // 仅响应区段排序拖拽（dataTransfer 类型区分）
-    if (!event.dataTransfer.types.includes("text/plain")) return;
+    // 仅响应区段排序拖拽（专用 dataTransfer 类型；知识树行拖拽不带它）
+    if (!event.dataTransfer.types.includes(SECTION_DRAG_TYPE)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
@@ -998,19 +1422,24 @@ export default function SidebarDesktop() {
   }, []);
 
   const onSectionDrop = useCallback((id: SectionId) => (event: React.DragEvent) => {
+    // drop 阶段读得到 dataTransfer 值：空值 = 不是区段排序拖拽（知识树行拖拽不带该类型）
+    const from = event.dataTransfer.getData(SECTION_DRAG_TYPE) as SectionId;
+    if (!SECTION_IDS.includes(from)) return;
     event.preventDefault();
     event.stopPropagation();
-    const from = event.dataTransfer.getData("text/plain") as SectionId;
     setReorderActive(null);
     setSectionDropHint(null);
-    if (!from || from === id || id === "kb") return;
+    if (from === id) return;
     // 落点在目标区段下半部 = 插到它后面；上半部 = 插到它前面（拖到文字下方=排到下面）
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const after = event.clientY > rect.top + rect.height / 2;
     setSectionOrder((current) => {
-      if (!current.includes(from)) return current;
-      const next = current.filter((s) => s !== from);
+      // 必须在归一化后的顺序上算下标：持久化的旧顺序可能没有 star，
+      // 直接 indexOf 会拿到 -1，插入位被算成 0（表现为"拖到收藏下面却跑到最上方"）。
+      const base = normalizeSectionOrder(current);
+      const next = base.filter((section) => section !== from);
       const idx = next.indexOf(id);
+      if (idx < 0) return base;
       next.splice(after ? idx + 1 : idx, 0, from);
       return next;
     });
@@ -1020,7 +1449,7 @@ export default function SidebarDesktop() {
   // 由目标板块的"上/下半内阴影高亮"表达落点；松手时 onSectionDrop 一次性提交顺序。
   // （旧 previewOrder 重排渲染会在换位时移除被拖板块 DOM，导致原生拖影中断、面板闪没。）
 
-  // ---- 面板高度（VS Code 式：把手拖拽定高，body 内部滚动；双击把手清除定高） ----
+  // ---- 面板高度：交给 SplitView（尺寸和恒等于容器高度，折叠份额按比例分给其它组）----
   const [sectionHeights, setSectionHeights] = useState<Partial<Record<SectionId, number>>>(() => {
     try {
       const saved = localStorage.getItem("nowen-next-sidebar-section-heights");
@@ -1033,82 +1462,67 @@ export default function SidebarDesktop() {
     try { localStorage.setItem("nowen-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
   }, [sectionHeights]);
 
-  const startSectionResize = useCallback((sectionId: SectionId, e: React.PointerEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = sectionHeights[sectionId]
-      ?? (e.currentTarget.previousElementSibling?.getBoundingClientRect().height ?? 240);
-    const onMove = (moveEvent: PointerEvent) => {
-      const next = Math.max(96, Math.min(800, startHeight + (moveEvent.clientY - startY)));
-      setSectionHeights((cur) => ({ ...cur, [sectionId]: next }));
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }, [sectionHeights]);
-
-  // ---- kb 树拖拽 ----
-  const onRowDragStart = useCallback((node: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    event.dataTransfer.setData("text/node", node.id);
-    event.dataTransfer.effectAllowed = "move";
-    setDrag({ nodeId: node.id });
-  }, []);
-
-  const onRowDragOver = useCallback((node: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    if (!drag?.nodeId) return;
-    if (drag.nodeId === node.id) return;
-    // 禁止移入自身子树
-    if (isDescendant(node.id, drag.nodeId, childrenMap)) return;
-    // 不可见行（搜索未命中）不作为目标 —— rows 里没有就跳过
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const ratio = (event.clientY - rect.top) / rect.height;
-    const isFolder = node.nodeType === "folder";
-    // 边缘命中区 35%：判定更容易（brief 4.7 是 30%，实际操作太苛刻）
-    const position: "before" | "after" | "into" =
-      !isFolder
-        ? ratio < 0.5 ? "before" : "after"
-        : ratio < 0.35 ? "before" : ratio > 0.65 ? "after" : "into";
-    setDropTarget({ nodeId: node.id, position });
-  }, [drag, childrenMap]);
-
-  const onRowDrop = useCallback((target: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const sourceId = drag?.nodeId;
-    const info = dropTarget;
-    setDrag(null);
-    setDropTarget(null);
-    if (!sourceId || !info || info.nodeId !== target.id) return;
-    const source = nodes.find((n) => n.id === sourceId);
-    if (!source) return;
-
-    void (async () => {
-      try {
-        if (info.position === "into") {
-          // 移入文件夹
-          await knowledgeTreeApi.move(sourceId, { parentId: target.id });
-          // 折叠文件夹自动展开
-          setExpanded((cur) => new Set(cur).add(target.id));
-        } else {
-          // 前/后插入：parentId 与目标一致
-          await knowledgeTreeApi.move(sourceId, { parentId: target.parentId });
-        }
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      } catch (error) {
-        console.error("[SidebarDesktop] drop move failed:", error);
+  // ---- kb 树拖拽：拿起 / 落点判定 / 落点视觉统一交给 useSortableDrag ----
+  const treeDrag = useSortableDrag(rows, {
+    getId: (row) => row.node.id,
+    // 只有文件夹能接受"拖入内部"，文档行只在上下两半判定前/后。
+    // 例外：根级知识库自己拖过来时只做根层前后排序，不接受"放入"（否则会从根列表消失）。
+    canDropInto: (row, source) => {
+      if (row.node.nodeType !== "folder") return false;
+      if (source && isRootNotebookNode(source.node)) return false;
+      return true;
+    },
+    // 禁止移入自身子树（target 在 source 子树内则整行都不接）；
+    // 根级知识库只能在根层内重排：落点必须是根层节点，且不能是"放入"。
+    canDrop: (source, target, position) => {
+      if (isRootNotebookNode(source.node)) {
+        return position !== "into" && (target.node.parentId ?? null) === null;
       }
-    })();
-  }, [drag, dropTarget, nodes, childrenMap]);
+      return !isDescendant(target.node.id, source.node.id, childrenMap);
+    },
+    // 行内重命名时不可拿起（知识库根也要能拖，只在落点上限制）
+    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id),
+    onDrop: ({ sourceId, targetId, position }) => {
+      const target = targetId ? rows.find((row) => row.node.id === targetId)?.node : undefined;
+      void (async () => {
+        try {
+          if (target && position === "into") {
+            // 移入文件夹
+            await knowledgeTreeApi.move(sourceId, { parentId: target.id });
+            // 折叠文件夹自动展开
+            setExpanded((cur) => new Set(cur).add(target.id));
+            // 本地先按同一套规则摆好（追加到该父级末尾），再交给 reload 收敛
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, target.id, null));
+          } else if (target) {
+            // 前/后插入：交给后端按锚点重排兄弟 sortOrder（只传 parentId 会被追加到末尾）
+            const parentId = target.parentId ?? null;
+            const anchorPosition = position === "before" ? "before" : "after";
+            await knowledgeTreeApi.move(sourceId, {
+              parentId,
+              ...(position === "before" ? { beforeId: target.id } : { afterId: target.id }),
+            });
+            // 作废拖拽期间已在飞的 reload，再本地摆好新顺序（两边顺序一致，reload 回来不跳）
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, parentId, { id: target.id, position: anchorPosition }));
+          } else {
+            // 空白区 = 移到根层末尾
+            await knowledgeTreeApi.move(sourceId, { parentId: null });
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, null, null));
+          }
+          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        } catch (error) {
+          console.error("[SidebarDesktop] drop move failed:", error);
+        }
+      })();
+    },
+  });
 
   // ---- 行级菜单动作 ----
   const startCreateFolder = useCallback(async (parentId: string | null) => {
     try {
-      const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: "新建文件夹" });
+      const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: parentId === null ? "新建知识库" : "新建文件夹" });
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
       if (parentId) {
         // 父折叠则展开
@@ -1134,10 +1548,21 @@ export default function SidebarDesktop() {
 
   const commitRename = useCallback(async () => {
     if (!renaming) return;
-    const { kind, id, value } = renaming;
+    const { kind, id, value, isNew } = renaming;
     const trimmed = value.trim();
     setRenaming(null);
-    if (!trimmed) return;
+    if (!trimmed) {
+      // 新建流程里留空 = 放弃这次创建（删掉刚建的节点）；普通重命名留空 = 保持原名
+      if (isNew) {
+        try {
+          await knowledgeTreeApi.remove(id, "subtree");
+          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        } catch (error) {
+          console.error("[SidebarDesktop] discard new node failed:", error);
+        }
+      }
+      return;
+    }
     try {
       if (kind === "kb") {
         await knowledgeTreeApi.update(id, { title: trimmed });
@@ -1151,15 +1576,61 @@ export default function SidebarDesktop() {
     }
   }, [renaming, reloadTags]);
 
+  /** 取消重命名：新建流程下等同于撤销这次创建（删除刚建的节点），否则仅退出改名。 */
+  const cancelRename = useCallback(() => {
+    const current = renaming;
+    setRenaming(null);
+    if (!current?.isNew) return;
+    void knowledgeTreeApi.remove(current.id, "subtree")
+      .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+      .catch((error) => console.error("[SidebarDesktop] discard new node failed:", error));
+  }, [renaming]);
+
   const deleteNode = useCallback(async (nodeId: string) => {
     try {
       await knowledgeTreeApi.remove(nodeId, "subtree");
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      if (focusRootId === nodeId) setFocusRootId(null);
+      if (focusRootId === nodeId) exitKb();
     } catch (error) {
       console.error("[SidebarDesktop] delete node failed:", error);
     }
   }, [focusRootId]);
+
+  // 选中节点的键盘快捷键：F2 重命名 / Delete 删除（与行菜单右侧提示一致）。
+  // 必须放在 deleteNode 声明之后——依赖数组在渲染期求值，提前引用即 TDZ。
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "F2" && event.key !== "Delete") return;
+      if (selectedNodeIds.size !== 1) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      if ((active as HTMLElement | null)?.isContentEditable) return;
+      // 浮层/对话框打开时不抢键（菜单内的 Delete 属于菜单自身语义）
+      if (document.querySelector("[role=dialog], [role=menu]")) return;
+      const nodeId = [...selectedNodeIds][0];
+      const node = nodes.find((n) => n.id === nodeId && !n.isDeleted);
+      if (!node) return;
+      if (event.key === "F2") {
+        event.preventDefault();
+        setRenaming({ kind: "kb", id: node.id, value: node.title });
+        return;
+      }
+      event.preventDefault();
+      void (async () => {
+        const ok = await confirm({
+          title: `删除「${node.title}」`,
+          description: node.nodeType === "folder"
+            ? "该文件夹（知识库）下的子文件夹与文档会一起删除。"
+            : "删除后可在回收站恢复。",
+          confirmText: "删除",
+          danger: true,
+        });
+        if (ok) await deleteNode(node.id);
+      })();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedNodeIds, nodes, deleteNode]);
 
   const deleteTag = useCallback(async (tagId: string) => {
     try {
@@ -1170,23 +1641,12 @@ export default function SidebarDesktop() {
     }
   }, [reloadTags]);
 
-  const togglePin = useCallback(async (node: KnowledgeTreeNode) => {
-    // 真实置顶排序归数据层；本批次只做标记切换（brief 4.6）
-    try {
-      const nextPin = node.isPinned ? 0 : 1;
-      await api.updateNote(node.resourceId, { isPinned: nextPin } as never);
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-    } catch (error) {
-      console.error("[SidebarDesktop] toggle pin failed:", error);
-    }
-  }, []);
-
   /** 标签文档"定位"：退专注 → 展开祖先 → 滚动 + 高亮闪烁 1.6s */
   const locateDoc = useCallback(async (title: string) => {
     const hit = nodes.find((n) => !n.isDeleted && n.nodeType !== "folder" && n.title === title);
     if (!hit) { setRowMenu(null); return; }
     if (focusRootId && !isDescendant(hit.id, focusRootId, childrenMap) && hit.id !== focusRootId) {
-      setFocusRootId(null);
+      exitKb();
     }
     // 展开全部祖先
     setExpanded((current) => {
@@ -1267,24 +1727,81 @@ export default function SidebarDesktop() {
       docs: tagDocs[tag.id] ?? [],
     }));
     // 专注模式：标签只显示属于当前知识库的文档，空标签组隐藏
-    if (focusRootId) {
+    if (focusRootResourceId) {
       rows = rows
         .map((row) => ({
           ...row,
-          docs: row.docs.filter((doc) => docRootMap.get(doc.id) === focusRootId),
+          docs: row.docs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId),
         }))
         .filter((row) => row.docs.length > 0);
     }
     return rows;
-  }, [tags, tagsExpanded, tagDocs, focusRootId, docRootMap]);
+  }, [tags, tagsExpanded, tagDocs, focusRootResourceId, docRootMap]);
 
   const focusRoot = focusRootId ? nodes.find((n) => n.id === focusRootId) ?? null : null;
+  // 收藏区段总数（文档 + 知识库）
+  const starTotal = visibleStarDocs.length + visibleStarKbs.length;
 
   // ---- 区段渲染顺序 ----
   const sectionMap: Record<SectionId, React.ReactNode> = {
     kb: (
       <section key="kb" className="shrink-0" data-next-section="kb">
-        <div className="flex w-full items-center gap-1 px-2 py-1">
+        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「📘 库名 ＋ N ×」
+            （点×退出库内树空间，点库名回 Overview，＋在库内新建）。 */}
+        {focusRoot ? (
+          <div
+            draggable
+            onDragStart={onSectionDragStart("kb")}
+            onDragEnd={onSectionDragEnd}
+            className={cn(
+              "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+              reorderActive === "kb" && "opacity-40",
+            )}
+          >
+            <FaBook size={13} className="shrink-0 text-accent-primary" />
+            <button
+              type="button"
+              onClick={() => openKbOverview(focusRoot.resourceId)}
+              title="打开库概览"
+              className="min-w-0 flex-1 truncate rounded px-0.5 py-0.5 text-left text-[12px] font-semibold text-accent-primary hover:bg-app-hover"
+            >
+              {focusRoot.title}
+            </button>
+            {!collapsedSections.has("kb") && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setCreateMenuState({ parentId: focusRoot.id, anchor: new DOMRect(rect.left, rect.top, rect.width, rect.height) });
+                  }}
+                  title={t("sidebarNext.newFolder", { defaultValue: "新建" })}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
+                >
+                  <Plus size={13} />
+                </button>
+                <span className="rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCountMap.get(focusRoot.id) ?? 0}</span>
+                <button
+                  type="button"
+                  onClick={exitKb}
+                  title={t("sidebarNext.focusExit", { defaultValue: "退出库内树空间" })}
+                  className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
+                >
+                  <X size={13} />
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+        <div
+          draggable
+          onDragStart={onSectionDragStart("kb")}
+          onDragEnd={onSectionDragEnd}
+          className={cn(
+            "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+            reorderActive === "kb" && "opacity-40",
+          )}
+        >
           <button
             type="button"
             onClick={() => toggleSection("kb")}
@@ -1327,96 +1844,70 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                <Ellipsis size={15} strokeWidth={2} />
               </button>
             </>
           )}
           <span className="ml-1 rounded-full bg-app-hover px-1.5 text-[10px] tabular-nums text-tx-tertiary">{docCount}</span>
         </div>
+        )}
 
         {!collapsedSections.has("kb") && (
           <div className="pb-2 pl-2.5 pr-1">
-            {focusRoot && (
-              <div className="mx-1 mb-1 flex items-center gap-1 rounded-md bg-accent-primary/15 px-1 py-1">
-                <button
-                  type="button"
-                  onClick={() => setFocusRootId(null)}
-                  title={t("sidebarNext.focusBack", { defaultValue: "返回全部知识库" })}
-                  className="flex h-5 w-5 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
-                </button>
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{focusRoot.title}</span>
-              </div>
-            )}
             {loading ? (
               <p className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</p>
             ) : rows.length === 0 ? (
-              <p className="px-2 py-2 text-[11px] text-tx-tertiary">
-                {searching
-                  ? t("sidebarNext.noMatch", { defaultValue: "无匹配的文件夹或笔记" })
-                  : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
-              </p>
+              <div className="px-2 py-2 text-[11px] text-tx-tertiary">
+                <p>
+                  {searching
+                    ? t("sidebarNext.noMatch", { defaultValue: "无匹配的文件夹或笔记" })
+                    : focusRoot
+                      ? t("sidebarNext.emptyKb", { defaultValue: "这个知识库还没有内容" })
+                      : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
+                </p>
+                {!searching && focusRoot && (
+                  <button
+                    type="button"
+                    onClick={() => void startCreateNote(focusRoot.id)}
+                    className="mt-1.5 flex items-center gap-1 rounded-md border border-dashed border-app-border px-2 py-1 text-[11px] text-tx-secondary hover:border-accent-primary hover:text-accent-primary"
+                  >
+                    <Plus size={12} />
+                    新建文档
+                  </button>
+                )}
+              </div>
             ) : (
+              // 空白区 = 根层末尾（行上的 dragOver/drop 已 stopPropagation，不会冒泡到这里）
               <div
                 ref={treeRootRef}
-                onDragOver={(e) => { if (drag?.nodeId) { e.preventDefault(); setDropTarget(null); } }}
-                onDrop={(e) => {
-                  // 空白区 drop：移到根层末尾（dropTarget 为 null 时才生效，行上的 drop 已 stopPropagation? 否——行 drop 会冒泡到这里，用 dropTarget 判定来源）
-                  if (!drag?.nodeId || dropTarget) return;
-                  e.preventDefault();
-                  void (async () => {
-                    try {
-                      await knowledgeTreeApi.move(drag.nodeId!, { parentId: null });
-                      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-                    } catch (err) { console.error("[SidebarDesktop] root drop failed:", err); }
-                    setDrag(null);
-                  })();
-                }}
+                {...treeDrag.getContainerProps()}
               >
                 {rows.map((row) => {
                   const { node, depth, hasChildren, expanded: isExpanded } = row;
                   const isFolder = node.nodeType === "folder";
+                  const isKbRoot = node.parentId === null && node.resourceType === "notebook";
                   const isSelected = selectedNodeIds.has(node.id);
-                  const isPinned = Boolean(node.isPinned);
-                  const isDropInto = dropTarget?.nodeId === node.id && dropTarget.position === "into";
-                  const isDropBefore = dropTarget?.nodeId === node.id && dropTarget.position === "before";
-                  const isDropAfter = dropTarget?.nodeId === node.id && dropTarget.position === "after";
-                  const isDragSource = drag?.nodeId === node.id;
                   const isFlash = flashId === node.id;
                   const isRenaming = renaming?.kind === "kb" && renaming.id === node.id;
                   return (
                     <div
                       key={node.id}
-                      draggable={!isRenaming}
-                      onDragStart={onRowDragStart(node)}
-                      onDragOver={onRowDragOver(node)}
-                      onDragLeave={() => setDropTarget((cur) => (cur?.nodeId === node.id ? null : cur))}
-                      onDrop={onRowDrop(node)}
+                      {...treeDrag.getDragProps(row)}
                       onDoubleClick={() => {
-                        if (depth === 0 && isFolder && !focusRootId) {
-                          setFocusRootId(node.id);
-                          setExpanded((cur) => new Set(cur).add(node.id));
-                        }
+                        // 双击库根 = 折叠/展开（Overview 导航只跟单击）
+                        if (isKbRoot) toggleNode(node);
                       }}
                       className={cn(
                         "group flex h-8 items-center gap-1 rounded-md pr-1 text-xs transition-colors",
-                        isSelected ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
-                        isDragSource && "opacity-40",
+                        // 重命名时不要蓝色选中底：会和输入框边框叠成一坨蓝色
+                        isSelected && !isRenaming ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
+                        // 选中标（左侧内阴影）；放在落点视觉之前，让落点阴影在悬停时覆盖它
+                        isSelected && "shadow-[inset_2px_0_0_var(--color-accent-primary)]",
                         isFlash && "animate-pulse bg-accent-primary/25",
-                        isDropInto && "bg-accent-primary/20 ring-1 ring-accent-primary",
+                        // 拿起半透明 / 上·下内阴影 / 拖入高亮
+                        treeDrag.visualFor(node.id),
                       )}
-                      style={{
-                        paddingLeft: 2 + depth * 16,
-                        boxShadow:
-                          isDropBefore
-                            ? "inset 0 2px 0 var(--color-accent-primary)"
-                            : isDropAfter
-                              ? "inset 0 -2px 0 var(--color-accent-primary)"
-                              : isSelected
-                                ? "inset 2px 0 0 var(--color-accent-primary)"
-                                : undefined,
-                      }}
+                      style={{ paddingLeft: 2 + depth * 16 }}
                       data-next-row={node.id}
                     >
                       <button
@@ -1432,27 +1923,49 @@ export default function SidebarDesktop() {
                       </button>
 
                       {isRenaming ? (
-                        <input
-                          ref={renameInputRef}
-                          value={renaming.value}
-                          onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
-                          }}
-                          onBlur={() => void commitRename()}
-                          className="min-w-0 flex-1 rounded border border-accent-primary bg-app-bg px-1 text-xs text-tx-primary outline-none"
-                          autoFocus
-                        />
+                        <>
+                          <input
+                            ref={renameInputRef}
+                            value={renaming.value}
+                            onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelRename(); }
+                            }}
+                            onBlur={() => void commitRename()}
+                            className="no-focus-ring h-[26px] min-w-0 flex-1 rounded-lg border border-accent-primary bg-app-bg px-2 text-[12px] text-tx-primary outline-none transition-colors"
+                            autoFocus
+                          />
+                          {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void commitRename()}
+                            title="确认"
+                            aria-label="确认重命名"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-accent-primary transition-colors hover:bg-app-hover"
+                          >
+                            <Check size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={cancelRename}
+                            title="取消"
+                            aria-label="取消重命名"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                          >
+                            <X size={13} />
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
                           onClick={(event) => handleRowClick(event, node)}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          {fileIconFor(node, depth === 0)}
+                          {fileIconFor(node, !focusRootId && depth === 0)}
                           <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                          {isPinned && <Pin size={11} className="shrink-0 text-tx-tertiary" />}
                           {isFolder && (
                             <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">
                               {docCountMap.get(node.id) ?? 0}
@@ -1463,17 +1976,17 @@ export default function SidebarDesktop() {
 
                       {!isRenaming && (
                         <>
-                          {!isFolder && (
+                          {isKbRoot && (
                             <button
                               type="button"
-                              onClick={(e) => { e.stopPropagation(); void togglePin(node); }}
-                              title={isPinned ? "取消置顶" : "置顶"}
+                              onClick={(e) => { e.stopPropagation(); focusKb(node.resourceId); }}
+                              title="聚焦此知识库"
                               className={cn(
-                                "hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex",
-                                isPinned && "flex",
+                                "h-5 w-5 shrink-0 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-accent-primary group-hover:flex",
+                                isSelected && "flex",
                               )}
                             >
-                              <Pin size={11} className={cn(isPinned && "text-accent-primary")} />
+                              <Focus size={11} />
                             </button>
                           )}
                           <button
@@ -1490,7 +2003,7 @@ export default function SidebarDesktop() {
                             title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                             className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                           >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                            <Ellipsis size={15} strokeWidth={2} />
                           </button>
                         </>
                       )}
@@ -1534,7 +2047,7 @@ export default function SidebarDesktop() {
                 title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-tx-primary"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                <Ellipsis size={15} strokeWidth={2} />
               </button>
             </>
           )}
@@ -1568,18 +2081,41 @@ export default function SidebarDesktop() {
                         <ChevronDown size={13} className={cn("transition-transform", !tagOpen && "-rotate-90")} />
                       </button>
                       {isRenaming ? (
-                        <input
-                          ref={renameInputRef}
-                          value={renaming.value}
-                          onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                            if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setRenaming(null); }
-                          }}
-                          onBlur={() => void commitRename()}
-                          className="min-w-0 flex-1 rounded border border-accent-primary bg-app-bg px-1 text-xs text-tx-primary outline-none"
-                          autoFocus
-                        />
+                        <>
+                          <input
+                            ref={renameInputRef}
+                            value={renaming.value}
+                            onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
+                              if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelRename(); }
+                            }}
+                            onBlur={() => void commitRename()}
+                            className="no-focus-ring h-[26px] min-w-0 flex-1 rounded-lg border border-accent-primary bg-app-bg px-2 text-[12px] text-tx-primary outline-none transition-colors"
+                            autoFocus
+                          />
+                          {/* 确认/取消按钮 onMouseDown 阻止默认，避免 input 先失焦触发 onBlur 提交 */}
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => void commitRename()}
+                            title="确认"
+                            aria-label="确认重命名"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-accent-primary transition-colors hover:bg-app-hover"
+                          >
+                            <Check size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={cancelRename}
+                            title="取消"
+                            aria-label="取消重命名"
+                            className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                          >
+                            <X size={13} />
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -1604,7 +2140,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                          <Ellipsis size={15} strokeWidth={2} />
                         </button>
                       )}
                     </div>
@@ -1617,28 +2153,7 @@ export default function SidebarDesktop() {
                         <span className="w-5 shrink-0" />
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              const note = await api.getNote(doc.id);
-                              if (!note) return;
-                              actions.setActiveNote(note);
-                              actions.setSelectedNotebook(note.notebookId);
-                              actions.setViewMode("notebook");
-                              actions.openNoteTab({
-                                id: note.id,
-                                title: note.title,
-                                notebookId: note.notebookId,
-                                workspaceId: note.workspaceId,
-                                contentFormat: note.contentFormat,
-                                isLocked: note.isLocked,
-                                isTrashed: note.isTrashed,
-                                updatedAt: note.updatedAt,
-                              });
-                              actions.setMobileView("editor");
-                            } catch (error) {
-                              console.error("[SidebarDesktop] open tagged note failed:", error);
-                            }
-                          }}
+                          onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
                           {doc.contentFormat === "markdown" ? (
@@ -1657,7 +2172,7 @@ export default function SidebarDesktop() {
                           title={t("sidebarNext.more", { defaultValue: "更多操作" })}
                           className="hidden h-5 w-5 items-center justify-center rounded text-tx-tertiary hover:bg-app-hover hover:text-tx-primary group-hover:flex"
                         >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+                          <Ellipsis size={15} strokeWidth={2} />
                         </button>
                       </div>
                     ))}
@@ -1719,21 +2234,14 @@ export default function SidebarDesktop() {
                   >
                     {tab.contentFormat === "markdown" ? (
                       <FileCode size={14} className="shrink-0 text-emerald-500" />
+                    ) : tab.contentFormat === "board" ? (
+                      <PenTool size={14} className="shrink-0 text-teal-500" />
                     ) : (
                       <FileText size={14} className="shrink-0 text-[var(--color-accent-primary)]" />
                     )}
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          const note = await api.getNote(tab.id);
-                          if (!note) return;
-                          actions.setActiveNote(note);
-                          actions.setViewMode("notebook");
-                        } catch (error) {
-                          console.error("[SidebarDesktop] activate tab failed:", error);
-                        }
-                      }}
+                      onClick={() => void openNoteFromTab(tab.id)}
                       className="min-w-0 flex-1 truncate text-left"
                     >
                       {tab.title}
@@ -1742,15 +2250,12 @@ export default function SidebarDesktop() {
                       type="button"
                       onClick={async () => {
                         const closingActive = tab.id === activeNoteId;
-                        const remaining = openTabs.filter((t) => t.id !== tab.id);
+                        const nextTab = closingActive ? getNextTabAfterClose(openTabs, tab.id) : null;
                         actions.closeNoteTab(tab.id);
                         if (!closingActive) return;
                         // 关闭激活文档：切到相邻页签（右侧优先），无页签则清空编辑区
-                        const idx = openTabs.findIndex((t) => t.id === tab.id);
-                        const nextTab = remaining[idx] ?? remaining[idx - 1];
                         if (nextTab) {
-                          const note = await api.getNote(nextTab.id);
-                          if (note) actions.setActiveNote(note);
+                          await openNoteFromTab(nextTab.id);
                         } else {
                           actions.setActiveNote(null);
                         }
@@ -1770,7 +2275,15 @@ export default function SidebarDesktop() {
     ),
     star: (
       <section key="star" className="shrink-0" data-next-section="star">
-        <div className="flex w-full items-center gap-1 px-2 py-1">
+        <div
+          draggable
+          onDragStart={onSectionDragStart("star")}
+          onDragEnd={onSectionDragEnd}
+          className={cn(
+            "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+            reorderActive === "star" && "opacity-40",
+          )}
+        >
           <button
             type="button"
             onClick={() => toggleSection("star")}
@@ -1784,12 +2297,22 @@ export default function SidebarDesktop() {
             <>
               <button
                 type="button"
-                title={`取消所有收藏（${starDocs.length} 条）`}
+                title={`取消所有收藏，共 ${starTotal} 条`}
                 className="flex h-[22px] w-[22px] items-center justify-center rounded text-tx-tertiary hover:bg-app-active hover:text-accent-danger"
-                onClick={() => {
-                  if (starDocs.length === 0) return;
-                  if (!window.confirm(`确定取消全部 ${starDocs.length} 条收藏吗？`)) return;
-                  Promise.all(starDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)))
+                onClick={async () => {
+                  if (starTotal === 0) return;
+                  const ok = await confirm({
+                    title: "取消全部收藏",
+                    description: focusRootResourceId
+                      ? `将取消当前知识库内 ${starTotal} 项的收藏，文档与知识库本身不受影响。`
+                      : `将取消 ${starTotal} 项的收藏，文档与知识库本身不受影响。`,
+                    confirmText: "取消收藏",
+                  });
+                  if (!ok) return;
+                  Promise.all([
+                    ...visibleStarDocs.map((doc) => api.updateNote(doc.id, { isFavorite: 0 } as never)),
+                    ...visibleStarKbs.map((kb) => knowledgeTreeApi.update(kb.id, { isFavorite: 0 })),
+                  ])
                     .then(() => {
                       reloadStar();
                       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
@@ -1799,44 +2322,69 @@ export default function SidebarDesktop() {
               >
                 <Star size={13} />
               </button>
-              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{starDocs.length}</span>
+              <span className="pr-1 text-[11px] tabular-nums text-tx-tertiary">{starTotal}</span>
             </>
           )}
         </div>
         {!collapsedSections.has("star") && (
           <div className="pb-1">
-            {starDocs.length === 0 ? (
+            {starTotal === 0 ? (
               <p className="px-6 py-1 text-xs text-tx-tertiary">暂无收藏</p>
-            ) : starDocs.map((doc) => (
-              <div
-                key={doc.id}
-                className="sbx-row group"
-                onClick={async () => {
-                  const note = await api.getNote(doc.id);
-                  if (!note) return;
-                  actions.setActiveNote(note);
-                  actions.setSelectedNotebook(note.notebookId);
-                  actions.openNoteTab({ id: note.id, title: note.title, notebookId: note.notebookId, workspaceId: note.workspaceId, contentFormat: note.contentFormat, isLocked: note.isLocked, isTrashed: note.isTrashed, updatedAt: note.updatedAt });
-                  actions.setMobileView("editor");
-                }}
-              >
-                <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
-                <span className="min-w-0 flex-1">
-                  <div className="truncate text-xs text-tx-primary">{doc.title}</div>
-                  <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
-                </span>
-                <span className="sbx-acts">
-                  <button
-                    type="button"
-                    title="取消收藏"
-                    onClick={(e) => { e.stopPropagation(); api.updateNote(doc.id, { isFavorite: 0 } as never).then(() => reloadStar()).catch(() => undefined); }}
-                    className="sbx-btn"
+            ) : (
+              <>
+                {visibleStarKbs.map((kb) => (
+                  <div
+                    key={`kb-${kb.id}`}
+                    className="sbx-row group"
+                    onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <Star size={12} className="text-amber-400" fill="currentColor" />
-                  </button>
-                </span>
-              </div>
-            ))}
+                    <span className="sbx-ico"><FaBook size={14} className="text-accent-primary" /></span>
+                    <span className="min-w-0 flex-1">
+                      <div className="truncate text-xs text-tx-primary">{kb.title}</div>
+                      <div className="sbx-sub">知识库</div>
+                    </span>
+                    <span className="sbx-acts">
+                      <button
+                        type="button"
+                        title="取消收藏"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          knowledgeTreeApi.update(kb.id, { isFavorite: 0 })
+                            .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+                            .catch(() => undefined);
+                        }}
+                        className="sbx-btn"
+                      >
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+                {visibleStarDocs.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="sbx-row group"
+                    onClick={() => { void openNoteFromTab(doc.id); }}
+                  >
+                    <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
+                    <span className="min-w-0 flex-1">
+                      <div className="truncate text-xs text-tx-primary">{doc.title}</div>
+                      <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
+                    </span>
+                    <span className="sbx-acts">
+                      <button
+                        type="button"
+                        title="取消收藏"
+                        onClick={(e) => { e.stopPropagation(); api.updateNote(doc.id, { isFavorite: 0 } as never).then(() => reloadStar()).catch(() => undefined); }}
+                        className="sbx-btn"
+                      >
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                      </button>
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </section>
@@ -1854,7 +2402,7 @@ export default function SidebarDesktop() {
       style={{ width: sidebarWidth }}
       data-next-sidebar=""
     >
-      {/* ===== 头部：位置 + 搜索 + 筛选（48px，三区通栏线对齐） ===== */}
+      {/* ===== 头部：位置 + 搜索（筛选内置在搜索结果面板内）（48px，三区通栏线对齐） ===== */}
       <header className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2.5">
         <div ref={spaceRef} className="relative shrink-0">
           <button
@@ -1949,6 +2497,7 @@ export default function SidebarDesktop() {
 
         {/* 搜索：照抄原型 .sb-search（26px 高、透明边框、聚焦实底+accent 边框）；仅知识库视图有语义 */}
         <div
+          ref={searchContainerRef}
           hidden={sidebarView !== "kb"}
           className={cn(
             "relative flex h-[26px] min-w-0 flex-1 items-center gap-1.5 rounded-md border border-transparent px-2",
@@ -1961,35 +2510,108 @@ export default function SidebarDesktop() {
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => { if (query.trim()) setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 // Esc 优先退专注，其次清空搜索（brief 4.5）
-                if (focusRootId) setFocusRootId(null);
+                if (focusRootId) exitKb();
                 else setQuery("");
               }
             }}
-            placeholder={t("sidebarNext.searchPlaceholder", { defaultValue: "搜索" })}
+            placeholder={focusRoot
+              ? t("sidebarNext.searchInKb", { defaultValue: `在「${focusRoot.title}」内搜索` })
+              : t("sidebarNext.searchPlaceholder", { defaultValue: "搜索" })}
             aria-label={t("sidebarNext.searchLabel", { defaultValue: "搜索知识库" })}
             className="no-focus-ring min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
           />
+        </div>
 
-          {/* 搜索结果弹层：当前空间的标签 + 文档 */}
-          {searchOpen && (query.trim() || matchedTags.length > 0) && (
-            <div
-              ref={searchRef2}
-              className="absolute left-1 top-full z-[90] mt-1 max-h-[70vh] w-[calc(100%-8px)] overflow-y-auto rounded-[10px] border border-app-border bg-app-elevated p-1 text-left shadow-[0_8px_24px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.45)]"
-              role="listbox"
-            >
-              {matchedTags.length === 0 && searchDocs.length === 0 && (
-                <p className="px-2 py-3 text-center text-[11px] text-tx-tertiary">
-                  {searchFetching ? "搜索中…" : "无匹配的标签或文档"}
-                </p>
+      {/* ===== 搜索结果面板：贴边悬于树之上（宽度 = 侧栏，绝不越界压编辑区）。
+          类型筛选（全部/知识库/文档/文件夹/收藏/标签）内嵌在面板顶部，不占头部按钮。 ===== */}
+      {sidebarView === "kb" && searchOpen && (
+        <div
+          ref={searchPopupRef}
+          role="dialog"
+          aria-label={t("sidebarNext.searchLabel", { defaultValue: "搜索知识库" })}
+          className="absolute inset-x-1.5 top-full z-[60] mt-1 flex max-h-[min(460px,calc(100vh-88px))] flex-col overflow-hidden rounded-lg border border-app-border bg-app-elevated text-left shadow-[0_10px_28px_rgba(15,23,42,0.14)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.5)]"
+        >
+          {/* 筛选条：类型 chips（三列网格，窄侧栏也全部可见、不折行错位） */}
+          <div className="shrink-0 border-b border-app-border px-2 pb-2 pt-1.5">
+              {focusRoot && (
+                <div className="mb-1.5 flex items-center gap-1">
+                  <span className="mr-0.5 text-[10px] text-tx-tertiary">范围</span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchScope("kb")}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10.5px] leading-4 transition-colors",
+                      searchScope === "kb" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+                    )}
+                  >
+                    库内
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSearchScope("all")}
+                    className={cn(
+                      "rounded-full px-2 py-0.5 text-[10.5px] leading-4 transition-colors",
+                      searchScope === "all" ? "bg-accent-primary/15 font-medium text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+                    )}
+                  >
+                    全空间
+                  </button>
+                </div>
               )}
+              <div className="grid grid-cols-3 gap-1 rounded-lg border border-app-border bg-app-surface p-1">
+                {FILTER_SCOPE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={scope === opt.value}
+                    onClick={() => setScope(opt.value)}
+                    className={cn(
+                      "flex h-7 items-center justify-center rounded-md text-[11.5px] leading-none transition-colors",
+                      scope === opt.value
+                        ? "bg-app-elevated font-medium text-accent-primary shadow-[0_1px_2px_rgba(15,23,42,0.10)]"
+                        : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+          </div>
 
-              {matchedTags.length > 0 && (
+          {/* 结果区（滚动） */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
+            {!query.trim() ? (
+              <div className="flex flex-col items-center gap-1.5 px-3 py-7 text-center">
+                <Search size={16} className="text-tx-tertiary opacity-60" />
+                <p className="text-[11.5px] leading-relaxed text-tx-tertiary">
+                  输入关键词搜索标签、收藏、知识库与文档
+                </p>
+              </div>
+            ) : (
+              <>
+                {(searchSections.tags && matchedTags.length > 0) === false
+                  && (searchSections.favorite && favoriteSearchDocs.length > 0) === false
+                  && searchSections.tree === false
+                  && (searchSections.docs && plainSearchDocs.length > 0) === false && (
+                  <p className="px-2 py-6 text-center text-[11px] text-tx-tertiary">
+                    {searchFetching
+                      ? "搜索中…"
+                      : scope === "notebook" ? "无匹配的知识库"
+                        : scope === "folder" ? "无匹配的文件夹"
+                          : scope === "document" ? "无匹配的文档"
+                            : scope === "favorite" ? "收藏中无匹配的文档"
+                              : scope === "tag" ? "已加标签的文档中无匹配"
+                                : "无匹配的标签、收藏、知识库或文档"}
+                  </p>
+                )}
+
+              {searchSections.tags && matchedTags.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">标签</p>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">标签</p>
                   {matchedTags.map((tag) => {
                     const tagOpen = searchTagOpen === tag.id;
                     const docs = tagDocs[tag.id] ?? [];
@@ -2035,10 +2657,67 @@ export default function SidebarDesktop() {
                 </>
               )}
 
-              {searchDocs.length > 0 && (
+              {searchSections.favorite && favoriteSearchDocs.length > 0 && (
                 <>
-                  <p className="px-2 pb-1 pt-1.5 text-[10px] font-medium uppercase tracking-wide text-tx-tertiary">文档</p>
-                  {searchDocs.map((doc) => (
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">收藏</p>
+                  {favoriteSearchDocs.map((doc) => (
+                    <button
+                      key={`fav-${doc.id}`}
+                      type="button"
+                      role="option"
+                      onClick={() => void openSearchDoc(doc.id)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
+                    >
+                      {doc.contentFormat === "markdown" ? (
+                        <FileCode size={13} className="shrink-0 text-emerald-500" />
+                      ) : (
+                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
+                      <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {searchSections.tree && (
+                <>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">知识库 / 文件夹</p>
+                  {matchedTreeNodes.map((node) => (
+                    <button
+                      key={`tree-${node.id}`}
+                      type="button"
+                      role="option"
+                      onClick={() => {
+                        if (node.nodeType === "folder") {
+                          revealTreeNode(node.id);
+                        } else {
+                          // 知识库命中：展开子树 + 打开 Overview
+                          setExpanded((current) => new Set(current).add(node.id));
+                          openKbOverview(node.resourceId);
+                          setSearchOpen(false);
+                          setQuery("");
+                        }
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
+                    >
+                      {node.nodeType === "folder" ? (
+                        <FaFolder size={13} className="shrink-0 text-amber-500" />
+                      ) : (
+                        <FaBook size={13} className="shrink-0 text-accent-primary" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {searchSections.docs && plainSearchDocs.length > 0 && (
+                <>
+                  <p className="px-2 pb-1 pt-2 text-[10.5px] font-medium text-tx-tertiary">
+                    {focusRoot && searchScope === "kb" ? "文档 · 库内" : scope === "favorite" ? "收藏的文档" : scope === "tag" ? "带标签的文档" : "文档"}
+                  </p>
+                  {plainSearchDocs.map((doc) => (
                     <button
                       key={doc.id}
                       type="button"
@@ -2056,46 +2735,11 @@ export default function SidebarDesktop() {
                   ))}
                 </>
               )}
-            </div>
-          )}
-        </div>
-
-        <div ref={filterRef} className="relative shrink-0" hidden={sidebarView !== "kb"}>
-          <button
-            type="button"
-            onClick={() => setFilterOpen((v) => !v)}
-            aria-expanded={filterOpen}
-            title={t("sidebarNext.filter", { defaultValue: "筛选" })}
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-              scope !== "all" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-tertiary hover:bg-app-hover",
+              </>
             )}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-            </svg>
-          </button>
-
-          {filterOpen && (
-            <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg">
-              {([
-                ["all", "全部"],
-                ["folder", "仅文件夹"],
-                ["note", "仅笔记"],
-              ] as Array<[FilterScope, string]>).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => { setScope(value); setFilterOpen(false); }}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
-                >
-                  <span className="flex-1">{label}</span>
-                  {scope === value && <Check size={12} className="text-accent-primary" />}
-                </button>
-              ))}
-            </div>
-          )}
+          </div>
         </div>
+      )}
       </header>
 
       {/* ===== 三面板容器（kb 固定置顶；其余区段头 HTML5 拖拽排序；折叠在原位收起；面板高度可拖拽） ===== */}
@@ -2105,7 +2749,16 @@ export default function SidebarDesktop() {
         onClick={(event) => {
           // 点侧栏空白（非行/按钮/面板头）= 清空选中
           const target = event.target as HTMLElement;
-          if (!target.closest("[data-next-row], button, input, .sbx-row, .sbx-view")) clearSelection();
+          if (target.closest("[data-next-row], button, input, .sbx-row, .sbx-view")) return;
+          clearSelection();
+          // 聚焦态（库内树空间）点空白只清选中，不退出聚焦
+          if (focusRootId) return;
+          // 空白点击代表「不针对任何库」：库 Overview 的 URL 要退回空间根，
+          // 否则主区还显示着某个库，与"什么都没选"的状态自相矛盾。
+          if (state.route.kind === "kb") {
+            const ws = getCurrentWorkspace();
+            pushAppPathState(moduleAppPath("notebook", ws) ?? KB_ROOT_APP_PATH);
+          }
         }}
       >
         {/* 多选浮动工具条：批量删除（知识树内） */}
@@ -2181,51 +2834,35 @@ export default function SidebarDesktop() {
             })()}
           </div>
         )}
-        {sidebarView === "kb" && !openPluginPanel && safeOrder.map((sectionId) => {
-          const collapsed = collapsedSections.has(sectionId);
-          const rawHeight = sectionHeights[sectionId];
-          // 定高 clamp 到当前可视空间：保证所有区段头都留在视口内，任何面板都不会被挤出屏幕
-          const bodyHeight = rawHeight && panelScrollRef.current
-            ? Math.max(96, Math.min(rawHeight, panelScrollRef.current.clientHeight - 160))
-            : rawHeight;
-          // 拖拽视觉：被拖板块整块半透明（=被拿起）；
-          // 目标板块按指针在上/下半显示上/下内阴影（=落点预示，阴影随上下移动）
-          const isDraggingThis = reorderActive === sectionId;
-          const isDropTarget = reorderActive && sectionDropHint?.id === sectionId;
-          const shadowClass = isDropTarget
-            ? sectionDropHint.after
-              ? "shadow-[inset_0_-14px_18px_-12px_rgba(59,130,246,0.55)]"
-              : "shadow-[inset_0_14px_18px_-12px_rgba(59,130,246,0.55)]"
-            : undefined;
-          return (
-            <div
-              key={sectionId}
-              onDragOver={onSectionDragOver(sectionId)}
-              onDrop={onSectionDrop(sectionId)}
-              className={cn(shadowClass, isDraggingThis && "opacity-40")}
-            >
-              {/* 区段体：定高时内部滚动（VS Code 式），否则自然高度由外层统一滚动 */}
-              <div
-                className={cn(
-                  !collapsed && bodyHeight ? "overflow-y-auto" : undefined,
-                )}
-                style={!collapsed && bodyHeight ? { height: bodyHeight } : undefined}
-              >
-                {sectionMap[sectionId]}
-              </div>
-              {/* 高度调节把手：展开态才显示 */}
-              {!collapsed && (
+        {sidebarView === "kb" && !openPluginPanel && (
+          <SplitView
+            itemIds={safeOrder as string[]}
+            sizes={sectionHeights as Record<string, number>}
+            onSizesChange={(next) => setSectionHeights(next as Partial<Record<SectionId, number>>)}
+            collapsedIds={collapsedSections as ReadonlySet<string>}
+            renderItem={(id) => {
+              const sectionId = id as SectionId;
+              // 拖拽视觉：被拖板块整块半透明（=被拿起）；
+              // 目标板块按指针在上/下半显示上/下内阴影（=落点预示，阴影随上下移动）
+              const isDraggingThis = reorderActive === sectionId;
+              const isDropTarget = reorderActive && sectionDropHint?.id === sectionId;
+              const shadowClass = isDropTarget
+                ? sectionDropHint.after
+                  ? "shadow-[inset_0_-14px_18px_-12px_rgba(59,130,246,0.55)]"
+                  : "shadow-[inset_0_14px_18px_-12px_rgba(59,130,246,0.55)]"
+                : undefined;
+              return (
                 <div
-                  role="separator"
-                  aria-orientation="horizontal"
-                  className="group/hr flex h-2.5 cursor-row-resize items-center justify-center border-t border-app-border transition-colors hover:bg-accent-primary/20"
-                  title="拖拽调整面板高度"
-                  onPointerDown={(e) => startSectionResize(sectionId, e)}
-                />
-              )}
-            </div>
-          );
-        })}
+                  onDragOver={onSectionDragOver(sectionId)}
+                  onDrop={onSectionDrop(sectionId)}
+                  className={cn("h-full min-h-0 overflow-y-auto", shadowClass, isDraggingThis && "opacity-40")}
+                >
+                  {sectionMap[sectionId]}
+                </div>
+              );
+            }}
+          />
+        )}
 
         {/* ===== 回收站视图 ===== */}
         {sidebarView === "trash" && (
@@ -2473,50 +3110,64 @@ export default function SidebarDesktop() {
           onClose={() => setCreateMenuState(null)}
           onCreate={(parentId, kind) => void handleCreate(parentId, kind)}
           onCreateFromTemplate={() => setCreateMenuState(null)}
-          onImport={() => setCreateMenuState(null)}
+          onImport={(parentId, importKind) => void handleImport(parentId, importKind)}
         />
+      )}
+
+      {/* 知识树触发的 Yuque 导入面板（与 KnowledgeTreePanel 同款） */}
+      {yuqueImportNotebookId !== null && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setYuqueImportNotebookId(null);
+          }}
+        >
+          <div className="w-full max-w-lg max-h-[82vh] overflow-y-auto rounded-xl border border-app-border bg-app-elevated p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-tx-primary">从 Yuque 导入</span>
+              <button
+                type="button"
+                onClick={() => setYuqueImportNotebookId(null)}
+                className="rounded-md p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+                aria-label="close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <YuqueImport defaultNotebookId={yuqueImportNotebookId ?? undefined} />
+          </div>
+        </div>
       )}
 
       {/* ===== 知识库 ⋮ 更多菜单（排序/折叠全部/刷新） ===== */}
       {kbMoreOpen && (
         <>
           <div className="fixed inset-0 z-[95]" onPointerDown={() => setKbMoreOpen(null)} />
-          <div
-            className="fixed z-[100] min-w-[150px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          <MenuSurface
+            className="fixed z-[100] w-[188px]"
             style={{ left: kbMoreOpen.x, top: kbMoreOpen.y }}
-            role="menu"
           >
-            <div className="px-2 pb-1 pt-1 text-[10px] text-tx-tertiary">排序方式</div>
+            <MenuLabel>排序方式</MenuLabel>
             {KNOWLEDGE_TREE_SORT_OPTIONS.map((option) => (
-              <button
+              <MenuItem
                 key={option.value}
-                type="button"
-                role="menuitem"
+                label={option.label}
+                checked={sortMode === option.value}
                 onClick={() => { applySortMode(option.value); setKbMoreOpen(null); }}
-                className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-              >
-                <span className="flex-1">{option.label}</span>
-                {sortMode === option.value && <Check size={12} className="text-accent-primary" />}
-              </button>
+              />
             ))}
-            <div className="my-1 border-t border-app-border" />
-            <button
-              type="button"
-              role="menuitem"
+            <MenuSeparator />
+            <MenuItem
+              icon={isAnyFolderExpanded(nodes, expanded) ? ChevronsDownUp : ChevronsUpDown}
+              label={isAnyFolderExpanded(nodes, expanded) ? "折叠全部" : "展开全部"}
               onClick={() => { toggleAllFolders(); setKbMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              {isAnyFolderExpanded(nodes, expanded) ? "折叠全部文件夹" : "展开全部文件夹"}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
+            />
+            <MenuItem
+              icon={RefreshCw}
+              label="刷新"
               onClick={() => { void reload(); setKbMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              刷新
-            </button>
-          </div>
+            />
+          </MenuSurface>
         </>
       )}
 
@@ -2524,28 +3175,22 @@ export default function SidebarDesktop() {
       {tagsMoreOpen && (
         <>
           <div className="fixed inset-0 z-[95]" onPointerDown={() => setTagsMoreOpen(null)} />
-          <div
-            className="fixed z-[100] min-w-[150px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          <MenuSurface
+            className="fixed z-[100] w-[188px]"
             style={{ left: tagsMoreOpen.x, top: tagsMoreOpen.y }}
-            role="menu"
           >
-            <button
-              type="button"
-              role="menuitem"
+            <MenuLabel>标签</MenuLabel>
+            <MenuItem
+              icon={tags.some((tg) => tagsExpanded.has(tg.id)) ? ChevronsDownUp : ChevronsUpDown}
+              label={tags.some((tg) => tagsExpanded.has(tg.id)) ? "折叠全部标签文档" : "展开全部标签文档"}
               onClick={() => { toggleAllTagDocs(); setTagsMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              {tags.some((tg) => tagsExpanded.has(tg.id)) ? "折叠全部标签文档" : "展开全部标签文档"}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
+            />
+            <MenuItem
+              icon={RefreshCw}
+              label="刷新"
               onClick={() => { void reloadTags(); setTagsMoreOpen(null); }}
-              className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
-            >
-              刷新
-            </button>
-          </div>
+            />
+          </MenuSurface>
         </>
       )}
 
@@ -2594,16 +3239,16 @@ export default function SidebarDesktop() {
 
       {/* ===== 行级 ⋮ 菜单（fixed 挂 body 语义，此处挂 aside 根部 fixed 等价） ===== */}
       {rowMenu && (
-        <div
+        <MenuSurface
           ref={menuRef}
-          className="fixed z-[100] min-w-[140px] rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+          className="fixed z-[100]"
           style={menuStyle}
-          role="menu"
         >
           {rowMenu.kind === "sec-kb" && (
             <>
-              <button type="button" role="menuitem" onClick={() => { setRowMenu(null); expandAllFolders(); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">全部展开</button>
-              <button type="button" role="menuitem" onClick={() => { setRowMenu(null); collapseAllFolders(); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">全部折叠</button>
+              <MenuLabel>知识库</MenuLabel>
+              <MenuItem icon={ChevronsUpDown} label="全部展开" onClick={() => { setRowMenu(null); expandAllFolders(); }} />
+              <MenuItem icon={ChevronsDownUp} label="全部折叠" onClick={() => { setRowMenu(null); collapseAllFolders(); }} />
             </>
           )}
           {rowMenu.kind === "kb-folder" && (() => {
@@ -2611,22 +3256,41 @@ export default function SidebarDesktop() {
             if (!node) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void startCreateNote(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">新建文档</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void startCreateFolder(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">新建子文件夹</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                {/* 与区块头 ＋ 同一个菜单：列出全部新建格式（富文本/Markdown/纯文本/
+                    画板/导图/模板/文件夹/表格/加密/导入），不再另写一套简化版 */}
+                <MenuItem
+                  icon={FilePlus2}
+                  label="新建…"
+                  onClick={() => {
+                    const anchor = new DOMRect(rowMenu.x, rowMenu.y, 0, 0);
+                    setRowMenu(null);
+                    setCreateMenuState({ parentId: node.id, anchor });
+                  }}
+                />
+                <MenuSeparator />
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
             );
           })()}
           {rowMenu.kind === "kb-note" && (() => {
             const node = nodes.find((n) => n.id === rowMenu.nodeId);
             if (!node) return null;
-            const pinned = Boolean(node.isPinned);
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void togglePin(node); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">{pinned ? "取消置顶" : "置顶"}</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(node.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                {/* 分屏入口：从侧栏直接打开第二篇文档（等宽左右分屏，点哪栏哪栏成为主编辑栏） */}
+                <MenuItem
+                  icon={Columns2}
+                  label="在右侧分屏打开"
+                  onClick={() => {
+                    setRowMenu(null);
+                    actions.splitEditor({ noteId: node.resourceId, direction: "right" });
+                  }}
+                />
+                <MenuSeparator />
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
             );
           })()}
@@ -2635,8 +3299,9 @@ export default function SidebarDesktop() {
             if (!tag) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "tag", id: tag.id, value: tag.name }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteTag(tag.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={Pencil} label="重命名" onClick={() => { setRowMenu(null); setRenaming({ kind: "tag", id: tag.id, value: tag.name }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除标签" danger onClick={() => { setRowMenu(null); void deleteTag(tag.id); }} />
               </>
             );
           })()}
@@ -2645,13 +3310,14 @@ export default function SidebarDesktop() {
             if (!doc) return null;
             return (
               <>
-                <button type="button" role="menuitem" onClick={() => void locateDoc(doc.title)} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">定位</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: doc.id, value: doc.title }); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover">重命名</button>
-                <button type="button" role="menuitem" onClick={() => { setRowMenu(null); void deleteNode(doc.id); }} className="flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs text-red-600 hover:bg-app-hover dark:text-red-400">删除</button>
+                <MenuItem icon={Locate} label="在树中定位" onClick={() => void locateDoc(doc.title)} />
+                <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: doc.id, value: doc.title }); }} />
+                <MenuSeparator />
+                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(doc.id); }} />
               </>
             );
           })()}
-        </div>
+        </MenuSurface>
       )}
     </aside>
   );

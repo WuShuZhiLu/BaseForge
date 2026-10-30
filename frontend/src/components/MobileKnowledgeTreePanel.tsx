@@ -15,7 +15,6 @@ import {
   Loader2,
   LockKeyhole,
   MoreHorizontal,
-  Pin,
   Plus,
   RefreshCw,
   Search,
@@ -45,8 +44,8 @@ import {
 import {
   importMarkdownIntoKnowledgeTree,
   importMarkdownZipIntoKnowledgeTree,
-  importSpreadsheetIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
+  importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
@@ -560,13 +559,7 @@ export default function MobileKnowledgeTreePanel({
       if (variant === "mobile") actions.setMobileSidebar(false);
       return;
     }
-    // 思维导图节点：走导图深链（/mindmaps/:id），由 App 切到导图模块。
-    // 之前这里直接落到下面的 resourceType !== "note" 分支被丢弃，点导图没有任何反应。
-    if (node.resourceType === "mindmap") {
-      pushMindMapAppPath(node.resourceId);
-      if (variant === "mobile") actions.setMobileSidebar(false);
-      return;
-    }
+    // 导图归一后是 resourceType="note" 的文档节点，直接按笔记打开（EditorPane 导图分支）。
     if (node.resourceType !== "note") return;
     rememberOpened(node.id);
     try {
@@ -610,7 +603,7 @@ export default function MobileKnowledgeTreePanel({
 
   const patchNoteStatus = useCallback((
     nodeId: string,
-    patch: Partial<Pick<KnowledgeTreeNode, "isPinned" | "isFavorite" | "isLocked">>,
+    patch: Partial<Pick<KnowledgeTreeNode, "isFavorite" | "isLocked">>,
   ) => {
     setNodes((current) => current.map((node) => node.id === nodeId ? { ...node, ...patch } : node));
   }, []);
@@ -665,13 +658,7 @@ export default function MobileKnowledgeTreePanel({
         toast.success("已创建文件夹");
         return;
       }
-      // 建完自动打开：导图/表格走各自深链（上游同款行为）。
-      if (snapshot.kind === "mindmap") {
-        rememberOpened(created.id);
-        pushMindMapAppPath(created.resourceId);
-        if (variant === "mobile") actions.setMobileSidebar(false);
-        return;
-      }
+      // 建完自动打开：表格走深链；导图归一后是笔记文档，走通用笔记打开。
       if (snapshot.kind === "sheet") {
         rememberOpened(created.id);
         pushSheetAppPath(created.resourceId);
@@ -704,7 +691,7 @@ rememberOpened(created.id);
 
   const importIntoTree = useCallback(async (
     targetParentId: string | null,
-    kind: "markdown" | "markdown-zip" | "word" | "wechat" | "yuque" | "spreadsheet",
+    kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque",
   ) => {
     setCreateMenu(null);
     const parent = targetParentId ? nodes.find((node) => node.id === targetParentId) || null : null;
@@ -732,9 +719,11 @@ rememberOpened(created.id);
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : kind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : kind === "wechat"
+            : kind === "pdf"
+              ? await importPdfIntoKnowledgeTree(options)
+              : kind === "wechat"
  ? await importWeChatArticleIntoKnowledgeTree(options)
- : await importSpreadsheetIntoKnowledgeTree(options);
+ : null;
       if (!imported) return;
       activateNote(imported, parent?.id || null);
       emitTreeChanged("node-imported-quick-browse");
@@ -1068,9 +1057,6 @@ rememberOpened(created.id);
                 >
                   {firstLevelNoteCount}
                 </span>
-              )}
-              {node.resourceType === "note" && node.isPinned === 1 && (
-                <Pin size={11} className={cn("shrink-0 fill-current text-accent-primary", desktopHoverHidden)} />
               )}
               {node.resourceType === "note" && node.isFavorite === 1 && (
                 <Star size={11} className={cn("shrink-0 fill-current text-amber-400", desktopHoverHidden)} />

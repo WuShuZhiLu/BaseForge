@@ -12,7 +12,7 @@ import {
   Bold, Italic, Highlighter, Table2, ChevronDown,
   Strikethrough, Code, Link as LinkIcon, Workflow, Sigma, BookOpen, Film, FolderSearch,
   Columns2, Info, Type, Trash2, Copy, ClipboardPaste, Scissors, Plus, Repeat, ChevronRight, ArrowLeft,
-  BrainCircuit, Network
+  BrainCircuit, Network, PenTool
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
@@ -944,7 +944,7 @@ export function getDefaultSlashCommands(
     },
     {
       // 思维导图：打开插入对话框（选择已有脑图或新建后插入）。
-      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出 MindMapEmbedInsertDialog。
+      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出文档嵌入选择对话框（导图 kind）。
       id: "mindmap",
       label: t("slash.mindmap") || "思维导图",
       description: t("slash.mindmapDesc") || "选择已有脑图或新建后插入",
@@ -968,6 +968,20 @@ export function getDefaultSlashCommands(
       keywords: ["sheet", "表格", "轻量表格", "嵌入表格", "excel"],
       action: () => {
         window.dispatchEvent(new CustomEvent("nowen:open-sheet-embed-picker"));
+      },
+    },
+    {
+      // 画板嵌入：与表格同管线（![[board:id]] wiki 引用）。
+      // EditorPane 监听 nowen:open-board-embed-picker 事件后弹出选择对话框。
+      id: "boardEmbed",
+      label: t("slash.boardEmbed") || "嵌入画板",
+      description: t("slash.boardEmbedDesc") || "把已有画板嵌入当前笔记",
+      icon: <PenTool size={16} />,
+      category: t("slash.catInsert"),
+      categoryKey: "insert",
+      keywords: ["board", "draw", "画板", "白板", "excalidraw", "嵌入画板"],
+      action: () => {
+        window.dispatchEvent(new CustomEvent("nowen:open-board-embed-picker"));
       },
     },
     {

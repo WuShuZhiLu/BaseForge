@@ -6,14 +6,18 @@ import { NOTEBOOKS_INVALIDATED_EVENT } from "@/lib/notebookInvalidation";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import { recordPhaseAPerfEvent } from "@/lib/phaseAPerfDiagnostics";
 import type { NoteLoadBeginPayload, NoteLoadSummary } from "@/lib/noteLoadCoordinator";
+import { primaryNoteLoadCoordinator } from "@/lib/noteLoadCoordinator";
 import { NoteActivationGuard } from "@/lib/noteActivationGuard";
 import {
   mergeAuthoritativeNotebooks,
   replaceOptimisticNotebook,
 } from "@/lib/notebookCreateState";
 import { prepareEditorSplitClose } from "@/lib/editorSplitMirror";
+import type { EditorSplitReferenceSide } from "@/lib/editorWorkspaceLayout";
+import type { SidebarPanelId } from "@/lib/sidebarPanels";
+import { getCurrentAppRoute, type AppRoute } from "@/lib/appRoute";
 
-export type SyncStatus = "idle" | "saving" | "saved" | "error" | "offline" | "queued";
+export type SyncStatus = "idle" | "pending" | "saving" | "saved" | "error" | "offline" | "queued";
 export type MobileView = "list" | "editor";
 
 export interface NoteLoadingState {
@@ -41,15 +45,28 @@ export interface OpenNoteTab {
 export type EditorSplitDirection = "right" | "down";
 
 export interface EditorSplitState {
+  /** 参考栏（副栏）文档 id。 */
   noteId: string;
+  /**
+   * 主栏文档 id；null 表示主栏空态（先分屏、后选文档）。
+   * 旧状态/旧调用方缺省时由 reducer 迁移为派发当时的 activeNote.id。
+   * 两栏与文档固定绑定：聚焦切换只把 activeNote 指向被聚焦的栏，
+   * 不交换两栏文档（渲染侧见 EditorSplitView）。
+   */
+  primaryNoteId?: string | null;
   direction: EditorSplitDirection;
+  /**
+   * 参考栏沿分屏轴的位置（可选，历史状态缺省为 "end"）。
+   * ⇄ 交换两栏时翻转它：文档与栏的绑定不动，只交换两栏的视觉位置。
+   */
+  referenceSide?: EditorSplitReferenceSide;
 }
 
-/** 左侧栏面板 id（方案 B）。 */
-export type SidebarPanelId = "tree" | "tags" | "fav" | "trash" | "files";
+/** 左侧栏面板 id（方案 B）：唯一定义在 lib/sidebarPanels.ts（面板框架），此处 re-export 兼容旧引用。 */
+export type { SidebarPanelId };
 
 /** 工具页签（方案 B · B2）：待办 / 小记 / AI / 分享 / 附件管理 / 回收站。
- *  与笔记页签共处一条页签区：工具页签占用主区编辑器列，笔记页签由 NoteTabsBar 管理。 */
+ *  工具页签占用主区编辑器列；笔记「打开的」列表在侧栏面板（OpenEditorsPanel / SidebarDesktop）。 */
 export type ToolTabKey = "tasks" | "diary" | "ai-chat" | "shares" | "files" | "trash";
 export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "diary", "ai-chat", "shares", "files", "trash"];
 
@@ -67,6 +84,9 @@ interface AppState {
   /** 左侧栏当前面板（方案 B：Rail 只切面板，不替换主区）。
    *  B1a 上线 tree/tags；B1b 扩到 fav/trash/files。 */
   sidebarPanel: SidebarPanelId;
+  /** 统一路由镜像（单一 RouteOwner 维护，见 lib/appRoute.ts）：
+   *  URL 解析结果，供视图层判断 isSheetView / issue 详情 / 导图路由等。 */
+  route: AppRoute;
   searchQuery: string;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
@@ -87,13 +107,15 @@ interface AppState {
   mobileSidebarOpen: boolean;
   /** 全局"笔记列表刷新"令牌：递增时 NoteList 会重新拉取当前视图的列表 */
   notesRefreshToken: number;
-  /** 顶部笔记标签页 V1：只保存元信息，不保存正文/编辑器状态。 */
+  /** 打开的笔记页签：只保存元信息，不保存正文/编辑器状态。展示于侧栏「打开的」面板。 */
   openNoteTabs: OpenNoteTab[];
   /** 已打开的工具页签（顺序即显示顺序）。 */
   openToolTabs: ToolTabKey[];
   /** 当前激活的工具页签；null 表示主区显示笔记/其它视图。 */
   activeToolTab: ToolTabKey | null;
-  /** 桌面端编辑区分屏：V1 支持一个副分屏，主分屏仍跟随 activeNote。 */
+  /** 路由文档打开失败（不存在/无权限）：主区显示「打不开」状态页，不跳转、不丢 URL。 */
+  noteLoadError: { noteId: string; status?: number; message?: string } | null;
+  /** 桌面端编辑区分屏：一个副分屏；两栏各自固定绑定一篇文档（primaryNoteId + noteId），聚焦切换只改 activeNote。 */
   editorSplit: EditorSplitState | null;
 }
 
@@ -115,6 +137,7 @@ type Action =
   | { type: "CLEAR_SELECTED_TAGS" }                         // TAG-FILTER-MULTI-01
   | { type: "SET_VIEW_MODE"; payload: ViewMode }
   | { type: "SET_SIDEBAR_PANEL"; payload: SidebarPanelId }
+  | { type: "SET_ROUTE"; payload: AppRoute }
   | { type: "SET_SEARCH_QUERY"; payload: string }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "SET_SIDEBAR_WIDTH"; payload: number }
@@ -141,6 +164,7 @@ type Action =
   | { type: "OPEN_TOOL_TAB"; payload: ToolTabKey }
   | { type: "CLOSE_TOOL_TAB"; payload: ToolTabKey }
   | { type: "SET_ACTIVE_TOOL_TAB"; payload: ToolTabKey | null }
+  | { type: "SET_NOTE_LOAD_ERROR"; payload: { noteId: string; status?: number; message?: string } | null }
   | { type: "CLOSE_NOTE_TAB"; payload: string }
   | { type: "UPDATE_NOTE_TAB"; payload: Partial<OpenNoteTab> & { id: string } }
   | { type: "REMOVE_NOTE_TAB"; payload: string }
@@ -187,6 +211,48 @@ function trimOpenNoteTabs(tabs: OpenNoteTab[], activeId?: string | null): OpenNo
   return tabs.filter((_, tabIndex) => tabIndex !== index);
 }
 
+const OPEN_NOTE_TAB_STORAGE_KEY = "nowen-open-note-tabs";
+
+/**
+ * 从 localStorage 恢复「打开的」页签。恢复通道与 dispatch 通道走同样的防线：
+ * 条目形状校验（防旧版本/脏数据形态）、加密转换屏障 isConversionMetadataSafe
+ * （已转换笔记不得以明文 contentFormat 复活）、按 id 去重、上限截断。
+ * 不做存在性校验（需要后端）：404 由 useTabNoteOpener 打开时自愈移除。
+ */
+function loadSavedOpenNoteTabs(): OpenNoteTab[] {
+  try {
+    const saved = localStorage.getItem(OPEN_NOTE_TAB_STORAGE_KEY);
+    const parsed: unknown = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(parsed)) return [];
+    const seen = new Set<string>();
+    const restored: OpenNoteTab[] = [];
+    for (const entry of parsed) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const candidate = entry as Partial<OpenNoteTab>;
+      if (typeof candidate.id !== "string" || candidate.id.length === 0 || candidate.id.length > 512) continue;
+      if (seen.has(candidate.id)) continue;
+      const tab: OpenNoteTab = {
+        id: candidate.id,
+        title: typeof candidate.title === "string" ? candidate.title : "",
+        notebookId: typeof candidate.notebookId === "string" ? candidate.notebookId : "",
+        workspaceId: typeof candidate.workspaceId === "string" ? candidate.workspaceId : null,
+        contentFormat: typeof candidate.contentFormat === "string" ? candidate.contentFormat : undefined,
+        isLocked: candidate.isLocked === 1 ? 1 : 0,
+        isTrashed: candidate.isTrashed === 1 ? 1 : 0,
+        updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : "",
+        pinned: candidate.pinned === true,
+      };
+      if (!isConversionMetadataSafe(tab)) continue;
+      seen.add(tab.id);
+      restored.push(tab);
+      if (restored.length >= MAX_OPEN_NOTE_TABS) break;
+    }
+    return restored;
+  } catch {
+    return [];
+  }
+}
+
 function getSavedSidebarWidth(): number {
   try {
     const saved = localStorage.getItem("nowen-sidebar-width");
@@ -228,6 +294,7 @@ const initialState: AppState = {
   selectedTagIds: [],
   viewMode: "all",
   sidebarPanel: "tree",
+  route: getCurrentAppRoute(),
   searchQuery: "",
   sidebarCollapsed: false,
   sidebarWidth: getSavedSidebarWidth(),
@@ -242,17 +309,10 @@ const initialState: AppState = {
   mobileView: "list",
   mobileSidebarOpen: false,
   notesRefreshToken: 0,
-  openNoteTabs: (() => {
-    try {
-      const saved = localStorage.getItem("nowen-open-note-tabs");
-      const parsed = saved ? JSON.parse(saved) as OpenNoteTab[] : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  })(),
+  openNoteTabs: loadSavedOpenNoteTabs(),
   openToolTabs: [],
   activeToolTab: null,
+  noteLoadError: null,
   editorSplit: null,
 };
 
@@ -285,21 +345,43 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case "REMOVE_NOTEBOOK":
       return { ...state, notebooks: state.notebooks.filter((notebook) => notebook.id !== action.payload) };
-    case "INVALIDATE_CONVERTED_NOTE":
+    case "INVALIDATE_CONVERTED_NOTE": {
+      const split = state.editorSplit;
       return {
         ...state,
         activeNote: state.activeNote?.id === action.payload ? null : state.activeNote,
         notes: state.notes.filter((note) => note.id !== action.payload),
         openNoteTabs: state.openNoteTabs.filter((tab) => tab.id !== action.payload),
-        editorSplit: state.editorSplit?.noteId === action.payload ? null : state.editorSplit,
+        // 参考栏文档被转换 → 整个分屏关闭；主栏文档被转换 → 主栏退回空态，分屏保留。
+        editorSplit: !split
+          ? null
+          : split.noteId === action.payload
+            ? null
+            : split.primaryNoteId === action.payload
+              ? { ...split, primaryNoteId: null }
+              : split,
         noteLoading: state.noteLoadingState.pendingNoteId === action.payload ? false : state.noteLoading,
         noteLoadingState: state.noteLoadingState.pendingNoteId === action.payload ? createIdleNoteLoadingState() : state.noteLoadingState,
         notesRefreshToken: state.notesRefreshToken + 1,
       };
+    }
     case "SET_NOTES":
       return { ...state, notes: action.payload.filter(isConversionNoteSafe) };
-    case "SET_ACTIVE_NOTE":
-      return action.payload && !isConversionNoteSafe(action.payload) ? state : { ...state, activeNote: action.payload };
+    case "SET_ACTIVE_NOTE": {
+      if (action.payload && !isConversionNoteSafe(action.payload)) return state;
+      const split = state.editorSplit;
+      const note = action.payload;
+      // 无分屏 / 清空焦点 / 聚焦主栏：主栏文档绑定不受影响。
+      if (!split || !note || note.id === split.primaryNoteId) {
+        return { ...state, activeNote: note };
+      }
+      if (note.id === split.noteId) {
+        // 聚焦参考栏文档：两栏与文档的绑定原地不动，只切换焦点。
+        return { ...state, activeNote: note };
+      }
+      // 打开两栏之外的第三篇文档：落到主栏（主栏文档跟随 activeNote）。
+      return { ...state, activeNote: note, editorSplit: { ...split, primaryNoteId: note.id } };
+    }
     case "SET_TAGS":
       return { ...state, tags: action.payload };
     case "SET_SELECTED_NOTEBOOK":
@@ -363,6 +445,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "SET_ACTIVE_TOOL_TAB":
       return state.activeToolTab === action.payload ? state : { ...state, activeToolTab: action.payload };
+    case "SET_NOTE_LOAD_ERROR":
+      return { ...state, noteLoadError: action.payload };
     case "SET_SIDEBAR_PANEL":
       return state.sidebarPanel === action.payload
         ? state
@@ -371,6 +455,15 @@ function reducer(state: AppState, action: Action): AppState {
       // 幂等：视图未变化时返回原 state，避免下游 useEffect 重复拉取造成卡顿
       if (state.viewMode === action.payload) return state;
       return { ...state, viewMode: action.payload };
+    case "SET_ROUTE":
+      // 去重须含查询附加字段（q/scope/tree）：?tree=focus 等瞬态只改 query 不改
+      // url/kind，按 url 去重会把「进入/退出库内树空间」的路由更新整个吞掉。
+      return state.route.url === action.payload.url && state.route.kind === action.payload.kind
+        && state.route.q === action.payload.q
+        && state.route.scope === action.payload.scope
+        && state.route.tree === action.payload.tree
+        ? state
+        : { ...state, route: action.payload };
     case "SET_SEARCH_QUERY":
       if (state.searchQuery === action.payload) return state;
       return { ...state, searchQuery: action.payload };
@@ -516,7 +609,16 @@ function reducer(state: AppState, action: Action): AppState {
           : null,
       };
     case "SPLIT_EDITOR":
-      return { ...state, editorSplit: action.payload };
+      return {
+        ...state,
+        editorSplit: {
+          ...action.payload,
+          // 旧调用方只传参考栏文档：主栏缺省迁移为派发当时的 activeNote（无主文档 → null 空态）。
+          primaryNoteId: action.payload.primaryNoteId !== undefined
+            ? action.payload.primaryNoteId
+            : (state.activeNote?.id ?? null),
+        },
+      };
     case "CLOSE_EDITOR_SPLIT":
     case "CLEAR_EDITOR_SPLITS":
       return { ...state, editorSplit: null };
@@ -537,11 +639,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // 打开的页签持久化：刷新后恢复"打开的编辑器"（侧栏面板依赖）
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-open-note-tabs", JSON.stringify(state.openNoteTabs));
+      localStorage.setItem(OPEN_NOTE_TAB_STORAGE_KEY, JSON.stringify(state.openNoteTabs));
     } catch { /* quota/serialization failures are non-fatal */ }
   }, [state.openNoteTabs]);
   const noteActivationGuard = useMemo(() => new NoteActivationGuard(), []);
   const profiledDispatch = useCallback<React.Dispatch<Action>>((action) => {
+    // 关闭页签/清空页签时取消仍在进行的加载，否则迟到的加载结果会把
+    // activeNote 重新写回已关闭的笔记（URL 也会跳回 /notes/:id）。
+    if (action.type === "CLEAR_NOTE_TABS") {
+      if (stateRef.current.noteLoadingState.pendingNoteId) primaryNoteLoadCoordinator.cancel();
+    } else if (action.type === "CLOSE_NOTE_TAB" || action.type === "REMOVE_NOTE_TAB") {
+      if (stateRef.current.noteLoadingState.pendingNoteId === action.payload) {
+        primaryNoteLoadCoordinator.cancel();
+      }
+    }
     if (action.type === "BEGIN_NOTE_LOAD") {
       noteActivationGuard.begin(action.payload, stateRef.current.activeNote?.id ?? null);
     } else if (action.type === "FAIL_NOTE_LOAD") {
@@ -670,6 +781,7 @@ export function useAppActions() {
     toggleSelectedTag: (v: string) => dispatch({ type: "TOGGLE_SELECTED_TAG", payload: v }),
     clearSelectedTags: () => dispatch({ type: "CLEAR_SELECTED_TAGS" }),
     setViewMode: (v: ViewMode) => dispatch({ type: "SET_VIEW_MODE", payload: v }),
+    setRoute: (r: AppRoute) => dispatch({ type: "SET_ROUTE", payload: r }),
     setSidebarPanel: (p: SidebarPanelId) => dispatch({ type: "SET_SIDEBAR_PANEL", payload: p }),
     setSearchQuery: (v: string) => dispatch({ type: "SET_SEARCH_QUERY", payload: v }),
     toggleSidebar: () => dispatch({ type: "TOGGLE_SIDEBAR" }),
@@ -696,6 +808,7 @@ export function useAppActions() {
     openToolTab: (key: ToolTabKey) => dispatch({ type: "OPEN_TOOL_TAB", payload: key }),
     closeToolTab: (key: ToolTabKey) => dispatch({ type: "CLOSE_TOOL_TAB", payload: key }),
     setActiveToolTab: (key: ToolTabKey | null) => dispatch({ type: "SET_ACTIVE_TOOL_TAB", payload: key }),
+    setNoteLoadError: (payload: { noteId: string; status?: number; message?: string } | null) => dispatch({ type: "SET_NOTE_LOAD_ERROR", payload }),
     closeNoteTab: (id: string) => dispatch({ type: "CLOSE_NOTE_TAB", payload: id }),
     updateNoteTab: (v: Partial<OpenNoteTab> & { id: string }) => dispatch({ type: "UPDATE_NOTE_TAB", payload: v }),
     removeNoteTab: (id: string) => dispatch({ type: "REMOVE_NOTE_TAB", payload: id }),

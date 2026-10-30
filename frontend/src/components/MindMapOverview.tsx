@@ -6,6 +6,7 @@ import { buildMindMapOverviewItems, getMindMapCreationLocations, type MindMapOve
 import { loadMobileKnowledgeTreeRecentEntries } from "@/lib/mobileKnowledgeTree";
 import type { MindMapListItem } from "@/types";
 import { cn } from "@/lib/utils";
+import { confirm } from "@/components/ui/confirm";
 
 export default function MindMapOverview({
   maps,
@@ -93,7 +94,7 @@ export default function MindMapOverview({
                   <span className="hidden shrink-0 text-xs text-tx-tertiary sm:inline">{new Date(map.updatedAt).toLocaleDateString()}</span>
                 </button>
                 <button type="button" onClick={() => onToggleStar(map.id)} aria-label={map.starred ? (isZh ? "取消收藏" : "Remove favorite") : (isZh ? "收藏" : "Favorite")} className="rounded-md p-2 text-tx-tertiary hover:bg-app-hover hover:text-amber-500"><Star size={16} className={map.starred ? "fill-amber-400 text-amber-400" : ""} /></button>
-                <button type="button" onClick={() => { if (window.confirm(isZh ? `将“${map.title}”移入回收站？` : `Move “${map.title}” to Trash?`)) onDelete(map.id); }} aria-label={isZh ? "删除脑图" : "Delete mind map"} className="rounded-md p-2 text-tx-tertiary hover:bg-app-hover hover:text-accent-danger"><Trash2 size={16} /></button>
+                <button type="button" onClick={async () => { const ok = await confirm({ title: isZh ? `将“${map.title}”移入回收站？` : `Move “${map.title}” to Trash?`, description: isZh ? "可在回收站中恢复。" : "You can restore it from Trash.", confirmText: isZh ? "移入回收站" : "Move to Trash", danger: true }); if (ok) onDelete(map.id); }} aria-label={isZh ? "删除脑图" : "Delete mind map"} className="rounded-md p-2 text-tx-tertiary hover:bg-app-hover hover:text-accent-danger"><Trash2 size={16} /></button>
               </div>
             ))}
           </div>

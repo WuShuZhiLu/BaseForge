@@ -1,4 +1,4 @@
-import { prompt as appPrompt } from "@/components/ui/confirm";
+import { choose, prompt as appPrompt } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace } from "@/lib/api";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import {
@@ -63,15 +63,76 @@ export async function importWordIntoKnowledgeTree(
   if (!file) return null;
   const toastId = toast.info("正在导入 Word 文档…", 0);
   try {
-    const { note } = await importDocxAsNote({ notebookId, file });
+    const result = await importDocxAsNote({ notebookId, file });
+    await moveImportedNote(result.note.id, notebookId, options.parent);
+    toast.dismiss(toastId);
+    // 导入报告：复杂版式按最接近格式转换，逐项提示（过长截断，完整清单在 warnings 里）。
+    const downgrades = result.downgrades || [];
+    if (downgrades.length > 0) {
+      const summary = downgrades
+        .map((item) => `${item.detail}×${item.count}`)
+        .join("、")
+        .slice(0, 80);
+      toast.info(`导入成功；以下版式已简化：${summary}${summary.length >= 80 ? "…" : ""}`);
+    } else {
+      toast.success("导入成功");
+    }
+    return result.note as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
+
+export async function importPdfIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const file = await pickPdfFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 PDF 文档…", 0);
+  let noteId: string | null = null;
+  try {
+    const title = file.name.replace(/\.pdf$/i, "").trim() || "PDF 文档";
+    const workspaceId = getCurrentWorkspace();
+    // 1) 建正文骨架（contentFormat="pdf"，内容 = 原件引用 + 批注层）
+    const note = await api.createNote({
+      title,
+      notebookId,
+      contentFormat: "pdf",
+      ...(workspaceId && workspaceId !== "personal" ? { workspaceId } : {}),
+    });
+    noteId = note.id;
+    // 2) 原件存附件
+    const attachment = await api.attachments.upload(note.id, file);
+    // 3) 回填原件引用
+    await api.updateNote(note.id, {
+      content: JSON.stringify({ attachmentId: attachment.id, annotations: [] }),
+      contentText: "",
+    });
     await moveImportedNote(note.id, notebookId, options.parent);
     toast.dismiss(toastId);
     toast.success("导入成功");
     return note as LoadedNote;
   } catch (error) {
     toast.dismiss(toastId);
+    // 失败回滚：把半成品笔记移入回收站（best-effort）
+    if (noteId) {
+      try { await api.updateNote(noteId, { isTrashed: 1 }); } catch { /* 尽力而为 */ }
+    }
     throw error;
   }
+}
+
+function pickPdfFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".pdf,application/pdf";
+    input.onchange = () => resolve(input.files?.[0] || null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
 }
 
 export async function importMarkdownIntoKnowledgeTree(
@@ -80,30 +141,82 @@ export async function importMarkdownIntoKnowledgeTree(
   const files = await pickMarkdownFiles();
   if (files.length === 0) return null;
 
-  const toastId = toast.info(`正在导入 ${files.length} 个 Markdown 文件…`, 0);
-  let result: Awaited<ReturnType<typeof importMarkdownFilesIntoKnowledgeTree>>;
-  try {
-    result = await importMarkdownFilesIntoKnowledgeTree(files, options.parent?.id ?? null);
-  } finally {
-    toast.dismiss(toastId);
+  // .txt 可选"保持纯文本"（默认仍转 Markdown；取消/关闭也按 Markdown 处理）
+  const txtFiles = files.filter((file) => /\.txt$/i.test(file.name));
+  const mdFiles = files.filter((file) => !/\.txt$/i.test(file.name));
+  let keepTxtPlain = false;
+  if (txtFiles.length > 0) {
+    const choice = await choose({
+      title: "检测到 .txt 文件",
+      description: `将 ${txtFiles.length} 个 .txt 文件导入为：`,
+      choices: [
+        { value: "markdown", label: "Markdown（转换格式，默认）" },
+        { value: "plain", label: "纯文本（保持原样，不做格式转换）" },
+      ],
+    });
+    keepTxtPlain = choice === "plain";
   }
 
-  if (result.imported.length === 0) {
-    throw new Error(
-      result.failures.length > 0
-        ? formatMarkdownImportFailures(result.failures)
-        : "Markdown 文件导入失败",
-    );
+  const importedNotes: LoadedNote[] = [];
+  if (mdFiles.length > 0 || (!keepTxtPlain && txtFiles.length > 0)) {
+    const toastId = toast.info(`正在导入 ${mdFiles.length + (keepTxtPlain ? 0 : txtFiles.length)} 个 Markdown 文件…`, 0);
+    let result: Awaited<ReturnType<typeof importMarkdownFilesIntoKnowledgeTree>>;
+    try {
+      result = await importMarkdownFilesIntoKnowledgeTree(
+        keepTxtPlain ? mdFiles : files,
+        options.parent?.id ?? null,
+      );
+    } finally {
+      toast.dismiss(toastId);
+    }
+    if (result.imported.length === 0 && (mdFiles.length > 0 || !keepTxtPlain)) {
+      throw new Error(
+        result.failures.length > 0
+          ? formatMarkdownImportFailures(result.failures)
+          : "Markdown 文件导入失败",
+      );
+    }
+    if (result.failures.length > 0) {
+      toast.warning(
+        `成功导入 ${result.imported.length} 个文件，${result.failures.length} 个失败：${formatMarkdownImportFailures(result.failures)}`,
+        8000,
+      );
+    }
+    importedNotes.push(...(result.imported as LoadedNote[]));
   }
-  if (result.failures.length > 0) {
-    toast.warning(
-      `成功导入 ${result.imported.length} 个文件，${result.failures.length} 个失败：${formatMarkdownImportFailures(result.failures)}`,
-      8000,
-    );
-  } else {
-    toast.success(`已导入 ${result.imported.length} 个 Markdown 文件`);
+
+  if (keepTxtPlain && txtFiles.length > 0) {
+    const plainNotes = await importPlainTextFiles(txtFiles, options);
+    importedNotes.push(...plainNotes);
+    toast.success(`已导入 ${plainNotes.length} 个纯文本文件`);
   }
-  return result.imported[0];
+
+  if (importedNotes.length === 0) {
+    throw new Error("没有可导入的文件");
+  }
+  return importedNotes[0];
+}
+
+/** .txt 保持纯文本：逐个建 plain 笔记（正文原样，服务端派生 contentText）。 */
+async function importPlainTextFiles(
+  files: File[],
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote[]> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const notes: LoadedNote[] = [];
+  for (const file of files) {
+    const text = await file.text();
+    const title = file.name.replace(/\.txt$/i, "").trim() || "无标题纯文本";
+    const note = await api.createNote({
+      notebookId,
+      title,
+      content: text,
+      contentFormat: "plain",
+    });
+    await moveImportedNote(note.id, notebookId, options.parent);
+    notes.push(note as LoadedNote);
+  }
+  return notes;
 }
 
 export async function importMarkdownZipIntoKnowledgeTree(
@@ -179,27 +292,3 @@ export async function importWeChatArticleIntoKnowledgeTree(
   }
 }
 
-export async function importSpreadsheetIntoKnowledgeTree(
-  options: KnowledgeTreeImportOptions,
-): Promise<null> {
-  const { pickSpreadsheetFile, importSpreadsheetFileAsSheets } = await import("@/lib/spreadsheetImport");
-  const { revealCreatedKnowledgeTreeNote } = await import("@/lib/knowledgeTreeCreateVisibility");
-  const { emitKnowledgeTreeRefresh } = await import("@/lib/workspaceRefreshBridge");
-  const { pushSheetAppPath } = await import("@/lib/sheetDeepLink");
-  const file = await pickSpreadsheetFile();
-  if (!file) return null;
-  const toastId = toast.info("正在导入表格…", 0);
-  try {
-    const result = await importSpreadsheetFileAsSheets(file, options.parent?.id ?? null);
-    revealCreatedKnowledgeTreeNote(options.parent?.id || null);
-    emitKnowledgeTreeRefresh("spreadsheet-imported");
-    toast.dismiss(toastId);
-    if (result.note) toast.info(result.note, 6000);
-    toast.success(`已导入 ${result.created.length} 个表格文档`);
-    pushSheetAppPath(result.created[0].resourceId);
-    return null; // 表格文档不是 note：面板对 null 提前返回，跳转已在上面完成
-  } catch (error) {
-    toast.dismiss(toastId);
-    throw error;
-  }
-}

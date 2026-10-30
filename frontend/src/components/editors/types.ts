@@ -37,6 +37,8 @@ export interface NoteEditorUpdatePayload {
   _noteId?: string;
   /** Tiptap 本地保存代次；仅用于把 REST ACK 精确关联到发起它的编辑器快照。 */
   _saveGeneration?: number;
+  /** true = 来自 flushSave（显式保存：Ctrl+S / 状态区点击 / 定时器）；防抖自动更新不带此标记。 */
+  _flush?: boolean;
 }
 
 /** 两个编辑器引擎统一的 props 契约 */

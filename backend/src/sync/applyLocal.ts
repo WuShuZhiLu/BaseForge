@@ -178,12 +178,13 @@ function applyNoteLocal(db: Database.Database, item: RemoteEntityPayload, option
   }
   const p = item.payload || {};
   const hasThemeId = Object.prototype.hasOwnProperty.call(p, "themeId");
+  const hasIsUnlisted = Object.prototype.hasOwnProperty.call(p, "isUnlisted");
   withEncryptedBlockWrite(db, item.entityId, str(p.content, "{}"), str(p.contentFormat, "richtext"), () => db.prepare(`
     INSERT INTO notes (
       id, userId, notebookId, workspaceId, title, content, contentText, contentFormat,
       isPinned, isFavorite, isLocked, isArchived, isTrashed, trashedAt,
-      themeId, version, sortOrder, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      themeId, isUnlisted, version, sortOrder, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
               COALESCE(?, datetime('now')), datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       notebookId = excluded.notebookId,
@@ -198,6 +199,7 @@ function applyNoteLocal(db: Database.Database, item: RemoteEntityPayload, option
       isTrashed = excluded.isTrashed,
       trashedAt = excluded.trashedAt,
       themeId = CASE WHEN ? THEN excluded.themeId ELSE notes.themeId END,
+      isUnlisted = CASE WHEN ? THEN excluded.isUnlisted ELSE notes.isUnlisted END,
       version = excluded.version,
       sortOrder = excluded.sortOrder,
       updatedAt = datetime('now')
@@ -217,10 +219,12 @@ function applyNoteLocal(db: Database.Database, item: RemoteEntityPayload, option
     bit(p.isTrashed),
     p.trashedAt ?? null,
     normalizeNoteThemeId(p.themeId),
+    bit(p.isUnlisted),
     Math.max(1, num(p.version, 1)),
     num(p.sortOrder),
     p.createdAt ?? null,
     hasThemeId ? 1 : 0,
+    hasIsUnlisted ? 1 : 0,
   ), p.encryptedBlocksVersion);
 }
 

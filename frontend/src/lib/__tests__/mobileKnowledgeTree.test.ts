@@ -89,22 +89,9 @@ describe("mobile knowledge tree navigation", () => {
 
     expect(getMobileKnowledgeTreeChildren(rows, "notebook:root").map((row) => row.id)).toEqual([
       "notebook:folder",
-      "note:pinned",
       "note:newer",
       "note:older",
-    ]);
-  });
-
-  it("keeps pinned documents ahead of recent-open ordering", () => {
-    const rows = [
-      node("note:recent", "Recent", { nodeType: "note", resourceType: "note" }),
-      node("note:pinned", "Pinned", { nodeType: "note", resourceType: "note", isPinned: 1 }),
-    ];
-    const entries = upsertMobileKnowledgeTreeRecentEntry([], "note:recent", Date.parse("2026-07-28T00:00:00.000Z"));
-
-    expect(buildMobileKnowledgeTreeRecentNodes(rows, entries).map((row) => row.id)).toEqual([
       "note:pinned",
-      "note:recent",
     ]);
   });
 

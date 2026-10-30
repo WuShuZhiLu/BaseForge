@@ -194,7 +194,7 @@ function resolveScope(c: any, body: AskBody): Scope | { error: Response } {
 }
 
 function scopeSql(scope: Scope, alias = "n"): { sql: string; params: any[] } {
-  const clauses = [`${alias}.isTrashed = 0`];
+  const clauses = [`${alias}.isTrashed = 0`, `${alias}.isUnlisted = 0`];
   const params: any[] = [];
   if (scope.workspaceId === null) {
     clauses.push(`${alias}.userId = ?`, `${alias}.workspaceId IS NULL`);

@@ -21,6 +21,7 @@ import {
   type ResolvedConflictSummary,
 } from "@/lib/syncLocalApi";
 import { buildAutomaticConflictMerge } from "@/lib/syncConflictAutoMerge";
+import { confirm } from "@/components/ui/confirm";
 import { isProtectedNotePayload } from "@/lib/encryptedNotes/blockDocument";
 
 const HISTORY_PAGE_SIZE = 20;
@@ -176,10 +177,12 @@ export function ConflictCenter({
     if (targets.length === 0) return;
 
     const sourceLabel = resolution === "keep-local" ? "本机" : "云端";
-    const confirmed = window.confirm(
-      `确定将已选 ${targets.length} 条冲突全部采用${sourceLabel}版本吗？另一方版本仍会保留在冲突记录中。`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: `将已选 ${targets.length} 条冲突全部采用${sourceLabel}版本？`,
+      description: "另一方版本仍会保留在冲突记录中。",
+      confirmText: `采用${sourceLabel}版本`,
+    });
+    if (!ok) return;
 
     setBusy(true);
     setError(null);
@@ -220,10 +223,12 @@ export function ConflictCenter({
     const targets = items.filter((item) => selectedIds.has(item.id));
     if (targets.length === 0) return;
 
-    const confirmed = window.confirm(
-      `将智能合并已选 ${targets.length} 条冲突。只处理双方修改字段不重叠的内容，同字段冲突会继续保留，是否继续？`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: `将已选 ${targets.length} 条冲突智能合并？`,
+      description: "只处理双方修改字段不重叠的内容，同字段冲突会继续保留。",
+      confirmText: "开始合并",
+    });
+    if (!ok) return;
 
     setBusy(true);
     setError(null);
@@ -285,10 +290,12 @@ export function ConflictCenter({
 
   const handleReopen = async (item: ResolvedConflictSummary) => {
     const title = item.localTitle || item.remoteTitle || item.entityId;
-    const confirmed = window.confirm(
-      `确定撤销“${title}”的已处理状态吗？它会重新出现在待处理列表中，但不会自动回滚当前内容。`,
-    );
-    if (!confirmed) return;
+    const ok = await confirm({
+      title: `撤销“${title}”的已处理状态？`,
+      description: "它会重新出现在待处理列表中，但不会自动回滚当前内容。",
+      confirmText: "撤销处理",
+    });
+    if (!ok) return;
 
     setBusy(true);
     setError(null);

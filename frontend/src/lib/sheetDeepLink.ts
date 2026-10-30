@@ -1,7 +1,5 @@
 import {
-  APP_PATH_CHANGED_EVENT,
   pushAppPathState,
-  replaceAppPathState,
   resolveCurrentAppPathname,
 } from "@/lib/appPathNavigation";
 
@@ -22,19 +20,6 @@ export function getCurrentSheetAppRoute(): SheetAppRoute {
   return parseSheetAppPath(resolveCurrentAppPathname());
 }
 
-export function subscribeSheetAppPath(listener: () => void): () => void {
-  window.addEventListener(APP_PATH_CHANGED_EVENT, listener);
-  window.addEventListener("popstate", listener);
-  return () => {
-    window.removeEventListener(APP_PATH_CHANGED_EVENT, listener);
-    window.removeEventListener("popstate", listener);
-  };
-}
-
 export function pushSheetAppPath(sheetId: string): void {
   pushAppPathState(`/sheets/${encodeURIComponent(sheetId)}`);
-}
-
-export function replaceSheetAppPath(sheetId: string): void {
-  replaceAppPathState(`/sheets/${encodeURIComponent(sheetId)}`);
 }

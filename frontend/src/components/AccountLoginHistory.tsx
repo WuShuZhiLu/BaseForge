@@ -14,6 +14,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { User } from "@/types";
 import { clearAuthTokens } from "@/lib/authSession";
+import { confirm } from "@/components/ui/confirm";
 
 function serverLabel(serverUrl: string): string {
   try {
@@ -104,7 +105,11 @@ export function AccountLoginHistoryList({
 
   const handleRemove = async (event: React.MouseEvent, item: AccountLoginHistoryItem) => {
     event.stopPropagation();
-    if (!window.confirm(t("auth.loginHistory.removeConfirm", { username: item.username }))) return;
+    const ok = await confirm({
+      title: t("auth.loginHistory.removeConfirm", { username: item.username }),
+      confirmText: t("common.delete"),
+    });
+    if (!ok) return;
     const result = await removeAccountLoginHistory(item.id);
     if (!result.ok) toast.error(t("auth.loginHistory.removeFailed"));
   };

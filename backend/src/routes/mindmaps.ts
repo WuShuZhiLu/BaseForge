@@ -1,18 +1,16 @@
 /**
- * 思维导图路由（工作区数据隔离 Phase 2 - Y4）
+ * 思维导图路由 —— 归一后的 /api/mindmaps 门面
  * ---------------------------------------------------------------------------
- * 与 diary / tasks 同构：
- *   - 集合接口（list / create）：挂 `requireWorkspaceFeature("mindmaps")`，
- *     通过 `?workspaceId=` 切换 scope（不传/空 = 个人空间）。
- *   - 单资源按 id 接口（read / update / delete）：**不**挂 feature 中间件，
- *     这样工作区关闭 mindmaps 后，老成员依然可以读/善后自己已有的导图。
- *   - 读取：
- *       personal → userId = ? AND workspaceId IS NULL
- *       workspace → workspaceId = ? （全员可见，与 diary 同）
- *   - 写/删：`canManageResource(creatorId, workspaceId, actorId)`
- *     （本人 + 工作区 admin/owner）
- *   - 不允许通过 PUT 修改 workspaceId——导图一旦落到一个空间就不迁移，
- *     避免权限与附件归属的连带错位。
+ * 导图已归一为知识库文档：正文存 notes（contentFormat="mindmap"，content 为
+ * MindMapData JSON），树/搜索/回收站/同步都走 notes 链路。本路由保留原路径与
+ * 响应结构（SDK / 移动端 / 嵌入卡片契约不变），读写全部落到 notes 表。
+ *
+ * 权限语义与归一前一致：
+ *   - 集合接口（list / create）挂 `requireWorkspaceFeature("mindmaps")`；
+ *   - 单资源接口不挂，便于工作区关闭功能后善后；
+ *   - 写/删：`canManageResource(creatorId, workspaceId, actorId)`。
+ * 门面创建（AI 存为导图等无树上下文的调用方）挂靠兜底 notebook；
+ * 知识树内新建走 createKnowledgeChild（knowledgeTreeCore）。
  */
 import { Hono } from "hono";
 import { getDb } from "../db/schema";
@@ -23,25 +21,34 @@ import {
   requireWorkspaceFeature,
 } from "../middleware/acl";
 import { ensureMindmapSchema } from "../lib/mindmap-schema";
+import { defaultMindmapContent, mindmapPlainText } from "../lib/mindmapData";
+import {
+  noteRowToMindmapPayload,
+  resolveMindmapFallbackNotebook,
+} from "../services/mindmapDocs";
 import { deleteKnowledgeNode, KnowledgeTreeError } from "../services/knowledgeTree.js";
 import { permanentlyDeleteMindmap } from "../services/trash/mindmapTrashAdapter.js";
+import { MINDMAP_LEGACY_NOTEBOOK_PREFIX } from "../db/knowledgeTreeMindmapFolderMigration.js";
 
 const app = new Hono();
 
-// 初始化表（统一兜底：mindmaps + starred + folderId + mindmap_folders）
+// 初始化表（统一兜底：mindmaps + starred + folderId + mindmap_folders）。
+// 归一后 mindmaps 只剩历史遗留用途（迁移前的旧库升级窗口期），保持幂等兜底。
 ensureMindmapSchema();
 
-interface MindmapRow {
+interface MindmapDocNoteRow {
   id: string;
   userId: string;
   workspaceId: string | null;
   title: string;
-  data: string;
-  starred: number;
-  folderId: string | null;
+  content: string | null;
+  isFavorite: number | null;
+  isUnlisted: number | null;
   createdAt: string;
   updatedAt: string;
 }
+
+const MINDMAP_DOC_SCOPE = `n.contentFormat = 'mindmap' AND n.isTrashed = 0 AND n.isUnlisted = 0`;
 
 /**
  * 解析请求的 scope（personal / workspace）。
@@ -60,21 +67,17 @@ function resolveMindmapScope(
 }
 
 /** 读权限：本人个人空间 OR 工作区成员。 */
-function canReadMindmap(row: MindmapRow, userId: string): boolean {
+function canReadMindmapDoc(row: MindmapDocNoteRow, userId: string): boolean {
   if (!row.workspaceId) return row.userId === userId;
   return getUserWorkspaceRole(row.workspaceId, userId) !== null;
 }
 
-// The knowledge-tree tombstone is the canonical trash state for mindmaps. A legacy map
-// without a projected tree node remains readable until the migration repairs it.
-const ACTIVE_MINDMAP = `NOT EXISTS (
-  SELECT 1 FROM knowledge_tree_nodes tree
-  WHERE tree.resourceType = 'mindmap' AND tree.resourceId = m.id AND tree.isDeleted = 1
-)`;
-
-function readActiveMindmap(db: ReturnType<typeof getDb>, id: string): MindmapRow | undefined {
-  return db.prepare(`SELECT m.* FROM mindmaps m WHERE m.id = ? AND ${ACTIVE_MINDMAP}`)
-    .get(id) as MindmapRow | undefined;
+/** 匿名导图文档（isUnlisted=1）允许按 id 读取：嵌入卡片是唯一访问入口。 */
+function readMindmapDoc(db: ReturnType<typeof getDb>, id: string): MindmapDocNoteRow | undefined {
+  return db.prepare(`
+    SELECT n.id, n.userId, n.workspaceId, n.title, n.content, n.isFavorite, n.isUnlisted, n.createdAt, n.updatedAt
+    FROM notes n WHERE n.id = ? AND n.contentFormat = 'mindmap' AND n.isTrashed = 0
+  `).get(id) as MindmapDocNoteRow | undefined;
 }
 
 // ---------- 列表 ----------
@@ -84,21 +87,20 @@ app.get("/", requireWorkspaceFeature("mindmaps"), (c) => {
   const scope = resolveMindmapScope(c.req.query("workspaceId") || "", userId);
   if (scope.error) return c.json({ error: scope.error, code: "FORBIDDEN" }, 403);
 
-  // creatorName：与 notes/tasks/diary 同款——LEFT JOIN users 拉创建者用户名，
-  // 工作区下导图列表用来展示"谁建的"。LEFT JOIN 兜底用户被删除的极端窗口期。
-  const sql =
-    scope.scope === "workspace"
-      ? `SELECT m.id, m.userId, m.workspaceId, m.title, m.starred, m.folderId, m.createdAt, m.updatedAt,
-                u.username AS creatorName
-         FROM mindmaps m LEFT JOIN users u ON u.id = m.userId
-         WHERE m.workspaceId = ? AND ${ACTIVE_MINDMAP} ORDER BY m.starred DESC, m.updatedAt DESC`
-      : `SELECT m.id, m.userId, m.workspaceId, m.title, m.starred, m.folderId, m.createdAt, m.updatedAt,
-                u.username AS creatorName
-         FROM mindmaps m LEFT JOIN users u ON u.id = m.userId
-         WHERE m.userId = ? AND m.workspaceId IS NULL AND ${ACTIVE_MINDMAP} ORDER BY m.starred DESC, m.updatedAt DESC`;
-  const param = scope.scope === "workspace" ? scope.workspaceId : userId;
-  const rows = db.prepare(sql).all(param);
-  return c.json(rows);
+  const rows = db.prepare(`
+    SELECT n.id, n.userId, n.workspaceId, n.title, n.isFavorite, n.createdAt, n.updatedAt,
+           u.username AS creatorName
+    FROM notes n LEFT JOIN users u ON u.id = n.userId
+    WHERE ${MINDMAP_DOC_SCOPE}
+      ${scope.scope === "workspace" ? "AND n.workspaceId = ?" : "AND n.userId = ? AND n.workspaceId IS NULL"}
+    ORDER BY n.isFavorite DESC, n.updatedAt DESC
+  `).all(scope.scope === "workspace" ? scope.workspaceId : userId) as Array<
+    Omit<MindmapDocNoteRow, "content"> & { creatorName: string }
+  >;
+  return c.json(rows.map((row) => ({
+    ...noteRowToMindmapPayload(row),
+    creatorName: row.creatorName,
+  })));
 });
 
 // ---------- 单个读取 ----------
@@ -107,13 +109,13 @@ app.get("/:id", (c) => {
   const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
   const id = c.req.param("id");
-  const row = readActiveMindmap(db, id);
+  const row = readMindmapDoc(db, id);
   if (!row) return c.json({ error: "思维导图不存在" }, 404);
-  if (!canReadMindmap(row, userId)) {
+  if (!canReadMindmapDoc(row, userId)) {
     return c.json({ error: "无权访问该导图", code: "FORBIDDEN" }, 403);
   }
   return c.json({
-    ...row,
+    ...noteRowToMindmapPayload(row),
     canEdit: canManageResource(row.userId, row.workspaceId, userId),
   });
 });
@@ -128,29 +130,25 @@ app.post("/", requireWorkspaceFeature("mindmaps"), async (c) => {
 
   const id = uuidv4();
   const title = body.title || "无标题导图";
+  const data = typeof body.data === "string"
+    ? body.data
+    : body.data
+      ? JSON.stringify(body.data)
+      : defaultMindmapContent(title);
 
-  // 默认初始数据：一个根节点
-  const defaultData = JSON.stringify({
-    root: {
-      id: "root",
-      text: title,
-      children: [],
-    },
-  });
-  const data = body.data || defaultData;
-
-  db.prepare(
-    "INSERT INTO mindmaps (id, userId, workspaceId, title, data) VALUES (?, ?, ?, ?, ?)",
-  ).run(
-    id,
-    userId,
-    scope.workspaceId,
-    title,
-    typeof data === "string" ? data : JSON.stringify(data),
+  db.prepare(`
+    INSERT INTO notes (
+      id, userId, workspaceId, notebookId, title, content, contentText,
+      contentFormat, note_type, sortOrder
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'mindmap', 'normal', 0)
+  `).run(
+    id, userId, scope.workspaceId,
+    resolveMindmapFallbackNotebook(db, userId, scope.workspaceId),
+    title, data, mindmapPlainText(data),
   );
 
-  const row = db.prepare("SELECT * FROM mindmaps WHERE id = ?").get(id);
-  return c.json(row, 201);
+  const row = readMindmapDoc(db, id) as MindmapDocNoteRow;
+  return c.json(noteRowToMindmapPayload(row), 201);
 });
 
 // ---------- 更新 ----------
@@ -163,12 +161,12 @@ app.put("/:id", async (c) => {
     data?: string | Record<string, unknown>;
     /**
      * 可选乐观锁。文档内弹层编辑等多入口编辑场景必须携带读取时的 updatedAt，
-     * 防止独立脑图中心/另一个浏览器窗口的更新被静默覆盖。
+     * 防止其他入口/另一个浏览器窗口的更新被静默覆盖。
      */
     expectedUpdatedAt?: string;
   }>();
 
-  const existing = readActiveMindmap(db, id);
+  const existing = readMindmapDoc(db, id);
   if (!existing) return c.json({ error: "思维导图不存在" }, 404);
 
   if (!canManageResource(existing.userId, existing.workspaceId, userId)) {
@@ -196,22 +194,23 @@ app.put("/:id", async (c) => {
     values.push(body.title);
   }
   if (body.data !== undefined) {
-    updates.push("data = ?");
-    values.push(typeof body.data === "string" ? body.data : JSON.stringify(body.data));
+    const data = typeof body.data === "string" ? body.data : JSON.stringify(body.data);
+    updates.push("content = ?", "contentText = ?");
+    values.push(data, mindmapPlainText(data));
   }
   // 显式忽略 body.workspaceId：不允许跨空间迁移
 
   if (updates.length > 0) {
     // 使用毫秒精度，确保同一秒内连续保存也能可靠参与下一次乐观锁比较。
-    updates.push("updatedAt = strftime('%Y-%m-%d %H:%M:%f', 'now')");
+    updates.push("updatedAt = strftime('%Y-%m-%d %H:%M:%f', 'now')", "version = version + 1");
     const where = expectedUpdatedAt
-      ? "WHERE id = ? AND updatedAt = ?"
-      : "WHERE id = ?";
+      ? "WHERE id = ? AND contentFormat = 'mindmap' AND updatedAt = ?"
+      : "WHERE id = ? AND contentFormat = 'mindmap'";
     values.push(id);
     if (expectedUpdatedAt) values.push(expectedUpdatedAt);
-    const result = db.prepare(`UPDATE mindmaps SET ${updates.join(", ")} ${where}`).run(...values);
+    const result = db.prepare(`UPDATE notes SET ${updates.join(", ")} ${where}`).run(...values);
     if (expectedUpdatedAt && result.changes === 0) {
-      const latest = db.prepare("SELECT updatedAt FROM mindmaps WHERE id = ?").get(id) as
+      const latest = db.prepare("SELECT updatedAt FROM notes WHERE id = ?").get(id) as
         | { updatedAt: string }
         | undefined;
       return c.json({
@@ -222,9 +221,9 @@ app.put("/:id", async (c) => {
     }
   }
 
-  const row = db.prepare("SELECT * FROM mindmaps WHERE id = ?").get(id) as MindmapRow;
+  const row = readMindmapDoc(db, id) as MindmapDocNoteRow;
   return c.json({
-    ...row,
+    ...noteRowToMindmapPayload(row),
     canEdit: canManageResource(row.userId, row.workspaceId, userId),
   });
 });
@@ -235,7 +234,7 @@ app.delete("/:id", (c) => {
   const userId = c.req.header("X-User-Id") || "";
   const id = c.req.param("id");
 
-  const existing = readActiveMindmap(db, id);
+  const existing = readMindmapDoc(db, id);
   if (!existing) return c.json({ error: "思维导图不存在" }, 404);
 
   if (!canManageResource(existing.userId, existing.workspaceId, userId)) {
@@ -244,9 +243,9 @@ app.delete("/:id", (c) => {
 
   const node = db.prepare(`
     SELECT id FROM knowledge_tree_nodes
-    WHERE resourceType = 'mindmap' AND resourceId = ? AND isDeleted = 0
+    WHERE resourceType = 'note' AND resourceId = ? AND isDeleted = 0
   `).get(id) as { id: string } | undefined;
-  if (!node) return c.json({ error: "脑图目录节点不存在，请先修复数据", code: "KNOWLEDGE_NODE_SYNC_FAILED" }, 409);
+  if (!node) return c.json({ error: "导图目录节点不存在，请先修复数据", code: "KNOWLEDGE_NODE_SYNC_FAILED" }, 409);
   try {
     deleteKnowledgeNode({ actorUserId: userId, nodeId: node.id, mode: "subtree", db });
   } catch (error) {
@@ -268,46 +267,52 @@ app.delete("/:id/permanent", (c) => {
   }
 });
 
-// ---------- ??/???? ----------
+// ---------- 收藏 / 移动 ----------
 app.patch("/:id/star", async (c) => {
   const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
   const id = c.req.param("id");
 
-  const existing = readActiveMindmap(db, id);
+  const existing = readMindmapDoc(db, id);
   if (!existing) return c.json({ error: "思维导图不存在" }, 404);
   if (!canManageResource(existing.userId, existing.workspaceId, userId)) {
     return c.json({ error: "无权修改此导图", code: "FORBIDDEN" }, 403);
   }
 
-  const newStarred = existing.starred ? 0 : 1;
-  db.prepare("UPDATE mindmaps SET starred = ?, updatedAt = datetime('now') WHERE id = ?").run(newStarred, id);
-  const row = db.prepare("SELECT * FROM mindmaps WHERE id = ?").get(id);
-  return c.json(row);
+  db.prepare("UPDATE notes SET isFavorite = 1 - isFavorite, updatedAt = datetime('now') WHERE id = ? AND contentFormat = 'mindmap'").run(id);
+  const row = readMindmapDoc(db, id) as MindmapDocNoteRow;
+  return c.json(noteRowToMindmapPayload(row));
 });
 
-// ---------- ???????? ----------
 app.patch("/:id/move", async (c) => {
   const db = getDb();
   const userId = c.req.header("X-User-Id") || "";
   const id = c.req.param("id");
   const body = await c.req.json<{ folderId: string | null }>();
 
-  const existing = readActiveMindmap(db, id);
+  const existing = readMindmapDoc(db, id);
   if (!existing) return c.json({ error: "Mindmap not found" }, 404);
   if (!canManageResource(existing.userId, existing.workspaceId, userId)) {
-    return c.json({ error: "???????", code: "FORBIDDEN" }, 403);
+    return c.json({ error: "无权修改此导图", code: "FORBIDDEN" }, 403);
   }
 
+  // 旧导图文件夹以伪 notebook 容器存在；folderId 为空时挂回兜底 notebook。
   const folderId = body.folderId || null;
+  let notebookId: string;
   if (folderId) {
-    const folder = db.prepare("SELECT * FROM mindmap_folders WHERE id = ?").get(folderId) as any;
-    if (!folder) return c.json({ error: "??????" }, 404);
+    const pseudoId = `${MINDMAP_LEGACY_NOTEBOOK_PREFIX}${folderId}`;
+    const folder = db.prepare("SELECT id FROM notebooks WHERE id = ?").get(pseudoId) as
+      | { id: string }
+      | undefined;
+    if (!folder) return c.json({ error: "目标文件夹不存在" }, 404);
+    notebookId = pseudoId;
+  } else {
+    notebookId = resolveMindmapFallbackNotebook(db, existing.userId, existing.workspaceId);
   }
 
-  db.prepare("UPDATE mindmaps SET folderId = ?, updatedAt = datetime('now') WHERE id = ?").run(folderId, id);
-  const row = db.prepare("SELECT * FROM mindmaps WHERE id = ?").get(id);
-  return c.json(row);
+  db.prepare("UPDATE notes SET notebookId = ?, updatedAt = datetime('now') WHERE id = ? AND contentFormat = 'mindmap'").run(notebookId, id);
+  const row = readMindmapDoc(db, id) as MindmapDocNoteRow;
+  return c.json(noteRowToMindmapPayload(row));
 });
 
 export default app;

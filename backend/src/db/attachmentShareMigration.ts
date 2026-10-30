@@ -3,7 +3,7 @@ import type { Migration } from "./migrations.impl.js";
 // 附件分享链接：FileManager 附件的只读可控分享（密码/过期/次数上限，可关闭可删除）。
 // 与笔记 shares 表平行的独立通道；现有 /api/attachments/:id 免 JWT 直链保持不动。
 export const attachmentShareMigration: Migration = {
-  version: 130,
+  version: 135,
   name: "attachment-shares",
   up: (db) => {
     db.exec(`

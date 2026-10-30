@@ -38,6 +38,21 @@ export default function PublicKnowledgeResourceRenderer({
   }, [resource]);
 
   if (resource.resourceType === "note") {
+    // 导图归一后是 contentFormat="mindmap" 的笔记，公共页用静态快照渲染。
+    if (resource.contentFormat === "mindmap") {
+      const html = renderSharedMindMapSnapshot({
+        id: resource.resourceId,
+        title: resource.title,
+        data: resource.content || "",
+        updatedAt: resource.updatedAt,
+      });
+      return (
+        <div
+          className="public-mindmap-resource"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      );
+    }
     return resource.contentFormat === "md" ? (
       <MarkdownPreview markdown={resource.content || ""} compact className="p-0" />
     ) : fakeNote ? (

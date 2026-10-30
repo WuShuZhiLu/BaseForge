@@ -93,7 +93,8 @@ export function pickMarkdownFiles(): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".md,.markdown,text/markdown,text/x-markdown";
+    // .txt 一并可选：选中后在导入入口里询问"保持纯文本 / 转 Markdown"（默认 Markdown）
+    input.accept = ".md,.markdown,text/markdown,text/x-markdown,.txt,text/plain";
     input.multiple = true;
     input.style.display = "none";
     document.body.appendChild(input);
@@ -102,7 +103,9 @@ export function pickMarkdownFiles(): Promise<File[]> {
     const cleanup = () => input.remove();
     input.onchange = () => {
       settled = true;
-      const files = Array.from(input.files || []).filter(isMarkdownDropFile);
+      const files = Array.from(input.files || []).filter((file) =>
+        isMarkdownDropFile(file) || /\.txt$/i.test(String(file.name || "")),
+      );
       cleanup();
       resolve(files);
     };

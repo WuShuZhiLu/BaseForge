@@ -25,3 +25,10 @@ export type { CreateDocxOptions } from "./serializers/docx-serializer";
 // Tiptap JSON → DocxIR 适配器（W2 MVP）。配合 createDocx 实现"任意笔记导出 .docx"。
 export { tiptapToIr } from "./serializers/tiptap-to-ir";
 export type { TiptapToIrOptions } from "./serializers/tiptap-to-ir";
+// DocxIR → Tiptap JSON 适配器（阶段 3）。导入 .docx 时把自研解析结果转成可编辑正文。
+export { irToTiptap, irPlainText } from "./serializers/ir-to-tiptap";
+export type {
+  IrToTiptapOptions,
+  IrToTiptapResult,
+  IrToTiptapDowngrade,
+} from "./serializers/ir-to-tiptap";

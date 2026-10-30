@@ -92,7 +92,7 @@ function PublicNotebookIndex() {
             </div>
           </div>
           {hasLoginToken() && (
-            <Button variant="outline" onClick={() => navigateToAppPath("/")}>返回工作台</Button>
+            <Button variant="outline" onClick={() => navigateToAppPath("/kb")}>返回工作台</Button>
           )}
         </div>
       </header>
@@ -332,7 +332,7 @@ function PublicNotebookReader({ token }: { token: string }) {
     try {
       await notebookPublicationApi.joinPublication(token, accessToken || undefined);
       toast.success(info?.permission === "write" && info.allowEdit ? "已加入，可在工作台编辑" : "已加入到共享笔记本");
-      navigateToAppPath("/");
+      navigateToAppPath("/kb");
     } catch (err: any) {
       toast.error(err?.message || "加入失败");
     } finally {

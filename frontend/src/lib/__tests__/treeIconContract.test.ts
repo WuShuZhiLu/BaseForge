@@ -43,6 +43,8 @@ describe("节点图标语义色规格", () => {
     expect(resolveNodeIconKind(fakeNode({ nodeType: "markdown" }))).toBe("markdown");
     expect(resolveNodeIconKind(fakeNode({ nodeType: "note", resourceType: "mindmap" }))).toBe("mindmap");
     expect(resolveNodeIconKind(fakeNode({ nodeType: "mindmap" }))).toBe("mindmap");
+    // 导图归一后是 contentFormat="mindmap" 的笔记节点。
+    expect(resolveNodeIconKind(fakeNode({ nodeType: "note", contentFormat: "mindmap" }))).toBe("mindmap");
     expect(resolveNodeIconKind(fakeNode({ nodeType: "note", noteType: "sheet" }))).toBe("sheet");
     expect(resolveNodeIconKind(fakeNode({ nodeType: "note" }))).toBe("note");
   });

@@ -47,7 +47,7 @@ export interface UpdateNotebookParams {
 }
 
 // ===== 笔记 =====
-export type NoteContentFormat = "markdown" | "tiptap-json" | "html";
+export type NoteContentFormat = "markdown" | "tiptap-json" | "html" | "plain" | "board" | "mindmap" | "pdf";
 
 export interface Note {
   id: string;
@@ -63,6 +63,7 @@ export interface Note {
   isFavorite: number;
   isLocked: number;
   isTrashed: number;
+  isUnlisted?: number;
   version: number;
   tags?: Tag[];
   createdAt: string;
@@ -102,6 +103,8 @@ export interface CreateNoteParams {
   contentFormat?: NoteContentFormat;
   /** @deprecated contentText 由服务端从 content 派生，仅保留旧客户端兼容。 */
   contentText?: string;
+  /** 匿名文档：不在知识树/列表中显示，仅供宿主笔记的嵌入块引用。 */
+  isUnlisted?: boolean | number;
 }
 
 export interface UpdateNoteParams {

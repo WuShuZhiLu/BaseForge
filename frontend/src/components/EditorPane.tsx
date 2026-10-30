@@ -1,12 +1,16 @@
-import React, { useCallback, useRef, useState, useEffect, useMemo } from "react";
+import React, { useCallback, useRef, useState, useEffect, useLayoutEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import SheetEmbedInsertDialog from "@/components/SheetEmbedInsertDialog";
-import MindMapEmbedInsertDialog from "@/components/MindMapEmbedInsertDialog";
+import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
-import { Star, Pin, Trash2, Cloud, RefreshCw, Check, Loader2, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck } from "lucide-react";
+import { openInternalNoteLink } from "@/lib/blockNavigation";
+import { Star, Trash2, Cloud, RefreshCw, Check, Clock, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LiaThumbtackSolid } from "react-icons/lia";
+import { RiMenuFold2Line } from "react-icons/ri";
+import { GoTriangleDown, GoTriangleRight } from "react-icons/go";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EditorToolbarPortal, useEditorChromeSlot } from "@/components/CollapsibleEditorToolbar";
 import TiptapEditor from "@/components/TiptapEditor";
 import EncryptedConversionEditorGuard from "@/components/EncryptedConversionEditorGuard";
 import EncryptedNotePane from "@/components/EncryptedNotePane";
@@ -14,6 +18,10 @@ import { isEncryptedNoteFormat } from "@/lib/encryptedNotes/noteDocument";
 import { PhaseAPerfProfiler } from "@/components/PhaseAPerfProfiler";
 import type { NoteEditorHeading, NoteEditorUpdatePayload } from "@/components/editors/types";
 import MarkdownEditor from "@/components/MarkdownEditor";
+import PlainTextEditor from "@/components/PlainTextEditor";
+import BoardEditor from "@/components/BoardEditor";
+import MindMapDocEditor from "@/components/MindMapDocEditor";
+import PdfDocEditor from "@/components/PdfDocEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -45,7 +53,7 @@ import { buildAiContext } from "@/lib/aiContextBuilder";
 import ShareModal from "@/components/ShareModal";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
 import SaveVersionDialog from "@/components/SaveVersionDialog";
-import { maybeSnapshotOnEditorLeave } from "@/lib/versionSnapshot";
+import { recordManualNoteSave, startVersionAutoSaveTimer, VERSION_RECORD_CREATED_EVENT } from "@/lib/versionSnapshot";
 import CommentPanel from "@/components/CommentPanel";
 import NoteAttachmentsPanel from "@/components/NoteAttachmentsPanel";
 import FolderSyncAttachmentPreviewPane, { isFolderSyncAttachmentNote } from "@/components/FolderSyncAttachmentPreviewPane";
@@ -94,12 +102,6 @@ import {
   shouldSkipUnchangedTitleOnlyUpdate,
 } from "@/lib/editorSyncGuards";
 import { canWriteNote } from "@/lib/notePermissions";
-import {
-  DEFAULT_OUTLINE_WIDTH,
-  clampOutlineWidth,
-  getSavedOutlineWidth,
-  persistOutlineWidth,
-} from "@/lib/outlinePanelWidth";
 import { preserveNoteSyncConflictSnapshot } from "@/lib/noteSyncSafety";
 import {
   NOTE_CONFLICT_AUTO_RESOLVED_EVENT,
@@ -133,6 +135,29 @@ interface EditorPaneProps {
   onSplitDocument?: () => void;
 }
 
+const ANONYMOUS_RETURN_NOTE_KEY = "nowen.anonymous-return-note-id";
+
+function readAnonymousReturnNoteId(): string | null {
+  try {
+    return sessionStorage.getItem(ANONYMOUS_RETURN_NOTE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeAnonymousReturnNoteId(noteId: string | null): void {
+  try {
+    if (noteId) sessionStorage.setItem(ANONYMOUS_RETURN_NOTE_KEY, noteId);
+    else sessionStorage.removeItem(ANONYMOUS_RETURN_NOTE_KEY);
+  } catch {
+    // sessionStorage 不可用时退回“仅关闭当前匿名文档”。
+  }
+}
+
+// 产品决策（2026-10-30）：编辑器的防抖更新只写本地草稿并显示「待保存」，
+// 不再自动 PUT。保存只发生在三个显式入口：Ctrl+S / 点击状态区 / 定时保存。
+const AUTO_SAVE_ON_UPDATE_DISABLED = true;
+
 function EditorPaneCore({
   canSplitDocument = false,
   onSplitDocument,
@@ -150,8 +175,58 @@ function EditorPaneCore({
   // 一起 reset 完成（目前是"用户在编辑期间手动切换状态，新笔记打开时也会保持"。
   // 因为长期使用极少的用户来说，每次新笔记都反向丢失偏好会很不习惯。
   const { prefs: userPrefs, setPref: setUserPref } = useUserPreferences();
+  // 分屏时顶栏也从编辑器里交出去，占分屏顶部的一条全宽行（与工具栏同一套宿主机制）。
+  const chromeSlot = useEditorChromeSlot();
+  // 顶栏「版本 N」显示版本历史记录号（只在三个显式入口落记录时 +1），
+  // 不再显示乐观锁计数（那会随普通打字保存一直自增，用户要求两者解耦）。
+  const [latestRecordVersion, setLatestRecordVersion] = useState<number | null>(null);
+  // 服务器已知内容基准：flush 去重必须与它比对，而不能与本地 activeNote 比——
+  // 防抖 emit 已经把本地状态刷成最新内容，用本地比会永远"没变化"→ 显式保存被跳过。
+  const lastServerContentRef = useRef<{ id: string; content: string; contentText: string; title: string } | null>(null);
+  const activeNoteIdForVersion = activeNote?.id ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    setLatestRecordVersion(null);
+    // 切换笔记时重置同步状态：上一 notes 的「已保存/待保存」不应带到新笔记上
+    actions.setSyncStatus("idle");
+    const noteAtSwitch = activeNoteRef.current;
+    if (noteAtSwitch && noteAtSwitch.id === activeNoteIdForVersion) {
+      lastServerContentRef.current = {
+        id: noteAtSwitch.id,
+        content: noteAtSwitch.content,
+        contentText: noteAtSwitch.contentText ?? "",
+        title: noteAtSwitch.title,
+      };
+    } else {
+      lastServerContentRef.current = null;
+    }
+    if (!activeNoteIdForVersion) return;
+    api.getNoteVersions(activeNoteIdForVersion, 1)
+      .then((res) => {
+        if (cancelled) return;
+        const first = (res as { versions?: Array<{ version?: number }> }).versions?.[0];
+        setLatestRecordVersion(typeof first?.version === "number" ? first.version : 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeNoteIdForVersion]);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ noteId: string; version: number }>).detail;
+      if (detail?.noteId === activeNoteIdForVersion && typeof detail.version === "number") {
+        setLatestRecordVersion(detail.version);
+      }
+    };
+    window.addEventListener(VERSION_RECORD_CREATED_EVENT, handler);
+    return () => window.removeEventListener(VERSION_RECORD_CREATED_EVENT, handler);
+  }, [activeNoteIdForVersion]);
   const [showOutline, setShowOutline] = useState<boolean>(() => userPrefs.outlineDefaultOpen);
-  const [outlineWidth, setOutlineWidth] = useState(getSavedOutlineWidth);
+  // 大纲总开关（会话级）：false = mini 刻度条 + 悬浮/钉住；true = 连 mini 一并隐藏、完全无痕，
+  // 仅经 ⋯ 菜单「显示大纲」唤回。切笔记不重置（隐藏是明确意图）。
+  const [outlineHidden, setOutlineHidden] = useState(false);
+  // 大纲浮层的挂载宿主（note-theme-surface 本体）：portal 进去才能继承笔记主题色，
+  // 并与正文共用同一张「纸」——否则退化成贴在纸上的一块灰卡片。
+  const [editorSurfaceEl, setEditorSurfaceEl] = useState<HTMLDivElement | null>(null);
   // 视图级只读：除了 DB 的 isLocked，还有用户偏好带来的"会话锁"。
   // 新笔记打开时如果启用了 lockOnOpen 偏好，就把当前笔记 id 加入集合，
   // 编辑器变为只读，用户需要点解锁按钮移除，从而恢复编辑能力。
@@ -174,7 +249,7 @@ function EditorPaneCore({
    * 当前视图级有效锁定状态：DB 的 isLocked **加** 用户偏好带来的"会话锁"。
    *
    * 它影响所有"只读即禁用"判断：编辑器 editable、删除按钮、AI 写作、移动到回收站。
-   * Y.Doc 协作笔记优先，但 togglePin / 收藏等元素仍然走 isLocked
+   * Y.Doc 协作笔记优先，但收藏等元素仍然走 isLocked
    * 判断。会话锁也应阻止用户在"被保护笔记"上偷偷 pin / 收藏。
    */
   const isViewLocked = !!activeNote && viewLockedIds.has(activeNote.id);
@@ -182,7 +257,12 @@ function EditorPaneCore({
   const noteSwitchPending = !!noteLoadingState.pendingNoteId;
   const effectiveLocked = !!activeNote?.isLocked || isViewLocked || isTrashed || noteSwitchPending;
   const canEditActiveNote = canWriteNote(activeNote);
-  const showDesktopOutline = showOutline && !state.editorFullscreen;
+  // 大纲只属于「富文本 / Markdown」类文档：board / mindmap / pdf / plain 没有标题层级，
+  // 不渲染右缘刻度条与面板，也不显示顶栏/⋯ 菜单里的大纲开关（否则是空面板 + 假入口）。
+  const noteFormat = activeNote?.contentFormat ?? "tiptap-json";
+  const outlineSupported = !["board", "mindmap", "pdf", "plain"].includes(noteFormat);
+  // 大纲宿主开关：全屏专注、用户隐藏（outlineHidden）或文档类型不支持时整体不渲染（连 mini 刻度条都没有）。
+  const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden && outlineSupported;
 
   // 布局模式切换（原悬浮按钮已删除，入口移到 ⋯ More 菜单）。
   // 复用 NoteWorkspaceLayoutController 的自动折叠/持久化逻辑：
@@ -204,42 +284,39 @@ function EditorPaneCore({
   };
   const compactMobileEditing = keyboardVisible && canEditActiveNote && !effectiveLocked;
 
-  const handleOutlineResizeStart = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = outlineWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const nextWidth = clampOutlineWidth(startWidth - (moveEvent.clientX - startX));
-      setOutlineWidth(nextWidth);
-      persistOutlineWidth(nextWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  }, [outlineWidth]);
-
-  const handleOutlineWidthReset = useCallback(() => {
-    setOutlineWidth(DEFAULT_OUTLINE_WIDTH);
-    persistOutlineWidth(DEFAULT_OUTLINE_WIDTH);
-  }, []);
+  /** 匿名文档没有知识树/页签入口，记录来源笔记以便“返回”。 */
   useEffect(() => subscribeOpenInternalNoteLink(async ({ noteId }) => {
+    const sourceNoteId = activeNoteRef.current?.id ?? null;
     await loadNote({
       noteId,
       summary: { title: t("editor.noteLoading"), notebookId: "" },
       request: () => api.getNote(noteId),
-      onSuccess: (target) => actions.setActiveNote(target),
+      onSuccess: (target) => {
+        if (target.isUnlisted === 1 && sourceNoteId && sourceNoteId !== target.id) {
+          writeAnonymousReturnNoteId(sourceNoteId);
+        } else if (target.isUnlisted !== 1) {
+          writeAnonymousReturnNoteId(null);
+        }
+        actions.setActiveNote(target);
+      },
     });
   }), [actions, loadNote, t]);
+
+  const exitAnonymousNote = useCallback(() => {
+    const returnNoteId = readAnonymousReturnNoteId();
+    writeAnonymousReturnNoteId(null);
+    if (!returnNoteId) {
+      actions.setActiveNote(null);
+      return;
+    }
+    void loadNote({
+      noteId: returnNoteId,
+      summary: { title: t("editor.noteLoading"), notebookId: "" },
+      request: () => api.getNote(returnNoteId),
+      onSuccess: (note) => actions.setActiveNote(note),
+      onError: () => actions.setActiveNote(null),
+    });
+  }, [actions, loadNote, t]);
 
   // �бʼ�ʱ��ƫ��Ӧ��"�򿪼�����"��
   // ����ֻ�� activeNote.id �仯ʱ��һ�Σ������� prefs.lockOnOpen���������û���
@@ -283,6 +360,8 @@ function EditorPaneCore({
   const [showMobileOutline, setShowMobileOutline] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  // 恢复历史版本时自增，作为编辑器 key 的一部分强制重挂载（编辑器不会响应 note.content 变化）
+  const [contentRevision, setContentRevision] = useState(0);
   const [showSaveVersionDialog, setShowSaveVersionDialog] = useState(false);
   const [showCommentPanel, setShowCommentPanel] = useState(false);
   const [showAttachmentsPanel, setShowAttachmentsPanel] = useState(false);
@@ -659,19 +738,10 @@ function EditorPaneCore({
       } else {
         try { editorHandleRef.current?.flushSave(); } catch { /* ignore */ }
       }
-      // 版本历史 v2：切走时对前一篇笔记触发会话结束快照（fire-and-forget，失败静默）
-      maybeSnapshotOnEditorLeave(prevId);
+      // 版本记录收敛：切走笔记不再触发会话结束快照（只有 Ctrl+S/已同步/定时保存落记录）
     }
     lastActiveIdRef.current = nextId;
   }, [activeNote?.id]);
-
-  // 版本历史 v2：编辑器整体卸载时对最后一篇笔记触发会话结束快照（fire-and-forget，失败静默）
-  useEffect(() => {
-    return () => {
-      const id = lastActiveIdRef.current;
-      if (id) maybeSnapshotOnEditorLeave(id);
-    };
-  }, []);
 
   // ������ P2-5: ��ǰ�༭��ģʽ ref���� handleUpdate ͬ��д�ݸ��ã� ������������������������������
   const editorModeRef = useRef<EditorMode>(editorMode);
@@ -1642,6 +1712,39 @@ function EditorPaneCore({
     }
 
     // Phase 2: �㲥"�����ڱ༭"��1.5s �������������Զ�ȡ����
+    // 产品决策（2026-10-30）：普通编辑不再自动 PUT——内容只进本地草稿并显示「待保存」；
+    // 版本记录只来自三个显式入口（Ctrl+S / 点击状态区 / 定时保存），它们经编辑器
+    // flushSave 带上 _flush 标记才会真正 PUT + 落记录。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && data._flush !== true) {
+      try { flagEditing(); } catch {}
+      actions.setSyncStatus("pending");
+      return;
+    }
+
+    // 与"服务器已知内容"比对（不能与本地 activeNote 比：防抖 emit 已把本地刷成最新）。
+    // 挂载初始化 emit / 空按 Ctrl+S 都算一致 → 静默忽略，不显示待保存。
+    const serverSnap = lastServerContentRef.current;
+    const unchanged = !!serverSnap && serverSnap.id === currentNote.id
+      && (data.content === undefined || data.content === serverSnap.content)
+      && (data.contentText === undefined || data.contentText === serverSnap.contentText)
+      && (data.title === undefined || data.title === serverSnap.title);
+
+    // 产品决策（2026-10-30）：普通编辑不再自动 PUT——内容只进本地草稿并显示「待保存」；
+    // 版本记录只来自三个显式入口（Ctrl+S / 点击状态区 / 定时保存），它们经编辑器
+    // flushSave 带上 _flush 标记才会真正 PUT + 落记录。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && data._flush !== true) {
+      try { flagEditing(); } catch {}
+      if (!unchanged) actions.setSyncStatus("pending");
+      return;
+    }
+
+    // 显式保存（_flush）但内容与当前一致：不发 PUT（否则服务器乐观锁会空转 +1，
+    // 之后真正修改时的版本记录号会把这些"空按"的次数叠上去，表现为版本号跳变）。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && unchanged) {
+      actions.setSyncStatus("idle");
+      return;
+    }
+
     try { flagEditing(); } catch {}
     actions.setSyncStatus("saving");
 
@@ -1847,6 +1950,13 @@ function EditorPaneCore({
         });
         actions.setSyncStatus("saved");
         actions.setLastSynced(new Date().toISOString());
+        // PUT 成功 → 服务器已知内容前移（flush 去重的新基准）
+        lastServerContentRef.current = {
+          id: currentNote.id,
+          content: updated.content ?? lastSentData.content ?? "",
+          contentText: updated.contentText ?? lastSentData.contentText ?? "",
+          title: updated.title,
+        };
         // 2���ָ� idle
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => actions.setSyncStatus("idle"), 2000);
@@ -1910,6 +2020,16 @@ function EditorPaneCore({
     const currentNote = activeNoteRef.current;
     if (!currentNote || syncStatus === "saving") return;
 
+    // 状态区点击 = 显式保存入口之一：先把编辑器 pending 的防抖更新 flush 成 PUT
+    //（flushSave 带 _flush 标记，绕过"普通编辑不自动 PUT"的门），等在途请求落盘。
+    try {
+      editorHandleRef.current?.flushSave();
+      const inflight = saveInflightRef.current;
+      if (inflight) {
+        await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+      }
+    } catch { /* PUT 失败也继续：后续手动同步与记录按服务端内容幂等 */ }
+
     // Manual sync must submit what is visible in the editor. In CRDT mode the live
     // Markdown resides in CodeMirror/Y.Doc and activeNote.content can still be the
     // previous server acknowledgement, which used to overwrite the second edit.
@@ -1959,6 +2079,11 @@ function EditorPaneCore({
       });
       actions.setSyncStatus("saved");
       actions.setLastSynced(new Date().toISOString());
+      // 版本记录入口①：手动同步成功 → 落一条 manual 版本记录。
+      // fire-and-forget；后端幂等（内容与最近一条版本一致时 created:false），不弹提示。
+      void recordManualNoteSave(updated.id).catch((e) => {
+        console.warn("[EditorPane] manual sync version record failed:", e);
+      });
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => actions.setSyncStatus("idle"), 2000);
     } catch (error) {
@@ -1967,20 +2092,65 @@ function EditorPaneCore({
     }
   }, [syncStatus, actions]);
 
+  // 版本记录入口②：Ctrl+S / Cmd+S —— flush 待存编辑后落一条 manual 版本记录。
+  // 普通防抖自动保存（PUT /notes）不落版本；后端按内容 hash 幂等，内容无变化不产生记录。
+  const saveAndRecordManualVersion = useCallback(async (noteId: string) => {
+    try {
+      editorHandleRef.current?.flushSave();
+      const inflight = saveInflightRef.current;
+      if (inflight) {
+        // flushSave 是同步触发的异步 PUT；等它在途请求落盘（上限 5s 防挂死），
+        // 保证快照记录的是用户按 Ctrl+S 时刻的编辑内容。
+        await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+      }
+    } catch { /* PUT 失败也继续：快照按服务端内容幂等，内容无变化不会落记录 */ }
+    try {
+      await recordManualNoteSave(noteId);
+    } catch (e) {
+      console.warn("[EditorPane] Ctrl+S version record failed:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "s")) return;
+      const note = activeNoteRef.current;
+      if (!note || note.isTrashed) return;
+      e.preventDefault();
+      void saveAndRecordManualVersion(note.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveAndRecordManualVersion]);
+
+  // 版本记录入口③：定时保存 —— 间隔读用户偏好 versionAutoSaveIntervalMinutes（默认 5 分钟）。
+  // 到点先 flush 待存编辑再调快照端点（source=auto；内容无变化后端不落）。
+  // 无激活文档 / 离线 / flush 失败时跳过本轮；卸载时清理定时器。
+  useEffect(() => {
+    return startVersionAutoSaveTimer({
+      getActiveNoteId: () => activeNoteRef.current?.id ?? null,
+      flushPendingSave: async () => {
+        if (!navigator.onLine) return false;
+        try {
+          editorHandleRef.current?.flushSave();
+          const inflight = saveInflightRef.current;
+          if (inflight) {
+            await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
+  }, []);
+
   const toggleFavorite = useCallback(async () => {
     if (!activeNote || activeNote.isTrashed) return;
     haptic.light();
     const updated = await api.updateNote(activeNote.id, { isFavorite: activeNote.isFavorite ? 0 : 1 } as any);
     actions.setActiveNote(updated);
     actions.updateNoteInList({ id: updated.id, isFavorite: updated.isFavorite });
-  }, [activeNote, actions]);
-
-  const togglePin = useCallback(async () => {
-    if (!activeNote || activeNote.isTrashed) return;
-    haptic.light();
-    const updated = await api.updateNote(activeNote.id, { isPinned: activeNote.isPinned ? 0 : 1 } as any);
-    actions.setActiveNote(updated);
-    actions.updateNoteInList({ id: updated.id, isPinned: updated.isPinned });
   }, [activeNote, actions]);
 
   // 笔记色标：写入后同步列表/Tab/知识树三处视图。
@@ -2440,20 +2610,78 @@ const moveToTrash = useCallback(async () => {
   const [aiMermaidResult, setAiMermaidResult] = useState("");
   const [aiMermaidType, setAiMermaidType] = useState<"mermaid_mindmap" | "mermaid_flowchart">("mermaid_mindmap");
   const [showMermaidDialog, setShowMermaidDialog] = useState(false);
-  const [showMindMapInsertDialog, setShowMindMapInsertDialog] = useState(false);
-  const [showSheetEmbedPicker, setShowSheetEmbedPicker] = useState(false);
+  const [embedPickerKind, setEmbedPickerKind] = useState<KnowledgeDocEmbedKind | null>(null);
+
+  // 斜杠命令「嵌入轻量表格/思维导图/画板」→ 插块即匿名：直接创建 isUnlisted=1
+  // 文档并插入，不再弹选择对话框。事件先经 state 中转，实际创建在下方
+  // pendingAnonEmbed 副作用里执行（那里能拿到最新的笔记/锁状态）。
+  const [pendingAnonEmbed, setPendingAnonEmbed] = useState<KnowledgeDocEmbedKind | null>(null);
+  // 防重入：创建期间再次触发（连点/双击）直接丢弃，避免重复建匿名文档。
+  const anonEmbedInFlightRef = useRef(false);
 
   useEffect(() => {
-    const openMindMapInsert = () => setShowMindMapInsertDialog(true);
+    const openMindMapInsert = () => setPendingAnonEmbed("mindmap");
+    const openSheetEmbedPicker = () => setPendingAnonEmbed("sheet");
+    const openBoardEmbedPicker = () => setPendingAnonEmbed("board");
     window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-    return () => window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
+    window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
+    window.addEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    return () => {
+      window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
+      window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
+      window.removeEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    };
   }, []);
 
   useEffect(() => {
-    const openSheetEmbedPicker = () => setShowSheetEmbedPicker(true);
-    window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-    return () => window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-  }, []);
+    if (!pendingAnonEmbed) return;
+    const kind = pendingAnonEmbed;
+    // 先清标记再执行；本副作用刻意不挂 cleanup 取消异步——cleanup 会随下面
+    // 的 setPendingAnonEmbed(null) 立即执行，把进行中的创建一并取消，导致
+    // 三类嵌入全部静默失败（实测 bug）。笔记切换的防护由创建完成后的
+    // activeNoteRef 比对承担。
+    setPendingAnonEmbed(null);
+    if (anonEmbedInFlightRef.current) return;
+    // 与下方文档嵌入选择对话框相同的编辑资格守卫。
+    if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return;
+    if (!activeNote.notebookId) {
+      // 匿名文档需要笔记本作用域；缺归属时退回选择对话框（仅引用已有文档路径）。
+      setEmbedPickerKind(kind);
+      return;
+    }
+    const kindLabel = kind === "board" ? "画板" : kind === "mindmap" ? "思维导图" : "轻量表格";
+    const notebookId = activeNote.notebookId;
+    const hostNoteId = activeNote.id;
+    anonEmbedInFlightRef.current = true;
+    void (async () => {
+      try {
+        // 插块即匿名：新建 isUnlisted=1 文档，仅以嵌入块形式存在。
+        // sheet → 后端落 note_type='sheet' + sheets 数据表（与知识树创建同构）。
+        const created = await api.createNote({
+          title: kindLabel,
+          contentFormat: kind,
+          notebookId,
+          isUnlisted: 1,
+        });
+        // 创建期间切换了笔记：放弃插入，避免把块写进另一篇笔记。
+        if (activeNoteRef.current?.id !== hostNoteId) return;
+        const markdown = `\n\n![[${kind}:${created.id}]]\n\n`;
+        const editorHandle = editorHandleRef.current;
+        const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
+        const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
+        if (inserted) {
+          editorHandle?.flushSave?.();
+          toast.success(`已插入匿名${kindLabel}`);
+        } else {
+          toast.error(`插入匿名${kindLabel}失败`);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "创建文档失败");
+      } finally {
+        anonEmbedInFlightRef.current = false;
+      }
+    })();
+  }, [pendingAnonEmbed, activeNote, effectiveLocked, isTrashed, noteIsFullHtmlDoc, canEditActiveNote]);
 
   const handleAIMermaid = useCallback(async (type: "mermaid_mindmap" | "mermaid_flowchart") => {
     if (!activeNote || aiMermaidLoading) return;
@@ -2539,11 +2767,8 @@ const moveToTrash = useCallback(async () => {
       const created = await api.createMindMap({ title, data: JSON.stringify(data) });
       toast.success("已保存为思维导图");
       setShowMermaidDialog(false);
-      // 通知 MindMapEditor 打开新图
-      // 切换到思维导图视图
-      // 保存 pending ID 到 sessionStorage 并切换到思维导图视图
-      sessionStorage.setItem("pendingOpenMindMapId", created.id);
-      actions.setViewMode("mindmaps");
+      // 导图已归一为知识库文档：作为笔记打开（不再跳独立导图模块）。
+      openInternalNoteLink(`note:${created.id}`);
     } catch (e: any) {
       console.error("Save mindmap error:", e);
       toast.error(e?.message || "保存失败");
@@ -2815,10 +3040,19 @@ const moveToTrash = useCallback(async () => {
               : isViewLocked
                 ? <Lock size={13} className="text-tx-tertiary shrink-0" />
                 : null}
-            {activeNote.isPinned ? <Pin size={13} className="text-accent-primary fill-accent-primary shrink-0" /> : null}
             <span className="truncate text-sm font-semibold text-tx-primary">
               {activeNote.title || t('editor.untitled')}
             </span>
+            {activeNote.isUnlisted === 1 && (
+              <button
+                type="button"
+                onClick={exitAnonymousNote}
+                title="返回来源笔记"
+                className="shrink-0 rounded-md bg-app-hover px-1.5 py-0.5 text-[11px] font-medium text-tx-secondary active:bg-app-active"
+              >
+                返回
+              </button>
+            )}
           </div>
           {/* ���� / �������ƶ��˹̶���������ť��࣬���ֳ�������ȶ��ɼ��� */}
           <Button
@@ -2902,15 +3136,6 @@ const moveToTrash = useCallback(async () => {
                   >
                     {effectiveLocked ? <Lock size={15} className="text-orange-500" /> : <Unlock size={15} className="text-tx-tertiary" />}
                     <span>{effectiveLocked ? t('editor.unlockTooltip') : t('editor.lockTooltip')}</span>
-                  </button>
-                  <div className="h-px bg-app-border mx-2 my-0.5" />
-                  <button
-                    onClick={() => { togglePin(); setShowMobileMenu(false); }}
-                    disabled={!!activeNote.isLocked || isTrashed}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors disabled:opacity-40"
-                  >
-                    <Pin size={15} className={cn(activeNote.isPinned ? "text-accent-primary fill-accent-primary" : "text-tx-tertiary")} />
-                    <span>{activeNote.isPinned ? t('editor.unpinTooltip') : t('editor.pinTooltip')}</span>
                   </button>
                   <div className="h-px bg-app-border mx-2 my-0.5" />
                   {/* �ƶ��ʼǱ� */}
@@ -3110,7 +3335,7 @@ const moveToTrash = useCallback(async () => {
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors"
                   >
                     <Download size={15} className="text-tx-tertiary" />
-                    <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）"}</span>
+                    <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP"}</span>
                   </button>
                   <button
                     onClick={() => { setShowMobileMenu(false); handleExportPDF(); }}
@@ -3230,7 +3455,8 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
 
-      {/* Desktop Editor Header */}
+      {/* Desktop Editor Header（分屏时由宿主 portal 到全宽位置：顶栏 + 工具栏各一条，都在内容分栏之上） */}
+      <EditorToolbarPortal target={chromeSlot}>
       <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-1.5 border-b border-app-border bg-app-surface/30 transition-colors">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {/* �ʼ��б����۵�ʱ���������ṩ��չ������ť��δ�۵�ʱ���ء�
@@ -3375,11 +3601,37 @@ const moveToTrash = useCallback(async () => {
               <FileCode size={11} />
               {t('note.format.markdownShort')}
             </span>
+          ) : activeNote.contentFormat === "board" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-teal-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-teal-600" title="画板文档">
+              <PenTool size={11} />
+              画板
+            </span>
+          ) : activeNote.contentFormat === "mindmap" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-violet-500" title="导图文档">
+              <Waypoints size={11} />
+              导图
+            </span>
+          ) : activeNote.contentFormat === "pdf" ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 text-[10px] font-mono font-medium text-red-500" title="PDF 文档（保原件 + 批注层）">
+              <FileText size={11} />
+              PDF
+            </span>
           ) : (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-mono text-tx-tertiary" title={t('note.format.richText')}>
               <FileText size={11} />
               {t('note.format.richTextShort')}
             </span>
+          )}
+          {activeNote.isUnlisted === 1 && (
+            <button
+              type="button"
+              onClick={exitAnonymousNote}
+              title="返回来源笔记"
+              className="inline-flex shrink-0 items-center gap-1 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-medium text-tx-secondary transition-colors hover:bg-app-active hover:text-tx-primary"
+            >
+              <ArrowLeft size={11} />
+              返回
+            </button>
           )}
           <button
             type="button"
@@ -3387,8 +3639,8 @@ const moveToTrash = useCallback(async () => {
             className="shrink-0 whitespace-nowrap text-[11px] text-tx-tertiary hover:text-accent-primary hover:underline cursor-pointer bg-transparent border-none p-0"
             title={t('editor.versionHistory')}
           >
-            {t('tiptap.version')}{activeNote.version}
-            <span className="hidden lg:inline"> · {new Date(activeNote.updatedAt + "Z").toLocaleString()}</span>
+            {/* 顶栏只显示版本记录号（随三个显式入口落记录而 +1），点击打开版本历史面板 */}
+            {t('tiptap.version')}{latestRecordVersion ?? 0}
           </button>
         </div>
 
@@ -3413,13 +3665,6 @@ const moveToTrash = useCallback(async () => {
               {effectiveLocked
                 ? <Lock size={14} className={activeNote.isLocked ? "text-orange-500" : "text-tx-tertiary"} />
                 : <Unlock size={14} />}
-            </Button>
-            <Button
-              variant="ghost" size="icon" className="h-7 w-7 rounded-md"
-              onClick={togglePin}
-              title={activeNote.isPinned ? t('editor.unpinTooltip') : t('editor.pinTooltip')}
-            >
-              <Pin size={14} className={cn(activeNote.isPinned && "text-accent-primary fill-accent-primary")} />
             </Button>
             <Button
               variant="ghost" size="icon" className="h-7 w-7 rounded-md"
@@ -3451,6 +3696,22 @@ const moveToTrash = useCallback(async () => {
               {htmlPreviewMode
                 ? <Pencil size={14} className="text-amber-500" />
                 : <Eye size={14} className="text-blue-500" />}
+            </Button>
+          )}
+
+          {/* 大纲显示/隐藏（桌面顶栏）：点亮 = mini 刻度条 + 悬浮浮出；钉住由面板内图钉控制。
+              仅富文本/Markdown 文档有此入口（其它类型没有标题层级）。 */}
+          {!state.editorFullscreen && outlineSupported && (
+            <Button
+              variant="ghost" size="icon" className="h-7 w-7 shrink-0"
+              onClick={() => setOutlineHidden((hidden) => !hidden)}
+              title={outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}
+              aria-pressed={!outlineHidden}
+            >
+              <ListTree
+                size={14}
+                className={cn(outlineHidden ? "text-tx-tertiary" : "text-accent-primary")}
+              />
             </Button>
           )}
 
@@ -3565,6 +3826,8 @@ const moveToTrash = useCallback(async () => {
                       <span>拆分文档</span>
                     </button>
                   )}
+                  {/* 分屏入口只在页签右键菜单（NoteTabsBar「在右侧分屏打开」）：
+                      文档自己的 ⋯ 里做「给自己分屏」没有语义，已移除 */}
 
                   {/* 布局模式切换（原悬浮按钮已删除，入口移到此处） */}
                   <div className="px-3 py-2">
@@ -3644,17 +3907,20 @@ const moveToTrash = useCallback(async () => {
                     <MessageCircle size={15} className="text-blue-500" />
                     <span>{t('editor.noteComments')}</span>
                   </button>
-                  {/* 大纲切换 */}
-                  <button
-                    onClick={() => {
-                      setShowOutline((open) => !open);
-                      setShowDesktopMoreMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
-                  >
-                    <ListTree size={15} className="text-tx-tertiary" />
-                    <span>{showDesktopOutline ? t('editor.hideOutline') : t('editor.showOutline')}</span>
-                  </button>
+                  {/* 大纲总开关：隐藏 = 连右缘 mini 刻度条一并消失（完全无痕）；
+                      显示 = mini + 悬浮浮出，钉住由面板内图钉控制。仅富文本/Markdown。 */}
+                  {outlineSupported && (
+                    <button
+                      onClick={() => {
+                        setOutlineHidden((hidden) => !hidden);
+                        setShowDesktopMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
+                    >
+                      <ListTree size={15} className="text-tx-tertiary" />
+                      <span>{outlineHidden ? t('editor.showOutline') : t('editor.hideOutline')}</span>
+                    </button>
+                  )}
                   {/* 反向链接 BACKLINKS-02 */}
                   <button
                     onClick={() => {
@@ -3769,11 +4035,18 @@ const moveToTrash = useCallback(async () => {
 
         </div>
       </div>
+      </EditorToolbarPortal>
 
       
       {/* Editor (HTML 预览 / MD / Tiptap 三模式共用) + Outline */}
-      <div className="flex-1 flex overflow-hidden">
-        <div className="note-theme-surface flex-1 overflow-hidden relative" data-note-id={activeNote.id}>
+      <div className="flex-1 flex overflow-hidden relative">
+        <div
+          ref={setEditorSurfaceEl}
+          className="note-theme-surface flex-1 overflow-hidden relative"
+          data-note-id={activeNote.id}
+          // 只有「钉住」才让正文让位（不覆盖）；悬浮态按约定覆盖正文。
+          data-outline-open={showDesktopOutlineHost && showOutline ? "true" : "false"}
+        >
           {/* Phase 2: ʵʱЭ����������� / Զ�̸��� / Զ��ɾ�������� absolute ���㣬��ռ�ĵ���������ҳ�涶�� */}
           {false && pendingDraft ? (
             <div
@@ -3818,11 +4091,45 @@ const moveToTrash = useCallback(async () => {
               content={activeNote.content}
               onOpenAttachmentDirectory={() => setShowAttachmentsPanel(true)}
             />
+          ) : activeNote.contentFormat === "board" ? (
+            <BoardEditor
+              key={`board-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "mindmap" ? (
+            // 导图文档：MindMapCenter 嵌入模式自管保存（/api/mindmaps 门面，乐观锁）。
+            <MindMapDocEditor
+              key={`mindmap-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "pdf" ? (
+            // PDF 文档：原件预览（pdfjs）+ 页码锚定批注层，正文走通用笔记保存。
+            <PdfDocEditor
+              key={`pdf-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "plain" ? (
+            <PlainTextEditor
+              key={`plain-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
           ) : activeNote.contentFormat === "markdown" ? (
             <MarkdownEditor
               // useYDoc only exposes the document after y:sync. Remount at that point so
               // CodeMirror gains yCollab without disabling normal saves while unsynced.
-              key={collabYDoc ? `md-native-y-${activeNote.id}` : `md-native-${activeNote.id}`}
+              key={collabYDoc ? `md-native-y-${activeNote.id}-r${contentRevision}` : `md-native-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3836,7 +4143,7 @@ const moveToTrash = useCallback(async () => {
             />
           ) : shouldRenderHtmlPreview ? (
             <HtmlPreviewPane
-              key={`html-${activeNote.id}`}
+              key={`html-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3850,7 +4157,7 @@ const moveToTrash = useCallback(async () => {
             <MarkdownEditor
               // Phase 3: key �� CRDT ����̬���л� provider ʱǿ���ؽ��༭����
               // ���� yCollab ��չ������ʱ���� yText ������״̬����
-              key={collabYDoc ? `md-y-${activeNote.id}` : `md-${activeNote.id}`}
+              key={collabYDoc ? `md-y-${activeNote.id}-r${contentRevision}` : `md-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}
@@ -3866,6 +4173,7 @@ const moveToTrash = useCallback(async () => {
           ) : (
             <PhaseAPerfProfiler>
               <TiptapEditor
+                key={`tiptap-${activeNote.id}-r${contentRevision}`}
                 ref={editorHandleRef}
                 note={activeNote}
                 onUpdate={handleEditorUpdate}
@@ -3921,6 +4229,8 @@ const moveToTrash = useCallback(async () => {
             try { editorHandleRef.current?.discardPending?.(); } catch { /* ignore */ }
             try { clearDraft(updated.id); } catch { /* ignore */ }
             skipNextSwitchFlushForNoteIdRef.current = updated.id;
+            // 编辑器只在 mount 时读 note.content，恢复版本后必须重挂载才能显示新内容
+            setContentRevision((v) => v + 1);
             actions.setActiveNote(updated);
             actions.updateNoteInList({
               id: updated.id,
@@ -3985,7 +4295,7 @@ const moveToTrash = useCallback(async () => {
             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary hover:bg-app-hover transition-colors"
           >
             <Download size={15} className="text-tx-tertiary" />
-            <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件（ZIP）"}</span>
+            <span>{t("noteList.exportAsMarkdownZip") || "Markdown + 附件 ZIP"}</span>
           </button>
           <button
             role="menuitem"
@@ -4245,37 +4555,39 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
       {/* HTML Ԥ�� �� �༭ģʽ�л�ȷ�ϵ��� */}
-      {/* 思维导图插入对话框 */}
-      <MindMapEmbedInsertDialog
-        open={showMindMapInsertDialog && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
-        workspaceId={activeNote?.workspaceId ?? null}
-        onClose={() => setShowMindMapInsertDialog(false)}
-        onInsert={(id) => {
-          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
-          const markdown = `\n\n![[mindmap:${id}]]\n\n`;
-          const editorHandle = editorHandleRef.current;
-          const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
-          const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
-          if (inserted) {
-            editorHandle?.flushSave?.();
-            toast.success("已插入思维导图");
+      {/* 思维导图插入复用泛化的文档嵌入选择对话框 */}
+      {/* 文档嵌入选择对话框：匿名创建的回退路径（笔记无笔记本归属）与「引用已有文档」入口 */}
+      <KnowledgeDocEmbedDialog
+        open={embedPickerKind !== null && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
+        kind={embedPickerKind ?? "sheet"}
+        onClose={() => setEmbedPickerKind(null)}
+        onCreate={(embedPickerKind === "board" || embedPickerKind === "mindmap") && activeNote?.notebookId ? async () => {
+          if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return null;
+          const kind = embedPickerKind;
+          try {
+            // 画板/导图插块即匿名：新建 isUnlisted=1 文档，仅以嵌入块形式存在。
+            const created = await api.createNote({
+              title: kind === "board" ? "画板" : "思维导图",
+              contentFormat: kind === "board" ? "board" : "mindmap",
+              notebookId: activeNote.notebookId,
+              isUnlisted: 1,
+            });
+            return { id: created.id, title: created.title || (kind === "board" ? "画板" : "思维导图") };
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "创建文档失败");
+            return null;
           }
-          return inserted;
-        }}
-      />
-      {/* 轻量表格嵌入选择对话框（斜杠命令「嵌入轻量表格」触发） */}
-      <SheetEmbedInsertDialog
-        open={showSheetEmbedPicker && !!activeNote && !effectiveLocked && !isTrashed && !noteIsFullHtmlDoc && canEditActiveNote}
-        onClose={() => setShowSheetEmbedPicker(false)}
-        onInsert={(sheetId, sheetTitle) => {
+        } : undefined}
+        onInsert={(docId, docTitle) => {
           if (!activeNote || activeNoteRef.current?.id !== activeNote.id || effectiveLocked || isTrashed || noteIsFullHtmlDoc || !canEditActiveNote) return false;
-          const markdown = `\n\n![[sheet:${sheetId}]]\n\n`;
+          const kind = embedPickerKind;
+          const markdown = `\n\n![[${kind}:${docId}]]\n\n`;
           const editorHandle = editorHandleRef.current;
           const insertedAtCursor = editorHandle?.insertMarkdownAtCursor?.(markdown) === true;
           const inserted = insertedAtCursor || editorHandle?.appendMarkdown?.(markdown) === true;
           if (inserted) {
             editorHandle?.flushSave?.();
-            toast.success("已嵌入轻量表格");
+            toast.success(kind === "board" ? "已插入画板" : "已嵌入轻量表格");
           }
           return inserted;
         }}
@@ -4329,97 +4641,390 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
 
-      {showDesktopOutline && (
-          <OutlinePanel
-            headings={headings}
-            width={outlineWidth}
-            onSelect={(pos) => scrollToRef.current?.(pos)}
-            onClose={() => setShowOutline(false)}
-            onResizeStart={handleOutlineResizeStart}
-            onResetWidth={handleOutlineWidthReset}
-          />
-        )}
+      {/* 大纲（Yuque 式）：portal 进笔记纸面——mini 刻度条常驻右缘，悬停浮出，钉住时纸张让出右侧留白。 */}
+      {showDesktopOutlineHost && editorSurfaceEl && createPortal(
+        <OutlinePanel
+          headings={headings}
+          pinned={showOutline}
+          onPinChange={setShowOutline}
+          onHide={() => setOutlineHidden(true)}
+          onSelect={(pos) => scrollToRef.current?.(pos)}
+        />,
+        editorSurfaceEl,
+      )}
       </div>
     </motion.div>
   );
 }
 
-/* ===== ������ ===== */
+/* ===== 大纲（Yuque 式三态）===== */
+
+/* 图钉：LiaThumbtackSolid（用户指定）；钉住=品牌色（激活语义，一眼可辨）、悬浮=浅灰 */
+function UprightPinGlyph({ pinned }: { pinned: boolean }) {
+  return (
+    <LiaThumbtackSolid
+      size={16}
+      className={cn("shrink-0 transition-colors", pinned ? "text-accent-primary" : "text-tx-tertiary/80")}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* 折叠全部：RiMenuFold2Line（用户指定），大小与图钉统一；颜色跟随钉住态同深浅 */
+function CollapseAllGlyph({ pinned }: { pinned: boolean }) {
+  return (
+    <RiMenuFold2Line
+      size={16}
+      className={cn("shrink-0", pinned ? "text-tx-secondary" : "text-tx-tertiary/80")}
+      aria-hidden="true"
+    />
+  );
+}
+
+/* ===== 大纲三态说明 =====
+ * 悬浮态：悬停期间常驻，离开即收回 mini。
+ * 钉住态：面板常驻（showOutline 用户偏好 = 「进入笔记默认钉住」）。
+ * 面板头：大纲 + 图钉（固定/悬浮切换）+ 全部折叠/展开。
+ * 条目：▼ 折叠箭头（有子级的标题才显示），当前标题左侧竖线 + 品牌色。 */
+
+/* 条目折叠箭头：GoTriangleDown/Right（用户指定，展开朝下 / 收起朝右） */
+function RowCaretGlyph({ open }: { open: boolean }) {
+  return open
+    ? <GoTriangleDown size={14} aria-hidden="true" />
+    : <GoTriangleRight size={14} aria-hidden="true" />;
+}
+
+interface OutlineNode {
+  h: NoteEditorHeading;
+  children: OutlineNode[];
+}
+
+function buildOutlineTree(headings: NoteEditorHeading[]): OutlineNode[] {
+  const roots: OutlineNode[] = [];
+  const stack: OutlineNode[] = [];
+  for (const h of headings) {
+    const node: OutlineNode = { h, children: [] };
+    while (stack.length > 0 && stack[stack.length - 1].h.level >= h.level) stack.pop();
+    if (stack.length > 0) stack[stack.length - 1].children.push(node);
+    else roots.push(node);
+    stack.push(node);
+  }
+  return roots;
+}
+
 function OutlinePanel({
   headings,
-  width,
+  pinned,
+  onPinChange,
+  onHide,
   onSelect,
-  onClose,
-  onResizeStart,
-  onResetWidth,
 }: {
   headings: NoteEditorHeading[];
-  width: number;
+  pinned: boolean;
+  onPinChange: (pinned: boolean) => void;
+  onHide: () => void;
   onSelect: (pos: number) => void;
-  onClose: () => void;
-  onResizeStart: (event: React.MouseEvent) => void;
-  onResetWidth: () => void;
 }) {
   const { t } = useTranslation();
-  return (
-    <div
-      className="relative hidden md:flex flex-none flex-col border-l border-app-border bg-app-surface/50 transition-colors"
-      style={{ width: `${width}px` }}
-    >
-      <div
-        onMouseDown={onResizeStart}
-        onDoubleClick={onResetWidth}
-        className="absolute inset-y-0 left-0 z-10 flex w-1 -translate-x-1/2 cursor-col-resize items-center justify-center hover:bg-accent-primary/30 active:bg-accent-primary/50 transition-colors group"
-        title="拖拽调整大纲宽度 / 双击恢复默认"
-      >
-        <div className="h-8 w-[2px] rounded-full bg-transparent group-hover:bg-accent-primary/60 transition-colors" />
-      </div>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-app-border">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-tx-secondary">
-          <ListTree size={13} className="text-accent-primary" />
-          <span>{t('editor.outline')}</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-0.5 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-secondary transition-colors"
-        >
-          <X size={13} />
-        </button>
-      </div>
-      <ScrollArea className="flex-1">
-        <div className="py-1">
-          {headings.length === 0 ? (
-            <div className="px-3 py-6 text-center">
-              <p className="text-[11px] text-tx-tertiary">{t('editor.noHeadings')}</p>
-              <p className="text-[10px] text-tx-tertiary mt-1">{t('editor.noHeadingsHint')}</p>
-            </div>
-          ) : (
-            headings.map((h) => (
+  const [hoverOpen, setHoverOpen] = useState(false);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [spineHeight, setSpineHeight] = useState(0);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  const expanded = pinned || hoverOpen;
+
+  // 面板顶部 = 编辑器工具栏底边：工具栏是滚动区内的 sticky 整宽条，
+  // 大纲必须从它下方开始（绝不允许占据工具栏那一行）。
+  // 工具栏可能折成两三行、也可能由不同组件各自渲染，因此扫描表面内所有
+  // sticky 顶部元素取最大底边，而不是只认某个 data 属性。
+  const [panelTop, setPanelTop] = useState(0);
+  useLayoutEffect(() => {
+    const panel = surfaceRef.current;
+    const surface = panel?.parentElement;
+    if (!surface) return;
+    const measure = () => {
+      const surfaceRect = surface.getBoundingClientRect();
+      let bottom = surfaceRect.top;
+      surface
+        .querySelectorAll<HTMLElement>(".sticky, [class*=\"sticky\"], [data-mobile-editor-toolbar], [data-markdown-mobile-toolbar]")
+        .forEach((el) => {
+          const position = getComputedStyle(el).position;
+          if (position !== "sticky" && position !== "fixed") return;
+          const rect = el.getBoundingClientRect();
+          if (rect.top > surfaceRect.top + 8) return;
+          bottom = Math.max(bottom, rect.bottom);
+        });
+      setPanelTop(Math.max(0, Math.round(bottom - surfaceRect.top)));
+    };
+    measure();
+    const observed = Array.from(
+      surface.querySelectorAll<HTMLElement>(".sticky, [class*=\"sticky\"], [data-mobile-editor-toolbar], [data-markdown-mobile-toolbar]"),
+    );
+    const observer = new ResizeObserver(measure);
+    observed.forEach((el) => observer.observe(el));
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [expanded]);
+
+  const tree = useMemo(() => buildOutlineTree(headings), [headings]);
+
+  // 树脊线：第一条目顶（内容层 pt-1 = 4px）→ 最后一条目底；画在滚动内容层随列表滚动
+  const SPINE_TOP_IN_CONTENT = 4;
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const panel = surfaceRef.current;
+      const content = list.querySelector<HTMLElement>("[data-outline-content]");
+      const rows = list.querySelectorAll<HTMLElement>("[data-outline-row]");
+      if (!panel || !content || rows.length === 0) {
+        setSpineHeight(0);
+        return;
+      }
+      const last = rows[rows.length - 1];
+      // 脊线：第一条目顶 → 最后一条目底（绿线）
+      setSpineHeight(Math.max(0, last.offsetTop + last.offsetHeight - SPINE_TOP_IN_CONTENT));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [tree, collapsedIds, expanded, headings]);
+  const parentIds = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: OutlineNode[]) => {
+      for (const n of nodes) {
+        if (n.children.length > 0) ids.push(n.h.id);
+        walk(n.children);
+      }
+    };
+    walk(tree);
+    return ids;
+  }, [tree]);
+  const allCollapsed = parentIds.length > 0 && parentIds.every((id) => collapsedIds.has(id));
+
+  const cancelHide = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+  const scheduleHide = useCallback(() => {
+    cancelHide();
+    hideTimerRef.current = setTimeout(() => setHoverOpen(false), 160);
+  }, [cancelHide]);
+
+  // 当前标题跟随：在编辑器表面容器上捕获滚动（滚动事件不冒泡，捕获阶段可从祖先接住），
+  // 取视口顶部以上最近的标题为当前项。DOM h1-h6 顺序 == headings 文档顺序，
+  // 数量对不上（特殊视图/异步渲染）时不高亮，仅影响跟随不影响跳转。
+  const surfaceRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const host = surfaceRef.current;
+    const surface = host?.parentElement;
+    if (!surface) return;
+    let raf = 0;
+    const sync = () => {
+      raf = 0;
+      if (headings.length === 0) { setActiveId(null); return; }
+      const els = surface.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6");
+      if (els.length !== headings.length) { setActiveId(null); return; }
+      let current: string | null = null;
+      els.forEach((el, i) => {
+        if (el.getBoundingClientRect().top <= 130) current = headings[i].id;
+      });
+      setActiveId(current ?? headings[0].id);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(sync);
+    };
+    surface.addEventListener("scroll", onScroll, true);
+    sync();
+    return () => {
+      surface.removeEventListener("scroll", onScroll, true);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [headings]);
+
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllCollapse = useCallback(() => {
+    setCollapsedIds(allCollapsed ? new Set() : new Set(parentIds));
+  }, [allCollapsed, parentIds]);
+
+  // 眼睛 = 彻底隐藏：连右缘 mini 刻度条一并消失（由父级 outlineHidden 承接），仅 ⋯ 菜单可唤回。
+  const hideOutline = useCallback(() => {
+    cancelHide();
+    setHoverOpen(false);
+    onHide();
+  }, [cancelHide, onHide]);
+
+  const renderNodes = (nodes: OutlineNode[], depth: number): React.ReactNode =>
+    nodes.map((node) => {
+      const { h } = node;
+      const hasKids = node.children.length > 0;
+      const isOpen = !collapsedIds.has(h.id);
+      const isActive = activeId === h.id;
+      return (
+        <React.Fragment key={h.id}>
+          <div
+            data-outline-row
+            {...(hasKids ? { "data-outline-toggle": "" } : {})}
+            className={cn(
+              "group/o relative flex items-center rounded-md py-[6px] pr-1 transition-colors",
+              !isActive && "hover:bg-app-hover/60",
+            )}
+          >
+            {/* ▼ 贴着条目文字左侧、随层级缩进；与文字同为 flex 子项，严格同行居中 */}
+            {hasKids ? (
               <button
-                key={h.id}
-                onClick={() => onSelect(h.pos)}
-                className={cn(
-                  "w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-app-hover truncate",
-                  h.level === 1 && "font-medium text-tx-primary",
-                  h.level === 2 && "text-tx-secondary",
-                  h.level === 3 && "text-tx-tertiary",
-                )}
-                style={{ paddingLeft: `${(h.level - 1) * 12 + 12}px` }}
-                title={h.text}
+                type="button"
+                onClick={() => toggleCollapse(h.id)}
+                className="flex-none w-3.5 h-[18px] flex items-center justify-center rounded text-tx-tertiary hover:text-tx-secondary transition-colors"
+                style={{ marginLeft: `${depth * 16 + 6}px` }}
+                title={isOpen ? t('editor.outlineCollapse') : t('editor.outlineExpand')}
               >
-                <span className={cn(
-                  "inline-block w-1.5 h-1.5 rounded-full mr-2 shrink-0 align-middle",
-                  h.level === 1 && "bg-accent-primary",
-                  h.level === 2 && "bg-accent-primary/50",
-                  h.level === 3 && "bg-tx-tertiary/50",
-                )} />
-                {h.text || t('editor.untitled')}
+                {isOpen
+                  ? <RowCaretGlyph open />
+                  : <RowCaretGlyph open={false} />}
               </button>
-            ))
-          )}
+            ) : (
+              <span
+                className="flex-none w-3.5"
+                style={{ marginLeft: `${depth * 16 + 6}px` }}
+              />
+            )}
+            {isActive && (
+              <span
+                className="flex-none h-3.5 w-[3px] rounded-full bg-accent-primary"
+                style={{ marginLeft: "6px" }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => onSelect(h.pos)}
+              title={h.text}
+              className={cn(
+                "flex-1 min-w-0 text-left text-[13.5px] leading-[19px] truncate transition-colors",
+                isActive
+                  ? "text-tx-primary font-medium"
+                  : "text-tx-secondary group-hover/o:text-tx-primary group-hover/o:font-medium",
+              )}
+            >
+              {h.text || t('editor.untitled')}
+            </button>
+          </div>
+          {hasKids && isOpen && renderNodes(node.children, depth + 1)}
+        </React.Fragment>
+      );
+    });
+
+  const showMini = !expanded && headings.length > 0;
+
+  return (
+    <>
+      {/* mini 态：右缘结构刻度条（无卡片感，只有一列短横线） */}
+      {showMini && (
+        <div
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 z-30 hidden md:flex flex-col items-end cursor-pointer py-5 px-2"
+          onMouseEnter={() => { cancelHide(); setHoverOpen(true); }}
+          title={t('editor.outline')}
+        >
+          <div className="flex flex-col items-end gap-[10px]">
+            {headings.map((h) => (
+              <span
+                key={h.id}
+                onClick={(e) => { e.stopPropagation(); onSelect(h.pos); }}
+                className={cn(
+                  "block h-[3px] rounded-full transition-all",
+                  // 右缘对齐：所有刻度的右端在同一条竖线上，层级越深越短（向左收）
+                  h.level === 1 ? "w-5" : h.level === 2 ? "w-3" : "w-2",
+                  activeId === h.id
+                    ? "bg-accent-primary"
+                    : "bg-tx-tertiary hover:bg-accent-primary",
+                )}
+              />
+            ))}
+          </div>
         </div>
-      </ScrollArea>
-    </div>
+      )}
+
+      {/* 浮出 / 钉住态：轻浮层（半透明 + blur + 软阴影），不占布局宽度 */}
+      {/* 浮出 / 钉住态：工具栏下方的右侧窄列（240px）。
+          · 钉住：正文列已让位（data-outline-open），列里只有文字，无底色；
+          · 悬浮：盖在正文之上，需要不透明纸色才能读，左侧一条极淡竖线分隔。 */}
+      {expanded && (
+        <div
+          ref={surfaceRef}
+          className="group/outline absolute right-0 z-30 hidden md:flex w-[280px] flex-col pt-4 pb-3 pl-4 pr-3"
+          style={{
+            top: panelTop,
+            bottom: 0,
+            // 语雀式通高纸色竖条：右侧整条都是纸面，任何内容都不会漏进这条留白。
+            background: "var(--note-theme-surface, var(--color-bg))",
+          }}
+          onMouseEnter={cancelHide}
+          onMouseLeave={() => { if (!pinned) scheduleHide(); }}
+        >
+          {/* 头部：标题与操作居中成组（对齐 Yuque） */}
+          <div className="group/head flex items-center justify-start gap-1.5 pt-1 pb-3 pl-6">
+            <span className="text-[13.5px] font-semibold text-tx-primary select-none">{t('editor.outline')}</span>
+            <button
+              type="button"
+              onClick={() => {
+                // 取消钉住时鼠标多半还在面板上：转入悬浮态自然过渡，移开才收回 mini
+                if (pinned) setHoverOpen(true);
+                onPinChange(!pinned);
+              }}
+              title={pinned ? t('editor.outlineUnpin') : t('editor.outlinePin')}
+              className="p-1 rounded-md text-tx-tertiary/80 hover:bg-app-hover hover:text-tx-secondary transition-colors"
+            >
+              <UprightPinGlyph pinned={pinned} />
+            </button>
+            <button
+              type="button"
+              onClick={toggleAllCollapse}
+              disabled={parentIds.length === 0}
+              title={allCollapsed ? t('editor.outlineExpandAll') : t('editor.outlineCollapseAll')}
+              aria-label={allCollapsed ? t('editor.outlineExpandAll') : t('editor.outlineCollapseAll')}
+              className="p-1 rounded-md text-tx-tertiary/80 hover:bg-app-hover hover:text-tx-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <CollapseAllGlyph pinned={pinned} />
+            </button>
+          </div>
+          <div ref={listRef} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 min-h-0">
+            <div data-outline-content className="relative pr-1 pb-2 pt-1">
+            {/* 树脊线：第一条目顶 → 最后一条目底（绿线范围），随列表滚动 */}
+            <div
+              className="absolute left-[2px] top-1 w-[2px] bg-app-border"
+              style={{ height: spineHeight }}
+            />
+              {headings.length === 0 ? (
+                <div className="px-3 py-6 text-center">
+                  <p className="text-[11px] text-tx-tertiary">{t('editor.noHeadings')}</p>
+                  <p className="text-[10px] text-tx-tertiary mt-1">{t('editor.noHeadingsHint')}</p>
+                </div>
+              ) : (
+                renderNodes(tree, 0)
+              )}
+            </div>
+          </ScrollArea>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -4555,20 +5160,20 @@ function SyncIndicator({
   // 失败、排队和离线状态继续保留在同步状态机中，但不再主动展示为失败提示。
   // 手动同步入口仍保持可见，真正冲突继续走独立的冲突处理流程。
   const displayStatus: SyncStatus =
-    syncStatus === "error" || syncStatus === "queued" || syncStatus === "offline"
+    syncStatus === "saved"
+      ? "idle" // 显式保存完成后与空闲态同展示（已同步 · 时间）；「待保存」只在有未保存改动时出现
+      : syncStatus === "error" || syncStatus === "queued" || syncStatus === "offline"
       ? "idle"
       : syncStatus;
   const formatFullTime = (ts: string) => {
     try { return new Date(ts).toLocaleString(); } catch { return ts; }
   };
 
-  const getTooltip = () => {
+    const getTooltip = () => {
     switch (displayStatus) {
       case "saving": return t('editor.saving');
-      case "saved":
-        return lastSyncedAt
-          ? `${t('editor.allSaved')}：${formatFullTime(lastSyncedAt)}`
-          : t('editor.allSaved');
+      case "pending":
+        return t('editor.pendingSaveTooltip');
       default:
         if (lastSyncedAt) {
           const diff = Date.now() - new Date(lastSyncedAt).getTime();
@@ -4600,15 +5205,15 @@ function SyncIndicator({
             <RefreshCw size={13} className="text-accent-primary" />
           </motion.div>
         )}
-        {displayStatus === "saved" && (
+        {displayStatus === "pending" && (
           <motion.div
-            key="saved"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: [1.3, 1] }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            transition={{ duration: 0.25 }}
+            key="pending"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
           >
-            <Check size={13} className="text-green-500" />
+            <Clock size={13} className="text-amber-500" />
           </motion.div>
         )}
         {displayStatus === "idle" && (
@@ -4627,20 +5232,11 @@ function SyncIndicator({
       <span className={cn(
         "hidden whitespace-nowrap sm:inline transition-colors",
         displayStatus === "saving" && "text-accent-primary",
-        displayStatus === "saved" && "text-green-500",
+        displayStatus === "pending" && "text-amber-500",
         displayStatus === "idle" && "text-tx-tertiary group-hover:text-tx-secondary",
       )}>
         {displayStatus === "saving" && t('editor.savingStatus')}
-        {displayStatus === "saved" && (
-          <>
-            {t('editor.savedStatus')}
-            {lastSyncedAt && (
-              <span className="ml-1 opacity-70">
-                · {new Date(lastSyncedAt).toLocaleTimeString()}
-              </span>
-            )}
-          </>
-        )}
+        {displayStatus === "pending" && t('editor.pendingSave')}
         {displayStatus === "idle" && (
           lastSyncedAt
             ? <>{t('editor.synced')}<span className="ml-1 opacity-70">· {new Date(lastSyncedAt).toLocaleTimeString()}</span></>

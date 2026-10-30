@@ -25,13 +25,17 @@ describe("shared note read-only permissions", () => {
     const gates = editorPaneSource.match(
       /editable=\{canEditActiveNote && !effectiveLocked && !modeSwitching\}/g,
     ) || [];
-    expect(gates).toHaveLength(3);
+    // 3 → 7：嵌入块 / PDF 受控查看器 / 导图等编辑模式加入后，每个模式实例都必须
+    // 被同一权限门控覆盖（存量契约没跟上功能演进，2026-10-26 实测对齐）。
+    expect(gates).toHaveLength(7);
   });
 
   it("keeps the split editor read-only and ignores stale update callbacks", () => {
     expect(splitViewSource).toContain('import { canWriteNote } from "@/lib/notePermissions";');
+    // 分屏改为两栏固定绑定文档（2026-10）：焦点栏编辑不再借道 activeNote 分流，
+    // 每一栏的编辑权仍必须过 canWriteNote + readOnly 门，镜像栏固定只读。
     expect(splitViewSource).toContain(
-      "const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && state.activeNote?.id !== noteId && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;",
+      "const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;",
     );
     expect(splitViewSource).toMatch(/readOnly\s*\|\|[\s\S]*!canWriteNote\(current\)/);
   });

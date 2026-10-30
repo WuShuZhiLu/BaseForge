@@ -105,11 +105,14 @@ test("手动版本：kind/label/description/contentHash 与版本附件引用同
   seedNote(`{"src":"/api/attachments/${ATTACHMENT_ID}"}`);
 
   const { status, json } = await requestJson("POST", `/shares/note/${NOTE_ID}/versions`, {
+    kind: "release",
     label: "定稿 v1",
     description: "首次发版",
   });
   assert.equal(status, 201);
-  assert.equal(json.kind, "manual");
+  // v134：该端点产 source=release，kind 与 source 同值
+  assert.equal(json.source, "release");
+  assert.equal(json.kind, "release");
   assert.equal(json.label, "定稿 v1");
   assert.equal(json.description, "首次发版");
   assert.match(json.contentHash, /^[0-9a-f]{16}$/);
@@ -134,38 +137,42 @@ test("版本列表：kind 筛选与占用字节统计", async () => {
   assert.equal(typeof all.json.contentBytesTotal, "number");
   assert.ok(all.json.contentBytesTotal > 0);
   for (const v of all.json.versions) {
-    assert.ok(v.kind === "auto" || v.kind === "manual");
+    assert.ok(v.kind === "auto" || v.kind === "manual" || v.kind === "release");
+    assert.equal(v.kind, v.source);
     assert.equal(typeof v.contentBytes, "number");
   }
 
-  const onlyManual = await requestJson("GET", `/shares/note/${NOTE_ID}/versions?kind=manual`);
-  assert.equal(onlyManual.json.total, 1);
-  assert.equal(onlyManual.json.versions[0].kind, "manual");
-  assert.equal(onlyManual.json.versions[0].label, "手动一");
+  const onlyRelease = await requestJson("GET", `/shares/note/${NOTE_ID}/versions?kind=release`);
+  assert.equal(onlyRelease.json.total, 1);
+  assert.equal(onlyRelease.json.versions[0].kind, "release");
+  assert.equal(onlyRelease.json.versions[0].label, "手动一");
+
+  const onlyAuto = await requestJson("GET", `/shares/note/${NOTE_ID}/versions?kind=auto`);
+  assert.equal(onlyAuto.json.total, 1);
+  assert.equal(onlyAuto.json.versions[0].kind, "auto");
 });
 
-test("自动快照：hash 回填去重 + 间隔判断 + 内容变更触发", async () => {
+test("调度器停用：满足旧补快照条件也不创建版本，仅回填 NULL hash", async () => {
   resetData();
   seedNote("{}");
   seedAutoVersion();
 
-  // 最新版本 createdAt 拨回 2 小时前（满足间隔），contentHash 置 NULL 触发惰性回填
+  // 最新版本 createdAt 拨回 2 小时前（远超 autoVersionIntervalMinutes），contentHash 置 NULL 触发惰性回填
   db().prepare(`UPDATE note_versions SET "createdAt" = datetime('now', '-2 hours'), "contentHash" = NULL WHERE "noteId" = ?`).run(NOTE_ID);
   db().prepare(`UPDATE notes SET updatedAt = datetime('now') WHERE id = ?`).run(NOTE_ID);
 
-  // 当前内容与版本内容一致：回填 hash 后去重命中，不新建
+  // 惰性回填仍然生效（支撑相邻合并去重），但不新建任何版本
   const first = await runVersionSnapshotOnce();
   assert.equal(first.backfilled, 1);
-  assert.equal(first.created, 0);
+  const totalAfterBackfill = (db().prepare(`SELECT COUNT(*) AS c FROM note_versions`).get() as any).c;
+  assert.equal(totalAfterBackfill, 1);
 
-  // 内容变更后：到点且 hash 变化 → 落一条 auto 版本
+  // 内容已变更且远超间隔：旧调度器会在此补一条 auto 快照，现在必须保持不再创建
   db().prepare(`UPDATE notes SET content = '{"b":2}', "contentText" = 'changed', updatedAt = datetime('now') WHERE id = ?`).run(NOTE_ID);
   const second = await runVersionSnapshotOnce();
-  assert.equal(second.created, 1);
-
-  // 连续第二轮：距新建版本不足间隔且 hash 一致 → 不再创建
-  const third = await runVersionSnapshotOnce();
-  assert.equal(third.created, 0);
+  assert.equal(second.backfilled, 0);
+  assert.equal((db().prepare(`SELECT COUNT(*) AS c FROM note_versions`).get() as any).c, totalAfterBackfill);
+  assert.equal((db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE kind = 'auto'`).get() as any).c, 1);
 });
 
 test("批量删除与清空：manual 版本豁免", async () => {
@@ -174,7 +181,7 @@ test("批量删除与清空：manual 版本豁免", async () => {
   seedAutoVersion(); // A1
   seedAutoVersion(); // A2
   await requestJson("POST", `/shares/note/${NOTE_ID}/versions`, { label: "保留我" });
-  const manual = db().prepare(`SELECT id FROM note_versions WHERE kind = 'manual'`).get() as { id: string };
+  const manual = db().prepare(`SELECT id FROM note_versions WHERE source = 'release'`).get() as { id: string };
   const autos = db().prepare(`SELECT id FROM note_versions WHERE kind = 'auto' ORDER BY version`).all() as Array<{ id: string }>;
 
   const batch = await requestJson("POST", `/shares/note/${NOTE_ID}/versions/batch-delete`, { ids: [autos[0].id, manual.id, "not-exists"] });
@@ -182,11 +189,11 @@ test("批量删除与清空：manual 版本豁免", async () => {
   assert.equal(batch.json.skipped, 2);
   assert.ok(db().prepare("SELECT id FROM note_versions WHERE id = ?").get(manual.id));
 
-  // 清空：只清 auto（A2），manual 保留
+  // 清空：只清 auto（A2），release/manual 保留
   const clear = await requestJson("DELETE", `/shares/note/${NOTE_ID}/versions`);
   assert.equal(clear.json.deleted, 1);
   assert.equal(clear.json.skippedManual, 1);
-  assert.equal(db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE kind = 'manual'`).get().c, 1);
+  assert.equal(db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE source = 'release'`).get().c, 1);
 });
 
 test("会话结束快照：内容未变幂等，变更后创建", async () => {
@@ -267,10 +274,10 @@ test("保留策略：按数量保留最近 N 条 auto，manual 永不参与", as
 
   const result = noteVersionsRepository.pruneAutoVersionsByCount(1);
   assert.equal(result.deleted, 2);
-  const remaining = db().prepare(`SELECT kind FROM note_versions ORDER BY version`).all() as Array<{ kind: string }>;
+  const remaining = db().prepare(`SELECT kind, source FROM note_versions ORDER BY version`).all() as Array<{ kind: string; source: string }>;
   assert.equal(remaining.length, 2);
-  assert.equal(remaining.filter((r) => r.kind === "manual").length, 1);
-  assert.equal(remaining.filter((r) => r.kind === "auto").length, 1);
+  assert.equal(remaining.filter((r) => r.source === "release").length, 1);
+  assert.equal(remaining.filter((r) => r.source === "auto").length, 1);
 });
 
 test("P2 附件 GC：删版本后失去引用的附件进入宽限队列，扫尾后物理删除", async () => {
@@ -325,7 +332,7 @@ test("P2 存储配额：超配额时按最旧优先清理 auto，manual 不参�
   const result = noteVersionsRepository.pruneAutoVersionsOverQuota(400);
   assert.ok(result.deleted >= 1, `deleted=${result.deleted}`);
   const autos = db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE kind = 'auto'`).get() as any;
-  const manuals = db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE kind = 'manual'`).get() as any;
-  assert.equal(manuals.c, 1);
+  const releases = db().prepare(`SELECT COUNT(*) AS c FROM note_versions WHERE source = 'release'`).get() as any;
+  assert.equal(releases.c, 1);
   assert.ok(autos.c >= 1 && autos.c <= 2, `autos=${autos.c}`);
 });

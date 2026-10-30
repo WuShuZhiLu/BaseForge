@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileArchive, FileCode, Files, FileText, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , FileSpreadsheet } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
+} from "lucide-react";
+import { FaBook } from "react-icons/fa";
 
 import NoteTemplatePickerDialog from "@/components/NoteTemplatePickerDialog";
 import EncryptedNoteCreateDialog from "@/components/EncryptedNoteCreateDialog";
@@ -33,17 +36,19 @@ const CREATE_MENU_WIDTH = 232;
 const CREATE_ITEMS = [
   { kind: "note", label: "富文本文档", icon: FileText },
   { kind: "markdown", label: "Markdown 文档", icon: FileCode },
+  { kind: "plain", label: "纯文本文档", icon: Files },
+  { kind: "board", label: "画板文档", icon: PenTool },
 { kind: "mindmap", label: "思维导图", icon: BrainCircuit },
 ] as const;
 const FOLDER_CREATE_ITEM = { kind: "folder", label: "文件夹" } as const;
 
 const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
-  { kind: "markdown-zip", label: "导入 Markdown + 附件（ZIP）", icon: FileArchive },
+  { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
   { kind: "word", label: "导入 Word 文档", icon: FileType2 },
+  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },
-{ kind: "spreadsheet", label: "导入 Excel/CSV 为 Markdown 表格", icon: FileSpreadsheet },
 ] as const;
 
 export interface KnowledgeTreeCreateMenuState {
@@ -209,8 +214,13 @@ export function KnowledgeTreeCreateDropdown({
   onCreateSheet,
   onCreateEncrypted,
 }: KnowledgeTreeCreateDropdownProps) {
+  const { t } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<React.CSSProperties | null>(null);
+  // 「导入」子菜单：锚定父项右侧弹出，点外/执行后关闭
+  const [importSubmenu, setImportSubmenu] = useState<{ anchor: DOMRect } | null>(null);
+  const importSubmenuRef = useRef<HTMLDivElement>(null);
+  const [importSubmenuPosition, setImportSubmenuPosition] = useState<React.CSSProperties | null>(null);
 
   useLayoutEffect(() => {
     if (!menu || !menuRef.current) {
@@ -220,11 +230,44 @@ export function KnowledgeTreeCreateDropdown({
     setPosition(menuPosition(menu.anchor, menuRef.current.scrollHeight));
   }, [menu]);
 
+  useLayoutEffect(() => {
+    if (!importSubmenu || !importSubmenuRef.current) {
+      setImportSubmenuPosition(null);
+      return;
+    }
+    setImportSubmenuPosition(menuPosition(importSubmenu.anchor, importSubmenuRef.current.scrollHeight));
+  }, [importSubmenu]);
+
+  useEffect(() => {
+    if (!importSubmenu) return;
+    const closeFromPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && (importSubmenuRef.current?.contains(target) || menuRef.current?.contains(target))) return;
+      setImportSubmenu(null);
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setImportSubmenu(null);
+    };
+    window.addEventListener("pointerdown", closeFromPointer, true);
+    window.addEventListener("keydown", closeFromKeyboard, true);
+    const onResize = () => setImportSubmenu(null);
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("pointerdown", closeFromPointer, true);
+      window.removeEventListener("keydown", closeFromKeyboard, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [importSubmenu]);
+
   useEffect(() => {
     if (!menu) return;
     const closeFromPointer = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      // 子菜单是 portal 到 body 的，不在 menuRef 内——漏判会导致点子菜单项时
+      // 主菜单先被关闭、目标 unmount，click 永远无法触发（导入点不动）。
+      if (target instanceof Node && (menuRef.current?.contains(target) || importSubmenuRef.current?.contains(target))) return;
       onClose();
     };
     const closeFromKeyboard = (event: KeyboardEvent) => {
@@ -249,23 +292,29 @@ export function KnowledgeTreeCreateDropdown({
     <div
       ref={menuRef}
       role="menu"
-      aria-label={menu.parentId ? "在当前节点下新建" : "在根目录新建"}
-      className="fixed z-[420] overflow-y-auto overscroll-contain rounded-lg border border-app-border bg-app-bg p-1 shadow-xl"
+      aria-label={menu.parentId ? t("sidebarNext.createUnder", { defaultValue: "在当前节点下新建" }) : t("sidebarNext.createAtRoot", { defaultValue: "在根目录新建" })}
+      className="fixed z-[420] overflow-y-auto overscroll-contain rounded-xl border border-app-border bg-app-elevated p-1.5 text-[12.5px] shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
       style={position || { left: 8, top: 8, width: CREATE_MENU_WIDTH, visibility: "hidden" }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       {menu.parentId === null ? (
         /* 根级（未选中任何节点）：只能新建知识库 */
-        <button
-          type="button"
-          role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
-          onClick={() => onCreate(null, "folder")}
-        >
-          <Folder size={15} className="text-amber-500" />
-          <span>新建知识库</span>
-        </button>
+        <>
+          <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">根目录</div>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
+            onClick={() => onCreate(null, "folder")}
+          >
+            <FaBook size={13} className="shrink-0 text-accent-primary" />
+            <span className="min-w-0 flex-1 truncate">{t("sidebarNext.newKnowledgeBase", { defaultValue: "新建知识库" })}</span>
+          </button>
+        </>
       ) : (<>
+      <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">
+        {menu.parentId ? t("sidebarNext.createUnder", { defaultValue: "在当前节点下新建" }) : t("sidebarNext.createAtRoot", { defaultValue: "在根目录新建" })}
+      </div>
       {CREATE_ITEMS.map((item) => {
         const Icon = item.icon;
         return (
@@ -273,12 +322,12 @@ export function KnowledgeTreeCreateDropdown({
             key={item.kind}
             type="button"
             role="menuitem"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+            className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
             onClick={() => onCreate(menu.parentId, item.kind)}
           >
             <Icon
-              size={15}
-              className={item.kind === "markdown" ? "text-emerald-500" : "text-accent-primary"}
+              size={14}
+              className={item.kind === "markdown" ? "text-emerald-500" : item.kind === "board" ? "text-teal-500" : "text-accent-primary"}
             />
             <span>{item.label}</span>
           </button>
@@ -287,29 +336,29 @@ export function KnowledgeTreeCreateDropdown({
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
         onClick={() => onCreateFromTemplate(menu.parentId)}
       >
-        <LayoutTemplate size={15} className="text-violet-500" />
+        <LayoutTemplate size={14} className="text-violet-500" />
         <span>从模板新建</span>
       </button>
       <button
         type="button"
         role="menuitem"
-        className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
         onClick={() => onCreate(menu.parentId, FOLDER_CREATE_ITEM.kind)}
       >
-        <Folder size={15} className="text-amber-500" />
+        <Folder size={14} className="text-amber-500" />
         <span>{FOLDER_CREATE_ITEM.label}</span>
       </button>
       {menu.parentId !== null && onCreateSheet && (
         <button
           type="button"
         role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
           onClick={() => onCreateSheet(menu.parentId)}
         >
-          <Table2 size={15} className="text-sky-500" />
+          <Table2 size={14} className="text-sky-500" />
           <span>轻量表格</span>
         </button>
       )}
@@ -317,42 +366,79 @@ export function KnowledgeTreeCreateDropdown({
         <button
           type="button"
           role="menuitem"
-          className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
+          className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
           onClick={() => onCreateEncrypted(menu.parentId)}
         >
-          <Lock size={15} className="text-accent-primary" />
+          <Lock size={14} className="text-accent-primary" />
           <span>加密笔记</span>
         </button>
       )}
       <div className="my-1 border-t border-app-border" />
-      {IMPORT_ITEMS.map((item) => {
-        const Icon = item.icon;
-        return (
-          <button
-            key={item.kind}
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary focus:bg-app-hover focus:text-tx-primary focus:outline-none"
-            onClick={() => onImport(menu.parentId, item.kind)}
-          >
-            <Icon
-              size={15}
-              className={item.kind === "markdown"
-                ? "text-emerald-500"
-                : item.kind === "markdown-zip"
-                  ? "text-amber-500"
-                  : item.kind === "word"
-                    ? "text-violet-500"
-                    : "text-sky-500"}
-            />
-            <span>{item.label}</span>
-          </button>
-        );
-      })}
-      <p className="border-t border-app-border px-2.5 pb-1 pt-2 text-[10px] text-tx-tertiary">
-        也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
-      </p>
+      {/* 导入：折叠为单个父项，点击弹出右侧子菜单 */}
+      <button
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={Boolean(importSubmenu)}
+        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
+        onClick={(event) => {
+          const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+          setImportSubmenu((current) => current ? null : { anchor: new DOMRect(rect.right - 4, rect.top, rect.width, rect.height) });
+        }}
+      >
+        <CloudDownload size={14} className="text-sky-500" />
+        <span>导入</span>
+        <ChevronDown size={13} className={cn("ml-auto shrink-0 -rotate-90 text-tx-tertiary", importSubmenu && "rotate-0")} />
+      </button>
+      <div className="mt-1 flex items-start gap-1.5 border-t border-app-border px-2 pb-1 pt-2">
+        <span className="mt-[1px] shrink-0 text-[10.5px] leading-4 text-tx-tertiary">ⓘ</span>
+        <p className="min-w-0 text-[10.5px] leading-4 text-tx-tertiary">
+          也可将 .md 或 Markdown 附件 ZIP 拖拽到目录树导入
+        </p>
+      </div>
       </>)}
+      {importSubmenu && createPortal(
+        <div
+          ref={importSubmenuRef}
+          role="menu"
+          aria-label="导入"
+          className="fixed z-[421] max-h-[60vh] min-w-[252px] overflow-y-auto overscroll-contain rounded-xl border border-app-border bg-app-elevated p-1.5 text-[12.5px] shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+          style={importSubmenuPosition || { left: importSubmenu.anchor.right + 4, top: importSubmenu.anchor.top, visibility: importSubmenuPosition ? undefined : "hidden" }}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <div className="px-2 pb-1 pt-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tx-tertiary">导入</div>
+          {IMPORT_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.kind}
+                type="button"
+                role="menuitem"
+                className="flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-tx-primary transition-colors hover:bg-app-hover focus:bg-app-hover focus:outline-none"
+                onClick={() => {
+                  setImportSubmenu(null);
+                  onImport(menu.parentId, item.kind);
+                }}
+              >
+                <Icon
+                  size={14}
+                  className={cn("shrink-0", item.kind === "markdown"
+                    ? "text-emerald-500"
+                    : item.kind === "markdown-zip"
+                      ? "text-amber-500"
+                      : item.kind === "word"
+                        ? "text-violet-500"
+                        : item.kind === "pdf"
+                          ? "text-red-500"
+                          : "text-sky-500")}
+                />
+                <span className="min-w-0 flex-1 truncate whitespace-nowrap">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
     </div>,
     document.body,
   );

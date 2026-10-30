@@ -71,12 +71,12 @@ describe("mobile startup bootstrap routing", () => {
     expect(classifyMobileBootstrapTarget(new URL("https://nas.test/api/notes"), "POST")).toBeNull();
   });
 
-  it("keeps pinned notes first and sorts updatedAt descending", () => {
+  it("sorts updatedAt descending", () => {
     const selected = selectNotesFromBootstrap(
       payload,
       new URL("https://nas.test/api/notes?workspaceId=personal&sortBy=updatedAt&sortOrder=desc"),
     );
-    expect(selected?.map((note) => note.id)).toEqual(["b", "c", "a"]);
+    expect(selected?.map((note) => note.id)).toEqual(["c", "b", "a"]);
   });
 
   it("includes descendant notebooks without returning sibling notes", () => {
@@ -84,7 +84,7 @@ describe("mobile startup bootstrap routing", () => {
       payload,
       new URL("https://nas.test/api/notes?workspaceId=personal&notebookId=root"),
     );
-    expect(selected?.map((note) => note.id)).toEqual(["b", "a"]);
+    expect(selected?.map((note) => note.id)).toEqual(["a", "b"]);
   });
 
   it("supports favorite and date filters while preserving compact metadata", () => {

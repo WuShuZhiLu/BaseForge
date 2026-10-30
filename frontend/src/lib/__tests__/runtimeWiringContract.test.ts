@@ -48,12 +48,14 @@ describe("1.5.1 runtime wiring contract", () => {
     }
   });
 
-  it("opens mind map nodes from the knowledge tree", () => {
+  it("opens mind map docs as notes from the knowledge tree (normalized)", () => {
+    // 导图归一后是 contentFormat="mindmap" 的笔记文档，不再走 /mindmaps/:id 深链。
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
+      "../../components/SidebarDesktop.tsx",
     ]) {
-      expect(read(file)).toContain("pushMindMapAppPath(node.resourceId)");
+      expect(read(file)).not.toContain("pushMindMapAppPath(node.resourceId)");
     }
   });
 });
@@ -67,25 +69,25 @@ describe("additive 1.5.1 feature wiring (user-approved)", () => {
     expect(menu.split("<span>轻量表格</span>").length - 1).toBe(1);
     expect(menu).toContain("onCreateSheet");
 
-    // 导图建完自动打开（另一条已锁行为，勿在此项改动时丢失）。
+    // 导图建完自动打开（另一条已锁行为；归一后走通用笔记打开链路，勿在此项改动时丢失）。
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
     ]) {
       const source = read(file);
-      expect(source).toContain('snapshot.kind === "mindmap"');
-      expect(source).toContain("pushMindMapAppPath(created.resourceId)");
+      expect(source).not.toContain('snapshot.kind === "mindmap"');
+      expect(source).toContain("activateNote(await api.getNote(created.resourceId)");
     }
 
-    // 表格数据 → Markdown 笔记导入（1.0.0：完善现有功能）。
-    expect(menu).toContain('kind: "spreadsheet"');
+    // 表格数据 → Markdown 笔记导入已在 57b37c29d 有意移除（新建菜单导入区折叠），
+    // 契约锁定移除态，防止误回流。
+    expect(menu).not.toContain('kind: "spreadsheet"');
     for (const file of [
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
     ]) {
       const source = read(file);
-      expect(source).toContain('importSpreadsheetIntoKnowledgeTree');
-      expect(source).toContain('"spreadsheet"');
+      expect(source).not.toContain('importSpreadsheetIntoKnowledgeTree');
     }
   });
 
@@ -196,7 +198,8 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     // （切到某面板 → 在容器中显示并展开它），标签面板仍由 SidebarMobile 注入交互回调。
     expect(sidebar).toContain("<SidebarPanelContainer");
     expect(sidebar).toContain("<TagsPanelContent");
-    expect(sidebar).toContain("updateSidebarPanel(id as never, { visible: true, collapsed: false })");
+    // SidebarPanelId 已并入 lib/sidebarPanels 唯一定义（AppContext 仅 re-export），兼容桥无需 as never
+    expect(sidebar).toContain("updateSidebarPanel(id, { visible: true, collapsed: false })");
     // 移动端分支保持原样（B3 未启动）
     expect(sidebar).toContain("<MobileKnowledgeTreePanel />");
 
@@ -221,12 +224,16 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(ctx).toContain('case "OPEN_TOOL_TAB"');
     expect(ctx).toContain('case "CLOSE_TOOL_TAB"');
     expect(ctx).toContain("openToolTab: (key: ToolTabKey)");
+    // 关闭页签时取消仍在进行的笔记加载，避免迟到的加载结果把 URL/编辑区拉回已关闭的笔记
+    expect(ctx).toContain("primaryNoteLoadCoordinator.cancel()");
 
     // 页签搬到侧栏「打开的」面板（VS Code OPEN EDITORS）；面板框架 S1 后它只是面板内容之一。
     const openEditors = read("../../components/sidebar/panels/OpenEditorsPanel.tsx");
     expect(openEditors).toContain("data-open-note-row={tab.id}");
     expect(openEditors).toContain("data-open-tool-row={key}");
-    expect(openEditors).toContain("actions.closeNoteTab(tab.id)");
+    expect(openEditors).toContain("actions.closeNoteTab(");
+    expect(openEditors).toContain("closeTab(tab.id)");
+    expect(openEditors).toContain("actions.setActiveNote(null)");
     expect(openEditors).toContain("actions.closeToolTab(key)");
     expect(openEditors).toContain("actions.setActiveToolTab(key)");
     // 内容-only：不再自带标题/折叠（由面板框架 Shell 提供）
@@ -242,7 +249,9 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(shared).toContain("export function usePanelRefresh");
     expect(shared).toContain("export function PanelRow");
     expect(shared).toContain("nowen:sidebar-panel-refresh");
-    expect(read("../../components/sidebar/panels/openNote.ts")).toContain("openNoteFromSidebarPanel");
+    // 打开笔记统一走 useTabNoteOpener（加载协调器链路）；裸 api.getNote + setActiveNote 已废除
+    expect(read("../../hooks/useTabNoteOpener.ts")).toContain("useNoteLoader");
+    expect(read("../../components/sidebar/panels/OpenEditorsPanel.tsx")).not.toContain("api.getNote");
 
     // 面板框架（S1）：布局 store + 容器 + 外壳 + 注册表
     const store = read("../../lib/sidebarPanels.ts");

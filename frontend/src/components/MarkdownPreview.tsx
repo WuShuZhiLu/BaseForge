@@ -20,6 +20,9 @@ import { MathView } from "@/components/MathView";
 import { NoteLinkPreviewAnchor } from "@/components/NoteLinkPreview";
 import { BlockEmbedCard } from "@/components/BlockEmbedExtension";
 import MindMapEmbedCard, { parseMindMapEmbedHref } from "@/components/MindMapEmbedCard";
+import BoardEmbedCard from "@/components/BoardEmbedCard";
+import SheetEmbedCard, { parseSheetEmbedHref } from "@/components/SheetEmbedCard";
+import { parseBoardEmbedHref } from "@/lib/boardEmbed";
 import { getGfmTaskChecked, wrapGfmTaskInlineContent } from "@/lib/gfmTaskChecked";
 import { preprocessInternalNoteLinks } from "@/lib/noteLinkSyntax";
 import { projectMarkdownForUser } from "@/lib/markdownUserContent";
@@ -318,7 +321,7 @@ function CalloutBlockquote({ node, children, sourceOffset = 0 }: { node?: any; c
   const title = (node?.properties?.["data-callout-title"] ?? node?.properties?.dataCalloutTitle) as string | undefined;
   const style = type ? calloutStyles[type] : undefined;
   if (!type || !title || !style) {
-    return <blockquote {...headingDataAttrs(node, sourceOffset)} className="my-4 rounded-r-lg border-l-4 border-accent-primary/40 bg-app-hover/40 px-4 py-2 italic text-tx-secondary">{children}</blockquote>;
+    return <blockquote {...headingDataAttrs(node, sourceOffset)} className="my-2 rounded-r-lg border-l-4 border-accent-primary/40 bg-app-hover/40 px-4 text-tx-secondary [&>p]:leading-[1.6] [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">{children}</blockquote>;
   }
   const Icon = style.icon;
   return (
@@ -423,6 +426,12 @@ function createComponents(
       const embedHref = props["data-nowen-block-embed"] ?? props.dataNowenBlockEmbed;
       if (typeof embedHref === "string" && parseMindMapEmbedHref(embedHref)) {
         return <div className="my-4"><MindMapEmbedCard href={embedHref} /></div>;
+      }
+      if (typeof embedHref === "string" && parseBoardEmbedHref(embedHref)) {
+        return <div className="my-4"><BoardEmbedCard href={embedHref} /></div>;
+      }
+      if (typeof embedHref === "string" && parseSheetEmbedHref(embedHref)) {
+        return <div className="my-4"><SheetEmbedCard href={embedHref} /></div>;
       }
       if (typeof embedHref === "string" && embedHref.startsWith("note:")) {
         return <div className="my-4"><BlockEmbedCard href={embedHref} /></div>;

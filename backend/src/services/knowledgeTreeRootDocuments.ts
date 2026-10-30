@@ -146,7 +146,7 @@ export function createKnowledgeChild(input: {
   actorUserId: string;
   workspaceId: string | null;
   parentId: string | null;
-  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet";
+  nodeType: "folder" | "note" | "markdown" | "word" | "mindmap" | "sheet" | "plain" | "board";
   title: string;
   /** 加密笔记：只透传密文信封，服务端不解释正文。 */
   encryptedContent?: string;
@@ -199,9 +199,12 @@ export function moveKnowledgeNode(input: {
   nodeId: string;
   parentId: string | null;
   sortOrder?: number;
+  beforeId?: string;
+  afterId?: string;
   db?: Database.Database;
 }): KnowledgeTreeNode {
-  if (input.parentId !== null) return moveKnowledgeNodeBase(input);
+  // 指定前后锚点时语义是「在父级内重排」，直接走基础实现，不能被根文档特例吞掉
+  if (input.parentId !== null || input.beforeId || input.afterId) return moveKnowledgeNodeBase(input);
 
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);

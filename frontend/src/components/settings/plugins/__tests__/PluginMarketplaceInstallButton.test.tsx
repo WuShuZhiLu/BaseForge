@@ -6,6 +6,8 @@ import type { RegistryPlugin } from "@/lib/pluginApi";
 const mocks = vi.hoisted(() => ({ install: vi.fn(), getPolicy: vi.fn(), setPolicy: vi.fn() }));
 vi.mock("@/lib/pluginApi", () => ({ pluginApi: { installFromRegistry: mocks.install, getRuntimePolicy: mocks.getPolicy, setRuntimePolicy: mocks.setPolicy } }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+const confirmMocks = vi.hoisted(() => ({ confirm: vi.fn(async () => true) }));
+vi.mock("@/components/ui/confirm", () => ({ confirm: confirmMocks.confirm }));
 import { PluginMarketplaceInstallButton } from "../PluginMarketplaceInstallButton";
 import { PluginRuntimePolicySettings } from "../PluginRuntimePolicySettings";
 
@@ -19,7 +21,7 @@ describe("marketplace installation", () => {
     mocks.getPolicy.mockResolvedValue({ allowNodeRuntime: false });
     mocks.setPolicy.mockResolvedValue({ allowNodeRuntime: true });
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMocks.confirm.mockResolvedValue(true);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
   const render = async (allowed: boolean | null, value = plugin) => { await act(async () => root.render(<PluginMarketplaceInstallButton sourceId="official-v2" plugin={value} nodeRuntimeAllowed={allowed} onInstalled={installed} />)); };
