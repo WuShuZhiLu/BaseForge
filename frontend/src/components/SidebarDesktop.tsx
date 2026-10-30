@@ -568,8 +568,14 @@ export default function SidebarDesktop() {
   useEffect(() => {
     reloadStar();
     const onKbChanged = () => reloadStar();
+    // nowen:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
+    const onNotesChanged = () => reloadStar();
     window.addEventListener("nowen:knowledge-tree-changed", onKbChanged);
-    return () => window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
+    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    return () => {
+      window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
+      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+    };
   }, [reloadStar]);
 
   useEffect(() => {

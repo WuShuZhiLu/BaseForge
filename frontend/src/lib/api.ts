@@ -311,6 +311,18 @@ api.updateNotebook = (async (...args: Parameters<typeof baseApi.updateNotebook>)
   return updated;
 }) as typeof baseApi.updateNotebook;
 
+// 文档收藏/锁定等状态变更广播：收藏区段与收藏面板据此即时刷新，不必等手动刷新。
+// 只在 isFavorite 变化时广播，避免普通编辑的高频保存刷屏。
+const nativeUpdateNote = baseApi.updateNote.bind(baseApi);
+api.updateNote = (async (...args: Parameters<typeof baseApi.updateNote>) => {
+  const updated = await nativeUpdateNote(...args);
+  const patch = args[1] as Record<string, unknown> | undefined;
+  if (patch && Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
+    window.dispatchEvent(new CustomEvent("nowen:notes-changed", { detail: { noteId: args[0] } }));
+  }
+  return updated;
+}) as typeof baseApi.updateNote;
+
 api.getTaskActivityEvents = (params: TaskActivityQuery = {}) => {
   const search = new URLSearchParams();
   const workspace = getCurrentWorkspace();

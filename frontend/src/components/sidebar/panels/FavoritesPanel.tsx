@@ -84,11 +84,17 @@ export default function FavoritesPanel() {
   const { data: items, loading, reload } = usePanelData<FavRow[]>(load, []);
   usePanelRefresh("fav", reload);
 
-  // 聚焦进出（URL ?tree=focus 变化）不重挂面板，监听应用内导航事件重拉
+  // 聚焦进出（URL ?tree=focus 变化）不重挂面板，监听应用内导航事件重拉；
+  // 文档收藏状态变更（nowen:notes-changed）也即时重拉
   React.useEffect(() => {
     const onPathChanged = () => reload();
+    const onNotesChanged = () => reload();
     window.addEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
-    return () => window.removeEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
+    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    return () => {
+      window.removeEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
+      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+    };
   }, [reload]);
 
   const openKb = useCallback((row: FavRow) => {
