@@ -3124,6 +3124,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       }
 
       // P0: 调度时快照 noteId，防止 debounce 期间切换笔记导致写错目标
+      // 只有用户真正在编辑器里输入（有焦点）才调度保存；打开文档时的 Yjs 回放/程序化
+      // 写入不算改动，否则重开文档会莫名显示待保存。
+      if (!editor.view.hasFocus()) return;
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         debounceTimer.current = null;
@@ -3292,6 +3295,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       title,
       _noteId: noteRef.current.id,
       _saveGeneration: ++saveGenerationRef.current,
+      _flush: true,
     });
     try {
       toast.success(t('tiptap.saved') || 'Saved');

@@ -4,7 +4,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import KnowledgeDocEmbedDialog, { type KnowledgeDocEmbedKind } from "@/components/KnowledgeDocEmbedDialog";
 import { confirmMediaNotePersistence } from "@/lib/mediaInsertionCommit";
 import { openInternalNoteLink } from "@/lib/blockNavigation";
-import { Star, Trash2, Cloud, RefreshCw, Check, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
+import { Star, Trash2, Cloud, RefreshCw, Check, Clock, Loader2, AlignJustify, ChevronLeft, FolderInput, ChevronRight, ChevronDown, BookOpen, Folder, X, List, ListTree, Lock, Unlock, Tag as TagIcon, Type, MoreHorizontal, Share2, History, Save, MessageCircle, FileCode, FileText, Eye, Pencil, PanelLeft, PanelLeftClose, Paperclip, Search, Sparkles, Network, Maximize2, Minimize2, Image, Link2, Printer, Scissors, Download, FileType2, ShieldCheck, PenTool, Waypoints, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import { RiMenuFold2Line } from "react-icons/ri";
@@ -53,7 +53,7 @@ import { buildAiContext } from "@/lib/aiContextBuilder";
 import ShareModal from "@/components/ShareModal";
 import VersionHistoryPanel from "@/components/VersionHistoryPanel";
 import SaveVersionDialog from "@/components/SaveVersionDialog";
-import { maybeSnapshotOnEditorLeave } from "@/lib/versionSnapshot";
+import { recordManualNoteSave, startVersionAutoSaveTimer, VERSION_RECORD_CREATED_EVENT } from "@/lib/versionSnapshot";
 import CommentPanel from "@/components/CommentPanel";
 import NoteAttachmentsPanel from "@/components/NoteAttachmentsPanel";
 import FolderSyncAttachmentPreviewPane, { isFolderSyncAttachmentNote } from "@/components/FolderSyncAttachmentPreviewPane";
@@ -154,6 +154,10 @@ function writeAnonymousReturnNoteId(noteId: string | null): void {
   }
 }
 
+// 产品决策（2026-10-30）：编辑器的防抖更新只写本地草稿并显示「待保存」，
+// 不再自动 PUT。保存只发生在三个显式入口：Ctrl+S / 点击状态区 / 定时保存。
+const AUTO_SAVE_ON_UPDATE_DISABLED = true;
+
 function EditorPaneCore({
   canSplitDocument = false,
   onSplitDocument,
@@ -173,6 +177,49 @@ function EditorPaneCore({
   const { prefs: userPrefs, setPref: setUserPref } = useUserPreferences();
   // 分屏时顶栏也从编辑器里交出去，占分屏顶部的一条全宽行（与工具栏同一套宿主机制）。
   const chromeSlot = useEditorChromeSlot();
+  // 顶栏「版本 N」显示版本历史记录号（只在三个显式入口落记录时 +1），
+  // 不再显示乐观锁计数（那会随普通打字保存一直自增，用户要求两者解耦）。
+  const [latestRecordVersion, setLatestRecordVersion] = useState<number | null>(null);
+  // 服务器已知内容基准：flush 去重必须与它比对，而不能与本地 activeNote 比——
+  // 防抖 emit 已经把本地状态刷成最新内容，用本地比会永远"没变化"→ 显式保存被跳过。
+  const lastServerContentRef = useRef<{ id: string; content: string; contentText: string; title: string } | null>(null);
+  const activeNoteIdForVersion = activeNote?.id ?? null;
+  useEffect(() => {
+    let cancelled = false;
+    setLatestRecordVersion(null);
+    // 切换笔记时重置同步状态：上一 notes 的「已保存/待保存」不应带到新笔记上
+    actions.setSyncStatus("idle");
+    const noteAtSwitch = activeNoteRef.current;
+    if (noteAtSwitch && noteAtSwitch.id === activeNoteIdForVersion) {
+      lastServerContentRef.current = {
+        id: noteAtSwitch.id,
+        content: noteAtSwitch.content,
+        contentText: noteAtSwitch.contentText ?? "",
+        title: noteAtSwitch.title,
+      };
+    } else {
+      lastServerContentRef.current = null;
+    }
+    if (!activeNoteIdForVersion) return;
+    api.getNoteVersions(activeNoteIdForVersion, 1)
+      .then((res) => {
+        if (cancelled) return;
+        const first = (res as { versions?: Array<{ version?: number }> }).versions?.[0];
+        setLatestRecordVersion(typeof first?.version === "number" ? first.version : 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeNoteIdForVersion]);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ noteId: string; version: number }>).detail;
+      if (detail?.noteId === activeNoteIdForVersion && typeof detail.version === "number") {
+        setLatestRecordVersion(detail.version);
+      }
+    };
+    window.addEventListener(VERSION_RECORD_CREATED_EVENT, handler);
+    return () => window.removeEventListener(VERSION_RECORD_CREATED_EVENT, handler);
+  }, [activeNoteIdForVersion]);
   const [showOutline, setShowOutline] = useState<boolean>(() => userPrefs.outlineDefaultOpen);
   // 大纲总开关（会话级）：false = mini 刻度条 + 悬浮/钉住；true = 连 mini 一并隐藏、完全无痕，
   // 仅经 ⋯ 菜单「显示大纲」唤回。切笔记不重置（隐藏是明确意图）。
@@ -691,19 +738,10 @@ function EditorPaneCore({
       } else {
         try { editorHandleRef.current?.flushSave(); } catch { /* ignore */ }
       }
-      // 版本历史 v2：切走时对前一篇笔记触发会话结束快照（fire-and-forget，失败静默）
-      maybeSnapshotOnEditorLeave(prevId);
+      // 版本记录收敛：切走笔记不再触发会话结束快照（只有 Ctrl+S/已同步/定时保存落记录）
     }
     lastActiveIdRef.current = nextId;
   }, [activeNote?.id]);
-
-  // 版本历史 v2：编辑器整体卸载时对最后一篇笔记触发会话结束快照（fire-and-forget，失败静默）
-  useEffect(() => {
-    return () => {
-      const id = lastActiveIdRef.current;
-      if (id) maybeSnapshotOnEditorLeave(id);
-    };
-  }, []);
 
   // ������ P2-5: ��ǰ�༭��ģʽ ref���� handleUpdate ͬ��д�ݸ��ã� ������������������������������
   const editorModeRef = useRef<EditorMode>(editorMode);
@@ -1674,6 +1712,39 @@ function EditorPaneCore({
     }
 
     // Phase 2: �㲥"�����ڱ༭"��1.5s �������������Զ�ȡ����
+    // 产品决策（2026-10-30）：普通编辑不再自动 PUT——内容只进本地草稿并显示「待保存」；
+    // 版本记录只来自三个显式入口（Ctrl+S / 点击状态区 / 定时保存），它们经编辑器
+    // flushSave 带上 _flush 标记才会真正 PUT + 落记录。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && data._flush !== true) {
+      try { flagEditing(); } catch {}
+      actions.setSyncStatus("pending");
+      return;
+    }
+
+    // 与"服务器已知内容"比对（不能与本地 activeNote 比：防抖 emit 已把本地刷成最新）。
+    // 挂载初始化 emit / 空按 Ctrl+S 都算一致 → 静默忽略，不显示待保存。
+    const serverSnap = lastServerContentRef.current;
+    const unchanged = !!serverSnap && serverSnap.id === currentNote.id
+      && (data.content === undefined || data.content === serverSnap.content)
+      && (data.contentText === undefined || data.contentText === serverSnap.contentText)
+      && (data.title === undefined || data.title === serverSnap.title);
+
+    // 产品决策（2026-10-30）：普通编辑不再自动 PUT——内容只进本地草稿并显示「待保存」；
+    // 版本记录只来自三个显式入口（Ctrl+S / 点击状态区 / 定时保存），它们经编辑器
+    // flushSave 带上 _flush 标记才会真正 PUT + 落记录。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && data._flush !== true) {
+      try { flagEditing(); } catch {}
+      if (!unchanged) actions.setSyncStatus("pending");
+      return;
+    }
+
+    // 显式保存（_flush）但内容与当前一致：不发 PUT（否则服务器乐观锁会空转 +1，
+    // 之后真正修改时的版本记录号会把这些"空按"的次数叠上去，表现为版本号跳变）。
+    if (AUTO_SAVE_ON_UPDATE_DISABLED && unchanged) {
+      actions.setSyncStatus("idle");
+      return;
+    }
+
     try { flagEditing(); } catch {}
     actions.setSyncStatus("saving");
 
@@ -1879,6 +1950,13 @@ function EditorPaneCore({
         });
         actions.setSyncStatus("saved");
         actions.setLastSynced(new Date().toISOString());
+        // PUT 成功 → 服务器已知内容前移（flush 去重的新基准）
+        lastServerContentRef.current = {
+          id: currentNote.id,
+          content: updated.content ?? lastSentData.content ?? "",
+          contentText: updated.contentText ?? lastSentData.contentText ?? "",
+          title: updated.title,
+        };
         // 2���ָ� idle
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => actions.setSyncStatus("idle"), 2000);
@@ -1942,6 +2020,16 @@ function EditorPaneCore({
     const currentNote = activeNoteRef.current;
     if (!currentNote || syncStatus === "saving") return;
 
+    // 状态区点击 = 显式保存入口之一：先把编辑器 pending 的防抖更新 flush 成 PUT
+    //（flushSave 带 _flush 标记，绕过"普通编辑不自动 PUT"的门），等在途请求落盘。
+    try {
+      editorHandleRef.current?.flushSave();
+      const inflight = saveInflightRef.current;
+      if (inflight) {
+        await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+      }
+    } catch { /* PUT 失败也继续：后续手动同步与记录按服务端内容幂等 */ }
+
     // Manual sync must submit what is visible in the editor. In CRDT mode the live
     // Markdown resides in CodeMirror/Y.Doc and activeNote.content can still be the
     // previous server acknowledgement, which used to overwrite the second edit.
@@ -1991,6 +2079,11 @@ function EditorPaneCore({
       });
       actions.setSyncStatus("saved");
       actions.setLastSynced(new Date().toISOString());
+      // 版本记录入口①：手动同步成功 → 落一条 manual 版本记录。
+      // fire-and-forget；后端幂等（内容与最近一条版本一致时 created:false），不弹提示。
+      void recordManualNoteSave(updated.id).catch((e) => {
+        console.warn("[EditorPane] manual sync version record failed:", e);
+      });
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
       savedTimerRef.current = setTimeout(() => actions.setSyncStatus("idle"), 2000);
     } catch (error) {
@@ -1998,6 +2091,59 @@ function EditorPaneCore({
       actions.setSyncStatus("error");
     }
   }, [syncStatus, actions]);
+
+  // 版本记录入口②：Ctrl+S / Cmd+S —— flush 待存编辑后落一条 manual 版本记录。
+  // 普通防抖自动保存（PUT /notes）不落版本；后端按内容 hash 幂等，内容无变化不产生记录。
+  const saveAndRecordManualVersion = useCallback(async (noteId: string) => {
+    try {
+      editorHandleRef.current?.flushSave();
+      const inflight = saveInflightRef.current;
+      if (inflight) {
+        // flushSave 是同步触发的异步 PUT；等它在途请求落盘（上限 5s 防挂死），
+        // 保证快照记录的是用户按 Ctrl+S 时刻的编辑内容。
+        await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+      }
+    } catch { /* PUT 失败也继续：快照按服务端内容幂等，内容无变化不会落记录 */ }
+    try {
+      await recordManualNoteSave(noteId);
+    } catch (e) {
+      console.warn("[EditorPane] Ctrl+S version record failed:", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "s")) return;
+      const note = activeNoteRef.current;
+      if (!note || note.isTrashed) return;
+      e.preventDefault();
+      void saveAndRecordManualVersion(note.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [saveAndRecordManualVersion]);
+
+  // 版本记录入口③：定时保存 —— 间隔读用户偏好 versionAutoSaveIntervalMinutes（默认 5 分钟）。
+  // 到点先 flush 待存编辑再调快照端点（source=auto；内容无变化后端不落）。
+  // 无激活文档 / 离线 / flush 失败时跳过本轮；卸载时清理定时器。
+  useEffect(() => {
+    return startVersionAutoSaveTimer({
+      getActiveNoteId: () => activeNoteRef.current?.id ?? null,
+      flushPendingSave: async () => {
+        if (!navigator.onLine) return false;
+        try {
+          editorHandleRef.current?.flushSave();
+          const inflight = saveInflightRef.current;
+          if (inflight) {
+            await Promise.race([inflight.catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    });
+  }, []);
 
   const toggleFavorite = useCallback(async () => {
     if (!activeNote || activeNote.isTrashed) return;
@@ -3493,8 +3639,8 @@ const moveToTrash = useCallback(async () => {
             className="shrink-0 whitespace-nowrap text-[11px] text-tx-tertiary hover:text-accent-primary hover:underline cursor-pointer bg-transparent border-none p-0"
             title={t('editor.versionHistory')}
           >
-            {t('tiptap.version')}{activeNote.version}
-            <span className="hidden lg:inline"> · {new Date(activeNote.updatedAt + "Z").toLocaleString()}</span>
+            {/* 顶栏只显示版本记录号（随三个显式入口落记录而 +1），点击打开版本历史面板 */}
+            {t('tiptap.version')}{latestRecordVersion ?? 0}
           </button>
         </div>
 
@@ -5014,20 +5160,20 @@ function SyncIndicator({
   // 失败、排队和离线状态继续保留在同步状态机中，但不再主动展示为失败提示。
   // 手动同步入口仍保持可见，真正冲突继续走独立的冲突处理流程。
   const displayStatus: SyncStatus =
-    syncStatus === "error" || syncStatus === "queued" || syncStatus === "offline"
+    syncStatus === "saved"
+      ? "idle" // 显式保存完成后与空闲态同展示（已同步 · 时间）；「待保存」只在有未保存改动时出现
+      : syncStatus === "error" || syncStatus === "queued" || syncStatus === "offline"
       ? "idle"
       : syncStatus;
   const formatFullTime = (ts: string) => {
     try { return new Date(ts).toLocaleString(); } catch { return ts; }
   };
 
-  const getTooltip = () => {
+    const getTooltip = () => {
     switch (displayStatus) {
       case "saving": return t('editor.saving');
-      case "saved":
-        return lastSyncedAt
-          ? `${t('editor.allSaved')}：${formatFullTime(lastSyncedAt)}`
-          : t('editor.allSaved');
+      case "pending":
+        return t('editor.pendingSaveTooltip');
       default:
         if (lastSyncedAt) {
           const diff = Date.now() - new Date(lastSyncedAt).getTime();
@@ -5059,15 +5205,15 @@ function SyncIndicator({
             <RefreshCw size={13} className="text-accent-primary" />
           </motion.div>
         )}
-        {displayStatus === "saved" && (
+        {displayStatus === "pending" && (
           <motion.div
-            key="saved"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: [1.3, 1] }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            transition={{ duration: 0.25 }}
+            key="pending"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
           >
-            <Check size={13} className="text-green-500" />
+            <Clock size={13} className="text-amber-500" />
           </motion.div>
         )}
         {displayStatus === "idle" && (
@@ -5086,20 +5232,11 @@ function SyncIndicator({
       <span className={cn(
         "hidden whitespace-nowrap sm:inline transition-colors",
         displayStatus === "saving" && "text-accent-primary",
-        displayStatus === "saved" && "text-green-500",
+        displayStatus === "pending" && "text-amber-500",
         displayStatus === "idle" && "text-tx-tertiary group-hover:text-tx-secondary",
       )}>
         {displayStatus === "saving" && t('editor.savingStatus')}
-        {displayStatus === "saved" && (
-          <>
-            {t('editor.savedStatus')}
-            {lastSyncedAt && (
-              <span className="ml-1 opacity-70">
-                · {new Date(lastSyncedAt).toLocaleTimeString()}
-              </span>
-            )}
-          </>
-        )}
+        {displayStatus === "pending" && t('editor.pendingSave')}
         {displayStatus === "idle" && (
           lastSyncedAt
             ? <>{t('editor.synced')}<span className="ml-1 opacity-70">· {new Date(lastSyncedAt).toLocaleTimeString()}</span></>

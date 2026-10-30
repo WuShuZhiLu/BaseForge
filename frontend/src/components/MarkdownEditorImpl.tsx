@@ -959,7 +959,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
 
   // ---------- �����߼� ----------
 
-  const emitSave = useCallback(() => {
+  const emitSave = useCallback((immediate = false) => {
     const view = viewRef.current;
     if (!view) return;
     const md = view.state.doc.toString();
@@ -977,7 +977,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         onUpdateRef.current({ title, _noteId: noteRef.current.id });
       }
     } else {
-      onUpdateRef.current({ content: md, contentText: plain, title, _noteId: noteRef.current.id });
+      onUpdateRef.current({ content: md, contentText: plain, title, _noteId: noteRef.current.id, _flush: immediate === true });
     }
   }, []);
 
@@ -994,7 +994,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       clearTimeout(debounceTimer.current);
       debounceTimer.current = null;
     }
-    emitSave();
+    emitSave(true);
     try {
       toast.success(tr("tiptap.saved") || "Saved");
     } catch {
@@ -1151,7 +1151,9 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       // 协同态下不 REST 保存（避免与 CRDT 重复写）；但含密文标记的笔记必须走 REST——
       // 这类笔记的 CRDT 已被禁用，若继续跳过保存，密文改动会丢。
       if (!collabEnabledRef.current || /nowen-encrypted/i.test(text)) {
-        scheduleSave();
+        // 只有用户真正在编辑器里输入（有焦点）才算"待保存"；打开文档时的程序化/协同回放
+        // 不标记改动，否则重开文档会莫名显示待保存。
+        if (update.view.hasFocus) scheduleSave();
       }
 
       const cursor = update.state.selection.main.head;
