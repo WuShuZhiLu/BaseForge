@@ -16,8 +16,6 @@ import { useTranslation } from "react-i18next";
 import FormatAwareEditorPane from "@/components/FormatAwareEditorPane";
 import NoteTabsBar from "@/components/NoteTabsBar";
 import {
-  EditorChromeSlot,
-  EditorToolbarDetached,
   EditorToolbarExpandSlot,
   EditorToolbarHost,
 } from "@/components/CollapsibleEditorToolbar";
@@ -46,10 +44,10 @@ import {
   resolveEditorSplitReferenceSide,
   saveEditorSplitRatio,
   shouldActivateSplitPane,
-  type EditorSplitReferenceSide,
 } from "@/lib/editorWorkspaceLayout";
 import {
   applyEditorUpdateToNote,
+  publishEditorSplitMirrorUpdate,
   readEditorSplitMirrorUpdate,
   requestEditorSplitMirror,
   UPDATE_EDITOR_SPLIT_MIRROR_EVENT,
@@ -78,41 +76,14 @@ const SPLIT_SEPARATOR_MENU_DELAY_MS = 220;
 const SPLIT_MENU_WIDTH = 208;
 const SPLIT_MENU_HEIGHT = 176;
 /**
- * 参考栏工具栏（写死在编辑器内部、桌面由宿主接管）在分屏里必须让位给全宽那一条：
- * 这里只藏桌面 expanded 块，且作用是整栏子树；移动端 compact 与它的“更多”展开行不受影响。
+ * 失焦栏的工具栏（写死在编辑器内部）必须让位给全宽那一条：
+ * 聚焦栏的桌面 expanded 工具栏被 portal 到全宽行（不在本栏子树内，不受此类影响）；
+ * 失焦栏的工具栏就地渲染，由这两条类在桌面隐藏。移动端 compact 与它的“更多”展开行不受影响。
  */
 const REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS = [
   "md:[&_[data-mobile-editor-toolbar=expanded]]:hidden",
   "md:[&_[data-markdown-mobile-toolbar=expanded]]:hidden",
 ].join(" ");
-
-type PaneScrollSnapshot = Array<{ index: number; top: number }>;
-
-/** 一栏内所有可滚动元素（编辑器/代码块/大纲各自可能是滚动容器），按 DOM 顺序取。 */
-function collectPaneScrollables(role: "main" | "reference"): HTMLElement[] {
-  if (typeof document === "undefined") return [];
-  const root = document.querySelector<HTMLElement>(`[data-editor-split-pane="${role}"]`);
-  if (!root) return [];
-  return Array.from(root.querySelectorAll<HTMLElement>("*"))
-    .filter((el) => el.scrollHeight > el.clientHeight + 8);
-}
-
-function readPaneScroll(role: "main" | "reference"): PaneScrollSnapshot {
-  return collectPaneScrollables(role)
-    .map((el, index) => ({ index, top: el.scrollTop }))
-    .filter((item) => item.top > 0);
-}
-
-function writePaneScroll(role: "main" | "reference", snapshot: PaneScrollSnapshot): void {
-  if (snapshot.length === 0) return;
-  const scrollables = collectPaneScrollables(role);
-  for (const item of snapshot) {
-    const el = scrollables[item.index];
-    if (!el) continue;
-    const max = el.scrollHeight - el.clientHeight;
-    if (max > 0) el.scrollTop = Math.min(item.top, max);
-  }
-}
 
 export default function EditorSplitView() {
   const { state } = useApp();
@@ -129,11 +100,10 @@ export default function EditorSplitView() {
   const [referenceSyncing, setReferenceSyncing] = useState(false);
   /** 分隔条点击弹出的分屏操作菜单（视口坐标）；null = 关闭。 */
   const [splitMenuAt, setSplitMenuAt] = useState<{ x: number; y: number } | null>(null);
-  /** 已完整加载过的文档快照：焦点在左右栏之间切换时用它首帧直出，避免空白/闪烁。 */
+  /** 已完整加载过的文档快照：栏内文档换篇后用它首帧直出，避免空白/闪烁。 */
   const noteCacheRef = useRef<Map<string, Note>>(new Map());
-  /** 切换防重入：连点参考栏正文会在一帧内读到同一份旧快照，重复交换会把两栏搞乱。 */
-  const switchPaneLockRef = useRef(false);
-  const switchPaneLockTimerRef = useRef<number | null>(null);
+  /** 分屏顶部的全宽工具栏落点行（聚焦栏的编辑器把桌面工具栏 portal 进来）。 */
+  const [toolbarRowEl, setToolbarRowEl] = useState<HTMLDivElement | null>(null);
   /** 分隔条“点击后延时开菜单”的定时器：双击复位时用它取消。 */
   const separatorMenuTimerRef = useRef<number | null>(null);
 
@@ -173,15 +143,10 @@ export default function EditorSplitView() {
       if (dragRafRef.current !== null) {
         cancelAnimationFrame(dragRafRef.current);
       }
-      if (switchPaneLockTimerRef.current !== null) {
-        window.clearTimeout(switchPaneLockTimerRef.current);
-        switchPaneLockTimerRef.current = null;
-      }
       if (separatorMenuTimerRef.current !== null) {
         window.clearTimeout(separatorMenuTimerRef.current);
         separatorMenuTimerRef.current = null;
       }
-      switchPaneLockRef.current = false;
     };
   }, []);
 
@@ -311,84 +276,53 @@ export default function EditorSplitView() {
     commitSplitRatio(pendingRatioRef.current + delta);
   }, [commitSplitRatio, split]);
 
+  // 主栏文档 id：新状态显式保存；旧状态缺省时迁移为当时的 activeNote（无主文档 → null 空态）。
+  const primaryNoteId = split
+    ? (split.primaryNoteId !== undefined ? split.primaryNoteId : (state.activeNote?.id ?? null))
+    : null;
+
   /**
-   * 交换两栏文档（焦点跟随 / ⇄ 调换共用）。
-   *
-   * 焦点切换会让两栏编辑器按新文档重建（主栏由 EditorPane(activeNote) 渲染），
-   * 重建后滚动位置归零。这里先按栏抓一份可滚动元素的 scrollTop，交换完成后再按
-   * 「文档现在所在的栏」恢复，避免用户只是点了一下另一栏就丢失阅读位置。
+   * 聚焦某一栏：两栏与文档的绑定原地不动，只把全局 activeNote 指向该栏文档。
+   * 不交换文档、不重挂载任何编辑器，因此不触发离开保存/版本快照。
    */
-  const switchSplitPanes = useCallback((paneNote: Note, referenceSide: EditorSplitReferenceSide) => {
+  const focusSplitPane = useCallback((paneNoteId: string) => {
     if (!split) return;
-    // 参考栏文档一律以 split.noteId 为准：点到的必须就是它，否则拿的是上一帧的旧快照。
-    const referenceNoteId = split.noteId;
-    if (paneNote.id !== referenceNoteId) return;
     const activeNote = state.activeNote;
-    // 无主文档（分屏刚建、主栏空态）或两栏已经是同一篇（镜像态）：直接 no-op。
-    if (!activeNote || !shouldActivateSplitPane(referenceNoteId, activeNote.id)) return;
-    // 切换进行中：忽略连点/双击，避免重复交换读同一份旧快照。
-    if (switchPaneLockRef.current) return;
-    switchPaneLockRef.current = true;
-    const mainSnapshot = readPaneScroll("main");
-    const referenceSnapshot = readPaneScroll("reference");
-    // 主文档与参考栏文档必须在一次派发里同时落库。分两次 dispatch（splitEditor +
-    // setActiveNote）时，后者可能被 note 激活守卫拦下或加密笔记「离开前」事件取消，
-    // 只剩 editorSplit.noteId 被改成原主文档 → split.noteId === activeNote.id →
-    // 编辑器落进「同文档只读镜像」，用户看到两栏变成同一篇文档。
-    actions.swapEditorSplitPanes({
-      activeNote: paneNote,
-      referenceNoteId: activeNote.id,
-      direction: split.direction,
-      referenceSide,
-    });
-    // 交换后：原主文档 → 参考栏；原参考文档 → 主栏
-    const restore = () => {
-      writePaneScroll("reference", mainSnapshot);
-      writePaneScroll("main", referenceSnapshot);
-    };
-    requestAnimationFrame(() => {
-      restore();
-      requestAnimationFrame(restore);
-    });
-    window.setTimeout(restore, 150);
-    window.setTimeout(restore, 400);
-    // 下一帧后再压一个短延时才放锁：双击的第二下已过一帧，仍会被挡掉。
-    requestAnimationFrame(() => {
-      if (switchPaneLockTimerRef.current !== null) {
-        window.clearTimeout(switchPaneLockTimerRef.current);
-      }
-      switchPaneLockTimerRef.current = window.setTimeout(() => {
-        switchPaneLockTimerRef.current = null;
-        switchPaneLockRef.current = false;
-      }, 180);
-    });
+    if (!activeNote || !shouldActivateSplitPane(paneNoteId, activeNote.id)) return;
+    const paneNote = noteCacheRef.current.get(paneNoteId);
+    if (!paneNote) return;
+    actions.setActiveNote(paneNote);
   }, [actions, split, state.activeNote]);
 
-  /**
-   * 焦点跟随：把参考栏文档设为主编辑文档。
-   * 参考栏位置随之翻转 —— 两栏文档留在原地，只交换“谁是主编辑栏”。
-   */
-  const promoteReferencePane = useCallback((paneNote: Note) => {
-    switchSplitPanes(paneNote, flipEditorSplitReferenceSide(split?.referenceSide));
-  }, [split, switchSplitPanes]);
-
-  /** 交换左右（ArrowLeftRight）：两栏文档互换位置，参考栏留在原侧。 */
-  const swapSplitPanes = useCallback((paneNote: Note) => {
-    switchSplitPanes(paneNote, resolveEditorSplitReferenceSide(split?.referenceSide));
-  }, [split, switchSplitPanes]);
-
-  const handleReferencePaneClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (!split || event.button !== 0) return;
+  const handlePaneActivation = useCallback((event: React.MouseEvent<HTMLDivElement>, paneNoteId: string | null) => {
+    if (event.button !== 0 || !paneNoteId) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest(SPLIT_PANE_ACTIVATION_IGNORE_SELECTOR)) return;
-    // 拖选文本/代码时不要抢焦点：选区非空视为“读参考”，保持 activeNote 不变。
+    // 拖选文本/代码时不要抢焦点：选区非空视为“阅读”，保持 activeNote 不变。
     if ((window.getSelection()?.toString() ?? "").length > 0) return;
-    const paneNote = noteCacheRef.current.get(split.noteId);
-    if (!paneNote) return;
-    promoteReferencePane(paneNote);
-  }, [promoteReferencePane, split]);
+    focusSplitPane(paneNoteId);
+  }, [focusSplitPane]);
 
-  const handleReferenceNoteLoaded = useCallback((loaded: Note) => {
+  const handlePrimaryPaneClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    handlePaneActivation(event, primaryNoteId);
+  }, [handlePaneActivation, primaryNoteId]);
+
+  const handleReferencePaneClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    handlePaneActivation(event, split?.noteId ?? null);
+  }, [handlePaneActivation, split]);
+
+  /** ⇄ 交换两栏视觉位置：文档与栏的绑定不动，只翻转参考栏在哪一侧。 */
+  const swapSplitSides = useCallback(() => {
+    if (!split) return;
+    actions.splitEditor({
+      noteId: split.noteId,
+      primaryNoteId,
+      direction: split.direction,
+      referenceSide: flipEditorSplitReferenceSide(split.referenceSide),
+    });
+  }, [actions, primaryNoteId, split]);
+
+  const handleNoteLoaded = useCallback((loaded: Note) => {
     noteCacheRef.current.set(loaded.id, loaded);
   }, []);
 
@@ -398,13 +332,15 @@ export default function EditorSplitView() {
 
   if (!split) return <FormatAwareEditorPane />;
 
-  // 主栏文档缺省（先点分屏、后选文档）：分屏照常渲染，主栏给空态，
-  // 参考栏照常显示它的文档；用户随后打开的文档会自然落到主栏。
-  const duplicateDocument = !!state.activeNote && split.noteId === state.activeNote.id;
+  // 同文档镜像：两栏绑定同一篇文档（primaryNoteId === noteId），参考栏固定只读。
+  const duplicateDocument = !!primaryNoteId && primaryNoteId === split.noteId;
+  // 聚焦归属：文档 id === activeNote.id 的栏是焦点栏（唯一可编辑、认领全宽工具栏）。
+  // 镜像态固定主栏为焦点栏，避免两栏同时认领工具栏。
+  const activeNoteId = state.activeNote?.id ?? null;
+  const primaryIsFocused = !!primaryNoteId && primaryNoteId === activeNoteId;
+  const referenceIsFocused = !duplicateDocument && split.noteId === activeNoteId;
   const effectiveReadOnly = duplicateDocument || referenceReadOnly;
   const referenceFirst = resolveEditorSplitReferenceSide(split.referenceSide) === "start";
-  const referenceTitle = state.openNoteTabs.find((tab) => tab.id === split.noteId)?.title
-    || t("editorTabs.noTitle");
 
   const referenceControls = (
     <div className="flex shrink-0 items-center gap-0.5" data-split-pane-controls="">
@@ -452,10 +388,7 @@ export default function EditorSplitView() {
       <button
         type="button"
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40"
-        onClick={() => {
-          const paneNote = noteCacheRef.current.get(split.noteId);
-          if (paneNote) swapSplitPanes(paneNote);
-        }}
+        onClick={swapSplitSides}
         disabled={duplicateDocument}
         title={t("editorTabs.promoteSplit", { defaultValue: "设为主编辑文档并交换主副屏" })}
         aria-label={t("editorTabs.promoteSplit", { defaultValue: "设为主编辑文档并交换主副屏" })}
@@ -491,6 +424,7 @@ export default function EditorSplitView() {
       onMouseDown={startResize}
       onDoubleClick={handleSeparatorDoubleClick}
       onKeyDown={handleSeparatorKeyDown}
+      style={{ order: 1 }}
       className={cn(
         "group relative shrink-0 bg-app-border hover:bg-accent-primary/30 active:bg-accent-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/60",
         split.direction === "down" ? "h-2 w-full cursor-row-resize" : "h-full w-2 cursor-col-resize"
@@ -529,24 +463,16 @@ export default function EditorSplitView() {
   );
 
   /**
-   * 参考栏的抬头改为浮层：左上角半透明文档名，右上角本栏控件。
-   * 两者都浮在正文之上，不再占用一整行高度（原来那一行把两栏各自压窄）。
-   * 浮签本身 pointer-events-none，点击仍然落到正文（= 把该栏设为主编辑文档）。
-   * 参考栏自己的格式工具栏已让位给全宽那条，正文贴顶，所以浮层固定贴顶。
+   * 参考栏控件条：挂在分屏容器层的固定位置（视觉上始终右上角），
+   * 不属于任何一栏，因此 ⇄ 交换左右后它不随参考栏换边移动。
+   * 浮层本身 pointer-events-none，控件条 pointer-events-auto；
+   * 点击仍作用于参考栏文档（split.noteId），行为不变。
    */
-  const referencePaneOverlay = (
+  const referenceControlsOverlay = (
     <div
-      className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 p-2"
-      data-split-pane-overlay="reference"
+      className="pointer-events-none absolute right-2 top-2 z-40 flex justify-end"
+      data-split-pane-controls-anchor=""
     >
-      <span
-        className="min-w-0 max-w-[55%] truncate rounded-md px-2 py-0.5 text-[11px] text-tx-secondary shadow-sm backdrop-blur"
-        style={{ backgroundColor: "color-mix(in srgb, var(--color-elevated) 80%, transparent)" }}
-        title={referenceTitle}
-        data-split-pane-label=""
-      >
-        {referenceTitle}
-      </span>
       <div
         className="pointer-events-auto flex shrink-0 items-center gap-0.5 rounded-md px-0.5 shadow-sm backdrop-blur"
         style={{ backgroundColor: "color-mix(in srgb, var(--color-elevated) 80%, transparent)" }}
@@ -557,37 +483,56 @@ export default function EditorSplitView() {
     </div>
   );
 
-  // 主栏：全局 activeNote 的完整编辑器。页签栏已提到分屏容器顶部（全宽一套），栏内不再重复。
-  const mainColumn = (
-    <SplitPaneColumn role="main" first={!referenceFirst} direction={split.direction}>
-      {state.activeNote ? <FormatAwareEditorPane /> : mainEmptyState}
+  // 主栏：固定绑定 primaryNoteId 的文档（与 activeNote 解耦，聚焦切换不换篇）。
+  // 页签栏已提到分屏容器顶部（全宽一套），栏内不再重复。
+  const primaryColumn = (
+    <SplitPaneColumn
+      role="main"
+      first={!referenceFirst}
+      direction={split.direction}
+      order={referenceFirst ? 2 : 0}
+      onClick={handlePrimaryPaneClick}
+      contentClassName={REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS}
+    >
+      {primaryNoteId ? (
+        <PaneToolbarScope active={primaryIsFocused} toolbarRow={toolbarRowEl}>
+          <SplitEditorPane
+            key={`pane-${primaryNoteId}`}
+            noteId={primaryNoteId}
+            initialNote={noteCacheRef.current.get(primaryNoteId) ?? null}
+            readOnly={false}
+            duplicateDocument={duplicateDocument}
+            onLoaded={handleNoteLoaded}
+            onSyncingChange={noopSyncing}
+          />
+        </PaneToolbarScope>
+      ) : mainEmptyState}
     </SplitPaneColumn>
   );
 
-  // 参考栏：本栏文档独立加载；抬头只剩浮层（文档名 + 本栏控件）。
-  // 整栏包在 EditorToolbarDetached 里 → 读不到宿主上下文，永远不会抢全宽工具栏；
-  // 它自己的桌面工具栏由 REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS 让位（工具栏归 activeNote）。
+  // 参考栏：固定绑定 split.noteId 的文档，独立加载；控件条已上提到分屏容器层（固定右上角）。
+  // 失焦栏的桌面工具栏就地渲染，由 REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS 让位给全宽那条。
   const referenceColumn = (
-    <EditorToolbarDetached>
-      <SplitPaneColumn
-        role="reference"
-        first={referenceFirst}
-        direction={split.direction}
-        onClick={handleReferencePaneClick}
-        overlay={referencePaneOverlay}
-        contentClassName={REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS}
-      >
+    <SplitPaneColumn
+      role="reference"
+      first={referenceFirst}
+      direction={split.direction}
+      order={referenceFirst ? 0 : 2}
+      onClick={handleReferencePaneClick}
+      contentClassName={REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS}
+    >
+      <PaneToolbarScope active={referenceIsFocused} toolbarRow={toolbarRowEl}>
         <SplitEditorPane
-          key={`split-pane-${split.noteId}`}
+          key={`pane-${split.noteId}`}
           noteId={split.noteId}
           initialNote={noteCacheRef.current.get(split.noteId) ?? null}
           readOnly={effectiveReadOnly}
           duplicateDocument={duplicateDocument}
-          onLoaded={handleReferenceNoteLoaded}
+          onLoaded={handleNoteLoaded}
           onSyncingChange={setReferenceSyncing}
         />
-      </SplitPaneColumn>
-    </EditorToolbarDetached>
+      </PaneToolbarScope>
+    </SplitPaneColumn>
   );
 
   const menuX = splitMenuAt
@@ -615,20 +560,11 @@ export default function EditorSplitView() {
       )}
 
       {/*
-        全宽顶栏：主栏编辑器把桌面顶栏（标题/版本/同步/操作）portal 到这里，
-        于是顶栏横跨整个分屏宽度；内容随 activeNote 变化，位置固定不变。
+        全宽格式工具栏落点行：聚焦栏的编辑器（PaneToolbarScope 内）把自己的
+        EditorToolbarExpandSlot portal 到这里，工具栏宽度 = 整个分屏宽度，作用的是聚焦栏文档。
+        没有聚焦栏（例如主栏空态、两栏都失焦）时该行为空，高度归零。
       */}
-      <EditorChromeSlot className="shrink-0" />
-
-      {/*
-        全宽格式工具栏：主栏编辑器认领宿主后把自己的桌面工具栏 portal 到这里，
-        于是工具栏宽度 = 整个分屏宽度，作用的仍然是 activeNote。
-        没有编辑器认领（例如主栏空态）时它是空 span，`empty:hidden` 让整行消失。
-      */}
-      <EditorToolbarExpandSlot
-        location="header"
-        className="w-full [&>*]:w-full [&>*]:min-w-0"
-      />
+      <div ref={setToolbarRowEl} className="shrink-0" data-editor-split-toolbar-row="" />
 
       <div
         ref={splitContainerRef}
@@ -637,27 +573,19 @@ export default function EditorSplitView() {
           "--split-secondary": `${(1 - splitRatio) * 100}%`,
         } as React.CSSProperties}
         className={cn(
-          "flex-1 min-h-0 min-w-0 overflow-hidden",
+          "relative flex-1 min-h-0 min-w-0 overflow-hidden",
           split.direction === "down" ? "flex flex-col" : "flex"
         )}
       >
         {/*
-          两栏按视觉位置挂载（不按 key 追踪身份）：参考栏换边时，
-          同一个位置上的编辑器换成另一份文档，内容不会左右对调。
+          两栏与文档固定绑定（key = pane-${noteId}），DOM 顺序固定；
+          参考栏换边（⇄）只翻转 CSS order，不重挂载任何编辑器。
+          控件条挂在容器层固定右上角（不随换边移动），z 高于两栏内容。
         */}
-        {referenceFirst ? (
-          <>
-            {referenceColumn}
-            {separator}
-            {mainColumn}
-          </>
-        ) : (
-          <>
-            {mainColumn}
-            {separator}
-            {referenceColumn}
-          </>
-        )}
+        {primaryColumn}
+        {separator}
+        {referenceColumn}
+        {referenceControlsOverlay}
       </div>
 
       {/*
@@ -681,8 +609,7 @@ export default function EditorSplitView() {
               disabled={duplicateDocument || !state.activeNote}
               onClick={() => {
                 setSplitMenuAt(null);
-                const paneNote = noteCacheRef.current.get(split.noteId);
-                if (paneNote) promoteReferencePane(paneNote);
+                focusSplitPane(split.noteId);
               }}
             />
             <MenuItem
@@ -691,8 +618,7 @@ export default function EditorSplitView() {
               disabled={duplicateDocument || !state.activeNote}
               onClick={() => {
                 setSplitMenuAt(null);
-                const paneNote = noteCacheRef.current.get(split.noteId);
-                if (paneNote) swapSplitPanes(paneNote);
+                swapSplitSides();
               }}
             />
             <MenuSeparator />
@@ -720,26 +646,57 @@ export default function EditorSplitView() {
     </div>
   );
 
-  // 宿主包在最外层：页签栏 + 全宽工具栏 + 分屏内容都在同一个上下文里，
-  // 只有主栏编辑器会认领它（参考栏被 EditorToolbarDetached 切断）。
-  return <EditorToolbarHost>{splitViewBody}</EditorToolbarHost>;
+  // 不再包全局宿主：每栏在 PaneToolbarScope 里各有一个独立宿主，
+  // 聚焦栏把自己的工具栏落点 portal 到全宽行，失焦栏就地渲染（整栏样式隐藏）。
+  return splitViewBody;
+}
+
+/** 主栏编辑器保存时的同步指示不占独立 UI（保存状态经页签/列表体现），占位回调保持 props 形状稳定。 */
+function noopSyncing(_syncing: boolean): void {}
+
+/**
+ * 单栏工具栏作用域：每栏一个独立宿主（组件类型与树位置固定，聚焦切换不重挂载栏内编辑器）。
+ * 聚焦栏把自己的 EditorToolbarExpandSlot portal 到分屏顶部的全宽行 → 桌面工具栏横跨全宽；
+ * 失焦栏不渲染落点（宿主 target 为空）→ 工具栏就地渲染，由整栏样式在桌面隐藏。
+ */
+function PaneToolbarScope({
+  active,
+  toolbarRow,
+  children,
+}: {
+  active: boolean;
+  toolbarRow: HTMLDivElement | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <EditorToolbarHost>
+      {children}
+      {active && toolbarRow && createPortal(
+        <EditorToolbarExpandSlot
+          location="header"
+          className="w-full [&>*]:w-full [&>*]:min-w-0"
+        />,
+        toolbarRow,
+      )}
+    </EditorToolbarHost>
+  );
 }
 
 function SplitPaneColumn({
   role,
   first,
+  order,
   direction,
-  overlay,
   contentClassName,
   onClick,
   children,
 }: {
   role: "main" | "reference";
   first: boolean;
+  /** CSS order：DOM 顺序固定，参考栏换边只翻转视觉位置，不重挂载两栏编辑器。 */
+  order: number;
   direction: EditorSplitState["direction"];
-  /** 浮在正文之上的抬头（参考栏文档名浮签 + 本栏控件）。 */
-  overlay?: React.ReactNode;
-  /** 附加到正文容器的类（例如只读参考时隐藏编辑器自带工具栏）。 */
+  /** 附加到正文容器的类（例如失焦时隐藏编辑器自带的桌面工具栏）。 */
   contentClassName?: string;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   children: React.ReactNode;
@@ -752,10 +709,12 @@ function SplitPaneColumn({
         "relative flex min-h-0 min-w-0 flex-none flex-col overflow-hidden",
         direction === "down" ? "w-full" : "h-full",
       )}
-      style={{ flexBasis: first ? "var(--split-primary)" : "var(--split-secondary)" }}
+      style={{
+        flexBasis: first ? "var(--split-primary)" : "var(--split-secondary)",
+        order,
+      }}
       onClick={onClick}
     >
-      {overlay}
       <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", contentClassName)}>
         {children}
       </div>
@@ -935,10 +894,13 @@ function SplitEditorPaneRuntime({
     if (
       readOnly ||
       !current ||
-      state.activeNote?.id === current.id ||
       !canWriteNote(current) ||
       (data._noteId && data._noteId !== current.id)
     ) return;
+    if (duplicateDocument) {
+      // 同文档镜像：本栏是可编辑的主栏，把更新实时广播给只读镜像栏。
+      publishEditorSplitMirrorUpdate(current.id, data);
+    }
     onSyncingChange(true);
     try {
       const updated = await api.updateNote(current.id, {
@@ -972,7 +934,7 @@ function SplitEditorPaneRuntime({
     } finally {
       onSyncingChange(false);
     }
-  }, [actions, onLoaded, onSyncingChange, readOnly, state.activeNote?.id, t]);
+  }, [actions, duplicateDocument, onLoaded, onSyncingChange, readOnly, state.activeNote?.id, t]);
 
   const handleOpenNote = useCallback(async (targetNoteId: string) => {
     await loadPrimaryNote({
@@ -998,7 +960,9 @@ function SplitEditorPaneRuntime({
   // 换栏/换文档时绝不渲染上一份文档：note 与 noteId 不一致时按空态处理，
   // 避免“内容对调但编辑器挂旧 doc”。
   const displayNote = note && note.id === noteId ? note : null;
-  const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && state.activeNote?.id !== noteId && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;
+  // 焦点栏与副屏（“允许副屏编辑”）都可编辑：保存由本栏 SplitEditorPane 自理，
+  // 不再依赖“是否 activeNote”分流到主编辑器。
+  const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;
 
   return (
     <section

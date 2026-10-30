@@ -32,8 +32,10 @@ describe("shared note read-only permissions", () => {
 
   it("keeps the split editor read-only and ignores stale update callbacks", () => {
     expect(splitViewSource).toContain('import { canWriteNote } from "@/lib/notePermissions";');
+    // 分屏改为两栏固定绑定文档（2026-10）：焦点栏编辑不再借道 activeNote 分流，
+    // 每一栏的编辑权仍必须过 canWriteNote + readOnly 门，镜像栏固定只读。
     expect(splitViewSource).toContain(
-      "const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && state.activeNote?.id !== noteId && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;",
+      "const editable = !!note && canWriteNote(note) && note.id === noteId && !readOnly && !note.isLocked && !note.isTrashed && !loadingState.pendingNoteId;",
     );
     expect(splitViewSource).toMatch(/readOnly\s*\|\|[\s\S]*!canWriteNote\(current\)/);
   });
