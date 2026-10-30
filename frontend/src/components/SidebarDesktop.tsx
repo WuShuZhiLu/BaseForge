@@ -47,7 +47,8 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import type { FileItem, NoteListItem, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
+import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
+import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
@@ -369,6 +370,8 @@ export default function SidebarDesktop() {
   const [plugCat, setPlugCat] = useState<"installed" | "market" | "disabled">("installed");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   // 知识库面板：+ 新建菜单（复用旧版 KnowledgeTreeCreateDropdown）与 ⋮ 更多菜单（排序/折叠/刷新）
   const [createMenuState, setCreateMenuState] = useState<KnowledgeTreeCreateMenuState | null>(null);
   const [sortMode, setSortMode] = useState<KnowledgeTreeSortMode>(() => loadKnowledgeTreeSortMode());
@@ -1803,6 +1806,11 @@ export default function SidebarDesktop() {
     ),
   };
 
+  const activeWorkspace = workspaces.find((w) => w.id === currentWs);
+  const canManageActiveWorkspace = Boolean(
+    activeWorkspace && (activeWorkspace.role === "owner" || activeWorkspace.role === "admin"),
+  );
+
   return (
     <aside
       className="relative flex h-full min-w-0 flex-col overflow-hidden border-r border-app-border bg-app-surface text-tx-primary"
@@ -1854,6 +1862,24 @@ export default function SidebarDesktop() {
                   {currentWs === w.id && <Check size={12} className="text-accent-primary" />}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => { setSpaceOpen(false); setCreateOpen(true); }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
+              >
+                <Plus size={13} className="shrink-0 text-tx-tertiary" />
+                <span className="flex-1">创建空间</span>
+              </button>
+              {canManageActiveWorkspace && (
+                <button
+                  type="button"
+                  onClick={() => { setSpaceOpen(false); setManageOpen(true); }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
+                >
+                  <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  <span className="flex-1">空间管理</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setSpaceOpen(false); setJoinOpen(true); }}
@@ -2468,12 +2494,35 @@ export default function SidebarDesktop() {
         </>
       )}
 
+      {/* ===== 创建空间对话框 ===== */}
+      {createOpen && (
+        <CreateWorkspaceDialog
+          onClose={() => setCreateOpen(false)}
+          onCreated={(workspace) => {
+            setCreateOpen(false);
+            api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
+            switchSpace(workspace.id);
+          }}
+        />
+      )}
+
       {/* ===== 加入空间对话框 ===== */}
       {joinOpen && (
         <JoinWorkspaceDialog
           onClose={() => setJoinOpen(false)}
           onJoined={() => {
             setJoinOpen(false);
+            api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
+          }}
+        />
+      )}
+
+      {/* ===== 当前空间管理（成员/邀请/功能） ===== */}
+      {manageOpen && activeWorkspace && (
+        <MembersPanel
+          workspaceId={activeWorkspace.id}
+          onClose={() => {
+            setManageOpen(false);
             api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
           }}
         />

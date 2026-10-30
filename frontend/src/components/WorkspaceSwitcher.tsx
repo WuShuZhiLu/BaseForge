@@ -438,7 +438,7 @@ function WorkspaceItem({
 }
 
 /* ========== 创建工作区对话框 ========== */
-function CreateWorkspaceDialog({
+export function CreateWorkspaceDialog({
   onClose,
   onCreated,
 }: {
