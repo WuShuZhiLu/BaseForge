@@ -63,6 +63,7 @@ import { TextSelection, NodeSelection } from "@tiptap/pm/state";
 import { CellSelection } from "@tiptap/pm/tables";
 import { markdownToSimpleHtml } from "@/lib/importService";
 import { repairTiptapJson } from "@/lib/tiptapSchemaRepair";
+import { EditorToolbarPortal, useEditorToolbarSlot } from "@/components/CollapsibleEditorToolbar";
 import { markdownToHtml as mdToFullHtml, detectFormat as detectContentFormat, tiptapJsonToMarkdown } from "@/lib/contentFormat";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { findInternalMarkdownMarkerRanges } from "@/lib/markdownUserContent";
@@ -5402,6 +5403,11 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   // 内容不在顶端（>4px）时给 sticky 工具栏加底部阴影，
   // 让其视觉上「浮」于内容之上——跟 Notion / Bear / Craft 等主流移动端编辑器一致。
   const [toolbarShadow, setToolbarShadow] = useState(false);
+  /**
+   * 分屏宿主接管时返回全宽工具栏的落点（null = 就地渲染）。
+   * 只影响桌面端 expanded 工具栏；compact 工具栏永远留在编辑器内。
+   */
+  const desktopToolbarSlot = useEditorToolbarSlot();
   // 查找替换面板开关；Ctrl/Cmd+F / Ctrl/Cmd+H 打开。
   const [searchOpen, setSearchOpen] = useState(false);
   // Ctrl/Cmd+H 打开时要求直接展开替换行并聚焦替换框；Ctrl+F / 工具栏按钮打开时复位
@@ -5708,6 +5714,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
             <ChevronDown size={16} className={cn("transition-transform", mobileToolbarExpanded && "rotate-180")} />
           </ToolbarButton>
         </div>
+        {/* 桌面格式工具栏：分屏宿主接管时整块 portal 到全宽位置（内部结构不变）；
+            没有宿主就原地渲染，行为与之前完全一致。compact（移动端）永远留在原地。 */}
+        <EditorToolbarPortal target={desktopToolbarSlot}>
         <div
           ref={outlineToolbarRef}
           data-mobile-editor-toolbar="expanded"
@@ -6096,6 +6105,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           {toolbarExpanded ? <ChevronUp size={iconSize} /> : <ChevronDown size={iconSize} />}
         </ToolbarButton>
       </div>
+        </EditorToolbarPortal>
 
       {/* 折叠态已移除：改为同容器内 flex-nowrap/flex-wrap 切换 */}
       </>

@@ -126,6 +126,7 @@ import { copyText } from "@/lib/clipboard";
 import { openTaskQuickCapture } from "@/lib/taskInboxApi";
 import { findTextAction, type TextAction } from "@/lib/textActions";
 import { cn } from "@/lib/utils";
+import { EditorToolbarPortal, useEditorToolbarSlot } from "@/components/CollapsibleEditorToolbar";
 import { normalizeToMarkdown, markdownToPlainText } from "@/lib/contentFormat";
 import { internalMarkdownMarkerExtensions } from "@/lib/markdownInternalMarkers";
 import { sanitizeMarkdownClipboardText } from "@/lib/markdownUserContent";
@@ -471,6 +472,11 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
     && typeof window !== "undefined"
     && window.matchMedia("(max-width: 767px)").matches;
   const [mobileToolbarExpanded, setMobileToolbarExpanded] = useState(false);
+  /**
+   * 分屏宿主接管时返回全宽工具栏的落点（null = 就地渲染）。
+   * 只影响桌面端 expanded 工具栏；compact 工具栏永远留在编辑器内。
+   */
+  const desktopToolbarSlot = useEditorToolbarSlot();
   useEffect(() => {
     setMobileToolbarExpanded(false);
   }, [keyboardVisible, note.id]);
@@ -1928,6 +1934,9 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
               <ChevronDown size={16} className={cn("transition-transform", mobileToolbarExpanded && "rotate-180")} />
             </ToolbarButton>
           </div>
+          {/* 桌面格式工具栏：分屏宿主接管时整块 portal 到全宽位置（内部结构不变）；
+              没有宿主就原地渲染。compact（移动端）永远留在原地。 */}
+          <EditorToolbarPortal target={desktopToolbarSlot}>
           <div
             data-markdown-mobile-toolbar="expanded"
             className={cn(
@@ -2200,6 +2209,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
             </button>
           </div>
           </div>
+          </EditorToolbarPortal>
         </>
       )}
 

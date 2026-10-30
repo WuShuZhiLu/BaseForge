@@ -1,9 +1,26 @@
 import EncryptedConversionEditorGuard from "./EncryptedConversionEditorGuard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Eye, FileText, Loader2, PanelLeftClose, Pencil, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  ArrowLeftRight,
+  Columns2,
+  Eye,
+  FileText,
+  Loader2,
+  PanelLeftClose,
+  Pencil,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FormatAwareEditorPane from "@/components/FormatAwareEditorPane";
 import NoteTabsBar from "@/components/NoteTabsBar";
+import {
+  EditorToolbarDetached,
+  EditorToolbarExpandSlot,
+  EditorToolbarHost,
+} from "@/components/CollapsibleEditorToolbar";
+import { MenuItem, MenuSeparator, MenuSurface } from "@/components/ui/menu";
 import NoteLoadingSkeleton from "@/components/NoteLoadingSkeleton";
 import TiptapEditor from "@/components/TiptapEditor";
 import MarkdownEditor from "@/components/MarkdownEditor";
@@ -49,6 +66,25 @@ const SPLIT_PANE_ACTIVATION_IGNORE_SELECTOR = [
   "[role='button']",
 ].join(", ");
 
+/**
+ * 分隔条按下后位移超过该阈值才算拖拽（改比例）；否则松开时按“点击”处理，弹出操作菜单。
+ * 3px 是鼠标抖动与真实拖动的经验分界。
+ */
+const SPLIT_SEPARATOR_DRAG_THRESHOLD = 3;
+/** 点击后延时弹菜单：给双击（复位 50/50）留出取消窗口。 */
+const SPLIT_SEPARATOR_MENU_DELAY_MS = 220;
+/** 分屏操作菜单的估算尺寸，用于把浮层夹在视口内。 */
+const SPLIT_MENU_WIDTH = 208;
+const SPLIT_MENU_HEIGHT = 176;
+/**
+ * 参考栏工具栏（写死在编辑器内部、桌面由宿主接管）在分屏里必须让位给全宽那一条：
+ * 这里只藏桌面 expanded 块，且作用是整栏子树；移动端 compact 与它的“更多”展开行不受影响。
+ */
+const REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS = [
+  "md:[&_[data-mobile-editor-toolbar=expanded]]:hidden",
+  "md:[&_[data-markdown-mobile-toolbar=expanded]]:hidden",
+].join(" ");
+
 type PaneScrollSnapshot = Array<{ index: number; top: number }>;
 
 /** 一栏内所有可滚动元素（编辑器/代码块/大纲各自可能是滚动容器），按 DOM 顺序取。 */
@@ -90,11 +126,15 @@ export default function EditorSplitView() {
   const [splitRatio, setSplitRatio] = useState(pendingRatioRef.current);
   const [referenceReadOnly, setReferenceReadOnly] = useState(false);
   const [referenceSyncing, setReferenceSyncing] = useState(false);
+  /** 分隔条点击弹出的分屏操作菜单（视口坐标）；null = 关闭。 */
+  const [splitMenuAt, setSplitMenuAt] = useState<{ x: number; y: number } | null>(null);
   /** 已完整加载过的文档快照：焦点在左右栏之间切换时用它首帧直出，避免空白/闪烁。 */
   const noteCacheRef = useRef<Map<string, Note>>(new Map());
   /** 切换防重入：连点参考栏正文会在一帧内读到同一份旧快照，重复交换会把两栏搞乱。 */
   const switchPaneLockRef = useRef(false);
   const switchPaneLockTimerRef = useRef<number | null>(null);
+  /** 分隔条“点击后延时开菜单”的定时器：双击复位时用它取消。 */
+  const separatorMenuTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!split) return;
@@ -106,12 +146,25 @@ export default function EditorSplitView() {
   useEffect(() => {
     setReferenceReadOnly(false);
     setReferenceSyncing(false);
+    setSplitMenuAt(null);
   }, [split?.noteId, split?.direction]);
 
   useEffect(() => {
     if (!state.activeNote) return;
     noteCacheRef.current.set(state.activeNote.id, state.activeNote);
   }, [state.activeNote]);
+
+  // 菜单打开期间按 Esc 关闭（捕获阶段，抢在编辑器快捷键之前吃掉）。
+  useEffect(() => {
+    if (!splitMenuAt) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setSplitMenuAt(null);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [splitMenuAt]);
 
   useEffect(() => {
     return () => {
@@ -122,6 +175,10 @@ export default function EditorSplitView() {
       if (switchPaneLockTimerRef.current !== null) {
         window.clearTimeout(switchPaneLockTimerRef.current);
         switchPaneLockTimerRef.current = null;
+      }
+      if (separatorMenuTimerRef.current !== null) {
+        window.clearTimeout(separatorMenuTimerRef.current);
+        separatorMenuTimerRef.current = null;
       }
       switchPaneLockRef.current = false;
     };
@@ -156,9 +213,24 @@ export default function EditorSplitView() {
     });
   }, []);
 
+  /**
+   * 分隔条按下：位移 > 3px 才算拖拽（改比例），否则按“点击”处理，松开后弹出操作菜单。
+   * 按下不再立即把比例跳到光标处 —— 那样单击就会挪动分隔条，和“点击弹菜单”互相打架。
+   */
   const startResize = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (!split || event.button !== 0) return;
     event.preventDefault();
+    if (separatorMenuTimerRef.current !== null) {
+      window.clearTimeout(separatorMenuTimerRef.current);
+      separatorMenuTimerRef.current = null;
+    }
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const cursor = split.direction === "down" ? "row-resize" : "col-resize";
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    let dragging = false;
 
     const applyRatio = (clientX: number, clientY: number) => {
       const rect = splitContainerRef.current?.getBoundingClientRect();
@@ -169,41 +241,67 @@ export default function EditorSplitView() {
       previewSplitRatio(raw);
     };
 
-    applyRatio(event.clientX, event.clientY);
-    const cursor = split.direction === "down" ? "row-resize" : "col-resize";
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = cursor;
-    document.body.style.userSelect = "none";
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      applyRatio(moveEvent.clientX, moveEvent.clientY);
-    };
-    const cleanup = () => {
+    const detach = () => {
       if (dragRafRef.current !== null) {
         cancelAnimationFrame(dragRafRef.current);
         dragRafRef.current = null;
       }
-      commitSplitRatio(pendingRatioRef.current, split.direction);
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = previousUserSelect;
       window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", cleanup);
+      window.removeEventListener("mouseup", onMouseUp);
       dragCleanupRef.current = null;
     };
 
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragging) {
+        const moved = Math.abs(moveEvent.clientX - startX) + Math.abs(moveEvent.clientY - startY);
+        if (moved <= SPLIT_SEPARATOR_DRAG_THRESHOLD) return;
+        dragging = true;
+        document.body.style.cursor = cursor;
+        document.body.style.userSelect = "none";
+      }
+      applyRatio(moveEvent.clientX, moveEvent.clientY);
+    };
+
+    const onMouseUp = () => {
+      detach();
+      if (dragging) {
+        commitSplitRatio(pendingRatioRef.current, split.direction);
+        return;
+      }
+      // 单击：延时弹菜单，给双击（复位 50/50）留出取消窗口。
+      separatorMenuTimerRef.current = window.setTimeout(() => {
+        separatorMenuTimerRef.current = null;
+        setSplitMenuAt({ x: startX, y: startY });
+      }, SPLIT_SEPARATOR_MENU_DELAY_MS);
+    };
+
+    // 上一轮若没收尾（例如鼠标在窗口外松开）：只解绑，不落盘、不弹菜单。
     dragCleanupRef.current?.();
-    dragCleanupRef.current = cleanup;
+    dragCleanupRef.current = detach;
     window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", cleanup);
+    window.addEventListener("mouseup", onMouseUp);
   }, [commitSplitRatio, previewSplitRatio, split]);
 
   const handleSeparatorDoubleClick = useCallback(() => {
+    if (separatorMenuTimerRef.current !== null) {
+      window.clearTimeout(separatorMenuTimerRef.current);
+      separatorMenuTimerRef.current = null;
+    }
+    setSplitMenuAt(null);
     commitSplitRatio(EDITOR_SPLIT_DEFAULT_RATIO);
   }, [commitSplitRatio]);
 
   const handleSeparatorKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!split) return;
+    if (event.key === "Enter" || event.key === " ") {
+      // 键盘等价于单击分隔条：在分隔条中心弹出操作菜单。
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      setSplitMenuAt({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+      return;
+    }
     const decreaseKey = split.direction === "down" ? "ArrowUp" : "ArrowLeft";
     const increaseKey = split.direction === "down" ? "ArrowDown" : "ArrowRight";
     if (event.key !== decreaseKey && event.key !== increaseKey) return;
@@ -384,7 +482,11 @@ export default function EditorSplitView() {
       aria-valuemax={80}
       aria-valuenow={Math.round(splitRatio * 100)}
       tabIndex={0}
-      title={t("editorTabs.splitSeparatorHint", { defaultValue: "拖动调整分屏比例，双击恢复 50/50" })}
+      title={t("editorTabs.splitSeparatorHint", {
+        defaultValue: "拖动调整分屏比例，单击打开操作菜单，双击恢复 50/50",
+      })}
+      aria-haspopup="menu"
+      aria-expanded={!!splitMenuAt}
       onMouseDown={startResize}
       onDoubleClick={handleSeparatorDoubleClick}
       onKeyDown={handleSeparatorKeyDown}
@@ -425,67 +527,102 @@ export default function EditorSplitView() {
     </div>
   );
 
-  // 主栏：全局 activeNote 的完整编辑器（含自己的页签栏与格式工具栏）。
-  const mainColumn = (
-    <SplitPaneColumn
-      role="main"
-      first={!referenceFirst}
-      direction={split.direction}
-      header={prefs.enableNoteTabs ? <NoteTabsBar /> : null}
+  /**
+   * 参考栏的抬头改为浮层：左上角半透明文档名，右上角本栏控件。
+   * 两者都浮在正文之上，不再占用一整行高度（原来那一行把两栏各自压窄）。
+   * 浮签本身 pointer-events-none，点击仍然落到正文（= 把该栏设为主编辑文档）。
+   * 参考栏自己的格式工具栏已让位给全宽那条，正文贴顶，所以浮层固定贴顶。
+   */
+  const referencePaneOverlay = (
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 p-2"
+      data-split-pane-overlay="reference"
     >
+      <span
+        className="min-w-0 max-w-[55%] truncate rounded-md px-2 py-0.5 text-[11px] text-tx-secondary shadow-sm backdrop-blur"
+        style={{ backgroundColor: "color-mix(in srgb, var(--color-elevated) 80%, transparent)" }}
+        title={referenceTitle}
+        data-split-pane-label=""
+      >
+        {referenceTitle}
+      </span>
+      <div
+        className="pointer-events-auto flex shrink-0 items-center gap-0.5 rounded-md px-0.5 shadow-sm backdrop-blur"
+        style={{ backgroundColor: "color-mix(in srgb, var(--color-elevated) 80%, transparent)" }}
+        data-split-pane-controls=""
+      >
+        {referenceControls}
+      </div>
+    </div>
+  );
+
+  // 主栏：全局 activeNote 的完整编辑器。页签栏已提到分屏容器顶部（全宽一套），栏内不再重复。
+  const mainColumn = (
+    <SplitPaneColumn role="main" first={!referenceFirst} direction={split.direction}>
       {state.activeNote ? <FormatAwareEditorPane /> : mainEmptyState}
     </SplitPaneColumn>
   );
 
-  // 参考栏：本栏文档独立加载；抬头同样是自己的页签栏，右端挂本栏控件。
+  // 参考栏：本栏文档独立加载；抬头只剩浮层（文档名 + 本栏控件）。
+  // 整栏包在 EditorToolbarDetached 里 → 读不到宿主上下文，永远不会抢全宽工具栏；
+  // 它自己的桌面工具栏由 REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS 让位（工具栏归 activeNote）。
   const referenceColumn = (
-    <SplitPaneColumn
-      role="reference"
-      first={referenceFirst}
-      direction={split.direction}
-      onClick={handleReferencePaneClick}
-      header={prefs.enableNoteTabs ? (
-        <NoteTabsBar
-          currentNoteId={split.noteId}
-          compact
-          trailing={referenceControls}
-          onSelectTab={(noteId) => actions.splitEditor({
-            noteId,
-            direction: split.direction,
-            referenceSide: resolveEditorSplitReferenceSide(split.referenceSide),
-          })}
+    <EditorToolbarDetached>
+      <SplitPaneColumn
+        role="reference"
+        first={referenceFirst}
+        direction={split.direction}
+        onClick={handleReferencePaneClick}
+        overlay={referencePaneOverlay}
+        contentClassName={REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS}
+      >
+        <SplitEditorPane
+          key={`split-pane-${split.noteId}`}
+          noteId={split.noteId}
+          initialNote={noteCacheRef.current.get(split.noteId) ?? null}
+          readOnly={effectiveReadOnly}
+          duplicateDocument={duplicateDocument}
+          onLoaded={handleReferenceNoteLoaded}
+          onSyncingChange={setReferenceSyncing}
         />
-      ) : (
-        <div
-          className="flex h-9 shrink-0 items-center gap-1.5 border-b border-app-border bg-app-surface/60 px-2.5"
-          data-split-pane-controls=""
-        >
-          <div className="min-w-0 flex-1 truncate text-sm font-medium text-tx-primary" title={referenceTitle}>
-            {referenceTitle}
-          </div>
-          {referenceControls}
-        </div>
-      )}
-    >
-      <SplitEditorPane
-        key={`split-pane-${split.noteId}`}
-        noteId={split.noteId}
-        initialNote={noteCacheRef.current.get(split.noteId) ?? null}
-        readOnly={effectiveReadOnly}
-        duplicateDocument={duplicateDocument}
-        onLoaded={handleReferenceNoteLoaded}
-        onSyncingChange={setReferenceSyncing}
-      />
-    </SplitPaneColumn>
+      </SplitPaneColumn>
+    </EditorToolbarDetached>
   );
 
-  return (
+  const menuX = splitMenuAt
+    ? Math.max(8, Math.min(splitMenuAt.x, window.innerWidth - SPLIT_MENU_WIDTH - 8))
+    : 0;
+  const menuY = splitMenuAt
+    ? Math.max(8, Math.min(splitMenuAt.y, window.innerHeight - SPLIT_MENU_HEIGHT - 8))
+    : 0;
+
+  const splitViewBody = (
     <div
       className="flex-1 flex flex-col min-w-0 overflow-hidden bg-app-bg"
       data-editor-split-view=""
       data-editor-split-direction={split.direction}
       data-editor-split-reference-side={resolveEditorSplitReferenceSide(split.referenceSide)}
     >
+      {/*
+        全宽页签栏：只此一套（默认行为 → 列出所有打开页签、高亮 activeNote）。
+        它不再属于任何一栏，所以两栏都能用它切换文档，也不会各占一半宽。
+      */}
+      {prefs.enableNoteTabs && (
+        <div className="shrink-0" data-editor-split-tabs="">
+          <NoteTabsBar />
+        </div>
+      )}
+
+      {/*
+        全宽格式工具栏：主栏编辑器认领宿主后把自己的桌面工具栏 portal 到这里，
+        于是工具栏宽度 = 整个分屏宽度，作用的仍然是 activeNote。
+        没有编辑器认领（例如主栏空态）时它是空 span，`empty:hidden` 让整行消失。
+      */}
+      <EditorToolbarExpandSlot
+        location="header"
+        className="w-full [&>*]:w-full [&>*]:min-w-0"
+      />
+
       <div
         ref={splitContainerRef}
         style={{
@@ -515,22 +652,88 @@ export default function EditorSplitView() {
           </>
         )}
       </div>
+
+      {/*
+        分隔条操作菜单：单击分隔条 / Enter / Space 打开，点外部或 Esc 关闭。
+        整屏透明背板负责“点外部关闭”，菜单本体挂 fixed 坐标以免被分屏容器裁掉。
+      */}
+      {splitMenuAt && createPortal(
+        <div
+          className="fixed inset-0 z-[90]"
+          data-editor-split-menu-backdrop=""
+          onMouseDown={() => setSplitMenuAt(null)}
+        >
+          <MenuSurface
+            style={{ left: menuX, top: menuY }}
+            className="fixed z-[91]"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <MenuItem
+              icon={Columns2}
+              label={t("editorTabs.splitMenuSwitch")}
+              disabled={duplicateDocument || !state.activeNote}
+              onClick={() => {
+                setSplitMenuAt(null);
+                const paneNote = noteCacheRef.current.get(split.noteId);
+                if (paneNote) promoteReferencePane(paneNote);
+              }}
+            />
+            <MenuItem
+              icon={ArrowLeftRight}
+              label={t("editorTabs.splitMenuSwap")}
+              disabled={duplicateDocument || !state.activeNote}
+              onClick={() => {
+                setSplitMenuAt(null);
+                const paneNote = noteCacheRef.current.get(split.noteId);
+                if (paneNote) swapSplitPanes(paneNote);
+              }}
+            />
+            <MenuSeparator />
+            <MenuItem
+              icon={RotateCcw}
+              label={t("editorTabs.splitMenuReset")}
+              hint="50 / 50"
+              onClick={() => {
+                setSplitMenuAt(null);
+                commitSplitRatio(EDITOR_SPLIT_DEFAULT_RATIO);
+              }}
+            />
+            <MenuItem
+              icon={X}
+              label={t("editorTabs.splitMenuClose")}
+              onClick={() => {
+                setSplitMenuAt(null);
+                actions.closeEditorSplit();
+              }}
+            />
+          </MenuSurface>
+        </div>,
+        document.body
+      )}
     </div>
   );
+
+  // 宿主包在最外层：页签栏 + 全宽工具栏 + 分屏内容都在同一个上下文里，
+  // 只有主栏编辑器会认领它（参考栏被 EditorToolbarDetached 切断）。
+  return <EditorToolbarHost>{splitViewBody}</EditorToolbarHost>;
 }
 
 function SplitPaneColumn({
   role,
   first,
   direction,
-  header,
+  overlay,
+  contentClassName,
   onClick,
   children,
 }: {
   role: "main" | "reference";
   first: boolean;
   direction: EditorSplitState["direction"];
-  header?: React.ReactNode;
+  /** 浮在正文之上的抬头（参考栏文档名浮签 + 本栏控件）。 */
+  overlay?: React.ReactNode;
+  /** 附加到正文容器的类（例如只读参考时隐藏编辑器自带工具栏）。 */
+  contentClassName?: string;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   children: React.ReactNode;
 }) {
@@ -539,14 +742,16 @@ function SplitPaneColumn({
       data-editor-split-pane={role}
       data-editor-split-pane-first={first ? "true" : "false"}
       className={cn(
-        "flex min-h-0 min-w-0 flex-none flex-col overflow-hidden",
+        "relative flex min-h-0 min-w-0 flex-none flex-col overflow-hidden",
         direction === "down" ? "w-full" : "h-full",
       )}
       style={{ flexBasis: first ? "var(--split-primary)" : "var(--split-secondary)" }}
       onClick={onClick}
     >
-      {header}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      {overlay}
+      <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", contentClassName)}>
+        {children}
+      </div>
     </div>
   );
 }
