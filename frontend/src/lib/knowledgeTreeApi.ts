@@ -124,7 +124,9 @@ function workspaceQuery(includeDeleted = false, workspaceIdOverride?: string): s
 }
 
 function withDisplaySort(result: KnowledgeTreeResponse): KnowledgeTreeResponse {
-  return { ...result, nodes: applyKnowledgeTreeSort(result.nodes) };
+  // 空库/接口异常时 nodes 可能缺失，兜底成空数组，避免下游 for...of 抛 "nodes is not iterable"
+  const nodes = Array.isArray(result?.nodes) ? result.nodes : [];
+  return { ...result, nodes: applyKnowledgeTreeSort(nodes) };
 }
 
 export const knowledgeTreeApi = {

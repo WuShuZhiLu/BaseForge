@@ -531,7 +531,7 @@ export default function SidebarDesktop() {
   const reload = useCallback(async () => {
     try {
       const response = await knowledgeTreeApi.list();
-      setNodes(response.nodes);
+      setNodes(Array.isArray(response?.nodes) ? response.nodes : []);
     } catch (error) {
       console.error("[SidebarDesktop] knowledge tree load failed:", error);
     } finally {
@@ -1210,6 +1210,43 @@ export default function SidebarDesktop() {
     });
     setRowMenu(null);
   }, [nodes, focusRootId, childrenMap]);
+
+  /**
+   * 打开的文档 → 侧栏选中同步（VS Code 式定位）：页签切换 / 命令面板 / 列表打开文档时，
+   * 自动退出专注、展开祖先、选中对应节点并滚动到位，避免"编辑器显示 b、侧栏还选着 a"。
+   */
+  const revealNoteById = useCallback((noteId: string) => {
+    const hit = nodes.find((n) => !n.isDeleted && n.nodeType !== "folder" && n.resourceId === noteId);
+    if (!hit) return;
+    if (focusRootId && hit.id !== focusRootId && !isDescendant(hit.id, focusRootId, childrenMap)) {
+      setFocusRootId(null);
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      let cursor: KnowledgeTreeNode | undefined = hit;
+      while (cursor?.parentId) {
+        next.add(cursor.parentId);
+        cursor = byId.get(cursor.parentId);
+      }
+      return next;
+    });
+    setSelectedNodeIds(new Set([hit.id]));
+    requestAnimationFrame(() => {
+      const el = treeRootRef.current?.querySelector(`[data-next-row="${hit.id}"]`);
+      el?.scrollIntoView({ block: "center" });
+    });
+  }, [nodes, focusRootId, childrenMap]);
+
+  // activeNote 变化（页签切换 / 命令面板 / 侧栏打开）时把选中与滚动定位同步过去；
+  // lastRevealedIdRef 防止同一文档重复触发（避免与用户手动多选打架）。
+  const lastRevealedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = state.activeNote?.id ?? null;
+    if (!id || lastRevealedIdRef.current === id) return;
+    lastRevealedIdRef.current = id;
+    revealNoteById(id);
+  }, [state.activeNote?.id, revealNoteById]);
 
   // ---- 菜单渲染位置修正（底部越界上翻） ----
   const menuStyle = useMemo(() => {

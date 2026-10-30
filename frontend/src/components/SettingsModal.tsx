@@ -1637,7 +1637,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
         transition={{ type: "spring", duration: 0.5, bounce: 0 }}
-        className="relative w-full max-w-4xl h-[80vh] min-h-[500px] flex flex-col md:flex-row overflow-hidden bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 max-md:h-[100dvh] max-md:max-w-none max-md:rounded-none max-md:border-0"
+        className="relative w-[min(1100px,86vw)] h-[min(78vh,calc(100dvh-4rem))] flex flex-col md:flex-row overflow-hidden bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 max-md:h-[100dvh] max-md:w-full max-md:max-h-none max-md:max-w-none max-md:rounded-none max-md:border-0"
         style={{ touchAction: "pan-y pinch-zoom" }}
         onClick={(e) => e.stopPropagation()}
         onPointerDownCapture={(e) => e.stopPropagation()}
@@ -1686,7 +1686,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
             <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{t('settings.title')}</span>
           </div>
 
-          <nav className="flex-1 space-y-0.5">
+          <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 pr-1">
             {SETTING_TABS.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
