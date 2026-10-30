@@ -358,8 +358,8 @@
     "routeUnavailableHint": "This note is currently unavailable. Returned to the list. If its folder is password-protected, unlock the folder first."
   },
   "editor": {
-    "selectNote": "Select a note to start editing",
-    "orCreateNew": "or create a new note",
+    "selectNote": "Pick a document from a knowledge base",
+    "orCreateNew": "or press Alt+N to create one there",
     "back": "Back",
     "moveToNotebook": "Move to another notebook",
     "moveToLabel": "Move to...",
@@ -437,7 +437,7 @@
     "offline": "Currently offline",
     "synced": "Synced",
     "sync": "Sync",
-    "newNoteShortcut": "Quick New Note",
+    "newNoteShortcut": "New document",
     "noteLoading": "Loading note...",
     "modeSwitch": {
       "toMd": "Currently Markdown editor, click to switch to rich text",

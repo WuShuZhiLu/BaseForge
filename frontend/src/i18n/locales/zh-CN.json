@@ -373,8 +373,8 @@
     }
   },
   "editor": {
-    "selectNote": "选择一条笔记开始编辑",
-    "orCreateNew": "或创建新笔记",
+    "selectNote": "从左侧知识库选择一篇文档",
+    "orCreateNew": "或按 Alt+N 在知识库中新建一篇",
     "back": "返回",
     "moveToNotebook": "移动到其他笔记本",
     "moveToLabel": "移动到...",
@@ -452,7 +452,7 @@
     "offline": "当前离线",
     "synced": "已同步",
     "sync": "同步",
-    "newNoteShortcut": "快速新建笔记",
+    "newNoteShortcut": "新建文档",
     "noteLoading": "正在加载笔记...",
     "modeSwitch": {
       "toMd": "当前 Markdown 编辑器，点击切换到富文本",
