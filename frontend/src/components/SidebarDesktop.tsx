@@ -1827,7 +1827,16 @@ export default function SidebarDesktop() {
             title={t("sidebarNext.switchSpace", { defaultValue: "切换空间" })}
             className="flex h-8 max-w-[104px] items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-tx-primary transition-colors hover:bg-app-hover"
           >
-            <Home size={14} className="shrink-0 text-tx-tertiary" />
+            {activeWorkspace?.avatarUrl ? (
+              <img
+                key={activeWorkspace.avatarUrl}
+                src={api.workspaceAvatarFileUrl(activeWorkspace.id, activeWorkspace.updatedAt)}
+                alt=""
+                className="h-5 w-5 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <Home size={14} className="shrink-0 text-tx-tertiary" />
+            )}
             <span className="min-w-0 truncate">
               {currentWs && currentWs !== "personal"
                 ? workspaces.find((w) => w.id === currentWs)?.name ?? "团队空间"
@@ -1857,7 +1866,16 @@ export default function SidebarDesktop() {
                   onClick={() => { switchSpace(w.id); setSpaceOpen(false); }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
                 >
-                  <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  {w.avatarUrl ? (
+                    <img
+                      key={w.avatarUrl}
+                      src={api.workspaceAvatarFileUrl(w.id, w.updatedAt)}
+                      alt=""
+                      className="h-4 w-4 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  )}
                   <span className="flex-1">{w.name}</span>
                   {currentWs === w.id && <Check size={12} className="text-accent-primary" />}
                 </button>

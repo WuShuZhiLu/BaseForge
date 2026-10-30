@@ -620,6 +620,7 @@ function initSchema(db: Database.Database) {
       name TEXT NOT NULL,
       description TEXT DEFAULT '',
       icon TEXT DEFAULT '🏢',
+      avatarUrl TEXT,
       ownerId TEXT NOT NULL,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt TEXT NOT NULL DEFAULT (datetime('now')),

@@ -48,6 +48,7 @@ export interface Workspace {
   name: string;
   description: string;
   icon: string;
+  avatarUrl?: string | null;
   ownerId: string;
   createdAt: string;
   updatedAt: string;

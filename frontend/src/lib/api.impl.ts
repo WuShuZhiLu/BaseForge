@@ -4374,6 +4374,32 @@ export const api = {
   updateWorkspace: (id: string, data: { name?: string; description?: string; icon?: string }) =>
     request<Workspace>(`/workspaces/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteWorkspace: (id: string) => request(`/workspaces/${id}`, { method: "DELETE" }),
+  uploadWorkspaceAvatar: async (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getAccessToken();
+    const res = await fetch(`${getBaseUrl()}/workspaces/${id}/avatar`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(String((payload as { error?: string }).error || "空间头像上传失败"));
+    }
+    return (await res.json()) as { success: boolean; avatarUrl: string };
+  },
+  removeWorkspaceAvatar: (id: string) =>
+    request<{ success: boolean; avatarUrl: string | null }>(`/workspaces/${id}/avatar`, { method: "DELETE" }),
+  /** 空间头像文件地址：<img> 无法带 Authorization 头，token 走查询参数 */
+  workspaceAvatarFileUrl: (id: string, version?: string | null): string => {
+    const token = getAccessToken();
+    const params = new URLSearchParams();
+    if (token) params.set("token", token);
+    if (version) params.set("v", version);
+    const query = params.toString();
+    return `${getBaseUrl()}/workspaces/${id}/avatar-file${query ? `?${query}` : ""}`;
+  },
   leaveWorkspace: (id: string) =>
     request<{ success: boolean }>(`/workspaces/${id}/leave`, { method: "POST" }),
 

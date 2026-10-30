@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     name TEXT NOT NULL,
     description TEXT DEFAULT '',
     icon TEXT DEFAULT '🏢',
+    "avatarUrl" TEXT,
     "ownerId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),

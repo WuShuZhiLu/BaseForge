@@ -450,7 +450,16 @@ function touchSessionLastSeen(sessionId: string) {
 app.route("/api/pm", clientLogRouter);
 
 app.use("/api/*", async (c, next) => {
-  const authHeader = c.req.header("Authorization");
+  let authHeader = c.req.header("Authorization");
+
+  // 空间头像文件由 <img> 直接请求，无法携带 Authorization 头 → 允许该路径用 ?token=
+  if (
+    (!authHeader || !authHeader.startsWith("Bearer ")) &&
+    c.req.query("token") &&
+    /^\/api\/workspaces\/[^/]+\/avatar-file$/.test(c.req.path)
+  ) {
+    authHeader = `Bearer ${c.req.query("token")}`;
+  }
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return c.json({ error: "未授权，请先登录", code: "UNAUTHENTICATED" }, 401);
