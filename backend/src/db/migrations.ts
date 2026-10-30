@@ -41,6 +41,7 @@ import { blockAuthorityStaleGuardMigration } from "./blockAuthorityStaleGuardMig
 import { yjsSubdocumentGenerationMigration } from "./yjsSubdocumentGenerationMigration.js";
 import { tagScopeUniquenessMigration } from "./tagScopeUniquenessMigration.js";
 import { knowledgeTreeMigration } from "./knowledgeTreeMigration.js";
+import { knowledgeTreeReferenceMigration } from "./knowledgeTreeReferenceMigration.js";
 import { knowledgeTreeResourceMigration } from "./knowledgeTreeResourceMigration.js";
 import { knowledgeTreeMindmapMigration } from "./knowledgeTreeMindmapMigration.js";
 import { knowledgeTreeMindmapFolderMigration } from "./knowledgeTreeMindmapFolderMigration.js";
@@ -444,6 +445,7 @@ export const MIGRATIONS: Migration[] = [
   versionSourceMigration,
   attachmentShareMigration,
   workspaceAvatarMigration,
+  knowledgeTreeReferenceMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(

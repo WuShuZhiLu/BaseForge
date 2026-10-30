@@ -44,6 +44,8 @@ export interface KnowledgeTreeNode {
   createdAt: string;
   updatedAt: string;
   access: EffectiveKnowledgeAccess;
+  /** 该行是指向同一篇笔记的引用（复制 = 连接），不是笔记的物理位置。 */
+  isReference?: boolean;
 }
 
 type NodeRow = Omit<KnowledgeTreeNode, "title" | "childCount" | "access">;
@@ -592,6 +594,293 @@ function descendantNodes(db: Database.Database, nodeId: string): NodeRow[] {
   `).all(nodeId) as NodeRow[];
 }
 
+/** 引用节点的 id 前缀：引用不属于 knowledge_tree_nodes，操作前先按它分流。 */
+export const KNOWLEDGE_REFERENCE_ID_PREFIX = "ref:";
+
+export function isKnowledgeReferenceId(nodeId: string): boolean {
+  return nodeId.startsWith(KNOWLEDGE_REFERENCE_ID_PREFIX);
+}
+
+/** 笔记行对应的树节点类型（与 notes 插入触发器的 CASE 保持一致）。 */
+function noteNodeType(contentFormat: string | null, noteType: string | null): KnowledgeNodeType {
+  if (noteType === "word") return "word";
+  if (contentFormat === "markdown") return "markdown";
+  return "note";
+}
+
+/** 删掉挂在这些目录下的引用（目录被删时引用跟着消失，但正文不动）。 */
+function deleteReferencesUnder(db: Database.Database, parentIds: Set<string>): void {
+  if (parentIds.size === 0) return;
+  const ids = [...parentIds];
+  for (let index = 0; index < ids.length; index += 200) {
+    const chunk = ids.slice(index, index + 200);
+    db.prepare(`
+      UPDATE knowledge_tree_references
+      SET isDeleted = 1, deletedAt = datetime('now'), updatedAt = datetime('now')
+      WHERE isDeleted = 0 AND parentId IN (${chunk.map(() => "?").join(",")})
+    `).run(...chunk);
+  }
+}
+
+/**
+ * 删除时结算引用：子树外还有引用指向这篇笔记 → 不回收正文，
+ * 而是把主节点搬到最早那条引用的目录，并消掉那条引用（避免同一位置出现两项）。
+ */
+function adoptReferenceLocation(
+  db: Database.Database,
+  node: NodeRow,
+  subtreeIds: Set<string>,
+): boolean {
+  if (node.resourceType !== "note") return false;
+  const ids = [...subtreeIds];
+  const placeholders = ids.map(() => "?").join(",");
+  const reference = db.prepare(`
+    SELECT id, parentId FROM knowledge_tree_references
+    WHERE resourceId = ? AND scopeKey = ? AND isDeleted = 0
+      AND parentId NOT IN (${placeholders})
+    ORDER BY createdAt, id LIMIT 1
+  `).get(node.resourceId, node.scopeKey, ...ids) as { id: string; parentId: string } | undefined;
+  if (!reference) return false;
+  syncBusinessParent(db, node, reference.parentId);
+  db.prepare(`
+    UPDATE knowledge_tree_nodes
+    SET parentId = ?, sortOrder = ?, updatedAt = datetime('now')
+    WHERE id = ?
+  `).run(reference.parentId, maxSortOrder(db, node.scopeKey, reference.parentId), node.id);
+  db.prepare(`
+    UPDATE knowledge_tree_references
+    SET isDeleted = 1, deletedAt = datetime('now'), updatedAt = datetime('now')
+    WHERE id = ?
+  `).run(reference.id);
+  return true;
+}
+
+type KnowledgeReferenceRow = {
+  id: string;
+  userId: string;
+  workspaceId: string | null;
+  scopeKey: string;
+  parentId: string;
+  resourceId: string;
+  title: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function readReference(db: Database.Database, referenceId: string): KnowledgeReferenceRow | null {
+  return (db.prepare(`
+    SELECT id, userId, workspaceId, scopeKey, parentId, resourceId, title, sortOrder, createdAt, updatedAt
+    FROM knowledge_tree_references WHERE id = ? AND isDeleted = 0
+  `).get(referenceId) as KnowledgeReferenceRow | undefined) || null;
+}
+
+function requireReference(db: Database.Database, referenceId: string): KnowledgeReferenceRow {
+  const reference = readReference(db, referenceId);
+  if (!reference) throw new KnowledgeTreeError("KNOWLEDGE_NODE_NOT_FOUND", 404, "内容节点不存在");
+  return reference;
+}
+
+/** 同一目录下，树节点与引用共用一条排序序列。 */
+function nextChildSortOrder(db: Database.Database, scope: string, parentId: string): number {
+  const nodeMax = db.prepare(`
+    SELECT COALESCE(MAX(sortOrder), -1) AS value FROM knowledge_tree_nodes
+    WHERE scopeKey = ? AND parentId = ? AND isDeleted = 0
+  `).get(scope, parentId) as { value: number };
+  const referenceMax = db.prepare(`
+    SELECT COALESCE(MAX(sortOrder), -1) AS value FROM knowledge_tree_references
+    WHERE scopeKey = ? AND parentId = ? AND isDeleted = 0
+  `).get(scope, parentId) as { value: number };
+  return Math.max(Number(nodeMax?.value ?? -1), Number(referenceMax?.value ?? -1)) + 1;
+}
+
+function referenceToNode(
+  db: Database.Database,
+  reference: KnowledgeReferenceRow,
+  actorUserId: string,
+): KnowledgeTreeNode {
+  const note = db.prepare(`
+    SELECT title, contentFormat, colorMark, note_type AS noteType, isPinned, isLocked
+    FROM notes WHERE id = ?
+  `).get(reference.resourceId) as {
+    title: string | null; contentFormat: string | null; colorMark: string | null;
+    noteType: string | null; isPinned: number | null; isLocked: number | null;
+  } | undefined;
+  return {
+    id: reference.id,
+    userId: reference.userId,
+    workspaceId: reference.workspaceId,
+    scopeKey: reference.scopeKey,
+    parentId: reference.parentId,
+    nodeType: noteNodeType(note?.contentFormat ?? null, note?.noteType ?? null),
+    resourceType: "note",
+    resourceId: reference.resourceId,
+    title: note?.title || reference.title,
+    isPinned: Number(note?.isPinned || 0),
+    isLocked: Number(note?.isLocked || 0),
+    contentFormat: note?.contentFormat ?? null,
+    colorMark: note?.colorMark ?? null,
+    noteType: note?.noteType ?? null,
+    sortOrder: Number(reference.sortOrder),
+    isExpanded: 0,
+    isDeleted: 0,
+    deletedAt: null,
+    childCount: 0,
+    createdAt: reference.createdAt,
+    updatedAt: reference.updatedAt,
+    access: resolveKnowledgeNodeAccess(reference.parentId, actorUserId, db),
+    isReference: true,
+  };
+}
+
+/**
+ * 复制 = 连接：不动正文，只在目标目录多加一条路径。
+ * 正文、附件、标签、评论仍然只有一份，改任何一条路径都是改同一篇文档。
+ */
+export function createKnowledgeReference(input: {
+  actorUserId: string;
+  nodeId: string;
+  parentId?: string | null;
+  db?: Database.Database;
+}): KnowledgeTreeNode {
+  const db = input.db || getDb();
+  ensureKnowledgeTreeTables(db);
+  const source = requireNode(db, input.nodeId);
+  if (source.resourceType !== "note") {
+    throw new KnowledgeTreeError("KNOWLEDGE_REFERENCE_UNSUPPORTED", 400, "只有文档可以复制为链接");
+  }
+  const parentId = input.parentId || source.parentId;
+  if (!parentId) {
+    // 根目录文档的隐藏容器在创建后就被摘掉了，没有地方可以挂副本。
+    throw new KnowledgeTreeError(
+      "KNOWLEDGE_REFERENCE_PARENT_REQUIRED",
+      400,
+      "根目录文档不能复制为链接，请先移动到文件夹",
+    );
+  }
+  const parent = requireNode(db, parentId);
+  if (parent.resourceType !== "notebook") {
+    throw new KnowledgeTreeError("KNOWLEDGE_REFERENCE_PARENT_INVALID", 400, "复制目标必须是文件夹");
+  }
+  if (parent.scopeKey !== source.scopeKey) {
+    throw new KnowledgeTreeError("KNOWLEDGE_TREE_SCOPE_MISMATCH", 400, "不能跨空间复制内容");
+  }
+  const targetAccess = resolveTargetAccess(db, parent.id, input.actorUserId, source.workspaceId);
+  if (!targetAccess.capabilities.canCreate) {
+    throw new KnowledgeTreeError("KNOWLEDGE_CAPABILITY_FORBIDDEN", 403, "没有在此处创建内容的权限", { required: "canCreate" });
+  }
+
+  const title = readNodeTitle(db, source);
+  const sortOrder = nextChildSortOrder(db, source.scopeKey, parent.id);
+  // UNIQUE(parentId, resourceId) 会保留已删除的路径，所以重新复制要复活旧行而不是插新行。
+  const existing = db.prepare(`
+    SELECT id FROM knowledge_tree_references WHERE parentId = ? AND resourceId = ? LIMIT 1
+  `).get(parent.id, source.resourceId) as { id: string } | undefined;
+  const referenceId = existing?.id || `${KNOWLEDGE_REFERENCE_ID_PREFIX}${uuid()}`;
+  const transaction = db.transaction(() => {
+    if (existing) {
+      db.prepare(`
+        UPDATE knowledge_tree_references
+        SET isDeleted = 0, deletedAt = NULL, title = ?, sortOrder = ?, updatedAt = datetime('now')
+        WHERE id = ?
+      `).run(title, sortOrder, existing.id);
+      return;
+    }
+    db.prepare(`
+      INSERT INTO knowledge_tree_references (
+        id, userId, workspaceId, scopeKey, parentId, resourceType, resourceId, title, sortOrder
+      ) VALUES (?, ?, ?, ?, ?, 'note', ?, ?, ?)
+    `).run(
+      referenceId, source.userId, source.workspaceId, source.scopeKey, parent.id, source.resourceId, title, sortOrder,
+    );
+  });
+  transaction();
+  return referenceToNode(db, requireReference(db, referenceId), input.actorUserId);
+}
+
+/** 移动一条路径：只改引用行，不影响正文，也不影响其它路径。 */
+export function moveKnowledgeReference(input: {
+  actorUserId: string;
+  referenceId: string;
+  parentId: string | null;
+  sortOrder?: number;
+  db?: Database.Database;
+}): KnowledgeTreeNode {
+  const db = input.db || getDb();
+  ensureKnowledgeTreeTables(db);
+  const reference = requireReference(db, input.referenceId);
+  requireCapability(db, reference.parentId, input.actorUserId, "canMove");
+  if (!input.parentId) {
+    throw new KnowledgeTreeError("KNOWLEDGE_REFERENCE_PARENT_REQUIRED", 400, "复制出来的文档必须放在文件夹中");
+  }
+  const parent = requireNode(db, input.parentId);
+  if (parent.resourceType !== "notebook") {
+    throw new KnowledgeTreeError("KNOWLEDGE_REFERENCE_PARENT_INVALID", 400, "复制出来的文档必须放在文件夹中");
+  }
+  if (parent.scopeKey !== reference.scopeKey) {
+    throw new KnowledgeTreeError("KNOWLEDGE_TREE_SCOPE_MISMATCH", 400, "不能跨空间移动内容");
+  }
+  const targetAccess = resolveTargetAccess(db, parent.id, input.actorUserId, reference.workspaceId);
+  if (!targetAccess.capabilities.canCreate) {
+    throw new KnowledgeTreeError("KNOWLEDGE_CAPABILITY_FORBIDDEN", 403, "没有移动到目标位置的权限", { required: "canCreate" });
+  }
+  const duplicate = db.prepare(`
+    SELECT id FROM knowledge_tree_references
+    WHERE parentId = ? AND resourceId = ? AND isDeleted = 0 AND id <> ?
+  `).get(parent.id, reference.resourceId, reference.id) as { id: string } | undefined;
+  if (duplicate) {
+    throw new KnowledgeTreeError("KNOWLEDGE_REFERENCE_DUPLICATE", 409, "该目录里已有这份文档");
+  }
+  const sortOrder = Number.isFinite(input.sortOrder)
+    ? Math.max(0, Math.trunc(input.sortOrder!))
+    : nextChildSortOrder(db, reference.scopeKey, parent.id);
+  db.prepare(`
+    UPDATE knowledge_tree_references SET parentId = ?, sortOrder = ?, updatedAt = datetime('now') WHERE id = ?
+  `).run(parent.id, sortOrder, reference.id);
+  return referenceToNode(db, requireReference(db, reference.id), input.actorUserId);
+}
+
+/** 引用没有独立标题：改名改的是同一份正文，所有路径一起变。 */
+export function renameKnowledgeReference(input: {
+  actorUserId: string;
+  referenceId: string;
+  title: string;
+  db?: Database.Database;
+}): KnowledgeTreeNode {
+  const db = input.db || getDb();
+  ensureKnowledgeTreeTables(db);
+  const reference = requireReference(db, input.referenceId);
+  requireCapability(db, reference.parentId, input.actorUserId, "canEdit");
+  const title = input.title.trim();
+  if (!title) throw new KnowledgeTreeError("KNOWLEDGE_TITLE_REQUIRED", 400, "名称不能为空");
+  const transaction = db.transaction(() => {
+    db.prepare("UPDATE notes SET title = ?, version = version + 1, updatedAt = datetime('now') WHERE id = ?")
+      .run(title, reference.resourceId);
+    db.prepare(`
+      UPDATE knowledge_tree_references SET title = ?, updatedAt = datetime('now')
+      WHERE resourceId = ? AND isDeleted = 0
+    `).run(title, reference.resourceId);
+  });
+  transaction();
+  return referenceToNode(db, requireReference(db, reference.id), input.actorUserId);
+}
+
+/** 删一条路径不动正文：正文只在最后一条路径消失时才被回收（见 adoptReferenceLocation）。 */
+function deleteKnowledgeReferenceNode(input: {
+  db: Database.Database;
+  actorUserId: string;
+  referenceId: string;
+}): { success: true; mode: KnowledgeDeleteMode; affectedNodeIds: string[]; promotedNodeIds: string[] } {
+  const reference = requireReference(input.db, input.referenceId);
+  requireCapability(input.db, reference.parentId, input.actorUserId, "canDelete");
+  input.db.prepare(`
+    UPDATE knowledge_tree_references
+    SET isDeleted = 1, deletedAt = datetime('now'), updatedAt = datetime('now')
+    WHERE id = ?
+  `).run(reference.id);
+  return { success: true, mode: "subtree", affectedNodeIds: [reference.id], promotedNodeIds: [] };
+}
+
 function softDeleteBusinessNode(db: Database.Database, node: NodeRow): void {
   if (node.resourceType === "note") {
     db.prepare(`
@@ -619,6 +908,9 @@ export function deleteKnowledgeNode(input: {
 }): { success: true; mode: KnowledgeDeleteMode; affectedNodeIds: string[]; promotedNodeIds: string[] } {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
+  if (isKnowledgeReferenceId(input.nodeId)) {
+    return deleteKnowledgeReferenceNode({ db, actorUserId: input.actorUserId, referenceId: input.nodeId });
+  }
   const node = requireNode(db, input.nodeId);
   requireCapability(db, node.id, input.actorUserId, "canDelete");
 
@@ -626,6 +918,8 @@ export function deleteKnowledgeNode(input: {
   const promoted: string[] = [];
   const transaction = db.transaction(() => {
     if (input.mode === "promote") {
+      // 目录只是个容器：它自己被删时，挂在它下面的路径（引用）一起消失，正文留在别处。
+      deleteReferencesUnder(db, new Set([node.id]));
       const children = db.prepare(`
         SELECT id, userId, workspaceId, scopeKey, parentId, nodeType, resourceType,
                resourceId, sortOrder, isExpanded, isDeleted, deletedAt, createdAt, updatedAt
@@ -649,7 +943,12 @@ export function deleteKnowledgeNode(input: {
       });
     } else {
       const nodes = descendantNodes(db, node.id);
+      const subtreeIds = new Set(nodes.map((current) => current.id));
+      // 先删被删子树内部的路径，再结算子树外还留着的路径。
+      deleteReferencesUnder(db, subtreeIds);
       for (const current of nodes) {
+        // 子树之外还有副本指向这篇文档：正文不回收，主节点搬到那条副本所在目录。
+        if (adoptReferenceLocation(db, current, subtreeIds)) continue;
         softDeleteBusinessNode(db, current);
         affected.push(current.id);
       }
@@ -717,6 +1016,16 @@ export function reorderKnowledgeNodes(input: {
   let updated = 0;
   const transaction = db.transaction(() => {
     for (const item of input.items) {
+      // 引用行与树节点共用一条排序序列，拖拽排序时也要能落库。
+      if (isKnowledgeReferenceId(item.id)) {
+        const reference = requireReference(db, item.id);
+        requireCapability(db, reference.parentId, input.actorUserId, "canMove");
+        const referenceSortOrder = Math.max(0, Math.trunc(Number(item.sortOrder) || 0));
+        db.prepare("UPDATE knowledge_tree_references SET sortOrder = ?, updatedAt = datetime('now') WHERE id = ?")
+          .run(referenceSortOrder, reference.id);
+        updated++;
+        continue;
+      }
       const node = requireNode(db, item.id);
       requireCapability(db, node.id, input.actorUserId, "canMove");
       const sortOrder = Math.max(0, Math.trunc(Number(item.sortOrder) || 0));

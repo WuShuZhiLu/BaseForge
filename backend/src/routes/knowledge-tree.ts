@@ -18,14 +18,18 @@ import {
 } from "../services/knowledgeCapabilities.js";
 import {
   createKnowledgeChild,
+  createKnowledgeReference,
   deleteKnowledgeNode,
   deleteKnowledgeNodesBatch,
+  duplicateKnowledgeNotebook,
+  isKnowledgeReferenceId,
   KnowledgeTreeError,
   listKnowledgeTree,
   listSharedKnowledgeTree,
   listKnowledgeTreeHistory,
   moveKnowledgeNode,
   moveKnowledgeNodesBatch,
+  renameKnowledgeReference,
   reorderKnowledgeNodes,
   restoreKnowledgeNode,
 } from "../services/knowledgeTree.js";
@@ -194,6 +198,16 @@ app.patch("/nodes/:nodeId", async (c) => {
   try {
     const db = getDb();
     const nodeId = c.req.param("nodeId");
+    if (isKnowledgeReferenceId(nodeId)) {
+      const body = await c.req.json().catch(() => ({}));
+      if (typeof body.title !== "string") return c.json({ error: "没有要修改的内容", code: "INVALID_PAYLOAD" }, 400);
+      return c.json(renameKnowledgeReference({
+        actorUserId: userIdOf(c),
+        referenceId: nodeId,
+        title: body.title,
+        db,
+      }));
+    }
     const access = resolveKnowledgeNodeAccess(nodeId, userIdOf(c), db);
     const body = await c.req.json().catch(() => ({}));
     const title = typeof body.title === "string" ? body.title.trim() : undefined;
@@ -285,6 +299,34 @@ app.put("/reorder", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (!Array.isArray(body.items)) return c.json({ error: "items is required" }, 400);
     return c.json(reorderKnowledgeNodes({ actorUserId: userIdOf(c), items: body.items }));
+  } catch (error) {
+    return mapError(c, error);
+  }
+});
+
+// 复制 = 连接：在同一处多加一条指向同一篇正文的路径，正文不复制。
+app.post("/nodes/:nodeId/reference", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const node = createKnowledgeReference({
+      actorUserId: userIdOf(c),
+      nodeId: c.req.param("nodeId"),
+      parentId: typeof body.parentId === "string" && body.parentId ? body.parentId : undefined,
+    });
+    return c.json(node, 201);
+  } catch (error) {
+    return mapError(c, error);
+  }
+});
+
+// 目录深拷贝：整棵子树的结构、文档正文与附件一并复制，副本落在源目录同级。
+app.post("/nodes/:nodeId/duplicate", async (c) => {
+  try {
+    const result = await duplicateKnowledgeNotebook({
+      actorUserId: userIdOf(c),
+      nodeId: c.req.param("nodeId"),
+    });
+    return c.json(result, 201);
   } catch (error) {
     return mapError(c, error);
   }

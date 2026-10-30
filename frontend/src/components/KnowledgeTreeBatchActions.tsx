@@ -71,7 +71,8 @@ export function KnowledgeTreeBatchMovePanel({
         : !candidate.sharedRootId)
     ))
   )).sort((left, right) => left.title.localeCompare(right.title)), [blocked, roots, targetNodes]);
-  const allowRoot = roots.length > 0 && roots.every((node) => !node.sharedRootId);
+  // 复制出来的路径必须有文件夹宿主，不能落到根层。
+  const allowRoot = roots.length > 0 && roots.every((node) => !node.sharedRootId && !node.isReference);
 
   const move = async (parentId: string | null) => {
     if (roots.length === 0 || moving) return;

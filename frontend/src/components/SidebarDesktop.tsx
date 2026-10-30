@@ -18,6 +18,14 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Circle,
+  Copy,
+  Download,
+  FileArchive,
+  FileType2,
+  FolderInput,
+  Image as ImageIcon,
+  Printer,
+  Share2,
   Ellipsis,
   ExternalLink,
   FileCode,
@@ -61,7 +69,21 @@ import {
   knowledgeTreeApi,
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
-import type { FileItem, NoteListItem, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
+import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
+import {
+  exportNoteAsImage,
+  exportSingleNote,
+  exportSingleNoteAsPDF,
+} from "@/lib/exportService";
+import {
+  NOTEBOOK_EXPORT_FORMAT_ITEMS,
+  exportNotebookAsFormat,
+  type NotebookExportFormat,
+} from "@/lib/notebookFormatExport";
+import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActions";
+import NotebookShareDialog from "@/components/NotebookShareDialog";
+import ShareModal from "@/components/ShareModal";
+import type { FileItem, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -400,6 +422,10 @@ export default function SidebarDesktop() {
 
   // 行级菜单
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
+  // 行菜单里的“移动 / 分享”入口状态（侧栏内置面板/弹窗，无需离开当前页）。
+  const [moveNodeId, setMoveNodeId] = useState<string | null>(null);
+  const [shareNote, setShareNote] = useState<{ id: string; title: string } | null>(null);
+  const [shareNotebook, setShareNotebook] = useState<Notebook | null>(null);
 
   // 重命名（行内 input）。isNew = 刚新建、正处于"先建后改名"流程：
   // 这种情况下取消/清空名字要真正把节点删掉，否则"取消"只是个装饰按钮。
@@ -1596,6 +1622,112 @@ export default function SidebarDesktop() {
     }
   }, [focusRootId]);
 
+  /** 复制文档 = 连接：正文、附件、标签都不复制，只多一条指向同一份内容的路径。 */
+  const duplicateNoteNode = useCallback(async (node: KnowledgeTreeNode) => {
+    if (node.resourceType !== "note") return;
+    try {
+      const reference = await knowledgeTreeApi.createReference(node.resourceId, node.parentId || undefined);
+      if (reference.parentId) setExpanded((cur) => new Set(cur).add(reference.parentId!));
+      await reload();
+      actions.refreshNotes();
+      toast.success("已复制，副本与原文档共用同一份内容");
+    } catch (error) {
+      console.error("[SidebarDesktop] copy note reference failed:", error);
+      toast.error(error instanceof Error ? error.message : "复制失败");
+    }
+  }, [actions, reload]);
+
+  /** 复制文件夹/知识库：整棵子树（子目录、文档、附件）深拷贝到同级。 */
+  const duplicateFolderNode = useCallback(async (node: KnowledgeTreeNode) => {
+    if (node.resourceType !== "notebook") return;
+    const toastId = toast.info(`正在复制“${node.title}”…`, 0);
+    try {
+      const result = await knowledgeTreeApi.duplicateFolder(node.id);
+      toast.dismiss(toastId);
+      const skipped = result.skippedNoteCount + result.skippedFileCount;
+      toast.success(skipped > 0
+        ? `已复制为“${result.title}”，跳过 ${skipped} 项无法复制的内容`
+        : `已复制为“${result.title}”`);
+      if (node.parentId) setExpanded((cur) => new Set(cur).add(node.parentId!));
+      await reload();
+      actions.refreshNotes();
+      actions.refreshNotebooks();
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] duplicate folder failed:", error);
+      toast.error(error instanceof Error ? error.message : "复制文件夹失败");
+    }
+  }, [actions, reload]);
+
+  /** 导出单篇文档：与知识库面板同一套格式。 */
+  const exportNoteNode = useCallback(async (node: KnowledgeTreeNode, actionId: string) => {
+    if (node.resourceType !== "note") return;
+    const toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    try {
+      if (actionId === "export_note_md" || actionId === "export_note_md_zip") {
+        const ok = await exportSingleNote(node.resourceId, { forceZip: actionId === "export_note_md_zip" });
+        if (!ok) throw new Error("导出失败");
+      } else if (actionId === "export_note_pdf") {
+        const result = await exportSingleNoteAsPDF(node.resourceId);
+        if (!result.ok && result.mode !== "canceled") {
+          throw new Error((result as { error?: string }).error || "导出失败");
+        }
+      } else if (actionId === "export_note_png" || actionId === "export_note_jpg") {
+        const fresh = await api.getNote(node.resourceId);
+        const ok = await exportNoteAsImage({
+          id: fresh.id,
+          title: fresh.title,
+          content: fresh.content,
+          contentText: fresh.contentText,
+          contentFormat: fresh.contentFormat,
+          updatedAt: fresh.updatedAt,
+        }, { format: actionId.endsWith("png") ? "png" : "jpg" });
+        if (!ok) throw new Error("导出失败");
+      } else if (actionId === "export_note_word") {
+        const fresh = await api.getNote(node.resourceId);
+        const { exportNoteAsDocx, downloadDocxBlob } = await import("@/lib/wordNoteService");
+        const blob = await exportNoteAsDocx(fresh.content || "", fresh.title || "未命名笔记");
+        await downloadDocxBlob(blob, fresh.title || "未命名笔记");
+      }
+      toast.dismiss(toastId);
+      toast.success("导出完成");
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] export note failed:", error);
+      toast.error(error instanceof Error ? error.message : "导出失败");
+    }
+  }, []);
+
+  /** 导出目录（含子目录）：与文档一致，可选 Markdown / PDF / PNG / JPG / Word。 */
+  const exportFolderNode = useCallback(async (node: KnowledgeTreeNode, format: NotebookExportFormat) => {
+    if (node.resourceType !== "notebook") return;
+    const { ids, names } = descendantNotebookResources(node, nodes);
+    let toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    try {
+      const ok = await exportNotebookAsFormat({
+        notebookId: node.resourceId,
+        notebookName: node.title,
+        descendantNotebookIds: ids,
+        descendantNotebookNames: names,
+      }, format, (progress) => {
+        // 逐篇渲染/打包时把粘性提示换成当前进度，避免长目录导出“毫无反应”。
+        if (progress.phase !== "converting" && progress.phase !== "packing") return;
+        toast.dismiss(toastId);
+        toastId = toast.info(progress.message, 0);
+      });
+      toast.dismiss(toastId);
+      if (ok) {
+        toast.success("导出完成");
+      } else {
+        toast.error("导出失败");
+      }
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] export folder failed:", error);
+      toast.error(error instanceof Error ? error.message : "导出失败");
+    }
+  }, [nodes]);
+
   // 选中节点的键盘快捷键：F2 重命名 / Delete 删除（与行菜单右侧提示一致）。
   // 必须放在 deleteNode 声明之后——依赖数组在渲染期求值，提前引用即 TDZ。
   useEffect(() => {
@@ -1966,6 +2098,12 @@ export default function SidebarDesktop() {
                         >
                           {fileIconFor(node, !focusRootId && depth === 0)}
                           <span className="min-w-0 flex-1 truncate">{node.title}</span>
+                          {/* 复制 = 连接：同一篇文档的额外路径带一个链标，提示正文只有一份 */}
+                          {node.isReference && (
+                            <span className="shrink-0 text-tx-tertiary" title="同一份内容的另一条路径">
+                              <Link2 size={10} />
+                            </span>
+                          )}
                           {isFolder && (
                             <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">
                               {docCountMap.get(node.id) ?? 0}
@@ -3268,6 +3406,29 @@ export default function SidebarDesktop() {
                   }}
                 />
                 <MenuSeparator />
+                {/* 与文档菜单对齐：复制 / 移动 / 导出 / 分享 都是目录的一级动作 */}
+                <MenuItem icon={Copy} label="复制" onClick={() => { setRowMenu(null); void duplicateFolderNode(node); }} />
+                <MenuItem icon={FolderInput} label="移动到…" onClick={() => { setRowMenu(null); setMoveNodeId(node.id); }} />
+                <MenuItem
+                  icon={Download}
+                  label="导出"
+                  children={NOTEBOOK_EXPORT_FORMAT_ITEMS.map((item) => ({
+                    id: `export_folder_${item.id}`,
+                    label: item.label,
+                    onClick: () => { setRowMenu(null); void exportFolderNode(node, item.id); },
+                  }))}
+                />
+                {(() => {
+                  const notebook = (state.notebooks ?? []).find((nb) => nb.id === node.resourceId);
+                  return notebook ? (
+                    <MenuItem
+                      icon={Share2}
+                      label="分享与发布"
+                      onClick={() => { setRowMenu(null); setShareNotebook(notebook); }}
+                    />
+                  ) : null;
+                })()}
+                <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
@@ -3288,9 +3449,39 @@ export default function SidebarDesktop() {
                   }}
                 />
                 <MenuSeparator />
+                {/* 语雀式文档菜单：复制 / 移动 / 导出 / 分享 都在一级，不再埋进“更多”。
+                    文件节点（resourceType=file）不参与这三类文档动作。 */}
+                {node.resourceType === "note" && !node.isReference && (
+                  <MenuItem icon={Copy} label="复制" onClick={() => { setRowMenu(null); void duplicateNoteNode(node); }} />
+                )}
+                <MenuItem icon={FolderInput} label="移动到…" onClick={() => { setRowMenu(null); setMoveNodeId(node.id); }} />
+                {node.resourceType === "note" && (
+                  <>
+                    <MenuItem
+                      icon={Download}
+                      label="导出"
+                      children={[
+                        { id: "export_note_md", label: "Markdown", icon: FileText, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_md"); } },
+                        { id: "export_note_md_zip", label: "Markdown + 附件 ZIP", icon: FileArchive, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_md_zip"); } },
+                        { id: "export_note_pdf", label: "PDF", icon: Printer, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_pdf"); } },
+                        { id: "export_note_png", label: "PNG", icon: ImageIcon, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_png"); } },
+                        { id: "export_note_jpg", label: "JPG", icon: ImageIcon, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_jpg"); } },
+                        { id: "export_note_word", label: "Word", icon: FileType2, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_word"); } },
+                      ]}
+                    />
+                    <MenuItem icon={Share2} label="分享" onClick={() => { setRowMenu(null); setShareNote({ id: node.resourceId, title: node.title }); }} />
+                  </>
+                )}
+                <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuSeparator />
-                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
+                <MenuItem
+                  icon={Trash2}
+                  label={node.isReference ? "删除这条路径" : "删除"}
+                  hint="Del"
+                  danger
+                  onClick={() => { setRowMenu(null); void deleteNode(node.id); }}
+                />
               </>
             );
           })()}
@@ -3318,6 +3509,33 @@ export default function SidebarDesktop() {
             );
           })()}
         </MenuSurface>
+      )}
+
+      {/* ===== 行菜单触发的移动面板（侧栏内直接选目标目录，支持文档与文件夹） ===== */}
+      {moveNodeId && (() => {
+        const target = nodes.find((node) => node.id === moveNodeId && !node.isDeleted);
+        if (!target) return null;
+        return (
+          <KnowledgeTreeBatchMovePanel
+            selectedNodes={[target]}
+            nodes={nodes}
+            targetNodes={nodes}
+            onMoved={() => { setMoveNodeId(null); void reload(); }}
+            onClose={() => setMoveNodeId(null)}
+          />
+        );
+      })()}
+
+      {/* ===== 行菜单触发的分享弹窗 ===== */}
+      {shareNote && (
+        <ShareModal
+          noteId={shareNote.id}
+          noteTitle={shareNote.title}
+          onClose={() => setShareNote(null)}
+        />
+      )}
+      {shareNotebook && (
+        <NotebookShareDialog notebook={shareNotebook} onClose={() => setShareNotebook(null)} />
       )}
     </aside>
   );

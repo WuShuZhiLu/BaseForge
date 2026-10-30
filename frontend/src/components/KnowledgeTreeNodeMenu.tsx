@@ -56,12 +56,18 @@ import {
 import type { ContextMenuState } from "@/hooks/useContextMenu";
 import { api } from "@/lib/api";
 import {
-  exportNotebook,
   exportSingleNote,
   exportSingleNoteAsPDF,
   exportNoteAsImage,
+  type ExportProgress,
 } from "@/lib/exportService";
+import {
+  NOTEBOOK_EXPORT_FORMAT_ITEMS,
+  exportNotebookAsFormat,
+  type NotebookExportFormat,
+} from "@/lib/notebookFormatExport";
 import type { KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
+import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import {
   convertNoteContent,
@@ -177,6 +183,10 @@ export function buildKnowledgeTreeNodeMenuItems(
     if (capabilities.canMove && isOwned) {
       management.push({ id: "move", label: "移动", icon: <FolderInput size={14} /> });
     }
+    // 导出与复制/移动/分享同为一级动作（不再埋在“更多”里）。
+    if (capabilities.canDownload) {
+      management.push({ id: "export_note", label: "导出", icon: <Download size={14} />, children: exportChildren() });
+    }
     if (isOwned || capabilities.canReshare) {
       management.push({ id: "share_note", label: "分享", icon: <Share2 size={14} /> });
     }
@@ -194,9 +204,6 @@ export function buildKnowledgeTreeNodeMenuItems(
     if (capabilities.canManageMembers) {
       more.push({ id: "permissions", label: "成员与权限", icon: <ShieldCheck size={14} /> });
     }
-    if (capabilities.canDownload) {
-      more.push({ id: "export_note", label: "导出", icon: <Download size={14} />, children: exportChildren() });
-    }
 
     return buildNoteContextMenuLayout({
       open: { id: "open", label: "打开", icon: <FileText size={14} /> },
@@ -206,9 +213,11 @@ export function buildKnowledgeTreeNodeMenuItems(
       ],
       duplicate: {
         id: "duplicate",
-        label: "创建副本",
+        label: "复制",
         icon: <Copy size={14} />,
-        disabled: !capabilities.canCreate || !note || note.isLocked === 1 || note.isTrashed === 1,
+        // 已经是连接（副本路径）的节点不能再复制：同一目录下再挂一条同样的路径没有意义。
+        disabled: !capabilities.canCreate || !note || note.isLocked === 1 || note.isTrashed === 1
+          || !!node.isReference,
       },
       create: capabilities.canCreate ? createChildren() : undefined,
       flags,
@@ -216,7 +225,7 @@ export function buildKnowledgeTreeNodeMenuItems(
       more,
       trash: capabilities.canDelete ? {
         id: "delete",
-        label: "移到回收站",
+        label: node.isReference ? "删除这条路径" : "移到回收站",
         icon: <Trash2 size={14} />,
         danger: true,
         disabled: !note || note.isLocked === 1,
@@ -253,11 +262,15 @@ export function buildKnowledgeTreeNodeMenuItems(
     });
   }
   if (capabilities.canEdit) management.push({ id: "rename", label: "重命名", icon: <Pencil size={14} /> });
-  if (isNotebook && (capabilities.canReshare || capabilities.canManageMembers)) {
-    management.push({ id: "share", label: "分享与发布", icon: <Link2 size={14} /> });
+  // 文件夹/知识库也能复制：整棵子树（含子目录与文档）深拷贝到同级。
+  if (isNotebook && !node.sharedRootId && capabilities.canCreate) {
+    management.push({ id: "duplicate_folder", label: "复制", icon: <Copy size={14} /> });
   }
   if (capabilities.canMove && !node.sharedRootId) {
     management.push({ id: "move", label: "移动", icon: <FolderInput size={14} /> });
+  }
+  if (isNotebook && (capabilities.canReshare || capabilities.canManageMembers)) {
+    management.push({ id: "share", label: "分享与发布", icon: <Link2 size={14} /> });
   }
   if (capabilities.canManageMembers) {
     management.push({ id: "permissions", label: "成员与权限", icon: <ShieldCheck size={14} /> });
@@ -302,7 +315,15 @@ export function buildKnowledgeTreeNodeMenuItems(
   if (capabilities.canDownload) {
     if (items.length) items.push(separator("sep-export"));
     if (isNotebook) {
-      items.push({ id: "export_folder", label: "导出目录为 Markdown", icon: <Download size={14} /> });
+      items.push({
+        id: "export_folder",
+        label: "导出",
+        icon: <Download size={14} />,
+        children: NOTEBOOK_EXPORT_FORMAT_ITEMS.map((item) => ({
+          id: `export_folder_${item.id}`,
+          label: item.label,
+        })),
+      });
     }
   }
 
@@ -317,31 +338,6 @@ export function buildKnowledgeTreeNodeMenuItems(
   }
 
   return items;
-}
-
-function descendantNotebookResources(node: KnowledgeTreeNode, nodes: KnowledgeTreeNode[]) {
-  const children = new Map<string, KnowledgeTreeNode[]>();
-  for (const candidate of nodes) {
-    if (!candidate.parentId) continue;
-    const list = children.get(candidate.parentId) || [];
-    list.push(candidate);
-    children.set(candidate.parentId, list);
-  }
-  const ids = new Set<string>();
-  const names = new Set<string>();
-  const stack = [node];
-  const visited = new Set<string>();
-  while (stack.length) {
-    const current = stack.pop()!;
-    if (visited.has(current.id)) continue;
-    visited.add(current.id);
-    if (current.resourceType === "notebook") {
-      ids.add(current.resourceId);
-      names.add(current.title);
-    }
-    for (const child of children.get(current.id) || []) stack.push(child);
-  }
-  return { ids, names };
 }
 
 export default function KnowledgeTreeNodeMenu({
@@ -516,14 +512,36 @@ export default function KnowledgeTreeNodeMenu({
 
   const duplicateCurrentNote = async () => {
     if (!node || node.resourceType !== "note") return;
-    const duplicated = await api.duplicateNote(node.resourceId);
-    revealCreatedKnowledgeTreeNote(duplicated.treeParentId);
-    openLoadedNote(duplicated);
-    actions.setSelectedKnowledgeTreeParent(duplicated.treeParentId);
+    // 复制 = 连接：正文不复制，只多一条指向同一份内容的路径。
+    const reference = await knowledgeTreeApi.createReference(node.resourceId, node.parentId || undefined);
+    revealCreatedKnowledgeTreeNote(reference.parentId);
+    actions.setSelectedKnowledgeTreeParent(reference.parentId);
     await onReload();
     actions.refreshNotes();
-    actions.refreshNotebooks();
-    toast.success("副本已创建");
+    toast.success("已复制，副本与原文档共用同一份内容");
+  };
+
+  const duplicateFolder = async () => {
+    if (!node || node.resourceType !== "notebook") return;
+    const toastId = toast.info(`正在复制“${node.title}”…`, 0);
+    try {
+      const result = await knowledgeTreeApi.duplicateFolder(node.id);
+      toast.dismiss(toastId);
+      const skipped = result.skippedNoteCount + result.skippedFileCount;
+      toast.success(skipped > 0
+        ? `已复制为“${result.title}”，跳过 ${skipped} 项无法复制的内容`
+        : `已复制为“${result.title}”`);
+      revealCreatedKnowledgeTreeNote(node.parentId);
+      await onReload();
+      actions.refreshNotes();
+      actions.refreshNotebooks();
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+        detail: { reason: "notebook-duplicated", nodeId: result.nodeId },
+      }));
+    } catch (error) {
+      toast.dismiss(toastId);
+      throw error;
+    }
   };
 
   const convertFormat = async () => {
@@ -592,20 +610,30 @@ export default function KnowledgeTreeNodeMenu({
     toast.success("已保存为模板");
   };
 
-  const exportFolder = async () => {
+  const exportFolder = async (format: NotebookExportFormat) => {
     if (!node || node.resourceType !== "notebook") return;
     const { ids, names } = descendantNotebookResources(node, nodes);
-    const toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    let toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    const onProgress = (progress: ExportProgress) => {
+      // 逐篇渲染/打包时把粘性提示换成当前进度，避免长目录导出“毫无反应”。
+      if (progress.phase !== "converting" && progress.phase !== "packing") return;
+      toast.dismiss(toastId);
+      toastId = toast.info(progress.message, 0);
+    };
     try {
-      const ok = await exportNotebook({
+      const ok = await exportNotebookAsFormat({
         notebookId: node.resourceId,
         notebookName: node.title,
         descendantNotebookIds: ids,
         descendantNotebookNames: names,
-      });
+      }, format, onProgress);
       toast.dismiss(toastId);
-      ok ? toast.success("导出完成") : toast.error("导出失败");
-    } catch (error: any) {
+      if (ok) {
+        toast.success("导出完成");
+      } else {
+        toast.error("导出失败");
+      }
+    } catch (error) {
       toast.dismiss(toastId);
       throw error;
     }
@@ -660,6 +688,7 @@ export default function KnowledgeTreeNodeMenu({
       "new_note",
       "new_markdown",
       "new_folder",
+      "duplicate_folder",
       "import_markdown",
       "import_markdown_zip",
       "import_word",
@@ -667,7 +696,11 @@ export default function KnowledgeTreeNodeMenu({
       "export_folder",
       "delete",
     ]);
-    if (node.nodeType === "folder" && !isNodeUnlocked(node) && protectedContentActions.has(actionId)) {
+    if (
+      node.nodeType === "folder"
+      && !isNodeUnlocked(node)
+      && (protectedContentActions.has(actionId) || actionId.startsWith("export_folder_"))
+    ) {
       onUnlockNode(node);
       return;
     }
@@ -677,6 +710,7 @@ export default function KnowledgeTreeNodeMenu({
         case "split_right": onSplit(node, "right"); break;
         case "split_down": onSplit(node, "down"); break;
         case "duplicate": await duplicateCurrentNote(); break;
+        case "duplicate_folder": await duplicateFolder(); break;
         case "new_note": onCreate(node, "note"); break;
         case "new_markdown": onCreate(node, "markdown"); break;
         case "new_folder": onCreate(node, "folder"); break;
@@ -727,9 +761,12 @@ export default function KnowledgeTreeNodeMenu({
           setIconPicker({ notebook, top: menu.y, left: menu.x });
           break;
         }
-        case "export_folder": await exportFolder(); break;
         default:
-          if (actionId.startsWith("export_note_")) await exportNote(actionId);
+          if (actionId.startsWith("export_note_")) {
+            await exportNote(actionId);
+          } else if (actionId.startsWith("export_folder_")) {
+            await exportFolder(actionId.slice("export_folder_".length) as NotebookExportFormat);
+          }
           break;
       }
     } catch (error: any) {

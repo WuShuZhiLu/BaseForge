@@ -122,7 +122,7 @@ export function noteContentToExportHtml(
   return noteContentToHtml(rawContent, contentText);
 }
 
-interface ExportNote {
+export interface ExportNote {
   id: string;
   title: string;
   content: string;
@@ -139,7 +139,7 @@ interface ExportNote {
 import { parseServerTime } from "@/lib/dateTime";
 
 // 清理文件名中的非法字符
-function sanitizeFilename(name: string): string {
+export function sanitizeFilename(name: string): string {
   return name.replace(/[\/\\?<>:*|"]/g, "_").replace(/\s+/g, " ").trim() || i18n.t('common.untitledNote');
 }
 
@@ -1166,49 +1166,62 @@ export async function exportAllNotes(
 //   直接让 zip 根就是那个笔记本名 —— 所以仍按"每个笔记本的 notebookName"做 folder，
 //   zip 文件名用 `<root 笔记本名>.zip`。
 // ============================================================================
+/**
+ * 目录级导出的公共入参：根笔记本 + 已由调用方算好的子树集合。
+ * Markdown / PDF / PNG / JPG / Word 都按同一口径取文档，避免各格式导出的范围不一致。
+ */
+export interface NotebookExportScope {
+  /** 根笔记本 id（用户右键的那一个） */
+  notebookId: string;
+  /** 根笔记本名（用于 zip 文件名 + 兜底展示） */
+  notebookName: string;
+  /** 根笔记本 + 所有子孙笔记本的 id 集合（由调用方计算好传入） */
+  descendantNotebookIds: Set<string>;
+  /**
+   * 降级用：根笔记本 + 所有子孙笔记本的"名称"集合。
+   * 仅在后端 /export/notes 返回的行里不含 notebookId 字段时才会启用
+   * （例如前端已升级但后端仍是旧镜像）。按名称过滤存在跨父目录同名冲突的风险，
+   * 所以只作兜底。
+   */
+  descendantNotebookNames?: Set<string>;
+}
+
+/**
+ * 取出某个目录（含子目录）下待导出的全部文档。
+ * 标签与搜索之外的过滤（权限、回收站）已在后端完成，这里只做目录归属筛选。
+ */
+export async function loadNotebookExportNotes(scope: NotebookExportScope): Promise<ExportNote[]> {
+  const { notebookName, descendantNotebookIds, descendantNotebookNames } = scope;
+  const allNotes = await api.getExportNotes() as ExportNote[];
+
+  // 过滤：优先按 notebookId 精确匹配；若后端不返回 notebookId（旧版本兼容），
+  // 再降级按 notebookName 过滤并在 console 留痕以便排查。
+  const hasId = (allNotes || []).some((n) => n && typeof n === "object" && !!(n as any).notebookId);
+  if (hasId) {
+    return (allNotes || []).filter(
+      (n) => n && typeof n === "object" && !!n.notebookId && descendantNotebookIds.has(n.notebookId)
+    );
+  }
+  console.warn(
+    "[exportNotebook] backend /export/notes missing notebookId; fallback to notebookName filter " +
+      "(may be inaccurate if duplicate names exist across parents). Upgrade backend to fix."
+  );
+  const nameSet = descendantNotebookNames || new Set<string>([notebookName]);
+  return (allNotes || []).filter(
+    (n) => n && typeof n === "object" && n.notebookName != null && nameSet.has(n.notebookName)
+  );
+}
+
 export async function exportNotebook(
-  params: {
-    /** 根笔记本 id（用户右键的那一个） */
-    notebookId: string;
-    /** 根笔记本名（用于 zip 文件名 + 兜底展示） */
-    notebookName: string;
-    /** 根笔记本 + 所有子孙笔记本的 id 集合（由调用方计算好传入） */
-    descendantNotebookIds: Set<string>;
-    /**
-     * 降级用：根笔记本 + 所有子孙笔记本的"名称"集合。
-     * 仅在后端 /export/notes 返回的行里不含 notebookId 字段时才会启用
-     * （例如前端已升级但后端仍是旧镜像）。按名称过滤存在跨父目录同名冲突的风险，
-     * 所以只作兜底。
-     */
-    descendantNotebookNames?: Set<string>;
-  },
+  params: NotebookExportScope,
   onProgress?: (p: ExportProgress) => void,
   options?: { inlineImages?: boolean }
 ): Promise<boolean> {
-  const { notebookId, notebookName, descendantNotebookIds, descendantNotebookNames } = params;
+  const { notebookId, notebookName } = params;
   const inlineImages = !!options?.inlineImages;
   try {
     onProgress?.({ phase: "fetching", current: 0, total: 0, message: i18n.t('export.fetchingData') });
-    const allNotes = await api.getExportNotes() as ExportNote[];
-
-    // 过滤：优先按 notebookId 精确匹配；若后端不返回 notebookId（旧版本兼容），
-    // 再降级按 notebookName 过滤并在 console 留痕以便排查。
-    const hasId = (allNotes || []).some((n) => n && typeof n === "object" && !!(n as any).notebookId);
-    let notes: ExportNote[];
-    if (hasId) {
-      notes = (allNotes || []).filter(
-        (n) => n && typeof n === "object" && !!n.notebookId && descendantNotebookIds.has(n.notebookId)
-      );
-    } else {
-      console.warn(
-        "[exportNotebook] backend /export/notes missing notebookId; fallback to notebookName filter " +
-          "(may be inaccurate if duplicate names exist across parents). Upgrade backend to fix."
-      );
-      const nameSet = descendantNotebookNames || new Set<string>([notebookName]);
-      notes = (allNotes || []).filter(
-        (n) => n && typeof n === "object" && n.notebookName != null && nameSet.has(n.notebookName)
-      );
-    }
+    const notes = await loadNotebookExportNotes(params);
 
     if (notes.length === 0) {
       onProgress?.({ phase: "error", current: 0, total: 0, message: i18n.t('export.noNotesToExport') });
@@ -1615,7 +1628,7 @@ export async function printNote(note: {
  *    因跨域 taint 失败。
  *  - PDF 为 A4 纵向，按图像高度换算分页；每页之间的"图像偏移"通过 `addImage` 的负 y 实现。
  */
-async function renderPrintableHtmlToPdfBlob(docHtml: string): Promise<Blob> {
+export async function renderPrintableHtmlToPdfBlob(docHtml: string): Promise<Blob> {
   // 离屏 iframe 承载 HTML；宽度固定 800px，保证 html2canvas 截图后再按 A4 缩放时分辨率足够。
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";

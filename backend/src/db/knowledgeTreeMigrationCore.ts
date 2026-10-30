@@ -10,6 +10,7 @@ export const KNOWLEDGE_TREE_SCHEMA_VERSION = 60;
  * ordering, inherited capability overrides and structural history.
  */
 export function ensureKnowledgeTreeTables(db: Database.Database): void {
+  ensureKnowledgeTreeReferenceTable(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_tree_nodes (
       id TEXT PRIMARY KEY,
@@ -86,6 +87,13 @@ export function ensureKnowledgeTreeTables(db: Database.Database): void {
       ON knowledge_tree_history(nodeId, createdAt DESC);
     CREATE INDEX IF NOT EXISTS idx_knowledge_tree_history_actor
       ON knowledge_tree_history(actorUserId, createdAt DESC);
+
+    -- 引用节点（复制 = 连接）：同一篇笔记可以出现在多个目录。
+    --
+    -- knowledge_tree_nodes 上只有"一个资源一个主节点"，因为 notes 行只能有
+    -- 一个 notebookId；引用表单独存放"额外路径"，正文、附件、标签仍然只存
+    -- 一份，删除按引用计数结算（见 deleteKnowledgeNode 的 adoptReferenceLocation）。
+    -- 建表语句见下方 ensureKnowledgeTreeReferenceTable（旧库靠 version 137 补装）。
 
     -- 回填阶段暂不创建 INSERT 守卫触发器：历史数据里父节点可能尚未插入
     -- （行序不确定），或父节点已删除/跨 scope，直接建守卫会让整批 INSERT 被
@@ -294,3 +302,37 @@ export const knowledgeTreeMigration: Migration = {
   name: "knowledge-tree-capabilities",
   up: ensureKnowledgeTreeTables,
 };
+
+/**
+ * 复制 = 连接：同一篇文档可以在多个目录各有一条路径，正文只存一份。
+ *
+ * 单独建表而不动 knowledge_tree_nodes 的 UNIQUE(scopeKey, resourceType, resourceId)：
+ * 重建那张表会让 ACL/历史的外键级联丢数据。
+ */
+export function ensureKnowledgeTreeReferenceTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS knowledge_tree_references (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      workspaceId TEXT,
+      scopeKey TEXT NOT NULL,
+      parentId TEXT NOT NULL,
+      resourceType TEXT NOT NULL CHECK(resourceType IN ('note')),
+      resourceId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      sortOrder INTEGER NOT NULL DEFAULT 0,
+      isDeleted INTEGER NOT NULL DEFAULT 0,
+      deletedAt TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (parentId) REFERENCES knowledge_tree_nodes(id) ON DELETE CASCADE,
+      UNIQUE (parentId, resourceId)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_knowledge_tree_references_scope
+      ON knowledge_tree_references(scopeKey, parentId, sortOrder, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_knowledge_tree_references_resource
+      ON knowledge_tree_references(resourceId, isDeleted);
+  `);
+}

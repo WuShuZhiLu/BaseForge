@@ -8,8 +8,12 @@ export type { SharedKnowledgeTreeNode } from "./sharedKnowledgeTreeListing.js";
 
 export {
   KnowledgeTreeError,
+  createKnowledgeReference,
   deleteKnowledgeNode,
+  isKnowledgeReferenceId,
   listKnowledgeTreeHistory,
+  moveKnowledgeReference,
+  renameKnowledgeReference,
   reorderKnowledgeNodes,
 } from "./knowledgeTreeCore.js";
 
@@ -21,6 +25,7 @@ export {
 } from "./knowledgeTreeRootDocuments.js";
 
 export { listKnowledgeTree } from "./knowledgeTreeListing.js";
+export { duplicateKnowledgeNotebook } from "./knowledgeTreeDuplicateNotebook.js";
 export { listSharedKnowledgeTree } from "./sharedKnowledgeTreeListing.js";
 export { restoreKnowledgeNode } from "./knowledgeTreeRestore.js";
 

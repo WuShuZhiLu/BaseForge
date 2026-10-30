@@ -4,7 +4,9 @@ import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 import {
   createKnowledgeChild as createKnowledgeChildBase,
+  isKnowledgeReferenceId,
   moveKnowledgeNode as moveKnowledgeNodeBase,
+  moveKnowledgeReference,
   type KnowledgeTreeNode,
 } from "./knowledgeTreeCore.js";
 
@@ -203,6 +205,16 @@ export function moveKnowledgeNode(input: {
   afterId?: string;
   db?: Database.Database;
 }): KnowledgeTreeNode {
+  // 引用只是一条额外路径：直接改引用行，不能走根文档特例（引用必须有文件夹）。
+  if (isKnowledgeReferenceId(input.nodeId)) {
+    return moveKnowledgeReference({
+      actorUserId: input.actorUserId,
+      referenceId: input.nodeId,
+      parentId: input.parentId,
+      sortOrder: input.sortOrder,
+      db: input.db,
+    });
+  }
   // 指定前后锚点时语义是「在父级内重排」，直接走基础实现，不能被根文档特例吞掉
   if (input.parentId !== null || input.beforeId || input.afterId) return moveKnowledgeNodeBase(input);
 

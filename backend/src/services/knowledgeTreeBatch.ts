@@ -4,6 +4,7 @@ import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 import {
   deleteKnowledgeNode,
+  isKnowledgeReferenceId,
   KnowledgeTreeError,
   type KnowledgeTreeNode,
 } from "./knowledgeTreeCore.js";
@@ -15,6 +16,18 @@ type SelectionRow = {
   id: string;
   parentId: string | null;
 };
+
+/** 树节点和引用都能被选中：引用只是一条额外路径，父级从引用表读。 */
+function readSelectionRow(db: Database.Database, nodeId: string): SelectionRow | undefined {
+  const node = db.prepare(`
+    SELECT id, parentId FROM knowledge_tree_nodes WHERE id = ? AND isDeleted = 0
+  `).get(nodeId) as SelectionRow | undefined;
+  if (node) return node;
+  if (!isKnowledgeReferenceId(nodeId)) return undefined;
+  return db.prepare(`
+    SELECT id, parentId FROM knowledge_tree_references WHERE id = ? AND isDeleted = 0
+  `).get(nodeId) as SelectionRow | undefined;
+}
 
 function normalizeNodeIds(nodeIds: unknown): string[] {
   if (!Array.isArray(nodeIds)) {
@@ -46,11 +59,7 @@ export function reduceKnowledgeTreeSelection(
   const rows = new Map<string, SelectionRow>();
 
   for (const nodeId of normalized) {
-    const row = db.prepare(`
-      SELECT id, parentId
-      FROM knowledge_tree_nodes
-      WHERE id = ? AND isDeleted = 0
-    `).get(nodeId) as SelectionRow | undefined;
+    const row = readSelectionRow(db, nodeId);
     if (!row) {
       throw new KnowledgeTreeError("KNOWLEDGE_NODE_NOT_FOUND", 404, "内容节点不存在", { nodeId });
     }
@@ -60,10 +69,7 @@ export function reduceKnowledgeTreeSelection(
   const parentOf = (nodeId: string): string | null => {
     const selectedRow = rows.get(nodeId);
     if (selectedRow) return selectedRow.parentId;
-    const row = db.prepare(`
-      SELECT parentId FROM knowledge_tree_nodes WHERE id = ? AND isDeleted = 0
-    `).get(nodeId) as { parentId: string | null } | undefined;
-    return row?.parentId ?? null;
+    return readSelectionRow(db, nodeId)?.parentId ?? null;
   };
 
   return normalized.filter((nodeId) => {
@@ -90,11 +96,7 @@ export function moveKnowledgeNodesBatch(input: {
   if (input.parentId && nodeIds.includes(input.parentId)) {
     throw new KnowledgeTreeError("KNOWLEDGE_TREE_CYCLE", 400, "不能移动到已选择的内容中");
   }
-  const movedNodeIds = nodeIds.filter((nodeId) => {
-    const row = db.prepare("SELECT parentId FROM knowledge_tree_nodes WHERE id = ?")
-      .get(nodeId) as { parentId: string | null };
-    return (row.parentId ?? null) !== input.parentId;
-  });
+  const movedNodeIds = nodeIds.filter((nodeId) => (readSelectionRow(db, nodeId)?.parentId ?? null) !== input.parentId);
   const execute = db.transaction(() => movedNodeIds.map((nodeId) => moveKnowledgeNode({
     actorUserId: input.actorUserId,
     nodeId,
@@ -118,12 +120,21 @@ export function deleteKnowledgeNodesBatch(input: {
   const execute = db.transaction(() => {
     const affectedNodeIds = new Set<string>();
     for (const nodeId of nodeIds) {
-      const result = deleteKnowledgeNode({
-        actorUserId: input.actorUserId,
-        nodeId,
-        mode: "subtree",
-        db,
-      });
+      let result: ReturnType<typeof deleteKnowledgeNode>;
+      try {
+        result = deleteKnowledgeNode({
+          actorUserId: input.actorUserId,
+          nodeId,
+          mode: "subtree",
+          db,
+        });
+      } catch (error) {
+        // 删主节点时会“收养”一条引用（主节点搬到那条路径），同批里那条引用已不存在。
+        if (error instanceof KnowledgeTreeError
+          && error.code === "KNOWLEDGE_NODE_NOT_FOUND"
+          && isKnowledgeReferenceId(nodeId)) continue;
+        throw error;
+      }
       for (const affectedNodeId of result.affectedNodeIds) affectedNodeIds.add(affectedNodeId);
     }
     return Array.from(affectedNodeIds);
