@@ -21,6 +21,7 @@ import {
   Ellipsis,
   ExternalLink,
   FileCode,
+  Columns2,
   FilePlus2,
   FileText,
   Focus,
@@ -90,6 +91,7 @@ import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
+import { useSortableDrag } from "@/hooks/useSortableDrag";
 
 /** 侧栏根宽，原型固定 260px（批次 C 做拖宽，范围 200–420）。 */
 const SIDEBAR_MIN_WIDTH = 200;
@@ -274,13 +276,6 @@ interface RowMenuState {
   y: number;
 }
 
-interface DragState {
-  /** 被拖拽节点 id（kb 树） */
-  nodeId?: string;
-  /** 区段拖拽排序 */
-  sectionId?: SectionId;
-}
-
 export default function SidebarDesktop() {
   const { t } = useTranslation();
   const { state } = useApp();
@@ -386,13 +381,6 @@ export default function SidebarDesktop() {
     } catch { /* ignore */ }
     return ["kb", "tags", "editors"];
   });
-
-  // 拖拽
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const [dropTarget, setDropTarget] = useState<{
-    nodeId: string;
-    position: "before" | "after" | "into";
-  } | null>(null);
 
   // 定位高亮
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -1407,60 +1395,35 @@ export default function SidebarDesktop() {
     try { localStorage.setItem("nowen-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
   }, [sectionHeights]);
 
-  // ---- kb 树拖拽 ----
-  const onRowDragStart = useCallback((node: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    event.dataTransfer.setData("text/node", node.id);
-    event.dataTransfer.effectAllowed = "move";
-    setDrag({ nodeId: node.id });
-  }, []);
-
-  const onRowDragOver = useCallback((node: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    if (!drag?.nodeId) return;
-    if (drag.nodeId === node.id) return;
-    // 禁止移入自身子树
-    if (isDescendant(node.id, drag.nodeId, childrenMap)) return;
-    // 不可见行（搜索未命中）不作为目标 —— rows 里没有就跳过
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const ratio = (event.clientY - rect.top) / rect.height;
-    const isFolder = node.nodeType === "folder";
-    // 边缘命中区 35%：判定更容易（brief 4.7 是 30%，实际操作太苛刻）
-    const position: "before" | "after" | "into" =
-      !isFolder
-        ? ratio < 0.5 ? "before" : "after"
-        : ratio < 0.35 ? "before" : ratio > 0.65 ? "after" : "into";
-    setDropTarget({ nodeId: node.id, position });
-  }, [drag, childrenMap]);
-
-  const onRowDrop = useCallback((target: KnowledgeTreeNode) => (event: React.DragEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const sourceId = drag?.nodeId;
-    const info = dropTarget;
-    setDrag(null);
-    setDropTarget(null);
-    if (!sourceId || !info || info.nodeId !== target.id) return;
-    const source = nodes.find((n) => n.id === sourceId);
-    if (!source) return;
-
-    void (async () => {
-      try {
-        if (info.position === "into") {
-          // 移入文件夹
-          await knowledgeTreeApi.move(sourceId, { parentId: target.id });
-          // 折叠文件夹自动展开
-          setExpanded((cur) => new Set(cur).add(target.id));
-        } else {
-          // 前/后插入：parentId 与目标一致
-          await knowledgeTreeApi.move(sourceId, { parentId: target.parentId });
+  // ---- kb 树拖拽：拿起 / 落点判定 / 落点视觉统一交给 useSortableDrag ----
+  const treeDrag = useSortableDrag(rows, {
+    getId: (row) => row.node.id,
+    // 只有文件夹能接受"拖入内部"，文档行只在上下两半判定前/后
+    canDropInto: (row) => row.node.nodeType === "folder",
+    // 禁止移入自身子树（target 在 source 子树内则整行都不接）
+    canDrop: (source, target) => !isDescendant(target.node.id, source.node.id, childrenMap),
+    // 行内重命名时不可拿起
+    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id),
+    onDrop: ({ sourceId, targetId, position }) => {
+      const target = targetId ? rows.find((row) => row.node.id === targetId)?.node : undefined;
+      void (async () => {
+        try {
+          if (target && position === "into") {
+            // 移入文件夹
+            await knowledgeTreeApi.move(sourceId, { parentId: target.id });
+            // 折叠文件夹自动展开
+            setExpanded((cur) => new Set(cur).add(target.id));
+          } else {
+            // 前/后插入：parentId 与目标一致；空白区（root）= 移到根层末尾
+            await knowledgeTreeApi.move(sourceId, { parentId: target?.parentId ?? null });
+          }
+          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        } catch (error) {
+          console.error("[SidebarDesktop] drop move failed:", error);
         }
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      } catch (error) {
-        console.error("[SidebarDesktop] drop move failed:", error);
-      }
-    })();
-  }, [drag, dropTarget, nodes, childrenMap]);
+      })();
+    },
+  });
 
   // ---- 行级菜单动作 ----
   const startCreateFolder = useCallback(async (parentId: string | null) => {
@@ -1767,41 +1730,22 @@ export default function SidebarDesktop() {
                 )}
               </div>
             ) : (
+              // 空白区 = 根层末尾（行上的 dragOver/drop 已 stopPropagation，不会冒泡到这里）
               <div
                 ref={treeRootRef}
-                onDragOver={(e) => { if (drag?.nodeId) { e.preventDefault(); setDropTarget(null); } }}
-                onDrop={(e) => {
-                  // 空白区 drop：移到根层末尾（dropTarget 为 null 时才生效，行上的 drop 已 stopPropagation? 否——行 drop 会冒泡到这里，用 dropTarget 判定来源）
-                  if (!drag?.nodeId || dropTarget) return;
-                  e.preventDefault();
-                  void (async () => {
-                    try {
-                      await knowledgeTreeApi.move(drag.nodeId!, { parentId: null });
-                      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-                    } catch (err) { console.error("[SidebarDesktop] root drop failed:", err); }
-                    setDrag(null);
-                  })();
-                }}
+                {...treeDrag.getContainerProps()}
               >
                 {rows.map((row) => {
                   const { node, depth, hasChildren, expanded: isExpanded } = row;
                   const isFolder = node.nodeType === "folder";
                   const isKbRoot = node.parentId === null && node.resourceType === "notebook";
                   const isSelected = selectedNodeIds.has(node.id);
-                  const isDropInto = dropTarget?.nodeId === node.id && dropTarget.position === "into";
-                  const isDropBefore = dropTarget?.nodeId === node.id && dropTarget.position === "before";
-                  const isDropAfter = dropTarget?.nodeId === node.id && dropTarget.position === "after";
-                  const isDragSource = drag?.nodeId === node.id;
                   const isFlash = flashId === node.id;
                   const isRenaming = renaming?.kind === "kb" && renaming.id === node.id;
                   return (
                     <div
                       key={node.id}
-                      draggable={!isRenaming}
-                      onDragStart={onRowDragStart(node)}
-                      onDragOver={onRowDragOver(node)}
-                      onDragLeave={() => setDropTarget((cur) => (cur?.nodeId === node.id ? null : cur))}
-                      onDrop={onRowDrop(node)}
+                      {...treeDrag.getDragProps(row)}
                       onDoubleClick={() => {
                         // 双击库根 = 折叠/展开（Overview 导航只跟单击）
                         if (isKbRoot) toggleNode(node);
@@ -1810,21 +1754,13 @@ export default function SidebarDesktop() {
                         "group flex h-8 items-center gap-1 rounded-md pr-1 text-xs transition-colors",
                         // 重命名时不要蓝色选中底：会和输入框边框叠成一坨蓝色
                         isSelected && !isRenaming ? "bg-accent-primary/20 font-medium text-tx-primary" : "text-tx-primary hover:bg-app-hover",
-                        isDragSource && "opacity-40",
+                        // 选中标（左侧内阴影）；放在落点视觉之前，让落点阴影在悬停时覆盖它
+                        isSelected && "shadow-[inset_2px_0_0_var(--color-accent-primary)]",
                         isFlash && "animate-pulse bg-accent-primary/25",
-                        isDropInto && "bg-accent-primary/20 ring-1 ring-accent-primary",
+                        // 拿起半透明 / 上·下内阴影 / 拖入高亮
+                        treeDrag.visualFor(node.id),
                       )}
-                      style={{
-                        paddingLeft: 2 + depth * 16,
-                        boxShadow:
-                          isDropBefore
-                            ? "inset 0 2px 0 var(--color-accent-primary)"
-                            : isDropAfter
-                              ? "inset 0 -2px 0 var(--color-accent-primary)"
-                              : isSelected
-                                ? "inset 2px 0 0 var(--color-accent-primary)"
-                                : undefined,
-                      }}
+                      style={{ paddingLeft: 2 + depth * 16 }}
                       data-next-row={node.id}
                     >
                       <button
@@ -3123,6 +3059,16 @@ export default function SidebarDesktop() {
             if (!node) return null;
             return (
               <>
+                {/* 分屏入口：从侧栏直接打开第二篇文档（等宽左右分屏，点哪栏哪栏成为主编辑栏） */}
+                <MenuItem
+                  icon={Columns2}
+                  label="在右侧分屏打开"
+                  onClick={() => {
+                    setRowMenu(null);
+                    actions.splitEditor({ noteId: node.resourceId, direction: "right" });
+                  }}
+                />
+                <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuSeparator />
                 <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />

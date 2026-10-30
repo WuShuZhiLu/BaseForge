@@ -13,6 +13,7 @@ import {
   replaceOptimisticNotebook,
 } from "@/lib/notebookCreateState";
 import { prepareEditorSplitClose } from "@/lib/editorSplitMirror";
+import type { EditorSplitReferenceSide } from "@/lib/editorWorkspaceLayout";
 import type { SidebarPanelId } from "@/lib/sidebarPanels";
 import { getCurrentAppRoute, type AppRoute } from "@/lib/appRoute";
 
@@ -44,8 +45,15 @@ export interface OpenNoteTab {
 export type EditorSplitDirection = "right" | "down";
 
 export interface EditorSplitState {
+  /** 参考栏（副栏）文档；主栏文档始终是全局 activeNote。 */
   noteId: string;
   direction: EditorSplitDirection;
+  /**
+   * 参考栏沿分屏轴的位置（可选，历史状态缺省为 "end"）。
+   * 点副栏抬头/正文把该栏文档设为主文档时翻转它，两栏内容原地不动，
+   * 只交换“谁是主编辑栏”。
+   */
+  referenceSide?: EditorSplitReferenceSide;
 }
 
 /** 左侧栏面板 id（方案 B）：唯一定义在 lib/sidebarPanels.ts（面板框架），此处 re-export 兼容旧引用。 */
