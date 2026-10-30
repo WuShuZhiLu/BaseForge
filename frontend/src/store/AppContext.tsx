@@ -56,6 +56,21 @@ export interface EditorSplitState {
   referenceSide?: EditorSplitReferenceSide;
 }
 
+/**
+ * 分屏两栏互换（点参考栏正文 / ⇄ 调换）：主栏文档与参考栏文档必须原子更新。
+ * 拆成「splitEditor + setActiveNote」两条 dispatch 时，后者可能被 note 激活守卫或
+ * 加密笔记离开拦截丢弃，只剩 split.noteId 被改成原主文档，于是 split.noteId 与
+ * activeNote 相同，编辑器落进「同文档只读镜像」分支——现象就是两栏显示同一篇文档。
+ */
+export interface EditorSplitSwapPayload {
+  /** 新的主栏文档（原参考栏文档）。 */
+  activeNote: Note;
+  /** 新的参考栏文档（原主栏文档）。 */
+  referenceNoteId: string;
+  direction: EditorSplitDirection;
+  referenceSide?: EditorSplitReferenceSide;
+}
+
 /** 左侧栏面板 id（方案 B）：唯一定义在 lib/sidebarPanels.ts（面板框架），此处 re-export 兼容旧引用。 */
 export type { SidebarPanelId };
 
@@ -165,6 +180,7 @@ type Action =
   | { type: "CLEAR_NOTE_TABS" }
   | { type: "SET_NOTE_TABS"; payload: OpenNoteTab[] }
   | { type: "SPLIT_EDITOR"; payload: EditorSplitState }
+  | { type: "SWAP_EDITOR_SPLIT_PANES"; payload: EditorSplitSwapPayload }
   | { type: "CLOSE_EDITOR_SPLIT" }
   | { type: "CLEAR_EDITOR_SPLITS" };
 
@@ -582,6 +598,17 @@ function reducer(state: AppState, action: Action): AppState {
       };
     case "SPLIT_EDITOR":
       return { ...state, editorSplit: action.payload };
+    case "SWAP_EDITOR_SPLIT_PANES": {
+      const { activeNote, referenceNoteId, direction, referenceSide } = action.payload;
+      // 两栏不能是同一篇：同 id 会落进「同文档只读镜像」，视觉上就是两栏同一文档。
+      if (!referenceNoteId || referenceNoteId === activeNote.id) return state;
+      if (!isConversionNoteSafe(activeNote)) return state;
+      return {
+        ...state,
+        activeNote,
+        editorSplit: { noteId: referenceNoteId, direction, referenceSide },
+      };
+    }
     case "CLOSE_EDITOR_SPLIT":
     case "CLEAR_EDITOR_SPLITS":
       return { ...state, editorSplit: null };
@@ -638,6 +665,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const current = stateRef.current;
     const leavingNote = (
       (action.type === "SET_ACTIVE_NOTE" && Boolean(current.activeNote) && action.payload?.id !== current.activeNote?.id)
+      || (
+        action.type === "SWAP_EDITOR_SPLIT_PANES"
+        && Boolean(current.activeNote)
+        && current.activeNote?.id !== action.payload.activeNote.id
+      )
       || (action.type === "SET_VIEW_MODE" && current.viewMode !== action.payload)
       || (action.type === "SET_MOBILE_VIEW" && action.payload !== "editor")
       || ((action.type === "CLOSE_NOTE_TAB" || action.type === "REMOVE_NOTE_TAB") && action.payload === current.activeNote?.id)
@@ -778,6 +810,7 @@ export function useAppActions() {
     clearNoteTabs: () => dispatch({ type: "CLEAR_NOTE_TABS" }),
     setNoteTabs: (v: OpenNoteTab[]) => dispatch({ type: "SET_NOTE_TABS", payload: v }),
     splitEditor: (v: EditorSplitState) => dispatch({ type: "SPLIT_EDITOR", payload: v }),
+    swapEditorSplitPanes: (v: EditorSplitSwapPayload) => dispatch({ type: "SWAP_EDITOR_SPLIT_PANES", payload: v }),
     closeEditorSplit: () => {
       prepareEditorSplitClose();
       dispatch({ type: "CLOSE_EDITOR_SPLIT" });

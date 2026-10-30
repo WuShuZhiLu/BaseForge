@@ -1,6 +1,6 @@
 import EncryptedConversionEditorGuard from "./EncryptedConversionEditorGuard";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeftRight, Eye, Loader2, PanelLeftClose, Pencil, X } from "lucide-react";
+import { ArrowLeftRight, Eye, FileText, Loader2, PanelLeftClose, Pencil, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FormatAwareEditorPane from "@/components/FormatAwareEditorPane";
 import NoteTabsBar from "@/components/NoteTabsBar";
@@ -92,6 +92,9 @@ export default function EditorSplitView() {
   const [referenceSyncing, setReferenceSyncing] = useState(false);
   /** 已完整加载过的文档快照：焦点在左右栏之间切换时用它首帧直出，避免空白/闪烁。 */
   const noteCacheRef = useRef<Map<string, Note>>(new Map());
+  /** 切换防重入：连点参考栏正文会在一帧内读到同一份旧快照，重复交换会把两栏搞乱。 */
+  const switchPaneLockRef = useRef(false);
+  const switchPaneLockTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!split) return;
@@ -116,6 +119,11 @@ export default function EditorSplitView() {
       if (dragRafRef.current !== null) {
         cancelAnimationFrame(dragRafRef.current);
       }
+      if (switchPaneLockTimerRef.current !== null) {
+        window.clearTimeout(switchPaneLockTimerRef.current);
+        switchPaneLockTimerRef.current = null;
+      }
+      switchPaneLockRef.current = false;
     };
   }, []);
 
@@ -212,16 +220,28 @@ export default function EditorSplitView() {
    * 「文档现在所在的栏」恢复，避免用户只是点了一下另一栏就丢失阅读位置。
    */
   const switchSplitPanes = useCallback((paneNote: Note, referenceSide: EditorSplitReferenceSide) => {
-    if (!split || !state.activeNote) return;
-    if (!shouldActivateSplitPane(paneNote.id, state.activeNote.id)) return;
+    if (!split) return;
+    // 参考栏文档一律以 split.noteId 为准：点到的必须就是它，否则拿的是上一帧的旧快照。
+    const referenceNoteId = split.noteId;
+    if (paneNote.id !== referenceNoteId) return;
+    const activeNote = state.activeNote;
+    // 无主文档（分屏刚建、主栏空态）或两栏已经是同一篇（镜像态）：直接 no-op。
+    if (!activeNote || !shouldActivateSplitPane(referenceNoteId, activeNote.id)) return;
+    // 切换进行中：忽略连点/双击，避免重复交换读同一份旧快照。
+    if (switchPaneLockRef.current) return;
+    switchPaneLockRef.current = true;
     const mainSnapshot = readPaneScroll("main");
     const referenceSnapshot = readPaneScroll("reference");
-    actions.splitEditor({
-      noteId: state.activeNote.id,
+    // 主文档与参考栏文档必须在一次派发里同时落库。分两次 dispatch（splitEditor +
+    // setActiveNote）时，后者可能被 note 激活守卫拦下或加密笔记「离开前」事件取消，
+    // 只剩 editorSplit.noteId 被改成原主文档 → split.noteId === activeNote.id →
+    // 编辑器落进「同文档只读镜像」，用户看到两栏变成同一篇文档。
+    actions.swapEditorSplitPanes({
+      activeNote: paneNote,
+      referenceNoteId: activeNote.id,
       direction: split.direction,
       referenceSide,
     });
-    actions.setActiveNote(paneNote);
     // 交换后：原主文档 → 参考栏；原参考文档 → 主栏
     const restore = () => {
       writePaneScroll("reference", mainSnapshot);
@@ -233,6 +253,16 @@ export default function EditorSplitView() {
     });
     window.setTimeout(restore, 150);
     window.setTimeout(restore, 400);
+    // 下一帧后再压一个短延时才放锁：双击的第二下已过一帧，仍会被挡掉。
+    requestAnimationFrame(() => {
+      if (switchPaneLockTimerRef.current !== null) {
+        window.clearTimeout(switchPaneLockTimerRef.current);
+      }
+      switchPaneLockTimerRef.current = window.setTimeout(() => {
+        switchPaneLockTimerRef.current = null;
+        switchPaneLockRef.current = false;
+      }, 180);
+    });
   }, [actions, split, state.activeNote]);
 
   /**
@@ -267,9 +297,11 @@ export default function EditorSplitView() {
     if (!state.noteListCollapsed) actions.toggleNoteListCollapsed();
   }, [actions, state.noteListCollapsed]);
 
-  if (!split || !state.activeNote) return <FormatAwareEditorPane />;
+  if (!split) return <FormatAwareEditorPane />;
 
-  const duplicateDocument = split.noteId === state.activeNote.id;
+  // 主栏文档缺省（先点分屏、后选文档）：分屏照常渲染，主栏给空态，
+  // 参考栏照常显示它的文档；用户随后打开的文档会自然落到主栏。
+  const duplicateDocument = !!state.activeNote && split.noteId === state.activeNote.id;
   const effectiveReadOnly = duplicateDocument || referenceReadOnly;
   const referenceFirst = resolveEditorSplitReferenceSide(split.referenceSide) === "start";
   const referenceTitle = state.openNoteTabs.find((tab) => tab.id === split.noteId)?.title
@@ -372,6 +404,27 @@ export default function EditorSplitView() {
     </div>
   );
 
+  // 主栏空态：沿用编辑区既有空态的视觉（图标 + 主/副文案），只换成「先有分屏、后选文档」
+  // 的说法，提示用户从左侧选一篇，参考栏保持原文档不动。
+  const mainEmptyState = (
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-center px-6"
+      data-editor-split-empty="main"
+    >
+      <div className="flex flex-col items-center text-center">
+        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-accent-primary/10 bg-accent-primary/5">
+          <FileText size={28} className="text-accent-primary/30" />
+        </div>
+        <p className="mb-1 text-sm font-medium text-tx-secondary">{t("editor.selectNote")}</p>
+        <p className="max-w-[220px] text-xs leading-relaxed text-tx-tertiary">
+          {t("editorTabs.splitEmptyMainHint", {
+            defaultValue: "从左侧选择或新建一篇文档，参考栏保留当前文档",
+          })}
+        </p>
+      </div>
+    </div>
+  );
+
   // 主栏：全局 activeNote 的完整编辑器（含自己的页签栏与格式工具栏）。
   const mainColumn = (
     <SplitPaneColumn
@@ -380,7 +433,7 @@ export default function EditorSplitView() {
       direction={split.direction}
       header={prefs.enableNoteTabs ? <NoteTabsBar /> : null}
     >
-      <FormatAwareEditorPane />
+      {state.activeNote ? <FormatAwareEditorPane /> : mainEmptyState}
     </SplitPaneColumn>
   );
 

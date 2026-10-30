@@ -114,6 +114,21 @@ const FILTER_SCOPE_OPTIONS: Array<{ value: FilterScope; label: string }> = [
 /** 区段顺序（可拖拽排序，持久化到 localStorage）。收藏作为知识库面板的一个区段（功能太少，不设独立面板） */
 type SectionId = "kb" | "tags" | "editors" | "star";
 const SECTION_ORDER_KEY = "nowen-next-sidebar-sections";
+/** 区段排序拖拽专用 dataTransfer 类型：与知识树行拖拽（text/plain）区分，互不误触。 */
+const SECTION_DRAG_TYPE = "application/x-nowen-sidebar-section";
+/** 区段全集（同时也是缺失区段的补位顺序）。 */
+const SECTION_IDS: SectionId[] = ["kb", "tags", "editors", "star"];
+
+/**
+ * 区段顺序归一化：过滤脏数据、补齐缺失区段。
+ * 归一是必须的——localStorage 里的旧顺序只有三个区段（收藏是后加的），
+ * 直接拿它算插入下标会 indexOf("star") === -1，落点被算成 0（跑到最上方）。
+ */
+function normalizeSectionOrder(order: readonly SectionId[]): SectionId[] {
+  const valid = order.filter((id) => SECTION_IDS.includes(id));
+  for (const id of SECTION_IDS) if (!valid.includes(id)) valid.push(id);
+  return valid;
+}
 
 type ExpandedSet = Set<string>;
 
@@ -152,6 +167,51 @@ function buildChildrenMap(nodes: KnowledgeTreeNode[], sortMode?: KnowledgeTreeSo
     }
   }
   return children;
+}
+
+/** 根级知识库节点（无父级 + notebook 资源）：只能在根层内重排，不能被拖入其它库/文件夹。 */
+function isRootNotebookNode(node: KnowledgeTreeNode): boolean {
+  return node.parentId === null && node.resourceType === "notebook";
+}
+
+/**
+ * 拖拽落点的本地乐观重排：与后端 move 的锚点语义保持一致——
+ * 把源节点挂到目标父级下，再把该父级兄弟按 0..n-1 重新编号（无锚点 = 落到末尾）。
+ *
+ * 为什么要本地先算：松手到 reload 回来之间有一次网络往返，树在这段时间里仍然
+ * 按旧顺序渲染（拖拽期间不做预演重排），表现为"松手后先弹回旧位置、稍后再跳到新位置"。
+ * 本地按同一套规则先摆好，reload 回来的服务端顺序与之一致，就不会再跳。
+ */
+function applyOptimisticMove(
+  nodes: KnowledgeTreeNode[],
+  sourceId: string,
+  parentId: string | null,
+  anchor: { id: string; position: "before" | "after" } | null,
+): KnowledgeTreeNode[] {
+  const source = nodes.find((node) => node.id === sourceId);
+  if (!source) return nodes;
+  const siblings = nodes
+    .filter((node) => !node.isDeleted && node.id !== sourceId && (node.parentId ?? null) === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+  const anchorIndex = anchor ? siblings.findIndex((node) => node.id === anchor.id) : -1;
+  const insertIndex = anchor && anchorIndex >= 0
+    ? (anchor.position === "before" ? anchorIndex : anchorIndex + 1)
+    : siblings.length;
+  const ordered = [
+    ...siblings.slice(0, insertIndex),
+    source,
+    ...siblings.slice(insertIndex),
+  ];
+  const nextSort = new Map(ordered.map((node, index) => [node.id, index] as const));
+  return nodes.map((node) => {
+    const sortOrder = nextSort.get(node.id);
+    const nextParentId = node.id === sourceId ? parentId : node.parentId;
+    if (sortOrder === undefined) {
+      return nextParentId === node.parentId ? node : { ...node, parentId: nextParentId };
+    }
+    if (sortOrder === node.sortOrder && nextParentId === node.parentId) return node;
+    return { ...node, parentId: nextParentId, sortOrder };
+  });
 }
 
 /**
@@ -374,12 +434,10 @@ export default function SidebarDesktop() {
   const [sectionOrder, setSectionOrder] = useState<SectionId[]>(() => {
     try {
       const saved = localStorage.getItem(SECTION_ORDER_KEY);
-      if (saved === "kb,tags,editors" || saved === "kb,editors,tags" || saved === "tags,kb,editors" ||
-          saved === "tags,editors,kb" || saved === "editors,kb,tags" || saved === "editors,tags,kb") {
-        return saved.split(",") as SectionId[];
-      }
+      // 旧数据只有三个区段（收藏是后加的），补齐交给归一化，不要在这里写死排列。
+      if (saved) return normalizeSectionOrder(saved.split(",") as SectionId[]);
     } catch { /* ignore */ }
-    return ["kb", "tags", "editors"];
+    return ["kb", "tags", "editors", "star"];
   });
 
   // 定位高亮
@@ -609,14 +667,19 @@ export default function SidebarDesktop() {
   const panelScrollRef = useRef<HTMLDivElement>(null);
 
   // ---- 数据加载 ----
+  // 并发 reload 的序号：只认最新一次请求的结果，避免早发出的旧响应后到、
+  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 nowen:knowledge-tree-changed 会同时触发 reload）。
+  const reloadSeqRef = useRef(0);
   const reload = useCallback(async () => {
+    const seq = ++reloadSeqRef.current;
     try {
       const response = await knowledgeTreeApi.list();
+      if (seq !== reloadSeqRef.current) return;
       setNodes(response.nodes);
     } catch (error) {
       console.error("[SidebarDesktop] knowledge tree load failed:", error);
     } finally {
-      setLoading(false);
+      if (seq === reloadSeqRef.current) setLoading(false);
     }
   }, []);
 
@@ -1320,13 +1383,8 @@ export default function SidebarDesktop() {
     try { localStorage.setItem(SECTION_ORDER_KEY, sectionOrder.join(",")); } catch { /* ignore */ }
   }, [sectionOrder]);
 
-  // 渲染兜底：顺序数组保证恰好包含全部三个区段（localStorage 脏数据/未来增删区段时不丢面板）
-  const safeOrder = useMemo<SectionId[]>(() => {
-    const all: SectionId[] = ["kb", "tags", "editors", "star"];
-    const valid = sectionOrder.filter((s) => all.includes(s));
-    for (const id of all) if (!valid.includes(id)) valid.push(id);
-    return valid;
-  }, [sectionOrder]);
+  // 渲染兜底：顺序数组保证恰好包含全部四个区段（localStorage 脏数据/未来增删区段时不丢面板）
+  const safeOrder = useMemo<SectionId[]>(() => normalizeSectionOrder(sectionOrder), [sectionOrder]);
 
   // ---- 区段排序（pointer 实现而非 HTML5 DnD：区段头按下拖动，松手时按当前指针位置落位） ----
   // 拖拽视觉反馈：正在拖拽的区段 id（HTML5 DnD）
@@ -1334,8 +1392,10 @@ export default function SidebarDesktop() {
 
   // ---- 区段排序：HTML5 DnD（原生拖影），从区段头空白处启动；button 上按下不启动 ----
   const onSectionDragStart = useCallback((id: SectionId) => (event: React.DragEvent) => {
-    if (id === "kb") return;
     event.dataTransfer.setData("text/plain", id);
+    // 专用类型：让区段拖拽和知识树行拖拽（也用 text/plain）互相区分，
+    // 否则拖一行文档经过别的区段头会被当成区段排序。
+    event.dataTransfer.setData(SECTION_DRAG_TYPE, id);
     event.dataTransfer.effectAllowed = "move";
     setReorderActive(id);
   }, []);
@@ -1349,9 +1409,8 @@ export default function SidebarDesktop() {
   const [sectionDropHint, setSectionDropHint] = useState<{ id: SectionId; after: boolean } | null>(null);
 
   const onSectionDragOver = useCallback((id: SectionId) => (event: React.DragEvent) => {
-    if (id === "kb") return;
-    // 仅响应区段排序拖拽（dataTransfer 类型区分）
-    if (!event.dataTransfer.types.includes("text/plain")) return;
+    // 仅响应区段排序拖拽（专用 dataTransfer 类型；知识树行拖拽不带它）
+    if (!event.dataTransfer.types.includes(SECTION_DRAG_TYPE)) return;
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
@@ -1360,19 +1419,24 @@ export default function SidebarDesktop() {
   }, []);
 
   const onSectionDrop = useCallback((id: SectionId) => (event: React.DragEvent) => {
+    // drop 阶段读得到 dataTransfer 值：空值 = 不是区段排序拖拽（知识树行拖拽不带该类型）
+    const from = event.dataTransfer.getData(SECTION_DRAG_TYPE) as SectionId;
+    if (!SECTION_IDS.includes(from)) return;
     event.preventDefault();
     event.stopPropagation();
-    const from = event.dataTransfer.getData("text/plain") as SectionId;
     setReorderActive(null);
     setSectionDropHint(null);
-    if (!from || from === id || id === "kb") return;
+    if (from === id) return;
     // 落点在目标区段下半部 = 插到它后面；上半部 = 插到它前面（拖到文字下方=排到下面）
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const after = event.clientY > rect.top + rect.height / 2;
     setSectionOrder((current) => {
-      if (!current.includes(from)) return current;
-      const next = current.filter((s) => s !== from);
+      // 必须在归一化后的顺序上算下标：持久化的旧顺序可能没有 star，
+      // 直接 indexOf 会拿到 -1，插入位被算成 0（表现为"拖到收藏下面却跑到最上方"）。
+      const base = normalizeSectionOrder(current);
+      const next = base.filter((section) => section !== from);
       const idx = next.indexOf(id);
+      if (idx < 0) return base;
       next.splice(after ? idx + 1 : idx, 0, from);
       return next;
     });
@@ -1398,13 +1462,23 @@ export default function SidebarDesktop() {
   // ---- kb 树拖拽：拿起 / 落点判定 / 落点视觉统一交给 useSortableDrag ----
   const treeDrag = useSortableDrag(rows, {
     getId: (row) => row.node.id,
-    // 只有文件夹能接受"拖入内部"，文档行只在上下两半判定前/后
-    canDropInto: (row) => row.node.nodeType === "folder",
-    // 禁止移入自身子树（target 在 source 子树内则整行都不接）
-    canDrop: (source, target) => !isDescendant(target.node.id, source.node.id, childrenMap),
-    // 行内重命名时不可拿起；知识库是根级节点，不允许被拖走（只能留在根层）
-    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id)
-      && !(row.node.parentId === null && row.node.resourceType === "notebook"),
+    // 只有文件夹能接受"拖入内部"，文档行只在上下两半判定前/后。
+    // 例外：根级知识库自己拖过来时只做根层前后排序，不接受"放入"（否则会从根列表消失）。
+    canDropInto: (row, source) => {
+      if (row.node.nodeType !== "folder") return false;
+      if (source && isRootNotebookNode(source.node)) return false;
+      return true;
+    },
+    // 禁止移入自身子树（target 在 source 子树内则整行都不接）；
+    // 根级知识库只能在根层内重排：落点必须是根层节点，且不能是"放入"。
+    canDrop: (source, target, position) => {
+      if (isRootNotebookNode(source.node)) {
+        return position !== "into" && (target.node.parentId ?? null) === null;
+      }
+      return !isDescendant(target.node.id, source.node.id, childrenMap);
+    },
+    // 行内重命名时不可拿起（知识库根也要能拖，只在落点上限制）
+    canDrag: (row) => !(renaming?.kind === "kb" && renaming.id === row.node.id),
     onDrop: ({ sourceId, targetId, position }) => {
       const target = targetId ? rows.find((row) => row.node.id === targetId)?.node : undefined;
       void (async () => {
@@ -1414,15 +1488,25 @@ export default function SidebarDesktop() {
             await knowledgeTreeApi.move(sourceId, { parentId: target.id });
             // 折叠文件夹自动展开
             setExpanded((cur) => new Set(cur).add(target.id));
+            // 本地先按同一套规则摆好（追加到该父级末尾），再交给 reload 收敛
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, target.id, null));
           } else if (target) {
             // 前/后插入：交给后端按锚点重排兄弟 sortOrder（只传 parentId 会被追加到末尾）
+            const parentId = target.parentId ?? null;
+            const anchorPosition = position === "before" ? "before" : "after";
             await knowledgeTreeApi.move(sourceId, {
-              parentId: target.parentId ?? null,
+              parentId,
               ...(position === "before" ? { beforeId: target.id } : { afterId: target.id }),
             });
+            // 作废拖拽期间已在飞的 reload，再本地摆好新顺序（两边顺序一致，reload 回来不跳）
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, parentId, { id: target.id, position: anchorPosition }));
           } else {
             // 空白区 = 移到根层末尾
             await knowledgeTreeApi.move(sourceId, { parentId: null });
+            reloadSeqRef.current += 1;
+            setNodes((cur) => applyOptimisticMove(cur, sourceId, null, null));
           }
           window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
         } catch (error) {
@@ -1625,7 +1709,15 @@ export default function SidebarDesktop() {
         {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「📘 库名 ＋ N ×」
             （点×退出库内树空间，点库名回 Overview，＋在库内新建）。 */}
         {focusRoot ? (
-          <div className="flex w-full items-center gap-1 px-2 py-1">
+          <div
+            draggable
+            onDragStart={onSectionDragStart("kb")}
+            onDragEnd={onSectionDragEnd}
+            className={cn(
+              "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+              reorderActive === "kb" && "opacity-40",
+            )}
+          >
             <FaBook size={13} className="shrink-0 text-accent-primary" />
             <button
               type="button"
@@ -1661,7 +1753,15 @@ export default function SidebarDesktop() {
             )}
           </div>
         ) : (
-        <div className="flex w-full items-center gap-1 px-2 py-1">
+        <div
+          draggable
+          onDragStart={onSectionDragStart("kb")}
+          onDragEnd={onSectionDragEnd}
+          className={cn(
+            "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+            reorderActive === "kb" && "opacity-40",
+          )}
+        >
           <button
             type="button"
             onClick={() => toggleSection("kb")}
@@ -2135,7 +2235,15 @@ export default function SidebarDesktop() {
     ),
     star: (
       <section key="star" className="shrink-0" data-next-section="star">
-        <div className="flex w-full items-center gap-1 px-2 py-1">
+        <div
+          draggable
+          onDragStart={onSectionDragStart("star")}
+          onDragEnd={onSectionDragEnd}
+          className={cn(
+            "flex w-full cursor-grab select-none items-center gap-1 px-2 py-1 active:cursor-grabbing",
+            reorderActive === "star" && "opacity-40",
+          )}
+        >
           <button
             type="button"
             onClick={() => toggleSection("star")}

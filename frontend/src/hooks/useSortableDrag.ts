@@ -34,8 +34,12 @@ export interface DropResult {
 
 export interface SortableDragOptions<T> {
   getId: (item: T) => string;
-  /** 该条目是否接受"拖入内部"（文件夹/分组）。返回 false 时上下各占 50%。 */
-  canDropInto?: (item: T) => boolean;
+  /**
+   * 该条目是否接受"拖入内部"（文件夹/分组）。返回 false 时上下各占 50%。
+   * 第二个参数是当前被拖动的条目（无源时为 null）——用于"同一个目标在不同源下
+   * 语义不同"的场景，例如知识库根只接受文档拖入，但根级知识库自己拖过来时只能前后插。
+   */
+  canDropInto?: (item: T, source: T | null) => boolean;
   /** 该条目此刻是否可被拿起（行内正在重命名等情况返回 false）。默认 true。 */
   canDrag?: (item: T) => boolean;
   /** 额外拒绝规则（不能移入自身子树、固定置顶项等）。 */
@@ -134,7 +138,7 @@ export function useSortableDrag<T>(
         onDragOver: (event: React.DragEvent) => {
           if (!sourceId || sourceId === id) return;
           const source = byId.get(sourceId);
-          const allowInto = canDropInto?.(item) ?? false;
+          const allowInto = source ? (canDropInto?.(item, source) ?? false) : false;
           const position = resolveDropPosition(event, allowInto);
           if (!source || (canDrop && !canDrop(source, item, position))) return;
           event.preventDefault();
