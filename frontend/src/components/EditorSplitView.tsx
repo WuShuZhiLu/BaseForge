@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import FormatAwareEditorPane from "@/components/FormatAwareEditorPane";
 import NoteTabsBar from "@/components/NoteTabsBar";
 import {
+  EditorChromeSlot,
   EditorToolbarDetached,
   EditorToolbarExpandSlot,
   EditorToolbarHost,
@@ -612,6 +613,12 @@ export default function EditorSplitView() {
           <NoteTabsBar />
         </div>
       )}
+
+      {/*
+        全宽顶栏：主栏编辑器把桌面顶栏（标题/版本/同步/操作）portal 到这里，
+        于是顶栏横跨整个分屏宽度；内容随 activeNote 变化，位置固定不变。
+      */}
+      <EditorChromeSlot className="shrink-0" />
 
       {/*
         全宽格式工具栏：主栏编辑器认领宿主后把自己的桌面工具栏 portal 到这里，

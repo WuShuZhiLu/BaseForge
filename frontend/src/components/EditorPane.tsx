@@ -10,6 +10,7 @@ import { LiaThumbtackSolid } from "react-icons/lia";
 import { RiMenuFold2Line } from "react-icons/ri";
 import { GoTriangleDown, GoTriangleRight } from "react-icons/go";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EditorToolbarPortal, useEditorChromeSlot } from "@/components/CollapsibleEditorToolbar";
 import TiptapEditor from "@/components/TiptapEditor";
 import EncryptedConversionEditorGuard from "@/components/EncryptedConversionEditorGuard";
 import EncryptedNotePane from "@/components/EncryptedNotePane";
@@ -170,6 +171,8 @@ function EditorPaneCore({
   // 一起 reset 完成（目前是"用户在编辑期间手动切换状态，新笔记打开时也会保持"。
   // 因为长期使用极少的用户来说，每次新笔记都反向丢失偏好会很不习惯。
   const { prefs: userPrefs, setPref: setUserPref } = useUserPreferences();
+  // 分屏时顶栏也从编辑器里交出去，占分屏顶部的一条全宽行（与工具栏同一套宿主机制）。
+  const chromeSlot = useEditorChromeSlot();
   const [showOutline, setShowOutline] = useState<boolean>(() => userPrefs.outlineDefaultOpen);
   // 大纲总开关（会话级）：false = mini 刻度条 + 悬浮/钉住；true = 连 mini 一并隐藏、完全无痕，
   // 仅经 ⋯ 菜单「显示大纲」唤回。切笔记不重置（隐藏是明确意图）。
@@ -3306,7 +3309,8 @@ const moveToTrash = useCallback(async () => {
         )}
       </AnimatePresence>
 
-      {/* Desktop Editor Header */}
+      {/* Desktop Editor Header（分屏时由宿主 portal 到全宽位置：顶栏 + 工具栏各一条，都在内容分栏之上） */}
+      <EditorToolbarPortal target={chromeSlot}>
       <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-1.5 border-b border-app-border bg-app-surface/30 transition-colors">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {/* �ʼ��б����۵�ʱ���������ṩ��չ������ť��δ�۵�ʱ���ء�
@@ -3885,6 +3889,7 @@ const moveToTrash = useCallback(async () => {
 
         </div>
       </div>
+      </EditorToolbarPortal>
 
       
       {/* Editor (HTML 预览 / MD / Tiptap 三模式共用) + Outline */}

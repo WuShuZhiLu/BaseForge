@@ -27,8 +27,10 @@ const DESKTOP_TOOLBAR_MEDIA_QUERY = "(min-width: 768px)";
 interface ToolbarHostValue {
   /** 实际生效的落点：header（分屏全宽行）优先于 tabs（页签行内的空位）。 */
   target: HTMLSpanElement | null;
+  /** 顶栏（标题/版本/同步/操作）的全宽落点；分屏时用它把顶栏也提到全宽。 */
+  chromeTarget: HTMLSpanElement | null;
   /** 登记落点元素；同一位置重复登记同一个元素会直接忽略，避免 ref 回调自我循环。 */
-  registerSlot: (location: "tabs" | "header", element: HTMLSpanElement | null) => void;
+  registerSlot: (location: "tabs" | "header" | "chrome", element: HTMLSpanElement | null) => void;
   mobileLeadingTarget: HTMLSpanElement | null;
   setMobileLeadingTarget: (target: HTMLSpanElement | null) => void;
   mobileTrailingTarget: HTMLSpanElement | null;
@@ -37,6 +39,9 @@ interface ToolbarHostValue {
   claimSlot: () => object | null;
   /** 归还认领；只有 token 匹配（仍是自己）时才真正释放。 */
   releaseSlot: (token: object) => void;
+  /** 顶栏认领（与工具栏认领相互独立，两条都能各自全宽）。 */
+  claimChromeSlot: () => object | null;
+  releaseChromeSlot: (token: object) => void;
 }
 
 const ToolbarHostContext = createContext<ToolbarHostValue | null>(null);
@@ -54,11 +59,13 @@ export function EditorToolbarHost({ children }: { children: ReactNode }) {
   const [slots, setSlots] = useState<{
     tabs: HTMLSpanElement | null;
     header: HTMLSpanElement | null;
-  }>({ tabs: null, header: null });
+    chrome: HTMLSpanElement | null;
+  }>({ tabs: null, header: null, chrome: null });
   const [mobileLeadingTarget, setMobileLeadingTarget] = useState<HTMLSpanElement | null>(null);
   const [mobileTrailingTarget, setMobileTrailingTarget] = useState<HTMLSpanElement | null>(null);
   const claimantRef = useRef<object | null>(null);
-  const registerSlot = useCallback((location: "tabs" | "header", element: HTMLSpanElement | null) => {
+  const chromeClaimantRef = useRef<object | null>(null);
+  const registerSlot = useCallback((location: "tabs" | "header" | "chrome", element: HTMLSpanElement | null) => {
     // 同一个元素重复登记时原样返回旧 state：ref 回调不会因此进入无限重渲染。
     setSlots((previous) => (previous[location] === element ? previous : { ...previous, [location]: element }));
   }, []);
@@ -71,10 +78,21 @@ export function EditorToolbarHost({ children }: { children: ReactNode }) {
   const releaseSlot = useCallback((token: object) => {
     if (claimantRef.current === token) claimantRef.current = null;
   }, []);
+  const claimChromeSlot = useCallback(() => {
+    if (chromeClaimantRef.current) return null;
+    const token = {};
+    chromeClaimantRef.current = token;
+    return token;
+  }, []);
+  const releaseChromeSlot = useCallback((token: object) => {
+    if (chromeClaimantRef.current === token) chromeClaimantRef.current = null;
+  }, []);
   const target = slots.header ?? slots.tabs;
+  const chromeTarget = slots.chrome;
   const value = useMemo(
     () => ({
       target,
+      chromeTarget,
       registerSlot,
       mobileLeadingTarget,
       setMobileLeadingTarget,
@@ -82,8 +100,20 @@ export function EditorToolbarHost({ children }: { children: ReactNode }) {
       setMobileTrailingTarget,
       claimSlot,
       releaseSlot,
+      claimChromeSlot,
+      releaseChromeSlot,
     }),
-    [target, registerSlot, mobileLeadingTarget, mobileTrailingTarget, claimSlot, releaseSlot],
+    [
+      target,
+      chromeTarget,
+      registerSlot,
+      mobileLeadingTarget,
+      mobileTrailingTarget,
+      claimSlot,
+      releaseSlot,
+      claimChromeSlot,
+      releaseChromeSlot,
+    ],
   );
   return <ToolbarHostContext.Provider value={value}>{children}</ToolbarHostContext.Provider>;
 }
@@ -184,6 +214,56 @@ export function EditorToolbarExpandSlot({
   );
 }
 
+
+/**
+ * 编辑器侧取「顶栏落点」：与工具栏同一套机制，但认领互相独立——
+ * 分屏时顶栏与工具栏都要各自占一条全宽行，不能互相抢。
+ */
+export function useEditorChromeSlot(): HTMLSpanElement | null {
+  const host = useContext(ToolbarHostContext);
+  const desktop = useDesktopViewport();
+  const claimChromeSlot = host?.claimChromeSlot;
+  const releaseChromeSlot = host?.releaseChromeSlot;
+  const [token, setToken] = useState<object | null>(null);
+
+  useLayoutEffect(() => {
+    if (!claimChromeSlot || !releaseChromeSlot || !desktop) {
+      setToken(null);
+      return;
+    }
+    const claimed = claimChromeSlot();
+    setToken(claimed);
+    return () => {
+      if (!claimed) return;
+      releaseChromeSlot(claimed);
+      setToken(null);
+    };
+  }, [claimChromeSlot, releaseChromeSlot, desktop]);
+
+  if (!host || !desktop || !token) return null;
+  return host.chromeTarget;
+}
+
+/** 分屏顶部的全宽顶栏落点；没有编辑器认领时整行消失。 */
+export function EditorChromeSlot({ className }: { className?: string }) {
+  const host = useContext(ToolbarHostContext);
+  const registerSlot = host?.registerSlot;
+  const setRef = useCallback(
+    (element: HTMLSpanElement | null) => {
+      registerSlot?.("chrome", element);
+    },
+    [registerSlot],
+  );
+  if (!host) return null;
+  // 顶栏本身是 `hidden md:flex`，这里不能再用 hidden 兜底，否则桌面上整条消失。
+  return (
+    <span
+      ref={setRef}
+      data-editor-chrome-slot=""
+      className={cn("flex w-full min-w-0 flex-col empty:hidden", className)}
+    />
+  );
+}
 
 export function MobileEditorToolbarSlot({ location }: { location: "leading" | "trailing" }) {
   const host = useContext(ToolbarHostContext);
