@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, BookOpen, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Lock, Mail, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   clearServerUrl,
@@ -565,9 +565,9 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.1, duration: 0.4 }}
-              className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/15 mb-4"
+              className="inline-flex items-center justify-center w-12 h-12 mb-4"
             >
-              <BookOpen size={24} className="text-indigo-600 dark:text-indigo-400" />
+              <img src="./base-notes-icon.svg" alt="BaseForge" width={48} height={48} className="w-12 h-12 drop-shadow-md" />
             </motion.div>
             <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
               {isTwoFactorStep ? t("auth.twoFactor.title") : siteConfig.title || t("auth.appTitle")}
