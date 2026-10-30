@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { FileText, Folder, FolderInput, Loader2, Trash2, TreePine, X } from "lucide-react";
+import { ArrowUp, ChevronRight, FolderInput, Loader2, Trash2, TreePine, X } from "lucide-react";
 
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
+import { knowledgeTreeEmojiFor } from "@/lib/knowledgeTreeIcons";
 import {
   knowledgeTreeDescendantIds,
   topLevelSelectedKnowledgeNodes,
@@ -93,6 +94,45 @@ export function KnowledgeTreeBatchMovePanel({
     }
   };
 
+  // ===== 文件夹浏览器（VSCode 式）：点文件夹进入下一级，面包屑/上级返回，「移动到此处」落点 =====
+  // 当前所在目录：null = 全空间根层。初始即根层。
+  const [currentId, setCurrentId] = useState<string | null>(null);
+
+  const candidateIds = useMemo(() => new Set(candidates.map((node) => node.id)), [candidates]);
+  const childrenOf = useMemo(() => {
+    const map = new Map<string | null, KnowledgeTreeNode[]>();
+    for (const node of targetNodes) {
+      if (node.isDeleted) continue;
+      map.set(node.parentId, [...(map.get(node.parentId) ?? []), node]);
+    }
+    return map;
+  }, [targetNodes]);
+  const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+
+  // 当前层的可落点（保持候选过滤）；文件夹排前、可进入，其余不可点
+  const currentEntries = useMemo(() => {
+    const entries = (childrenOf.get(currentId) ?? []).filter((node) => candidateIds.has(node.id));
+    return entries.sort((left, right) => {
+      if ((left.nodeType === "folder") !== (right.nodeType === "folder")) return left.nodeType === "folder" ? -1 : 1;
+      return left.title.localeCompare(right.title);
+    });
+  }, [childrenOf, currentId, candidateIds]);
+
+  // 面包屑链：根目录 → … → 当前目录
+  const crumbs = useMemo(() => {
+    const chain: KnowledgeTreeNode[] = [];
+    let current = currentId ? nodeById.get(currentId) : undefined;
+    while (current) {
+      chain.unshift(current);
+      current = current.parentId ? nodeById.get(current.parentId) : undefined;
+    }
+    return chain;
+  }, [currentId, nodeById]);
+
+  // 落点合法性：当前目录本身是候选，或处于根层且根层被允许
+  const currentIsCandidate = currentId === null ? allowRoot : candidateIds.has(currentId);
+  const alreadyHere = roots.length > 0 && roots.every((node) => (node.parentId ?? null) === currentId);
+
   return (
     <div className="absolute inset-0 z-[220] flex flex-col bg-app-sidebar" onClick={(event) => event.stopPropagation()}>
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-app-border px-3">
@@ -101,19 +141,75 @@ export function KnowledgeTreeBatchMovePanel({
         {moving && <Loader2 size={14} className="animate-spin text-tx-tertiary" />}
         <button type="button" disabled={moving} onClick={onClose} className="rounded-md p-1.5 text-tx-tertiary hover:bg-app-hover disabled:opacity-40" aria-label="关闭移动面板"><X size={16} /></button>
       </header>
+      {/* 面包屑 + 上一级：与 Linux 文件选择器同交互 */}
+      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-app-border px-2">
+        <button
+          type="button"
+          disabled={moving || currentId === null}
+          onClick={() => setCurrentId(nodeById.get(currentId ?? "")?.parentId ?? null)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="上一级"
+          title="上一级"
+        >
+          <ArrowUp size={14} />
+        </button>
+        <div className="min-w-0 flex-1 truncate text-xs text-tx-secondary">
+          <button
+            type="button"
+            onClick={() => setCurrentId(null)}
+            className={`rounded px-1 py-0.5 hover:bg-app-hover ${currentId === null ? "font-medium text-tx-primary" : "text-tx-tertiary hover:text-tx-primary"}`}
+          >
+            根目录
+          </button>
+          {crumbs.map((crumb) => (
+            <span key={crumb.id}>
+              <ChevronRight size={11} className="inline text-app-border" />
+              <button
+                type="button"
+                onClick={() => setCurrentId(crumb.id)}
+                className={`rounded px-1 py-0.5 hover:bg-app-hover ${crumb.id === currentId ? "font-medium text-tx-primary" : "text-tx-tertiary hover:text-tx-primary"}`}
+              >
+                {crumb.title}
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
-        {allowRoot && (
-          <button type="button" disabled={moving || roots.every((node) => node.parentId === null)} onClick={() => void move(null)} className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-tx-secondary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40">
-            <TreePine size={15} className="text-accent-primary" /><span className="truncate">根目录</span>
-          </button>
+        {currentEntries.map((entry) => {
+          const isFolder = entry.nodeType === "folder";
+          const disabled = moving || !isFolder || roots.every((node) => node.parentId === entry.id);
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => isFolder && setCurrentId(entry.id)}
+              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-tx-secondary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40 ${isFolder ? "" : "opacity-60"}`}
+            >
+              <span className="shrink-0 text-[14px] leading-none">{knowledgeTreeEmojiFor(entry, entry.parentId === null && entry.resourceType === "notebook")}</span>
+              <span className="min-w-0 flex-1 truncate">{entry.title}</span>
+              {isFolder && <ChevronRight size={13} className="shrink-0 text-tx-tertiary" />}
+            </button>
+          );
+        })}
+        {currentEntries.length === 0 && (
+          <p className="py-10 text-center text-xs text-tx-tertiary">
+            {currentId === null && !allowRoot ? "根层不可作为目标，请进入一个文件夹" : "此目录下没有可进入的子文件夹"}
+          </p>
         )}
-        {candidates.map((candidate) => (
-          <button key={candidate.id} type="button" disabled={moving || roots.every((node) => node.parentId === candidate.id)} onClick={() => void move(candidate.id)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-tx-secondary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40">
-            {candidate.nodeType === "folder" ? <Folder size={15} className="shrink-0 text-amber-500" /> : <FileText size={15} className="shrink-0 text-accent-primary" />}
-            <span className="truncate">{candidate.title}</span>
-          </button>
-        ))}
-        {candidates.length === 0 && !allowRoot && <p className="py-10 text-center text-xs text-tx-tertiary">没有可用目标节点</p>}
+      </div>
+      {/* 落点：移动到当前所在目录 */}
+      <div className="shrink-0 border-t border-app-border p-2">
+        <button
+          type="button"
+          disabled={moving || !currentIsCandidate || alreadyHere}
+          onClick={() => void move(currentId)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-full bg-accent-primary px-4 py-2 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {moving ? <Loader2 size={13} className="animate-spin" /> : <TreePine size={13} />}
+          {currentId === null ? "移动到根目录" : alreadyHere ? "已在此目录" : `移动到「${crumbs[crumbs.length - 1]?.title ?? ""}」`}
+        </button>
       </div>
     </div>
   );
