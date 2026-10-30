@@ -28,7 +28,6 @@ import {
   Share2,
   Ellipsis,
   ExternalLink,
-  FileCode,
   Columns2,
   FilePlus2,
   FileText,
@@ -41,7 +40,6 @@ import {
   Pencil,
   Play,
   BookOpen,
-  PenTool,
   Pin,
   Plus,
   RefreshCw,
@@ -68,7 +66,7 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
-import { knowledgeTreeEmojiFor } from "@/lib/knowledgeTreeIcons";
+import { knowledgeTreeEmojiFor, docEmojiForFormat } from "@/lib/knowledgeTreeIcons";
 import {
   exportNoteAsImage,
   exportSingleNote,
@@ -88,7 +86,6 @@ import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
-import { FaFolder, FaBook } from "react-icons/fa";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import {
   importMarkdownIntoKnowledgeTree,
@@ -1047,14 +1044,13 @@ export default function SidebarDesktop() {
     return starDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [starDocs, focusRootResourceId, docRootMap]);
 
-  // 收藏区段的根层知识库：树节点 isFavorite=1 的知识库（notebook 收藏落 notebooks 表），
-  // 同样跟随聚焦范围——聚焦某库时只显示该库自身的收藏项
+  // 收藏区段的知识库条目：只在全空间（未聚焦）时显示；聚焦某库时该库自身就在眼前，
+  // 再列一条"知识库"收藏是冗余，直接隐藏（文档收藏仍按聚焦范围过滤）
   const visibleStarKbs = useMemo(() => {
-    const kbs = nodes.filter(
+    if (focusRootResourceId) return [];
+    return nodes.filter(
       (n) => !n.isDeleted && n.parentId === null && n.resourceType === "notebook" && n.isFavorite === 1,
     );
-    if (!focusRootResourceId) return kbs;
-    return kbs.filter((kb) => kb.resourceId === focusRootResourceId);
   }, [nodes, focusRootResourceId]);
 
   // 收藏模块：当前笔记不在（可见）收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
@@ -1866,7 +1862,7 @@ export default function SidebarDesktop() {
               reorderActive === "kb" && "opacity-40",
             )}
           >
-            <FaBook size={13} className="shrink-0 text-accent-primary" />
+            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(focusRoot, true)}</span>
             <button
               type="button"
               onClick={() => openKbOverview(focusRoot.resourceId)}
@@ -2270,11 +2266,7 @@ export default function SidebarDesktop() {
                           onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          {doc.contentFormat === "markdown" ? (
-                            <FileCode size={15} className="shrink-0 text-emerald-500" />
-                          ) : (
-                            <FileText size={15} className="shrink-0 text-[var(--color-accent-primary)]" />
-                          )}
+                          <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                           <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                         </button>
                         <button
@@ -2346,13 +2338,7 @@ export default function SidebarDesktop() {
                       isActive ? "bg-app-active text-tx-primary" : "text-tx-primary hover:bg-app-hover",
                     )}
                   >
-                    {tab.contentFormat === "markdown" ? (
-                      <FileCode size={14} className="shrink-0 text-emerald-500" />
-                    ) : tab.contentFormat === "board" ? (
-                      <PenTool size={14} className="shrink-0 text-teal-500" />
-                    ) : (
-                      <FileText size={14} className="shrink-0 text-[var(--color-accent-primary)]" />
-                    )}
+                    <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(tab.contentFormat)}</span>
                     <button
                       type="button"
                       onClick={() => void openNoteFromTab(tab.id)}
@@ -2452,7 +2438,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <span className="sbx-ico"><FaBook size={14} className="text-accent-primary" /></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(kb, true)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{kb.title}</div>
                       <div className="sbx-sub">知识库</div>
@@ -2480,7 +2466,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => { void openNoteFromTab(doc.id); }}
                   >
-                    <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{doc.title}</div>
                       <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
@@ -2757,11 +2743,7 @@ export default function SidebarDesktop() {
                             onClick={() => void openSearchDoc(doc.id)}
                             className="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                           >
-                            {doc.contentFormat === "markdown" ? (
-                              <FileCode size={13} className="shrink-0 text-emerald-500" />
-                            ) : (
-                              <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                            )}
+                            <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                             <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                           </button>
                         ))}
@@ -2782,11 +2764,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {doc.contentFormat === "markdown" ? (
-                        <FileCode size={13} className="shrink-0 text-emerald-500" />
-                      ) : (
-                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
                       <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
                     </button>
@@ -2815,11 +2793,7 @@ export default function SidebarDesktop() {
                       }}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {node.nodeType === "folder" ? (
-                        <FaFolder size={13} className="shrink-0 text-amber-500" />
-                      ) : (
-                        <FaBook size={13} className="shrink-0 text-accent-primary" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, node.parentId === null)}</span>
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
                     </button>
                   ))}
@@ -2839,11 +2813,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {doc.contentFormat === "markdown" ? (
-                        <FileCode size={13} className="shrink-0 text-emerald-500" />
-                      ) : (
-                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                     </button>
                   ))}
@@ -2997,7 +2967,9 @@ export default function SidebarDesktop() {
                 <p className="sbx-view-empty">回收站是空的</p>
               ) : trashItems.map((item) => (
                 <div key={item.id} className="sbx-row group">
-                  <span className="sbx-ico">{item.resourceType === "notebook" ? <Folder size={14} className="text-amber-500" /> : item.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
+                  <span className="sbx-ico">{item.resourceType === "notebook"
+                    ? <span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(item as never, true)}</span>
+                    : <span className="text-[13px] leading-none">{docEmojiForFormat(item.contentFormat, (item as never as { noteType?: string }).noteType)}</span>}</span>
                   <span className="min-w-0 flex-1">
                     <div className="truncate text-xs text-tx-primary">{item.title}</div>
                     <div className="sbx-sub">{item.resourceType === "notebook" ? "文件夹" : "文档"} · {item.deletedAt ? item.deletedAt.slice(5, 10) : ""} 删除</div>
