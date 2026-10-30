@@ -1022,14 +1022,54 @@ export interface NoteVersion {
   changeType: string;
   changeSummary: string | null;
   createdAt: string;
-  /** v2：auto=自动/系统版本，manual=手动保存版本；旧后端不下发时按 auto 归类 */
-  kind?: "auto" | "manual";
+  /** v2 旧口径列：v134 起与 source 同值（auto|manual|release），旧后端不下发时按 auto 归类 */
+  kind?: "auto" | "manual" | "release";
+  /** v134 版本来源：auto=定时快照，manual=Ctrl+S 保存，release=用户「保存为版本」；列表每条下发 */
+  source?: "auto" | "manual" | "release";
   /** 手动版本名称（label 为空时服务端默认「手动备份 YYYY/MM/DD HH:mm」） */
   label?: string | null;
   /** 手动版本描述 */
   description?: string | null;
   /** 版本内容占用字节（列表接口下发，用于占用统计） */
   contentBytes?: number;
+}
+
+/** v134：服务端版本对比的行（GET .../versions/diff） */
+export interface VersionDiffRow {
+  type: "equal" | "add" | "remove";
+  text: string;
+  /** 该行在 A（旧版本）中的行号（1 起），新增行为 null */
+  oldLine: number | null;
+  /** 该行在 B（新版本）中的行号（1 起），删除行为 null */
+  newLine: number | null;
+}
+
+/** v134：服务端版本对比统计 */
+export interface VersionDiffStats {
+  added: number;
+  removed: number;
+  unchanged: number;
+}
+
+/** v134：diff 结果中单侧版本的元信息 */
+export interface VersionDiffMeta {
+  id: string;
+  version: number;
+  title: string | null;
+  createdAt: string;
+  source: "auto" | "manual" | "release";
+  kind: "auto" | "manual" | "release";
+  label: string | null;
+  contentFormat: string;
+  contentBytes: number;
+}
+
+/** v134：服务端版本对比结果（{a, b, rows, stats}） */
+export interface VersionDiffResult {
+  a: VersionDiffMeta;
+  b: VersionDiffMeta;
+  rows: VersionDiffRow[];
+  stats: VersionDiffStats;
 }
 
 /** 版本历史 v2 保留策略配置 */
@@ -1043,7 +1083,10 @@ export interface VersionRetentionConfig {
 export interface VersionHistorySettings {
   autoVersionIntervalMinutes: number;
   sessionEndSnapshot: boolean;
+  /** v134：auto（定时快照）保留策略 */
   retention: VersionRetentionConfig;
+  /** v134：manual（Ctrl+S 保存记录）保留策略；release（发版）永不参与清理 */
+  manualRetention: VersionRetentionConfig;
   /** P2 存储配额（MB）：auto 版本总字节超限时最旧优先清理；0 = 不限制 */
   storageQuotaMb: number;
 }
