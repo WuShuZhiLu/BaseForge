@@ -47,13 +47,11 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  Table2,
   Sparkles,
   Star,
   Trash2,
   Upload,
   Users,
-  Waypoints,
   X,
   XCircle,
 } from "lucide-react";
@@ -70,6 +68,7 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
+import { knowledgeTreeEmojiFor } from "@/lib/knowledgeTreeIcons";
 import {
   exportNoteAsImage,
   exportSingleNote,
@@ -315,31 +314,8 @@ function subtreeHasMatch(
 }
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
-  if (node.nodeType === "folder") {
-    // 根层知识库（笔记本）用实心书本与普通实心文件夹区分
-    if (isRoot && node.resourceType === "notebook") {
-      return <FaBook size={14} className="shrink-0 text-accent-primary" />;
-    }
-    return <FaFolder size={14} className="shrink-0 text-amber-400" />;
-  }
-  // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
-  if (node.noteType === "sheet") {
-    return <Table2 size={15} className="shrink-0 text-emerald-500" />;
-  }
-  if (node.contentFormat === "board") {
-    return <PenTool size={15} className="shrink-0 text-teal-500" />;
-  }
-  // 导图归一后是 contentFormat="mindmap" 的笔记节点；nodeType/resourceType 判断保留给遗留数据。
-  if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") {
-    return <Waypoints size={15} className="shrink-0 text-violet-500" />;
-  }
-  if (node.contentFormat === "pdf") {
-    return <FileText size={15} className="shrink-0 text-red-500" />;
-  }
-  if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
-    return <FileCode size={15} className="shrink-0 text-emerald-500" />;
-  }
-  return <FileText size={15} className="shrink-0 text-[var(--color-accent-primary)]" />;
+  // 与总览页共用一套 emoji 图标（见 knowledgeTreeIcons.ts），两处类型视觉一致
+  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, isRoot)}</span>;
 }
 
 const TAG_DOT_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#06b6d4"];

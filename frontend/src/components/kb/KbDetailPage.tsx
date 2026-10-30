@@ -10,8 +10,8 @@
  * - 空库 = 空态引导新建第一篇文档
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FaBook, FaStar, FaRegStar } from "react-icons/fa";
-import { Bold, ChevronRight, Code as CodeIcon, Italic, Link as LinkIcon, List, ListOrdered, MoreHorizontal, NotebookPen, Pencil, Plus, Strikethrough, Trash2 } from "lucide-react";
+import { FaStar, FaRegStar } from "react-icons/fa";
+import { Bold, ChevronRight, Code as CodeIcon, Italic, Link as LinkIcon, List, ListOrdered, MoreHorizontal, NotebookPen, Palette, Pencil, Plus, Strikethrough, Trash2 } from "lucide-react";
 
 import { getCurrentWorkspace } from "@/lib/api";
 import {
@@ -24,6 +24,7 @@ import { pushAppPathState, resolveCurrentAppPathname } from "@/lib/appPathNaviga
 import { kbNoteAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { toast } from "@/lib/toast";
+import { knowledgeTreeEmojiFor, NOTEBOOK_EMOJIS } from "@/lib/knowledgeTreeIcons";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import NotebookShareDialog from "@/components/NotebookShareDialog";
@@ -208,6 +209,18 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     });
   }, []);
 
+  // 换封面：把"书"的封面色写进 notebooks.icon，侧栏与总览同步生效
+  const updateCover = useCallback(async (emoji: string) => {
+    try {
+      await api.updateNotebook(kbId, { icon: emoji });
+      setNotebooks((current) => (current ?? []).map((nb) => (nb.id === kbId ? { ...nb, icon: emoji } : nb)));
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+    } catch (err) {
+      console.error("[KbDetailPage] update cover failed:", err);
+      toast.error("更换封面失败");
+    }
+  }, [kbId]);
+
   // 行内重命名：提交后由树变更事件刷新侧栏与本页标题
   const commitRename = useCallback(async () => {
     if (!kbNode || renaming === null) return;
@@ -336,7 +349,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
           </React.Fragment>
         );
       }
-      const icon = <span className="shrink-0 text-[13px] leading-none">{node.noteType === "sheet" ? "📊" : "📄"}</span>;
+      const icon = <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node)}</span>;
       return (
         <div
           key={node.id}
@@ -367,7 +380,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   if (!kbNode) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-tx-tertiary">
-        <FaBook size={28} className="opacity-40" />
+        <span className="text-[28px] leading-none opacity-40">📗</span>
         <p className="text-[13px]">知识库不存在或已被删除</p>
       </div>
     );
@@ -381,6 +394,8 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   const isEmpty = docCount === 0;
   const avatarColors = ["#2563eb", "#0891b2", "#7c3aed"];
   const isFavorite = kbNode.isFavorite === 1;
+  // 当前生效封面（与侧栏同一规则：自选优先，默认蓝色）
+  const currentCover = knowledgeTreeEmojiFor(kbNode, true);
 
   return (
     <div className="flex-1 overflow-y-auto bg-app-bg dark:bg-app-surface">
@@ -388,7 +403,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
         {/* 头部：图标 / 标题 / 统计 / 动作区（收藏 / 分享 / 新建 / 更多） */}
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
-            <FaBook size={24} className="text-amber-600" />
+            <span className="text-[28px] leading-none">{knowledgeTreeEmojiFor(kbNode, true)}</span>
           </div>
           <div className="min-w-0 flex-1">
             {renaming !== null ? (
@@ -467,7 +482,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
                 <MoreHorizontal size={14} />
               </button>
               {moreOpen && (
-                <div className="absolute right-0 top-9 z-10 w-44 rounded-xl border border-app-border bg-app-bg p-1 shadow-lg">
+                <div className="absolute right-0 top-9 z-10 w-52 rounded-xl border border-app-border bg-app-bg p-1 shadow-lg">
                   <button
                     type="button"
                     onClick={() => { setMoreOpen(false); setRenaming(kbNode.title); }}
@@ -484,6 +499,31 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
                     <NotebookPen size={13} className="text-tx-tertiary" />
                     编辑总览
                   </button>
+                  <div className="group/sub relative">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-tx-primary hover:bg-app-hover"
+                    >
+                      <Palette size={13} className="text-tx-tertiary" />
+                      <span className="min-w-0 flex-1">封面颜色</span>
+                      <span className="shrink-0 text-[13px] leading-none">{currentCover}</span>
+                      <ChevronRight size={12} className="shrink-0 text-tx-tertiary" />
+                    </button>
+                    <div className="absolute left-full top-0 z-[1] hidden pl-1 group-hover/sub:block">
+                      <div className="flex w-max gap-1 rounded-xl border border-app-border bg-app-bg p-1.5 shadow-lg">
+                        {NOTEBOOK_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => void updateCover(emoji)}
+                            className={`flex h-7 w-7 items-center justify-center rounded-md text-[15px] hover:bg-app-hover ${currentCover === emoji ? "bg-app-hover ring-1 ring-accent-primary" : ""}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => { setMoreOpen(false); void deleteKb(); }}
@@ -579,7 +619,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
 
         {isEmpty ? (
           <div className="mt-14 rounded-xl border-[1.5px] border-dashed border-app-border bg-app-elevated px-6 py-12 text-center">
-            <FaBook size={30} className="mx-auto opacity-30" />
+            <span className="mx-auto block text-[30px] leading-none opacity-30">{knowledgeTreeEmojiFor(kbNode, true)}</span>
             <h3 className="mt-3 text-[15px] font-medium text-tx-primary">这个知识库还没有内容</h3>
             <p className="mt-1 text-[12.5px] text-tx-tertiary">创建第一篇文档，开始沉淀你的知识</p>
             <button
