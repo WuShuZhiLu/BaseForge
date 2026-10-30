@@ -37,6 +37,7 @@ import { useRailMode, type RailMode } from "@/hooks/useRailMode";
 import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
 import { cn } from "@/lib/utils";
 import SettingsModal from "@/components/SettingsModal";
+import { AccountLoginHistoryDialog } from "@/components/AccountLoginHistory";
 import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/appPathNavigation";
 
 type NavItemMode = Extract<
@@ -180,6 +181,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   const { theme, setTheme } = useTheme();
 
   const [popupOpen, setPopupOpen] = useState(false);
+  const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [railCustom, setRailCustomState] = useState<RailCustomization>(loadRailCustomization);
   const [badgeMenu, setBadgeMenu] = useState<{ x: number; y: number; item: NavItem | null } | null>(null);
   const [badgeManagerOpen, setBadgeManagerOpen] = useState(false);
@@ -843,7 +845,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             <button
               type="button"
               role="menuitem"
-              onClick={() => void handleLogout()}
+              onClick={() => { setPopupOpen(false); setSwitchAccountOpen(true); }}
               className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-tx-primary transition-colors hover:bg-app-hover"
             >
               <UserRound size={14} className="shrink-0 text-tx-tertiary" />
@@ -938,6 +940,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           onClose={closeSettings}
         />
       )}
+
+      <AccountLoginHistoryDialog open={switchAccountOpen} onClose={() => setSwitchAccountOpen(false)} />
     </nav>
   );
 }
