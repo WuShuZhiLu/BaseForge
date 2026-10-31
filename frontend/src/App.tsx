@@ -617,7 +617,7 @@ function AppLayout() {
   // useSiteSettings 是分享页/登录页等更外层场景也会用到的更基础 Provider。
   const { siteConfig } = useSiteSettings();
   useEffect(() => {
-    const baseTitle = siteConfig.title || "nowen-note";
+    const baseTitle = siteConfig.title || "BaseForge";
     if (userPrefs.noteTitleAsAppTitle) {
       const noteTitle = (state.activeNote?.title || "").trim();
       document.title = noteTitle ? `${noteTitle} - ${baseTitle}` : baseTitle;

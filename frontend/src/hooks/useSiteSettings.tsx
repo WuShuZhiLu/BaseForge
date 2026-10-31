@@ -74,7 +74,7 @@ function parseDataUrlMime(url: string): string {
 }
 
 function applyToDOM(title: string, faviconUrl: string) {
-  document.title = title || "nowen-note";
+  document.title = title || "BaseForge";
 
   const oldLinks = document.head.querySelectorAll<HTMLLinkElement>(
     'link[rel="icon"], link[rel="shortcut icon"], link[rel="alternate icon"], link[rel="apple-touch-icon"]'
