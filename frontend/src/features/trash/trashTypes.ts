@@ -5,6 +5,8 @@ export interface TrashItem {
   resourceType: TrashResourceType;
   title: string;
   contentFormat: string | null;
+  /** 笔记正文摘录，供内容预览；非笔记为 null。 */
+  preview: string | null;
   deletedAt: string | null;
   originalParentId: string | null;
   originalPath: string[];

@@ -68,6 +68,27 @@ import {
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
 import { knowledgeTreeEmojiFor, docEmojiForFormat } from "@/lib/knowledgeTreeIcons";
 import {
+  getRetentionDays,
+  getTrashSetting,
+  getTrashTimeFilter,
+  getTrashTypeFilter,
+  setTrashSetting,
+  setTrashTimeFilter,
+  TRASH_TIME_META,
+
+  retentionColor,
+  retentionDaysLeft,
+  setRetentionDays,
+  setTrashTypeFilter as persistTrashTypeFilter,
+  TRASH_RETENTION_OPTIONS,
+  TRASH_TYPE_META,
+  trashTypeEmoji,
+  trashTypeKey,
+  trashTypeLabel,
+  type TrashTimeFilter,
+  type TrashTypeKey,
+} from "@/features/trash/trashUi";
+import {
   exportNoteAsImage,
   exportSingleNote,
   exportSingleNoteAsPDF,
@@ -463,6 +484,23 @@ export default function SidebarDesktop() {
   // 收藏 / 回收站 / 文件管理数据
   const [starDocs, setStarDocs] = useState<NoteListItem[]>([]);
   const [trashItems, setTrashItems] = useState<import("@/features/trash/trashTypes").TrashItem[]>([]);
+  // 侧栏回收站类型筛选（与主区 TrashPage 同语义：按 resourceType）
+  const [trashFilter, setTrashFilterState] = useState<TrashTypeKey[]>(() => getTrashTypeFilter());
+  const [retentionDays, setRetentionDaysState] = useState(() => getRetentionDays());
+  const [timeFilter, setTimeFilterState] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
+  const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
+  const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
+  const setTrashTypeFilter = useCallback((keys: TrashTypeKey[]) => { setTrashTypeFilterState(keys); persistTrashTypeFilter(keys); }, []);
+  useEffect(() => {
+    const onFilter = () => { setTrashTypeFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); };
+    const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };
+    window.addEventListener("nowen:trash-filter", onFilter);
+    window.addEventListener("nowen:trash-settings", onSettings);
+    return () => {
+      window.removeEventListener("nowen:trash-filter", onFilter);
+      window.removeEventListener("nowen:trash-settings", onSettings);
+    };
+  }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [fileCat, setFileCat] = useState<"all" | "image" | "other">("all");
   // 插件列表（后端 GET /plugins）
@@ -584,9 +622,6 @@ export default function SidebarDesktop() {
     return () => window.removeEventListener("nowen:builtin-plugins-changed", onChanged);
   }, []);
 
-  const reloadTrash = useCallback(() => {
-    api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined);
-  }, []);
   const reloadFiles = useCallback(() => {
     api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
   }, []);
@@ -2954,52 +2989,115 @@ export default function SidebarDesktop() {
           />
         )}
 
-        {/* ===== 回收站视图 ===== */}
+        {/* ===== 回收站视图 =====
+             面板头 h-10：与主区回收站页的筛选行（40px）同一节奏，横线贯通对齐。
+             职责 = 浏览 + 单条恢复/删除；清空、批量、筛选只在主区完整工作区。 */}
         {sidebarView === "trash" && (
           <div className="sbx-view">
-            <div className="sbx-view-head"><span>回收站</span><span className="flex-1" /><span className="sbx-badge">{trashItems.length}</span></div>
-            <div
-              className="mx-2 mb-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-accent-danger hover:bg-app-hover"
-              onClick={() => {
-                if (trashItems.length === 0) return;
-                api.trash.empty(getCurrentWorkspace()).then(() => reloadTrash()).catch(() => undefined);
-              }}
-            >
-              <Trash2 size={13} />
-              清空回收站
+            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]">
+              <Trash2 size={13} className="shrink-0 text-tx-tertiary" />
+              <span className="min-w-0 truncate font-semibold text-tx-primary">回收站</span>
+              <span className="shrink-0 rounded-lg bg-app-hover px-1.5 py-px text-[10.5px] tabular-nums text-tx-tertiary">{trashItems.length}</span>
+              <span className="flex-1" />
+              <button
+                type="button"
+                title="刷新"
+                onClick={() => api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined)}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+              >
+                <RotateCcw size={12} />
+              </button>
             </div>
-            <div className="px-1 pb-2">
-              {trashItems.length === 0 ? (
-                <p className="sbx-view-empty">回收站是空的</p>
-              ) : trashItems.map((item) => (
-                <div key={item.id} className="sbx-row group">
-                  <span className="sbx-ico">{item.resourceType === "notebook"
-                    ? <span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(item as never, true)}</span>
-                    : <span className="text-[13px] leading-none">{docEmojiForFormat(item.contentFormat, (item as never as { noteType?: string }).noteType)}</span>}</span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{item.title}</div>
-                    <div className="sbx-sub">{item.resourceType === "notebook" ? "文件夹" : "文档"} · {item.deletedAt ? item.deletedAt.slice(5, 10) : ""} 删除</div>
-                  </span>
-                  <span className="sbx-acts">
+            {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter） */}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-[10.5px] text-tx-tertiary">类型 · 可多选</span>
+                <button type="button" className="text-[10.5px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>
+              </div>
+              <div className="grid grid-cols-2 gap-1">
+                {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeKey[]).map((key) => {
+                  const count = key === "all"
+                    ? trashItems.length
+                    : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length;
+                  return (
                     <button
+                      key={key}
                       type="button"
-                      title="恢复"
-                      onClick={() => { api.trash.mutate(getCurrentWorkspace(), "restore", [item.id]).then(() => { reloadTrash(); window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")); }).catch(() => undefined); }}
-                      className="sbx-btn"
+                      aria-pressed={trashFilter.includes(key)}
+                      onClick={() => {
+                        const next = key === "all" ? ["all" as TrashTypeKey]
+                          : trashFilter.includes(key) ? trashFilter.filter((k) => k !== key) : [...trashFilter.filter((k) => k !== "all"), key];
+                        setTrashTypeFilter(next.length ? next : ["all"]);
+                      }}
+                      className={`flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${trashFilter.includes(key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                     >
-                      <RotateCcw size={12} />
+                      <span>{key === "all" ? "🗂" : TRASH_TYPE_META.find((meta) => meta.key === key)?.emoji}</span>
+                      <span className="min-w-0 flex-1 truncate text-left">{key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label}</span>
+                      <span className="tabular-nums text-tx-tertiary">{count}</span>
                     </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">删除时间</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {TRASH_TIME_META.filter((meta) => meta.key !== "older" || retentionDays > 30).map((meta) => (
+                  <button
+                    key={meta.key}
+                    type="button"
+                    aria-pressed={timeFilter === meta.key}
+                    onClick={() => { setTimeFilterState(meta.key); setTrashTimeFilter(meta.key); }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${timeFilter === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2.5 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">自动清理</div>
+              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+                <span>保留期限</span>
+                <span className="flex gap-1">
+                  {TRASH_RETENTION_OPTIONS.map((days) => (
                     <button
+                      key={days}
                       type="button"
-                      title="彻底删除"
-                      onClick={() => { api.trash.mutate(getCurrentWorkspace(), "permanent", [item.id]).then(() => reloadTrash()).catch(() => undefined); }}
-                      className="sbx-btn hover:text-accent-danger"
+                      aria-pressed={retentionDays === days}
+                      onClick={() => { setRetentionDaysState(days); setRetentionDays(days); }}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] ${retentionDays === days ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                     >
-                      <X size={12} />
+                      {days} 天
                     </button>
-                  </span>
-                </div>
-              ))}
+                  ))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+                <span>到期前提醒我</span>
+                <button
+                  type="button"
+                  aria-pressed={notifyExpiry}
+                  aria-label="到期前提醒我"
+                  onClick={() => { const next = !notifyExpiry; setNotifyExpiryState(next); setTrashSetting("notifyExpiry", next); }}
+                  className={`relative h-[17px] w-[30px] rounded-full transition-colors ${notifyExpiry ? "bg-accent-primary" : "bg-app-border"}`}
+                >
+                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${notifyExpiry ? "left-[15px]" : "left-0.5"}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+                <span>每周清理摘要</span>
+                <button
+                  type="button"
+                  aria-pressed={weeklySummary}
+                  aria-label="每周清理摘要"
+                  onClick={() => { const next = !weeklySummary; setWeeklySummaryState(next); setTrashSetting("weeklySummary", next); }}
+                  className={`relative h-[17px] w-[30px] rounded-full transition-colors ${weeklySummary ? "bg-accent-primary" : "bg-app-border"}`}
+                >
+                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${weeklySummary ? "left-[15px]" : "left-0.5"}`} />
+                </button>
+              </div>
+              <div className="px-1 pb-1 pt-0.5 text-[10px] leading-relaxed text-tx-tertiary">到期条目自动彻底删除；提醒走应用内通知与图标徽标</div>
             </div>
           </div>
         )}

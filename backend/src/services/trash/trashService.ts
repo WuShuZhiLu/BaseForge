@@ -16,6 +16,8 @@ export interface TrashItem {
   resourceType: TrashResourceType;
   title: string;
   contentFormat: string | null;
+  /** 笔记正文摘录（前 200 字），供回收站内容预览；非笔记为 null。 */
+  preview: string | null;
   deletedAt: string | null;
   originalParentId: string | null;
   originalPath: string[];
@@ -64,10 +66,37 @@ export function listTrash(scope: Scope): TrashItem[] {
     } else if (node.resourceType === "mindmap") {
       canDeletePermanently &&= canManageResource(node.userId, node.workspaceId, scope.userId);
     }
+    // 内容预览：优先 contentText；富文本正文常在 tiptap JSON 里（contentText 为空），从 JSON 提取文本。
+    let preview: string | null = null;
+    if (node.resourceType === "note") {
+      const row = getDb().prepare("SELECT contentText, content FROM notes WHERE id = ?").get(node.resourceId) as { contentText?: string | null; content?: string | null } | undefined;
+      const contentText = (row?.contentText || "").trim();
+      const content = (row?.content || "").trim();
+      if (contentText) {
+        preview = contentText.slice(0, 200);
+      } else if (content.startsWith("{")) {
+        try {
+          const texts: string[] = [];
+          const walk = (value: unknown): void => {
+            if (!value || typeof value !== "object" || texts.join("").length >= 200) return;
+            const node = value as { type?: string; text?: string; content?: unknown[] };
+            if (typeof node.text === "string" && node.text.trim()) texts.push(node.text.trim());
+            if (Array.isArray(node.content)) node.content.forEach(walk);
+          };
+          walk(JSON.parse(content));
+          preview = texts.join(" ").slice(0, 200) || null;
+        } catch {
+          preview = null;
+        }
+      } else if (content) {
+        preview = content.replace(/^#+\s/gm, "").slice(0, 200) || null;
+      }
+    }
     return {
       id: node.id, resourceId: node.resourceId,
       resourceType: node.noteType === "sheet" ? "sheet" : node.resourceType as TrashResourceType,
       title: node.title, contentFormat: node.contentFormat || null, deletedAt: node.deletedAt,
+      preview,
       originalParentId: node.parentId, originalPath: path.map((parent) => parent.title),
       originalPathHidden: actualAncestors.some((parent) => !byId.has(parent.id) && !parent.id.startsWith("notebook:__nowen_root_documents__:")),
       canRestore: node.access.capabilities.canDelete && deletedAncestors.every((parent) => resolveKnowledgeNodeAccess(parent.id, scope.userId, getDb(), { includeDeleted: true }).capabilities.canDelete),
