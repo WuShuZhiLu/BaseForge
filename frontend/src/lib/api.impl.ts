@@ -1357,8 +1357,8 @@ export interface AttachmentHealthReportData {
 export const api = {
   trash: {
     list: (workspaceId: string) => request<{ items: import("@/features/trash/trashTypes").TrashItem[] }>(`/trash?workspaceId=${encodeURIComponent(workspaceId)}`),
-    mutate: (workspaceId: string, action: "restore" | "permanent", ids: string[]) =>
-      request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash/batch?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ action, ids }) }),
+    mutate: (workspaceId: string, action: "restore" | "permanent", ids: string[], options?: { targetParentId?: string }) =>
+      request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash/batch?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ action, ids, ...(options?.targetParentId ? { targetParentId: options.targetParentId } : {}) }) }),
     empty: (workspaceId: string) => request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "DELETE" }),
   },
   plugins: {

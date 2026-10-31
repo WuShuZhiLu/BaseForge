@@ -26,7 +26,13 @@ app.post("/batch", async (c) => {
     || body.ids.length === 0 || body.ids.length > 500 || body.ids.some((id: unknown) => typeof id !== "string" || !id || id.length > 256)) {
     return c.json({ error: "无效的回收站操作", code: "INVALID_TRASH_OPERATION" }, 400);
   }
-  return c.json(mutateTrash(scopeOf(c), body.action, [...new Set(body.ids)] as string[]));
+  // 「恢复到…」：仅在单条恢复时允许指定目标目录。
+  const targetParentId = typeof body.targetParentId === "string" && body.targetParentId && body.targetParentId.length <= 256
+    ? body.targetParentId : null;
+  if (targetParentId && (body.action !== "restore" || body.ids.length !== 1)) {
+    return c.json({ error: "指定恢复目标仅支持单条恢复", code: "INVALID_TRASH_OPERATION" }, 400);
+  }
+  return c.json(mutateTrash(scopeOf(c), body.action, [...new Set(body.ids)] as string[], { targetParentId }));
 });
 app.delete("/", (c) => c.json(emptyTrash(scopeOf(c))));
 export default app;

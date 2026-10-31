@@ -3360,7 +3360,11 @@
     "weeklySummary": "Weekly summary",
     "weeklySummarySub": "Weekly digest in notification center",
     "typesEmpty": "Nothing under selected types",
-    "filterHint": "Nothing matches the current filters — try adjusting type or time"
+    "filterHint": "Nothing matches the current filters — try adjusting type or time",
+    "boardInfo": "{{shapes}} shapes · {{texts}} text labels",
+    "restoreToTitle": "Restore \"{{title}}\" to…",
+    "restoredTo": "Restored to selected location",
+    "noSubfolders": "No subfolders here"
   },
   "htmlPlayground": {
     "run": "Run HTML",

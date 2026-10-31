@@ -11,7 +11,10 @@ import type { ToolPageHeaderMode } from "@/lib/toolPage";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 import { toast } from "@/lib/toast";
 import { confirm } from "@/components/ui/confirm";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useTrash } from "./useTrash";
+import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import { permanentSelection, type TrashItem } from "./trashTypes";
 import {
   getRetentionDays,
@@ -48,6 +51,8 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   const [activeId, setActiveId] = useState<string | null>(null);
   const [retentionDays, setRetention] = useState(() => getRetentionDays());
   const [expanded, setExpanded] = useState(false);
+  // 「恢复到…」：目标目录选择器
+  const [restoreToItem, setRestoreToItem] = useState<TrashItem | null>(null);
 
   // 侧栏的类型筛选与保留期设置跨组件同步
   useEffect(() => {
@@ -70,7 +75,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   const active = visible.find((item) => item.id === activeId) ?? null;
   const disabled = trash.loading || trash.busy || trash.error !== null;
 
-  const operate = async (action: "restore" | "permanent" | "empty", ids: string[]) => {
+  const operate = async (action: "restore" | "permanent" | "empty", ids: string[], options?: { targetParentId?: string }) => {
     const targets = action === "empty" ? trash.items : action === "permanent" ? permanentSelection(trash.items, ids) : trash.items.filter((item) => ids.includes(item.id));
     if (action !== "restore") {
       if (!await confirm({ title: t(action === "empty" ? "trashCenter.empty" : "trashCenter.permanent"),
@@ -79,11 +84,12 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
       if (!await confirm({ title: t("trashCenter.restore"), description: t("trashCenter.restoreConfirm"), confirmText: t("trashCenter.restore") })) return;
     }
     try {
-      const result = await trash.mutate(action, ids);
+      const result = await trash.mutate(action, ids, options);
       if (getCurrentWorkspace() !== workspaceId) return;
       setSelected((current) => current.filter((id) => !result.succeededIds.includes(id)));
       if (result.succeededIds.includes(activeId ?? "")) setActiveId(null);
-      if (result.failures.length) toast.warning(t("trashCenter.partial", { count: result.succeededIds.length, failed: result.failures.length }));
+      if (options?.targetParentId && result.failures.length === 0) toast.success(t("trashCenter.restoredTo", { defaultValue: "已恢复到所选位置" }));
+      else if (result.failures.length) toast.warning(t("trashCenter.partial", { count: result.succeededIds.length, failed: result.failures.length }));
       else toast.success(t("trashCenter.success", { count: result.succeededIds.length }));
       if (state.activeNote && result.noteIds.includes(state.activeNote.id)) actions.setActiveNote(null);
       actions.refreshNotes();
@@ -138,10 +144,25 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
       {/* 详情预览 */}
       <aside className="flex w-[430px] shrink-0 flex-col border-l border-app-border bg-app-bg">
         {active ? <TrashPreview item={active} retentionDays={retentionDays} disabled={disabled} expanded={expanded} onExpand={setExpanded}
-          onRestore={() => void operate("restore", [active.id])} onPurge={() => void operate("permanent", [active.id])} />
+          onRestore={() => void operate("restore", [active.id])}
+          onRestoreTo={() => setRestoreToItem(active)}
+          onPurge={() => void operate("permanent", [active.id])} />
           : <div className="flex flex-1 flex-col items-center justify-center gap-2 text-tx-tertiary"><span className="text-[26px]">👈</span><p className="text-[12.5px] text-center leading-relaxed">点一条内容<br/>先看内容预览，确认后恢复</p></div>}
       </aside>
     </div>
+    {/* 恢复到…：目标目录选择器 */}
+    {restoreToItem && (
+      <TrashFolderPicker
+        title={t("trashCenter.restoreToTitle", { defaultValue: "恢复「{{title}}」到…", title: restoreToItem.title })}
+        disabled={trash.busy || trash.loading}
+        onConfirm={(targetParentId) => {
+          const target = restoreToItem;
+          setRestoreToItem(null);
+          void operate("restore", [target.id], { targetParentId });
+        }}
+        onClose={() => setRestoreToItem(null)}
+      />
+    )}
   </main>;
 }
 
@@ -176,9 +197,54 @@ function TrashRow({ item, disabled, selected, active, retentionDays, onSelect, o
   </li>;
 }
 
-function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRestore, onPurge }: {
+/** 预览正文：按后端 preview.kind 分发渲染（markdown 渲染 / 导图大纲 / 迷你表格 / 画板统计 / 纯文本）。 */
+function TrashPreviewBody({ item, large = false }: { item: TrashItem; large?: boolean }) {
+  const { t } = useTranslation();
+  const typeKey = trashTypeKey(item.resourceType, item.contentFormat);
+  const preview = item.preview;
+  if (!preview) {
+    return <div className="flex h-full min-h-24 flex-col items-center justify-center gap-2 py-6 text-tx-tertiary">
+      <span className={large ? "text-[40px]" : "text-[28px]"}>{trashTypeEmoji(typeKey)}</span>
+      <p>{trashTypeLabel(typeKey)} · {t("trashCenter.previewUnavailable", { defaultValue: "该类型暂不支持内容预览" })}</p>
+    </div>;
+  }
+  if (preview.kind === "markdown") {
+    return <div className={large ? "[&_h1]:text-xl [&_h2]:text-lg [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_code]:rounded [&_code]:bg-app-hover [&_code]:px-1" : "[&_h1]:text-sm [&_h2]:text-[13px] [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_code]:rounded [&_code]:bg-app-hover [&_code]:px-1"}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{preview.text || ""}</ReactMarkdown>
+    </div>;
+  }
+  if (preview.kind === "outline") {
+    return <ul className="space-y-1">
+      {preview.outline?.map((node, index) => (
+        <li key={index} style={{ paddingLeft: `${node.level * (large ? 22 : 14)}px` }}
+          className={`truncate ${node.level === 0 ? "font-medium text-tx-primary" : ""} ${large ? "text-[13.5px]" : "text-xs"}`}>
+          {node.level > 0 && <span className="mr-1.5 text-tx-tertiary">└</span>}{node.label}
+        </li>
+      ))}
+    </ul>;
+  }
+  if (preview.kind === "table") {
+    return <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-xs">
+        <thead><tr>{preview.table?.columns.map((column, index) => <th key={index} className="border border-app-border bg-app-panel px-2 py-1 text-left font-medium">{column}</th>)}</tr></thead>
+        <tbody>{preview.table?.rows.map((row, rowIndex) => (
+          <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} className="border border-app-border px-2 py-1">{cell || "—"}</td>)}</tr>
+        ))}</tbody>
+      </table>
+    </div>;
+  }
+  if (preview.kind === "board") {
+    return <div className="flex h-full min-h-24 flex-col items-center justify-center gap-2 py-6 text-tx-tertiary">
+      <span className={large ? "text-[40px]" : "text-[28px]"}>🎨</span>
+      <p>{t("trashCenter.boardInfo", { defaultValue: "{{shapes}} 个图形 · {{texts}} 个文字标注", shapes: preview.board?.shapes ?? 0, texts: preview.board?.texts ?? 0 })}</p>
+    </div>;
+  }
+  return <p className="whitespace-pre-wrap">{preview.text}</p>;
+}
+
+function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRestore, onRestoreTo, onPurge }: {
   item: TrashItem; retentionDays: number; disabled: boolean; expanded: boolean; onExpand: (next: boolean) => void;
-  onRestore: () => void; onPurge: () => void;
+  onRestore: () => void; onRestoreTo: () => void; onPurge: () => void;
 }) {
   const { t } = useTranslation();
   const typeKey = trashTypeKey(item.resourceType, item.contentFormat);
@@ -203,8 +269,7 @@ function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRes
           <span className="flex items-center gap-2.5"><span>{trashTypeLabel(typeKey)}</span><button onClick={() => onExpand(!expanded)} className="text-accent-primary">{t("trashCenter.expand", { defaultValue: "⤢ 放大" })}</button></span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3 text-xs leading-relaxed text-tx-secondary">
-          {item.preview ? <p className="whitespace-pre-wrap">{item.preview}{item.preview.length >= 200 ? "…" : ""}</p>
-            : <div className="flex h-full flex-col items-center justify-center gap-2 py-6 text-tx-tertiary"><span className="text-[28px]">{trashTypeEmoji(typeKey)}</span><p>{trashTypeLabel(typeKey)} · {t("trashCenter.previewUnavailable", { defaultValue: "该类型暂不支持内容预览" })}</p></div>}
+          <TrashPreviewBody item={item} />
         </div>
       </div>
       {daysLeft <= 3 && <div className="mt-3 shrink-0 rounded-lg bg-[#fdf6e7] px-2.5 py-2 text-[11px] leading-relaxed text-[#b7791f]">{t("trashCenter.expiringSoon", { defaultValue: "⚠ 即将到期自动清除，需要请尽快恢复" })}</div>}
@@ -212,7 +277,7 @@ function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRes
     <div className="shrink-0 border-t border-app-border p-3.5">
       <div className="flex gap-2">
         <button className={`${buttonClass} flex-1 border-accent-primary bg-accent-primary text-white hover:opacity-90`} disabled={disabled || !item.canRestore} onClick={onRestore}><RotateCcw size={14} />{t("trashCenter.restore")}</button>
-        <button className={`${buttonClass} flex-1`} disabled={disabled} title={t("trashCenter.restoreTo", { defaultValue: "选择其它位置恢复（即将推出）" })} onClick={() => toast.info(t("trashCenter.restoreToComing", { defaultValue: "「恢复到指定位置」即将推出" }))}><span>{t("trashCenter.restoreTo", { defaultValue: "恢复到…" })}</span></button>
+        <button className={`${buttonClass} flex-1`} disabled={disabled || !item.canRestore} onClick={onRestoreTo}><span>{t("trashCenter.restoreTo", { defaultValue: "恢复到…" })}</span></button>
         <button className={`${buttonClass} w-10 text-accent-danger`} disabled={disabled || !item.canDeletePermanently} onClick={onPurge} title={t("trashCenter.permanent")}><Trash2 size={14} /></button>
       </div>
     </div>
@@ -226,11 +291,116 @@ function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRes
             <button onClick={() => onExpand(false)} className="text-tx-tertiary hover:text-tx-primary">✕</button>
           </div>
           <div className="min-h-0 flex-1 overflow-auto px-8 py-6 text-[13.5px] leading-relaxed text-tx-secondary">
-            {item.preview ? <p className="whitespace-pre-wrap">{item.preview}{item.preview.length >= 200 ? "…" : ""}</p>
-              : <p className="text-center text-tx-tertiary">{t("trashCenter.previewUnavailable", { defaultValue: "该类型暂不支持内容预览" })}</p>}
+            <TrashPreviewBody item={item} large />
           </div>
         </div>
       </div>
     )}
   </>;
+}
+
+/** 「恢复到…」目标目录选择器：面包屑 + 逐级进入（与移动面板同交互），确定后恢复到所选目录。 */
+function TrashFolderPicker({ title, disabled, onConfirm, onClose }: {
+  title: string; disabled: boolean; onConfirm: (targetParentId: string) => void; onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [nodes, setNodes] = useState<KnowledgeTreeNode[] | null>(null);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    knowledgeTreeApi.list()
+      .then((res) => { if (!cancelled) setNodes(res.nodes); })
+      .catch(() => { if (!cancelled) setNodes([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const childrenMap = useMemo(() => {
+    const map = new Map<string | null, KnowledgeTreeNode[]>();
+    for (const node of nodes ?? []) {
+      if (node.isDeleted) continue;
+      if (node.nodeType !== "folder") continue;
+      if (!node.access.capabilities.canCreate) continue;
+      map.set(node.parentId, [...(map.get(node.parentId) ?? []), node]);
+    }
+    for (const list of map.values()) list.sort((a, b) => a.title.localeCompare(b.title));
+    return map;
+  }, [nodes]);
+  const nodeById = useMemo(() => new Map((nodes ?? []).map((node) => [node.id, node])), [nodes]);
+  const crumbs = useMemo(() => {
+    const chain: KnowledgeTreeNode[] = [];
+    let current = currentId ? nodeById.get(currentId) : undefined;
+    while (current) {
+      chain.unshift(current);
+      current = current.parentId ? nodeById.get(current.parentId) : undefined;
+    }
+    return chain;
+  }, [currentId, nodeById]);
+  const currentChildren = childrenMap.get(currentId) ?? [];
+
+  const confirm = async () => {
+    if (currentId === null || confirming) return;
+    setConfirming(true);
+    onConfirm(currentId);
+  };
+
+  return <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45" onClick={onClose}>
+    <div className="flex h-[480px] w-[440px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-bg shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-app-border px-3.5">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-tx-primary">{title}</span>
+        <button onClick={onClose} className="text-tx-tertiary hover:text-tx-primary">✕</button>
+      </div>
+      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-app-border px-2.5 text-xs">
+        <button
+          type="button"
+          disabled={currentId === null}
+          onClick={() => setCurrentId(nodeById.get(currentId ?? "")?.parentId ?? null)}
+          className="flex h-6 w-6 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-hover hover:text-tx-primary disabled:opacity-40"
+          title="上一级"
+        >↑</button>
+        <button
+          type="button"
+          onClick={() => setCurrentId(null)}
+          className={`rounded px-1.5 py-0.5 hover:bg-app-hover ${currentId === null ? "font-medium text-tx-primary" : "text-tx-tertiary hover:text-tx-primary"}`}
+        >根目录</button>
+        {crumbs.map((crumb) => (
+          <span key={crumb.id} className="flex items-center">
+            <span className="text-app-border">›</span>
+            <button
+              type="button"
+              onClick={() => setCurrentId(crumb.id)}
+              className={`rounded px-1.5 py-0.5 hover:bg-app-hover ${crumb.id === currentId ? "font-medium text-tx-primary" : "text-tx-tertiary hover:text-tx-primary"}`}
+            >{crumb.title}</button>
+          </span>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {nodes === null ? <p className="py-10 text-center text-xs text-tx-tertiary">{t("common.loading")}</p>
+          : currentChildren.length === 0 ? <p className="py-10 text-center text-xs text-tx-tertiary">{t("trashCenter.noSubfolders", { defaultValue: "此目录下没有子文件夹" })}</p>
+          : currentChildren.map((folder) => (
+            <button
+              key={folder.id}
+              type="button"
+              onClick={() => setCurrentId(folder.id)}
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+            >
+              <span className="shrink-0 text-[13px] leading-none">📁</span>
+              <span className="min-w-0 flex-1 truncate">{folder.title}</span>
+              <span className="shrink-0 text-tx-tertiary">›</span>
+            </button>
+          ))}
+      </div>
+      <div className="shrink-0 border-t border-app-border p-2.5">
+        <button
+          type="button"
+          disabled={disabled || confirming || currentId === null}
+          onClick={() => void confirm()}
+          className="w-full rounded-full bg-accent-primary px-4 py-2 text-[12.5px] font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {currentId === null ? "请先进入一个文件夹" : confirming ? "恢复中…" : `恢复到这里（${crumbs.map((crumb) => crumb.title).join(" / ") || "根目录"}）`}
+        </button>
+      </div>
+    </div>
+  </div>;
 }

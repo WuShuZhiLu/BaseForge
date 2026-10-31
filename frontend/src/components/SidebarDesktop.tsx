@@ -491,6 +491,19 @@ export default function SidebarDesktop() {
   const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
   const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
   const setTrashTypeFilter = useCallback((keys: TrashTypeKey[]) => { setTrashTypeFilterState(keys); persistTrashTypeFilter(keys); }, []);
+  // 回收站视图激活时，恢复/删除/清空等操作后即时刷新计数与类型分布
+  useEffect(() => {
+    if (sidebarView !== "trash") return;
+    const reload = () => { api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined); };
+    window.addEventListener("nowen:storage-changed", reload);
+    window.addEventListener("nowen:knowledge-tree-changed", reload);
+    window.addEventListener("nowen:notes-changed", reload);
+    return () => {
+      window.removeEventListener("nowen:storage-changed", reload);
+      window.removeEventListener("nowen:knowledge-tree-changed", reload);
+      window.removeEventListener("nowen:notes-changed", reload);
+    };
+  }, [sidebarView]);
   useEffect(() => {
     const onFilter = () => { setTrashTypeFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); };
     const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };

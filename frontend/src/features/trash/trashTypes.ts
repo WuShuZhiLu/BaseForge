@@ -5,8 +5,8 @@ export interface TrashItem {
   resourceType: TrashResourceType;
   title: string;
   contentFormat: string | null;
-  /** 笔记正文摘录，供内容预览；非笔记为 null。 */
-  preview: string | null;
+  /** 结构化内容预览：文本/markdown/导图大纲/迷你表格/画板统计。 */
+  preview: import("./trashServiceTypes").TrashPreview | null;
   deletedAt: string | null;
   originalParentId: string | null;
   originalPath: string[];

@@ -37,11 +37,11 @@ export function useTrash(workspaceId: string, refreshToken: number) {
       offs.forEach((off) => off());
     };
   }, [reload, refreshToken]);
-  const mutate = async (action: "restore" | "permanent" | "empty", ids: string[]) => {
+  const mutate = async (action: "restore" | "permanent" | "empty", ids: string[], options?: { targetParentId?: string }) => {
     setBusy(true);
     setResult(null);
     try {
-      const response = action === "empty" ? await trashApi.empty(workspaceId) : await trashApi.mutate(workspaceId, action, ids);
+      const response = action === "empty" ? await trashApi.empty(workspaceId) : await trashApi.mutate(workspaceId, action, ids, options);
       setResult(response);
       await reload();
       return response;

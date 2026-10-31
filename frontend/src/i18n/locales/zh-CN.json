@@ -3375,7 +3375,11 @@
     "weeklySummary": "每周清理摘要",
     "weeklySummarySub": "每周一通知中心推送汇总",
     "typesEmpty": "所选类型下没有内容",
-    "filterHint": "当前筛选条件下没有匹配项，试试调整类型或删除时间"
+    "filterHint": "当前筛选条件下没有匹配项，试试调整类型或删除时间",
+    "boardInfo": "{{shapes}} 个图形 · {{texts}} 个文字标注",
+    "restoreToTitle": "恢复「{{title}}」到…",
+    "restoredTo": "已恢复到所选位置",
+    "noSubfolders": "此目录下没有子文件夹"
   },
   "htmlPlayground": {
     "run": "运行 HTML",
