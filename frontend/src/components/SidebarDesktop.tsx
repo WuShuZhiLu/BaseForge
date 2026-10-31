@@ -3118,7 +3118,7 @@ export default function SidebarDesktop() {
         {/* ===== 项目管理视图 ===== */}
         {sidebarView === "projects" && (
           <div>
-            <div className="sbx-view-head cursor-pointer select-none" onClick={() => togglePanelCollapsed("projects")} title={panelCollapsed.projects ? "展开" : "折叠"}>
+            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px] cursor-pointer select-none" onClick={() => togglePanelCollapsed("projects")} title={panelCollapsed.projects ? "展开" : "折叠"}>
               <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.projects && "-rotate-90")} />
               <span>项目管理</span>
             </div>
@@ -3129,7 +3129,7 @@ export default function SidebarDesktop() {
         {/* ===== 分享管理视图 ===== */}
         {sidebarView === "shares" && (
           <div>
-            <div className="sbx-view-head cursor-pointer select-none" onClick={() => togglePanelCollapsed("shares")} title={panelCollapsed.shares ? "展开" : "折叠"}>
+            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px] cursor-pointer select-none" onClick={() => togglePanelCollapsed("shares")} title={panelCollapsed.shares ? "展开" : "折叠"}>
               <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.shares && "-rotate-90")} />
               <span>分享管理</span>
             </div>
@@ -3140,7 +3140,7 @@ export default function SidebarDesktop() {
         {/* ===== 文件管理视图 ===== */}
         {sidebarView === "files" && (
           <div className="sbx-view">
-            <div className="sbx-view-head">
+            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]">
               <button
                 type="button"
                 aria-expanded={!panelCollapsed.files}
@@ -3196,7 +3196,7 @@ export default function SidebarDesktop() {
         {/* ===== 插件视图 ===== */}
         {sidebarView === "plugins" && (
           <div className="sbx-view">
-            <div className="sbx-view-head"><span>插件</span><span className="flex-1" /><span className="sbx-badge">{BUILTIN_PLUGINS.length}</span></div>
+            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]"><span>插件</span><span className="flex-1" /><span className="sbx-badge">{BUILTIN_PLUGINS.length}</span></div>
             <div className="sbx-chips">
               {([["installed", "已安装"], ["market", "市场"], ["disabled", "已停用"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
                 <span key={cat} className={cn("sbx-chip", plugCat === cat && "on")} onClick={() => setPlugCat(cat)}>{label}</span>

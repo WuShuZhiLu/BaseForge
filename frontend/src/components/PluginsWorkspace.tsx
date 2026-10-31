@@ -682,23 +682,29 @@ export default function PluginsWorkspace() {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-app-bg">
-      <div className="mx-auto w-full max-w-2xl p-6">
-        <div className="flex items-center gap-2">
-          {detail ? (
-            <button
-              type="button"
-              onClick={backToList}
-              className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
-            >
-              <ArrowLeft size={12} />返回列表
-            </button>
-          ) : <span />}
-          <span className="flex-1" />
-          {GROUP_TABS.map(([key]) => tab(key))}
-        </div>
-
-        {detail?.source === "builtin" && <div className="mt-6" key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
+      {/* 标题行 h-12：与侧栏工作区头同一节奏；返回/分组 tab 右置 */}
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
+        <Puzzle size={18} className="shrink-0 text-tx-secondary" />
+        <h2 className="text-[15px] font-semibold text-tx-primary">插件</h2>
+        <span className="hidden truncate text-xs text-tx-tertiary sm:inline">
+          {detail ? "查看插件详情" : "管理内置与已安装插件"}
+        </span>
+        <span className="flex-1" />
+        {detail ? (
+          <button
+            type="button"
+            onClick={backToList}
+            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
+          >
+            <ArrowLeft size={12} />返回列表
+          </button>
+        ) : <span />}
+        <span className="flex items-center gap-1.5">{GROUP_TABS.map(([key]) => tab(key))}</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-2xl p-6 pt-5">
+        {detail?.source === "builtin" && <div key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
         {detail?.source === "installed" && (
           <div className="mt-6">
             <InstalledDetail
@@ -726,15 +732,7 @@ export default function PluginsWorkspace() {
         )}
 
         {!detail && (
-          <div className="mt-6">
-            <div className="mb-4 flex items-start gap-3">
-              <Puzzle size={32} className="mt-1 text-tx-tertiary" />
-              <div>
-                <h2 className="text-base font-semibold text-tx-primary">插件</h2>
-                <p className="mt-1 text-sm text-tx-secondary">从左侧或下方选择一个插件，查看详细信息。</p>
-              </div>
-            </div>
-
+          <div>
             {group === "builtin" && (
               <div className="space-y-2">
                 {BUILTIN_PLUGINS.map((item) => (

@@ -1201,10 +1201,9 @@ export default function FileManager() {
           </div>
         </div>
       )}
-      {/* 顶栏 */}
+      {/* 顶栏：h-12 与侧栏工作区头同一节奏 */}
       <div
-        className="flex flex-wrap items-center gap-2 md:gap-3 px-3 md:px-6 py-2.5 md:py-3 border-b border-app-border bg-app-surface/40"
-        style={{ paddingTop: "calc(var(--safe-area-top) + 4px)" }}
+        className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4"
       >
         {/* 左侧：标题区 */}
         <div className="flex items-center gap-2 min-w-0">
@@ -1220,7 +1219,7 @@ export default function FileManager() {
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-tx-primary whitespace-nowrap">
+              <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">
                 {isImageHostMode ? "图床" : "附件"}
               </h2>
               {!isImageHostMode && (
@@ -1269,11 +1268,6 @@ export default function FileManager() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-tx-tertiary leading-none mt-0.5">
-              {isImageHostMode
-                ? "上传图片 / 文件即得直链 · 支持复制 URL / Markdown / HTML"
-                : statsLine || " "}
-            </p>
           </div>
         </div>
 
@@ -1432,8 +1426,14 @@ export default function FileManager() {
       ) : (
         <>
 
-      {/* 工具条：分类 / 搜索 / 排序 */}
-      <div className="flex flex-wrap items-center gap-2 px-3 md:px-6 py-1.5 md:py-2 border-b border-app-border bg-app-surface/20">
+      {/* 工具条：h-10 与侧栏面板头对齐；统计行并入左侧 */}
+      <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
+        <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
+          {isImageHostMode
+            ? "上传图片 / 文件即得直链 · 支持复制 URL / Markdown / HTML"
+            : statsLine || " "}
+        </p>
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         {/* 分类 Tabs：移动端可横滚，桌面端正常排列 */}
         <div className="flex items-center gap-1 text-xs overflow-x-auto no-scrollbar shrink-0 max-w-full">
           {(isImageHostMode

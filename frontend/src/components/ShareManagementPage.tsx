@@ -506,33 +506,36 @@ export default function ShareManagementPage() {
   const showHeaderRisk = publicOrigin.risk !== "none" && !showLocalhostBanner;
 
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-app-bg">
-      <div className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2"><Link2 size={22} className="text-accent-primary" /><h1 className="text-xl font-semibold text-tx-primary">分享管理</h1></div>
-            <p className="mt-1 text-sm text-tx-secondary">集中查看、修改、停用和清理当前账号可管理的分享链接。</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {showHeaderRisk && (
-              <PublicOriginRiskControl
-                publicOrigin={publicOrigin}
-                configuredOrigin={siteConfig.publicWebOrigin}
-                updatePublicWebOrigin={updatePublicWebOrigin}
-                variant="badge"
-              />
-            )}
-            <Button variant="outline" onClick={openCommentCenter}>
-              <MessageSquareText size={15} className="mr-2" />
-              评论管理
-            </Button>
-            <Button variant="outline" onClick={() => void load(true)} disabled={refreshing}>
-              {refreshing ? <Loader2 size={15} className="mr-2 animate-spin" /> : <RefreshCw size={15} className="mr-2" />}
-              刷新
-            </Button>
-          </div>
-        </header>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-app-bg">
+      {/* 标题行 h-12：与侧栏工作区头同一节奏 */}
+      <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-app-border px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link2 size={18} className="shrink-0 text-accent-primary" />
+          <h1 className="text-[15px] font-semibold text-tx-primary">分享管理</h1>
+          <span className="hidden truncate text-xs text-tx-tertiary lg:inline">集中查看、修改、停用和清理分享链接</span>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {showHeaderRisk && (
+            <PublicOriginRiskControl
+              publicOrigin={publicOrigin}
+              configuredOrigin={siteConfig.publicWebOrigin}
+              updatePublicWebOrigin={updatePublicWebOrigin}
+              variant="badge"
+            />
+          )}
+          <Button variant="outline" onClick={openCommentCenter}>
+            <MessageSquareText size={15} className="mr-2" />
+            评论管理
+          </Button>
+          <Button variant="outline" onClick={() => void load(true)} disabled={refreshing}>
+            {refreshing ? <Loader2 size={15} className="mr-2 animate-spin" /> : <RefreshCw size={15} className="mr-2" />}
+            刷新
+          </Button>
+        </div>
+      </header>
 
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1500px] space-y-5 px-4 py-4 sm:px-6 lg:px-8">
         {showLocalhostBanner && (
           <PublicOriginRiskControl
             publicOrigin={publicOrigin}
@@ -635,6 +638,7 @@ export default function ShareManagementPage() {
           onClose={() => { setEditing(null); void load(true); }}
         />
       )}
+      </div>
     </div>
   );
 }
