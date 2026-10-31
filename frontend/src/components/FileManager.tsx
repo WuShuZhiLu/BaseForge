@@ -70,6 +70,8 @@ import { navigateToolPage } from "@/components/toolTabs";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 import { FileItem, FileStats, FileSortKey, FileCategory } from "@/types";
+import { FILE_SORT_OPTIONS as SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesSort, getFilesViewMode } from "@/features/files/filesUi";
+import type { FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,15 +173,6 @@ type CategoryFilter = "all" | FileCategory | "myUploads" | "unreferenced";
  */
 type MyUploadsRefFilter = "all" | "referenced" | "unreferenced";
 
-const SORT_OPTIONS: Array<{ value: FileSortKey; label: string }> = [
-  { value: "created_desc", label: "最新上传" },
-  { value: "created_asc", label: "最早上传" },
-  { value: "size_desc", label: "大小 ↓" },
-  { value: "size_asc", label: "大小 ↑" },
-  { value: "name_asc", label: "名称 A→Z" },
-  { value: "name_desc", label: "名称 Z→A" },
-];
-
 // ---------------------------------------------------------------------------
 // 分页大小（每页条数）
 // ---------------------------------------------------------------------------
@@ -278,25 +271,21 @@ export default function FileManager() {
   // 每页条数：默认 10，从 localStorage 恢复上次选择，跨会话保留。
   const [pageSize, setPageSize] = useState<number>(() => readStoredPageSize());
 
-  // 筛选 / 搜索
-  const [category, setCategory] = useState<CategoryFilter>("all");
+  // 筛选 / 搜索：分类/排序/视图/分组由侧栏面板驱动（filesUi 共享存储 + 事件同步）
+  const [category, setCategory] = useState<CategoryFilter>(() => getFilesCategory() as CategoryFilter);
   // "我的上传"内部的二级子筛选；仅在 category === "myUploads" 时参与请求。
   // 切到非 myUploads 主 tab 时不重置——下次回到"我的上传"还能保持上次的子筛选选择。
   const [myUploadsRef, setMyUploadsRef] = useState<MyUploadsRefFilter>("all");
-  const [sort, setSort] = useState<FileSortKey>("created_desc");
+  const [sort, setSort] = useState<FileSortKey>(() => getFilesSort());
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState(""); // debounced
 
-  // 视图模式：文件管理默认 list（信息密度高、文件名 / 时间 / 大小一目了然，
-  //          普通用户进文件管理多半是来"找一个具体文件"的，列表更高效）；
-  //          切到"图片"分类时会自动跳 grid（见 handleCategoryChange）；
-  //          图床模式下强制 grid（见 toggleImageHostMode）。
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
+  // 视图模式：默认 list（信息密度高）；切到"图片"分类时自动跳 grid（见下方同步 effect）；
+  // 图床模式下强制 grid（见 toggleImageHostMode）。
+  const [viewMode, setViewMode] = useState<FilesViewMode>(() => getFilesViewMode());
 
-  // 分组模式：扁平列表 vs 按笔记本分组 vs 按附件文件夹分组
-  const [groupMode, setGroupMode] = useState<"flat" | "notebook" | "folder">(() => {
-    try { return (localStorage.getItem("nowen-file-group") as "flat" | "notebook" | "folder") || "flat"; } catch { return "flat"; }
-  });
+  // 分组模式：扁平列表 vs 按笔记本分组 vs 按附件文件夹分组（filesUi 共享，含旧键迁移）
+  const [groupMode, setGroupMode] = useState<FilesGroupMode>(() => getFilesGroupMode());
 
   // 附件文件夹列表（groupMode === "folder" 时使用）
   const [attachmentFolders, setAttachmentFolders] = useState<Array<{ id: string; name: string; fileCount: number }>>([]);
@@ -325,6 +314,25 @@ export default function FileManager() {
   //     - 详情抽屉头部新增"外链分享"区块，醒目展示完整直链 + 三种格式按钮
   //   不持久化到 localStorage：当前作为临时操作模式，避免下次进来发现"图片之外的文件不见了"。
   const [isImageHostMode, setIsImageHostMode] = useState(false);
+
+  // 侧栏面板修改分类/排序/视图/分组时同步到主区（与回收站 trashUi 同一模式）。
+  // 必须在 isImageHostMode 声明之后：deps 数组在渲染期求值，提前引用即 TDZ。
+  useEffect(() => {
+    const onUi = () => {
+      const nextCategory = getFilesCategory() as CategoryFilter;
+      setCategory(nextCategory);
+      setSort(getFilesSort());
+      const nextView = getFilesViewMode();
+      setViewMode(isImageHostMode ? "grid" : nextView);
+      setGroupMode(getFilesGroupMode());
+      setPage(1);
+      // 分类切换的视图自动跳转（原 handleCategoryChange 语义）：文件→列表，其余→网格
+      if (!isImageHostMode) setViewMode(nextCategory === "file" ? "list" : "grid");
+      if (nextCategory === "myUploads") setMyUploadsRef("all");
+    };
+    window.addEventListener("nowen:files-ui", onUi);
+    return () => window.removeEventListener("nowen:files-ui", onUi);
+  }, [isImageHostMode]);
 
   // 详情抽屉
   // detailId 为 null 时抽屉关闭；非 null 由 AttachmentDetailDrawer 自己加载详情。
@@ -568,20 +576,7 @@ export default function FileManager() {
   }, [loadStats, loadList, loadReclaimable]);
 
   // ---- 分类切换时重置到第 1 页 + 调整默认视图 ----
-  const handleCategoryChange = useCallback((c: CategoryFilter) => {
-    setCategory(c);
-    setPage(1);
-    // 切到"文件"分类时默认列表视图；"图片" / "全部" / "我的上传" / "孤儿"默认网格视图。
-    // 用户在同一分类里手动切换了视图就不再被覆盖（放在 effect 依赖外）。
-    // **图床例外**：图床整体锁 grid（顶栏视图切换按钮也是隐藏的），所以这里跳过自动切。
-    if (!isImageHostMode) {
-      if (c === "file") setViewMode("list");
-      else setViewMode("grid");
-    }
-    // 进入"我的上传"时，子筛选总是从"全部"开始；保留旧值会让"刚切过来就只看到一种"
-    // 与用户预期不符。离开 myUploads 时不需要重置，下次进来还是从全部开始。
-    if (c === "myUploads") setMyUploadsRef("all");
-  }, [isImageHostMode]);
+
 
   // ---- 详情抽屉控制 ----
   // 加载逻辑下沉到 AttachmentDetailDrawer 内部，这里只负责打开/关闭。
@@ -1291,68 +1286,6 @@ export default function FileManager() {
           {isImageHostMode ? "退出图床" : "图床"}
         </Button>
 
-        {/* 视图切换：图床模式锁定网格视图，所以隐藏切换组 */}
-        {!isImageHostMode && (
-          <div className="hidden md:flex items-center rounded-lg border border-app-border bg-app-bg p-0.5">
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                viewMode === "grid" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => setViewMode("grid")}
-              title="网格视图"
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                viewMode === "list" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => setViewMode("list")}
-              title="列表视图"
-            >
-              <List size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* 分组切换：扁平 / 按笔记本 / 按文件夹 */}
-        {!isImageHostMode && (
-          <div className="hidden md:flex items-center rounded-lg border border-app-border bg-app-bg p-0.5">
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "flat" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("flat"); localStorage.setItem("nowen-file-group", "flat"); }}
-              title="不分组"
-            >
-              <List size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "notebook" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("notebook"); localStorage.setItem("nowen-file-group", "notebook"); }}
-              title="按笔记本分组"
-            >
-              <FolderOpen size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "folder" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("folder"); localStorage.setItem("nowen-file-group", "folder"); }}
-              title="按文件夹分组"
-            >
-              <FolderOpen size={14} />
-            </button>
-          </div>
-        )}
-
         <Button
           size="sm"
           variant={selectionMode ? "default" : "outline"}
@@ -1434,79 +1367,9 @@ export default function FileManager() {
             : statsLine || " "}
         </p>
         <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-        {/* 分类 Tabs：移动端可横滚，桌面端正常排列 */}
-        <div className="flex items-center gap-1 text-xs overflow-x-auto no-scrollbar shrink-0 max-w-full">
-          {(isImageHostMode
-            ? ([
-                { key: "all", label: "全部", count: stats?.total ?? 0, icon: <Filter size={12} /> },
-                { key: "image", label: "图片", count: stats?.images.count ?? 0, icon: <ImageIcon size={12} /> },
-                { key: "file", label: "文件", count: stats?.files.count ?? 0, icon: <FileText size={12} /> },
-                {
-                  key: "myUploads",
-                  label: "我的上传",
-                  count: stats?.myUploads?.total ?? 0,
-                  icon: <UploadCloud size={12} />,
-                },
-                {
-                  key: "unreferenced",
-                  label: "未引用",
-                  count: stats?.unreferenced?.count ?? 0,
-                  icon: <Sparkles size={12} />,
-                },
-              ] as const)
-            : ([
-                { key: "all", label: "全部", count: stats?.total ?? 0, icon: <Filter size={12} /> },
-                { key: "image", label: "图片", count: stats?.images.count ?? 0, icon: <ImageIcon size={12} /> },
-                { key: "file", label: "文件", count: stats?.files.count ?? 0, icon: <FileText size={12} /> },
-                // 我的上传：用户从文件管理页直接上传的文件（≠ 编辑器粘贴的）。
-                // 选中后下面会显示二级子 tab（全部 / 已引用 / 未引用）。
-                {
-                  key: "myUploads",
-                  label: "我的上传",
-                  count: stats?.myUploads?.total ?? 0,
-                  icon: <UploadCloud size={12} />,
-                },
-                // 孤儿（unreferenced）tab：高亮琥珀色，与顶栏"可回收"徽标视觉呼应；
-                // count 为 0 时也显示，方便用户确认"当前没有孤儿"。
-                {
-                  key: "unreferenced",
-                  label: "孤儿",
-                  count: stats?.unreferenced?.count ?? 0,
-                  icon: <Sparkles size={12} />,
-                },
-              ] as const)
-          ).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => handleCategoryChange(tab.key as CategoryFilter)}
-              className={cn(
-                "px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors",
-                category === tab.key
-                  ? tab.key === "unreferenced"
-                    ? "bg-amber-500/15 text-amber-600"
-                    : "bg-accent-primary/15 text-accent-primary"
-                  : tab.key === "unreferenced" && tab.count > 0
-                    ? "text-amber-600 hover:bg-amber-500/10"
-                    : "text-tx-secondary hover:bg-app-hover",
-              )}
-              title={
-                tab.key === "unreferenced"
-                  ? "没有被任何笔记引用的附件（刚上传 24 小时内的不算）"
-                  : tab.key === "myUploads"
-                    ? "你从附件页直接上传的文件（不含编辑器粘贴的）"
-                    : undefined
-              }
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-              <span className="text-[10px] text-tx-tertiary">{tab.count}</span>
-            </button>
-          ))}
-        </div>
-
         <div className="flex-1" />
 
-        {/* 搜索 + 排序 */}
+        {/* 搜索 */}
         <div className="flex items-center gap-2">
           <div className="relative w-40 md:w-56">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-tertiary" />
@@ -1526,24 +1389,6 @@ export default function FileManager() {
             )}
           </div>
 
-          {/* 排序 */}
-          <div className="flex items-center gap-1 text-xs shrink-0">
-            <ArrowUpDown size={12} className="text-tx-tertiary hidden sm:block" />
-            <select
-              className="h-8 px-2 rounded-md border border-app-border bg-app-bg text-tx-primary text-xs outline-none"
-              value={sort}
-              onChange={(e) => {
-                setSort(e.target.value as FileSortKey);
-                setPage(1);
-              }}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
       </div>
 

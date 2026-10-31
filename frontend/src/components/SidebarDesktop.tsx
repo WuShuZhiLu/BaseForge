@@ -101,7 +101,8 @@ import {
 import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActions";
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
-import type { FileItem, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
+import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
+import { FILE_SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesSort, getFilesViewMode, setFilesUi, type FilesGroupMode, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -515,7 +516,7 @@ export default function SidebarDesktop() {
     };
   }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
-  const [fileCat, setFileCat] = useState<"all" | "image" | "other">("all");
+  const [fileStats, setFileStats] = useState<FileStats | null>(null);
   // 插件列表（后端 GET /plugins）
   const [plugCat, setPlugCat] = useState<"installed" | "market" | "disabled">("installed");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
@@ -562,6 +563,7 @@ export default function SidebarDesktop() {
     }
     if (view === "files") {
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => setFileItems([]));
+      api.files.stats().then((s) => setFileStats(s)).catch(() => setFileStats(null));
     }
     if (view === "plugins") {
       api.plugins.list().then((list) => setPlugins(list)).catch(() => setPlugins([]));
@@ -3155,38 +3157,81 @@ export default function SidebarDesktop() {
               <button type="button" title="上传文件" onClick={() => setUploadOpen(true)} className="sbx-btn">
                 <Upload size={13} />
               </button>
-              <span className="sbx-badge">{fileItems.length}</span>
+              <span className="sbx-badge">{fileStats?.total ?? fileItems.length}</span>
             </div>
             {!panelCollapsed.files && (
             <>
-            <div className="sbx-chips">
-              {([["all", "全部"], ["image", "图片"], ["other", "其他"]] as Array<[typeof fileCat, string]>).map(([cat, label]) => (
-                <span key={cat} className={cn("sbx-chip", fileCat === cat && "on")} onClick={() => setFileCat(cat)}>{label}</span>
-              ))}
-              <span
-                className="sbx-chip"
-                title="远程文件（WebDAV / 百度网盘）：在文件管理中打开"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
-                  actions.setViewMode("files");
-                }}
-              >
-                ☁ 远程
-              </span>
+            {/* 分类（与主区 filesUi 共享同步） */}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">分类</div>
+              <div className="space-y-1">
+                {([["all", "🗂 全部"], ["image", "🖼 图片"], ["file", "📄 文件"], ["myUploads", "📤 我的上传"], ["unreferenced", "✨ 未引用"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesCategory() === key}
+                    onClick={() => setFilesUi({ category: key })}
+                    className={`flex w-full items-center rounded-md border px-2 py-1 text-[11.5px] ${getFilesCategory() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    {label}
+                    {fileStats && <span className="ml-auto tabular-nums text-tx-tertiary">{
+                      key === "all" ? fileStats.total
+                      : key === "image" ? fileStats.images.count
+                      : key === "file" ? fileStats.files.count
+                      : key === "myUploads" ? fileStats.myUploads?.total ?? 0
+                      : fileStats.unreferenced?.count ?? 0}</span>}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="px-1 pb-2">
-              {fileItems.filter((f) => fileCat === "all" || f.category === fileCat).length === 0 ? (
-                <p className="sbx-view-empty">该类型暂无文件</p>
-              ) : fileItems.filter((f) => fileCat === "all" || f.category === fileCat).map((f) => (
-                <div key={f.id} className="sbx-row group" onClick={() => window.open(f.url, "_blank")}>
-                  <span className="sbx-ico">{f.category === "image" ? <FileText size={14} className="text-accent-primary" /> : <FileText size={14} className="text-tx-tertiary" />}</span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{f.filename}</div>
-                    <div className="sbx-sub">{f.createdAt.slice(0, 10)}</div>
-                  </span>
-                  <span className="sbx-meta">{f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`}</span>
-                </div>
-              ))}
+            {/* 排序 + 视图 + 分组 */}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序与展示</div>
+              <select
+                value={getFilesSort()}
+                onChange={(event) => setFilesUi({ sort: event.target.value as FileSortKey })}
+                className="w-full rounded-md border border-app-border bg-app-bg px-1.5 py-1 text-[11.5px] text-tx-primary"
+              >
+                {FILE_SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
+              <div className="mt-1.5 grid grid-cols-2 gap-1">
+                {([["list", "📃 列表"], ["grid", "▦ 网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={getFilesViewMode() === mode}
+                    onClick={() => setFilesUi({ view: mode })}
+                    className={`rounded-md border px-2 py-1 text-[11px] ${getFilesViewMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-3 gap-1">
+                {([["flat", "扁平"], ["notebook", "按库"], ["folder", "按文件夹"]] as Array<[FilesGroupMode, string]>).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={getFilesGroupMode() === mode}
+                    onClick={() => setFilesUi({ group: mode })}
+                    className={`rounded-md border px-1 py-1 text-[11px] ${getFilesGroupMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+            {/* 来源 */}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">来源</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                <span
+                  className="cursor-pointer rounded-full border border-app-border bg-app-bg px-2 py-0.5 text-[11px] text-tx-secondary hover:bg-app-hover"
+                  title="远程文件（WebDAV / 百度网盘）：在文件管理中打开"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
+                    actions.setViewMode("files");
+                  }}
+                >
+                  ☁ 远程
+                </span>
+              </div>
             </div>
             </>
             )}
