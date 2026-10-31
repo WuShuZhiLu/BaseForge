@@ -827,6 +827,7 @@ export default function PluginsWorkspace() {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 }
