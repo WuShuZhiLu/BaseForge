@@ -348,7 +348,7 @@ export class PluginLifecycle {
       return;
     }
     if (record.activeOperationId === operationId) {
-      this.rollback(pluginId, "Nowen 启动时恢复未完成的插件更新", "PLUGIN_UPDATE_INTERRUPTED");
+      this.rollback(pluginId, "BaseForge 启动时恢复未完成的插件更新", "PLUGIN_UPDATE_INTERRUPTED");
       return;
     }
     this.markOperationFailed(operationId, "PLUGIN_UPDATE_INTERRUPTED", "更新在绑定 active operation 前中断");

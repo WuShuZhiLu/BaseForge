@@ -320,7 +320,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
       return null;
     }
     // Android 原生 HTTP 无法完成绿联网关的交互式 302 认证。
-    // 对可信 UGREENlink 域名直接打开远程 Web 工作台，且不发送 Nowen 账号密码。
+    // 对可信 UGREENlink 域名直接打开远程 Web 工作台，且不发送 BaseForge 账号密码。
     if (isNativeMobileClient && isUgreenRemoteAccessUrl(url)) {
       setServerStatus("ok");
       setServerUrl(url);

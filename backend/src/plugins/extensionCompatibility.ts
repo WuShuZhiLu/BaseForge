@@ -44,7 +44,7 @@ export function resolveExtensionCompatibility(input: ExtensionCompatibilityInput
   if (!validTrustSource) return denied("PLUGIN_TRUST_SOURCE_INVALID", "插件来源与信任等级不匹配");
   if (INVALID_SIGNATURE_STATES.has(signatureState)) return denied("PLUGIN_SIGNATURE_INVALID", "插件签名无效或已被撤销");
   if (BLOCKED_ADVISORY_STATES.has(advisoryState)) return denied("PLUGIN_ADVISORY_BLOCKED", "插件版本存在严重安全公告，已拒绝运行");
-  if (!nowenVersionSatisfies(manifest.engines.nowen)) return denied("PLUGIN_NOWEN_INCOMPATIBLE", `插件要求 Nowen ${manifest.engines.nowen}`);
+  if (!nowenVersionSatisfies(manifest.engines.nowen)) return denied("PLUGIN_NOWEN_INCOMPATIBLE", `插件要求 BaseForge ${manifest.engines.nowen}`);
 
   if (manifest.apiVersion === 2 && manifest.runtime !== "declarative") {
     const runtimePlatforms = manifest.runtimePlatform || manifest.platforms;

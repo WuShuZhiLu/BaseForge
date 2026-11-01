@@ -178,7 +178,7 @@ export async function runFolderSyncOnce(
           await appendSafeLog(
             folderId,
             "warn",
-            `${candidate.relativePath}: removed from sync scope; preserved Nowen note and detached source mapping`,
+            `${candidate.relativePath}: removed from sync scope; preserved BaseForge note and detached source mapping`,
           );
         }
       } catch (error: any) {
@@ -268,7 +268,7 @@ export async function runFolderSyncOnce(
         await appendSafeLog(
           folderId,
           "warn",
-          `${candidate.relativePath}: preserved edited Nowen content as an independent conflict copy`,
+          `${candidate.relativePath}: preserved edited BaseForge content as an independent conflict copy`,
         );
       }
       if (response.extractionError) {
@@ -300,14 +300,14 @@ export async function runFolderSyncOnce(
             success: true,
             skipped: true,
             noteId: candidate.existingNoteId || undefined,
-            error: "已保留 Nowen 编辑并停止跟踪该源文件",
+            error: "已保留 BaseForge 编辑并停止跟踪该源文件",
           });
           skipped += 1;
           detached += 1;
           await appendSafeLog(
             folderId,
             "warn",
-            `${candidate.relativePath}: conflict detected; kept Nowen content and stopped tracking this source path`,
+            `${candidate.relativePath}: conflict detected; kept BaseForge content and stopped tracking this source path`,
           );
         } catch (detachError: any) {
           failed += 1;
@@ -320,7 +320,7 @@ export async function runFolderSyncOnce(
         conflicts += 1;
         await fs.markUploadResult(folderId, candidate.relativePath, {
           success: false,
-          error: `SYNC_CONFLICT:${error?.message || "Nowen 笔记存在本地编辑"}`,
+          error: `SYNC_CONFLICT:${error?.message || "BaseForge 笔记存在本地编辑"}`,
         });
       } else {
         failed += 1;

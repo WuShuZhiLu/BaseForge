@@ -9,5 +9,5 @@ services:
       - "/var/apps/nowen-note/shares/nowen-note/data:/app/data"
     environment:
       - NODE_ENV=production
-      - DB_PATH=/app/data/nowen-note.db
+      - DB_PATH=/app/data/baseforge.db
       - PORT=3001

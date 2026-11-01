@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Puzzle, Users, Info, ExternalLink, Heart, Sparkles, RefreshCw, ZoomIn, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, CloudDownload, Mail, Mic, Workflow, CalendarClock, Archive } from "lucide-react";
+import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, Heart, Sparkles, RefreshCw, ZoomIn, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, CloudDownload, Mail, Mic, Workflow, CalendarClock, Archive } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import wechatSponsorQr from "@/assets/sponsor/weixin.jpg";
 import alipaySponsorQr from "@/assets/sponsor/zhifubao.png";
@@ -17,7 +17,6 @@ import BackupCenterTab from "@/components/settings/BackupCenterTab";
 import ShortcutSettingsPanel from "@/components/settings/ShortcutSettingsPanel";
 import AISettingsPanel from "@/components/AISettingsPanel";
 import SidebarDisplaySettings from "@/components/settings/SidebarDisplaySettings";
-import PluginSettingsTab from "@/components/settings/plugins/PluginSettingsTab";
 import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
 import AutomationCenter from "@/components/automation/AutomationCenter";
 import TaskDigestSettings from "@/components/automation/TaskDigestSettings";
@@ -53,7 +52,7 @@ import {
   type MobileKnowledgeTreeViewMode,
 } from "@/lib/mobileKnowledgeTreeViewMode";
 
-type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "plugins" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "offlineSync" | "folderSync" | "users" | "workspaces" | "download" | "about";
+type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "offlineSync" | "folderSync" | "users" | "workspaces" | "download" | "about";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -1556,7 +1555,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     { id: "switches" as const, label: t('settings.switches'), icon: ToggleLeft },
     ...(shortcutSurface !== "android" ? [{ id: "shortcuts" as const, label: "快捷键", icon: Keyboard }] : []),
     { id: "ai" as const, label: t('settings.ai'), icon: Bot },
-    { id: "plugins" as const, label: t('plugins.title', { defaultValue: '插件' }), icon: Puzzle },
+    // 插件管理已合并到侧栏「插件」中心（内置/已安装/市场/管理），设置里不再重复一份。
     { id: "voice" as const, label: t('speech.title', { defaultValue: '语音转写' }), icon: Mic },
     { id: "automation" as const, label: t('automation.title', { defaultValue: '自动化' }), icon: Workflow },
     { id: "security" as const, label: t('settings.security'), icon: Shield },
@@ -1755,7 +1754,6 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
             {activeTab === "switches" && <SwitchesPanel />}
             {activeTab === "shortcuts" && shortcutSurface !== "android" && <ShortcutSettingsPanel />}
             {activeTab === "ai" && <AISettingsPanel />}
-            {activeTab === "plugins" && <PluginSettingsTab isAdmin={isAdmin} />}
             {activeTab === "voice" && <SpeechSettingsPanel />}
             {activeTab === "automation" && (
               <div className="space-y-6">

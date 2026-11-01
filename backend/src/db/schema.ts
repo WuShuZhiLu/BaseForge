@@ -7,7 +7,32 @@ import { assertSafeTestDatabasePath } from "./test-db-guard.js";
 import { ensureNormalizedSearchFts } from "../lib/searchIndex.js";
 import { requireSqliteVecForStoredTables } from "./sqlite-vec-extension.js";
 
-const DB_PATH = process.env.DB_PATH || path.join(process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data"), "nowen-note.db");
+const DB_FILE_NAME = "baseforge.db";
+/** 旧版本的主库文件名；首次以新名启动时原样改名，避免看起来丢数据 */
+const LEGACY_DB_FILE_NAME = "nowen-note.db";
+
+function resolveDefaultDbPath(): string {
+  const baseDir = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
+  return path.join(baseDir, DB_FILE_NAME);
+}
+
+function adoptLegacyDatabaseFile(dbPath: string): void {
+  if (fs.existsSync(dbPath)) return;
+  const legacy = path.join(path.dirname(dbPath), LEGACY_DB_FILE_NAME);
+  if (!fs.existsSync(legacy)) return;
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const from = legacy + suffix;
+    if (!fs.existsSync(from)) continue;
+    try {
+      fs.renameSync(from, dbPath + suffix);
+    } catch {
+      // 数据库仍被占用时保持旧文件，由下次启动重试
+    }
+  }
+}
+
+const DB_PATH = process.env.DB_PATH || resolveDefaultDbPath();
+adoptLegacyDatabaseFile(DB_PATH);
 assertSafeTestDatabasePath(DB_PATH);
 
 const DB_REGISTRY_KEY = Symbol.for("nowen-note.sqlite-database-registry");

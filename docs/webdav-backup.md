@@ -17,7 +17,7 @@ BaseForge 支持将已经生成完成的本地备份上传到 WebDAV。该能力
 - 将 WebDAV 作为实时笔记同步后端；
 - 将 WebDAV 作为附件在线存储后端；
 - 让 BaseForge 对外提供 WebDAV 服务端接口；
-- 将 `nowen-note.db` 放在 WebDAV、davfs 或其他网络文件系统上直接运行；
+- 将 `baseforge.db` 放在 WebDAV、davfs 或其他网络文件系统上直接运行；
 - 自动删除或轮转 WebDAV 中的历史备份。
 
 本地自动备份的保留策略仍然有效，但远端文件需要由 WebDAV 服务、OpenList/rclone 或管理员另行配置生命周期管理。

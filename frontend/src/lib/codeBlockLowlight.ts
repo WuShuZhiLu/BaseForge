@@ -35,7 +35,7 @@ export function getCodeBlockAutoLanguageSubset(
   return lowlight.listLanguages().filter((language) => !EXPLICIT_ONLY_LANGUAGES.has(language));
 }
 
-/** Create an isolated lowlight instance with every Nowen code-block language registered. */
+/** Create an isolated lowlight instance with every BaseForge code-block language registered. */
 export function createCodeBlockLowlight() {
   const lowlight = createLowlight({ ...installCodeBlockLanguages() });
   const highlightAuto = lowlight.highlightAuto.bind(lowlight);

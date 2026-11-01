@@ -48,7 +48,7 @@ app.get("/package", async (c) => {
     return c.json({ error: "管理员已禁用你的个人空间导出功能", code: "FEATURE_DISABLED" }, 403);
   }
   if (includePermissions && !workspaceId) {
-    return c.json({ error: "成员与权限只能随工作区 Nowen 无损包导出", code: "PERMISSION_EXPORT_REQUIRES_WORKSPACE" }, 400);
+    return c.json({ error: "成员与权限只能随工作区 BaseForge 无损包导出", code: "PERMISSION_EXPORT_REQUIRES_WORKSPACE" }, 400);
   }
   if (includePermissions && !canManageRoundTripPermissions(userId, workspaceId)) {
     return c.json({ error: "只有工作区 owner/admin 可以导出成员与权限清单", code: "PERMISSION_EXPORT_FORBIDDEN" }, 403);

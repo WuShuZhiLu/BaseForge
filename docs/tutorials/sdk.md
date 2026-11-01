@@ -1,6 +1,6 @@
 # TypeScript SDK 使用教程
 
-> 在 Node.js / TypeScript 项目中通过 SDK 操作 nowen-note。
+> 在 Node.js / TypeScript 项目中通过 SDK 操作 BaseForge。
 
 ---
 

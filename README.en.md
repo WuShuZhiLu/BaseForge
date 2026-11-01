@@ -33,7 +33,7 @@
 
 ## Development preview
 
-BaseForge is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain BaseForge' own design.
+BaseForge is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain BaseForge's own design.
 
 > See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
@@ -228,14 +228,15 @@ The persistent directory inside the container is **`/app/data`**, not `/data`. T
 
 ```text
 /app/data/
-├── nowen-note.db
+├── baseforge.db
 ├── attachments/
 ├── backups/
 ├── fonts/
 └── .jwt_secret
 ```
 
-- SQLite is the default production database at `/app/data/nowen-note.db`.
+- SQLite is the default production database at `/app/data/baseforge.db`.
+- On upgrade the legacy database file is renamed to `baseforge.db` automatically at first start; no manual step is needed.
 - Attachments are stored under `/app/data/attachments` and organized by `YYYY/MM`.
 - Automatic backups are stored under `/app/data/backups` by default.
 - Map `BACKUP_DIR` to an independent physical disk and follow a 3-2-1 backup strategy for production.

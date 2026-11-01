@@ -14,6 +14,7 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { DB_FILE_NAME, LEGACY_DB_FILE_NAME } = require("./dataDir");
 const {
   buildReleaseDownloadUrl,
   isManualDownloadPlatform,
@@ -218,8 +219,11 @@ function backupDatabaseBeforeUpdate() {
   try {
     const userDataPath = ctx.getUserDataPath?.();
     if (!userDataPath) return;
-    const dbPath = path.join(userDataPath, "nowen-note.db");
-    if (!fs.existsSync(dbPath)) return;
+    // 旧版库文件名 nowen-note.db 仍可能存在（迁移失败/回退场景），两边都认
+    const dbPath = path.join(userDataPath, DB_FILE_NAME);
+    const legacyDbPath = path.join(userDataPath, LEGACY_DB_FILE_NAME);
+    const sourceBase = fs.existsSync(dbPath) ? dbPath : legacyDbPath;
+    if (!fs.existsSync(sourceBase)) return;
 
     const root = path.join(userDataPath, "backups-pre-update");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -227,9 +231,9 @@ function backupDatabaseBeforeUpdate() {
     fs.mkdirSync(targetDir, { recursive: true });
 
     for (const suffix of ["", "-wal", "-shm"]) {
-      const source = dbPath + suffix;
+      const source = sourceBase + suffix;
       if (fs.existsSync(source)) {
-        fs.copyFileSync(source, path.join(targetDir, `nowen-note.db${suffix}`));
+        fs.copyFileSync(source, path.join(targetDir, `${DB_FILE_NAME}${suffix}`));
       }
     }
     fs.writeFileSync(

@@ -390,7 +390,7 @@ export function parsePluginManifest(value: unknown, options: ParsePluginManifest
     }
   }
   const currentVersion = options.currentVersion || NOWEN_VERSION;
-  if (!nowenVersionSatisfies(manifest.engines.nowen, currentVersion)) throw new Error(`插件要求 Nowen ${manifest.engines.nowen}，当前版本为 ${currentVersion}`);
+  if (!nowenVersionSatisfies(manifest.engines.nowen, currentVersion)) throw new Error(`插件要求 BaseForge ${manifest.engines.nowen}，当前版本为 ${currentVersion}`);
   return manifest;
 }
 

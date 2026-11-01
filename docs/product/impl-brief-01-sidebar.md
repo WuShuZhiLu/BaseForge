@@ -12,7 +12,7 @@
   - `prototypes/base-notes-current.html` —— 轮 15 定稿，单文件、无构建、可直接浏览器打开
   - `prototypes/base-notes-current.backup-20261017-r15.html` —— 同内容备份
   - `prototypes/base-notes-current.backup-20261017-r12.html` / `...-20261017.html` —— 历史版本，仅对照用
-- 代码库：nowen-note 仓库（本地路径由使用者提供给 agent）。**agent 第一步**：阅读现有 sidebar 相关代码，确定框架/组件/状态管理映射；本文只定义行为与视觉规格，不指定实现方式。
+- 代码库：BaseForge 仓库（本地路径由使用者提供给 agent）。**agent 第一步**：阅读现有 sidebar 相关代码，确定框架/组件/状态管理映射；本文只定义行为与视觉规格，不指定实现方式。
 
 ## 2. 本批次范围 / 非范围
 

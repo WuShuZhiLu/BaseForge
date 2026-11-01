@@ -328,7 +328,7 @@ export default function TaskDataTransferBridge() {
               <section>
                 <div className="mb-2">
                   <h3 className="text-sm font-semibold text-tx-primary">导入待办数据</h3>
-                  <p className="mt-0.5 text-xs text-tx-tertiary">支持 Nowen JSON 和 CSV，单文件最大 10MB，写入前先预检。</p>
+                  <p className="mt-0.5 text-xs text-tx-tertiary">支持 BaseForge JSON 和 CSV，单文件最大 10MB，写入前先预检。</p>
                 </div>
 
                 {!preview ? (

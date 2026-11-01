@@ -144,4 +144,22 @@ describe("SiteSettingsProvider ICP 备案号", () => {
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="icon"]')?.href).toBe(favicon);
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')?.href).toBe(favicon);
   });
+
+  it("后端不可用时浏览器标签页仍显示 BaseForge", async () => {
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError("Failed to fetch");
+    });
+
+    await act(async () => {
+      root.render(
+        <SiteSettingsProvider>
+          <div />
+        </SiteSettingsProvider>,
+      );
+    });
+
+    await waitFor(() => {
+      expect(document.title).toBe("BaseForge");
+    });
+  });
 });

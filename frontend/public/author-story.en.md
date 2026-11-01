@@ -1,6 +1,6 @@
 # Author's Note: From Rescuing a Decade of Memories to Building a Cross-Platform Private Knowledge Base
 
-> The story behind `nowen-note` · [中文版本](./AUTHOR_STORY.md)
+> The story behind BaseForge · [中文版本](./AUTHOR_STORY.md)
 
 As a NAS hobbyist for seven or eight years, I've always believed that the endgame of tinkering with hardware is finding the perfect software to host your digital legacy.
 
@@ -39,7 +39,7 @@ I even compromised at one point and ran a hacked Synology inside a VM on the new
 
 ## III. Evolution: Coding My Own Quirks Into the Product
 
-With that idea, the prototype of `nowen-note` was officially born.
+With that idea, the prototype of BaseForge was officially born.
 
 I stitched and refactored every habit I had picked up over the years into this single system:
 
@@ -73,12 +73,12 @@ To be honest, I have a day job. But in this era where AI tools amplify developer
 
 New users often ask me: *Will this project ever charge money? Is my data safe with you?*
 
-My answer hasn't changed: **`nowen-note` is fully open-sourced under GPL-3.0. It does not belong to any company. It belongs to you and the community.**
+My answer hasn't changed: **BaseForge is fully open-sourced under GPL-3.0. It does not belong to any company. It belongs to you and the community.**
 
 What it advocates is **purely self-hosted deployment**. All your journals, ideas, daily ramblings, and knowledge live inside the SQLite database on *your* NAS or server. No cloud vendor can peek at your data, and no one can lock you out of your own assets.
 
-My goal is to maintain this project for **a hundred years**. As long as our devices still get power, and as long as we still feel the urge to write things down, `nowen-note` will keep iterating.
+My goal is to maintain this project for **a hundred years**. As long as our devices still get power, and as long as we still feel the urge to write things down, BaseForge will keep iterating.
 
 If you're someone who loves tinkering with NAS, relies heavily on note-taking, and has high standards for digital privacy — come try it, give us feedback, file PRs, or join our community group (QQ: `1093473044`). Let's build this small private knowledge base into the digital safe haven that homelabbers deserve.
 
-- **GitHub repository**: [cropflre/nowen-note](https://github.com/cropflre/nowen-note)
+- **GitHub repository**: [Project repository](https://github.com/cropflre/nowen-note)

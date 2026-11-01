@@ -94,8 +94,8 @@ function variant(base: AppAppearanceTokens, patch: Partial<AppAppearanceTokens>)
 export const APP_APPEARANCES: readonly AppAppearanceDefinition[] = [
   {
     id: "default",
-    name: { zh: "Nowen 默认", en: "Nowen Default" },
-    description: { zh: "现代清爽，保持 Nowen 当前跨平台视觉。", en: "Clean, modern and consistent across platforms." },
+    name: { zh: "BaseForge 默认", en: "BaseForge Default" },
+    description: { zh: "现代清爽，保持 BaseForge 当前跨平台视觉。", en: "Clean, modern and consistent across platforms." },
     modes: { light: defaultLight, dark: defaultDark },
   },
   {

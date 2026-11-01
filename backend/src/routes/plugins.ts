@@ -74,8 +74,8 @@ pluginsRouter.post("/install", requireAdmin, bodyLimit({
   try {
     const body = await c.req.parseBody();
     const upload = body.file;
-    if (!(upload instanceof File)) return c.json({ error: "请上传 file 字段中的 .nowen-plugin 文件" }, 400);
-    if (!upload.name.endsWith(".nowen-plugin")) return c.json({ error: "文件扩展名必须是 .nowen-plugin" }, 400);
+    if (!(upload instanceof File)) return c.json({ error: "请通过 file 字段上传插件包" }, 400);
+    if (!upload.name.endsWith(".nowen-plugin")) return c.json({ error: "插件包文件扩展名不正确" }, 400);
     const confirmNodeRuntime = body.confirmNodeRuntime === "true";
     const record = await getPluginService().install(Buffer.from(await upload.arrayBuffer()), userId(c), confirmNodeRuntime);
     return c.json({ success: true, plugin: record }, 201);

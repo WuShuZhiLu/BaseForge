@@ -62,7 +62,7 @@ function encodeMarkdownUrl(url: string): string {
 /**
  * Markdown 编辑器从文件管理插入时：
  * - 图片生成 `![alt](url)`，预览区直接渲染图片；
- * - 视频生成 Nowen 的 `@[video](url "title")` 语法，预览区直接播放；
+ * - 视频生成 BaseForge 的 `@[video](url "title")` 语法，预览区直接播放；
  * - 其他文件继续生成带大小的附件链接。
  */
 export function buildExistingAttachmentMarkdownSnippet(

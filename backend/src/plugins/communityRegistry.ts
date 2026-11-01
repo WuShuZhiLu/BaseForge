@@ -80,7 +80,7 @@ export class CommunityRegistry {
     if (!plugin) throw Object.assign(new Error("Registry 中不存在该插件"), { code: "REGISTRY_PLUGIN_NOT_FOUND" });
     const version = plugin.versions.find((item) => item.version === (requestedVersion || plugin.latestVersion));
     if (!version) throw Object.assign(new Error("Registry 中不存在该版本"), { code: "PLUGIN_VERSION_NOT_FOUND" });
-    if (!nowenVersionSatisfies(version.nowen)) throw Object.assign(new Error(`插件版本与当前 Nowen 不兼容: ${version.nowen}`), { code: "PLUGIN_INCOMPATIBLE" });
+    if (!nowenVersionSatisfies(version.nowen)) throw Object.assign(new Error(`插件版本与当前 BaseForge 不兼容: ${version.nowen}`), { code: "PLUGIN_INCOMPATIBLE" });
     const bytes = await safeRegistryFetch(version.download, PACKAGE_LIMITS.compressedBytes);
     verifyRegistryChecksum(bytes, version.sha256);
     return { bytes, plugin, version };

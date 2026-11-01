@@ -26,7 +26,7 @@ export interface SiteConfig {
 }
 
 const DEFAULT_CONFIG: SiteConfig = {
-  title: "nowen-note",
+  title: "BaseForge",
   favicon: "",
   shareFooterText: "",
   icpBeian: "",
@@ -131,7 +131,7 @@ function applyEditorFont(fontId: string, customFontName?: string) {
 
 function toSiteConfig(data: any, previous: SiteConfig = DEFAULT_CONFIG): SiteConfig {
   return {
-    title: data?.site_title || "nowen-note",
+    title: data?.site_title || "BaseForge",
     favicon: data?.site_favicon || "",
     shareFooterText: data?.site_share_footer_text || "",
     icpBeian: data?.site_icp_beian || previous.icpBeian || "",

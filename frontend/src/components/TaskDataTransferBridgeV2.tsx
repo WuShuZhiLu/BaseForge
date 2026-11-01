@@ -325,7 +325,7 @@ export default function TaskDataTransferBridgeV2() {
               <section>
                 <div className="mb-2">
                   <h3 className="text-sm font-semibold text-tx-primary">导入待办数据</h3>
-                  <p className="mt-0.5 text-xs text-tx-tertiary">支持完整备份 ZIP、Nowen JSON 和 CSV；写入前会先进行安全预检。</p>
+                  <p className="mt-0.5 text-xs text-tx-tertiary">支持完整备份 ZIP、BaseForge JSON 和 CSV；写入前会先进行安全预检。</p>
                 </div>
 
                 {!preview ? (

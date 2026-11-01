@@ -524,7 +524,7 @@ export default function DataManager() {
     setIsExporting(false);
   };
 
-  // Nowen 数据包导出
+  // BaseForge 数据包导出
   const handleExportNowenPackage = async () => {
     setIsExportingNowen(true);
     try {
@@ -1352,7 +1352,7 @@ export default function DataManager() {
               )}
             </button>
 
-            {/* Nowen 数据包导出 */}
+            {/* BaseForge 数据包导出 */}
             <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
               <div className="flex items-center gap-2 mb-2">
                 <Package size={16} className="text-violet-500" />
@@ -1980,7 +1980,7 @@ export default function DataManager() {
                   </p>
                   <input
                     type="file"
-                    accept=".nowen.zip,.zip"
+                    accept=".zip,application/zip"
                     className="hidden"
                     id="nowen-package-import-input"
                     onChange={async (e) => {

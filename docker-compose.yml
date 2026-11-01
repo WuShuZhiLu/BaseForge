@@ -14,7 +14,7 @@ services:
         required: false
     environment:
       - NODE_ENV=production
-      - DB_PATH=/app/data/nowen-note.db
+      - DB_PATH=/app/data/baseforge.db
       - PORT=3001
       - TZ=${TZ:-Asia/Shanghai}
       - PUBLIC_WEB_ORIGIN=${PUBLIC_WEB_ORIGIN:-}

@@ -17,7 +17,7 @@ export class WorkflowService {
   }
 
   private recover(): void {
-    getDb().prepare(`UPDATE automation_workflow_runs SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='Nowen 重启，运行已中断',requiresAttention=1,lockedBy=NULL,lockedAt=NULL WHERE status='running'`)
+    getDb().prepare(`UPDATE automation_workflow_runs SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='BaseForge 重启，运行已中断',requiresAttention=1,lockedBy=NULL,lockedAt=NULL WHERE status='running'`)
       .run(new Date().toISOString());
     getDb().prepare("UPDATE automation_workflow_runs SET lockedBy=NULL,lockedAt=NULL WHERE status IN ('queued','waiting')").run();
     getDb().prepare("UPDATE automation_events SET dispatchState='pending',lockedBy=NULL,lockedAt=NULL WHERE dispatchState='processing'").run();

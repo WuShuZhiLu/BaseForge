@@ -50,7 +50,7 @@ export function installUgreenCredentialedFetch(): void {
 /**
  * UGREENlink protects remote applications with its own browser session. The
  * desktop bridge opens only the health endpoint in an isolated window; once the
- * gateway is ready, the main login form continues the Nowen sign-in itself.
+ * gateway is ready, the main login form continues the BaseForge sign-in itself.
  */
 export async function openUgreenRemoteWorkspace(input: string): Promise<void> {
   const url = getUgreenRemoteAccessUrl(input);

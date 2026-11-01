@@ -365,7 +365,7 @@ auth.post("/desktop/reset-local", async (c) => {
   const sessionId = createSession({
     userId,
     ip: extractClientIp(c),
-    userAgent: c.req.header("user-agent") || "Nowen Desktop",
+    userAgent: c.req.header("user-agent") || "BaseForge Desktop",
   });
   const tokens = issueLoginTokens({
     userId,

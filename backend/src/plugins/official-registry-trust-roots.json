@@ -1,7 +1,7 @@
 [
   {
     "sourceId": "official-v2",
-    "sourceName": "Nowen Official Registry",
+    "sourceName": "BaseForge Official Registry",
     "indexUrl": "https://cropflre.github.io/nowen-plugin-registry/v2/index.json",
     "keyId": "nowen-registry-root-2026",
     "algorithm": "Ed25519",

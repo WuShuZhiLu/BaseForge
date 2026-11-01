@@ -30,7 +30,7 @@
 
 在你的对象存储服务中创建一个 Bucket。
 
-### 步骤二：配置 nowen-note
+### 步骤二：配置 BaseForge
 
 1. ⚙️ 设置 → 数据管理 → 对象存储
 2. 填写配置：
@@ -55,7 +55,7 @@
 1. 登录 Cloudflare Dashboard
 2. 创建 R2 Bucket
 3. 创建 API Token（权限：Object Read & Write）
-4. 在 nowen-note 中填写：
+4. 在 BaseForge 中填写：
    - Endpoint：`https://<account-id>.r2.cloudflarestorage.com`
    - Bucket：你的 Bucket 名称
    - Access Key：Token 的 Access Key ID
@@ -68,7 +68,7 @@
 1. 部署 MinIO 服务
 2. 创建 Bucket
 3. 创建访问密钥
-4. 在 nowen-note 中填写 MinIO 的 Endpoint 和密钥
+4. 在 BaseForge 中填写 MinIO 的 Endpoint 和密钥
 
 ---
 

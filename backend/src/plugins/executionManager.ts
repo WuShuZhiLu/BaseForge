@@ -58,10 +58,10 @@ export class PluginExecutionManager {
   private recoverInterruptedExecutions(): void {
     const finishedAt = new Date().toISOString();
     getDb().prepare(`UPDATE plugin_executions
-      SET status='failed',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='Nowen 重启，排队任务未执行'
+      SET status='failed',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='BaseForge 重启，排队任务未执行'
       WHERE status='queued'`).run(finishedAt);
     getDb().prepare(`UPDATE plugin_executions
-      SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='Nowen 重启，运行中的任务已中断'
+      SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='BaseForge 重启，运行中的任务已中断'
       WHERE status='running'`).run(finishedAt);
   }
 

@@ -167,7 +167,7 @@ export function fetchSyncSettings(): Promise<SyncSettingsResponse> {
 }
 
 /**
- * 连接到一台 Nowen Server。
+ * 连接到一台 BaseForge Server。
  *
  * 后端保证：不会改写既有 Profile 的地址，换服务器一律新建 Profile，
  * 且**不会删除任何本地数据**。

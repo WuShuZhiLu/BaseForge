@@ -91,7 +91,7 @@ function createMockS3() {
 
 function createTempFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-object-storage-"));
-  const dbPath = path.join(root, "nowen-note.db");
+  const dbPath = path.join(root, "baseforge.db");
   const attachmentsDir = path.join(root, "attachments");
   fs.mkdirSync(attachmentsDir, { recursive: true });
 

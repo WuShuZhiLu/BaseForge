@@ -272,7 +272,7 @@ function FullDataTransferPanel() {
     }
     if (!(await isZipFile(file))) {
       setSelectedFile(null);
-      setNotice({ type: "error", text: "请选择由 nowen-note 导出的完整备份 ZIP，旧 .data 文件不包含图片，不能在此入口恢复。" });
+      setNotice({ type: "error", text: "请选择由 BaseForge 导出的完整备份 ZIP，旧 .data 文件不包含图片，不能在此入口恢复。" });
       return;
     }
     setSelectedFile(file);

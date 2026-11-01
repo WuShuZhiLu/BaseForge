@@ -1384,7 +1384,7 @@ export const api = {
     const res = await fetch(`${getBaseUrl()}/settings`, { cache: "no-store" });
     if (!res.ok)
       return {
-        site_title: "nowen-note",
+        site_title: "BaseForge",
         site_favicon: "",
         site_share_footer_text: "",
         site_icp_beian: "",
@@ -2517,7 +2517,7 @@ export const api = {
     }
     return res.json() as Promise<{ downloadToken: string; filename: string; size: number }>;
   },
-  /** 导出 Nowen 数据包（.nowen.zip） */
+  /** 导出 BaseForge 数据包（.zip，兼容旧 .nowen.zip） */
   downloadNowenPackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
     const ws = opts?.workspaceId ?? getCurrentWorkspace();
     const params = new URLSearchParams();
@@ -2539,7 +2539,7 @@ export const api = {
     const blob = await res.blob();
     const contentDisp = res.headers.get("Content-Disposition") || "";
     const filenameMatch = /filename\*?=(?:UTF-8'')?([^;\n]*)/i.exec(contentDisp);
-    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"/g, "")) : "nowen-package.nowen.zip";
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"/g, "")) : "baseforge-package.zip";
     return { blob, filename };
   },
   resolveImportOrigins: (
@@ -2808,7 +2808,7 @@ export const api = {
       }
     }
   },
-  /** Nowen 数据包 dry-run 预检 */
+  /** BaseForge 数据包 dry-run 预检 */
   dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string }) => {
     const token = getToken();
     const form = new FormData();
@@ -2825,7 +2825,7 @@ export const api = {
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
   },
-  /** Nowen 数据包正式导入 */
+  /** BaseForge 数据包正式导入 */
   importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string }) => {
     const token = getToken();
     const form = new FormData();
@@ -5340,7 +5340,7 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
     const text = await res.text();
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     if (contentType.includes("text/html") || /^\s*</.test(text)) {
-      return { ok: false, htmlResponse: true, error: "返回了网页 HTML，而不是 Nowen Note API" };
+      return { ok: false, htmlResponse: true, error: "返回了网页 HTML，而不是 BaseForge API" };
     }
     let data: unknown;
     try { data = JSON.parse(text); } catch { return { ok: false, error: "返回内容不是有效 JSON" }; }
@@ -5350,7 +5350,7 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
       || payload.status !== "ok"
       || (payload.service !== "nowen-note" && typeof payload.version !== "string")
     ) {
-      return { ok: false, error: "JSON 响应不符合 Nowen Note 健康检查格式" };
+      return { ok: false, error: "JSON 响应不符合 BaseForge 健康检查格式" };
     }
     return {
       ok: true,
@@ -5428,7 +5428,7 @@ export async function testServerConnection(serverUrl: string): Promise<ServerPro
   if (!resolved) {
     const error = sawHtml
       ? "检测到可访问的网页，但标准及兼容 API 路径均不可用。请检查反向代理是否转发 API 请求。"
-      : `未检测到 Nowen Note API（${errors.join("；")}）`;
+      : `未检测到 BaseForge API（${errors.join("；")}）`;
     console.error("[api] server probe failed", { serverUrl: base, errors });
     return { ok: false, apiOk: false, websocketOk: false, error };
   }

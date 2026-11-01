@@ -300,8 +300,8 @@ const SIGN_AND_EDIT_EXECUTABLE = !SKIP_RCEDIT;
 // ===== Linux 包元信息（deb 必填，否则 electron-builder 会 warn）=====
 // 这些字段同时被 AppImage 和 deb 使用
 const LINUX_MAINTAINER =
-  process.env.NOWEN_LINUX_MAINTAINER || "Nowen <noreply@nowen.local>";
-const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "Nowen";
+  process.env.NOWEN_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
+const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "BaseForge";
 const LINUX_HOMEPAGE =
   process.env.NOWEN_LINUX_HOMEPAGE || "https://github.com/cropflre/nowen-note";
 
@@ -483,7 +483,7 @@ module.exports = {
     // 若使用 Azure Code Signing / Cloud HSM，可改用 signingHashAlgorithms + signtoolOptions
     signingHashAlgorithms: ["sha256"],
     verifyUpdateCodeSignature: true,
-    publisherName: "Nowen",
+    publisherName: "BaseForge",
   },
   nsis: {
     oneClick: false,

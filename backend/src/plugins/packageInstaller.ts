@@ -29,7 +29,7 @@ function assertInside(root: string, target: string): void {
 function normalizeCompatibilityValidationError(error: unknown): never {
   const coded = error as Error & { code?: string; issues?: Array<{ path?: Array<string | number> }> };
   if (coded.code) throw coded;
-  if (coded.message?.startsWith("插件要求 Nowen ") || coded.message?.includes("engines.nowen")) throw Object.assign(coded, { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
+  if (coded.message?.startsWith("插件要求 BaseForge ") || coded.message?.includes("engines.nowen")) throw Object.assign(coded, { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
   if (coded.message?.startsWith("不支持 Plugin API V")) throw Object.assign(coded, { code: "PLUGIN_API_VERSION_UNSUPPORTED" });
   if (coded.issues?.some((issue) => issue.path?.[0] === "runtime" || issue.path?.[0] === "apiVersion")) throw Object.assign(coded, { code: "PLUGIN_API_RUNTIME_INCOMPATIBLE" });
   throw coded;

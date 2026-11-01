@@ -17,7 +17,7 @@ docker run -d \
   --restart unless-stopped \
   -p 3001:3001 \
   -v /opt/nowen-note/data:/app/data \
-  -e DB_PATH=/app/data/nowen-note.db \
+  -e DB_PATH=/app/data/baseforge.db \
   -e NOWEN_ICP_BEIAN="粤ICP备XXXXXXXX号-X" \
   nowen-note
 ```
@@ -33,7 +33,7 @@ services:
     volumes:
       - /opt/nowen-note/data:/app/data
     environment:
-      DB_PATH: /app/data/nowen-note.db
+      DB_PATH: /app/data/baseforge.db
       NOWEN_ICP_BEIAN: 粤ICP备XXXXXXXX号-X
 ```
 

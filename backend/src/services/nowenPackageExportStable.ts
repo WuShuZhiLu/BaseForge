@@ -22,7 +22,7 @@ export async function createStableNowenPackageExport(
   const { includePermissions = false, ...baseParams } = params;
   const result = await createNowenPackageExport(baseParams);
   if (!includePermissions) return result;
-  if (!baseParams.workspaceId) throw new Error("成员与权限只能随工作区 Nowen 无损包导出");
+  if (!baseParams.workspaceId) throw new Error("成员与权限只能随工作区 BaseForge 无损包导出");
   return addPermissionsToNowenPackageExport({
     result,
     userId: baseParams.userId,

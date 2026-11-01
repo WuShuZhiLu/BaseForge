@@ -67,7 +67,7 @@ function hasSharedText(payload: AndroidSharePayload): boolean {
 function actionLabel(action: string): string {
   if (action.endsWith("SEND_MULTIPLE")) return "多文件分享";
   if (action.endsWith("SEND")) return "系统分享";
-  if (action.endsWith("VIEW")) return "用 Nowen 打开";
+  if (action.endsWith("VIEW")) return "用 BaseForge 打开";
   return "外部导入";
 }
 
@@ -249,7 +249,7 @@ export default function AndroidShareImportCenter() {
   ) => {
     const apiBaseUrl = getBaseUrl();
     if (!/^https?:\/\//i.test(apiBaseUrl)) {
-      throw new Error("尚未配置可访问的 Nowen 服务器地址");
+      throw new Error("尚未配置可访问的 BaseForge 服务器地址");
     }
     const authToken = localStorage.getItem("nowen-token") || "";
     if (!authToken) throw new Error("登录状态已失效，请重新登录后重试");
@@ -381,7 +381,7 @@ export default function AndroidShareImportCenter() {
     if (!current || running) return;
     const accepted = await confirm({
       title: "放弃这次外部导入？",
-      description: "已复制到 Nowen 私有目录的临时文件会被删除，此操作无法恢复。",
+      description: "已复制到 BaseForge 私有目录的临时文件会被删除，此操作无法恢复。",
       confirmText: "放弃并清理",
       danger: true,
     });

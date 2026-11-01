@@ -10,7 +10,7 @@
  * 数据源：
  *   - /api/releases/latest（后端代理 GitHub API，带成功缓存和失败时旧数据回退）。
  *   - 该接口返回的 assets[].browserDownloadUrl 形如
- *       https://github.com/cropflre/nowen-note/releases/download/v1.1.7/Nowen-Note-1.1.7.apk
+ *       https://github.com/<owner>/<repo>/releases/download/v1.1.7/BaseForge-1.1.7.apk
  *     前端只做"在这条 URL 前面拼一段加速代理"的字符串变换，不再二次请求 GitHub。
  *
  * 加速源选择策略：
@@ -99,7 +99,7 @@ type AssetCategory =
   | "linux-tar"     // Linux tar.gz / tgz
   | "fpk"           // 飞牛 NAS
   | "upk"           // 绿联 NAS
-  | "clipper"       // 浏览器扩展 zip（nowen-clipper）
+  | "clipper"       // 浏览器扩展 zip（BaseForge 剪藏扩展）
   | "other";
 
 type PlatformCategory = "windows" | "android" | "macos" | "ios" | "linux" | "other";
@@ -118,7 +118,7 @@ function categorize(name: string): AssetCategory {
     return "win-setup"; // 默认归为安装版（Setup / nsis）
   }
   if (lower.endsWith(".apk")) return "android";
-  // clipper 浏览器扩展：发布脚本里包名形如 nowen-clipper-x.y.z.zip。
+  // clipper 浏览器扩展：发布脚本里包名形如 <品牌>-clipper-x.y.z.zip。
   if (lower.startsWith("nowen-clipper") && lower.endsWith(".zip")) return "clipper";
   if (lower.endsWith(".ipa") || (lower.includes("ios") && lower.endsWith(".zip"))) return "ios";
   if (
@@ -142,6 +142,11 @@ function categorize(name: string): AssetCategory {
   if (lower.endsWith(".fpk")) return "fpk";
   if (lower.endsWith(".upk")) return "upk";
   return "other";
+}
+
+/** 历史发布产物文件名仍带旧品牌，列表里统一按现品牌显示（下载到的真实文件不改名）。 */
+function displayAssetName(name: string): string {
+  return name.replace(/nowen[ ._-]?note/gi, "BaseForge").replace(/nowen/gi, "BaseForge");
 }
 
 /** 自动更新元数据不是给用户手动下载的安装包，不放入“其他”分组。 */
@@ -231,7 +236,7 @@ const PLATFORM_ORDER: Array<{
 const GITHUB_RELEASE_URL = "https://github.com/cropflre/nowen-note/releases/latest";
 
 const DOCKER_RUN_COMMAND =
-  "docker run -d --name nowen-note -p 3001:3001 -v ~/nowen-data:/app/data cropflre/nowen-note:latest";
+  "docker run -d --name baseforge -p 3001:3001 -v ~/baseforge-data:/app/data cropflre/nowen-note:latest";
 
 async function copyText(value: string): Promise<boolean> {
   try {
@@ -530,8 +535,8 @@ export default function DownloadPanel() {
                               defaultValue: defaultAssetLabel(category),
                             })}
                           </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate mt-0.5" title={a.name}>
-                            {a.name}
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate mt-0.5" title={displayAssetName(a.name)}>
+                            {displayAssetName(a.name)}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             {a.size > 0 && (

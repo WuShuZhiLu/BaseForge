@@ -34,8 +34,12 @@ const {
   setTrustedMainWindowId,
 } = require("./security");
 const {
+  DB_FILE_NAME,
   getDefaultDataPath,
   getUserDataPathFromRoot,
+  migrateLegacyDataDir,
+  migrateLegacyDatabase,
+  migrateLegacyUserDataRoot,
   readCustomDataDir,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,
@@ -43,6 +47,13 @@ const {
   copyDataDir,
   verifyCopiedDataDir,
 } = require("./dataDir");
+
+// ---------- 用户数据目录改名迁移 ----------
+// 必须先于 initLogger 等任何 userData 使用：旧版根目录叫 nowen-note，
+// 这里原样搬到 baseforge，再把 Electron 的 userData 指向新目录。
+const migratedUserDataRoot = migrateLegacyUserDataRoot(app.getPath("appData"));
+app.setPath("userData", migratedUserDataRoot);
+migrateLegacyDataDir(migratedUserDataRoot);
 
 // 日志 & 崩溃上报需尽早初始化（crashReporter.start 建议在 ready 之前）
 initLogger({
@@ -499,7 +510,7 @@ async function startBackend() {
   backendPort = await getFreePort();
   const backendEntry = getBackendEntry();
   const userDataPath = getUserDataPath();
-  const dbPath = path.join(userDataPath, "nowen-note.db");
+  const dbPath = path.join(userDataPath, DB_FILE_NAME);
   const backendCwd = app.isPackaged
     ? path.join(process.resourcesPath)
     : path.join(__dirname, "..");
@@ -507,6 +518,8 @@ async function startBackend() {
   // 确保 userData 目录存在（第一次运行时 db 文件所在目录可能不存在）
   try {
     fs.mkdirSync(userDataPath, { recursive: true });
+    // 旧版数据库文件名为 nowen-note.db，原样改成新名后再启动后端
+    migrateLegacyDatabase(userDataPath);
   } catch (e) {
     console.error("[Electron] mkdir userData failed:", e?.message || e);
   }
@@ -876,7 +889,7 @@ function openAboutWindow() {
     </style></head><body><div class="box">
       <div class="title">BaseForge</div>
       <div class="ver">v${app.getVersion()}</div>
-      <div class="desc">一款现代化的笔记应用<br/>© Nowen</div>
+      <div class="desc">一款现代化的笔记应用<br/>© BaseForge</div>
     </div></body></html>`;
   about.setMenuBarVisibility(false);
   about.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));

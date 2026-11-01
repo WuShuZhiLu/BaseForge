@@ -21,7 +21,7 @@ export default function ServerConnectionSettings() {
     <h3 className="text-sm font-medium">{t("serverConnection.title")}</h3>
     <dl className="space-y-2 text-sm">
       <div><dt className="text-xs text-muted-foreground">{t("serverConnection.server")}</dt>
-        <dd>{connection.name || "Nowen Note"}{connection.serverInstanceId
+        <dd>{connection.name || "BaseForge"}{connection.serverInstanceId
           ? <span className="ml-2 text-xs text-muted-foreground" title={connection.serverInstanceId}>{connection.serverInstanceId.slice(0, 8)}</span>
           : null}</dd></div>
       <div><dt className="text-xs text-muted-foreground">{t("serverConnection.currentConnection")}</dt>

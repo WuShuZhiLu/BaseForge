@@ -35,7 +35,7 @@ BaseForge 使用 SQLite 数据库，性能通常很好。如果变慢：
 ### Q：数据库文件在哪里？
 
 ```
-data/nowen-note.db
+data/baseforge.db
 ```
 
 ### Q：数据库太大了？

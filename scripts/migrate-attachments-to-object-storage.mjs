@@ -67,7 +67,7 @@ function printHelp() {
 Options:
   --dry-run           Scan only. This is the default.
   --apply             Upload local files missing from the object bucket.
-  --db                SQLite DB path. Defaults to DB_PATH or data/nowen-note.db.
+  --db                SQLite DB path. Defaults to DB_PATH or data/baseforge.db.
   --attachments-dir   Local attachment directory. Defaults to data/attachments.
   --limit             Process at most N unique attachment paths.
   --verbose           Print every changed or problematic path.
@@ -123,7 +123,10 @@ function resolveDbPath(cliPath) {
   if (cliPath) return path.resolve(cliPath);
   if (process.env.DB_PATH) return path.resolve(process.env.DB_PATH);
   const base = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
-  return path.resolve(base, "nowen-note.db");
+  // 主库文件名已改为 baseforge.db；目录里还只有旧文件名时继续读旧库
+  const next = path.resolve(base, "baseforge.db");
+  const legacy = path.resolve(base, "nowen-note.db");
+  return !fs.existsSync(next) && fs.existsSync(legacy) ? legacy : next;
 }
 
 function resolveAttachmentsDir(cliPath) {

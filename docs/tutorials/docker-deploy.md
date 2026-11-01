@@ -49,7 +49,7 @@ NOWEN_IMAGE_TAG=v1.4.1 docker compose up -d
 |---|---|---|
 | `NOWEN_PORT` | `3001` | 宿主机映射端口 |
 | `NOWEN_IMAGE_TAG` | `latest` | 官方镜像 Tag，生产建议固定为 `vX.Y.Z` |
-| `DB_PATH` | `/app/data/nowen-note.db` | 容器内数据库路径 |
+| `DB_PATH` | `/app/data/baseforge.db` | 容器内数据库路径 |
 | `NOWEN_INSTANCE_ID` | `nowen-note` | 同一 Docker Engine 上的受管实例标识 |
 | `NOWEN_UPDATER_TOKEN` | 空 | Docker 在线升级代理密钥；空表示默认关闭 |
 

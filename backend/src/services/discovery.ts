@@ -54,9 +54,9 @@ export function publishMdns(opts: PublishOptions): boolean {
     const { Bonjour } = require("bonjour-service");
     bonjourInstance = new Bonjour();
 
-    const hostname = os.hostname() || "nowen-note";
+    const hostname = os.hostname() || "baseforge";
     // 端口作为天然去重维度拼进 name，避免同机多实例 probe 冲突
-    const name = opts.name || `nowen-note@${hostname}:${opts.port}`;
+    const name = opts.name || `BaseForge@${hostname}:${opts.port}`;
 
     publishedService = bonjourInstance.publish({
       // 注意：bonjour-service 要求 type 不带下划线前缀和 ._tcp 后缀，它内部会拼
@@ -69,7 +69,7 @@ export function publishMdns(opts: PublishOptions): boolean {
         path: "/",
         https: "0",
         // txt 里回传 hostname + port，便于客户端展示人类可读名字
-        name: `nowen-note@${hostname}`,
+        name: `BaseForge@${hostname}`,
         port: String(opts.port),
       },
     });

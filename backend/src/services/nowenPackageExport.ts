@@ -829,7 +829,7 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
   const filename = filenameBase
     ? `${sanitizeSegment(filenameBase)}.zip`
     : packageKind === "markdown"
-      ? `nowen-note_backup_${date}.zip`
-      : `nowen-package-${date}.nowen.zip`;
+      ? `baseforge_backup_${date}.zip`
+      : `baseforge-package-${date}.zip`;
   return { buffer, filename, stats };
 }

@@ -853,7 +853,7 @@ export async function addPermissionsToNowenPackageExport<TStats extends object>(
   const zip = await JSZip.loadAsync(args.result.buffer);
   const manifestEntry = await readJsonEntry<Record<string, unknown>>(zip, "manifest.json");
   const manifest = manifestEntry.value;
-  if (!manifest || manifest.packageKind === "markdown") throw new Error("只有 Nowen 无损包支持权限导出");
+  if (!manifest || manifest.packageKind === "markdown") throw new Error("只有 BaseForge 无损包支持权限导出");
   const treeEntry = await readJsonEntry<{ nodes?: Array<{ sourceId?: string }> }>(zip, "tree.json");
   const notebookIds = (treeEntry.value?.nodes || []).map((item) => String(item.sourceId || "")).filter(Boolean);
   const workspace = getDb().prepare("SELECT id, name FROM workspaces WHERE id = ?").get(args.workspaceId) as

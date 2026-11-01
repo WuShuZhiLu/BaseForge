@@ -77,7 +77,7 @@ export async function downloadRoundTripPermissionPackage(options: {
   return {
     blob: await response.blob(),
     filename: filenameFromDisposition(response.headers.get("Content-Disposition"))
-      || `nowen-note-${new Date().toISOString().slice(0, 10)}.nowen.zip`,
+      || `baseforge-${new Date().toISOString().slice(0, 10)}.zip`,
   };
 }
 

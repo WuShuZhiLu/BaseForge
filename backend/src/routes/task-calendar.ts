@@ -319,7 +319,7 @@ taskCalendar.get("/feed/:token", (c) => {
     "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    icsFold("X-WR-CALNAME:Nowen Tasks"),
+    icsFold("X-WR-CALNAME:BaseForge Tasks"),
   ];
   for (const task of tasks) {
     calLines.push(buildVEvent(task, feed, remindersByTask.get(task.id) || []));
@@ -460,7 +460,7 @@ export function buildIcsForToken(token: string): { body: string; feedId: string 
   const calLines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    icsFold("X-WR-CALNAME:Nowen Tasks"),
+    icsFold("X-WR-CALNAME:BaseForge Tasks"),
   ];
   for (const task of tasks) {
     calLines.push(buildVEvent(task, feed, remindersByTask.get(task.id) || []));

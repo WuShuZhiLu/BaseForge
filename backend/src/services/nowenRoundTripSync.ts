@@ -372,7 +372,7 @@ async function parsePackage(zipBuffer: Buffer): Promise<PackageModel> {
   const zip = await JSZip.loadAsync(zipBuffer);
   const manifest = await readJson<Manifest>(zip, "manifest.json");
   if (!manifest || manifest.format !== "nowen-package" || manifest.app !== "nowen-note") {
-    throw new Error("Invalid Nowen round-trip package manifest");
+    throw new Error("Invalid BaseForge round-trip package manifest");
   }
 
   const tree = await readJson<{ nodes?: Array<Record<string, unknown>> }>(zip, "tree.json");
@@ -814,7 +814,7 @@ export async function importRoundTripPackageSync(
     errors.push("Markdown 往返包发生过格式转换，不能使用增量同步");
   }
   if (!SOURCE_INSTANCE_PATTERN.test(sourceInstanceId)) {
-    errors.push("数据包缺少稳定 sourceInstanceId，请在来源实例重新导出 Nowen 无损包");
+    errors.push("数据包缺少稳定 sourceInstanceId，请在来源实例重新导出 BaseForge 无损包");
   }
   if (params.targetNotebookId) {
     errors.push("增量同步使用首次导入时记录的位置，不能重新指定目标笔记本");
