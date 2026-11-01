@@ -219,6 +219,31 @@ describe("ShareManagementPage", () => {
     expect(host.textContent).toContain("排序：最近访问");
   });
 
+  it("对象图标按文件类型分开，不把每个文件都画成回形针", async () => {
+    mocks.list.mockResolvedValue({
+      ...response,
+      items: [
+        { ...fileItem, id: "fs-pdf", title: "季度报表.pdf" },
+        { ...fileItem, id: "fs-jpg", title: "0089KBGPgy1i2imiyhwv4j.jpg" },
+        { ...fileItem, id: "fs-bin", title: "installer" },
+        noteItem,
+      ],
+      total: 4,
+    });
+    await act(async () => { root.render(<ShareManagementPage />); });
+    await flushEffects();
+
+    // pdf 橙色、图片紫色、无扩展名回形针：一行一个形状，不再整列同一个图标
+    expect(host.querySelectorAll('[class*="bg-orange-500/12"]').length).toBe(1);
+    expect(host.querySelectorAll('[class*="bg-violet-500/12"]').length).toBe(1);
+    expect(host.querySelector("svg.lucide-image")).not.toBeNull();
+    expect(host.querySelectorAll("svg.lucide-paperclip").length).toBe(1);
+    // 笔记/文件标签按原型用蓝/紫底色，而不是统一的灰描边（只在表格里找，快捷 chips 也用同一个蓝）
+    const table = host.querySelector("table")!;
+    expect(table.querySelectorAll('[class*="bg-[#e8efff]"]').length).toBe(1);
+    expect(table.querySelectorAll('[class*="bg-[#f3e8ff]"]').length).toBe(3);
+  });
+
   it("左栏分类与主区共用同一份筛选状态", async () => {
     await act(async () => { root.render(<ShareManagementPage />); });
     await flushEffects();

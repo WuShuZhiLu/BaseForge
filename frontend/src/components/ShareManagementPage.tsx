@@ -14,11 +14,18 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  FileArchive,
+  FileAudio,
+  FileCode,
+  FileSpreadsheet,
   FileText,
+  FileType,
+  FileVideo,
   Link2,
   Loader2,
   CheckSquare,
   Globe,
+  Image as ImageIcon,
   Paperclip,
   Pencil,
   Plus,
@@ -93,13 +100,41 @@ const PAGE_SIZE = 50;
 /** 选中项的主键：同一 id 只在其通道内唯一。 */
 const itemKey = (item: Pick<ShareCenterItem, "channel" | "id">) => `${item.channel}|${item.id}`;
 
-const OBJECT_ICONS = { note: FileText, file: Paperclip, notebook: BookOpen } as const;
-/** 对象图标配色：原型每个类型一块不同底色的方图标，不做成一排灰点。 */
-const OBJECT_ICON_TONES = {
-  note: "bg-sky-500/12 text-sky-600 dark:text-sky-300",
-  file: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
-  notebook: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
-} as const;
+const IMAGE_EXT = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg", "heic", "heif", "tif", "tiff", "ico"];
+const VIDEO_EXT = ["mp4", "mov", "m4v", "webm", "mkv", "avi", "wmv"];
+const AUDIO_EXT = ["mp3", "wav", "flac", "aac", "ogg", "m4a", "opus", "amr"];
+const SHEET_EXT = ["xls", "xlsx", "csv", "ods"];
+const DOC_EXT = ["doc", "docx", "rtf", "odt", "ppt", "pptx", "key", "pages", "numbers", "txt", "md", "markdown"];
+const ARCHIVE_EXT = ["zip", "rar", "7z", "gz", "tgz", "tar", "bz2", "xz"];
+const CODE_EXT = ["json", "js", "jsx", "ts", "tsx", "html", "css", "py", "go", "rs", "java", "sh", "yml", "yaml", "xml", "sql"];
+
+/**
+ * 对象图标：原型里图片、视频、PDF、目录、笔记各是一块不同底色的方图标，
+ * 而不是所有「文件」都画成同一个回形针——分享出去的本来就什么类型都有。
+ */
+function shareObjectVisual(item: Pick<ShareCenterItem, "objectKind" | "title">): { Icon: typeof FileText; tone: string } {
+  if (item.objectKind === "notebook") return { Icon: BookOpen, tone: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300" };
+  if (item.objectKind === "note") return { Icon: FileText, tone: "bg-sky-500/12 text-sky-600 dark:text-sky-300" };
+  const title = item.title || "";
+  const dot = title.lastIndexOf(".");
+  const ext = dot > 0 ? title.slice(dot + 1).toLowerCase() : "";
+  if (IMAGE_EXT.includes(ext)) return { Icon: ImageIcon, tone: "bg-violet-500/12 text-violet-600 dark:text-violet-300" };
+  if (VIDEO_EXT.includes(ext)) return { Icon: FileVideo, tone: "bg-indigo-500/12 text-indigo-600 dark:text-indigo-300" };
+  if (AUDIO_EXT.includes(ext)) return { Icon: FileAudio, tone: "bg-teal-500/12 text-teal-600 dark:text-teal-300" };
+  if (ext === "pdf") return { Icon: FileText, tone: "bg-orange-500/12 text-orange-600 dark:text-orange-300" };
+  if (SHEET_EXT.includes(ext)) return { Icon: FileSpreadsheet, tone: "bg-green-500/12 text-green-600 dark:text-green-300" };
+  if (DOC_EXT.includes(ext)) return { Icon: FileType, tone: "bg-blue-500/12 text-blue-600 dark:text-blue-300" };
+  if (ARCHIVE_EXT.includes(ext)) return { Icon: FileArchive, tone: "bg-amber-500/12 text-amber-600 dark:text-amber-300" };
+  if (CODE_EXT.includes(ext)) return { Icon: FileCode, tone: "bg-slate-500/12 text-slate-600 dark:text-slate-300" };
+  return { Icon: Paperclip, tone: "bg-slate-500/10 text-tx-tertiary" };
+}
+
+/** 笔记/文件/目录标签：原型就是蓝/紫/绿三色底，比统一灰描边好认。 */
+const KIND_CHIP_TONES: Record<ShareCenterItem["objectKind"], string> = {
+  note: "bg-[#e8efff] text-[#2b5fd9] dark:bg-sky-500/15 dark:text-sky-300",
+  file: "bg-[#f3e8ff] text-[#722ed1] dark:bg-violet-500/15 dark:text-violet-300",
+  notebook: "bg-[#e6f7ed] text-[#1c7a3d] dark:bg-emerald-500/15 dark:text-emerald-300",
+};
 
 /** 从 UA 里抽「浏览器 · 系统」，抽不出就回「未知设备」——访问明细不展示原始 UA。 */
 function describeUserAgent(ua: string | null): string {
@@ -698,7 +733,7 @@ export default function ShareManagementPage() {
               </thead>
               <tbody>
                 {items.map((item) => {
-                  const Icon = OBJECT_ICONS[item.objectKind];
+                  const { Icon, tone } = shareObjectVisual(item);
                   const checked = selected.has(itemKey(item));
                   const lastSeen = formatShareLastSeen(item.lastSeenAt);
                   return (
@@ -721,11 +756,11 @@ export default function ShareManagementPage() {
                       )}
                       <td className="px-2.5 py-2.5">
                         <div className="flex min-w-0 gap-2">
-                          <span className={`mt-0.5 shrink-0 rounded-md p-1.5 ${OBJECT_ICON_TONES[item.objectKind]}`}><Icon size={14} /></span>
+                          <span className={`mt-0.5 shrink-0 rounded-md p-1.5 ${tone}`}><Icon size={14} /></span>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-tx-primary">
                               {item.title || "未命名"}
-                              <span className="ml-1.5 rounded border border-app-border px-1 py-0.5 align-middle text-[10px] font-normal text-tx-tertiary">{shareObjectKindLabel(item.objectKind)}</span>
+                              <span className={`ml-1.5 rounded px-1 py-0.5 align-middle text-[10px] font-normal ${KIND_CHIP_TONES[item.objectKind]}`}>{shareObjectKindLabel(item.objectKind)}</span>
                             </p>
                             <p className="mt-0.5 truncate text-[11px] text-tx-tertiary">
                               {item.objectPath} · {formatShareDate(item.createdAt)} 创建
