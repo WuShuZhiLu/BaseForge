@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   installed: [] as Array<Record<string, unknown>>,
   catalog: [] as Array<Record<string, unknown>>,
+  role: "admin" as string,
   setViewMode: vi.fn(),
 }));
 
@@ -22,7 +23,7 @@ vi.mock("@/store/AppContext", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getMe: vi.fn(() => Promise.resolve({ role: "admin" })),
+    getMe: vi.fn(() => Promise.resolve({ role: mocks.role })),
   },
 }));
 
@@ -39,6 +40,13 @@ vi.mock("@/lib/pluginApi", () => ({
     rollback: vi.fn(() => Promise.resolve({})),
     uninstall: vi.fn(() => Promise.resolve({})),
     installFromRegistry: vi.fn(() => Promise.resolve({ success: true, plugin: {} })),
+    // 详情页「设置与运行」分区与管理分组会在挂载时拉取这些数据
+    settings: vi.fn(() => Promise.resolve({})),
+    executions: vi.fn(() => Promise.resolve([])),
+    connections: vi.fn(() => Promise.resolve([])),
+    getDeveloperMode: vi.fn(() => Promise.resolve({ enabled: false, available: false })),
+    checkUpdates: vi.fn(() => Promise.resolve([])),
+    setRegistrySource: vi.fn(() => Promise.resolve([])),
   },
 }));
 
@@ -78,9 +86,18 @@ function text(host: HTMLElement): string {
   return host.textContent || "";
 }
 
+/** 分组导航在侧栏，主区通过事件切分组 */
+async function openGroup(group: "builtin" | "installed" | "catalog" | "admin") {
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group } }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 beforeEach(() => {
   mocks.installed = [];
   mocks.catalog = [];
+  mocks.role = "admin";
   localStorage.clear();
 });
 
@@ -135,12 +152,8 @@ describe("PluginsWorkspace 插件详情页", () => {
     }];
     const { host, root } = await renderWorkspace();
 
-    // 切到「已安装」分组 → 点击插件进入详情
-    const tabs = Array.from(host.querySelectorAll("button"));
-    const installedTab = tabs.find((button) => button.textContent === "已安装");
-    expect(installedTab).toBeTruthy();
-    click(installedTab!);
-    await flush();
+    // 侧栏切到「已安装」分组 → 点击插件进入详情
+    await openGroup("installed");
 
     const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes("acme.notesync"));
     expect(row).toBeTruthy();
@@ -157,6 +170,39 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(content).toContain("创建和修改笔记");
     expect(content).toContain("回滚到 v1.1.0"); // 管理员操作
     expect(content).toContain("仓库"); // Overview 外链
+    // 设置入口合并到插件中心：详情页直接能改插件自有设置项
+    expect(content).toContain("设置与运行");
+    expect(content).toContain("插件设置");
+    expect(content).toContain("同步地址");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("管理分组：管理员可装载本地包、检查更新与 Registry 来源", async () => {
+    const { host, root } = await renderWorkspace();
+
+    // 主区不再带分组 tab，分组只由侧栏事件驱动
+    expect(Array.from(host.querySelectorAll("button")).map((button) => button.textContent)).not.toContain("管理");
+    await openGroup("admin");
+
+    const content = text(host);
+    expect(content).toContain("安装插件包");
+    expect(content).toContain("检查更新");
+    expect(content).toContain("Registry 来源与国内镜像");
+    expect(content).toContain("开发者模式");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("非管理员进入管理分组只看到权限提示", async () => {
+    mocks.role = "user";
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("admin");
+
+    const content = text(host);
+    expect(content).toContain("插件管理仅对管理员开放");
+    expect(content).not.toContain("安装插件包");
 
     act(() => { root.unmount(); });
   });

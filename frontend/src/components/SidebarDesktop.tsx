@@ -581,7 +581,7 @@ export default function SidebarDesktop() {
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
   const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
   // 插件列表（后端 GET /plugins）
-  const [plugCat, setPlugCat] = useState<"installed" | "market" | "disabled">("installed");
+  const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "admin">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
   const [joinOpen, setJoinOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -699,6 +699,16 @@ export default function SidebarDesktop() {
     const onChanged = () => setBuiltinDisabled(getDisabledBuiltinPlugins());
     window.addEventListener("nowen:builtin-plugins-changed", onChanged);
     return () => window.removeEventListener("nowen:builtin-plugins-changed", onChanged);
+  }, []);
+
+  // 主区工作区切分组（如安装后跳「已安装」）时，侧栏分类跟着高亮，两边只有一套分组
+  useEffect(() => {
+    const onGroup = (event: Event) => {
+      const next = (event as CustomEvent<{ group?: typeof plugCat }>).detail?.group;
+      if (next) setPlugCat(next);
+    };
+    window.addEventListener("nowen:plugin-group", onGroup);
+    return () => window.removeEventListener("nowen:plugin-group", onGroup);
   }, []);
 
   const reloadFiles = useCallback(() => {
@@ -3376,19 +3386,31 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
               <span className="min-w-0 truncate text-xs font-medium text-tx-primary">插件</span>
             </div>
+            {/* 分组与主区同一套（内置/已安装/市场/管理）：侧栏是导航，主区是列表与详情 */}
             <div className="sbx-chips">
-              {([["installed", "已安装"], ["market", "市场"], ["disabled", "已停用"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
-                <span key={cat} className={cn("sbx-chip", plugCat === cat && "on")} onClick={() => setPlugCat(cat)}>{label}</span>
+              {([["builtin", "内置"], ["installed", "已安装"], ["catalog", "市场"], ["admin", "管理"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
+                <span
+                  key={cat}
+                  className={cn("sbx-chip", plugCat === cat && "on")}
+                  onClick={() => {
+                    setPlugCat(cat);
+                    window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: cat } }));
+                    if (state.viewMode !== "plugins") actions.setViewMode("plugins");
+                  }}
+                >
+                  {label}
+                </span>
               ))}
             </div>
+            {/* 行内只留名称 + 开关：副标题、描述、长说明都收到 title 或主区，侧栏不再堆字 */}
             <div className="px-1 pb-2">
-              {plugCat === "installed" && BUILTIN_PLUGINS.map((plug) => {
+              {plugCat === "builtin" && BUILTIN_PLUGINS.map((plug) => {
                 const enabled = isBuiltinPluginEnabled(plug.id) && !builtinDisabled.has(plug.id);
                 return (
                   <div
                     key={plug.id}
-                    className="sbx-row group cursor-pointer items-start"
-                    title="查看插件详情"
+                    className="sbx-row group items-center"
+                    title={plug.description ? `查看插件详情 · ${plug.description}` : "查看插件详情"}
                     onClick={() => {
                       // VSCode 式：点击插件 → 工作区显示详情页
                       try { localStorage.setItem("nowen-plugins-workspace-selected", plug.id); } catch { /* ignore */ }
@@ -3396,11 +3418,8 @@ export default function SidebarDesktop() {
                       if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                     }}
                   >
-                    <span className="sbx-ico mt-0.5">{plug.icon === "tasks" ? <ListTodo size={14} className="text-violet-500" /> : plug.icon === "diary" ? <RefreshCw size={14} className="text-amber-500" /> : plug.icon === "ai" ? <Sparkles size={14} className="text-accent-primary" /> : <Link2 size={14} className="text-tx-tertiary" />}</span>
-                    <span className="min-w-0 flex-1">
-                      <div className="truncate text-xs text-tx-primary">{plug.name}</div>
-                      <div className="sbx-sub">{plug.description}</div>
-                    </span>
+                    <span className="sbx-ico">{plug.icon === "tasks" ? <ListTodo size={14} className="text-violet-500" /> : plug.icon === "diary" ? <RefreshCw size={14} className="text-amber-500" /> : plug.icon === "ai" ? <Sparkles size={14} className="text-accent-primary" /> : <Link2 size={14} className="text-tx-tertiary" />}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{plug.name}</span>
                     <span className="sbx-acts">
                       {enabled && (
                         <button
@@ -3421,21 +3440,24 @@ export default function SidebarDesktop() {
                   </div>
                 );
               })}
-              {(plugCat === "market"
-                ? []
-                : plugins.filter((p) => plugCat === "installed" ? p.status === "enabled" : p.status !== "enabled")
-              ).map((plug) => (
-                <div key={plug.id} className="sbx-row group items-start">
-                  <span className="sbx-ico mt-0.5"><ListTodo size={14} className="text-violet-500" /></span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{plug.name}</div>
-                    <div className="sbx-sub">v{plug.version} · {plug.status === "enabled" ? "已启用" : "已停用"}{plug.source ? ` · ${plug.source}` : ""}</div>
-                    {plug.description && <div className="sbx-sub">{plug.description}</div>}
-                  </span>
+              {plugCat === "installed" && plugins.map((plug) => (
+                <div
+                  key={plug.id}
+                  className="sbx-row group items-center"
+                  title={`查看插件详情 · v${plug.version}${plug.description ? ` · ${plug.description}` : ""}`}
+                  onClick={() => {
+                    // 第三方插件与内置插件一致：点行 → 工作区详情
+                    window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: plug.id } }));
+                    if (state.viewMode !== "plugins") actions.setViewMode("plugins");
+                  }}
+                >
+                  <span className="sbx-ico"><Puzzle size={14} className="text-tx-tertiary" /></span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{plug.name}</span>
                   <span
                     className={cn("sbx-switch", plug.status === "enabled" && "on")}
                     title={plug.status === "enabled" ? "停用插件" : "启用插件"}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       const action = plug.status === "enabled" ? api.plugins.disable(plug.id) : api.plugins.enable(plug.id);
                       action
                         .then(() => api.plugins.list().then((list) => setPlugins(list)).catch(() => undefined))
@@ -3444,15 +3466,12 @@ export default function SidebarDesktop() {
                   />
                 </div>
               ))}
-
-              {plugCat === "disabled" && plugins.filter((p) => p.status !== "enabled").length === 0 && (
-                <p className="sbx-view-empty">没有已停用的插件</p>
+              {plugCat === "installed" && plugins.length === 0 && (
+                <p className="sbx-view-empty">尚未安装第三方插件，去「市场」看看</p>
               )}
-              {plugCat === "market" && (
-                <p className="sbx-view-empty">插件市场（后续批次）</p>
-              )}
+              {plugCat === "catalog" && <p className="sbx-view-empty">市场在主区：选中条目可查看权限并安装</p>}
+              {plugCat === "admin" && <p className="sbx-view-empty">管理在主区：安装包、检查更新、Registry 与执行边界</p>}
             </div>
-            <p className="sbx-view-tip">插件面板不由宿主写死入口：启用后经 contributes.sidebarPanels 注册到侧栏，卸载即移除；数据始终保留。</p>
           </div>
         )}
       </div>

@@ -6,7 +6,11 @@
  * - builtin：官方内置插件（builtin registry），页内启停 + 打开面板/主区；
  * - installed：已安装第三方插件（GET /plugins），管理员启停/回滚/卸载；
  * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
- * 页内 Tab 分组（内置/已安装/市场）；侧栏点击内置插件 → nowen:plugin-selected 直达详情。
+ * 页内 Tab 分组（内置/已安装/市场/管理）；侧栏点击内置插件 → nowen:plugin-selected 直达详情，
+ * 侧栏点「市场」→ nowen:plugin-group 切到市场分组。
+ *
+ * 管理分组（仅管理员）收口原先在 设置 → 插件 里的全局能力：本地安装、检查更新、
+ * Runtime 策略、Registry 来源、开发者模式；单插件配置在详情页「设置与运行」分区。
  *
  * 选中状态经 localStorage + nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
  * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
@@ -33,6 +37,8 @@ import { api } from "@/lib/api";
 import { useAppActions } from "@/store/AppContext";
 import { pluginApi, type InstalledPlugin, type PluginPermissionRow } from "@/lib/pluginApi";
 import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
+import { PluginConfigSections } from "@/components/plugins/PluginConfigSections";
+import { PluginAdminPanel } from "@/components/plugins/PluginAdminPanel";
 import {
   BUILTIN_PLUGINS,
   isBuiltinPluginEnabled,
@@ -43,15 +49,18 @@ import {
 
 const SELECTED_KEY = "nowen-plugins-workspace-selected";
 const PLUGIN_SELECTED_EVENT = "nowen:plugin-selected";
+/** 侧栏插件视图点「市场」→ 工作区切到对应分组 */
+const PLUGIN_GROUP_EVENT = "nowen:plugin-group";
 const BUILTIN_CHANGED_EVENT = "nowen:builtin-plugins-changed";
-/** 市场目录默认源（与设置页 PluginSettingsTab 保持一致） */
+/** 市场目录默认源（Registry V2 官方源） */
 const MARKET_SOURCE_ID = "official-v2";
 
 type DetailSource = "builtin" | "installed" | "catalog";
-type GroupKey = DetailSource;
+/** 管理分组不对应任何可选中对象，只承载全局管理能力 */
+type GroupKey = DetailSource | "admin";
 type CatalogExtension = Awaited<ReturnType<typeof pluginApi.registryCatalog>>[number];
 
-/** 与设置页 PluginSettingsTab 的 permissionLabels 保持一致（就地复制，避免耦合设置页组件） */
+/** 与详情页共用的一份权限中文名（工作区的权限分区不再单独维护） */
 const PERMISSION_LABELS: Record<string, string> = {
   "notes:read": "读取笔记", "notes:write": "创建和修改笔记",
   "notebooks:read": "读取笔记本", "notebooks:write": "创建和修改笔记本",
@@ -73,6 +82,7 @@ const GROUP_TABS: Array<[GroupKey, string]> = [
   ["builtin", "内置"],
   ["installed", "已安装"],
   ["catalog", "市场"],
+  ["admin", "管理"],
 ];
 
 function iconFor(plug: BuiltinPluginDef, size: number) {
@@ -315,7 +325,7 @@ function installedContributionGroups(plugin: InstalledPlugin): Array<[string, st
   return groups.filter(([, items]) => items.length > 0);
 }
 
-function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollback, onUninstall }: {
+function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollback, onUninstall, onChanged }: {
   plugin: InstalledPlugin;
   isAdmin: boolean;
   busy: boolean;
@@ -323,6 +333,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
   onToggle: (plugin: InstalledPlugin) => void;
   onRollback: (plugin: InstalledPlugin) => void;
   onUninstall: (plugin: InstalledPlugin) => void;
+  onChanged: () => Promise<void>;
 }) {
   const presentation = getPluginRuntimePresentation(plugin);
   const groups = installedContributionGroups(plugin);
@@ -375,6 +386,13 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
           emptyText={presentation.declarative ? "零数据权限（Manifest 安装阶段强制）" : "不请求数据权限"}
         />
       </SectionCard>
+      {/* 插件自有设置项 / 连接密钥 / Actions 试跑 / Inbound / 执行记录：
+          原先在 设置 → 插件 的卡片里，现在就在这里配 */}
+      <SectionCard title="设置与运行">
+        <div className="mt-3">
+          <PluginConfigSections plugin={plugin} onChanged={onChanged} />
+        </div>
+      </SectionCard>
       <VersionHistory
         versions={(plugin.versions || []).map((item) => ({ version: item.version, date: item.installedAt, note: item.trustLevel }))}
         current={plugin.version}
@@ -422,7 +440,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
               </button>
             </>
           ) : (
-            <p className="text-xs text-tx-tertiary">启停 / 回滚 / 卸载为管理员操作，请前往 设置 → 扩展生态。</p>
+            <p className="text-xs text-tx-tertiary">启停 / 回滚 / 卸载为管理员操作。</p>
           )}
         </div>
         {actionError && <p role="alert" className="mt-2 text-xs text-red-600">{actionError}</p>}
@@ -440,7 +458,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
   onInstall: (extension: CatalogExtension) => void;
 }) {
   const latest = sortVersionsDesc(extension.versions)[0];
-  // 与 PluginMarketplaceInstallButton 相同的策略门槛：Node Runtime 插件需管理员先放行
+  // 与插件市场的安装门槛一致：Node Runtime 插件需管理员先在「管理」分组放行
   const needsPolicy = extension.runtime === "node-action" && nodeRuntimeAllowed !== true;
   const permissions = latest?.permissions || [];
   return (
@@ -487,11 +505,11 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
               <Download size={13} />{busy ? "正在安装" : "安装"}
             </button>
           ) : (
-            <p className="text-xs text-tx-tertiary">安装为管理员操作，请前往 设置 → 扩展生态。</p>
+            <p className="text-xs text-tx-tertiary">安装为管理员操作。</p>
           )}
           {isAdmin && needsPolicy && (
             <p className="text-xs text-amber-600">
-              {nodeRuntimeAllowed === null ? "正在读取 Runtime 策略" : "此插件需要 Node Runtime，请先在 设置 → 扩展生态 放行"}
+              {nodeRuntimeAllowed === null ? "正在读取 Runtime 策略" : "此插件需要 Node Runtime，请先到本页「管理」分组放行"}
             </p>
           )}
         </div>
@@ -534,22 +552,42 @@ export default function PluginsWorkspace() {
     }
   }, []);
 
+  /** 分组切换统一出口：主区自己换分组（如安装后跳已安装）时也广播出去，侧栏分类跟着高亮 */
+  const goGroup = useCallback((next: GroupKey) => {
+    setGroup(next);
+    window.dispatchEvent(new CustomEvent(PLUGIN_GROUP_EVENT, { detail: { group: next } }));
+  }, []);
+
   useEffect(() => {
     const onSelect = (event: Event) => {
       const id = (event as CustomEvent<{ id: string }>).detail?.id;
-      if (id && BUILTIN_PLUGINS.some((p) => p.id === id)) {
+      if (!id) return;
+      if (BUILTIN_PLUGINS.some((p) => p.id === id)) {
         setSelectedId(id as BuiltinPluginId);
-        setGroup("builtin");
+        goGroup("builtin");
+        return;
       }
+      // 第三方插件：侧栏行点击 → 切到已安装分组并选中同一插件
+      setInstalledSelection(id);
+      goGroup("installed");
+    };
+    // 侧栏插件视图的「市场」分类 → 切到本页的市场分组
+    const onGroup = (event: Event) => {
+      const next = (event as CustomEvent<{ group?: GroupKey }>).detail?.group;
+      if (!next || !GROUP_TABS.some(([key]) => key === next)) return;
+      setGroup(next);
+      setActionError("");
     };
     const onChanged = () => setVersion((v) => v + 1);
     window.addEventListener(PLUGIN_SELECTED_EVENT, onSelect);
+    window.addEventListener(PLUGIN_GROUP_EVENT, onGroup);
     window.addEventListener(BUILTIN_CHANGED_EVENT, onChanged);
     return () => {
       window.removeEventListener(PLUGIN_SELECTED_EVENT, onSelect);
+      window.removeEventListener(PLUGIN_GROUP_EVENT, onGroup);
       window.removeEventListener(BUILTIN_CHANGED_EVENT, onChanged);
     };
-  }, []);
+  }, [goGroup]);
 
   useEffect(() => {
     let cancelled = false;
@@ -591,7 +629,7 @@ export default function PluginsWorkspace() {
   const selectBuiltin = (id: BuiltinPluginId) => {
     try { localStorage.setItem(SELECTED_KEY, id); } catch { /* ignore */ }
     setSelectedId(id);
-    setGroup("builtin");
+    goGroup("builtin");
   };
 
   const clearActionState = () => {
@@ -648,7 +686,7 @@ export default function PluginsWorkspace() {
       .then(async (result) => {
         await refreshInstalled();
         setInstalledSelection(result.plugin.id);
-        setGroup("installed");
+        goGroup("installed");
         clearActionState();
       })
       .catch((error) => setActionError(error instanceof Error ? error.message : String(error)))
@@ -662,24 +700,8 @@ export default function PluginsWorkspace() {
     clearActionState();
   };
 
-  const switchGroup = (next: GroupKey) => {
-    setGroup(next);
-    clearActionState();
-  };
-
-  const tab = (key: GroupKey) => (
-    <button
-      key={key}
-      type="button"
-      onClick={() => switchGroup(key)}
-      className={cn(
-        "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-        group === key ? "bg-accent-primary text-white" : "border border-app-border bg-app-surface text-tx-secondary hover:bg-app-hover",
-      )}
-    >
-      {GROUP_TABS.find(([id]) => id === key)?.[1]}
-    </button>
-  );
+  /** 分组导航在侧栏插件视图（内置/已安装/市场/管理），主区只跟事件跑，不再重复一排 tab。 */
+  const groupLabel = GROUP_TABS.find(([key]) => key === group)?.[1] ?? "";
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
@@ -688,7 +710,7 @@ export default function PluginsWorkspace() {
         <Puzzle size={18} className="shrink-0 text-tx-secondary" />
         <h2 className="text-[15px] font-semibold text-tx-primary">插件</h2>
         <span className="hidden truncate text-xs text-tx-tertiary sm:inline">
-          {detail ? "查看插件详情" : "管理内置与已安装插件"}
+          {detail ? "查看插件详情" : group === "admin" ? "安装源、更新与执行边界" : groupLabel}
         </span>
         <span className="flex-1" />
         {detail ? (
@@ -700,7 +722,6 @@ export default function PluginsWorkspace() {
             <ArrowLeft size={12} />返回列表
           </button>
         ) : <span />}
-        <span className="flex items-center gap-1.5">{GROUP_TABS.map(([key]) => tab(key))}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-2xl p-6 pt-5">
@@ -715,6 +736,7 @@ export default function PluginsWorkspace() {
               onToggle={toggleInstalled}
               onRollback={rollbackInstalled}
               onUninstall={uninstallInstalled}
+              onChanged={refreshInstalled}
             />
           </div>
         )}
@@ -755,6 +777,17 @@ export default function PluginsWorkspace() {
                   </button>
                 ))}
               </div>
+            )}
+
+            {group === "admin" && (
+              <PluginAdminPanel
+                isAdmin={isAdmin}
+                onInstalled={async () => {
+                  await refreshInstalled();
+                  goGroup("installed");
+                  clearActionState();
+                }}
+              />
             )}
 
             {group === "installed" && (
