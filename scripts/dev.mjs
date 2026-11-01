@@ -149,12 +149,13 @@ process.once("SIGTERM", () => void shutdown(0))
 startProcess(
   "后端",
   process.execPath,
-  [electronCli, tsxCli, "watch", backendEntry],
+  // 直接用系统 node22 跑后端：sharp 在 Electron 内置 node（20.18）下会原生崩溃，
+  // node22 下正常；better-sqlite3 需处于 node ABI（npm run rebuild:node）。
+  [tsxCli, "watch", backendEntry],
   {
-    cwd: rootDir,
+    cwd: backendDir,
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
       PORT: String(backendPort),
     },
   },

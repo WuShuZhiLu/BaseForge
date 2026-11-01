@@ -3500,6 +3500,8 @@ export const api = {
       filter?: FileFilter;
       myUploadsRef?: FileMyUploadsRef;
       mime?: string;
+      /** 上传时间：最近 N 天（侧栏时间 chips）。 */
+      uploadedWithin?: number;
       notebookId?: string;
       /** 仅返回"被该笔记引用过"的附件（走 attachment_references 倒排表）。 */
       noteId?: string;

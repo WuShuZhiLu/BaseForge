@@ -233,6 +233,7 @@ export interface NoteListItem {
   snippetHtml?: string;
   /** 搜索结果中命中的字段：title, content, title+content */
   matchedField?: string;
+  noteType?: string | null;
 }
 
 export interface Tag {

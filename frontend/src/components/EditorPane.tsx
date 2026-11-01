@@ -4822,7 +4822,7 @@ function OutlinePanel({
   // 当前标题跟随：在编辑器表面容器上捕获滚动（滚动事件不冒泡，捕获阶段可从祖先接住），
   // 取视口顶部以上最近的标题为当前项。DOM h1-h6 顺序 == headings 文档顺序，
   // 数量对不上（特殊视图/异步渲染）时不高亮，仅影响跟随不影响跳转。
-  const surfaceRef = useRef<HTMLElement | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const host = surfaceRef.current;
     const surface = host?.parentElement;

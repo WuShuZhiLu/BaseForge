@@ -6,6 +6,8 @@
  */
 
 export type TrashTypeKey = "rich" | "markdown" | "mindmap" | "plain" | "board" | "sheet" | "word" | "pdf" | "attach";
+/** 侧栏/主区共享的类型筛选值：类型键 + "all"。 */
+export type TrashTypeFilterKey = "all" | TrashTypeKey;
 
 export const TRASH_TYPE_META: Array<{ key: TrashTypeKey; emoji: string; label: string }> = [
   { key: "rich", emoji: "📄", label: "富文本" },
@@ -74,7 +76,7 @@ export function retentionColor(daysLeft: number): string {
 
 const FILTER_KEY = "trash.typeFilter";
 
-export function getTrashTypeFilter(): TrashTypeKey[] {
+export function getTrashTypeFilter(): TrashTypeFilterKey[] {
   try {
     const raw = JSON.parse(localStorage.getItem(FILTER_KEY) || "");
     return Array.isArray(raw) && raw.length ? raw : ["all"];
@@ -83,7 +85,7 @@ export function getTrashTypeFilter(): TrashTypeKey[] {
   }
 }
 
-export function setTrashTypeFilter(keys: TrashTypeKey[]): void {
+export function setTrashTypeFilter(keys: TrashTypeFilterKey[]): void {
   localStorage.setItem(FILTER_KEY, JSON.stringify(keys.length ? keys : ["all"]));
   window.dispatchEvent(new CustomEvent("nowen:trash-filter"));
 }

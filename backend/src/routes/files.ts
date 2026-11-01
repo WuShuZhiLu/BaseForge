@@ -448,8 +448,32 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   }
 
   if (mime) {
-    whereParts.push("a.mimeType = ?");
-    params.push(mime.toLowerCase());
+    // 逗号分隔多选（侧栏类型 chips）：image/png,image/jpeg → IN 查询
+    const mimeList = mime.split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+    if (mimeList.length === 1) {
+      whereParts.push("a.mimeType = ?");
+      params.push(mimeList[0]);
+    } else {
+      // 支持 "audio/" 这类前缀项：带 / 结尾的用 LIKE，精确的用 IN
+      const clauses: string[] = [];
+      for (const entry of mimeList) {
+        if (entry.endsWith("/")) {
+          clauses.push("a.mimeType LIKE ?");
+          params.push(`${entry}%`);
+        } else {
+          clauses.push("a.mimeType = ?");
+          params.push(entry);
+        }
+      }
+      whereParts.push(`(${clauses.join(" OR ")})`);
+    }
+  }
+
+  // 上传时间：uploadedWithin=N 天（侧栏时间 chips）
+  const uploadedWithin = Number(c.req.query("uploadedWithin") || 0);
+  if (Number.isFinite(uploadedWithin) && uploadedWithin > 0) {
+    whereParts.push("a.createdAt >= datetime('now', ?)");
+    params.push(`-${Math.floor(uploadedWithin)} days`);
   }
 
   if (notebookId) {
@@ -667,7 +691,8 @@ app.get("/stats", requireWorkspaceFeature("files"), (c) => {
     const sumRow = db
       .prepare(
         `SELECT COUNT(*) AS c, COALESCE(SUM(size), 0) AS b
-           FROM attachments WHERE id IN (${placeholders})`,
+           FROM attachments WHERE id IN (${placeholders})
+             AND (mimeType IS NULL OR mimeType NOT LIKE 'image/%')`,
       )
       .get(...ids) as { c: number; b: number } | undefined;
     unreferencedCount = sumRow?.c ?? 0;
@@ -683,7 +708,19 @@ app.get("/stats", requireWorkspaceFeature("files"), (c) => {
     userId,
     scope.scope === "workspace" ? scope.workspaceId! : undefined,
   );
-  const myUploadsTotal = uploadsSummary.total;
+  // 附件来源不含图片（图片归图床来源）："我的上传"徽标与计数也用非图片口径
+  const myUploadsNonImageRow = db
+    .prepare(
+      scope.scope === "workspace"
+        ? `SELECT COUNT(*) AS c FROM attachments
+            WHERE uploadSource = 'file_manager' AND workspaceId = ?
+              AND (mimeType IS NULL OR mimeType NOT LIKE 'image/%')`
+        : `SELECT COUNT(*) AS c FROM attachments
+            WHERE uploadSource = 'file_manager' AND userId = ? AND workspaceId IS NULL
+              AND (mimeType IS NULL OR mimeType NOT LIKE 'image/%')`,
+    )
+    .get(scope.scope === "workspace" ? scope.workspaceId! : userId) as { c: number } | undefined;
+  const myUploadsTotal = myUploadsNonImageRow?.c ?? 0;
   const myUploadsReferenced = uploadsSummary.referenced;
   const myUploadsUnreferenced = uploadsSummary.unreferenced;
 

@@ -23,11 +23,14 @@ export default function FileUploadDialog({
   onClose,
   onUploaded,
   defaultFolderId,
+  uploadFilter,
 }: {
   open: boolean;
   onClose: () => void;
   onUploaded: () => void;
   defaultFolderId?: string | null;
+  /** 上传分流：image=只收图片，non-image=只收非图片；不传则不过滤。 */
+  uploadFilter?: "image" | "non-image";
 }) {
   const { t } = useTranslation();
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -35,6 +38,7 @@ export default function FileUploadDialog({
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [folderOpen, setFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,14 +62,24 @@ export default function FileUploadDialog({
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const newFiles: PendingFile[] = Array.from(files).map((f) => ({
+    const isImage = (f: File) => f.type.startsWith("image/");
+    // 上传分流：不符合当前视图类型的文件拒绝并提示，合法文件照常收集。
+    const accepted = uploadFilter === "image"
+      ? Array.from(files).filter(isImage)
+      : uploadFilter === "non-image"
+        ? Array.from(files).filter((f) => !isImage(f))
+        : Array.from(files);
+    if (accepted.length < files.length) {
+      toast.error(uploadFilter === "image" ? "图床仅支持图片，请在附件来源上传" : "图片请到图床上传");
+    }
+    const newFiles: PendingFile[] = accepted.map((f) => ({
       file: f,
       id: `${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     }));
     setPendingFiles((prev) => [...prev, ...newFiles]);
     // 清空 input 以便重复选择同名文件
     e.target.value = "";
-  }, []);
+  }, [uploadFilter]);
 
   // 移除待上传文件
   const removeFile = useCallback((id: string) => {
@@ -150,20 +164,58 @@ export default function FileUploadDialog({
             </div>
           </div>
 
-          {/* 目标文件夹 */}
+          {/* 目标文件夹：点击触发器展开主题化下拉列表（不用原生 select） */}
           <div>
             <label className="block text-xs text-tx-tertiary mb-1.5">{t("fileManager.targetFolder") || "目标位置"}</label>
             <div className="flex items-center gap-2">
-              <select
-                value={selectedFolderId || ""}
-                onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                className="flex-1 text-sm rounded-lg border border-app-border bg-app-bg text-tx-primary px-3 py-1.5 outline-none focus:ring-2 focus:ring-accent-primary/30"
-              >
-                <option value="">{t("fileManager.unarchived") || "未归档文件"}</option>
-                {folders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.fileCount})</option>
-                ))}
-              </select>
+              <div className="relative flex-1">
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={folderOpen}
+                  onClick={() => setFolderOpen((v) => !v)}
+                  className="flex w-full items-center rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-sm text-tx-primary hover:border-accent-primary/50"
+                >
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {selectedFolderId
+                      ? folders.find((f) => f.id === selectedFolderId)?.name || ""
+                      : t("fileManager.unarchived") || "未归档文件"}
+                  </span>
+                  <span className="ml-2 text-tx-tertiary">▾</span>
+                </button>
+                {folderOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setFolderOpen(false)} />
+                    <div
+                      role="listbox"
+                      className="absolute left-0 right-0 top-full z-20 mt-1 max-h-44 overflow-y-auto rounded-lg border border-app-border bg-app-elevated p-1 shadow-lg"
+                    >
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={!selectedFolderId}
+                        onClick={() => { setSelectedFolderId(null); setFolderOpen(false); }}
+                        className={`flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-[12.5px] ${!selectedFolderId ? "bg-[#e8efff] text-accent-primary" : "text-tx-secondary hover:bg-app-hover"}`}
+                      >
+                        {t("fileManager.unarchived") || "未归档文件"}
+                      </button>
+                      {folders.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selectedFolderId === f.id}
+                          onClick={() => { setSelectedFolderId(f.id); setFolderOpen(false); }}
+                          className={`flex w-full items-center rounded-md px-2.5 py-1.5 text-left text-[12.5px] ${selectedFolderId === f.id ? "bg-[#e8efff] text-accent-primary" : "text-tx-secondary hover:bg-app-hover"}`}
+                        >
+                          <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                          <span className="tabular-nums text-tx-tertiary">({f.fileCount})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setCreatingFolder(true)}
@@ -217,6 +269,7 @@ export default function FileUploadDialog({
               ref={fileInputRef}
               type="file"
               multiple
+              accept={uploadFilter === "image" ? "image/*" : undefined}
               onChange={handleFileSelect}
               className="hidden"
             />

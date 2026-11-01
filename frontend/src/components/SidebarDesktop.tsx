@@ -9,7 +9,7 @@
  *      + 知识树嵌套/折叠/搜索/筛选 + 专注模式 + 行级菜单
  *      + 拖拽 + 面板沉底 + 区段拖拽排序。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowUpDown,
   Check,
@@ -49,9 +49,12 @@ import {
   Star,
   Trash2,
   Upload,
+  KanbanSquare,
+  Inbox,
   Users,
   X,
   XCircle,
+  Puzzle,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -86,6 +89,7 @@ import {
   trashTypeKey,
   trashTypeLabel,
   type TrashTimeFilter,
+  type TrashTypeFilterKey,
   type TrashTypeKey,
 } from "@/features/trash/trashUi";
 import {
@@ -102,7 +106,7 @@ import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActi
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { FILE_SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesSort, getFilesViewMode, setFilesUi, type FilesGroupMode, type FilesViewMode } from "@/features/files/filesUi";
+import { FILE_IH_MIME_CHIPS, FILE_IH_SORT_OPTIONS, FILE_DOC_MIME_CHIPS, FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesIhCategory, getFilesIhMimes, getFilesIhSort, getFilesIhTime, getFilesMimes, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesSort, getFilesSource, getFilesTime, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -354,6 +358,23 @@ interface RowMenuState {
   y: number;
 }
 
+/** 面板内可折叠分区：与知识库区段同一折叠交互（箭头 + panelCollapsed 持久化）。 */
+function PanelSection({ label, extra, children }: {
+  label: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-app-border px-2 py-1.5">
+      <div className="flex items-center justify-between px-1 pb-1">
+        <span className="text-[10.5px] text-tx-tertiary">{label}</span>
+        {extra}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export default function SidebarDesktop() {
   const { t } = useTranslation();
   const { state } = useApp();
@@ -440,6 +461,9 @@ export default function SidebarDesktop() {
   }, [collapsedSections]);
   // 模块侧栏面板折叠状态（projects/files/shares 等单块面板，同样持久化）
   const SIDEBAR_PANEL_COLLAPSED_KEY = "nowen-next-sidebar-panel-collapsed";
+  // 文件管理面板的来源/筛选状态（filesUi）：订阅保证侧栏 chips 即时反映选择
+  const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
+  void filesUiVersion;
   const [panelCollapsed, setPanelCollapsed] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(SIDEBAR_PANEL_COLLAPSED_KEY);
@@ -486,12 +510,12 @@ export default function SidebarDesktop() {
   const [starDocs, setStarDocs] = useState<NoteListItem[]>([]);
   const [trashItems, setTrashItems] = useState<import("@/features/trash/trashTypes").TrashItem[]>([]);
   // 侧栏回收站类型筛选（与主区 TrashPage 同语义：按 resourceType）
-  const [trashFilter, setTrashFilterState] = useState<TrashTypeKey[]>(() => getTrashTypeFilter());
+  const [trashFilter, setTrashFilterState] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
   const [retentionDays, setRetentionDaysState] = useState(() => getRetentionDays());
   const [timeFilter, setTimeFilterState] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
   const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
   const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
-  const setTrashTypeFilter = useCallback((keys: TrashTypeKey[]) => { setTrashTypeFilterState(keys); persistTrashTypeFilter(keys); }, []);
+  const setTrashTypeFilter = useCallback((keys: TrashTypeFilterKey[]) => { setTrashFilterState(keys); persistTrashTypeFilter(keys); }, []);
   // 回收站视图激活时，恢复/删除/清空等操作后即时刷新计数与类型分布
   useEffect(() => {
     if (sidebarView !== "trash") return;
@@ -505,8 +529,24 @@ export default function SidebarDesktop() {
       window.removeEventListener("nowen:notes-changed", reload);
     };
   }, [sidebarView]);
+  // 文件管理视图激活时：上传/删除/清理后即时刷新计数（stats + 文件列表）
   useEffect(() => {
-    const onFilter = () => { setTrashTypeFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); };
+    if (sidebarView !== "files") return;
+    const reload = () => {
+      api.files.stats().then((s) => setFileStats(s)).catch(() => undefined);
+      api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
+    };
+    window.addEventListener("nowen:storage-changed", reload);
+    window.addEventListener("nowen:knowledge-tree-changed", reload);
+    window.addEventListener("nowen:notes-changed", reload);
+    return () => {
+      window.removeEventListener("nowen:storage-changed", reload);
+      window.removeEventListener("nowen:knowledge-tree-changed", reload);
+      window.removeEventListener("nowen:notes-changed", reload);
+    };
+  }, [sidebarView]);
+  useEffect(() => {
+    const onFilter = () => { setTrashFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); }
     const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };
     window.addEventListener("nowen:trash-filter", onFilter);
     window.addEventListener("nowen:trash-settings", onSettings);
@@ -517,6 +557,7 @@ export default function SidebarDesktop() {
   }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
+  const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
   // 插件列表（后端 GET /plugins）
   const [plugCat, setPlugCat] = useState<"installed" | "market" | "disabled">("installed");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
@@ -564,6 +605,7 @@ export default function SidebarDesktop() {
     if (view === "files") {
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => setFileItems([]));
       api.files.stats().then((s) => setFileStats(s)).catch(() => setFileStats(null));
+      api.getRemoteFileSources().then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })))).catch(() => setRemoteSources([]));
     }
     if (view === "plugins") {
       api.plugins.list().then((list) => setPlugins(list)).catch(() => setPlugins([]));
@@ -2558,8 +2600,11 @@ export default function SidebarDesktop() {
       style={{ width: sidebarWidth }}
       data-next-sidebar=""
     >
-      {/* ===== 头部：位置 + 搜索（筛选内置在搜索结果面板内）（48px，三区通栏线对齐） ===== */}
-      <header className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2.5">
+      {/* ===== 头部：位置 + 搜索 —— 仅知识库视图显示；模块视图有自己的面板头 ===== */}
+      <header
+        className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2.5"
+        style={sidebarView === "kb" ? undefined : { display: "none" }}
+      >
         <div ref={spaceRef} className="relative shrink-0">
           <button
             type="button"
@@ -3009,28 +3054,17 @@ export default function SidebarDesktop() {
              职责 = 浏览 + 单条恢复/删除；清空、批量、筛选只在主区完整工作区。 */}
         {sidebarView === "trash" && (
           <div className="sbx-view">
-            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]">
-              <Trash2 size={13} className="shrink-0 text-tx-tertiary" />
-              <span className="min-w-0 truncate font-semibold text-tx-primary">回收站</span>
-              <span className="shrink-0 rounded-lg bg-app-hover px-1.5 py-px text-[10.5px] tabular-nums text-tx-tertiary">{trashItems.length}</span>
-              <span className="flex-1" />
-              <button
-                type="button"
-                title="刷新"
-                onClick={() => api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined)}
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
-              >
-                <RotateCcw size={12} />
-              </button>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">回收站</span>
             </div>
             {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter） */}
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="flex items-center justify-between px-1 pb-1">
-                <span className="text-[10.5px] text-tx-tertiary">类型 · 可多选</span>
-                <button type="button" className="text-[10.5px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>
-              </div>
+            <PanelSection
+              label="类型 · 可多选"
+              extra={<button type="button" className="text-[10.5px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>}
+            >
               <div className="grid grid-cols-2 gap-1">
-                {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeKey[]).map((key) => {
+                {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => {
                   const count = key === "all"
                     ? trashItems.length
                     : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length;
@@ -3053,9 +3087,10 @@ export default function SidebarDesktop() {
                   );
                 })}
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">删除时间</div>
+            </PanelSection>
+            <PanelSection
+              label="删除时间"
+            >
               <div className="flex flex-wrap gap-1 px-1">
                 {TRASH_TIME_META.filter((meta) => meta.key !== "older" || retentionDays > 30).map((meta) => (
                   <button
@@ -3069,9 +3104,10 @@ export default function SidebarDesktop() {
                   </button>
                 ))}
               </div>
-            </div>
-            <div className="border-b border-app-border px-2.5 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">自动清理</div>
+            </PanelSection>
+            <PanelSection
+              label="自动清理"
+            >
               <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
                 <span>保留期限</span>
                 <span className="flex gap-1">
@@ -3113,16 +3149,16 @@ export default function SidebarDesktop() {
                 </button>
               </div>
               <div className="px-1 pb-1 pt-0.5 text-[10px] leading-relaxed text-tx-tertiary">到期条目自动彻底删除；提醒走应用内通知与图标徽标</div>
-            </div>
+            </PanelSection>
           </div>
         )}
 
         {/* ===== 项目管理视图 ===== */}
         {sidebarView === "projects" && (
           <div>
-            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px] cursor-pointer select-none" onClick={() => togglePanelCollapsed("projects")} title={panelCollapsed.projects ? "展开" : "折叠"}>
-              <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.projects && "-rotate-90")} />
-              <span>项目管理</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><KanbanSquare size={13} /></span>
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">项目管理</span>
             </div>
             {!panelCollapsed.projects && <ProjectsSidePanel onOpenMain={() => actions.setViewMode("projects")} />}
           </div>
@@ -3131,41 +3167,45 @@ export default function SidebarDesktop() {
         {/* ===== 分享管理视图 ===== */}
         {sidebarView === "shares" && (
           <div>
-            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px] cursor-pointer select-none" onClick={() => togglePanelCollapsed("shares")} title={panelCollapsed.shares ? "展开" : "折叠"}>
-              <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.shares && "-rotate-90")} />
-              <span>分享管理</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">分享管理</span>
             </div>
             {!panelCollapsed.shares && <SharesSidePanel onOpenMain={() => actions.setViewMode("shares")} />}
           </div>
         )}
 
-        {/* ===== 文件管理视图 ===== */}
+        {/* ===== 文件管理视图 =====
+             侧栏 = 来源选择 + 该来源的筛选/设置；列表与批量在主区。 */}
         {sidebarView === "files" && (
           <div className="sbx-view">
-            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]">
-              <button
-                type="button"
-                aria-expanded={!panelCollapsed.files}
-                title={panelCollapsed.files ? "展开" : "折叠"}
-                className="flex items-center gap-1 text-xs text-tx-secondary hover:text-tx-primary"
-                onClick={() => togglePanelCollapsed("files")}
-              >
-                <ChevronDown size={12} className={cn("transition-transform", panelCollapsed.files && "-rotate-90")} />
-                <span>文件管理</span>
-              </button>
-              <span className="flex-1" />
-              <button type="button" title="上传文件" onClick={() => setUploadOpen(true)} className="sbx-btn">
-                <Upload size={13} />
-              </button>
-              <span className="sbx-badge">{fileStats?.total ?? fileItems.length}</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
+              <Inbox size={14} className="shrink-0 text-tx-tertiary" />
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">文件管理</span>
             </div>
-            {!panelCollapsed.files && (
-            <>
-            {/* 分类（与主区 filesUi 共享同步） */}
+            {/* 来源：三大功能 */}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">来源</div>
+              <div className="space-y-1">
+                {([["attachments", "📎", "附件"], ["imagehost", "🌐", "图床"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", "☁️", "远程文件"]] : [])] as Array<[FilesSource, string, string]>).map(([key, emoji, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesSource() === key}
+                    onClick={() => setFilesUi({ source: key })}
+                    className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11.5px] ${getFilesSource() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    <span>{emoji}</span>
+                    <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {getFilesSource() === "attachments" && (<>
             <div className="border-b border-app-border px-2 py-1.5">
               <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">分类</div>
               <div className="space-y-1">
-                {([["all", "🗂 全部"], ["image", "🖼 图片"], ["file", "📄 文件"], ["myUploads", "📤 我的上传"], ["unreferenced", "✨ 未引用"]] as Array<[string, string]>).map(([key, label]) => (
+                {([["all", "🗂 全部"], ["myUploads", "📤 我的上传"], ["unreferenced", "✨ 未引用"]] as Array<[string, string]>).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -3175,26 +3215,61 @@ export default function SidebarDesktop() {
                   >
                     {label}
                     {fileStats && <span className="ml-auto tabular-nums text-tx-tertiary">{
-                      key === "all" ? fileStats.total
-                      : key === "image" ? fileStats.images.count
-                      : key === "file" ? fileStats.files.count
+                      key === "all" ? fileStats.files.count
                       : key === "myUploads" ? fileStats.myUploads?.total ?? 0
                       : fileStats.unreferenced?.count ?? 0}</span>}
                   </button>
                 ))}
               </div>
             </div>
-            {/* 排序 + 视图 + 分组 */}
             <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序与展示</div>
-              <select
-                value={getFilesSort()}
-                onChange={(event) => setFilesUi({ sort: event.target.value as FileSortKey })}
-                className="w-full rounded-md border border-app-border bg-app-bg px-1.5 py-1 text-[11.5px] text-tx-primary"
-              >
-                {FILE_SORT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-              </select>
-              <div className="mt-1.5 grid grid-cols-2 gap-1">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ mimes: [] })}>清除</button></div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_DOC_MIME_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    aria-pressed={getFilesMimes().includes(chip.key)}
+                    onClick={() => {
+                      const current = getFilesMimes();
+                      setFilesUi({ mimes: current.includes(chip.key) ? current.filter((m) => m !== chip.key) : [...current, chip.key] });
+                    }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesMimes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{chip.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">上传时间</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesTime() === key}
+                    onClick={() => setFilesUi({ time: key })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={getFilesSort() === opt.value}
+                    onClick={() => setFilesUi({ sort: opt.value })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">展示</div>
+              <div className="grid grid-cols-2 gap-1 px-1">
                 {([["list", "📃 列表"], ["grid", "▦ 网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
                   <button
                     key={mode}
@@ -3205,7 +3280,7 @@ export default function SidebarDesktop() {
                   >{label}</button>
                 ))}
               </div>
-              <div className="mt-1 grid grid-cols-3 gap-1">
+              <div className="mt-1 grid grid-cols-3 gap-1 px-1">
                 {([["flat", "扁平"], ["notebook", "按库"], ["folder", "按文件夹"]] as Array<[FilesGroupMode, string]>).map(([mode, label]) => (
                   <button
                     key={mode}
@@ -3217,31 +3292,137 @@ export default function SidebarDesktop() {
                 ))}
               </div>
             </div>
-            {/* 来源 */}
+            </>)}
+            {getFilesSource() === "imagehost" && (<>
             <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">来源</div>
-              <div className="flex flex-wrap gap-1 px-1">
-                <span
-                  className="cursor-pointer rounded-full border border-app-border bg-app-bg px-2 py-0.5 text-[11px] text-tx-secondary hover:bg-app-hover"
-                  title="远程文件（WebDAV / 百度网盘）：在文件管理中打开"
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
-                    actions.setViewMode("files");
-                  }}
-                >
-                  ☁ 远程
-                </span>
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">分类</div>
+              <div className="space-y-1">
+                {([["image", "🖼 图片"], ["file", "📄 文件"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesIhCategory() === key}
+                    onClick={() => setFilesUi({ ihCategory: key })}
+                    className={`flex w-full items-center rounded-md border px-2 py-1 text-[11.5px] ${getFilesIhCategory() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
               </div>
             </div>
-            </>
-            )}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ ihMimes: [] })}>清除</button></div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_IH_MIME_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    aria-pressed={getFilesIhMimes().includes(chip.key)}
+                    onClick={() => {
+                      const current = getFilesIhMimes();
+                      setFilesUi({ ihMimes: current.includes(chip.key) ? current.filter((m) => m !== chip.key) : [...current, chip.key] });
+                    }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesIhMimes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{chip.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_IH_SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={getFilesIhSort() === opt.value}
+                    onClick={() => setFilesUi({ ihSort: opt.value })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesIhSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="px-2 pb-2 text-[10px] leading-relaxed text-tx-tertiary">上传即得公开直链；删除图床文件会使外部引用失效。</div>
+            <PanelSection label="上传时间">
+              <div className="flex flex-wrap gap-1 px-1">
+                {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesIhTime() === key}
+                    onClick={() => setFilesUi({ ihTime: key })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesIhTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            <PanelSection label="展示">
+              <div className="grid grid-cols-2 gap-1 px-1">
+                {([["list", "📃 列表"], ["grid", "▦ 网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={getFilesViewMode() === mode}
+                    onClick={() => setFilesUi({ view: mode })}
+                    className={`rounded-md border px-2 py-1 text-[11px] ${getFilesViewMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            </>)}
+            {getFilesSource() === "remote" && (<>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_REMOTE_TYPE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    aria-pressed={getFilesRemoteTypes().includes(chip.key)}
+                    onClick={() => {
+                      const current = getFilesRemoteTypes();
+                      setFilesUi({ remoteTypes: current.includes(chip.key) ? current.filter((t) => t !== chip.key) : [...current, chip.key] });
+                    }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTypes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{chip.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={getFilesRemoteSort() === opt.value}
+                    onClick={() => setFilesUi({ remoteSort: opt.value as FilesRemoteSortKey })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </div>
+            </>)}
+            <PanelSection label="修改时间">
+              <div className="flex flex-wrap gap-1 px-1">
+                {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"], ["older", "更早"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesRemoteTime() === key}
+                    onClick={() => setFilesUi({ remoteTime: key })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
           </div>
         )}
 
         {/* ===== 插件视图 ===== */}
         {sidebarView === "plugins" && (
           <div className="sbx-view">
-            <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-[12.5px]"><span>插件</span><span className="flex-1" /><span className="sbx-badge">{BUILTIN_PLUGINS.length}</span></div>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">插件</span>
+            </div>
             <div className="sbx-chips">
               {([["installed", "已安装"], ["market", "市场"], ["disabled", "已停用"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
                 <span key={cat} className={cn("sbx-chip", plugCat === cat && "on")} onClick={() => setPlugCat(cat)}>{label}</span>

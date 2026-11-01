@@ -65,6 +65,7 @@ export function useTabNoteOpener() {
         });
       },
     });
+    if (!result) return; // 加载被取消（协调器返回 undefined）
     // 404 自愈：页签指向已删除/不存在的笔记时，把死页签从「打开的」移除并清掉
     // 错误浮层。此前死页签永远留着，点击只会反复报「打开失败」。
     if (result.status === "error" && (result.error as { status?: number } | undefined)?.status === 404) {

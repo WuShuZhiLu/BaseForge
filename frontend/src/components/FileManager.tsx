@@ -23,7 +23,7 @@
  *   点 "跳转到笔记" → api.getNote(id) → setActiveNote + setViewMode("all")；
  *   复用 AppContext，与 SidebarMobile / NoteList 的跳转路径一致。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import RemoteFilesPanel from "@/components/RemoteFilesPanel";
 import type { RemoteSourcePublic } from "@/types";
@@ -63,6 +63,7 @@ import {
   Share2,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
+import { isBuiltinPluginEnabled } from "@/plugins/builtin/registry";
 import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
 import { navigateToolPage } from "@/components/toolTabs";
 
@@ -70,8 +71,8 @@ import { navigateToolPage } from "@/components/toolTabs";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 import { FileItem, FileStats, FileSortKey, FileCategory } from "@/types";
-import { FILE_SORT_OPTIONS as SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesSort, getFilesViewMode } from "@/features/files/filesUi";
-import type { FilesViewMode } from "@/features/files/filesUi";
+import { FILE_SORT_OPTIONS as SORT_OPTIONS, FILE_DOC_MIME_CHIPS, FILE_IH_MIME_CHIPS, expandMimeChips, getFilesCategory, getFilesGroupMode, getFilesIhCategory, getFilesIhMimes, getFilesIhSort, getFilesIhTime, getFilesMimes, getFilesSort, getFilesSource, getFilesTime, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
+import type { FilesGroupMode, FilesSource, FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -255,11 +256,10 @@ export default function FileManager() {
   const actions = useAppActions();
 
   // 列表状态
-  // 远程文件管理（remote-files 内置插件）：文件管理内的并列视图（本地附件 / 远程文件 Tab）
-  const [sourceTab, setSourceTab] = useState<"local" | "remote">("local");
-  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab
+  // 远程文件管理（remote-files 内置插件）：经侧栏「来源」切换，主区不重复提供入口
+  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab（来源由侧栏 filesUi 驱动，无需本地状态）
   useEffect(() => {
-    const handler = () => setSourceTab("remote");
+    const handler = () => setFilesUi({ source: "remote" });
     window.addEventListener("nowen:files-remote-tab", handler);
     return () => window.removeEventListener("nowen:files-remote-tab", handler);
   }, []);
@@ -271,21 +271,11 @@ export default function FileManager() {
   // 每页条数：默认 10，从 localStorage 恢复上次选择，跨会话保留。
   const [pageSize, setPageSize] = useState<number>(() => readStoredPageSize());
 
-  // 筛选 / 搜索：分类/排序/视图/分组由侧栏面板驱动（filesUi 共享存储 + 事件同步）
-  const [category, setCategory] = useState<CategoryFilter>(() => getFilesCategory() as CategoryFilter);
+  // 筛选 / 搜索：分类/排序/视图/分组由侧栏 filesUi 驱动（useSyncExternalStore 派生，见下方）
   // "我的上传"内部的二级子筛选；仅在 category === "myUploads" 时参与请求。
-  // 切到非 myUploads 主 tab 时不重置——下次回到"我的上传"还能保持上次的子筛选选择。
   const [myUploadsRef, setMyUploadsRef] = useState<MyUploadsRefFilter>("all");
-  const [sort, setSort] = useState<FileSortKey>(() => getFilesSort());
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState(""); // debounced
-
-  // 视图模式：默认 list（信息密度高）；切到"图片"分类时自动跳 grid（见下方同步 effect）；
-  // 图床模式下强制 grid（见 toggleImageHostMode）。
-  const [viewMode, setViewMode] = useState<FilesViewMode>(() => getFilesViewMode());
-
-  // 分组模式：扁平列表 vs 按笔记本分组 vs 按附件文件夹分组（filesUi 共享，含旧键迁移）
-  const [groupMode, setGroupMode] = useState<FilesGroupMode>(() => getFilesGroupMode());
 
   // 附件文件夹列表（groupMode === "folder" 时使用）
   const [attachmentFolders, setAttachmentFolders] = useState<Array<{ id: string; name: string; fileCount: number }>>([]);
@@ -304,35 +294,18 @@ export default function FileManager() {
     });
   }, []);
 
-  // 图床模式（Image Host）：
-  //   特化的 UI 子模式，专门服务于"把笔记附件当外链图床用"的场景。
-  //   开启后：
-  //     - 强制 category=image（隐藏其他分类 tab）
-  //     - 强制 viewMode=grid（图床的核心交互是看图复制链接）
-  //     - GridCard hover 工具条上的"复制链接"按钮变成"分裂下拉"——
-  //       左半快速复制 URL，右半弹出 Markdown / HTML 选项
-  //     - 详情抽屉头部新增"外链分享"区块，醒目展示完整直链 + 三种格式按钮
-  //   不持久化到 localStorage：当前作为临时操作模式，避免下次进来发现"图片之外的文件不见了"。
-  const [isImageHostMode, setIsImageHostMode] = useState(false);
-
-  // 侧栏面板修改分类/排序/视图/分组时同步到主区（与回收站 trashUi 同一模式）。
-  // 必须在 isImageHostMode 声明之后：deps 数组在渲染期求值，提前引用即 TDZ。
-  useEffect(() => {
-    const onUi = () => {
-      const nextCategory = getFilesCategory() as CategoryFilter;
-      setCategory(nextCategory);
-      setSort(getFilesSort());
-      const nextView = getFilesViewMode();
-      setViewMode(isImageHostMode ? "grid" : nextView);
-      setGroupMode(getFilesGroupMode());
-      setPage(1);
-      // 分类切换的视图自动跳转（原 handleCategoryChange 语义）：文件→列表，其余→网格
-      if (!isImageHostMode) setViewMode(nextCategory === "file" ? "list" : "grid");
-      if (nextCategory === "myUploads") setMyUploadsRef("all");
-    };
-    window.addEventListener("nowen:files-ui", onUi);
-    return () => window.removeEventListener("nowen:files-ui", onUi);
-  }, [isImageHostMode]);
+  // 来源/分类/排序/视图/分组：全部由侧栏 filesUi 驱动，useSyncExternalStore 保证
+  // 任何一端修改必然触发本组件重渲染（版本号变化）。
+  const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
+  void filesUiVersion; // 仅为订阅；实际值在渲染期从 getter 读取
+  const source = getFilesSource();
+  const isRemoteSource = source === "remote" && isBuiltinPluginEnabled("remote-files");
+  const sourceTab = isRemoteSource ? "remote" : "local";
+  const isImageHostMode = source === "imagehost";
+  const category = (isImageHostMode ? getFilesIhCategory() : getFilesCategory()) as CategoryFilter;
+  const sort = (isImageHostMode && getFilesIhSort() === "copied_desc" ? "created_desc" : isImageHostMode ? getFilesIhSort() : getFilesSort()) as FileSortKey;
+  const viewMode: FilesViewMode = getFilesViewMode();
+  const groupMode = getFilesGroupMode();
 
   // 详情抽屉
   // detailId 为 null 时抽屉关闭；非 null 由 AttachmentDetailDrawer 自己加载详情。
@@ -423,11 +396,14 @@ export default function FileManager() {
       c: category,
       // 仅在 myUploads tab 下子筛选才有意义；其他 tab 固定写空串避免污染 key
       mur: category === "myUploads" ? myUploadsRef : "",
+      mimes: getFilesMimes().join(","),
+      tf: getFilesTime(),
       s: sort,
       q: searchQuery,
       p: page,
       ps: pageSize,
       ihm: isImageHostMode,
+      ihmMimes: isImageHostMode ? getFilesIhMimes().join(",") : "",
       // 工作区切换会重新 mount FileManager，理论上 cache 跟着销毁，
       // 但模块级 Map 跨实例存活——把当前 workspace 加进 key 防误命中。
       // 直接读取 store 在这里不方便，简单起见用 location 作为代理（已包含 workspace 路径）。
@@ -450,21 +426,28 @@ export default function FileManager() {
       // v14：图床模式下不再强制 category=image——图床定位扩展为"任意文件的外链分享"，
       //      用户可能要把 zip / pdf 也传上来发链接给别人下载。tab 切换由用户自主决定。
       const isOrphan = category === "unreferenced";
-      const isMyUploads = category === "myUploads";
-      const apiFilter = isOrphan
-        ? ("unreferenced" as const)
-        : isMyUploads
-          ? ("myUploads" as const)
-          : undefined;
-      const apiCategory =
-        isOrphan || isMyUploads
-          ? undefined
-          : category === "all"
-            ? undefined
-            : (category as FileCategory);
+      const isMyUploads = category === "myUploads" || isImageHostMode;
+      // 图床与附件是两个独立来源：图床只展示用户直接上传的文件（filter=myUploads），
+      // 不与编辑器粘贴产生的附件混在一起。
+      // 附件与图床互斥：附件恒排除图片（category=file），图床恒 = 我的上传图片
+      const apiCategory: FileCategory = isImageHostMode ? "image" : "file";
+      const apiFilter: "unreferenced" | "myUploads" | undefined = isImageHostMode
+        ? "myUploads"
+        : isOrphan
+          ? "unreferenced"
+          : isMyUploads
+            ? "myUploads"
+            : undefined;
       const res = await api.files.list({
         category: apiCategory,
         filter: apiFilter,
+        mime: expandMimeChips(
+          isImageHostMode ? FILE_IH_MIME_CHIPS : FILE_DOC_MIME_CHIPS,
+          isImageHostMode ? getFilesIhMimes() : getFilesMimes(),
+        ).join(",") || undefined,
+        uploadedWithin: (isImageHostMode ? getFilesIhTime() : getFilesTime()) !== "all"
+          ? ({ today: 1, week: 7, month: 30 } as Record<string, number>)[isImageHostMode ? getFilesIhTime() : getFilesTime()] || undefined
+          : undefined,
         myUploadsRef:
           isMyUploads && myUploadsRef !== "all" ? myUploadsRef : undefined,
         q: searchQuery || undefined,
@@ -489,7 +472,7 @@ export default function FileManager() {
     } finally {
       setLoading(false);
     }
-  }, [category, myUploadsRef, sort, searchQuery, page, pageSize, isImageHostMode]);
+  }, [category, myUploadsRef, sort, searchQuery, page, pageSize, isImageHostMode, filesUiVersion]);
 
   useEffect(() => {
     loadList();
@@ -520,8 +503,8 @@ export default function FileManager() {
       }
 
       const ok = await confirmDialog({
-        title: "确定清理未引用附件？",
-        description: `本次将清理 ${preview.totalRemovedItems} 个没有被任何笔记引用的附件，预计释放约 ${humanSize(preview.totalFreedBytes)}。最近 24 小时上传的附件不会被清理。该操作不可撤销。`,
+        title: "确定清理未引用内容？",
+        description: `本次将删除所有未被引用的内容：共 ${preview.totalRemovedItems} 个，预计释放约 ${humanSize(preview.totalFreedBytes)}。最近 24 小时上传的内容不会被清理。该操作不可撤销。`,
         confirmText: "立即清理",
         danger: true,
       });
@@ -565,6 +548,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       loadList();
     };
     window.addEventListener("nowen:workspace-changed", onWs);
@@ -591,6 +575,11 @@ export default function FileManager() {
   // ---- 删除：列表层面同步（剔除 / 翻页 / 缓存 / 统计） ----
   // 抽屉删除走 onAfterDelete 路径；ListView 行内删除按钮先二次确认 → 调 api.files.remove
   // → 再走 afterDelete。两条路径共用同一份「列表后处理」。
+  // 附件数量/存储变化 → 通知侧栏文件面板刷新计数
+  const notifyStorageChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "file-manager" } }));
+  }, []);
+
   const afterDelete = useCallback(
     (id: string) => {
       // 本地列表即时剔除（让 UI 立刻有反馈，不等接口往返）
@@ -600,6 +589,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       // 关键：删除后必须重新拉当前页，把"被删项后面的"那一项从第 N+1 项
       // 顶上来，否则用户会看到当前页只剩 PAGE_SIZE-1 项，要切页才能看到
       // 后面被顶上来的文件。当前页若被删空且不在第 1 页 → 回退一页
@@ -611,7 +601,7 @@ export default function FileManager() {
         loadList();
       }
     },
-    [loadStats, loadReclaimable, loadList, items.length, page],
+    [loadStats, loadReclaimable, loadList, items.length, page, notifyStorageChanged],
   );
 
   // ---- 附件另存到远程（remote-files 内置插件联动）----
@@ -767,6 +757,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       // 关键：与单删一致——删除后必须重新拉当前页，把后续页的项顶上来，
       // 否则当前页会剩不足 PAGE_SIZE 项，要切页才能看到完整的剩余文件。
       // 当前页全删空且不在第 1 页 → 回退一页（page 变化会触发 loadList）。
@@ -820,12 +811,29 @@ export default function FileManager() {
         loadReclaimable();
       }
     },
-    [loadList, loadStats, loadReclaimable],
+    [loadList, loadStats, loadReclaimable, notifyStorageChanged],
   );
 
   const onPickFiles = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  // 统一上传分流：图床只收图片，附件只收非图片；被拒的整批提示，不中断合法文件。
+  // 文件选择、粘贴、拖拽三个入口共用（复核发现 paste/drop 曾绕过分流）。
+  const routeUpload = useCallback(
+    (files: File[]) => {
+      const isImage = (f: File) => f.type.startsWith("image/");
+      const accepted = files.filter((f) => (isImageHostMode ? isImage(f) : !isImage(f)));
+      if (accepted.length < files.length) {
+        toast.error(isImageHostMode ? "图床仅支持图片，请在附件来源上传" : "图片请到图床上传");
+      }
+      if (accepted.length > 0) {
+        handleUpload(accepted);
+      }
+    },
+    [handleUpload, isImageHostMode],
+  );
+
 
   // ---- 粘贴板上传（图床高频用法：截图 → Ctrl+V）----
   //
@@ -855,43 +863,22 @@ export default function FileManager() {
       }
       if (files.length > 0) {
         e.preventDefault();
-        handleUpload(files);
+        routeUpload(files);
       }
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
-  }, [handleUpload]);
-
-  // ---- 图床模式开关 ----
-  //
-  // 进入：默认看"全部"，强制 viewMode=grid（图床的核心交互是缩略图 + 复制直链），
-  //       回到第 1 页（避免在"文件"分页里残留页码）。
-  // 退出：保持当前 category 不变（用户可能本来在浏览"图片"），view 由用户上次手动状态决定。
-  // 两个方向都清空多选，避免状态混乱。
-  const toggleImageHostMode = useCallback(() => {
-    setIsImageHostMode((prev) => {
-      const next = !prev;
-      setSelectedIds(new Set());
-      setSelectionMode(false);
-      setPage(1);
-      if (next) {
-        // 进入图床：默认"全部"——图床承载图片+文件两类资源的外链分享
-        setCategory("all");
-        setViewMode("grid");
-      }
-      return next;
-    });
-  }, []);
+  }, [routeUpload]);
 
   const onFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
-        handleUpload(e.target.files);
+        routeUpload(Array.from(e.target.files));
       }
       // 清空 input value，允许再次选相同文件
       e.target.value = "";
     },
-    [handleUpload],
+    [routeUpload],
   );
 
   // ---- 拖拽上传整区 ----
@@ -920,10 +907,10 @@ export default function FileManager() {
       dragCounter.current = 0;
       setDragOver(false);
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        handleUpload(e.dataTransfer.files);
+        routeUpload(Array.from(e.dataTransfer.files));
       }
     },
-    [handleUpload],
+    [routeUpload],
   );
 
   // ---- 跳转到引用笔记 ----
@@ -1105,7 +1092,8 @@ export default function FileManager() {
   // 方便状态栏展示
   const statsLine = useMemo(() => {
     if (!stats) return "";
-    return `共 ${stats.total} 个文件 · ${humanSize(stats.totalBytes)}（图片 ${stats.images.count} · 其他 ${stats.files.count}）`;
+    // 附件来源不含图片（图片在图床来源）：统计口径 = 非图片文件
+    return `共 ${stats.files.count} 个文件 · ${humanSize(stats.files.bytes)}`;
   }, [stats]);
 
   const storageBadge = useMemo(() => {
@@ -1196,6 +1184,8 @@ export default function FileManager() {
           </div>
         </div>
       )}
+      {sourceTab !== "remote" && (
+      <>
       {/* 顶栏：h-12 与侧栏工作区头同一节奏 */}
       <div
         className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4"
@@ -1217,34 +1207,6 @@ export default function FileManager() {
               <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">
                 {isImageHostMode ? "图床" : "附件"}
               </h2>
-              {!isImageHostMode && (
-                <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5" role="tablist">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sourceTab === "local"}
-                    onClick={() => setSourceTab("local")}
-                    className={cn(
-                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
-                      sourceTab === "local" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-                    )}
-                  >
-                    本地
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sourceTab === "remote"}
-                    onClick={() => setSourceTab("remote")}
-                    className={cn(
-                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
-                      sourceTab === "remote" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-                    )}
-                  >
-                    远程
-                  </button>
-                </div>
-              )}
               {storageBadge && (
                 <div
                   className={cn(
@@ -1268,24 +1230,9 @@ export default function FileManager() {
 
         <div className="flex-1" />
 
-        {/* 图床模式开关：放在视图切换之前，让用户第一眼能找到。
-            图床本质是 FileManager 的"图片专区 + 直链复制"特化形态，
-            点亮后整页 UI 会切换为图床外观（标题 / 图标 / 卡片工具条）。 */}
-        <Button
-          size="sm"
-          variant={isImageHostMode ? "default" : "outline"}
-          onClick={toggleImageHostMode}
-          className={cn(
-            "shrink-0",
-            isImageHostMode &&
-              "bg-indigo-500 hover:bg-indigo-600 text-white border-indigo-500",
-          )}
-          title={isImageHostMode ? "退出图床" : "进入图床（外链分享 · 图片与文件直链）"}
-        >
-          <Globe size={14} className="mr-1" />
-          {isImageHostMode ? "退出图床" : "图床"}
-        </Button>
-
+{!isRemoteSource && (
+        <>
+        {/* 多选 / 清理 / 上传：附件与图床的操作；远程来源有面板自带操作 */}
         <Button
           size="sm"
           variant={selectionMode ? "default" : "outline"}
@@ -1328,7 +1275,7 @@ export default function FileManager() {
           ) : (
             <Trash2 size={14} className="mr-1" />
           )}
-          <span>清理附件</span>
+          <span>清理</span>
           {reclaimable && reclaimable.items > 0 && (
             <span className="hidden sm:inline ml-1 text-[10px] opacity-80">
               {humanSize(reclaimable.bytes)} · {reclaimable.items} 项
@@ -1344,12 +1291,18 @@ export default function FileManager() {
           ref={fileInputRef}
           type="file"
           multiple
-          // 图床支持任意类型——图片 / 压缩包 / PDF 等都能拿到公开直链分享给他人下载，
-          // 不再限制 accept。
+          // 上传分流：图床只收图片，附件只收非图片（后者无原生 accept 取反，
+          // 在 onFileInputChange 里校验提示）。
+          accept={isImageHostMode ? "image/*" : undefined}
           className="hidden"
           onChange={onFileInputChange}
         />
+        </>
+      )}
       </div>
+
+      </>
+      )}
 
       {/* 远程文件视图（remote-files 内置插件）：与本地附件并列的补充视图，经顶栏 Tab 切换 */}
       {sourceTab === "remote" ? (
@@ -1363,9 +1316,30 @@ export default function FileManager() {
       <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
         <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
           {isImageHostMode
-            ? "上传图片 / 文件即得直链 · 支持复制 URL / Markdown / HTML"
+            ? `共 ${total} 个文件`
             : statsLine || " "}
         </p>
+        {/* 已选筛选 chips：类型/时间，可单个移除 */}
+        {!isImageHostMode && (getFilesMimes().length > 0 || getFilesTime() !== "all") && (
+          <div className="flex shrink-0 flex-wrap items-center gap-1">
+            {getFilesMimes().map((key) => {
+              const chip = FILE_DOC_MIME_CHIPS.find((entry) => entry.key === key);
+              return (
+                <span key={key} className="flex items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+                  类型：{chip?.label}
+                  <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ mimes: getFilesMimes().filter((entry) => entry !== key) })}>✕</button>
+                </span>
+              );
+            })}
+            {getFilesTime() !== "all" && (
+              <span className="flex items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+                {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
+                <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
+              </span>
+            )}
+            <button type="button" className="text-[10.5px] text-tx-tertiary hover:text-tx-secondary" onClick={() => setFilesUi({ mimes: [], time: "all" })}>清除筛选</button>
+          </div>
+        )}
         <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <div className="flex-1" />
 
@@ -1377,7 +1351,7 @@ export default function FileManager() {
               placeholder="按文件名搜索…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-7 h-8 text-xs bg-app-bg"
+              className="h-8 border-none bg-app-hover pl-7 text-xs no-focus-ring"
             />
             {searchInput && (
               <button
@@ -1696,8 +1670,9 @@ export default function FileManager() {
       <FileUploadDialog
         open={uploadDialogOpen}
         onClose={() => setUploadDialogOpen(false)}
-        onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); }}
+        onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); notifyStorageChanged(); }}
         defaultFolderId={null}
+        uploadFilter={isImageHostMode ? "image" : "non-image"}
       />
         </>
       )}
@@ -1722,7 +1697,7 @@ function EmptyState({ hasFilter, onUpload }: { hasFilter: boolean; onUpload: () 
     <div className="flex flex-col items-center justify-center py-16 text-tx-tertiary">
       <Inbox size={40} className="mb-3 opacity-40" />
       <p className="text-sm">还没有任何文件</p>
-      <p className="text-xs mt-1 mb-4">上传一张图片或任意文件开始使用</p>
+      <p className="text-xs mt-1 mb-4">上传文件开始使用 · 图片请在「图床」来源上传</p>
       <Button size="sm" onClick={onUpload}>
         <Upload size={14} className="mr-1" />
         上传文件

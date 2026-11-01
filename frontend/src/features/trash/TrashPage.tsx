@@ -28,6 +28,7 @@ import {
   trashTypeKey,
   trashTypeLabel,
   type TrashTimeFilter,
+  type TrashTypeFilterKey,
   type TrashTypeKey,
 } from "./trashUi";
 
@@ -44,7 +45,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   const actions = useAppActions();
   const { state } = useApp();
   const trash = useTrash(workspaceId, refreshToken);
-  const [typeFilter, setTypeFilter] = useState<TrashTypeKey[]>(() => getTrashTypeFilter());
+  const [typeFilter, setTypeFilter] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
   const [timeFilter, setTimeFilter] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -113,7 +114,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
     </header>
     {/* 工具行 h-10：只留搜索；批量在列表底部批量条 */}
     <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border px-4">
-      <label className="flex h-7 w-56 items-center gap-1.5 rounded-lg border border-app-border px-2.5 text-tx-tertiary"><Search size={13} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("trashCenter.search")} aria-label={t("trashCenter.search")} className="min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none" /></label>
+      <label className="flex h-7 w-56 items-center gap-1.5 rounded-lg bg-app-hover px-2.5 text-tx-tertiary"><Search size={13} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("trashCenter.search")} aria-label={t("trashCenter.search")} className="min-w-0 flex-1 border-none bg-transparent text-xs text-tx-primary outline-none no-focus-ring" /></label>
       <span className="flex-1" />
       <span className="text-xs text-tx-tertiary">{t("trashCenter.sortHint", { defaultValue: "排序：最近删除" })}</span>
     </div>
