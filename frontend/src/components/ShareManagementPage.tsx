@@ -17,12 +17,14 @@ import {
   FileText,
   Link2,
   Loader2,
-  MessageSquareText,
+  CheckSquare,
+  Globe,
   Paperclip,
   Pencil,
   Plus,
   Power,
   PowerOff,
+  RefreshCw,
   RotateCcw,
   Search,
   Trash2,
@@ -44,7 +46,6 @@ import { navigateToolPage } from "@/components/toolTabs";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 import { copyText } from "@/lib/clipboard";
-import { openCommentCenter } from "@/lib/noteCommentNavigation";
 import {
   buildPublicWebUrl,
   resolvePublicWebOrigin,
@@ -60,7 +61,7 @@ import {
   getShareRisk,
   getShareSort,
   setShareCenterUi,
-  shareGroupTitle,
+  shareCenterScopeTitle,
   shareQuickQuery,
   SHARE_QUICK_CHIPS,
   SHARE_SORT_OPTIONS,
@@ -93,6 +94,12 @@ const PAGE_SIZE = 50;
 const itemKey = (item: Pick<ShareCenterItem, "channel" | "id">) => `${item.channel}|${item.id}`;
 
 const OBJECT_ICONS = { note: FileText, file: Paperclip, notebook: BookOpen } as const;
+/** 对象图标配色：原型每个类型一块不同底色的方图标，不做成一排灰点。 */
+const OBJECT_ICON_TONES = {
+  note: "bg-sky-500/12 text-sky-600 dark:text-sky-300",
+  file: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
+  notebook: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
+} as const;
 
 /** 从 UA 里抽「浏览器 · 系统」，抽不出就回「未知设备」——访问明细不展示原始 UA。 */
 function describeUserAgent(ua: string | null): string {
@@ -157,6 +164,8 @@ export default function ShareManagementPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Map<string, ShareCenterItem>>(new Map());
+  /** 批量选择态：默认不显示勾选列，未进入时不占宽度（与文件管理右上角的「选择」同一交互） */
+  const [selectionMode, setSelectionMode] = useState(false);
   const [detail, setDetail] = useState<ShareCenterItem | null>(null);
   const [editingNoteShare, setEditingNoteShare] = useState<ShareCenterItem | null>(null);
   const [creatingShare, setCreatingShare] = useState<{ noteId: string; title: string } | null>(null);
@@ -309,6 +318,11 @@ export default function ShareManagementPage() {
       else next.set(key, item);
       return next;
     });
+  };
+
+  const toggleSelectionMode = () => {
+    if (selectionMode) setSelected(new Map());
+    setSelectionMode(!selectionMode);
   };
 
   const targets = useMemo(
@@ -523,18 +537,34 @@ export default function ShareManagementPage() {
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
         <h1 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-tx-primary">
           <Link2 size={17} className="shrink-0 text-accent-primary" />
-          <span className="truncate">{shareGroupTitle(group)}</span>
+          <span className="truncate">{shareCenterScopeTitle()}</span>
           <span className="shrink-0 rounded-full border border-app-border px-2 py-0.5 text-[11px] font-normal tabular-nums text-tx-tertiary">
             {data?.total || 0} 条
           </span>
         </h1>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Button variant="outline" onClick={openCommentCenter}>
-            <MessageSquareText size={15} className="mr-2" />
-            评论管理
+          {/* 与文件管理右上角同一个控件：图标 + 文字，进入/退出批量选择 */}
+          <Button
+            size="sm"
+            variant={selectionMode ? "default" : "outline"}
+            onClick={toggleSelectionMode}
+            className="shrink-0"
+            title={selectionMode ? "退出多选" : "进入多选"}
+          >
+            {selectionMode ? (
+              <>
+                <X size={14} className="mr-1" />
+                退出多选
+              </>
+            ) : (
+              <>
+                <CheckSquare size={14} className="mr-1" />
+                选择
+              </>
+            )}
           </Button>
-          <Button onClick={shareActiveNote}>
-            <Plus size={15} className="mr-1.5" />
+          <Button size="sm" onClick={shareActiveNote}>
+            <Plus size={14} className="mr-1" />
             新建分享
           </Button>
         </div>
@@ -632,7 +662,7 @@ export default function ShareManagementPage() {
             <Link2 size={30} className="text-tx-tertiary" />
             <h2 className="mt-3 font-medium text-tx-primary">还没有符合条件的分享链接</h2>
             <p className="mt-1 max-w-md text-sm text-tx-secondary">
-              笔记、附件、目录三条线都收在这里了。若确实分享过文件却看不到，试着清掉左侧筛选。
+              笔记、附件、目录三条线都收在这里了。若确实分享过文件却看不到，换个分类或清掉搜索与快捷筛选。
             </p>
           </div>
         ) : (
@@ -640,22 +670,24 @@ export default function ShareManagementPage() {
             <table className="w-full min-w-[880px] table-fixed text-left text-sm">
               <thead className="sticky top-0 z-10 bg-app-surface text-[11.5px] font-normal text-tx-secondary shadow-[inset_0_-1px_0_var(--app-border)]">
                 <tr>
-                  <th className="w-9 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      aria-label="全选本页"
-                      checked={selectableItems.length > 0 && selectableItems.every((item) => selected.has(itemKey(item)))}
-                      onChange={(event) => setSelected((current) => {
-                        const next = new Map(current);
-                        if (event.target.checked) {
-                          for (const item of selectableItems) next.set(itemKey(item), item);
-                        } else {
-                          for (const item of selectableItems) next.delete(itemKey(item));
-                        }
-                        return next;
-                      })}
-                    />
-                  </th>
+                  {selectionMode && (
+                    <th className="w-9 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label="全选本页"
+                        checked={selectableItems.length > 0 && selectableItems.every((item) => selected.has(itemKey(item)))}
+                        onChange={(event) => setSelected((current) => {
+                          const next = new Map(current);
+                          if (event.target.checked) {
+                            for (const item of selectableItems) next.set(itemKey(item), item);
+                          } else {
+                            for (const item of selectableItems) next.delete(itemKey(item));
+                          }
+                          return next;
+                        })}
+                      />
+                    </th>
+                  )}
                   <th className="w-[26%] px-2.5 py-2.5">对象 / 链接</th>
                   <th className="w-[9%] px-2.5 py-2.5">状态</th>
                   <th className="w-[17%] px-2.5 py-2.5">谁可以访问</th>
@@ -678,16 +710,18 @@ export default function ShareManagementPage() {
                         checked && "bg-accent-primary/[0.05]",
                       )}
                     >
-                      <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
-                        {item.channel === "attachment_bare" ? (
-                          <span className="text-[11px] text-tx-tertiary" title="附件裸直链不是分享记录，不可批量处置">—</span>
-                        ) : (
-                          <input type="checkbox" aria-label={`选择 ${item.title || item.token}`} checked={checked} onChange={() => toggleSelected(item)} />
-                        )}
-                      </td>
+                      {selectionMode && (
+                        <td className="px-3 py-2.5" onClick={(event) => event.stopPropagation()}>
+                          {item.channel === "attachment_bare" ? (
+                            <span className="text-[11px] text-tx-tertiary" title="附件裸直链不是分享记录，不可批量处置">—</span>
+                          ) : (
+                            <input type="checkbox" aria-label={`选择 ${item.title || item.token}`} checked={checked} onChange={() => toggleSelected(item)} />
+                          )}
+                        </td>
+                      )}
                       <td className="px-2.5 py-2.5">
                         <div className="flex min-w-0 gap-2">
-                          <span className="mt-0.5 shrink-0 rounded-md bg-app-hover p-1.5 text-tx-secondary"><Icon size={14} /></span>
+                          <span className={`mt-0.5 shrink-0 rounded-md p-1.5 ${OBJECT_ICON_TONES[item.objectKind]}`}><Icon size={14} /></span>
                           <div className="min-w-0">
                             <p className="truncate font-medium text-tx-primary">
                               {item.title || "未命名"}
@@ -1088,10 +1122,13 @@ function ShareDetailDrawer({
                   className="flex items-start justify-between gap-3 px-3 py-1.5 text-[11px]"
                 >
                   <span className="shrink-0 text-tx-tertiary">{formatShareLastSeen(visit.lastSeenAt) || "—"}</span>
-                  <span className="min-w-0 truncate text-right text-tx-secondary">
-                    {describeUserAgent(visit.userAgent)}
-                    {visit.ipPrefix ? ` · IP ${visit.ipPrefix}` : ""}
-                    <span className="ml-1.5 text-tx-tertiary">#{visit.session}</span>
+                  <span className="flex min-w-0 items-center gap-1 text-right text-tx-secondary">
+                    <Globe size={11} className="shrink-0 text-tx-tertiary" />
+                    <span className="min-w-0 truncate">
+                      {describeUserAgent(visit.userAgent)}
+                      {visit.ipPrefix ? ` · IP ${visit.ipPrefix}` : ""}
+                      <span className="ml-1.5 text-tx-tertiary">#{visit.session}</span>
+                    </span>
                   </span>
                 </li>
               ))}
@@ -1118,12 +1155,12 @@ function ShareDetailDrawer({
             <div className="flex flex-wrap gap-2">
               {item.channel === "note_share" && (
                 <>
-                  <Button size="sm" variant="outline" onClick={() => void rotateToken()}><RotateCcw size={13} className="mr-1.5" />轮换链接</Button>
-                  <Button size="sm" variant="outline" disabled={item.viewCount === null || item.viewCount === 0} onClick={() => void resetViews()}>重置访问次数</Button>
+                  <Button size="sm" variant="outline" onClick={() => void rotateToken()}><RefreshCw size={13} className="mr-1.5" />轮换链接</Button>
+                  <Button size="sm" variant="outline" disabled={item.viewCount === null || item.viewCount === 0} onClick={() => void resetViews()}><RotateCcw size={13} className="mr-1.5" />重置访问次数</Button>
                 </>
               )}
               {item.channel === "attachment_share" && (
-                <Button size="sm" variant="outline" disabled={item.viewCount === null || item.viewCount === 0} onClick={() => void resetViews()}>重置访问次数</Button>
+                <Button size="sm" variant="outline" disabled={item.viewCount === null || item.viewCount === 0} onClick={() => void resetViews()}><RotateCcw size={13} className="mr-1.5" />重置访问次数</Button>
               )}
               {item.channel !== "note_share" && (
                 <Button size="sm" variant="outline" onClick={() => void act("disable")}><PowerOff size={13} className="mr-1.5" />停用</Button>

@@ -55,6 +55,12 @@ import {
   X,
   XCircle,
   Puzzle,
+  EyeOff,
+  Ghost,
+  Layers,
+  Magnet,
+  Paperclip,
+  Unlock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -4044,8 +4050,9 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
 }
 
 /** 分享中心侧栏面板（核心模块 shares）：五通道统计速览 + 最近分享链接，点击进主区管理 */
-function ShareCategoryRow({ active, label, count, tone, onClick }: {
+function ShareCategoryRow({ active, icon, label, count, tone, onClick }: {
   active: boolean;
+  icon: React.ReactNode;
   label: string;
   count: number;
   tone?: string;
@@ -4056,21 +4063,29 @@ function ShareCategoryRow({ active, label, count, tone, onClick }: {
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-md border px-2 py-1 text-[11.5px] ${active
-        ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
-        : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+      className={`flex w-full items-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-xs transition-colors ${active
+        ? "bg-[#dbe6ff] font-medium text-accent-primary dark:bg-accent-primary/15"
+        : "text-tx-secondary hover:bg-app-hover"}`}
     >
+      {/* 原型每一行都带图标：状态用彩点、对象类型与风险用图形图标 */}
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center opacity-90">{icon}</span>
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-      <span className={`shrink-0 tabular-nums ${tone || "text-tx-tertiary"}`}>{count}</span>
+      <span className={`shrink-0 tabular-nums text-[10.5px] ${tone || "text-tx-tertiary"}`}>{count}</span>
     </button>
   );
+}
+
+/** 状态用彩点（原型 🟢 / ⏳ / ⛔ 的语义），其余分组用图形图标。 */
+function shareDot(className: string) {
+  return <Circle size={7} className={`fill-current ${className}`} />;
 }
 
 /**
  * 分享中心侧栏（原型 share-redesign-v1 ① 的左栏）
  * ---------------------------------------------------------------------------
- * 分类只有这三组 + 风险说明：徽标数来自后端 counts，与主区列表同源
- * （同一集合统计），因此「点进去的条数 = 徽标数」。
+ * 三组分类是「导航」不是「叠加筛选」：点一项会把其它两维复位（见 pick），
+ * 所以永远不会出现三行同时高亮、列表却空掉的自相矛盾状态。
+ * 每行徽标 = 点它之后看到的条数（后端按同一集合统计），因此「条数 = 徽标数」。
  * 主区不重复渲染分类，两侧共用 features/shares/shareCenterUi 里的筛选状态。
  */
 function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
@@ -4104,40 +4119,37 @@ function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
     return () => window.removeEventListener("nowen:workspace-changed", onChange);
   }, [reload]);
 
+  /**
+   * 分类是导航，不是叠加筛选：点一项就把其它两维复位。
+   * 否则「目录/知识库 + 无密码且永久」会叠出空列表，而左栏还有三个高亮。
+   */
   const pick = (patch: Parameters<typeof setShareCenterUi>[0]) => {
-    setShareCenterUi(patch);
+    setShareCenterUi({ group: "all", objectKind: "all", risk: "all", ...patch });
     onOpenMain();
   };
 
   return (
     <div className="sbx-view">
-      <div className="sbx-view-head">
-        <span>分享中心</span><span className="flex-1" />
-        <button type="button" title="刷新" onClick={reload} className="sbx-btn">
-          <RefreshCw size={13} />
-        </button>
-        <span className="sbx-badge">{counts?.total ?? 0}</span>
-      </div>
-
       <div className="border-b border-app-border px-2 py-1.5">
         <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">状态</div>
         <div className="space-y-1">
-          <ShareCategoryRow active={group === "all"} label="全部" count={counts?.total ?? 0} onClick={() => pick({ group: "all" })} />
-          <ShareCategoryRow active={group === "active"} label="生效中" count={counts?.groups.active ?? 0} onClick={() => pick({ group: "active" })} />
-          <ShareCategoryRow active={group === "attention"} label="需要处理" count={counts?.groups.attention ?? 0}
+          <ShareCategoryRow active={group === "all"} icon={<Layers size={12} />} label="全部" count={counts?.total ?? 0} onClick={() => pick({ group: "all" })} />
+          <ShareCategoryRow active={group === "active"} icon={shareDot("text-emerald-500")} label="生效中" count={counts?.groups.active ?? 0} onClick={() => pick({ group: "active" })} />
+          <ShareCategoryRow active={group === "attention"} icon={shareDot("text-amber-500")} label="需要处理" count={counts?.groups.attention ?? 0}
             tone={(counts?.groups.attention ?? 0) > 0 ? "text-amber-600 dark:text-amber-300" : undefined}
             onClick={() => pick({ group: "attention" })} />
-          <ShareCategoryRow active={group === "disabled"} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
+          <ShareCategoryRow active={group === "disabled"} icon={shareDot("text-tx-tertiary")} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
         </div>
       </div>
 
       <div className="border-b border-app-border px-2 py-1.5">
         <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">对象类型</div>
         <div className="space-y-1">
-          {([["note", "笔记链接"], ["file", "文件链接"], ["notebook", "目录 / 知识库"]] as Array<[ShareCenterObjectKind, string]>).map(([kind, label]) => (
+          {([["note", "笔记链接", <FileText key="note" size={12} />], ["file", "文件链接", <Paperclip key="file" size={12} />], ["notebook", "目录 / 知识库", <BookOpen key="notebook" size={12} />]] as Array<[ShareCenterObjectKind, string, React.ReactNode]>).map(([kind, label, icon]) => (
             <ShareCategoryRow
               key={kind}
               active={objectKind === kind}
+              icon={icon}
               label={label}
               count={counts?.objects[kind] ?? 0}
               onClick={() => pick({ objectKind: objectKind === kind ? "all" : kind })}
@@ -4153,33 +4165,35 @@ function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
             <ShareCategoryRow
               key={value}
               active={risk === value}
+              icon={value === "open_ended" ? <Unlock size={12} /> : value === "orphan" ? <Ghost size={12} /> : <EyeOff size={12} />}
               label={shareRiskLabel(value)}
               count={counts?.risks[value] ?? 0}
               tone={value === "unused" ? undefined : (counts?.risks[value] ?? 0) > 0 ? "text-rose-600 dark:text-rose-300" : undefined}
               onClick={() => pick({ risk: risk === value ? "all" : value })}
             />
           ))}
-          {/* 裸直链不是分享记录：点它是切换主区列表到附件原件池，同时把状态分组复位，
-              否则「生效中 + 裸直链」的组合会互相抵消成空列表。 */}
+          {/* 裸直链也在同一个列表里：点它只是把风险维度切到 bare（其它维度由 pick 复位） */}
           <ShareCategoryRow
             active={risk === "bare"}
+            icon={<Magnet size={12} />}
             label={shareRiskLabel("bare")}
             count={counts?.risks.bare ?? bareCount}
             tone="text-rose-600 dark:text-rose-300"
-            onClick={() => pick(risk === "bare" ? { risk: "all" } : { risk: "bare", group: "all" })}
+            onClick={() => pick({ risk: risk === "bare" ? "all" : "bare" })}
           />
         </div>
       </div>
 
       <div className="border-b border-app-border px-2 py-1.5">
-        <div className="rounded-lg border border-app-border bg-app-bg p-2.5 text-[11px] leading-5 text-tx-secondary">
-          <p className="font-medium text-tx-primary">附件裸直链不是「私有地址」</p>
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.08] p-2.5 text-[11px] leading-5 text-amber-800 dark:text-amber-200">
+          <p className="flex items-center gap-1.5 font-medium"><Magnet size={12} className="shrink-0" />附件裸直链不是「私有地址」</p>
           <p className="mt-1">
             笔记里插入的图片/文件本身就有 <code>/api/attachments/&lt;id&gt;</code> 免登录直链：
             知道地址即可永久访问，既不计数也无法撤销（设计上要保留，否则笔记里的图会裂）。
           </p>
           <button type="button" onClick={() => actions.openToolTab("files")} className="mt-1 text-accent-primary underline-offset-4 hover:underline">
-            查看这 {bareCount} 个文件 →
+            {/* 数字与上方徽标同一个表达式，两处永远一致 */}
+            查看这 {counts?.risks.bare ?? bareCount} 个文件 →
           </button>
         </div>
       </div>
@@ -4188,12 +4202,11 @@ function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
         <PublicOriginRiskControl variant="box" />
       </div>
 
-      <div className="sbx-foot-row">
-        <span className="sbx-foot-tip">{loading ? "加载中…" : ""}</span>
-        <button type="button" onClick={onOpenMain} className="sbx-foot-link">
-          在主区打开
-        </button>
-      </div>
+      {loading && (
+        <div className="sbx-foot-row">
+          <span className="sbx-foot-tip">加载中…</span>
+        </div>
+      )}
     </div>
   );
 }

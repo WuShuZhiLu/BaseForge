@@ -12,6 +12,7 @@ import type {
   ShareCenterRisk,
   ShareCenterStatusGroup,
 } from "@/lib/shareCenter";
+import { shareObjectKindLabel, shareRiskLabel } from "@/lib/shareCenter";
 
 export type ShareCenterGroup = ShareCenterStatusGroup | "all";
 /** 主区工具行的快捷 chips，对标原型「全部 / 仅查看 / 可评论 / 可编辑 / 有密码 / 7 天内到期」。 */
@@ -100,6 +101,18 @@ export function shareGroupTitle(group: ShareCenterGroup): string {
     default:
       return "全部分享";
   }
+}
+
+/**
+ * 主区标题：跟着当前分类走（风险 > 对象类型 > 状态）。
+ * 以前固定写「全部分享」，带着筛选时会变成「全部分享 0 条」这种自相矛盾的标题。
+ */
+export function shareCenterScopeTitle(): string {
+  const risk = getShareRisk();
+  if (risk !== "all") return shareRiskLabel(risk);
+  const objectKind = getShareObjectKind();
+  if (objectKind !== "all") return shareObjectKindLabel(objectKind);
+  return shareGroupTitle(getShareGroup());
 }
 
 /** 快捷 chips：与原型一致，单选（再点一次回到「全部」）。 */

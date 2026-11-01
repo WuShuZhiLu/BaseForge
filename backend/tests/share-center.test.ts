@@ -154,8 +154,9 @@ test("五条通道收进同一个列表，字段归一", () => {
   const channels = new Set(api().items.map((item) => item.channel));
   assert.deepEqual(
     channels,
-    new Set(["note_share", "attachment_share", "file_share", "notebook_invite", "notebook_publication"]),
-    "五路分享必须都能列出来（file_shares / 邀请链接 / 公开出版此前完全没有 UI）",
+    // 裸直链也是这个列表里的一类（原型「全部」里就含裸直链），否则「全部」会比子分类还小
+    new Set(["note_share", "attachment_share", "file_share", "notebook_invite", "notebook_publication", "attachment_bare"]),
+    "五路分享 + 附件裸直链必须都能列出来（file_shares / 邀请链接 / 公开出版此前完全没有 UI）",
   );
 
   const note = findItem("note_share", "sh-open");
@@ -238,9 +239,14 @@ test("风险与有效期筛选按语义命中", () => {
 
 test("不计数的通道排在按访问量排序的末尾", () => {
   const sorted = api("sort=viewCount&order=desc");
-  assert.deepEqual(sorted.items.slice(-2).map((item) => item.viewCount), [null, null],
-    "file_shares / 公开出版不计数，不能被当成 0 次");
-  assert.notEqual(sorted.items[sorted.items.length - 3].viewCount, null);
+  // file_shares / 公开出版 / 裸直链都不计数：它们不能被当成 0 次，必须全部沉底
+  const firstNull = sorted.items.findIndex((item) => item.viewCount === null);
+  assert.ok(firstNull > 0, "至少有一个可计数的通道排在前面");
+  assert.ok(
+    sorted.items.slice(firstNull).every((item) => item.viewCount === null),
+    "file_shares / 公开出版不计数，不能被当成 0 次",
+  );
+  assert.notEqual(sorted.items[firstNull - 1].viewCount, null);
 });
 
 test("lastSeenAt 来自访问会话表，没有记录的排最后", () => {
@@ -371,8 +377,27 @@ test("附件裸直链是一个可点的分类，计数与列表同源", () => {
   assert.ok(bare.items.every((item) => item.channel === "attachment_bare"));
   assert.ok(bare.items.every((item) => item.urlPath.startsWith("/api/attachments/") && !item.urlPath.includes("share=")));
   assert.ok(bare.items.every((item) => item.risks.includes("bare")));
-  // 裸直链不是分享记录，不能污染「全部分享」的集合
-  assert.equal(all.items.filter((item) => item.channel === "attachment_bare").length, 0);
+  // 裸直链也在这个列表里（否则「全部」会比它的子分类还小），徽标与行数一致
+  assert.equal(all.items.filter((item) => item.channel === "attachment_bare").length, all.counts.risks.bare);
+});
+
+test("徽标跟着筛选变：列表空了徽标就不能再有数字", () => {
+  // 搜索一个不存在的词，列表与所有徽标必须同时归零
+  const empty = api("q=zzz-not-exist");
+  assert.equal(empty.total, 0);
+  assert.equal(empty.counts.total, 0);
+  assert.deepEqual(empty.counts.groups, { active: 0, attention: 0, disabled: 0 });
+  assert.deepEqual(empty.counts.objects, { note: 0, file: 0, notebook: 0 });
+  assert.deepEqual(empty.counts.risks, { open_ended: 0, orphan: 0, unused: 0, bare: 0 });
+
+  // 选中对象维度时，其它徽标只在剩下这个约束内统计：
+  // 每一行徽标 = 点它之后看到的条数。
+  const notebook = api("objectKind=notebook");
+  assert.equal(notebook.total, notebook.counts.objects.notebook, "对象徽标 = 点它看到的条数");
+  assert.equal(api().total, notebook.counts.total, "「全部」徽标 = 不做分类筛选时的条数");
+  for (const group of ["active", "attention", "disabled"] as const) {
+    assert.equal(api(`objectKind=notebook&group=${group}`).total, notebook.counts.groups[group]);
+  }
 });
 
 test("按被分享对象定位单条（列表行内入口跳抽屉用）", async () => {

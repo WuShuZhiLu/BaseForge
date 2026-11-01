@@ -482,8 +482,8 @@ function collectShareCenterItems(db: any, userId: string, nowMs: number): ShareC
 
 /**
  * 附件裸直链：`/api/attachments/:id` 是笔记插图自带的免登录直链，不是分享记录。
- * 它不计数、不能停用、不能撤销（关掉会让笔记里的图裂），所以独立成一路数据源，
- * 只在「附件裸直链」风险分类下进列表 —— 混进默认列表会让「全部分享」的条数变假。
+ * 它不计数、不能停用、不能撤销（关掉会让笔记里的图裂），所以独立成一路数据源；
+ * 在总列表里只占一行、操作列只保留复制/打开，风险维度下单独可筛。
  */
 function collectBareAttachments(db: any, userId: string): ShareCenterItem[] {
   const rows = db.prepare(`
@@ -520,23 +520,6 @@ function collectBareAttachments(db: any, userId: string): ShareCenterItem[] {
     risks: ["bare"] as ShareCenterRisk[],
     capabilities: null,
   }));
-}
-
-function buildCounts(items: ShareCenterItem[]): ShareCenterCounts {
-  const counts: ShareCenterCounts = {
-    total: items.length,
-    groups: { active: 0, attention: 0, disabled: 0 },
-    statuses: { active: 0, disabled: 0, expired: 0, exhausted: 0, orphan: 0 },
-    objects: { note: 0, file: 0, notebook: 0 },
-    risks: { open_ended: 0, orphan: 0, unused: 0, bare: 0 },
-  };
-  for (const item of items) {
-    counts.groups[GROUPS[item.status]] += 1;
-    counts.statuses[item.status] += 1;
-    counts.objects[item.objectKind] += 1;
-    for (const risk of item.risks) counts.risks[risk] += 1;
-  }
-  return counts;
 }
 
 function matchesQuery(item: ShareCenterItem, query: ShareCenterQuery, nowMs: number, needle: string): boolean {
@@ -599,16 +582,43 @@ function compareItems(a: ShareCenterItem, b: ShareCenterItem, sort: NonNullable<
 }
 
 export function queryShareCenter(db: any, userId: string, query: ShareCenterQuery, nowMs = Date.now()) {
-  const items = collectShareCenterItems(db, userId, nowMs);
-  // 徽标数与列表同源：counts 从完整集合统计，再按筛选条件切片，绝不另算一套。
-  const counts = buildCounts(items);
-  // 裸直链是附件原件，不在分享记录集合里：单独成池，只在「附件裸直链」分类下
-  // 当列表用（其余筛选条件照常生效），计数回填到左栏徽标。
+  const shareItems = collectShareCenterItems(db, userId, nowMs);
+  // 附件裸直链也是这个列表里的一类东西（原型「全部 14 条」里就含裸直链），
+  // 因此并入同一个池子：徽标、列表、分页只有一个口径，不会出现
+  // 「全部 2 条」而「裸直链 7 条」这种自相矛盾的数字。
   const bareItems = collectBareAttachments(db, userId);
-  counts.risks.bare = bareItems.length;
+  const allItems = [...shareItems, ...bareItems];
   const needle = query.q?.toLocaleLowerCase() || "";
-  const pool = query.risk === "bare" ? bareItems : items;
-  const filtered = pool.filter((item) => matchesQuery(item, query, nowMs, needle));
+
+  /**
+   * 每一行徽标都等于「点它之后看到的条数」：统计时排除它自己这一维的约束，
+   * 另一个维度、快捷筛选、搜索照常生效。所以列表空时徽标一定跟着变，不会骗人。
+   */
+  const scope = (keep: { group?: boolean; objectKind?: boolean; risk?: boolean } = {}) =>
+    allItems.filter((item) => matchesQuery(item, {
+      ...query,
+      group: keep.group ? query.group : undefined,
+      objectKind: keep.objectKind ? query.objectKind : undefined,
+      risk: keep.risk ? query.risk : undefined,
+    }, nowMs, needle));
+
+  const counts: ShareCenterCounts = {
+    total: scope().length,
+    groups: { active: 0, attention: 0, disabled: 0 },
+    statuses: { active: 0, disabled: 0, expired: 0, exhausted: 0, orphan: 0 },
+    objects: { note: 0, file: 0, notebook: 0 },
+    risks: { open_ended: 0, orphan: 0, unused: 0, bare: 0 },
+  };
+  for (const item of scope({ objectKind: true, risk: true })) {
+    counts.groups[GROUPS[item.status]] += 1;
+    counts.statuses[item.status] += 1;
+  }
+  for (const item of scope({ group: true, risk: true })) counts.objects[item.objectKind] += 1;
+  for (const item of scope({ group: true, objectKind: true })) {
+    for (const risk of item.risks) counts.risks[risk] += 1;
+  }
+
+  const filtered = allItems.filter((item) => matchesQuery(item, query, nowMs, needle));
   const direction = query.order === "asc" ? 1 : -1;
   const sort = query.sort || "updatedAt";
   filtered.sort((a, b) => compareItems(a, b, sort, direction));

@@ -256,6 +256,10 @@ describe("ShareManagementPage", () => {
     await act(async () => { root.render(<ShareManagementPage />); });
     await flushEffects();
 
+    // 勾选列默认不显示：先点右上角「选择」进入多选态（与文件管理同一交互）
+    expect(host.querySelector('input[aria-label="选择 我的公开笔记"]')).toBeNull();
+    await click(findButtonByText(host, "选择")!);
+
     const checkbox = host.querySelector('input[aria-label="选择 我的公开笔记"]') as HTMLInputElement | null;
     expect(checkbox).not.toBeNull();
     await act(async () => {
