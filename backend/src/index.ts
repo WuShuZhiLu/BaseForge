@@ -71,6 +71,7 @@ import auditRouter from "./routes/audit";
 import backupsRouter, { handleFullBackupJobDownload } from "./routes/backups";
 import emailRouter from "./routes/email";
 import { sharesRouter, sharedRouter } from "./routes/shares";
+import { shareCenterRouter } from "./routes/share-center";
 import workspacesRouter from "./routes/workspaces";
 import authRouter from "./routes/auth";
 import usersRouter from "./routes/users";
@@ -616,6 +617,8 @@ app.route("/api/fonts", fontsRouter);
 app.route("/api/attachments", attachmentsRouter);
 // 附件分享管理端点（JWT 保护）：开启/列表/改设置/删除
 app.route("/api/attachment-shares", attachmentSharesRouter);
+// 分享中心：五路分享数据收口的统一列表 + 批量处置（JWT 保护）
+app.route("/api/share-center", shareCenterRouter);
 app.route("/api/task-attachments", taskAttachmentsRouter);
 // 必须先于 /api/task-reminders 的 /:taskId 路由注册，否则 recent 会被当成任务 ID。
 app.get("/api/task-reminders/recent", (c) => {

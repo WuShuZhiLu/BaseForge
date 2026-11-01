@@ -389,6 +389,9 @@ function initSchema(db: Database.Database) {
       sessionHash TEXT NOT NULL,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       lastSeenAt TEXT NOT NULL DEFAULT (datetime('now')),
+      -- 访问明细用：UA 原样（截断）+ 脱敏 IP 前缀（1.2.3.* / 2001:db8:1:*）
+      userAgent TEXT,
+      ipPrefix TEXT,
       PRIMARY KEY (shareId, sessionHash),
       FOREIGN KEY (shareId) REFERENCES shares(id) ON DELETE CASCADE
     );

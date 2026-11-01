@@ -110,11 +110,11 @@ const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFe
   },
 ];
 
-/** 分享管理：固定导航项（非插件），跟随文件管理 */
+/** 分享中心：固定导航项（非插件），跟随文件管理 */
 const SHARES_NAV_ITEM: NavItem = {
   mode: "shares",
   titleKey: "sidebarNext.nav.shares",
-  titleDefault: "分享管理",
+  titleDefault: "分享中心",
   icon: (sz: number) => <Link2 size={sz} strokeWidth={2} />,
 };
 
@@ -133,7 +133,7 @@ const PLUGIN_ITEMS: NavItem[] = [
  * - pluginGroupCollapsed：插件组折叠（折叠时点「插件」徽章弹出插件菜单）；
  * - coreOrder / pluginOrder：分割线上下两组各自内部的显示顺序
  *   （拖拽排序持久化，仅限组内；缺失的 mode 按默认顺序追加在末尾）。
- *   分割线位置固定：核心徽章（知识库/收藏/回收站/文件管理/分享管理）在上，
+ *   分割线位置固定：核心徽章（知识库/收藏/回收站/文件管理/分享中心）在上，
  *   插件徽章（固定不可动）与各插件徽章在下，禁止跨组拖拽。
  */
 type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean; coreOrder?: string[]; pluginOrder?: string[] };

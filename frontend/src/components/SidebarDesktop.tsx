@@ -134,6 +134,22 @@ import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname, hasInAppForwardNavigationOccurred } from "@/lib/appPathNavigation";
 import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import {
+  shareCenterApi,
+  shareRiskLabel,
+  type ShareCenterCounts,
+  type ShareCenterObjectKind,
+  type ShareCenterRisk,
+} from "@/lib/shareCenter";
+import {
+  getShareCenterUiVersion,
+  getShareGroup,
+  getShareObjectKind,
+  getShareRisk,
+  setShareCenterUi,
+  subscribeShareCenterUi,
+} from "@/features/shares/shareCenterUi";
+import { PublicOriginRiskControl } from "@/components/PublicOriginRiskControl";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { useSortableDrag } from "@/hooks/useSortableDrag";
@@ -3164,12 +3180,12 @@ export default function SidebarDesktop() {
           </div>
         )}
 
-        {/* ===== 分享管理视图 ===== */}
+        {/* ===== 分享中心视图 ===== */}
         {sidebarView === "shares" && (
           <div>
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
-              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">分享管理</span>
+              <span className="min-w-0 truncate text-xs font-medium text-tx-primary">分享中心</span>
             </div>
             {!panelCollapsed.shares && <SharesSidePanel onOpenMain={() => actions.setViewMode("shares")} />}
           </div>
@@ -4027,86 +4043,153 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
   );
 }
 
-/** 分享管理侧栏面板（核心模块 shares）：统计速览 + 最近分享链接，点击进主区管理 */
+/** 分享中心侧栏面板（核心模块 shares）：五通道统计速览 + 最近分享链接，点击进主区管理 */
+function ShareCategoryRow({ active, label, count, tone, onClick }: {
+  active: boolean;
+  label: string;
+  count: number;
+  tone?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-md border px-2 py-1 text-[11.5px] ${active
+        ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
+        : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+    >
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+      <span className={`shrink-0 tabular-nums ${tone || "text-tx-tertiary"}`}>{count}</span>
+    </button>
+  );
+}
+
+/**
+ * 分享中心侧栏（原型 share-redesign-v1 ① 的左栏）
+ * ---------------------------------------------------------------------------
+ * 分类只有这三组 + 风险说明：徽标数来自后端 counts，与主区列表同源
+ * （同一集合统计），因此「点进去的条数 = 徽标数」。
+ * 主区不重复渲染分类，两侧共用 features/shares/shareCenterUi 里的筛选状态。
+ */
 function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
-  const [stats, setStats] = useState<{ total: number; active: number; paused: number } | null>(null);
-  const [recent, setRecent] = useState<Array<{ id: string; title: string; isActive: boolean }>>([]);
+  const actions = useAppActions();
+  const [counts, setCounts] = useState<ShareCenterCounts | null>(null);
+  const [bareCount, setBareCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const uiVersion = useSyncExternalStore(subscribeShareCenterUi, getShareCenterUiVersion, getShareCenterUiVersion);
+  const group = useMemo(() => getShareGroup(), [uiVersion]);
+  const objectKind = useMemo(() => getShareObjectKind(), [uiVersion]);
+  const risk = useMemo(() => getShareRisk(), [uiVersion]);
 
   const reload = useCallback(() => {
     setLoading(true);
-    api
-      .getShareManagement({ sort: "updatedAt", order: "desc" })
-      .then((r) => {
-        setStats({ total: r.stats.total, active: r.stats.active, paused: Math.max(0, r.stats.total - r.stats.active) });
-        setRecent(
-          (r.items ?? []).slice(0, 8).map((item) => ({
-            id: item.id,
-            title: item.noteTitle || "未命名笔记",
-            isActive: !!item.isActive,
-          })),
-        );
+    // 计数与主区同源：不在这里按 status 自己统计
+    shareCenterApi
+      .list({ pageSize: 1 })
+      .then((response) => {
+        setCounts(response.counts);
+        setBareCount(response.bareAttachmentUrls.count);
       })
-      .catch(() => {
-        setStats(null);
-        setRecent([]);
-      })
+      .catch(() => setCounts(null))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const onChange = () => reload();
+    window.addEventListener("nowen:workspace-changed", onChange);
+    return () => window.removeEventListener("nowen:workspace-changed", onChange);
+  }, [reload]);
+
+  const pick = (patch: Parameters<typeof setShareCenterUi>[0]) => {
+    setShareCenterUi(patch);
+    onOpenMain();
+  };
 
   return (
     <div className="sbx-view">
       <div className="sbx-view-head">
-        <span>分享管理</span><span className="flex-1" />
+        <span>分享中心</span><span className="flex-1" />
         <button type="button" title="刷新" onClick={reload} className="sbx-btn">
           <RefreshCw size={13} />
         </button>
-        <span className="sbx-badge">{stats?.total ?? 0}</span>
+        <span className="sbx-badge">{counts?.total ?? 0}</span>
       </div>
-      <div className="px-2 pb-1 grid grid-cols-3 gap-1">
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-tx-primary">{stats?.total ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">全部</p>
-        </div>
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-emerald-500">{stats?.active ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">启用</p>
-        </div>
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-amber-500">{stats?.paused ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">停用</p>
+
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">状态</div>
+        <div className="space-y-1">
+          <ShareCategoryRow active={group === "all"} label="全部" count={counts?.total ?? 0} onClick={() => pick({ group: "all" })} />
+          <ShareCategoryRow active={group === "active"} label="生效中" count={counts?.groups.active ?? 0} onClick={() => pick({ group: "active" })} />
+          <ShareCategoryRow active={group === "attention"} label="需要处理" count={counts?.groups.attention ?? 0}
+            tone={(counts?.groups.attention ?? 0) > 0 ? "text-amber-600 dark:text-amber-300" : undefined}
+            onClick={() => pick({ group: "attention" })} />
+          <ShareCategoryRow active={group === "disabled"} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
         </div>
       </div>
-      <div className="px-1 pb-2">
-        {loading ? (
-          <p className="sbx-view-empty">加载中…</p>
-        ) : recent.length === 0 ? (
-          <p className="sbx-view-empty">还没有分享链接，在笔记里点击「分享」创建</p>
-        ) : (
-          recent.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={onOpenMain}
-              className="sbx-row w-full text-left flex items-center gap-2"
-              title="在主区打开分享管理"
-            >
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 shrink-0 rounded-full",
-                  item.isActive ? "bg-emerald-500" : "bg-amber-500",
-                )}
-              />
-              <span className="min-w-0 flex-1 truncate text-[11px]">{item.title}</span>
-              <ExternalLink size={11} className="shrink-0 text-tx-tertiary" />
-            </button>
-          ))
-        )}
+
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">对象类型</div>
+        <div className="space-y-1">
+          {([["note", "笔记链接"], ["file", "文件链接"], ["notebook", "目录 / 知识库"]] as Array<[ShareCenterObjectKind, string]>).map(([kind, label]) => (
+            <ShareCategoryRow
+              key={kind}
+              active={objectKind === kind}
+              label={label}
+              count={counts?.objects[kind] ?? 0}
+              onClick={() => pick({ objectKind: objectKind === kind ? "all" : kind })}
+            />
+          ))}
+        </div>
       </div>
+
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">风险</div>
+        <div className="space-y-1">
+          {(["open_ended", "orphan", "unused"] as ShareCenterRisk[]).map((value) => (
+            <ShareCategoryRow
+              key={value}
+              active={risk === value}
+              label={shareRiskLabel(value)}
+              count={counts?.risks[value] ?? 0}
+              tone={value === "unused" ? undefined : (counts?.risks[value] ?? 0) > 0 ? "text-rose-600 dark:text-rose-300" : undefined}
+              onClick={() => pick({ risk: risk === value ? "all" : value })}
+            />
+          ))}
+          {/* 裸直链不是分享记录：点它是切换主区列表到附件原件池，同时把状态分组复位，
+              否则「生效中 + 裸直链」的组合会互相抵消成空列表。 */}
+          <ShareCategoryRow
+            active={risk === "bare"}
+            label={shareRiskLabel("bare")}
+            count={counts?.risks.bare ?? bareCount}
+            tone="text-rose-600 dark:text-rose-300"
+            onClick={() => pick(risk === "bare" ? { risk: "all" } : { risk: "bare", group: "all" })}
+          />
+        </div>
+      </div>
+
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="rounded-lg border border-app-border bg-app-bg p-2.5 text-[11px] leading-5 text-tx-secondary">
+          <p className="font-medium text-tx-primary">附件裸直链不是「私有地址」</p>
+          <p className="mt-1">
+            笔记里插入的图片/文件本身就有 <code>/api/attachments/&lt;id&gt;</code> 免登录直链：
+            知道地址即可永久访问，既不计数也无法撤销（设计上要保留，否则笔记里的图会裂）。
+          </p>
+          <button type="button" onClick={() => actions.openToolTab("files")} className="mt-1 text-accent-primary underline-offset-4 hover:underline">
+            查看这 {bareCount} 个文件 →
+          </button>
+        </div>
+      </div>
+
+      <div className="px-2 py-1.5">
+        <PublicOriginRiskControl variant="box" />
+      </div>
+
       <div className="sbx-foot-row">
-        <span className="sbx-foot-tip" />
+        <span className="sbx-foot-tip">{loading ? "加载中…" : ""}</span>
         <button type="button" onClick={onOpenMain} className="sbx-foot-link">
           在主区打开
         </button>

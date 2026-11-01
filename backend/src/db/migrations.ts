@@ -355,6 +355,21 @@ const taskInboxCanonicalMigration: Migration = {
   name: "personal-task-inbox-and-capture-source-canonical",
 };
 
+// v138: 分享访问会话补记 UA 与脱敏 IP 前缀——分享中心「访问记录」明细要按会话列出客户端。
+const shareViewSessionClientMetaMigration: Migration = {
+  version: 138,
+  name: "share-view-session-client-meta",
+  up: (db) => {
+    const columns = db.prepare("PRAGMA table_info(share_view_sessions)").all() as { name: string }[];
+    if (!columns.some((column) => column.name === "userAgent")) {
+      db.prepare("ALTER TABLE share_view_sessions ADD COLUMN userAgent TEXT").run();
+    }
+    if (!columns.some((column) => column.name === "ipPrefix")) {
+      db.prepare("ALTER TABLE share_view_sessions ADD COLUMN ipPrefix TEXT").run();
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   ...BASE_MIGRATIONS.filter((migration) => migration.version !== 44),
   patchedV44,
@@ -446,6 +461,7 @@ export const MIGRATIONS: Migration[] = [
   attachmentShareMigration,
   workspaceAvatarMigration,
   knowledgeTreeReferenceMigration,
+  shareViewSessionClientMetaMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(

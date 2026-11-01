@@ -15,6 +15,7 @@ import {
   resolvePublicWebOrigin,
 } from "@/lib/publicWebOrigin";
 import { toast } from "@/lib/toast";
+import { SHARE_DEFAULT_EXPIRY_DAYS, shareExpiresInDays } from "@/lib/shareCenter";
 import type { Share, SharePermission } from "@/types";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -33,9 +34,33 @@ function toLocalDateTime(value: string | null | undefined): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
+/**
+ * 有效期档位。默认 7 天（与后端 lib/share-defaults.ts 同一个值），“永久”必须显式选择：
+ * 历史上“留空即永久”让批量分享一次造出多条无限期公开链。
+ */
+type ExpiryPreset = "1" | "7" | "30" | "90" | "never" | "custom";
+const EXPIRY_PRESETS: ExpiryPreset[] = ["1", "7", "30", "90", "never", "custom"];
+const DEFAULT_EXPIRY_PRESET: ExpiryPreset = String(SHARE_DEFAULT_EXPIRY_DAYS) as ExpiryPreset;
+
+function presetForShare(expiresAt: string | null | undefined): ExpiryPreset {
+  return expiresAt ? "custom" : "never";
+}
+
+/** 随机密码：去掉易混淆字符，方便口头/短消息传达。 */
+function randomSharePassword(): string {
+  const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
+
 export default function ShareModal({ noteId, noteTitle, initialShareId, onClose }: ShareModalProps) {
   const { t, i18n } = useTranslation();
   const permissionLabel = (value: string) => value === "comment" ? t("shareUi.canComment") : value === "edit" ? t("shareUi.guestCanEdit") : value === "edit_auth" ? t("shareUi.signedInCanEdit") : t("shareUi.viewOnly");
+  const expiryPresetLabel = (preset: ExpiryPreset) => preset === "never"
+    ? t("shareUi.expiresNever")
+    : preset === "custom"
+      ? t("shareUi.expiresCustom")
+      : t("shareUi.expiresDays", { days: Number(preset) });
   const { siteConfig, updatePublicWebOrigin } = useSiteSettings();
   const [shares, setShares] = useState<Share[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,12 +71,31 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
+  const [expiryPreset, setExpiryPreset] = useState<ExpiryPreset>(DEFAULT_EXPIRY_PRESET);
   const [maxViews, setMaxViews] = useState("");
   const [canManagePublicOrigin, setCanManagePublicOrigin] = useState(false);
   const [originDraft, setOriginDraft] = useState(siteConfig.publicWebOrigin);
   const [originSaving, setOriginSaving] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const initialShareAppliedRef = useRef<string | null>(null);
+
+  /**
+   * 原型 ② 的两档预设：
+   * - 仅链接：无密码，默认 7 天后过期；
+   * - 链接 + 密码（推荐）：随机密码 + 7 天 + 10 个会话。
+   * 选中后下面的细项仍可继续手改。
+   */
+  const applyTier = (tier: "link" | "password") => {
+    if (tier === "link") {
+      setPassword("");
+      setExpiryPreset(DEFAULT_EXPIRY_PRESET);
+      setMaxViews("");
+      return;
+    }
+    setPassword((current) => current.trim() || randomSharePassword());
+    setExpiryPreset(DEFAULT_EXPIRY_PRESET);
+    setMaxViews("10");
+  };
 
   const publicOrigin = resolvePublicWebOrigin({
     runtimeOrigin: siteConfig.publicWebOrigin,
@@ -82,6 +126,7 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
           setPermission(target.permission);
           setPassword("");
           setExpiresAt(toLocalDateTime(target.expiresAt));
+          setExpiryPreset(presetForShare(target.expiresAt));
           setMaxViews(target.maxViews ? String(target.maxViews) : "");
         }
       }
@@ -128,6 +173,7 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
     setPermission("view");
     setPassword("");
     setExpiresAt("");
+    setExpiryPreset(DEFAULT_EXPIRY_PRESET);
     setMaxViews("");
     setShowPassword(false);
   };
@@ -137,6 +183,7 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
     setPermission(share.permission);
     setPassword("");
     setExpiresAt(toLocalDateTime(share.expiresAt));
+    setExpiryPreset(presetForShare(share.expiresAt));
     setMaxViews(share.maxViews ? String(share.maxViews) : "");
   };
 
@@ -147,11 +194,20 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
       toast.error(t("shareUi.maxViewsInvalid"));
       return;
     }
+    if (expiryPreset === "custom" && !expiresAt) {
+      toast.error(t("shareUi.expiresCustomRequired"));
+      return;
+    }
     setSaving(true);
     try {
       const common = {
         permission,
-        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        // 永远由档位算出绝对时间；“永久”是显式 null，不再依赖后端缺省。
+        expiresAt: expiryPreset === "never"
+          ? null
+          : expiryPreset === "custom"
+            ? new Date(expiresAt).toISOString()
+            : shareExpiresInDays(Number(expiryPreset)),
         maxViews: parsedMax,
       };
       if (editingId) {
@@ -165,7 +221,7 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
           noteId,
           permission,
           password: password.trim() || undefined,
-          expiresAt: common.expiresAt || undefined,
+          expiresAt: common.expiresAt,
           maxViews: parsedMax || undefined,
         });
         if (publicOrigin.requiresAnonymousCheck) {
@@ -272,10 +328,56 @@ export default function ShareModal({ noteId, noteTitle, initialShareId, onClose 
           <div className="grid min-h-0 flex-1 lg:grid-cols-[300px_1fr]">
             <section className="border-b border-app-border p-5 lg:border-b-0 lg:border-r">
               <div className="mb-4 flex items-center gap-2"><Settings2 size={16} className="text-accent-primary" /><h3 className="text-sm font-semibold">{editingId ? t("shareUi.editShareSettings") : t("shareUi.createNewShare")}</h3></div>
+              {/* 原型 ②：先选两档预设（仅链接 / 链接 + 密码），下面的细项仍可改 */}
+              <div className="mb-3 grid gap-2">
+                {([
+                  { key: "link" as const, title: t("shareUi.tierLinkTitle"), desc: t("shareUi.tierLinkDesc", { days: SHARE_DEFAULT_EXPIRY_DAYS }) },
+                  { key: "password" as const, title: t("shareUi.tierPasswordTitle"), desc: t("shareUi.tierPasswordDesc", { days: SHARE_DEFAULT_EXPIRY_DAYS }), recommended: true },
+                ]).map((tier) => {
+                  const active = tier.key === "password" ? password.trim().length > 0 : password.trim().length === 0;
+                  return (
+                    <button
+                      key={tier.key}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => applyTier(tier.key)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-colors",
+                        active ? "border-accent-primary bg-accent-primary/[0.06]" : "border-app-border bg-app-bg hover:bg-app-hover",
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-tx-primary">
+                        {tier.title}
+                        {tier.recommended && (
+                          <span className="rounded-full bg-accent-primary/10 px-1.5 py-0.5 text-[10px] text-accent-primary">{t("shareUi.tierRecommended")}</span>
+                        )}
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-4 text-tx-tertiary">{tier.desc}</span>
+                    </button>
+                  );
+                })}
+              </div>
               <div className="space-y-3">
                 <label className="block space-y-1"><span className="text-xs text-tx-secondary">{t("shareUi.permission")}</span><select className="h-10 w-full rounded-lg border border-app-border bg-app-bg px-3 text-sm" value={permission} onChange={(event) => setPermission(event.target.value as SharePermission)}><option value="view">{t("shareUi.viewOnly")}</option><option value="comment">{t("shareUi.viewAndComment")}</option><option value="edit">{t("shareUi.guestCanEdit")}</option><option value="edit_auth">{t("shareUi.signedInCanEdit")}</option></select></label>
-                <label className="block space-y-1"><span className="text-xs text-tx-secondary">{t("shareUi.accessPassword")}</span><div className="relative"><Input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={editingId ? t("shareUi.passwordUnchanged") : t("shareUi.passwordMin")} className="pr-10" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-2.5 text-tx-tertiary">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
-                <label className="block space-y-1"><span className="text-xs text-tx-secondary">{t("shareUi.expiresAt")}</span><Input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></label>
+                <div className="block space-y-1"><span className="text-xs text-tx-secondary">{t("shareUi.accessPassword")}</span><div className="relative"><Input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder={editingId ? t("shareUi.passwordUnchanged") : t("shareUi.passwordMin")} className="pr-10" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-2.5 text-tx-tertiary">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><button type="button" onClick={() => { setPassword(randomSharePassword()); setShowPassword(true); }} className="text-[11px] text-accent-primary underline-offset-4 hover:underline">{t("shareUi.generatePassword")}</button></div>
+                <div className="space-y-1">
+                  <span className="text-xs text-tx-secondary">{t("shareUi.expiresAt")}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {EXPIRY_PRESETS.map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        aria-pressed={expiryPreset === preset}
+                        onClick={() => setExpiryPreset(preset)}
+                        className={cn("h-8 rounded-lg border px-2.5 text-xs", expiryPreset === preset ? "border-accent-primary bg-accent-primary/10 text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover")}
+                      >
+                        {expiryPresetLabel(preset)}
+                      </button>
+                    ))}
+                  </div>
+                  {expiryPreset === "custom" && <Input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />}
+                  <p className="text-[11px] text-tx-tertiary">{t("shareUi.expiresDefaultHint", { days: SHARE_DEFAULT_EXPIRY_DAYS })}</p>
+                </div>
                 <label className="block space-y-1"><span className="text-xs text-tx-secondary">{t("shareUi.maxSessions")}</span><Input type="number" min={1} value={maxViews} onChange={(event) => setMaxViews(event.target.value)} placeholder={t("shareUi.refreshNote")} /></label>
                 <div className="flex gap-2 pt-1"><Button onClick={submit} disabled={saving} className="flex-1">{saving ? <Loader2 size={15} className="mr-1 animate-spin" /> : <Link2 size={15} className="mr-1" />}{editingId ? t("shareUi.saveSettings") : t("shareUi.createLink")}</Button>{editingId && <Button variant="outline" onClick={resetForm}>{t("shareUi.cancel")}</Button>}</div>
               </div>

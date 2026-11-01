@@ -35,6 +35,7 @@ import {
   recordCredentialSuccess,
 } from "../lib/share-credential-rate-limit";
 import { logAudit } from "../services/audit";
+import { defaultShareExpiresAt } from "../lib/share-defaults";
 import { readAttachmentObject } from "../services/attachment-storage";
 import { isHighRiskMime, encodeContentDispositionFilename } from "./attachments-core";
 
@@ -70,7 +71,7 @@ function findAccessibleShareByToken(db: ReturnType<typeof getDb>, token: string)
 
 function validateShareSettings(body: {
   password?: unknown; expiresAt?: unknown; maxViews?: unknown;
-}): { password: string | null; expiresAt: string | null; maxViews: number | null } | { error: string; status: number } {
+}): { password: string | null; expiresAt: string | null | undefined; maxViews: number | null } | { error: string; status: number } {
   let password: string | null = null;
   if (body.password !== undefined && body.password !== null && String(body.password).trim() !== "") {
     password = String(body.password).trim();
@@ -78,8 +79,11 @@ function validateShareSettings(body: {
       return { error: "密码长度需为 4-128 个字符", status: 400 };
     }
   }
-  let expiresAt: string | null = null;
-  if (body.expiresAt !== undefined && body.expiresAt !== null && String(body.expiresAt).trim() !== "") {
+  // undefined = 未指定（新建时由调用方补默认 7 天）；null = 显式要求永久。
+  let expiresAt: string | null | undefined;
+  if (body.expiresAt === null) {
+    expiresAt = null;
+  } else if (body.expiresAt !== undefined && String(body.expiresAt).trim() !== "") {
     expiresAt = String(body.expiresAt);
     if (isNaN(new Date(expiresAt).getTime())) {
       return { error: "过期时间无效", status: 400 };
@@ -228,6 +232,8 @@ attachmentSharesRouter.post("/", async (c) => {
 
   const settings = validateShareSettings(body);
   if ("error" in settings) return c.json({ error: settings.error }, settings.status as 400);
+  // 没指定有效期就是 7 天：批量「生成公开链接」传的是空对象，以前会落成一堆永久裸链。
+  const expiresAt = settings.expiresAt === undefined ? defaultShareExpiresAt() : settings.expiresAt;
 
   const now = new Date().toISOString();
   const existing = db
@@ -245,7 +251,7 @@ attachmentSharesRouter.post("/", async (c) => {
       WHERE id = ?
     `).run(
       settings.password ? await bcrypt.hash(settings.password, 10) : null,
-      settings.expiresAt, settings.maxViews, credentialVersion, existing.id,
+      expiresAt, settings.maxViews, credentialVersion, existing.id,
     );
     const share = db.prepare("SELECT * FROM attachment_shares WHERE id = ?").get(existing.id);
     return c.json(publicShareView(share as Record<string, any>), 200);
@@ -259,7 +265,7 @@ attachmentSharesRouter.post("/", async (c) => {
   `).run(
     id, attachmentId, userId, shareToken,
     settings.password ? await bcrypt.hash(settings.password, 10) : null,
-    settings.expiresAt, settings.maxViews,
+    expiresAt, settings.maxViews,
   );
   logAudit(userId, "share", "attachment_share_create", {
     shareId: id, attachmentId, hasPassword: !!settings.password,

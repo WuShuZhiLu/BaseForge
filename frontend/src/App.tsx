@@ -31,6 +31,7 @@ import { openWorkspaceIssue } from "@/lib/workspaceIssueNavigation";
 import WechatClipboardBridge from "@/components/WechatClipboardBridge";
 import SharedNoteView from "@/components/SharedNoteView";
 import NotebookShareJoinView from "@/components/NotebookShareJoinView";
+import AttachmentShareView from "@/components/AttachmentShareView";
 import LoginPage from "@/components/LoginPage";
 import QuickLoginGate from "@/components/QuickLoginGate";
 import QuickLoginEnrollDialog from "@/components/QuickLoginEnrollDialog";
@@ -1593,6 +1594,17 @@ function App() {
     return (
       <ThemeProvider>
         <NotebookShareJoinView token={notebookShareMatch[1]} />
+        <Toaster />
+      </ThemeProvider>
+    );
+  }
+
+  // 附件分享访客页 /fs/:token（分享中心里 attachment_share 的 urlPath）
+  const attachmentShareMatch = path.match(/^\/fs\/([A-Za-z0-9_-]+)$/);
+  if (attachmentShareMatch) {
+    return (
+      <ThemeProvider>
+        <AttachmentShareView shareToken={attachmentShareMatch[1]} />
         <Toaster />
       </ThemeProvider>
     );

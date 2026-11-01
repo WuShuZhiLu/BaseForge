@@ -3641,7 +3641,8 @@ export const api = {
   },
 
   // Shares (分享管理)
-  createShare: (data: { noteId: string; permission?: string; password?: string; expiresAt?: string; maxViews?: number }) =>
+  // expiresAt：undefined = 用后端缺省（7 天），显式 null = 永久，字符串 = 指定时刻。
+  createShare: (data: { noteId: string; permission?: string; password?: string; expiresAt?: string | null; maxViews?: number }) =>
     request<Share>("/shares", { method: "POST", body: JSON.stringify(data) }),
   getShares: () => request<Share[]>("/shares"),
   getShareManagement: (params: import("@/types").ShareManagementQuery = {}) => {
