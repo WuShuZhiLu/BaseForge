@@ -1,32 +1,45 @@
 /**
- * 文件管理共享 UI 状态：来源、分类筛选、排序、视图、分组。
+ * 文件管理共享 UI 状态：来源、类型筛选、排序、视图、分组。
  *
  * 侧栏面板与主区 FileManager 共用：任何一端修改都持久化到 localStorage，并通过
  * subscribeFilesUi + useSyncExternalStore 通知 React 重渲染（版本号快照保证
  * 状态变化必然生效，不依赖 DOM 事件监听的生命周期时机）。
+ *
+ * 统一文件池（v1.0 文件管理重设计）：
+ *   - 来源从三来源（附件 / 图床 / 远程）收敛为「文件 + 远程」两个；
+ *   - 文件类型（图片 / 视频 / 音频 / 文档 / 其他）从"分隔容器"降级为"筛选维度"，
+ *     单一选中（不像旧版那样每个来源各维护一套 chips 状态）。
  */
-import type { FileSortKey } from "@/types";
+import type { FileShareStatus, FileSortKey, MimeCategory } from "@/types";
 
 export type FilesViewMode = "grid" | "list";
-/** 文件管理三大来源：本地附件 / 图床 / 插件远程文件 */
-export type FilesSource = "attachments" | "imagehost" | "remote";
+/**
+ * 文件管理视图来源：
+ *   - "all"    ：统一文件池（本地附件与原图床文件混排，不再按上传方式分隔）
+ *   - "remote" ：插件远程文件（WebDAV / 百度网盘 / SMB），认证模型不同，保持独立入口
+ */
+export type FilesSource = "all" | "remote";
 export type FilesGroupMode = "flat" | "notebook" | "folder";
+/** 统一类型 chips 的选中值："all" = 不按类型过滤。 */
+export type FilesTypeFilter = MimeCategory | "all";
 
 const KEYS = {
   source: "nowen.filesUi.source",
-  mimes: "nowen.filesUi.mimes",
-  time: "nowen.filesUi.time",
-  ihCategory: "nowen.filesUi.ihCategory",
-  ihMimes: "nowen.filesUi.ihMimes",
-  ihSort: "nowen.filesUi.ihSort",
-  ihTime: "nowen.filesUi.ihTime",
-  remoteTypes: "nowen.filesUi.remoteTypes",
-  remoteTime: "nowen.filesUi.remoteTime",
-  remoteSort: "nowen.filesUi.remoteSort",
+  type: "nowen.filesUi.unifiedType",
   category: "nowen.filesUi.category",
+  share: "nowen.filesUi.share",
+  time: "nowen.filesUi.time",
   sort: "nowen.filesUi.sort",
   view: "nowen.filesUi.view",
   group: "nowen.filesUi.group",
+  remoteTypes: "nowen.filesUi.remoteTypes",
+  remoteTime: "nowen.filesUi.remoteTime",
+  remoteSort: "nowen.filesUi.remoteSort",
+} as const;
+
+/** 三来源时代的遗留键：只在首次读取时用于迁移，不再写入。 */
+const LEGACY_KEYS = {
+  ihCategory: "nowen.filesUi.ihCategory",
 } as const;
 
 // ===== useSyncExternalStore 接口：版本号 + 订阅 =====
@@ -48,57 +61,43 @@ function emit(): void {
 }
 
 export function getFilesSource(): FilesSource {
-  const raw = localStorage.getItem(KEYS.source) as FilesSource | null;
-  return raw === "imagehost" || raw === "remote" ? raw : "attachments";
+  // 兼容旧值："attachments" / "imagehost" 一律并入统一文件池。
+  return localStorage.getItem(KEYS.source) === "remote" ? "remote" : "all";
 }
 
-/** 附件来源：选中的 MIME 类型（多选，空 = 全部） */
-export function getFilesMimes(): string[] {
-  try { const raw = JSON.parse(localStorage.getItem(KEYS.mimes) || ""); return Array.isArray(raw) ? raw : []; } catch { return []; }
+function isFilesTypeFilter(raw: string | null): raw is FilesTypeFilter {
+  return raw === "all" || raw === "image" || raw === "video" || raw === "audio" || raw === "doc" || raw === "other";
 }
 
-/** 附件来源：上传时间筛选（all/today/week/month/older） */
+/** 统一类型筛选（图片/视频/音频/文档/其他），默认"全部"。 */
+export function getFilesType(): FilesTypeFilter {
+  const raw = localStorage.getItem(KEYS.type);
+  if (isFilesTypeFilter(raw)) return raw;
+  // 首次升级：旧图床只展示图片（ihCategory 默认 "image"），迁移成"类型=图片"；
+  // 其余情况保持"全部"，避免用户升级后突然看到一个被筛空的列表。
+  const migrated: FilesTypeFilter = localStorage.getItem(LEGACY_KEYS.ihCategory) === "image" ? "image" : "all";
+  localStorage.setItem(KEYS.type, migrated);
+  return migrated;
+}
+
+/**
+ * 范围筛选（与类型维度正交）：全部 / 我的上传 / 文档引用 / 未引用。
+ * "referenced" 与 "unreferenced" 在后端用同一次内容扫描，严格互补。
+ */
+export function getFilesCategory(): string {
+  const raw = localStorage.getItem(KEYS.category);
+  return raw === "myUploads" || raw === "unreferenced" || raw === "referenced" ? raw : "all";
+}
+
+/** 分享状态筛选（all/shared/unshared），默认不筛。 */
+export function getFilesShare(): FileShareStatus | "all" {
+  const raw = localStorage.getItem(KEYS.share);
+  return raw === "shared" || raw === "unshared" ? raw : "all";
+}
+
+/** 上传时间筛选（all/today/week/month）。 */
 export function getFilesTime(): string {
   return localStorage.getItem(KEYS.time) || "all";
-}
-
-/** 图床来源：分类与排序 */
-export function getFilesIhCategory(): string {
-  // 图床默认只看图片（"图床"的语义就是图片直链）
-  return localStorage.getItem(KEYS.ihCategory) || "image";
-}
-
-/** 图床来源：图片子类 chips（png/jpeg/webp/gif/svg，空 = 全部） */
-export function getFilesIhMimes(): string[] {
-  try { const raw = JSON.parse(localStorage.getItem(KEYS.ihMimes) || ""); return Array.isArray(raw) ? raw : []; } catch { return []; }
-}
-
-export function getFilesIhSort(): string {
-  return localStorage.getItem(KEYS.ihSort) || "copied_desc";
-}
-
-/** 图床来源：上传时间筛选（all/today/week/month） */
-export function getFilesIhTime(): string {
-  return localStorage.getItem(KEYS.ihTime) || "all";
-}
-
-/** 远程来源：类型 chips（多选，空 = 全部） */
-export function getFilesRemoteTypes(): string[] {
-  try { const raw = JSON.parse(localStorage.getItem(KEYS.remoteTypes) || ""); return Array.isArray(raw) ? raw : []; } catch { return []; }
-}
-
-export function getFilesRemoteTime(): string {
-  return localStorage.getItem(KEYS.remoteTime) || "all";
-}
-
-export function getFilesRemoteSort(): FilesRemoteSortKey {
-  return (localStorage.getItem(KEYS.remoteSort) as FilesRemoteSortKey) || "name_asc";
-}
-
-export function getFilesCategory(): string {
-  // 清洗历史遗留：附件来源的分类不含 image/file（图片归图床）
-  const raw = localStorage.getItem(KEYS.category);
-  return raw === "myUploads" || raw === "unreferenced" ? raw : "all";
 }
 
 export function getFilesSort(): FileSortKey {
@@ -115,22 +114,31 @@ export function getFilesGroupMode(): FilesGroupMode {
   return (localStorage.getItem(KEYS.group) as FilesGroupMode) || (legacy as FilesGroupMode) || "flat";
 }
 
-export function setFilesUi(patch: { source?: FilesSource; mimes?: string[]; time?: string; ihCategory?: string; ihMimes?: string[]; ihSort?: string; ihTime?: string; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string; category?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode }): void {
+/** 远程来源：类型 chips（多选，空 = 全部） */
+export function getFilesRemoteTypes(): string[] {
+  try { const raw = JSON.parse(localStorage.getItem(KEYS.remoteTypes) || ""); return Array.isArray(raw) ? raw : []; } catch { return []; }
+}
+
+export function getFilesRemoteTime(): string {
+  return localStorage.getItem(KEYS.remoteTime) || "all";
+}
+
+export function getFilesRemoteSort(): FilesRemoteSortKey {
+  return (localStorage.getItem(KEYS.remoteSort) as FilesRemoteSortKey) || "name_asc";
+}
+
+export function setFilesUi(patch: { source?: FilesSource; type?: FilesTypeFilter; category?: string; share?: FileShareStatus | "all"; time?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string }): void {
   if (patch.source !== undefined) localStorage.setItem(KEYS.source, patch.source);
-  if (patch.mimes !== undefined) localStorage.setItem(KEYS.mimes, JSON.stringify(patch.mimes));
-  if (patch.time !== undefined) localStorage.setItem(KEYS.time, patch.time);
-  if (patch.ihCategory !== undefined) localStorage.setItem(KEYS.ihCategory, patch.ihCategory);
-  if (patch.ihMimes !== undefined) localStorage.setItem(KEYS.ihMimes, JSON.stringify(patch.ihMimes));
-  if (patch.ihSort !== undefined) localStorage.setItem(KEYS.ihSort, patch.ihSort);
-  if (patch.ihMimes !== undefined) localStorage.setItem(KEYS.ihMimes, JSON.stringify(patch.ihMimes));
-  if (patch.ihTime !== undefined) localStorage.setItem(KEYS.ihTime, patch.ihTime);
-  if (patch.remoteTypes !== undefined) localStorage.setItem(KEYS.remoteTypes, JSON.stringify(patch.remoteTypes));
-  if (patch.remoteSort !== undefined) localStorage.setItem(KEYS.remoteSort, patch.remoteSort);
-  if (patch.remoteTime !== undefined) localStorage.setItem(KEYS.remoteTime, patch.remoteTime);
+  if (patch.type !== undefined) localStorage.setItem(KEYS.type, patch.type);
   if (patch.category !== undefined) localStorage.setItem(KEYS.category, patch.category);
+  if (patch.share !== undefined) localStorage.setItem(KEYS.share, patch.share);
+  if (patch.time !== undefined) localStorage.setItem(KEYS.time, patch.time);
   if (patch.sort !== undefined) localStorage.setItem(KEYS.sort, patch.sort);
   if (patch.view !== undefined) localStorage.setItem(KEYS.view, patch.view);
   if (patch.group !== undefined) localStorage.setItem(KEYS.group, patch.group);
+  if (patch.remoteTypes !== undefined) localStorage.setItem(KEYS.remoteTypes, JSON.stringify(patch.remoteTypes));
+  if (patch.remoteSort !== undefined) localStorage.setItem(KEYS.remoteSort, patch.remoteSort);
+  if (patch.remoteTime !== undefined) localStorage.setItem(KEYS.remoteTime, patch.remoteTime);
   emit();
 }
 
@@ -141,49 +149,48 @@ export const FILE_SORT_OPTIONS: Array<{ value: FileSortKey; label: string }> = [
   { value: "size_asc", label: "大小 ↑" },
   { value: "name_asc", label: "名称 A→Z" },
   { value: "name_desc", label: "名称 Z→A" },
+  { value: "referenced_desc", label: "最近引用" },
 ];
 
-/** 附件来源的类型 chips：非图片（图片归图床）。 */
-export const FILE_DOC_MIME_CHIPS: Array<{ key: string; label: string; mimes: string[] }> = [
-  { key: "pdf", label: "PDF", mimes: ["application/pdf"] },
-  { key: "word", label: "Word", mimes: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"] },
-  { key: "md", label: "Markdown", mimes: ["text/markdown", "text/plain"] },
-  { key: "zip", label: "压缩包", mimes: ["application/zip", "application/x-zip-compressed", "application/gzip"] },
-  { key: "audio", label: "音频", mimes: ["audio/"] },
-  { key: "video", label: "视频", mimes: ["video/"] },
+/** 分享状态 chips（侧栏「分享状态」分组）。 */
+export const FILE_SHARE_OPTIONS: Array<{ value: FileShareStatus | "all"; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "shared", label: "已分享" },
+  { value: "unshared", label: "未分享" },
 ];
 
-/** 图床来源的类型 chips：图片子类。 */
-export const FILE_IMAGE_MIME_CHIPS: Array<{ key: string; label: string; mimes: string[] }> = [
-  { key: "png", label: "PNG", mimes: ["image/png"] },
-  { key: "jpeg", label: "JPG", mimes: ["image/jpeg"] },
-  { key: "webp", label: "WebP", mimes: ["image/webp"] },
-  { key: "gif", label: "GIF", mimes: ["image/gif"] },
-  { key: "svg", label: "SVG", mimes: ["image/svg+xml"] },
+/** 统一类型 chips（作用于整个文件池，不再按来源区分）。 */
+export const FILE_TYPE_CHIPS: Array<{ key: FilesTypeFilter; label: string }> = [
+  { key: "all", label: "全部" },
+  { key: "image", label: "图片" },
+  { key: "video", label: "视频" },
+  { key: "audio", label: "音频" },
+  { key: "doc", label: "文档" },
+  { key: "other", label: "其他" },
 ];
 
-/** 把选中的 chip keys 展开成 mime 列表（audio/ video/ 前缀形式由后端 LIKE 匹配）。 */
-export function expandMimeChips(chips: Array<{ key: string; label: string; mimes: string[] }>, keys: string[]): string[] {
-  const out: string[] = [];
-  for (const key of keys) {
-    const chip = chips.find((entry) => entry.key === key);
-    if (chip) out.push(...chip.mimes);
-  }
-  return out;
+/** 类型大类的展示文案（列表"类型"列 / 卡片类型标签共用）。 */
+export const MIME_CATEGORY_LABELS: Record<MimeCategory, string> = {
+  image: "图片",
+  video: "视频",
+  audio: "音频",
+  doc: "文档",
+  other: "其他",
+};
+
+/**
+ * 取文件记录的类型大类：后端 /api/files 已下发 mimeCategory，
+ * 老服务端缺席时按 MIME 前缀粗判兜底（与后端 getMimeCategory 的主干一致）。
+ */
+export function resolveMimeCategory(item: { mimeCategory?: MimeCategory; mimeType?: string }): MimeCategory {
+  if (item.mimeCategory) return item.mimeCategory;
+  const mime = (item.mimeType || "").toLowerCase();
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("video/")) return "video";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("text/")) return "doc";
+  return "other";
 }
-
-/** 图床类型 chips：图片子类（FILE_IMAGE_MIME_CHIPS 的子集）。 */
-export const FILE_IH_MIME_CHIPS = FILE_IMAGE_MIME_CHIPS.filter((chip) =>
-  ["png", "jpeg", "webp", "gif", "svg"].includes(chip.key),
-);
-
-/** 图床排序选项（与既有 ihSort 值保持兼容）。 */
-export const FILE_IH_SORT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "copied_desc", label: "最近复制" },
-  { value: "created_desc", label: "最近上传" },
-  { value: "size_desc", label: "大小 ↓" },
-  { value: "name_asc", label: "名称 A→Z" },
-];
 
 export type FilesRemoteSortKey = "name_asc" | "name_desc" | "modified_desc" | "size_desc";
 

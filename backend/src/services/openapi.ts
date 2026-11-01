@@ -444,15 +444,17 @@ export function generateOpenAPISpec(): Record<string, any> {
           tags: ["文件"],
           summary: "列出文件管理中的附件",
           parameters: [
-            { name: "category", in: "query", schema: { type: "string", enum: ["all", "image", "file"], default: "all" } },
-            { name: "filter", in: "query", schema: { type: "string", enum: ["unreferenced", "myUploads"] } },
+            { name: "category", in: "query", schema: { type: "string", enum: ["all", "image", "file"], default: "all" }, deprecated: true, description: "旧的二分筛选；新代码用 mimeCategory" },
+            { name: "mimeCategory", in: "query", schema: { type: "string", enum: ["image", "video", "audio", "doc", "other"] }, description: "统一文件池的类型大类筛选" },
+            { name: "filter", in: "query", schema: { type: "string", enum: ["unreferenced", "referenced", "myUploads"] }, description: "referenced = 被笔记正文引用过的附件，与 unreferenced 严格互补" },
+            { name: "shareStatus", in: "query", schema: { type: "string", enum: ["shared", "unshared"] }, description: "按生效中（未过期且未关闭）的只读分享链接筛选" },
             { name: "myUploadsRef", in: "query", schema: { type: "string", enum: ["referenced", "unreferenced"] } },
             { name: "mime", in: "query", schema: { type: "string" } },
             { name: "notebookId", in: "query", schema: { type: "string" } },
             { name: "noteId", in: "query", schema: { type: "string" }, description: "只返回被该笔记引用过的附件" },
             { name: "folderId", in: "query", schema: { type: "string" }, description: "附件文件夹 ID；__unarchived 表示未归档" },
-            { name: "q", in: "query", schema: { type: "string" } },
-            { name: "sort", in: "query", schema: { type: "string", enum: ["name_asc", "name_desc", "size_asc", "size_desc", "created_asc", "created_desc"] } },
+            { name: "q", in: "query", schema: { type: "string" }, description: "关键字，同时匹配文件名与 MIME 类型" },
+            { name: "sort", in: "query", schema: { type: "string", enum: ["name_asc", "name_desc", "size_asc", "size_desc", "created_asc", "created_desc", "referenced_desc"] }, description: "referenced_desc = 最近被文档引用的排前，从未引用的沉底" },
             { name: "page", in: "query", schema: { type: "integer", default: 1, minimum: 1 } },
             { name: "pageSize", in: "query", schema: { type: "integer", default: 50, minimum: 1, maximum: 200 } },
             { name: "workspaceId", in: "query", schema: { type: "string" } },
@@ -537,6 +539,28 @@ export function generateOpenAPISpec(): Record<string, any> {
             },
           },
           responses: { "200": { description: "批量删除结果" }, "400": { description: "ids 不合法" } },
+        },
+      },
+      "/api/files/batch-move": {
+        post: {
+          tags: ["文件"],
+          summary: "批量归档 / 移出附件文件夹",
+          description: "folderId 传字符串归档到该文件夹，传 null 或不传归入未归档；只改 attachments.folderId，不碰磁盘。",
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ids: { type: "array", items: { type: "string" }, maxItems: 200 },
+                    folderId: { type: "string", nullable: true },
+                  },
+                  required: ["ids"],
+                },
+              },
+            },
+          },
+          responses: { "200": { description: "批量移动结果" }, "400": { description: "ids / folderId 不合法" }, "404": { description: "目标文件夹不存在" } },
         },
       },
 

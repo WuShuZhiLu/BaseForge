@@ -29,6 +29,8 @@
  */
 import fs from "fs";
 import path from "path";
+import { spawn } from "child_process";
+import { getMediaFfmpegPath } from "../lib/ffmpeg-path";
 // 使用动态 require，避免 sharp 安装失败时整个后端起不来——
 // sharp 是 native 模块，少数平台/CI 没有预编译 binary 时会报错。
 // 此处兜底：拿不到 sharp 时缩略图功能整体降级为"返回原图"。
@@ -202,6 +204,137 @@ export async function getOrCreateThumbnailFromBufferAsync(
   width: number,
 ): Promise<ThumbnailResult | null> {
   return getOrCreateThumbnailFromInputAsync(attachmentsDir, attachmentId, sourceBuffer, sourceMime, width);
+}
+
+// ---------------------------------------------------------------------------
+// 视频海报（统一文件池：视频卡片显示首帧，而不是一个通用图标）
+// ---------------------------------------------------------------------------
+//
+// 抽帧交给 ffmpeg，缩放 + 编码交给 sharp：
+//   - ffmpeg-static 不保证带 libwebp 编码器，让它输出 png 更可靠；
+//   - png 直接喂给已有的 getOrCreateThumbnailFromInputAsync(Buffer) 分支，
+//     与图片缩略图共用缓存命名（.thumbs/{id}_w{width}.webp）、编码参数和
+//     deleteThumbnailsFor 清理逻辑，不新增第二套缓存体系。
+//
+// 只在**本地文件**上生成：对象存储（S3/NAS）取首帧需要整段下载，代价不对称，
+// 交给调用方回退原图 + 前端占位图标。
+//
+// 降级：ffmpeg 不可用 / 视频损坏 / 超时 → 返回 null 并把本能力整体关掉
+// （不反复 spawn 试错），调用方回退原文件。
+
+/** 抽帧前先把宽边压到 1920：4K 原帧转 png 会有几十 MB。 */
+const VIDEO_POSTER_MAX_WIDTH = 1920;
+const VIDEO_POSTER_TIMEOUT_MS = 15_000;
+/** 防御异常码流把 stdout 撑爆内存（正常 1920 宽 png 在几 MB 量级）。 */
+const VIDEO_POSTER_MAX_PNG_BYTES = 64 * 1024 * 1024;
+
+let videoPosterDisabled = false;
+const videoPosterPending = new Map<string, Promise<ThumbnailResult | null>>();
+// 抽帧是 CPU 密集操作：网格一页可能有几十个视频，全部并发 spawn ffmpeg 会把
+// 后端瞬时打满（而前端 <img loading=lazy> 一屏就能触发十几个请求）。
+// 因此把同时进行的 ffmpeg 限制为 1，与 modern-media 转码队列同样的取舍。
+let videoPosterQueue: Promise<unknown> = Promise.resolve();
+
+/** 判定 MIME 是否可走视频海报分支。 */
+export function isVideoThumbnailable(mime: string | null | undefined): boolean {
+  if (!sharp || videoPosterDisabled) return false;
+  return (mime || "").toLowerCase().startsWith("video/");
+}
+
+/** 用 ffmpeg 取第一帧（png，写到 stdout pipe）。 */
+function extractVideoFirstFrame(sourcePath: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(getMediaFfmpegPath(), [
+      "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+      "-i", sourcePath,
+      // 只取一帧、丢音轨；filtergraph 里的逗号需转义（spawn 不过 shell，但 ffmpeg 自己解析）
+      "-frames:v", "1", "-an",
+      "-vf", `scale=w=min(${VIDEO_POSTER_MAX_WIDTH}\\,iw):h=-2`,
+      "-f", "image2pipe", "-c:v", "png", "pipe:1",
+    ], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error("VIDEO_POSTER_TIMEOUT"));
+    }, VIDEO_POSTER_TIMEOUT_MS);
+
+    child.stdout.on("data", (data: Buffer) => {
+      bytes += data.length;
+      if (bytes > VIDEO_POSTER_MAX_PNG_BYTES) {
+        child.kill();
+        reject(new Error("VIDEO_POSTER_FRAME_TOO_LARGE"));
+        return;
+      }
+      chunks.push(data);
+    });
+    child.stderr.on("data", (data: Buffer) => {
+      stderr = (stderr + data.toString("utf8")).slice(-2048);
+    });
+    child.on("error", (failure) => { clearTimeout(timer); reject(failure); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 0 && bytes > 0) resolve(Buffer.concat(chunks));
+      else reject(new Error(`VIDEO_POSTER_FAILED(${code}): ${stderr}`));
+    });
+  });
+}
+
+/**
+ * 获取（或生成）视频首帧海报。参数与 getOrCreateThumbnailAsync 对齐，
+ * 调用方可以按 MIME 在两条路径里二选一。
+ */
+export async function getOrCreateVideoThumbnailAsync(
+  attachmentsDir: string,
+  attachmentId: string,
+  sourcePath: string,
+  sourceMime: string,
+  width: number,
+): Promise<ThumbnailResult | null> {
+  if (!isVideoThumbnailable(sourceMime)) return null;
+
+  const cachePath = getThumbCachePath(attachmentsDir, attachmentId, width);
+  try {
+    if (fs.existsSync(cachePath)) {
+      return { buffer: fs.readFileSync(cachePath), mimeType: "image/webp", fromCache: true };
+    }
+  } catch {
+    /* 读缓存失败：当作 miss 重新生成 */
+  }
+
+  const inflight = videoPosterPending.get(cachePath);
+  if (inflight) return inflight;
+
+  const task = (async (): Promise<ThumbnailResult | null> => {
+    try {
+      // 排队期间可能已被其它请求生成；getOrCreateThumbnailFromInputAsync 自己
+      // 会先查缓存，命中就直接返回，不会重复跑 ffmpeg。
+      await videoPosterQueue.catch(() => { /* 前一个任务失败不阻断队列 */ });
+      const frame = await extractVideoFirstFrame(sourcePath);
+      const result = await getOrCreateThumbnailFromInputAsync(
+        attachmentsDir, attachmentId, frame, "image/png", width,
+      );
+      if (!result) throw new Error("sharp 编码海报失败");
+      return result;
+    } catch (err) {
+      console.warn(
+        `[thumbnails] 生成视频海报失败 attachment=${attachmentId} w=${width}:`,
+        err,
+      );
+      // 只有“ffmpeg 根本调不起来”（ENOENT）才是环境性不可用，整体关掉；
+      // 单个视频损坏 / 超时只影响这一张，不能误伤其它视频。
+      if ((err as NodeJS.ErrnoException | null)?.code === "ENOENT") videoPosterDisabled = true;
+      return null;
+    } finally {
+      videoPosterPending.delete(cachePath);
+    }
+  })();
+
+  videoPosterPending.set(cachePath, task);
+  videoPosterQueue = task;
+  return task;
 }
 
 /**

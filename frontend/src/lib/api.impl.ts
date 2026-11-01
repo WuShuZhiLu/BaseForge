@@ -3490,15 +3490,22 @@ export const api = {
 
     /** 分页列出文件。所有筛选字段可选；默认按 createdAt desc。
      *  Y4: 自动注入 workspaceId（调用方未显式指定时）。
-     *  filter=unreferenced：仅返回 scope 内"没有被任何笔记引用"的附件（含 24h 宽限期）。
-     *    与 category 正交——可同时传 category=image 得到"孤儿图片"。
+     *  filter=unreferenced / referenced：scope 内"没被任何笔记正文引用"
+     *    / "被至少一篇笔记正文引用"两个互补分类（相加就是全部，不看时间宽限期）；
+     *    与 mimeCategory 正交——可同时传 mimeCategory=image 得到"未引用的图片"。
      *  filter=myUploads：仅返回"用户从文件管理页直接上传"的附件（noteId 指向 holder note）；
      *    可叠加 myUploadsRef=referenced/unreferenced 进一步拆分"已被笔记引用 / 还没引用"。
+     *  shareStatus=shared / unshared：按是否存在生效中的只读分享链接筛选。
      */
     list: (params: {
+      /** 统一文件池的类型筛选（image/video/audio/doc/other）。 */
+      mimeCategory?: import("@/types").MimeCategory;
+      /** @deprecated 三来源时代的来源二分筛选，新代码用 mimeCategory。 */
       category?: FileCategory;
       filter?: FileFilter;
       myUploadsRef?: FileMyUploadsRef;
+      /** 分享状态（侧栏「分享状态」chips）：只算生效中且未过期的链接。 */
+      shareStatus?: import("@/types").FileShareStatus;
       mime?: string;
       /** 上传时间：最近 N 天（侧栏时间 chips）。 */
       uploadedWithin?: number;
@@ -3514,6 +3521,7 @@ export const api = {
       pageSize?: number;
     } = {}): Promise<FileListResponse> => {
       const qs = new URLSearchParams();
+      if (params.mimeCategory) qs.set("mimeCategory", params.mimeCategory);
       // 注意：FileCategory 已收窄为 "image" | "file"，不再含 "all"。
       // 调用方（FileManager）自己维护 "all" | FileCategory 的 UI 过滤，
       // 在传进来之前就会把 "all" 映射成 undefined，这里只需非空判断。
@@ -3523,6 +3531,10 @@ export const api = {
       // 但为了让 URL 干净，前端只在 filter 匹配时传。
       if (params.filter === "myUploads" && params.myUploadsRef) {
         qs.set("myUploadsRef", params.myUploadsRef);
+      }
+      if (params.shareStatus) qs.set("shareStatus", params.shareStatus);
+      if (typeof params.uploadedWithin === "number" && params.uploadedWithin > 0) {
+        qs.set("uploadedWithin", String(params.uploadedWithin));
       }
       if (params.mime) qs.set("mime", params.mime);
       if (params.notebookId) qs.set("notebookId", params.notebookId);
@@ -3566,6 +3578,21 @@ export const api = {
       }>(`/files/batch-delete`, {
         method: "POST",
         body: JSON.stringify({ ids }),
+      }),
+
+    /**
+     * 批量归档 / 移出附件文件夹（只改 attachments.folderId，不碰磁盘）。
+     * folderId 传 null = 移出到"未归档"；单次最多 200 个，
+     * 无权 / 不存在的 id 进 failed[]，不阻塞同批其它项。
+     */
+    batchMove: (ids: string[], folderId: string | null) =>
+      request<{
+        success: boolean;
+        moved: number;
+        failed: Array<{ id: string; reason: string }>;
+      }>(`/files/batch-move`, {
+        method: "POST",
+        body: JSON.stringify({ ids, folderId }),
       }),
 
     /**

@@ -7,7 +7,6 @@ import { getDb } from "../src/db/schema";
 import {
   fileOrphanVisibilityMiddleware,
   getCurrentReferenceNotes,
-  getImmediateOrphanSummary,
   getProtectedManualUploadIds,
 } from "../src/runtime/file-orphan-visibility";
 
@@ -62,17 +61,13 @@ function cleanupFixture(fixture: Fixture): void {
   db.prepare("DELETE FROM users WHERE id = ?").run(fixture.userId);
 }
 
-test("fresh editor attachment becomes an orphan immediately after its last note reference is removed", () => {
+test("current reference lookup follows attachment_references immediately on add and remove", () => {
   const db = getDb();
   const fixture = seedFixture();
   const scope = { kind: "personal" as const, workspaceId: null };
 
   try {
-    // 新上传不足 24 小时也必须立刻出现在只读“孤儿”视图中。
-    assert.deepEqual(getImmediateOrphanSummary(db, scope, fixture.userId), {
-      count: 1,
-      bytes: 843 * 1024,
-    });
+    // “来源笔记”必须跟着当前真实引用，而不是上传时的归属。
     assert.equal(
       getCurrentReferenceNotes(db, [fixture.attachmentId], scope, fixture.userId)
         .has(fixture.attachmentId),
@@ -83,10 +78,6 @@ test("fresh editor attachment becomes an orphan immediately after its last note 
       "INSERT INTO attachment_references (attachmentId, noteId) VALUES (?, ?)",
     ).run(fixture.attachmentId, fixture.noteId);
 
-    assert.deepEqual(getImmediateOrphanSummary(db, scope, fixture.userId), {
-      count: 0,
-      bytes: 0,
-    });
     const referenced = getCurrentReferenceNotes(
       db,
       [fixture.attachmentId],
@@ -101,10 +92,6 @@ test("fresh editor attachment becomes an orphan immediately after its last note 
       "DELETE FROM attachment_references WHERE attachmentId = ? AND noteId = ?",
     ).run(fixture.attachmentId, fixture.noteId);
 
-    assert.deepEqual(getImmediateOrphanSummary(db, scope, fixture.userId), {
-      count: 1,
-      bytes: 843 * 1024,
-    });
     assert.equal(
       getCurrentReferenceNotes(db, [fixture.attachmentId], scope, fixture.userId)
         .has(fixture.attachmentId),
@@ -115,7 +102,7 @@ test("fresh editor attachment becomes an orphan immediately after its last note 
   }
 });
 
-test("file manager responses expose immediate orphan state instead of historical upload ownership", async () => {
+test("file manager responses expose current reference state instead of historical upload ownership", async () => {
   const db = getDb();
   const fixture = seedFixture();
   const app = new Hono();
@@ -164,23 +151,22 @@ test("file manager responses expose immediate orphan state instead of historical
     assert.equal(allPayload.items[0].primaryNote, null);
     assert.equal(allPayload.items[0].isAutoCleanupProtected, false);
 
-    const orphanResponse = await app.request(
+    const unreferencedResponse = await app.request(
       "http://localhost/api/files?filter=unreferenced&page=1&pageSize=10",
       { headers },
     );
-    assert.equal(orphanResponse.status, 200);
-    const orphanPayload = await orphanResponse.json() as any;
-    assert.equal(orphanPayload.total, 1);
-    assert.equal(orphanPayload.items[0].id, fixture.attachmentId);
-    assert.equal(orphanPayload.items[0].primaryNote, null);
+    assert.equal(unreferencedResponse.status, 200);
+    const unreferencedPayload = await unreferencedResponse.json() as any;
+    // 刚上传、还没插进笔记的文件也必须出现在「未引用」里（这一层不再重建该列表）。
+    assert.equal(unreferencedPayload.total, 1);
+    assert.equal(unreferencedPayload.items[0].id, fixture.attachmentId);
+    assert.equal(unreferencedPayload.items[0].primaryNote, null);
 
     const statsResponse = await app.request("http://localhost/api/files/stats", { headers });
     assert.equal(statsResponse.status, 200);
     const statsPayload = await statsResponse.json() as any;
-    assert.deepEqual(statsPayload.unreferenced, {
-      count: 1,
-      bytes: 843 * 1024,
-    });
+    // stats 透传：这一层不再用倒排表口径覆写 unreferenced 徽标。
+    assert.deepEqual(statsPayload.unreferenced, { count: 0, bytes: 0 });
 
     db.prepare(
       "INSERT INTO attachment_references (attachmentId, noteId) VALUES (?, ?)",
@@ -195,7 +181,7 @@ test("file manager responses expose immediate orphan state instead of historical
   }
 });
 
-test("manual uploads are marked protected and excluded from orphan list and count", async () => {
+test("manual uploads stay in the unreferenced list but are marked auto-cleanup protected", async () => {
   const db = getDb();
   const fixture = seedFixture();
   const scope = { kind: "personal" as const, workspaceId: null };
@@ -240,10 +226,6 @@ test("manual uploads are marked protected and excluded from orphan list and coun
   const headers = { "X-User-Id": fixture.userId };
 
   try {
-    assert.deepEqual(getImmediateOrphanSummary(db, scope, fixture.userId), {
-      count: 0,
-      bytes: 0,
-    });
     assert.equal(
       getProtectedManualUploadIds(db, [fixture.attachmentId], scope, fixture.userId)
         .has(fixture.attachmentId),
@@ -255,17 +237,19 @@ test("manual uploads are marked protected and excluded from orphan list and coun
     assert.equal(allPayload.items[0].isManualUpload, true);
     assert.equal(allPayload.items[0].isAutoCleanupProtected, true);
 
-    const orphanResponse = await app.request(
+    const unreferencedResponse = await app.request(
       "http://localhost/api/files?filter=unreferenced&page=1&pageSize=10",
       { headers },
     );
-    const orphanPayload = await orphanResponse.json() as any;
-    assert.equal(orphanPayload.total, 0);
-    assert.deepEqual(orphanPayload.items, []);
+    const unreferencedPayload = await unreferencedResponse.json() as any;
+    // 从文件管理手动上传的文件是「未引用」最典型的人群：列出但带盾牌。
+    assert.equal(unreferencedPayload.total, 1);
+    assert.equal(unreferencedPayload.items[0].id, fixture.attachmentId);
+    assert.equal(unreferencedPayload.items[0].isAutoCleanupProtected, true);
 
     const statsResponse = await app.request("http://localhost/api/files/stats", { headers });
     const statsPayload = await statsResponse.json() as any;
-    assert.deepEqual(statsPayload.unreferenced, { count: 0, bytes: 0 });
+    assert.deepEqual(statsPayload.unreferenced, { count: 1, bytes: 843 * 1024 });
 
     const detailResponse = await app.request(
       `http://localhost/api/files/${fixture.attachmentId}`,

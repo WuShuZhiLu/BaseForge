@@ -73,6 +73,7 @@ import {
   parseThumbnailWidth,
   getOrCreateThumbnailAsync,
   getOrCreateThumbnailFromBufferAsync,
+  getOrCreateVideoThumbnailAsync,
   isThumbnailable,
   deleteThumbnailsFor,
 } from "../services/thumbnails";
@@ -460,12 +461,24 @@ export async function handleDownloadAttachment(
   const createThumbnailFromBuffer = dependencies.getOrCreateThumbnailFromBufferAsync
     ?? getOrCreateThumbnailFromBufferAsync;
 
+  const absPath = path.join(ATTACHMENTS_DIR, row.path);
+  const localExists = fs.existsSync(absPath);
+
+  // 视频海报分支：带 ?w= 的视频请求**只允许**拿到海报或 404，绝不能回退成
+  // 整个视频文件——调用方是 <img>，回退会让浏览器白下几百 MB 字节再报解码失败。
+  // 这里故意不看 ffmpeg/sharp 可用性（isVideoThumbnailable 会因降级返回 false），
+  // 降级统一由“海报为 null → 404”承担；对象存储也不取（抽首帧要整段下载）。
+  const wantsVideoPoster = Boolean(requestedWidth)
+    && !forceDownload
+    && (row.mimeType || "").toLowerCase().startsWith("video/");
+
   // 是否会走缩略图分支只依赖 query 参数 + row.mimeType，不需要读文件内容就能
   // 确定。据此可在读取任何字节之前算出这次响应的 ETag variant，命中
   // If-None-Match 时直接 304，省掉磁盘/对象存储读取以及（若是缩略图）sharp
   // 编码。此前 ETag 统一为 "att-<id>"，原图和不同宽度的缩略图共用同一个验证
   // 器，属于错误的实体标识；现在按 (id, variant) 区分。
-  const willServeThumbnail = Boolean(requestedWidth) && !forceDownload && isThumbnailable(row.mimeType);
+  const willServeThumbnail = Boolean(requestedWidth) && !forceDownload
+    && (wantsVideoPoster || isThumbnailable(row.mimeType));
   const etag = computeAttachmentEtag(row.id, willServeThumbnail ? requestedWidth! : "original");
 
   if (requestMatchesEtag(new Headers(c.req.raw.headers), etag)) {
@@ -479,35 +492,42 @@ export async function handleDownloadAttachment(
     });
   }
 
-  const absPath = path.join(ATTACHMENTS_DIR, row.path);
-  const localExists = fs.existsSync(absPath);
-
   // 缩略图分支：仅在
   //   1) 请求带合法 ?w=
   //   2) 不是 ?download=1（下载场景必须给原文件）
-  //   3) 原图是可缩略的 raster 图片
-  // 三者同时满足时尝试。任何一步失败就回退到原图。
+  //   3) 原图是可缩略的 raster 图片，或本地视频（取首帧海报）
+  // 三者同时满足时尝试。图片任何一步失败就回退到原图；视频失败给 404。
   let sourceBuffer: Buffer | null | undefined;
   if (willServeThumbnail) {
-    const thumb = localExists
-      ? await getOrCreateThumbnailAsync(
-          ATTACHMENTS_DIR,
-          row.id,
-          absPath,
-          row.mimeType,
-          requestedWidth!,
-        )
-      : await (async () => {
-          sourceBuffer = await readObject(row.path);
-          if (!sourceBuffer) return null;
-          return createThumbnailFromBuffer(
+    const thumb = wantsVideoPoster
+      ? (localExists
+          ? await getOrCreateVideoThumbnailAsync(
+              ATTACHMENTS_DIR,
+              row.id,
+              absPath,
+              row.mimeType,
+              requestedWidth!,
+            )
+          : null)
+      : localExists
+        ? await getOrCreateThumbnailAsync(
             ATTACHMENTS_DIR,
             row.id,
-            sourceBuffer,
+            absPath,
             row.mimeType,
             requestedWidth!,
-          );
-        })();
+          )
+        : await (async () => {
+            sourceBuffer = await readObject(row.path);
+            if (!sourceBuffer) return null;
+            return createThumbnailFromBuffer(
+              ATTACHMENTS_DIR,
+              row.id,
+              sourceBuffer,
+              row.mimeType,
+              requestedWidth!,
+            );
+          })();
     if (thumb) {
       return c.body(toResponseBody(thumb.buffer), 200, {
         "Content-Type": thumb.mimeType,
@@ -517,6 +537,15 @@ export async function handleDownloadAttachment(
         "X-Thumbnail-Width": String(requestedWidth),
         ETag: etag,
       });
+    }
+    if (wantsVideoPoster) {
+      // X-Attachment-Note：让外层访问日志能区分“海报不存在”与“附件文件丢了”，
+      // 否则每次无 ffmpeg 的部署都会打一堆误导性的 attachment.file.missing。
+      return c.json(
+        { error: "视频海报不可用", code: "VIDEO_POSTER_UNAVAILABLE" },
+        404,
+        { "X-Attachment-Note": "video-poster-unavailable" },
+      );
     }
     // thumb 为 null（sharp 失败 / 不可用）→ fall through 返回原图。
     // 此时上面预先算好的 etag 是缩略图 variant，和接下来要返回的原图内容

@@ -2,6 +2,19 @@ import type { Context, Next } from "hono";
 
 import { getDb } from "../db/schema.js";
 import { createUserAttachmentAccessUrls } from "../lib/attachment-signed-url.js";
+import { scanAttachmentReferences } from "../lib/attachment-reference-scan.js";
+import {
+  buildMimeCategoryWhere,
+  getMimeCategory,
+  isMimeCategory,
+  type MimeCategory,
+} from "../lib/mime-category.js";
+import {
+  appendIdSetWhere,
+  buildKeywordWhere,
+  buildShareStatusWhere,
+  resolveFileListOrderBy,
+} from "../lib/file-list-sql.js";
 import {
   hasKnowledgeCapability,
   resolveResourceKnowledgeAccess,
@@ -28,6 +41,8 @@ type FileListDbRow = {
   notebookName: string | null;
   notebookIcon: string | null;
   folderName: string | null;
+  /** 引用该附件的笔记数（attachment_references 倒排表计数），仅列表查询选出。 */
+  refCount?: number;
 };
 
 const THUMBNAILABLE_MIMES = new Set([
@@ -134,6 +149,14 @@ function visibleAttachmentStats(workspaceId: string | null, userId: string) {
         WHERE a.workspaceId IS NULL AND a.userId = ?
       `).all(userId) as Array<{ id: string; noteId: string; mimeType: string; size: number }>;
 
+  // 侧栏「文档引用 / 未引用」两个徽标必须跟点进去的列表同源：两者都来自
+  // 同一次内容扫描（严格互补，相加就是全部），并且同样经过笔记可见性过滤。
+  const scan = scanAttachmentReferences(
+    db,
+    { scope: workspaceId ? "workspace" : "personal", workspaceId },
+    userId,
+  );
+
   const byMime = new Map<string, { count: number; bytes: number }>();
   let total = 0;
   let totalBytes = 0;
@@ -141,23 +164,35 @@ function visibleAttachmentStats(workspaceId: string | null, userId: string) {
   let imageBytes = 0;
   let fileCount = 0;
   let fileBytes = 0;
+  let referencedCount = 0;
+  let referencedBytes = 0;
+  let unreferencedCount = 0;
+  let unreferencedBytes = 0;
 
   for (const row of rows as Array<{ id: string; noteId: string; mimeType: string; size: number }>) {
     const access = accessForNote(row.noteId, userId);
     if (!hasKnowledgeCapability(access, "canView")) continue;
     total += 1;
     totalBytes += Number(row.size || 0);
+    const bytes = Number(row.size || 0);
+    if (scan.referencedIds.has(row.id)) {
+      referencedCount += 1;
+      referencedBytes += bytes;
+    } else if (scan.orphanIds.has(row.id)) {
+      unreferencedCount += 1;
+      unreferencedBytes += bytes;
+    }
     const mime = row.mimeType || "application/octet-stream";
     const stats = byMime.get(mime) || { count: 0, bytes: 0 };
     stats.count += 1;
-    stats.bytes += Number(row.size || 0);
+    stats.bytes += bytes;
     byMime.set(mime, stats);
     if (mime.toLowerCase().startsWith("image/")) {
       imageCount += 1;
-      imageBytes += Number(row.size || 0);
+      imageBytes += bytes;
     } else {
       fileCount += 1;
-      fileBytes += Number(row.size || 0);
+      fileBytes += bytes;
     }
   }
 
@@ -166,6 +201,8 @@ function visibleAttachmentStats(workspaceId: string | null, userId: string) {
     totalBytes,
     images: { count: imageCount, bytes: imageBytes },
     files: { count: fileCount, bytes: fileBytes },
+    referenced: { count: referencedCount, bytes: referencedBytes },
+    unreferenced: { count: unreferencedCount, bytes: unreferencedBytes },
     byMime: [...byMime.entries()].map(([mime, value]) => ({ mime, ...value })),
   };
 }
@@ -176,74 +213,11 @@ function normalizePositiveInteger(value: string | undefined, fallback: number, m
   return max ? Math.min(max, normalized) : normalized;
 }
 
-function resolveOrderBy(sort: string): string {
-  switch (sort.toLowerCase()) {
-    case "name_asc":
-      return "a.filename COLLATE NOCASE ASC";
-    case "name_desc":
-      return "a.filename COLLATE NOCASE DESC";
-    case "size_asc":
-      return "a.size ASC";
-    case "size_desc":
-      return "a.size DESC";
-    case "created_asc":
-      return "a.createdAt ASC";
-    case "created_desc":
-    default:
-      return "a.createdAt DESC";
-  }
-}
-
 function fileScope(c: Context): FileScope {
   const rawWorkspaceId = (c.req.query("workspaceId") || "").trim();
   return rawWorkspaceId && rawWorkspaceId !== "personal"
     ? { scope: "workspace", workspaceId: rawWorkspaceId }
     : { scope: "personal", workspaceId: null };
-}
-
-function buildUnreferencedSet(scope: FileScope, userId: string): Set<string> {
-  const db = getDb();
-  const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
-  const contentRows = (scope.scope === "workspace"
-    ? db.prepare(`
-        SELECT content
-        FROM notes
-        WHERE workspaceId = ? AND content IS NOT NULL AND content <> ''
-      `).all(scope.workspaceId!)
-    : db.prepare(`
-        SELECT content
-        FROM notes
-        WHERE userId = ? AND workspaceId IS NULL
-          AND content IS NOT NULL AND content <> ''
-      `).all(userId)) as Array<{ content: string }>;
-  const haystack = contentRows.map((row) => row.content).join("\n");
-
-  const candidates = (scope.scope === "workspace"
-    ? db.prepare(`
-        SELECT a.id, a.createdAt
-        FROM attachments a
-        INNER JOIN notes n ON n.id = a.noteId
-        WHERE a.workspaceId = ?
-      `).all(scope.workspaceId!)
-    : db.prepare(`
-        SELECT a.id, a.createdAt
-        FROM attachments a
-        INNER JOIN notes n ON n.id = a.noteId
-        WHERE a.userId = ? AND a.workspaceId IS NULL
-      `).all(userId)) as Array<{ id: string; createdAt: string }>;
-
-  const ids = new Set<string>();
-  for (const row of candidates) {
-    const timestamp = new Date(
-      row.createdAt && row.createdAt.includes("T")
-        ? row.createdAt
-        : `${(row.createdAt || "").replace(" ", "T")}Z`,
-    ).getTime();
-    if (Number.isFinite(timestamp) && timestamp > cutoffMs) continue;
-    if (haystack.includes(`/api/attachments/${row.id}`)) continue;
-    ids.add(row.id);
-  }
-  return ids;
 }
 
 function toFileOut(row: FileListDbRow): Record<string, unknown> {
@@ -256,6 +230,7 @@ function toFileOut(row: FileListDbRow): Record<string, unknown> {
     size: row.size,
     createdAt: row.createdAt,
     category: image ? "image" : "file",
+    mimeCategory: getMimeCategory(row.mimeType),
     url: `/api/attachments/${row.id}`,
     hash: row.hash ?? null,
     folderId: row.folderId ?? null,
@@ -271,7 +246,12 @@ function toFileOut(row: FileListDbRow): Record<string, unknown> {
         }
       : null,
   };
-  if (image && THUMBNAILABLE_MIMES.has(mime)) {
+  if (typeof row.refCount === "number") {
+    // 与 routes/files.ts 一致：列表项下发引用计数，供“文档引用”视图展示。
+    output.referenceCount = row.refCount;
+  }
+  if ((image && THUMBNAILABLE_MIMES.has(mime)) || mime.startsWith("video/")) {
+    // 图片走 sharp 缩放；视频走 ffmpeg 首帧海报（与 routes/files.ts 对齐）
     output.thumbnailUrl = `/api/attachments/${row.id}?w=240`;
   }
   return output;
@@ -281,13 +261,28 @@ function toFileOut(row: FileListDbRow): Record<string, unknown> {
  * Rebuild the root file list from the complete candidate set. The legacy route applies
  * LIMIT/OFFSET before the knowledge-tree guard runs, so filtering only payload.items can
  * produce empty pages and a false total. Access must be resolved before pagination.
+ *
+ * 参数口径必须跟 routes/files.ts 对齐——这一层会整体重建响应，这里没认得的
+ * query 参数就等于在应用里不存在（实测：mimeCategory / shareStatus / filter=referenced
+ * / sort=referenced_desc 曾在此被静默丢弃）。mime-category / file-list-sql /
+ * attachment-reference-scan 三个 lib 就是为了让两层不会再次各自漂移。
  */
 function visibleFileList(c: Context, userId: string) {
   const db = getDb();
   const scope = fileScope(c);
   const category = (c.req.query("category") || "all").toLowerCase();
+  // 统一文件池的类型筛选；mimeCategory 优先于已弃用的 category（两者不叠加）。
+  const mimeCategoryRaw = (c.req.query("mimeCategory") || "").toLowerCase();
+  const mimeCategory: MimeCategory | null = isMimeCategory(mimeCategoryRaw)
+    ? mimeCategoryRaw
+    : null;
   const filter = (c.req.query("filter") || "").toLowerCase();
   const mime = (c.req.query("mime") || "").toLowerCase();
+  const shareStatusRaw = (c.req.query("shareStatus") || "").toLowerCase();
+  const shareStatus = shareStatusRaw === "shared" || shareStatusRaw === "unshared"
+    ? shareStatusRaw
+    : null;
+  const uploadedWithin = Number(c.req.query("uploadedWithin") || 0);
   const notebookId = c.req.query("notebookId") || "";
   const noteId = c.req.query("noteId") || "";
   const folderId = c.req.query("folderId") || "";
@@ -305,8 +300,15 @@ function visibleFileList(c: Context, userId: string) {
     params.push(userId);
   }
 
-  if (category === "image") whereParts.push("a.mimeType LIKE 'image/%'");
-  if (category === "file") whereParts.push("(a.mimeType IS NULL OR a.mimeType NOT LIKE 'image/%')");
+  if (mimeCategory) {
+    const cond = buildMimeCategoryWhere(mimeCategory);
+    whereParts.push(cond.sql);
+    params.push(...cond.params);
+  } else if (category === "image") {
+    whereParts.push("a.mimeType LIKE 'image/%'");
+  } else if (category === "file") {
+    whereParts.push("(a.mimeType IS NULL OR a.mimeType NOT LIKE 'image/%')");
+  }
   if (mime) {
     whereParts.push("a.mimeType = ?");
     params.push(mime);
@@ -316,8 +318,13 @@ function visibleFileList(c: Context, userId: string) {
     params.push(notebookId);
   }
   if (q) {
-    whereParts.push("a.filename LIKE ? COLLATE NOCASE");
-    params.push(`%${q}%`);
+    // 搜索框同时命中文件名和 MIME 类型（输 "pdf" / "video/" 也能找到）
+    whereParts.push(buildKeywordWhere());
+    params.push(`%${q}%`, `%${q}%`);
+  }
+  if (Number.isFinite(uploadedWithin) && uploadedWithin > 0) {
+    whereParts.push("a.createdAt >= datetime('now', ?)");
+    params.push(`-${Math.floor(uploadedWithin)} days`);
   }
   if (noteId) {
     whereParts.push(
@@ -331,14 +338,14 @@ function visibleFileList(c: Context, userId: string) {
     whereParts.push("a.folderId = ?");
     params.push(folderId);
   }
-  if (filter === "unreferenced") {
-    const ids = [...buildUnreferencedSet(scope, userId)];
-    if (ids.length === 0) {
-      whereParts.push("1 = 0");
-    } else {
-      whereParts.push(`a.id IN (${ids.map(() => "?").join(",")})`);
-      params.push(...ids);
-    }
+  // 「文档引用 / 未引用」两个分类来自同一次内容扫描，严格互补；空集也必须
+  // 落成 `1 = 0`，不能省略条件（否则退化成返回全部附件）。
+  if (filter === "unreferenced" || filter === "referenced") {
+    const scan = scanAttachmentReferences(db, scope, userId);
+    appendIdSetWhere(whereParts, params, filter === "unreferenced" ? scan.orphanIds : scan.referencedIds);
+  }
+  if (shareStatus) {
+    whereParts.push(buildShareStatusWhere(shareStatus));
   }
   if (filter === "myuploads") {
     whereParts.push("a.uploadSource = ?");
@@ -356,13 +363,15 @@ function visibleFileList(c: Context, userId: string) {
            a.noteId, a.folderId,
            n.title AS noteTitle, n.notebookId, n.isTrashed,
            nb.name AS notebookName, nb.icon AS notebookIcon,
-           af.name AS folderName
+           af.name AS folderName,
+           (SELECT COUNT(*) FROM attachment_references ar
+                WHERE ar.attachmentId = a.id) AS refCount
     FROM attachments a
     LEFT JOIN notes n ON n.id = a.noteId
     LEFT JOIN notebooks nb ON nb.id = n.notebookId
     LEFT JOIN attachment_folders af ON af.id = a.folderId
     WHERE ${whereParts.join(" AND ")}
-    ORDER BY ${resolveOrderBy(c.req.query("sort") || "created_desc")}
+    ORDER BY ${resolveFileListOrderBy(c.req.query("sort"))}
   `).all(...params) as FileListDbRow[];
 
   const accessCache = new Map<string, { canView: boolean; canDownload: boolean }>();
@@ -420,11 +429,11 @@ export async function enforceKnowledgeFilesVisibility(c: Context, next: Next): P
   if (path.endsWith("/stats")) {
     const rawWorkspaceId = (c.req.query("workspaceId") || "").trim();
     const workspaceId = rawWorkspaceId && rawWorkspaceId !== "personal" ? rawWorkspaceId : null;
-    const stats = visibleAttachmentStats(workspaceId, userId);
+    // referenced / unreferenced 现在由本层按可见性算出（旧写法把它们写死为 0，
+    // 侧栏「未引用」徽标会永远是 0，点进去却有文件）。
     replaceJsonResponse(c, {
       ...payload,
-      ...stats,
-      unreferenced: { count: 0, bytes: 0 },
+      ...visibleAttachmentStats(workspaceId, userId),
     });
     return;
   }

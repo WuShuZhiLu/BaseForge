@@ -2,7 +2,6 @@ import type Database from "better-sqlite3";
 import type { Context, Next } from "hono";
 
 import { getDb } from "../db/schema.js";
-import { createUserAttachmentAccessUrls } from "../lib/attachment-signed-url.js";
 
 type FilesScope =
   | { kind: "personal"; workspaceId: null }
@@ -17,29 +16,7 @@ type ReferenceNote = {
   isTrashed: number;
 };
 
-type FileListRow = {
-  id: string;
-  filename: string;
-  mimeType: string;
-  size: number;
-  path: string;
-  createdAt: string;
-  noteId: string;
-  hash: string | null;
-  folderId: string | null;
-  folderName: string | null;
-  uploadSource: string | null;
-};
-
 const MANUAL_UPLOAD_SOURCE = "file_manager";
-
-const THUMBNAILABLE_MIMES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/bmp",
-  "image/gif",
-]);
 
 function resolveScope(c: Context): FilesScope {
   const workspaceId = (c.req.query("workspaceId") || "").trim();
@@ -78,38 +55,6 @@ function appendNoteScope(
     where.push(`${alias}.userId = ?`, `${alias}.workspaceId IS NULL`);
     params.push(userId);
   }
-}
-
-/**
- * 文件管理中的“孤儿”是一个只读状态，应立即反映 attachment_references 的真实结果。
- * 24 小时宽限只属于真正删除文件的 cleanup-orphans 接口，不能用于列表可见性。
- *
- * 文件管理手动上传（uploadSource=file_manager）代表用户明确保存的独立文件，属于
- * “未引用但受保护”，不应再被叫作孤儿，也不参与孤儿数量统计。
- */
-export function getImmediateOrphanSummary(
-  db: Database.Database,
-  scope: FilesScope,
-  userId: string,
-): { count: number; bytes: number } {
-  const where: string[] = [
-    "EXISTS(SELECT 1 FROM notes owner_note WHERE owner_note.id = a.noteId)",
-    "NOT EXISTS(SELECT 1 FROM attachment_references ar WHERE ar.attachmentId = a.id)",
-    "COALESCE(a.uploadSource, '') <> 'file_manager'",
-  ];
-  const params: Array<string | number> = [];
-  appendAttachmentScope(where, params, scope, userId);
-
-  const row = db.prepare(`
-    SELECT COUNT(*) AS count, COALESCE(SUM(COALESCE(a.size, 0)), 0) AS bytes
-      FROM attachments a
-     WHERE ${where.join(" AND ")}
-  `).get(...params) as { count: number; bytes: number } | undefined;
-
-  return {
-    count: Number(row?.count || 0),
-    bytes: Number(row?.bytes || 0),
-  };
 }
 
 /**
@@ -199,132 +144,6 @@ export function getProtectedManualUploadIds(
   return result;
 }
 
-function resolveOrderBy(sort: string | undefined): string {
-  switch ((sort || "").toLowerCase()) {
-    case "name_asc": return "a.filename COLLATE NOCASE ASC";
-    case "name_desc": return "a.filename COLLATE NOCASE DESC";
-    case "size_asc": return "a.size ASC";
-    case "size_desc": return "a.size DESC";
-    case "created_asc": return "a.createdAt ASC";
-    case "created_desc":
-    default: return "a.createdAt DESC";
-  }
-}
-
-function toOrphanFileOut(row: FileListRow) {
-  const mime = (row.mimeType || "").toLowerCase();
-  const image = mime.startsWith("image/");
-  return {
-    id: row.id,
-    filename: row.filename,
-    mimeType: row.mimeType,
-    size: row.size,
-    createdAt: row.createdAt,
-    category: image ? "image" : "file",
-    url: `/api/attachments/${row.id}`,
-    ...(image && THUMBNAILABLE_MIMES.has(mime)
-      ? { thumbnailUrl: `/api/attachments/${row.id}?w=240` }
-      : {}),
-    hash: row.hash ?? null,
-    folderId: row.folderId ?? null,
-    folderName: row.folderName ?? null,
-    // 真正孤儿没有当前引用，也不是文件管理手动上传的受保护资产。
-    primaryNote: null,
-    isManualUpload: false,
-    isAutoCleanupProtected: false,
-  };
-}
-
-function buildImmediateOrphanList(
-  db: Database.Database,
-  c: Context,
-  scope: FilesScope,
-  userId: string,
-) {
-  const category = (c.req.query("category") || "all").toLowerCase();
-  const mime = c.req.query("mime") || "";
-  const notebookId = c.req.query("notebookId") || "";
-  const noteId = c.req.query("noteId") || "";
-  const folderId = c.req.query("folderId") || "";
-  const q = (c.req.query("q") || "").trim();
-  const page = Math.max(1, Number(c.req.query("page") || 1));
-  const pageSize = Math.min(200, Math.max(1, Number(c.req.query("pageSize") || 50)));
-
-  const where: string[] = [
-    "NOT EXISTS(SELECT 1 FROM attachment_references ar WHERE ar.attachmentId = a.id)",
-    "COALESCE(a.uploadSource, '') <> 'file_manager'",
-  ];
-  const params: Array<string | number> = [];
-  appendAttachmentScope(where, params, scope, userId);
-
-  if (category === "image") {
-    where.push("a.mimeType LIKE 'image/%'");
-  } else if (category === "file") {
-    where.push("(a.mimeType IS NULL OR a.mimeType NOT LIKE 'image/%')");
-  }
-  if (mime) {
-    where.push("a.mimeType = ?");
-    params.push(mime.toLowerCase());
-  }
-  if (notebookId) {
-    where.push("n.notebookId = ?");
-    params.push(notebookId);
-  }
-  if (q) {
-    where.push("a.filename LIKE ? COLLATE NOCASE");
-    params.push(`%${q}%`);
-  }
-  if (folderId) {
-    if (folderId === "__unarchived") {
-      where.push("a.folderId IS NULL");
-    } else {
-      where.push("a.folderId = ?");
-      params.push(folderId);
-    }
-  }
-  // “某笔记引用的文件”和“无任何引用”互斥，明确返回空集。
-  if (noteId) where.push("1 = 0");
-
-  const whereSql = where.join(" AND ");
-  const totalRow = db.prepare(`
-    SELECT COUNT(*) AS count
-      FROM attachments a
-      INNER JOIN notes n ON n.id = a.noteId
-      LEFT JOIN notebooks nb ON nb.id = n.notebookId
-      LEFT JOIN attachment_folders af ON af.id = a.folderId
-     WHERE ${whereSql}
-  `).get(...params) as { count: number };
-
-  const rows = db.prepare(`
-    SELECT a.id,
-           a.filename,
-           a.mimeType,
-           a.size,
-           a.path,
-           a.createdAt,
-           a.noteId,
-           a.hash,
-           a.folderId,
-           a.uploadSource,
-           af.name AS folderName
-      FROM attachments a
-      INNER JOIN notes n ON n.id = a.noteId
-      LEFT JOIN notebooks nb ON nb.id = n.notebookId
-      LEFT JOIN attachment_folders af ON af.id = a.folderId
-     WHERE ${whereSql}
-     ORDER BY ${resolveOrderBy(c.req.query("sort"))}
-     LIMIT ? OFFSET ?
-  `).all(...params, pageSize, (page - 1) * pageSize) as FileListRow[];
-
-  return {
-    items: rows.map(toOrphanFileOut),
-    accessUrls: createUserAttachmentAccessUrls(userId, rows),
-    total: Number(totalRow?.count || 0),
-    page,
-    pageSize,
-  };
-}
-
 function replaceJsonResponse(c: Context, payload: unknown): void {
   const original = c.res;
   const headers = new Headers(original.headers);
@@ -350,11 +169,15 @@ function isFilesDetail(pathname: string): boolean {
 }
 
 /**
- * 该中间件在原 filesRouter 完成鉴权和功能开关校验后再修正响应：
- * - 孤儿列表：立即反映真实引用，并排除用户主动保存的手动上传文件；
- * - 统计徽标：与孤儿列表使用相同口径；
- * - 普通列表“来源笔记”：改成当前真实引用；
+ * 该中间件在原 filesRouter（及知识树收口层）完成鉴权后修正响应：
+ * - 列表“来源笔记”：改成当前真实引用（attachments.noteId 只是上传归属）；
  * - 列表和详情：为文件管理手动上传下发受保护标记，供 UI 展示绿色盾牌。
+ *
+ * 这里不再重建“未引用”列表或统计。历史上它用过一套“倒排表 NOT EXISTS 且
+ * uploadSource<>file_manager”的孤儿口径覆盖收口层结果，结果是：侧栏「文档引用」
+ * 走内容扫描、「未引用」走倒排表且排除手动上传——从文件管理上传的文件永远不进
+ * 「未引用」（实测返回空），两个分类也不再互补。清理口径（含 24h 宽限与手动
+ * 上传保护）只属于 `/api/data-file/cleanup-orphans`。
  */
 export async function fileOrphanVisibilityMiddleware(c: Context, next: Next): Promise<void> {
   await next();
@@ -367,24 +190,7 @@ export async function fileOrphanVisibilityMiddleware(c: Context, next: Next): Pr
   const db = getDb();
   const scope = resolveScope(c);
 
-  if (isFilesStats(pathname)) {
-    let payload: any;
-    try {
-      payload = await c.res.clone().json();
-    } catch {
-      return;
-    }
-    payload.unreferenced = getImmediateOrphanSummary(db, scope, userId);
-    replaceJsonResponse(c, payload);
-    return;
-  }
-
   if (isFilesRoot(pathname)) {
-    if ((c.req.query("filter") || "").toLowerCase() === "unreferenced") {
-      replaceJsonResponse(c, buildImmediateOrphanList(db, c, scope, userId));
-      return;
-    }
-
     let payload: any;
     try {
       payload = await c.res.clone().json();

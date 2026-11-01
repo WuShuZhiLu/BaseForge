@@ -43,24 +43,21 @@ import {
   FileCode,
   FileAudio,
   FileVideo,
+  Play,
   FileSpreadsheet,
   ExternalLink,
   Download,
   Loader2,
-  Filter,
   FolderOpen,
   ChevronRight,
   ChevronDown,
-  ArrowUpDown,
   Inbox,
   Copy,
   Check,
   CheckSquare,
   Square,
-  Sparkles,
-  Link2,
-  Globe,
   Share2,
+  Link2,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
 import { isBuiltinPluginEnabled } from "@/plugins/builtin/registry";
@@ -70,9 +67,9 @@ import { navigateToolPage } from "@/components/toolTabs";
 /** 页签契约：页面自带标题行（附件管理顶栏），宿主顶栏无需重复渲染。 */
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
-import { FileItem, FileStats, FileSortKey, FileCategory } from "@/types";
-import { FILE_SORT_OPTIONS as SORT_OPTIONS, FILE_DOC_MIME_CHIPS, FILE_IH_MIME_CHIPS, expandMimeChips, getFilesCategory, getFilesGroupMode, getFilesIhCategory, getFilesIhMimes, getFilesIhSort, getFilesIhTime, getFilesMimes, getFilesSort, getFilesSource, getFilesTime, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
-import type { FilesGroupMode, FilesSource, FilesViewMode } from "@/features/files/filesUi";
+import { FileItem, FileStats } from "@/types";
+import { FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
+import type { FilesTypeFilter, FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,10 +82,10 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { buildPublicAttachmentUrl } from "@/lib/publicAttachmentUrl";
 import { downloadAttachment } from "@/lib/downloadFile";
 import {
-  formatImageHostSnippet,
-  imageHostFormatLabel,
-  type ImageHostFormat,
-} from "@/lib/imageHostFormats";
+  formatFileLinkSnippet,
+  fileLinkFormatLabel,
+  type FileLinkFormat,
+} from "@/lib/fileLinkFormats";
 import AttachmentDetailDrawer from "@/components/attachmentDetail/AttachmentDetailDrawer";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import {
@@ -158,13 +155,14 @@ function formatLocalTime(s: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * UI 侧的分类 Tab 值。在 FileCategory（"image" | "file"）基础上额外加：
- *   - "all"          全部（不传 category / filter）
+ * UI 侧的范围筛选（与类型维度正交）：
+ *   - "all"          全部文件
  *   - "myUploads"    我的上传（用户从文件管理页直接上传的附件，
- *                    实现上 = attachments.noteId 指向 holder note）
- *   - "unreferenced" 孤儿视图（走 filter=unreferenced，category 不参与）
+ *                    实现上 = attachments.uploadSource = 'file_manager'）
+ *   - "referenced"   文档引用（正文里引用过的附件，走 filter=referenced）
+ *   - "unreferenced" 未引用视图（走 filter=unreferenced；与上一项严格互补，相加=全部）
  */
-type CategoryFilter = "all" | FileCategory | "myUploads" | "unreferenced";
+type CategoryFilter = "all" | "myUploads" | "referenced" | "unreferenced";
 
 /**
  * "我的上传"内部的二级子筛选。仅在 category="myUploads" 时生效。
@@ -211,7 +209,7 @@ function readStoredPageSize(): number {
 //
 // 策略：
 //   - 模块级 Map（FileManager 实例销毁后下次进来仍然命中，体感更好）；
-//   - cacheKey 是 list 的所有筛选参数 + workspace 作用域 + isImageHostMode；
+//   - cacheKey 是 list 的所有筛选参数（类型/范围/时间/排序/搜索/分页）+ workspace 作用域；
 //   - TTL 30s：足够覆盖典型"翻页 → 看图 → 切回上一页"的窗口；
 //   - 写动作（删除 / 上传 / 重命名）会调用 invalidateFileListCache() 清空，
 //     避免显示陈旧数据。
@@ -299,11 +297,17 @@ export default function FileManager() {
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
   void filesUiVersion; // 仅为订阅；实际值在渲染期从 getter 读取
   const source = getFilesSource();
-  const isRemoteSource = source === "remote" && isBuiltinPluginEnabled("remote-files");
+  // remote-files 是内置插件，关闭后「保存到远程」等联动入口也必须消失
+  const remoteFilesEnabled = isBuiltinPluginEnabled("remote-files");
+  const isRemoteSource = source === "remote" && remoteFilesEnabled;
   const sourceTab = isRemoteSource ? "remote" : "local";
-  const isImageHostMode = source === "imagehost";
-  const category = (isImageHostMode ? getFilesIhCategory() : getFilesCategory()) as CategoryFilter;
-  const sort = (isImageHostMode && getFilesIhSort() === "copied_desc" ? "created_desc" : isImageHostMode ? getFilesIhSort() : getFilesSort()) as FileSortKey;
+  // 统一文件池：类型（图片/视频/音频/文档/其他）是筛选维度而非分隔容器；
+  // 范围（全部/我的上传/未引用）与它正交，两者可叠加。
+  const typeFilter = getFilesType();
+  const category = getFilesCategory() as CategoryFilter;
+  /** 分享状态（侧栏「分享状态」chips）：all = 不筛。 */
+  const shareFilter = getFilesShare();
+  const sort = getFilesSort();
   const viewMode: FilesViewMode = getFilesViewMode();
   const groupMode = getFilesGroupMode();
 
@@ -313,9 +317,25 @@ export default function FileManager() {
 
   // 附件分享对话框：shareTargetId 非空时打开（列表行"分享"按钮 / 详情抽屉头部入口）。
   const [shareTargetId, setShareTargetId] = useState<string | null>(null);
+  // 已开启分享（isActive）的附件 id 集合：卡片"已分享"角标的数据源。
+  // 注：公开直链对所有附件都可用，这里的"已分享"指用户主动建过分享链接。
+  const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
+  const loadShares = useCallback(async () => {
+    try {
+      const rows = await attachmentShareApi.list();
+      setSharedIds(new Set(rows.filter((row) => row.isActive).map((row) => row.attachmentId)));
+    } catch {
+      // 角标不是关键路径，失败静默，不打扰用户
+    }
+  }, []);
+  useEffect(() => { void loadShares(); }, [loadShares]);
   const openShareById = useCallback((id: string) => setShareTargetId(id), []);
   const openShare = useCallback((item: FileItem) => setShareTargetId(item.id), []);
-  const closeShare = useCallback(() => setShareTargetId(null), []);
+  const closeShare = useCallback(() => {
+    setShareTargetId(null);
+    // 对话框里可能开启/关闭了分享 → 回来刷新角标
+    void loadShares();
+  }, [loadShares]);
 
   // 上传
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -330,6 +350,8 @@ export default function FileManager() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchMoving, setBatchMoving] = useState(false);
+  const [batchSharing, setBatchSharing] = useState(false);
 
   // 可回收空间（dryRun 扫出的"孤儿附件"汇总）：
   //   顶部清理按钮始终可见；有可回收项时附带展示数量与空间。
@@ -391,19 +413,18 @@ export default function FileManager() {
   // ---- 拉列表（受 category / sort / searchQuery / page 驱动）----
   const loadList = useCallback(async () => {
     // v12：客户端 30s TTL 缓存。命中即跳过 API 调用，秒开翻页。
-    // cacheKey 包含全部筛选维度 + workspace + 图床模式，保证不同场景互不串台。
+    // cacheKey 包含全部筛选维度 + workspace，保证不同场景互不串台。
     const cacheKey = JSON.stringify({
       c: category,
-      // 仅在 myUploads tab 下子筛选才有意义；其他 tab 固定写空串避免污染 key
+      // 仅在 myUploads 范围下子筛选才有意义；其他范围固定写空串避免污染 key
       mur: category === "myUploads" ? myUploadsRef : "",
-      mimes: getFilesMimes().join(","),
+      t: typeFilter,
+      sh: shareFilter,
       tf: getFilesTime(),
       s: sort,
       q: searchQuery,
       p: page,
       ps: pageSize,
-      ihm: isImageHostMode,
-      ihmMimes: isImageHostMode ? getFilesIhMimes().join(",") : "",
       // 工作区切换会重新 mount FileManager，理论上 cache 跟着销毁，
       // 但模块级 Map 跨实例存活——把当前 workspace 加进 key 防误命中。
       // 直接读取 store 在这里不方便，简单起见用 location 作为代理（已包含 workspace 路径）。
@@ -420,45 +441,27 @@ export default function FileManager() {
 
     setLoading(true);
     try {
-      // category="unreferenced" / "myUploads" 都是 UI 上的伪分类，实际走后端 filter=...，
-      // 真正的 category 维度不参与（孤儿视图保持包含全部 MIME；我的上传同理，
-      // 用户上传过的可能既有图也有文件）。
-      // v14：图床模式下不再强制 category=image——图床定位扩展为"任意文件的外链分享"，
-      //      用户可能要把 zip / pdf 也传上来发链接给别人下载。tab 切换由用户自主决定。
-      const isOrphan = category === "unreferenced";
-      const isMyUploads = category === "myUploads" || isImageHostMode;
-      // 图床与附件是两个独立来源：图床只展示用户直接上传的文件（filter=myUploads），
-      // 不与编辑器粘贴产生的附件混在一起。
-      // 附件与图床互斥：附件恒排除图片（category=file），图床恒 = 我的上传图片
-      const apiCategory: FileCategory = isImageHostMode ? "image" : "file";
-      const apiFilter: "unreferenced" | "myUploads" | undefined = isImageHostMode
-        ? "myUploads"
-        : isOrphan
-          ? "unreferenced"
-          : isMyUploads
-            ? "myUploads"
-            : undefined;
+      // 统一文件池：类型走 mimeCategory（"全部"时不传），范围走 filter=...，
+      // 分享状态走 shareStatus。三者正交可叠加（例如"未引用的视频"、
+      // "已分享的图片"），后端一个 WHERE 子句同时收口。
+      const apiFilter: "unreferenced" | "referenced" | "myUploads" | undefined =
+        category === "unreferenced" || category === "referenced" || category === "myUploads"
+          ? category
+          : undefined;
       const res = await api.files.list({
-        category: apiCategory,
+        mimeCategory: typeFilter === "all" ? undefined : typeFilter,
         filter: apiFilter,
-        mime: expandMimeChips(
-          isImageHostMode ? FILE_IH_MIME_CHIPS : FILE_DOC_MIME_CHIPS,
-          isImageHostMode ? getFilesIhMimes() : getFilesMimes(),
-        ).join(",") || undefined,
-        uploadedWithin: (isImageHostMode ? getFilesIhTime() : getFilesTime()) !== "all"
-          ? ({ today: 1, week: 7, month: 30 } as Record<string, number>)[isImageHostMode ? getFilesIhTime() : getFilesTime()] || undefined
+        shareStatus: shareFilter === "all" ? undefined : shareFilter,
+        uploadedWithin: getFilesTime() !== "all"
+          ? ({ today: 1, week: 7, month: 30 } as Record<string, number>)[getFilesTime()] || undefined
           : undefined,
         myUploadsRef:
-          isMyUploads && myUploadsRef !== "all" ? myUploadsRef : undefined,
+          category === "myUploads" && myUploadsRef !== "all" ? myUploadsRef : undefined,
         q: searchQuery || undefined,
         sort,
         page,
         pageSize,
       });
-      // v13：图床模式下对"我的上传/未引用"也走 category=image，由后端直接收口，
-      //       前端不再做二次过滤——total 就是真实可分页数，分页器不会跳变。
-      //       早期版本（仅 unreferenced 时）做客户端过滤是因为后端 filter=unreferenced
-      //       不接受 category，今天后端两个维度可同时生效，这段 dead path 已去除。
       setItems(res.items);
       setTotal(res.total);
       writeFileListCache(cacheKey, {
@@ -472,7 +475,7 @@ export default function FileManager() {
     } finally {
       setLoading(false);
     }
-  }, [category, myUploadsRef, sort, searchQuery, page, pageSize, isImageHostMode, filesUiVersion]);
+  }, [typeFilter, category, shareFilter, myUploadsRef, sort, searchQuery, page, pageSize, filesUiVersion]);
 
   useEffect(() => {
     loadList();
@@ -775,11 +778,81 @@ export default function FileManager() {
     }
   }, [selectedIds, detailId, closeDetail, loadStats, loadReclaimable, loadList, items.length, page]);
 
+  // ---- 批量归档到文件夹 ----
+  // folderId = null 表示移出到"未归档"。后端只改 attachments.folderId，
+  // 所以改完直接刷列表（当前筛选如果是按文件夹分组，用户能立刻看到变化）。
+  const handleBatchMove = useCallback(
+    async (folderId: string | null) => {
+      if (selectedIds.size === 0 || batchMoving) return;
+      const ids = Array.from(selectedIds);
+      setBatchMoving(true);
+      try {
+        const res = await api.files.batchMove(ids, folderId);
+        const label = folderId
+          ? attachmentFolders.find((f) => f.id === folderId)?.name || "文件夹"
+          : "未归档";
+        if (res.failed.length === 0) {
+          toast.success(`已移动 ${res.moved} 个文件到“${label}”`);
+          setSelectionMode(false);
+        } else {
+          toast.error(
+            `已移动 ${res.moved} 个，${res.failed.length} 个失败：${res.failed[0]?.reason || ""}${res.failed.length > 1 ? " 等" : ""}`,
+          );
+        }
+        invalidateFileListCache();
+        loadStats();
+        loadList();
+      } catch (err) {
+        console.error("[FileManager] batch move failed:", err);
+        toast.error(err instanceof Error ? err.message : "批量移动失败");
+      } finally {
+        setBatchMoving(false);
+      }
+    },
+    [selectedIds, batchMoving, attachmentFolders, loadStats, loadList],
+  );
+
+  // ---- 批量生成公开链接 ----
+  // 一个附件一条分享记录（后端语义），因此逐个 POST；拿到链接后整体拷到
+  // 剪贴板（一行一个），与单文件“复制链接”同一个 copyText 通道。
+  const handleBatchShareLinks = useCallback(async () => {
+    if (selectedIds.size === 0 || batchSharing) return;
+    const ids = Array.from(selectedIds);
+    setBatchSharing(true);
+    try {
+      const links: string[] = [];
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          const share = await attachmentShareApi.open(id, {});
+          links.push(buildAttachmentShareUrl(share.shareToken));
+        } catch {
+          failed += 1;
+        }
+      }
+      if (links.length === 0) {
+        toast.error("生成公开链接失败");
+        return;
+      }
+      const copied = await copyText(links.join("\n"));
+      toast.success(
+        copied
+          ? `已生成 ${links.length} 个公开链接并复制到剪贴板${failed ? `（${failed} 个失败）` : ""}`
+          : `已生成 ${links.length} 个公开链接，但复制失败：当前环境不允许访问剪贴板`,
+      );
+      // 刷新"已分享"角标 + 分享状态筛选徽标（stats.shared）
+      loadShares();
+      loadStats();
+    } finally {
+      setBatchSharing(false);
+    }
+  }, [selectedIds, batchSharing, loadShares, loadStats]);
+
   // 切换分类 / 搜索 / 排序 / 翻页时，已勾选的 id 可能不再在当前 items 里，
   // 体验上保留集合也容易让用户产生"幽灵勾选"。统一在这些维度变化时清空。
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [category, myUploadsRef, sort, searchQuery, page]);
+  }, [category, shareFilter, myUploadsRef, sort, searchQuery, page]);
 
   // ---- 上传 ----
   const handleUpload = useCallback(
@@ -818,20 +891,12 @@ export default function FileManager() {
     fileInputRef.current?.click();
   }, []);
 
-  // 统一上传分流：图床只收图片，附件只收非图片；被拒的整批提示，不中断合法文件。
-  // 文件选择、粘贴、拖拽三个入口共用（复核发现 paste/drop 曾绕过分流）。
+  // 统一上传入口：文件池不再区分来源，任何类型都直接进池子（服务端不再做 MIME 分流）。
   const routeUpload = useCallback(
     (files: File[]) => {
-      const isImage = (f: File) => f.type.startsWith("image/");
-      const accepted = files.filter((f) => (isImageHostMode ? isImage(f) : !isImage(f)));
-      if (accepted.length < files.length) {
-        toast.error(isImageHostMode ? "图床仅支持图片，请在附件来源上传" : "图片请到图床上传");
-      }
-      if (accepted.length > 0) {
-        handleUpload(accepted);
-      }
+      if (files.length > 0) handleUpload(files);
     },
-    [handleUpload, isImageHostMode],
+    [handleUpload],
   );
 
 
@@ -950,13 +1015,14 @@ export default function FileManager() {
 
   /** 把附件信息按指定格式（URL / Markdown / HTML）复制到剪贴板。 */
   const copySnippet = useCallback(
-    async (item: { id: string; filename: string; url: string }, format: ImageHostFormat = "url") => {
+    async (item: { id: string; filename: string; url: string; mimeType?: string }, format: FileLinkFormat = "url") => {
       const full = buildPublicAttachmentUrl(resolveAttachmentUrl(item.url), publicAttachmentOptions);
-      const snippet = formatImageHostSnippet(format, full, item.filename);
+      // 片段形态由 MIME 决定：图片 <img>/![]()、视频 <video>、音频 <audio>、其他 <a>/[]()
+      const snippet = formatFileLinkSnippet(format, full, item.filename, item.mimeType);
       const ok = await copyText(snippet);
       if (ok) {
         setCopiedId(item.id);
-        toast.success(`已复制 ${imageHostFormatLabel(format)}`);
+        toast.success(`已复制 ${fileLinkFormatLabel(format)}`);
         setTimeout(() => setCopiedId((id) => (id === item.id ? null : id)), 1200);
       } else {
         toast.error("复制失败，请检查浏览器剪贴板权限");
@@ -1023,7 +1089,9 @@ export default function FileManager() {
 
   // 空态文案：区分"一张没有" vs "当前筛选无结果"
   const isFirstPageNoResults = !loading && items.length === 0 && page === 1;
-  const hasAnyFilter = searchQuery || category !== "all";
+  // 空态文案分叉依据：类型 / 范围 / 时间 / 搜索 任一非默认即视为"筛选中"
+  const hasAnyFilter =
+    Boolean(searchQuery) || category !== "all" || typeFilter !== "all" || shareFilter !== "all" || getFilesTime() !== "all";
 
   // 扁平视图也按 id 去重，防止重复渲染
   const displayItems = useMemo(() => {
@@ -1092,9 +1160,33 @@ export default function FileManager() {
   // 方便状态栏展示
   const statsLine = useMemo(() => {
     if (!stats) return "";
-    // 附件来源不含图片（图片在图床来源）：统计口径 = 非图片文件
-    return `共 ${stats.files.count} 个文件 · ${humanSize(stats.files.bytes)}`;
+    // 统一文件池：统计口径 = 全类型文件（图片 / 视频 / 音频 / 文档 / 其他）
+    return `共 ${stats.total} 个文件 · ${humanSize(stats.totalBytes)}`;
   }, [stats]);
+
+  // 类型 chips 的统计（个数 + 占用）：来自 /api/files/stats 的大类分桶。
+  // 个数直接画在 chip 上（首屏就能看到"图片 128 / 视频 6"这类分布），
+  // 字节数放 title：避免工具条被五个数字挤满。
+  const typeStatOf = useCallback(
+    (key: FilesTypeFilter): { count: number; bytes: number } => {
+      if (!stats) return { count: 0, bytes: 0 };
+      switch (key) {
+        case "image":
+          return stats.images;
+        case "video":
+          return stats.videos ?? { count: 0, bytes: 0 };
+        case "audio":
+          return stats.audios ?? { count: 0, bytes: 0 };
+        case "doc":
+          return stats.documents ?? { count: 0, bytes: 0 };
+        case "other":
+          return stats.others ?? { count: 0, bytes: 0 };
+        default:
+          return { count: stats.total, bytes: stats.totalBytes };
+      }
+    },
+    [stats],
+  );
 
   const storageBadge = useMemo(() => {
     const storage = stats?.storage;
@@ -1192,21 +1284,12 @@ export default function FileManager() {
       >
         {/* 左侧：标题区 */}
         <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
-              isImageHostMode
-                ? "bg-indigo-500/15 text-indigo-500"
-                : "bg-accent-primary/10 text-accent-primary",
-            )}
-          >
-            {isImageHostMode ? <Globe size={18} /> : <Inbox size={18} />}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 bg-accent-primary/10 text-accent-primary">
+            <FolderOpen size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">
-                {isImageHostMode ? "图床" : "附件"}
-              </h2>
+              <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">文件</h2>
               {storageBadge && (
                 <div
                   className={cn(
@@ -1287,13 +1370,11 @@ export default function FileManager() {
           {uploading ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
           {uploading ? "上传中" : "上传文件"}
         </Button>
+        {/* 统一文件池：不限制上传类型（图片 / 视频 / 音频 / 文档一律进池子） */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          // 上传分流：图床只收图片，附件只收非图片（后者无原生 accept 取反，
-          // 在 onFileInputChange 里校验提示）。
-          accept={isImageHostMode ? "image/*" : undefined}
           className="hidden"
           onChange={onFileInputChange}
         />
@@ -1315,30 +1396,60 @@ export default function FileManager() {
       {/* 工具条：h-10 与侧栏面板头对齐；统计行并入左侧 */}
       <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
         <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
-          {isImageHostMode
-            ? `共 ${total} 个文件`
-            : statsLine || " "}
+          {statsLine || " "}
         </p>
-        {/* 已选筛选 chips：类型/时间，可单个移除 */}
-        {!isImageHostMode && (getFilesMimes().length > 0 || getFilesTime() !== "all") && (
-          <div className="flex shrink-0 flex-wrap items-center gap-1">
-            {getFilesMimes().map((key) => {
-              const chip = FILE_DOC_MIME_CHIPS.find((entry) => entry.key === key);
-              return (
-                <span key={key} className="flex items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
-                  类型：{chip?.label}
-                  <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ mimes: getFilesMimes().filter((entry) => entry !== key) })}>✕</button>
-                </span>
-              );
-            })}
-            {getFilesTime() !== "all" && (
-              <span className="flex items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
-                {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
-                <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
-              </span>
-            )}
-            <button type="button" className="text-[10.5px] text-tx-tertiary hover:text-tx-secondary" onClick={() => setFilesUi({ mimes: [], time: "all" })}>清除筛选</button>
-          </div>
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
+        {/* 类型 chips：单选。统一文件池后，类型从"分隔容器"降级为"筛选维度"，
+            与"范围 / 时间 / 分享状态"正交叠加（例如"未引用的视频"）。 */}
+        <div className="flex shrink-0 items-center gap-1">
+          {FILE_TYPE_CHIPS.map((chip) => {
+            const active = typeFilter === chip.key;
+            const bucket = typeStatOf(chip.key);
+            return (
+              <button
+                key={chip.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  setFilesUi({ type: chip.key });
+                  setPage(1);
+                }}
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
+                  active
+                    ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary"
+                    : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover",
+                )}
+                title={`${chip.label} · ${bucket.count} 个${bucket.bytes ? ` · ${humanSize(bucket.bytes)}` : ""}`}
+              >
+                {chip.label}
+                {/* 内联个数：首屏就能按类型看到文件分布，不必逐个点 chip */}
+                <span className="ml-1 tabular-nums opacity-60">{bucket.count}</span>
+              </button>
+            );
+          })}
+        </div>
+        {getFilesTime() !== "all" && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+            {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
+            <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
+          </span>
+        )}
+        {/* 已分享的附件：侧栏选中后在主区给一个可单独掉的标签，避免用户忘了自己在筛分享状态 */}
+        {shareFilter !== "all" && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+            {shareFilter === "shared" ? "已分享" : "未分享"}
+            <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ share: "all" })}>✕</button>
+          </span>
+        )}
+        {(typeFilter !== "all" || getFilesTime() !== "all" || shareFilter !== "all") && (
+          <button
+            type="button"
+            className="shrink-0 text-[10.5px] text-tx-tertiary hover:text-tx-secondary"
+            onClick={() => setFilesUi({ type: "all", time: "all", share: "all" })}
+          >
+            清除筛选
+          </button>
         )}
         <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <div className="flex-1" />
@@ -1348,7 +1459,7 @@ export default function FileManager() {
           <div className="relative w-40 md:w-56">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-tertiary" />
             <Input
-              placeholder="按文件名搜索…"
+              placeholder="搜索文件名或类型（如 pdf）…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="h-8 border-none bg-app-hover pl-7 text-xs no-focus-ring"
@@ -1453,6 +1564,38 @@ export default function FileManager() {
 
               <div className="flex-1" />
 
+              {/* 批量归档：同一个附件文件夹体系（上传对话框 / 分组视图共用） */}
+              <select
+                value=""
+                disabled={selectedIds.size === 0 || batchMoving}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  void handleBatchMove(v === "__unarchived__" ? null : v);
+                }}
+                className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
+                title="把选中文件归档到附件文件夹"
+              >
+                <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
+                <option value="__unarchived__">未归档</option>
+                {attachmentFolders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBatchShareLinks}
+                disabled={selectedIds.size === 0 || batchSharing}
+                title="为选中附件开启只读分享链接，并全部复制到剪贴板"
+              >
+                {batchSharing ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <Link2 size={14} className="mr-1" />
+                )}
+                生成公开链接
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -1523,7 +1666,7 @@ export default function FileManager() {
                             selectionMode={selectionMode}
                             selectedIds={selectedIds}
                             onToggleSelect={toggleSelect}
-                            isImageHostMode={isImageHostMode}
+                            sharedIds={sharedIds}
                           />
                         ) : (
                           <ListView
@@ -1533,13 +1676,14 @@ export default function FileManager() {
                             onJumpToNote={jumpToNote}
                             onDownload={downloadItem}
                             onDelete={afterDelete}
-                            onSaveRemote={openRemoteSave}
+                            onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
                             onShare={openShare}
                             copiedId={copiedId}
                             downloadingId={downloadingId}
                             selectionMode={selectionMode}
                             selectedIds={selectedIds}
                             onToggleSelect={toggleSelect}
+                            sharedIds={sharedIds}
                           />
                         )
                       )}
@@ -1559,7 +1703,7 @@ export default function FileManager() {
                 selectionMode={selectionMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                isImageHostMode={isImageHostMode}
+                sharedIds={sharedIds}
               />
             ) : (
               <ListView
@@ -1569,13 +1713,14 @@ export default function FileManager() {
                  onJumpToNote={jumpToNote}
                  onDownload={downloadItem}
                  onDelete={handleDelete}
-                 onSaveRemote={openRemoteSave}
+                 onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
                 onShare={openShare}
                 copiedId={copiedId}
                 downloadingId={downloadingId}
                 selectionMode={selectionMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
+                sharedIds={sharedIds}
               />
             )}
 
@@ -1645,7 +1790,6 @@ export default function FileManager() {
             onAfterDelete={afterDelete}
             onAfterRename={afterRename}
             showDelete
-            isImageHostMode={isImageHostMode}
             extraHeaderActions={(
               <button
                 className="p-1.5 rounded-md text-tx-tertiary hover:text-tx-primary hover:bg-app-hover"
@@ -1672,7 +1816,6 @@ export default function FileManager() {
         onClose={() => setUploadDialogOpen(false)}
         onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); notifyStorageChanged(); }}
         defaultFolderId={null}
-        uploadFilter={isImageHostMode ? "image" : "non-image"}
       />
         </>
       )}
@@ -1697,7 +1840,7 @@ function EmptyState({ hasFilter, onUpload }: { hasFilter: boolean; onUpload: () 
     <div className="flex flex-col items-center justify-center py-16 text-tx-tertiary">
       <Inbox size={40} className="mb-3 opacity-40" />
       <p className="text-sm">还没有任何文件</p>
-      <p className="text-xs mt-1 mb-4">上传文件开始使用 · 图片请在「图床」来源上传</p>
+      <p className="text-xs mt-1 mb-4">上传文件开始使用 · 支持图片 / 视频 / 音频 / 文档等任意类型</p>
       <Button size="sm" onClick={onUpload}>
         <Upload size={14} className="mr-1" />
         上传文件
@@ -1720,19 +1863,20 @@ function GridView({
   selectionMode,
   selectedIds,
   onToggleSelect,
-  isImageHostMode,
+  sharedIds,
 }: {
   items: FileItem[];
   onOpen: (id: string) => void;
   onCopyUrl: (item: FileItem) => void;
-  onCopySnippet: (item: FileItem, format: ImageHostFormat) => void;
+  onCopySnippet: (item: FileItem, format: FileLinkFormat) => void;
   onDownload: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
-  isImageHostMode: boolean;
+  /** 已开启分享（isActive）的附件 id 集合——卡片"已分享"角标的数据源 */
+  sharedIds: Set<string>;
 }) {
   // 性能优化（v12）：
   //   GridCard 用 React.memo 浅比较 props。为了让 memo 真正生效，
@@ -1759,7 +1903,7 @@ function GridView({
           selectionMode={selectionMode}
           selected={selectedIds.has(it.id)}
           onToggleSelect={onToggleSelect}
-          isImageHostMode={isImageHostMode}
+          isShared={sharedIds.has(it.id)}
         />
       ))}
     </div>
@@ -1770,7 +1914,7 @@ interface GridCardProps {
   item: FileItem;
   onOpen: (id: string) => void;
   onCopyUrl: (item: FileItem) => void;
-  onCopySnippet: (item: FileItem, format: ImageHostFormat) => void;
+  onCopySnippet: (item: FileItem, format: FileLinkFormat) => void;
   onDownload: (item: FileItem) => void;
   /** 当前卡片是否处于"刚刚复制成功"高亮态（替代 copiedId === item.id 全局比较） */
   isCopied: boolean;
@@ -1779,7 +1923,8 @@ interface GridCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  isImageHostMode: boolean;
+  /** 是否已开启只读分享链接（角标数据来自 attachment_shares） */
+  isShared: boolean;
 }
 
 /**
@@ -1806,10 +1951,14 @@ const GridCard = React.memo(function GridCard({
   selectionMode,
   selected,
   onToggleSelect,
-  isImageHostMode,
+  isShared,
 }: GridCardProps) {
   const isImage = item.category === "image";
-  // 图床的"复制格式"下拉菜单是否展开。每张卡独立维护——同时只能展开一个比较自然，
+  // 视频卡片用后端 ffmpeg 首帧海报当缩略图；拿不到 thumbnailUrl（老服务端）
+  // 就仍然用类型图标占位。
+  const isVideo = resolveMimeCategory(item) === "video";
+  const hasThumbnail = isImage || (isVideo && Boolean(item.thumbnailUrl));
+  // "复制格式"下拉菜单是否展开。每张卡独立维护——同时只能展开一个比较自然，
   // 但实现上让外层点击就关掉即可，无需引入全局状态。
   const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   // 点卡片其他位置时关掉菜单（避免菜单悬空残留）
@@ -1847,7 +1996,7 @@ const GridCard = React.memo(function GridCard({
       title={item.filename}
     >
       <div className="aspect-square w-full bg-app-bg flex items-center justify-center overflow-hidden">
-        {isImage ? (
+        {hasThumbnail ? (
           <img
             src={thumbSrc}
             alt={item.filename}
@@ -1860,13 +2009,15 @@ const GridCard = React.memo(function GridCard({
             fetchpriority="low"
             className="w-full h-full object-cover"
             onError={(e) => {
-              // 破图兜底：先尝试退回原图（缩略图生成失败时尤其有用），
-              // 仍失败再隐藏 + 展示占位。
+              // 破图兜底：图片先尝试退回原图（缩略图生成失败时尤其有用）；
+              // 视频不能回退——那会把整个视频文件当图片下回来，直接走占位。
               const el = e.currentTarget;
-              const fallbackUrl = resolveAttachmentUrl(item.url);
-              if (el.src !== fallbackUrl) {
-                el.src = fallbackUrl;
-                return;
+              if (!isVideo) {
+                const fallbackUrl = resolveAttachmentUrl(item.url);
+                if (el.src !== fallbackUrl) {
+                  el.src = fallbackUrl;
+                  return;
+                }
               }
               el.style.display = "none";
               const fallback = el.nextElementSibling as HTMLElement | null;
@@ -1874,30 +2025,37 @@ const GridCard = React.memo(function GridCard({
             }}
           />
         ) : null}
-        {!isImage && (
+        {!hasThumbnail && (
           <div className="w-full h-full flex flex-col items-center justify-center text-tx-tertiary">
             <div className="text-accent-primary/70 mb-1">{mimeIcon(item.mimeType)}</div>
-            <span className="text-[10px] uppercase tracking-wide">{(item.mimeType || "").split("/")[1] || "file"}</span>
+            <span className="text-[10px] uppercase tracking-wide">{MIME_CATEGORY_LABELS[resolveMimeCategory(item)]}</span>
           </div>
         )}
-        {isImage && (
+        {hasThumbnail && (
           <div className="w-full h-full hidden flex-col items-center justify-center text-tx-tertiary bg-app-bg">
             {mimeIcon(item.mimeType)}
             <span className="text-[10px] mt-1">无法加载</span>
           </div>
         )}
 
-        {/* 图床模式：左下角的"公开直链"角标。
-            语义提示：当前附件有一条无需登录就能访问的 URL，
-            点击右上的复制按钮可拿到 URL/Markdown/HTML 任一形式。
-            v14：扩展到所有附件（不止图片）——图床支持文件外链分享。 */}
-        {isImageHostMode && (
+        {/* 视频海报上的播放角标：区分“这是一段视频”与普通图片 */}
+        {isVideo && hasThumbnail && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-8 h-8 rounded-full bg-black/45 flex items-center justify-center">
+              <Play size={14} className="text-white" />
+            </div>
+          </div>
+        )}
+
+        {/* 已分享角标：存在生效中的只读分享链接（attachment_shares.isActive）。
+            注：公开直链对所有附件都可用，这里的"已分享"指用户主动建过分享。 */}
+        {isShared && (
           <div
             className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-indigo-500/85 text-white text-[9px] flex items-center gap-1 pointer-events-none"
-            title="此附件有公开直链，可对外引用"
+            title="已开启只读分享链接"
           >
-            <Link2 size={9} />
-            <span>直链</span>
+            <Share2 size={9} />
+            <span>已分享</span>
           </div>
         )}
       </div>
@@ -1928,17 +2086,11 @@ const GridCard = React.memo(function GridCard({
       )}
 
       {/* hover 工具条（选择模式下隐藏，避免误操作）。
-          - 普通模式：下载 + 复制链接（单击直接复制 URL）
-          - 图床模式：下载 + 分裂式复制按钮（左半 URL，右半下拉 MD/HTML）
-          图床下让"复制链接"常驻可见而不是 hover 才出现——这是图床场景的核心交互，
-          手机端（无 hover）也得能点到。 */}
+          统一文件池：所有类型都有公开直链，工具栏统一为"下载 + 分裂式复制"
+          （左半 URL，右半下拉 Markdown / HTML）。
+          复制常驻可见而不是仅 hover 才出现——手机端（无 hover）也得能点到。 */}
       {!selectionMode && (
-        <div
-          className={cn(
-            "absolute top-1.5 right-1.5 flex gap-1 transition-opacity",
-            isImageHostMode ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-          )}
-        >
+        <div className="absolute top-1.5 right-1.5 flex gap-1 transition-opacity opacity-100">
           <button
             className="w-6 h-6 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center disabled:opacity-50"
             onClick={(e) => {
@@ -1951,63 +2103,50 @@ const GridCard = React.memo(function GridCard({
             {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
           </button>
 
-          {isImageHostMode ? (
-            // 分裂按钮：左半 URL，右半下拉 MD/HTML
-            <div className="relative flex items-stretch rounded-md overflow-hidden">
-              <button
-                className="px-1.5 bg-black/50 hover:bg-black/70 text-white flex items-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCopyUrl(item);
-                }}
-                title="复制 URL"
-              >
-                {isCopied ? <Check size={12} /> : <Copy size={12} />}
-              </button>
-              <button
-                className="px-0.5 bg-black/50 hover:bg-black/70 text-white flex items-center border-l border-white/15"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFormatMenuOpen((v) => !v);
-                }}
-                title="选择复制格式"
-              >
-                <ChevronDown size={11} />
-              </button>
-              {formatMenuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-app-border bg-app-surface shadow-md py-1 text-xs"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {(["url", "markdown", "html"] as ImageHostFormat[]).map((fmt) => (
-                    <button
-                      key={fmt}
-                      className="w-full px-2.5 py-1.5 text-left text-tx-primary hover:bg-app-hover flex items-center gap-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFormatMenuOpen(false);
-                        onCopySnippet(item, fmt);
-                      }}
-                    >
-                      <Copy size={11} className="text-tx-tertiary" />
-                      <span>{imageHostFormatLabel(fmt)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
+          {/* 分裂按钮：左半 URL，右半下拉 MD/HTML */}
+          <div className="relative flex items-stretch rounded-md overflow-hidden">
             <button
-              className="w-6 h-6 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center"
+              className="px-1.5 bg-black/50 hover:bg-black/70 text-white flex items-center"
               onClick={(e) => {
                 e.stopPropagation();
                 onCopyUrl(item);
               }}
-              title="复制链接"
+              title="复制 URL"
             >
               {isCopied ? <Check size={12} /> : <Copy size={12} />}
             </button>
-          )}
+            <button
+              className="px-0.5 bg-black/50 hover:bg-black/70 text-white flex items-center border-l border-white/15"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFormatMenuOpen((v) => !v);
+              }}
+              title="选择复制格式"
+            >
+              <ChevronDown size={11} />
+            </button>
+            {formatMenuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-app-border bg-app-surface shadow-md py-1 text-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["url", "markdown", "html"] as FileLinkFormat[]).map((fmt) => (
+                  <button
+                    key={fmt}
+                    className="w-full px-2.5 py-1.5 text-left text-tx-primary hover:bg-app-hover flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFormatMenuOpen(false);
+                      onCopySnippet(item, fmt);
+                    }}
+                  >
+                    <Copy size={11} className="text-tx-tertiary" />
+                    <span>{fileLinkFormatLabel(fmt)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -2031,6 +2170,7 @@ function ListView({
   selectionMode,
   selectedIds,
   onToggleSelect,
+  sharedIds,
 }: {
   items: FileItem[];
   onOpen: (id: string) => void;
@@ -2038,13 +2178,16 @@ function ListView({
   onJumpToNote: (noteId: string) => void;
   onDownload: (item: FileItem) => void;
   onDelete: (id: string) => void;
-  onSaveRemote: (item: FileItem) => void;
+  /** 未传（remote-files 插件关闭）时不渲染「保存到远程」按钮 */
+  onSaveRemote?: (item: FileItem) => void;
   onShare: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  /** 已开启分享（isActive）的附件 id 集合——“已分享”标记的数据源 */
+  sharedIds: Set<string>;
 }) {
   return (
     <div className="rounded-lg border border-app-border bg-app-surface overflow-hidden">
@@ -2115,7 +2258,18 @@ function ListView({
                   <div className="truncate" title={it.filename}>{it.filename}</div>
                 </td>
                 <td className="px-3 py-2 text-tx-tertiary hidden md:table-cell">
-                  <code className="text-[11px]">{it.mimeType || "-"}</code>
+                  <span className="inline-flex items-center gap-1">
+                    <span title={it.mimeType || undefined}>{MIME_CATEGORY_LABELS[resolveMimeCategory(it)]}</span>
+                    {sharedIds.has(it.id) && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded bg-accent-primary/10 px-1 text-[10px] text-accent-primary"
+                        title="已开启只读分享链接"
+                      >
+                        <Share2 size={9} />
+                        已分享
+                      </span>
+                    )}
+                  </span>
                 </td>
                 <td className="px-3 py-2 text-right text-tx-secondary tabular-nums">{humanSize(it.size)}</td>
                 <td className="px-3 py-2 hidden lg:table-cell text-tx-secondary">
@@ -2150,16 +2304,18 @@ function ListView({
                     >
                       {downloadingId === it.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                     </button>
-                    <button
-                      className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void onSaveRemote(it);
-                      }}
-                      title="保存到远程（WebDAV / 百度网盘）"
-                    >
-                      <Cloud size={12} />
-                    </button>
+                    {onSaveRemote && (
+                      <button
+                        className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onSaveRemote(it);
+                        }}
+                        title="保存到远程（WebDAV / 百度网盘）"
+                      >
+                        <Cloud size={12} />
+                      </button>
+                    )}
                     <button
                       className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
                       onClick={(e) => {

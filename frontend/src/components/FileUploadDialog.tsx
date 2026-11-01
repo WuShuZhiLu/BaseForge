@@ -23,14 +23,11 @@ export default function FileUploadDialog({
   onClose,
   onUploaded,
   defaultFolderId,
-  uploadFilter,
 }: {
   open: boolean;
   onClose: () => void;
   onUploaded: () => void;
   defaultFolderId?: string | null;
-  /** 上传分流：image=只收图片，non-image=只收非图片；不传则不过滤。 */
-  uploadFilter?: "image" | "non-image";
 }) {
   const { t } = useTranslation();
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -62,24 +59,15 @@ export default function FileUploadDialog({
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const isImage = (f: File) => f.type.startsWith("image/");
-    // 上传分流：不符合当前视图类型的文件拒绝并提示，合法文件照常收集。
-    const accepted = uploadFilter === "image"
-      ? Array.from(files).filter(isImage)
-      : uploadFilter === "non-image"
-        ? Array.from(files).filter((f) => !isImage(f))
-        : Array.from(files);
-    if (accepted.length < files.length) {
-      toast.error(uploadFilter === "image" ? "图床仅支持图片，请在附件来源上传" : "图片请到图床上传");
-    }
-    const newFiles: PendingFile[] = accepted.map((f) => ({
+    // 统一文件池：不限制类型，选中什么就上传什么。
+    const newFiles: PendingFile[] = Array.from(files).map((f) => ({
       file: f,
       id: `${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     }));
     setPendingFiles((prev) => [...prev, ...newFiles]);
     // 清空 input 以便重复选择同名文件
     e.target.value = "";
-  }, [uploadFilter]);
+  }, []);
 
   // 移除待上传文件
   const removeFile = useCallback((id: string) => {
@@ -269,7 +257,6 @@ export default function FileUploadDialog({
               ref={fileInputRef}
               type="file"
               multiple
-              accept={uploadFilter === "image" ? "image/*" : undefined}
               onChange={handleFileSelect}
               className="hidden"
             />

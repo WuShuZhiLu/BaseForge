@@ -441,16 +441,22 @@ export interface RemoteFileEntry {
 export type FileCategory = "image" | "file";
 
 /**
- * 文件视图筛选（与 category 正交）：
- *   - "unreferenced"：scope 内"没有任何笔记引用"的附件（含 24h 宽限期）。
- *   - "myUploads"   ：scope 内"用户从文件管理页直接上传"的附件
- *                     （即 attachments.noteId 指向 isArchived=1 的 holder note）。
- *                     可与 myUploadsRef 子筛选搭配使用——见下方类型。
- *
- * 前端单独维护 UI 选择（"孤儿" / "我的上传"两个 tab），传给后端 `filter=...`；
- * 与 category=image/file 可并存（"孤儿图片" / "我的上传里的文件"）。
+ * MIME 大类：文件管理「统一文件池」的类型筛选维度。
+ * 与后端 backend/src/lib/mime-category.ts 的 MimeCategory 一一对应；
+ * /api/files 会在每条记录上下发 mimeCategory，前端不必再维护一份白名单。
  */
-export type FileFilter = "unreferenced" | "myUploads";
+export type MimeCategory = "image" | "video" | "audio" | "doc" | "other";
+
+/**
+ * 列表范围筛选（与类型维度 mimeCategory 正交，可与 category=image/file 并存）：
+ *   - "unreferenced"：没被任何笔记正文引用到的附件（含文件管理手动上传、刚上传的）；
+ *   - "referenced"  ：文档引用——正文里能找到 `/api/attachments/<id>` 的附件；
+ *     两者来自同一次内容扫描，严格互补（相加就是全部）；不看时间宽限期，
+ *     防误清靠 cleanup-orphans 的 graceHours 与列表项的 isAutoCleanupProtected 标记；
+ *   - "myUploads"   ：从文件管理页主动上传（uploadSource='file_manager'），
+ *                     可搭配下方 myUploadsRef 子筛选。
+ */
+export type FileFilter = "unreferenced" | "referenced" | "myUploads";
 
 /**
  * "我的上传"子筛选：仅当 filter=myUploads 时由前端发送。
@@ -458,11 +464,17 @@ export type FileFilter = "unreferenced" | "myUploads";
  *   - "unreferenced" ：上传后还没被任何笔记引用。
  *   不传 = 不再细分（返回我的上传全部）。
  *
- * 注意：这里的 "unreferenced" 与 FileFilter.unreferenced 不同——后者是全集合的孤儿
- * （包括编辑器里粘贴后又删除的图，且有 24h 宽限期）；本字段是"我的上传"子集内的
- * "还没用过的"，没有宽限期，刚上传的也立刻可见。
+ * 注意：这里的 "unreferenced" 与 FileFilter.unreferenced 不同——后者是全集合范围，
+ * 用内容扫描判定；本字段是"我的上传"子集内的"还没用过的"，用 attachment_references
+ * 倒排表判定（正常保存流程下两者一致；只有历史库没回填时倒排表会偏宽）。
  */
 export type FileMyUploadsRef = "referenced" | "unreferenced";
+
+/**
+ * 分享状态筛选：只算生效中（isActive=1）且未过期的只读分享链接。
+ * 已关闭 / 已过期的分享归入 "unshared"。
+ */
+export type FileShareStatus = "shared" | "unshared";
 
 /** 文件排序键（与后端 resolveOrderBy 白名单一致）。 */
 export type FileSortKey =
@@ -471,7 +483,9 @@ export type FileSortKey =
   | "name_asc"
   | "name_desc"
   | "size_asc"
-  | "size_desc";
+  | "size_desc"
+  /** 最近被文档引用的排前，从未被引用的沉底（取 attachment_references 最新一条时间）。 */
+  | "referenced_desc";
 
 /**
  * 文件管理列表 / 详情共用的基础行。
@@ -488,6 +502,11 @@ export interface FileItem {
   size: number;
   createdAt: string;
   category: FileCategory;
+  /**
+   * 统一文件池的类型大类（后端下发）。老服务端可能不返回，
+   * 前端用 filesUi.ts 的 resolveMimeCategory() 做兼容兜底。
+   */
+  mimeCategory?: MimeCategory;
   url: string;
   /** 当前会话展示使用的短期签名地址；持久化时仍使用 url 裸链。 */
   accessUrls?: Record<string, string>;
@@ -500,6 +519,11 @@ export interface FileItem {
    * - 复制到 Markdown / HTML 的也是 url（外链给别人用必然要原图）。
    */
   thumbnailUrl?: string;
+  /**
+   * 引用该附件的笔记数（attachment_references 倒排表计数）。
+   * 仅 GET /api/files 列表查询下发；详情/其它入口可能缺席，前端按 undefined 处理。
+   */
+  referenceCount?: number;
   /**
    * SHA-256 hex；v11 起新上传/抽取的附件会带；v11 之前的老附件为 null
    * （懒迁移策略，不强制回填）。仅在文件管理详情视图里供"复制 hash / 排查重复"用。
@@ -549,9 +573,19 @@ export interface FileStats {
   total: number;
   totalBytes: number;
   images: { count: number; bytes: number };
+  /** 统一文件池的类型分布（与类型 chips 徽标对应）。 */
+  videos?: { count: number; bytes: number };
+  audios?: { count: number; bytes: number };
+  documents?: { count: number; bytes: number };
+  others?: { count: number; bytes: number };
+  /** 兼容字段：非图片总和（旧口径，新代码优先读上面的分类型字段）。 */
   files: { count: number; bytes: number };
   /** 孤儿视图徽标：scope 内没有被任何笔记引用的附件数 / 占用。 */
   unreferenced: { count: number; bytes: number };
+  /** “文档引用”分类徽标：与上一行同一次内容扫描，严格互补。 */
+  referenced?: { count: number; bytes: number };
+  /** “已分享”徽标：存在生效中（未关闭且未过期）只读分享链接的附件。 */
+  shared?: { count: number; bytes: number };
   /**
    * "我的上传"徽标（v12 文件管理新增）：
    *   - total       ：用户从文件管理页直接上传的全部附件数；
