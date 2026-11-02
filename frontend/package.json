@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0-preview.1",
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && node ../scripts/verify-sync-notification-ui.cjs",

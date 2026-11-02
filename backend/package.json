@@ -1,6 +1,9 @@
 {
   "name": "nowen-note-backend",
   "version": "1.0.0-preview.1",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "dev": "tsx watch src/index.hardened.ts",
     "build": "node build.bundle.mjs",
@@ -9,7 +12,7 @@
     "test": "node scripts/run-tests-serial.mjs",
     "test:serial": "node scripts/run-tests-serial.mjs",
     "fixture:phase-b": "node scripts/phase-b-notebook-fixture.mjs",
-    "rebuild:node": "npm rebuild better-sqlite3",
+    "rebuild:node": "node ../scripts/rebuild-sqlite-node.mjs",
     "rebuild:electron": "node ../scripts/rebuild-native.mjs --prebuild=true",
     "migrate:inline-images": "node ../scripts/migrate-inline-images-to-attachments.mjs",
     "migrate:inline-images:apply": "node ../scripts/migrate-inline-images-to-attachments.mjs --apply"

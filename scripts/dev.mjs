@@ -60,6 +60,28 @@ assertFile(viteCli, "npm run install:all")
 assertFile(backendEntry, "确认 backend/src/index.hardened.ts 是否存在")
 assertFile(viteDevConfig, "确认 frontend/vite.dev.config.ts 是否存在")
 
+// node 版本下限：22.5 起才有内置 node:sqlite（后续数据库层要从 better-sqlite3 迁过去）。
+// 低于这个版本直接叫停，避免后端跑到一半才因为缺 API 崩掉。
+const MIN_NODE = [22, 5, 0]
+{
+  const current = process.versions.node.split(".").map((part) => Number.parseInt(part, 10))
+  const tooOld =
+    current[0] < MIN_NODE[0] ||
+    (current[0] === MIN_NODE[0] && current[1] < MIN_NODE[1])
+  if (tooOld) {
+    console.error(
+      [
+        "",
+        `[dev] 当前 node ${process.version} 过低，本项目要求 >= v${MIN_NODE.join(".")}。`,
+        "      v22.5 起才有内置 node:sqlite（数据库层正在从 better-sqlite3 迁向它）。",
+        "      请切换到 node 22.5+ 后重跑：nvm use 22（或把 node 22 放到 PATH 前面）。",
+        "",
+      ].join("\n"),
+    )
+    process.exit(1)
+  }
+}
+
 // 原生模块 ABI 必须与运行时一致：better-sqlite3 是按 node 22（ABI 127）编译的，
 // 若用 node 24（ABI 137）启动会在后端启动瞬间 ERR_DLOPEN_FAILED，且报错埋在日志里很难辨认。
 // 这里先探一次，失败即给出可直接执行的修复命令。
