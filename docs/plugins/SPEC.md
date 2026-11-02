@@ -526,22 +526,22 @@ cd examples/plugins/my-plugin && node ../../../packages/nowen-plugin-cli/bin/now
 
 ---
 
-## 9. 已知边界与不一致点（只记录，未修改代码）
+## 9. 已知边界（2026-11-02 已处理 5 项，剩余 1 项待办）
 
-1. **白名单两侧语义已对齐，但发布侧没对齐。** 声明期与运行期都只接受精确域名：`*.example.com` 在安装期即报
+1. **白名单两侧语义已对齐，但发布侧没对齐（待办）。** 声明期与运行期都只接受精确域名：`*.example.com` 在安装期即报
    `不支持通配符，请逐个填写精确域名`，运行期遇到库里的历史 wildcard 配置也 fail-closed。
    残留缺口在**注册表侧**：`packages/nowen-extension-registry/src/security/manifestV2.ts` 只校验
    `externalFetchHosts` 是 `string[]`、不校验域名格式，因此"发布时就会拦"这件事目前还不成立，只能保证
    "用户端安装时拒绝"。
-2. **宿主版本常量落后于示例。** `types.ts` 的 `NOWEN_VERSION = "1.5.0"`，而 `examples/plugins/task-digest`
-   要求 `>=1.5.1`、`productivity-pack`/`floating-dock` 要求 `>=1.6.0`，默认参数下这些示例无法通过包校验。
-3. **贡献契约与 manifest schema 不同步。** `contribution-contract.json` 声明了 `activityBadges`（since 2.2，
-   declarative），但 `manifest.ts` 无该字段（strict schema 会报未知键）；反向地，`mainViewPanels` 在 schema 中存在
-   但契约 JSON 未列出。
+2. ~~宿主版本常量落后于示例。~~ **已修**：`NOWEN_VERSION` 由 `1.5.0` 抬到真实基线 `1.5.1`（上游 tag bd6f4f73）；
+   `EXTENSION_V21_TARGET_NOWEN_VERSION` 保持 `1.6.0`，它是 extensionsV21 的启用门槛，不是基线。
+   要求 `>=1.6.0` 的示例仍装不上，这是有意的——宿主尚未宣称具备 1.6.0 能力。
+3. ~~贡献契约与 manifest schema 不同步。~~ **已修**：契约移除未实现的 `activityBadges`（schema 从未支持，
+   等实现了再加回）；补上 schema 早已支持的 `mainViewPanels`。两处生成物由
+   `scripts/generate-plugin-contracts.mjs` 从契约重新生成，并有 `plugin-contract-sync.test.ts` 守卫。
 4. **端口：声明期禁、运行期保留。** manifest 里写 `api.example.com:8443` 会被拒（含 `:` 按 IP 字面量处理），
    对外契约就是"仅 443 的精确域名"；运行期 `host:port` 匹配逻辑保留，只作为遗留/未来配置的防御性实现。
-5. **`attachments:write` 处于半废弃状态。** 它在 `PLUGIN_PERMISSIONS` 与 V1 白名单中，但不在
-   `host-api-contract.json` 的权限表、也没有对应 Host API 方法，V2 manifest 直接拒。
-6. **`sidebarPanels` 的运行时期望与 schema 不一致。** 契约 JSON（工作区 `contractVersion: 6`）把它限定为
-   `runtimes: ["declarative"]`，但 manifest schema 对 executable 也放行，`pluginService.contributions()` 也不按
-   runtime 过滤，只按 `uiExtensions` 开关过滤。
+5. ~~`attachments:write` 处于半废弃状态。~~ **已标注**：无对应 Host 方法，仅为兼容 v1 manifest 保留，
+   V2 直接拒绝；代码注释已写明"新插件不要请求该权限"。
+6. ~~`sidebarPanels` 的运行时期望与 schema 不一致。~~ **已修**：契约放开为三种 runtime，与实际行为一致
+   （宿主按声明式渲染，不按 runtime 过滤）。
