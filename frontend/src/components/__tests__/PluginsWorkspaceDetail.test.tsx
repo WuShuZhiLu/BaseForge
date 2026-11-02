@@ -114,7 +114,9 @@ describe("PluginsWorkspace 插件详情页", () => {
     const content = text(host);
     expect(content).toContain("待办事项");
     expect(content).toContain("v1.0.0");
-    expect(content).toContain("官方内置 · tasks");
+    expect(content).toContain("内置插件 · tasks");
+    // 来源按实际标注（待办沿用 nowen note 实现），不再用含糊的"官方内置"
+    expect(content).toContain("来自 nowen note");
     expect(content).toContain("功能与贡献");
     expect(content).toContain("侧栏迷你面板：待办");
     expect(content).toContain("已启用");

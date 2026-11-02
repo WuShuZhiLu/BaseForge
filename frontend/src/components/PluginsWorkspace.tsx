@@ -40,6 +40,7 @@ import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import { PluginConfigSections } from "@/components/plugins/PluginConfigSections";
 import { PluginAdminPanel } from "@/components/plugins/PluginAdminPanel";
 import {
+  BUILTIN_ORIGIN_LABEL,
   BUILTIN_PLUGINS,
   isBuiltinPluginEnabled,
   setBuiltinPluginDisabled,
@@ -244,12 +245,12 @@ function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
       <DetailHeader
         icon={iconFor(plug, 28)}
         name={plug.name}
-        uniqueId={`官方内置 · ${plug.id}`}
+        uniqueId={`内置插件 · ${plug.id}`}
         version={plug.version}
         description={plug.description}
         badges={
           <>
-            <Badge tone="info">官方内置</Badge>
+            <Badge tone="info">{BUILTIN_ORIGIN_LABEL[plug.origin]}</Badge>
             <Badge tone={enabled ? "ok" : "neutral"}>{enabled ? "已启用" : "已停用"}</Badge>
           </>
         }
@@ -268,34 +269,9 @@ function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
           {enabled ? "停用" : "启用"}
         </button>
         {enabled && (
-          <>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-plugin-panel", { detail: { id: plug.id } }))}
-              className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
-            >
-              打开侧栏面板
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // 嵌入型插件（远程文件）无独立主区 → 进文件管理的远程文件页
-                if (plug.embedded) {
-                  window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
-                  actions.setViewMode("files");
-                  return;
-                }
-                if (plug.viewMode === "remote-files") {
-                  actions.setViewMode("files");
-                  return;
-                }
-                actions.setViewMode(plug.viewMode);
-              }}
-              className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover"
-            >
-              在主区打开
-            </button>
-          </>
+          <span className="text-xs text-tx-tertiary">
+            入口：{plug.entryHint}
+          </span>
         )}
       </div>
       <SectionCard title="功能与贡献">
