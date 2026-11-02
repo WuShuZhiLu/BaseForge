@@ -24,7 +24,6 @@
     "test:docker-healthcheck": "node --test scripts/tests/docker-runtime-port-healthcheck.test.mjs",
     "test:loading-ux": "node --test scripts/tests/unified-loading-experience.test.mjs",
     "test:renderer-recovery": "node --test scripts/tests/renderer-recovery.test.cjs",
-    "smoke:linux-native": "ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/smoke-better-sqlite3.cjs",
     "build:icon": "node scripts/build-icon.mjs",
     "build:mobile-icons": "node scripts/sync-mobile-icons.mjs",
     "electron:dev": "npm run rebuild:native && npm run build:all && NOWEN_DEV_BACKEND_URL=http://127.0.0.1:3001 electron .",

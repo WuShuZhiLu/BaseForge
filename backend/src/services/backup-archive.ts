@@ -3,6 +3,9 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { DatabaseSync } from "node:sqlite";
+// 本模块直接 new DatabaseSync 打开备份副本，不经过 db/schema.ts，
+// 必须显式引入能力补齐（transaction/pragma/backup）才能使用 db.transaction。
+import "../db/sqlite-ext.js";
 
 export interface BackupDirectoryStats {
   count: number;

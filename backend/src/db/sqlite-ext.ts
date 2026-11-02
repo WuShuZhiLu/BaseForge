@@ -165,9 +165,63 @@ const stmtProto = StatementSync.prototype as unknown as {
   all: (...args: unknown[]) => unknown
 }
 
+/**
+ * 错误码还原：node:sqlite 统一抛 `Error { code: "ERR_SQLITE_ERROR", errcode }`，
+ * 而 better-sqlite3 把扩展错误码命名成 `SQLITE_CONSTRAINT_UNIQUE` / `SQLITE_CONSTRAINT_TRIGGER`
+ * 等。业务侧有 7 处按 `code.startsWith("SQLITE_CONSTRAINT")` 分支
+ * （routes/auth、routes/users、routes/notes、routes/journals、services/workspaceJournals 等），
+ * 迁移后这些分支会静默失效——例如重复用户名注册从 409 退化成 500。
+ * 这里只在抛出边界把 errcode 映射回旧命名，SQL 与结果集行为保持不变。
+ * 未列入表的扩展码回退到主码（errcode & 0xff）对应的名字。
+ */
+const LEGACY_SQLITE_CODES: Record<number, string> = {
+  1: "SQLITE_ERROR",
+  5: "SQLITE_BUSY",
+  6: "SQLITE_LOCKED",
+  13: "SQLITE_FULL",
+  14: "SQLITE_CANTOPEN",
+  19: "SQLITE_CONSTRAINT",
+  20: "SQLITE_MISMATCH",
+  21: "SQLITE_MISUSE",
+  26: "SQLITE_NOTADB",
+  275: "SQLITE_CONSTRAINT_CHECK",
+  787: "SQLITE_CONSTRAINT_FOREIGNKEY",
+  1299: "SQLITE_CONSTRAINT_NOTNULL",
+  1555: "SQLITE_CONSTRAINT_PRIMARYKEY",
+  1811: "SQLITE_CONSTRAINT_TRIGGER",
+  2067: "SQLITE_CONSTRAINT_UNIQUE",
+  2579: "SQLITE_CONSTRAINT_ROWID",
+  2835: "SQLITE_CONSTRAINT_PINNED",
+  3275: "SQLITE_CONSTRAINT_DATATYPE",
+}
+
+function rethrowWithLegacyCode(error: unknown): never {
+  if (error instanceof Error) {
+    const errcode = (error as { errcode?: unknown }).errcode
+    if (typeof errcode === "number") {
+      const legacy = LEGACY_SQLITE_CODES[errcode] ?? LEGACY_SQLITE_CODES[errcode & 0xff]
+      if (legacy) (error as { code?: string }).code = legacy
+    }
+  }
+  throw error
+}
+
+function withLegacyCode<T>(fn: () => T): T {
+  try {
+    return fn()
+  } catch (error) {
+    rethrowWithLegacyCode(error)
+  }
+}
+
+const originalExec = DatabaseSync.prototype.exec
+DatabaseSync.prototype.exec = function exec(this: DatabaseSync, sql: string) {
+  return withLegacyCode(() => originalExec.call(this, sql))
+} as typeof DatabaseSync.prototype.exec
+
 const originalRun = stmtProto.run
 stmtProto.run = function run(this: StatementSync, ...args: unknown[]) {
-  const result = originalRun.apply(this, normalizeParams(args) as never)
+  const result = withLegacyCode(() => originalRun.apply(this, normalizeParams(args) as never))
   if (result && typeof result === "object") {
     return {
       ...result,
@@ -191,12 +245,13 @@ function toPlainRow<T>(row: T): T {
 
 const originalGet = stmtProto.get
 stmtProto.get = function get(this: StatementSync, ...args: unknown[]) {
-  return toPlainRow(originalGet.apply(this, normalizeParams(args) as never) as unknown)
+  const row = withLegacyCode(() => originalGet.apply(this, normalizeParams(args) as never) as unknown)
+  return toPlainRow(row)
 } as typeof stmtProto.get
 
 const originalAll = stmtProto.all
 stmtProto.all = function all(this: StatementSync, ...args: unknown[]) {
-  const rows = originalAll.apply(this, normalizeParams(args) as never) as unknown[]
+  const rows = withLegacyCode(() => originalAll.apply(this, normalizeParams(args) as never) as unknown[])
   return rows.map((row) => toPlainRow(row))
 } as typeof stmtProto.all
 
