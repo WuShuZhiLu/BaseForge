@@ -8,6 +8,8 @@ import {
 } from "../src/plugins/pluginRateLimiter.js";
 import { PluginPermissions, externalFetchHostsFromConfig } from "../src/plugins/permissions.js";
 import type { PermissionRow } from "../src/plugins/permissions.js";
+import { parsePluginManifest } from "../src/plugins/manifest.js";
+import { secureExternalFetch } from "../src/plugins/secureExternalFetch.js";
 import type { PluginExecutionContext, PluginRegistryRecord } from "../src/plugins/types.js";
 import { initAuditTables } from "../src/services/audit.js";
 
@@ -47,6 +49,40 @@ function stubBroker(limiter: PluginExternalFetchLimiter): HostApiBroker {
     limiter,
   );
 }
+
+test("白名单只接受精确域名：声明期拒绝通配符与端口，运行期对非法条目 fail-closed", async () => {
+  const base = {
+    id: "com.example.hosts-rules",
+    name: "Hosts",
+    description: "",
+    version: "1.0.0",
+    apiVersion: 1 as const,
+    engines: { nowen: ">=1.5.0 <2.0.0" },
+    runtime: "node-action" as const,
+    main: "index.mjs",
+    permissions: ["external:fetch" as const],
+    actions: [{ id: "run", name: "Run", input: {} }],
+  };
+  assert.doesNotThrow(() => parsePluginManifest({ ...base, permissionConfig: { externalFetchHosts: ["api.example.com"] } }));
+  assert.throws(
+    () => parsePluginManifest({ ...base, permissionConfig: { externalFetchHosts: ["*.example.com"] } }),
+    /通配符/,
+  );
+  assert.throws(
+    () => parsePluginManifest({ ...base, permissionConfig: { externalFetchHosts: ["api.example.com:8443"] } }),
+    /IP 字面量/,
+  );
+
+  await assert.rejects(
+    () => secureExternalFetch({ url: "https://api.example.com/v1" }, {
+      allowedHosts: ["*.example.com"],
+      timeoutMs: 1000,
+      maxRedirects: 0,
+      maxResponseBytes: 1024,
+    }),
+    (error: any) => error.code === "EXTERNAL_FETCH_DENIED",
+  );
+});
 
 test("授权视图解析 external:fetch 域名列表，缺失或损坏的 configJson 返回空数组", () => {
   const db = getDb();

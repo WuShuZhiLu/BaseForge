@@ -30,22 +30,25 @@ const connectionSchema = z.object({
   description: z.string().max(500).optional(),
 }).strict();
 
-const EXTERNAL_HOST_PATTERN = /^(\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
+const EXTERNAL_HOST_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".localdomain", ".localhost", ".lan", ".home.arpa"];
 
 /**
- * 外网白名单的静态校验：只接受正常域名（可带 *. 前缀），拒绝 IP 字面量与内网域名。
+ * 外网白名单的静态校验：只接受精确域名（不含通配符、不含端口），拒绝 IP 字面量与内网域名。
  * 运行时的 CIDR 拦截只能挡住"解析后落在内网"的情况，挡不住 manifest 里直接写
  * 127.0.0.1 / localhost / *.internal 这类意图明显的声明，所以在安装校验阶段就拒掉。
+ * 运行期白名单是精确匹配（secureExternalFetch 会把含 * 的条目录视为非法配置并拒绝），
+ * 因此这里必须同步拒绝，避免"装得上、跑不通"。
  */
 function validateExternalHost(value: string): string | null {
   const host = value.trim().toLowerCase();
   if (!host) return "域名不能为空";
+  if (host.includes("*")) return "不支持通配符，请逐个填写精确域名";
   if (/^[\d.]+$/.test(host) || host.includes(":")) return "不能使用 IP 字面量，请填写域名";
   if (host === "localhost" || BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
     return "不能使用内网/本机域名";
   }
-  if (!EXTERNAL_HOST_PATTERN.test(host)) return "域名格式不合法（允许 example.com 或 *.example.com）";
+  if (!EXTERNAL_HOST_PATTERN.test(host)) return "域名格式不合法（请填写类似 api.example.com 的精确域名）";
   return null;
 }
 
