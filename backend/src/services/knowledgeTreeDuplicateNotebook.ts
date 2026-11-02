@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -44,7 +44,7 @@ function chunked<T>(items: T[], size = 400): T[][] {
   return out;
 }
 
-function readSubtree(db: Database.Database, rootId: string): SubtreeRow[] {
+function readSubtree(db: DatabaseSync, rootId: string): SubtreeRow[] {
   return db.prepare(`
     WITH RECURSIVE subtree(id) AS (
       SELECT id FROM knowledge_tree_nodes WHERE id = ? AND isDeleted = 0
@@ -58,7 +58,7 @@ function readSubtree(db: Database.Database, rootId: string): SubtreeRow[] {
     FROM knowledge_tree_nodes node
     JOIN subtree ON subtree.id = node.id
     ORDER BY node.sortOrder, node.id
-  `).all(rootId) as SubtreeRow[];
+  `).all(rootId) as unknown as SubtreeRow[];
 }
 
 /** 父在前、子在后：深拷贝时先建目录，再往里放内容。 */
@@ -84,7 +84,7 @@ function orderSubtree(rootId: string, rows: SubtreeRow[]): SubtreeRow[] {
   return ordered;
 }
 
-function readNotebookMeta(db: Database.Database, notebookId: string): NotebookMetaRow {
+function readNotebookMeta(db: DatabaseSync, notebookId: string): NotebookMetaRow {
   const row = db.prepare("SELECT name, icon, description FROM notebooks WHERE id = ?")
     .get(notebookId) as NotebookMetaRow | undefined;
   return { name: row?.name || "未命名文件夹", icon: row?.icon || null, description: row?.description || null };
@@ -96,7 +96,7 @@ function duplicateTitleBase(title: string): string {
 }
 
 function nextNotebookTitle(
-  db: Database.Database,
+  db: DatabaseSync,
   scopeKey: string,
   parentId: string | null,
   title: string,
@@ -125,7 +125,7 @@ function nextNotebookTitle(
 
 /** 副本与源目录同级：要么在父目录里可新建，要么在工作区根层有编辑权限。 */
 function canCreateSibling(
-  db: Database.Database,
+  db: DatabaseSync,
   source: SourceNodeRow,
   userId: string,
 ): boolean {
@@ -144,7 +144,7 @@ function canCreateSibling(
 /** 只有能完整复制的文档格式才随目录复制（含导图、画板）；锁定、加密、纯文本等跳过并计数。 */
 const COPYABLE_CONTENT_FORMATS = new Set(["markdown", "tiptap-json", "mindmap", "board"]);
 
-function readCopyableNoteIds(db: Database.Database, noteIds: string[]): Set<string> {
+function readCopyableNoteIds(db: DatabaseSync, noteIds: string[]): Set<string> {
   const copyable = new Set<string>();
   for (const chunk of chunked(noteIds)) {
     const rows = db.prepare(`
@@ -160,7 +160,7 @@ function readCopyableNoteIds(db: Database.Database, noteIds: string[]): Set<stri
   return copyable;
 }
 
-function hardDeleteRows(db: Database.Database, table: "notes" | "notebooks", ids: string[]): void {
+function hardDeleteRows(db: DatabaseSync, table: "notes" | "notebooks", ids: string[]): void {
   for (const chunk of chunked(ids)) {
     db.prepare(`DELETE FROM ${table} WHERE id IN (${chunk.map(() => "?").join(",")})`).run(...chunk);
   }
@@ -168,7 +168,7 @@ function hardDeleteRows(db: Database.Database, table: "notes" | "notebooks", ids
 
 /** 复制中途失败时清掉本次新建的行，避免留下半棵树。 */
 function rollbackCreatedRows(
-  db: Database.Database,
+  db: DatabaseSync,
   createdNoteIds: string[],
   createdNotebookIds: string[],
 ): void {
@@ -191,7 +191,7 @@ function rollbackCreatedRows(
 export async function duplicateKnowledgeNotebook(input: {
   actorUserId: string;
   nodeId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): Promise<DuplicatedNotebookResult> {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);

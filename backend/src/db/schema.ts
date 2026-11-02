@@ -1,4 +1,6 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
+// 副作用挂载：给 DatabaseSync 补上 transaction / pragma / backup（node:sqlite 未提供）
+import "./sqlite-ext.js";
 import path from "path";
 import fs from "fs";
 import { runMigrations, getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from "./migrations.js";
@@ -37,11 +39,11 @@ assertSafeTestDatabasePath(DB_PATH);
 
 const DB_REGISTRY_KEY = Symbol.for("nowen-note.sqlite-database-registry");
 const globalState = globalThis as typeof globalThis & {
-  [DB_REGISTRY_KEY]?: Map<string, Database.Database>;
+  [DB_REGISTRY_KEY]?: Map<string, DatabaseSync>;
 };
-const dbRegistry = globalState[DB_REGISTRY_KEY] || new Map<string, Database.Database>();
+const dbRegistry = globalState[DB_REGISTRY_KEY] || new Map<string, DatabaseSync>();
 globalState[DB_REGISTRY_KEY] = dbRegistry;
-let db: Database.Database | undefined;
+let db: DatabaseSync | undefined;
 
 /**
  * 返回当前 SQLite 数据库文件的绝对路径。
@@ -78,7 +80,7 @@ export function closeDb(): void {
   }
 }
 
-export function getDb(): Database.Database {
+export function getDb(): DatabaseSync {
   if (!db) {
     db = dbRegistry.get(DB_PATH);
     if (db) return db;
@@ -87,7 +89,9 @@ export function getDb(): Database.Database {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    db = new Database(DB_PATH);
+    // allowExtension：node:sqlite 默认禁止加载扩展，而 sqlite-vec 依赖 loadExtension，
+    // 构建向量索引的库必须开启（此前 better-sqlite3 默认允许）。
+    db = new DatabaseSync(DB_PATH, { allowExtension: true });
     dbRegistry.set(DB_PATH, db);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
@@ -176,7 +180,7 @@ export function getCodeSchemaVersion(): number {
   return CURRENT_SCHEMA_VERSION;
 }
 
-function initSchema(db: Database.Database) {
+function initSchema(db: DatabaseSync) {
   db.exec(`
     -- 用户表
     CREATE TABLE IF NOT EXISTS users (

@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
-function columnNames(db: Database.Database): Set<string> {
+function columnNames(db: DatabaseSync): Set<string> {
   return new Set((db.prepare("PRAGMA table_info(note_y_subdocument_manifests)").all() as Array<{ name: string }>)
     .map((column) => column.name));
 }

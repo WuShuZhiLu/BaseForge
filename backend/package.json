@@ -24,7 +24,6 @@
     "@types/ws": "^8.18.1",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^11.7.0",
     "bonjour-service": "^1.2.1",
     "busboy": "^1.6.0",
     "cheerio": "^1.2.0",
@@ -54,7 +53,6 @@
   "devDependencies": {
     "@types/archiver": "^6.0.4",
     "@types/bcryptjs": "^2.4.6",
-    "@types/better-sqlite3": "^7.6.12",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.20.0",

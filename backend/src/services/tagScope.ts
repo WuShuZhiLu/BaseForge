@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 export interface ScopedTagRecord {
   id: string;
@@ -35,7 +35,7 @@ export function normalizeTagName(raw: unknown): string {
  * ASCII 大小写差异，避免 React/react 被当成两个标签。
  */
 export function findTagByScopedName(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   name: string,
@@ -77,7 +77,7 @@ export function isTagUniqueConstraintError(error: unknown): boolean {
  * 后到请求捕获唯一冲突后重新查询并复用已创建记录，而不是向用户暴露 409。
  */
 export function ensureScopedTag(
-  db: Database.Database,
+  db: DatabaseSync,
   input: EnsureScopedTagInput,
 ): EnsureScopedTagResult {
   const name = normalizeTagName(input.name);

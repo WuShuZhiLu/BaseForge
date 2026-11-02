@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -16,9 +16,9 @@ export interface KnowledgeAccessPolicyState {
   isExplicit: boolean;
 }
 
-const initializedDatabases = new WeakSet<Database.Database>();
+const initializedDatabases = new WeakSet<DatabaseSync>();
 
-function createPolicyTable(db: Database.Database): void {
+function createPolicyTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_tree_access_policies (
       nodeId TEXT PRIMARY KEY,
@@ -34,7 +34,7 @@ function createPolicyTable(db: Database.Database): void {
   `);
 }
 
-function ensureCompatiblePolicySchema(db: Database.Database): void {
+function ensureCompatiblePolicySchema(db: DatabaseSync): void {
   const table = db.prepare(`
     SELECT sql
     FROM sqlite_master
@@ -81,7 +81,7 @@ function ensureCompatiblePolicySchema(db: Database.Database): void {
 }
 
 export function ensureKnowledgeAccessPolicyTable(
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): void {
   if (initializedDatabases.has(db)) return;
   ensureKnowledgeTreeTables(db);
@@ -108,7 +108,7 @@ export function ensureKnowledgeAccessPolicyTable(
 
 export function getKnowledgeNodeAccessPolicy(
   nodeId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): KnowledgeAccessPolicyState {
   ensureKnowledgeAccessPolicyTable(db);
   const row = db.prepare(`
@@ -123,14 +123,14 @@ export function getKnowledgeNodeAccessPolicy(
 
 export function getKnowledgeNodeAccessMode(
   nodeId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): KnowledgeAccessMode {
   return getKnowledgeNodeAccessPolicy(nodeId, db).accessMode;
 }
 
 export function findNearestRestrictedKnowledgePolicy(
   nodeId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): KnowledgeAccessPolicyMatch | null {
   ensureKnowledgeAccessPolicyTable(db);
   return (db.prepare(`
@@ -155,7 +155,7 @@ export function findNearestRestrictedKnowledgePolicy(
 export function restrictKnowledgeNodeAccess(input: {
   nodeId: string;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): void {
   const db = input.db || getDb();
   ensureKnowledgeAccessPolicyTable(db);
@@ -181,7 +181,7 @@ export function setKnowledgeNodeAccessMode(input: {
   nodeId: string;
   accessMode: KnowledgeAccessMode;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeAccessPolicyState {
   const db = input.db || getDb();
   ensureKnowledgeAccessPolicyTable(db);
@@ -200,7 +200,7 @@ export function setKnowledgeNodeAccessMode(input: {
 
 export function restoreKnowledgeNodeInheritanceIfEmpty(input: {
   nodeId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): boolean {
   const db = input.db || getDb();
   ensureKnowledgeAccessPolicyTable(db);

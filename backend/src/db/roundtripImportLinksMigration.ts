@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
-export function ensureRoundTripImportLinksSchema(db: Database.Database): void {
+export function ensureRoundTripImportLinksSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS roundtrip_import_links (
       id TEXT PRIMARY KEY,

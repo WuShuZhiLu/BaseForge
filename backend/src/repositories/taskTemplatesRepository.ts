@@ -41,11 +41,11 @@ export const taskTemplatesRepository = {
     if (workspaceId) {
       return db
         .prepare('SELECT * FROM task_templates WHERE "workspaceId" = ? ORDER BY "createdAt" DESC')
-        .all(workspaceId) as TaskTemplateRecord[];
+        .all(workspaceId) as unknown as TaskTemplateRecord[];
     } else {
       return db
         .prepare('SELECT * FROM task_templates WHERE "userId" = ? AND "workspaceId" IS NULL ORDER BY "createdAt" DESC')
-        .all(userId) as TaskTemplateRecord[];
+        .all(userId) as unknown as TaskTemplateRecord[];
     }
   },
 

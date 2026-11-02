@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 import { synchronizeLegacyNotebookHierarchy } from "./legacyKnowledgeHierarchy.js";
@@ -68,7 +68,7 @@ interface EvidenceRow {
   evidenceCount: number;
 }
 
-function tableExists(db: Database.Database, table: string): boolean {
+function tableExists(db: DatabaseSync, table: string): boolean {
   return !!db.prepare(
     "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = ?",
   ).get(table);
@@ -79,7 +79,7 @@ function placeholders(values: readonly unknown[]): string {
 }
 
 function countRows(
-  db: Database.Database,
+  db: DatabaseSync,
   table: string,
   column: string,
   values: readonly string[],
@@ -95,7 +95,7 @@ function countRows(
 }
 
 function readSubtreeIds(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   notebookId: string,
 ): string[] {
@@ -114,7 +114,7 @@ function readSubtreeIds(
   `).all(notebookId, userId, userId) as Array<{ id: string }>).map((row) => row.id);
 }
 
-function readEvidence(db: Database.Database, userId: string): EvidenceRow[] {
+function readEvidence(db: DatabaseSync, userId: string): EvidenceRow[] {
   if (!tableExists(db, "knowledge_tree_history")) return [];
   return db.prepare(`
     SELECT
@@ -127,7 +127,7 @@ function readEvidence(db: Database.Database, userId: string): EvidenceRow[] {
       AND metadata LIKE '%"source":"journal_archive"%'
     GROUP BY fromParentId
     ORDER BY notebookId ASC
-  `).all(userId) as EvidenceRow[];
+  `).all(userId) as unknown as EvidenceRow[];
 }
 
 function previewToken(userId: string, candidates: JournalArchiveCleanupCandidate[]): string {
@@ -146,7 +146,7 @@ function previewToken(userId: string, candidates: JournalArchiveCleanupCandidate
 }
 
 export function previewJournalArchiveCleanup(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
 }): JournalArchiveCleanupPreview {
   ensureKnowledgeTreeTables(input.db);
@@ -217,7 +217,7 @@ export function previewJournalArchiveCleanup(input: {
 }
 
 function insertCleanupHistory(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     action: "delete_subtree" | "restore";
     userId: string;
@@ -249,7 +249,7 @@ function insertCleanupHistory(
 }
 
 export function applyJournalArchiveCleanup(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
   previewToken: string;
   candidateIds?: string[];
@@ -321,7 +321,7 @@ export function applyJournalArchiveCleanup(input: {
 }
 
 export function restoreJournalArchiveCleanup(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
   cleanupId: string;
 }): JournalArchiveCleanupRestoreResult {

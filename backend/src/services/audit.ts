@@ -145,7 +145,7 @@ class AuditLogger {
     const total = (db.prepare(`SELECT COUNT(*) as count FROM audit_logs ${where}`).get(...values) as any).count;
     const logs = db.prepare(
       `SELECT * FROM audit_logs ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`
-    ).all(...values, limit, offset) as AuditEntry[];
+    ).all(...values, limit, offset) as unknown as AuditEntry[];
 
     return { logs, total };
   }
@@ -155,7 +155,7 @@ class AuditLogger {
     const db = getDb();
     const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
     const result = db.prepare("DELETE FROM audit_logs WHERE createdAt < ?").run(cutoff);
-    return result.changes;
+    return result.changes as number;
   }
 }
 

@@ -1,5 +1,5 @@
 import { withEncryptedBlockWrite } from "../lib/encryptedBlockWrites.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { guardEncryptedNoteMutation, guardEncryptedBlockWriter } from "../lib/encryptedNotes.js";
 import { runChangeFeedSuppressed } from "./suppression";
 import { SyncError } from "./errors";
@@ -66,7 +66,7 @@ function workspaceIdOf(input: ApplyMutationInput): string | null {
 
 /** 查台账：已处理过的 mutation 直接返回首次结果。 */
 function findApplied(
-  db: Database.Database,
+  db: DatabaseSync,
   mutationId: string,
   userId: string,
 ): { resultVersion: number | null } | null {
@@ -78,7 +78,7 @@ function findApplied(
 }
 
 function recordApplied(
-  db: Database.Database,
+  db: DatabaseSync,
   input: ApplyMutationInput,
   resultVersion: number | null,
 ): void {
@@ -101,7 +101,7 @@ function recordApplied(
 // 各实体的写入
 // ---------------------------------------------------------------------------
 
-function applyNotebook(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyNotebook(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     // 软删除：notebooks 有 isDeleted 列，硬删会连带级联清掉笔记，
     // 而删除笔记本不应意味着销毁其中的内容。
@@ -149,7 +149,7 @@ function applyNotebook(db: Database.Database, input: ApplyMutationInput): number
   return null;
 }
 
-function applyTag(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyTag(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     db.prepare(`DELETE FROM tags WHERE id = ? AND workspaceId IS ?
       AND (? IS NOT NULL OR userId = ?)`)
@@ -183,7 +183,7 @@ function applyTag(db: Database.Database, input: ApplyMutationInput): number | nu
  * baseVersion 缺失时按"客户端不知道自己在覆盖什么"处理：
  * 若服务端已存在该笔记，一律判冲突，绝不盲目覆盖正文。
  */
-function applyNote(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyNote(db: DatabaseSync, input: ApplyMutationInput): number | null {
   const existing = db.prepare(`
     SELECT version, themeId, colorMark, content, contentFormat, isUnlisted FROM notes WHERE id = ? AND workspaceId IS ?
       AND (? IS NOT NULL OR userId = ?)
@@ -286,7 +286,7 @@ function applyNote(db: Database.Database, input: ApplyMutationInput): number | n
 }
 
 /** entityId 形如 "noteId:tagId"。 */
-function applyNoteTag(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyNoteTag(db: DatabaseSync, input: ApplyMutationInput): number | null {
   const separator = input.entityId.lastIndexOf(":");
   if (separator <= 0) throw new SyncError("INVALID_PAYLOAD", "note_tag entityId 需为 noteId:tagId");
   const noteId = input.entityId.slice(0, separator);
@@ -315,7 +315,7 @@ function applyNoteTag(db: Database.Database, input: ApplyMutationInput): number 
 }
 
 /** entityId 形如 "userId:noteId"。 */
-function applyFavorite(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyFavorite(db: DatabaseSync, input: ApplyMutationInput): number | null {
   const separator = input.entityId.lastIndexOf(":");
   if (separator <= 0) throw new SyncError("INVALID_PAYLOAD", "favorite entityId 需为 userId:noteId");
   const noteId = input.entityId.slice(separator + 1);
@@ -347,7 +347,7 @@ function applyFavorite(db: Database.Database, input: ApplyMutationInput): number
  * 元数据先通过 push 创建，二进制随后通过 blob PUT 落地。
  * path 在二进制到达前为空字符串，避免产生“先传文件但没有引用”的孤儿对象。
  */
-function applyAttachment(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyAttachment(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     db.prepare(`DELETE FROM attachments WHERE id = ? AND noteId IN (
       SELECT id FROM notes WHERE workspaceId IS ? AND (? IS NOT NULL OR userId = ?)
@@ -397,7 +397,7 @@ function applyAttachment(db: Database.Database, input: ApplyMutationInput): numb
  * 按时间判定"谁更新"会让慢钟设备的修改被永久吞掉。
  * 因此只要双方 updatedAt 不同就判冲突，交给用户决定。
  */
-function applyTask(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyTask(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     // 子任务通过 parentId 的 CASCADE 一并删除，与本地删除语义一致。
     db.prepare(`DELETE FROM tasks WHERE id = ? AND workspaceId IS ?
@@ -463,13 +463,13 @@ function applyTask(db: Database.Database, input: ApplyMutationInput): number | n
   return null;
 }
 
-function noteExists(db: Database.Database, id: string, input: ApplyMutationInput): boolean {
+function noteExists(db: DatabaseSync, id: string, input: ApplyMutationInput): boolean {
   return !!db.prepare(`SELECT 1 FROM notes WHERE id = ? AND workspaceId IS ?
     AND (? IS NOT NULL OR userId = ?)`)
     .get(id, workspaceIdOf(input), workspaceIdOf(input), input.userId);
 }
 
-function taskExists(db: Database.Database, id: string, input: ApplyMutationInput): boolean {
+function taskExists(db: DatabaseSync, id: string, input: ApplyMutationInput): boolean {
   return !!db.prepare(`SELECT 1 FROM tasks WHERE id = ? AND workspaceId IS ?
     AND (? IS NOT NULL OR userId = ?)`)
     .get(id, workspaceIdOf(input), workspaceIdOf(input), input.userId);
@@ -484,7 +484,7 @@ function taskExists(db: Database.Database, id: string, input: ApplyMutationInput
  * lastNotifiedAt **不同步** —— 那是"这台设备有没有弹过通知"的本机状态，
  * 同步过来会让另一台设备漏掉提醒。
  */
-function applyTaskReminder(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyTaskReminder(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     db.prepare("DELETE FROM task_reminders WHERE id = ? AND userId = ?")
       .run(input.entityId, input.userId);
@@ -525,7 +525,7 @@ function applyTaskReminder(db: Database.Database, input: ApplyMutationInput): nu
  * 那些附件的二进制走独立通道（与 attachments 同理），
  * 此处只同步引用关系。
  */
-function applyDiary(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyDiary(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     db.prepare(`DELETE FROM diaries WHERE id = ? AND workspaceId IS ?
       AND (? IS NOT NULL OR userId = ?)`)
@@ -577,7 +577,7 @@ function applyDiary(db: Database.Database, input: ApplyMutationInput): number | 
  *
  * 与 note 一样用 baseUpdatedAt 比对，不一致即冲突。
  */
-function applyMindmap(db: Database.Database, input: ApplyMutationInput): number | null {
+function applyMindmap(db: DatabaseSync, input: ApplyMutationInput): number | null {
   if (input.operation === "delete") {
     db.prepare(`DELETE FROM mindmaps WHERE id = ? AND workspaceId IS ?
       AND (? IS NOT NULL OR userId = ?)`)
@@ -620,7 +620,7 @@ function applyMindmap(db: Database.Database, input: ApplyMutationInput): number 
   return null;
 }
 
-const APPLIERS: Record<ApplyMutationInput["entityType"], (db: Database.Database, input: ApplyMutationInput) => number | null> = {
+const APPLIERS: Record<ApplyMutationInput["entityType"], (db: DatabaseSync, input: ApplyMutationInput) => number | null> = {
   notebook: applyNotebook,
   note: applyNote,
   tag: applyTag,
@@ -650,7 +650,7 @@ const APPLIERS: Record<ApplyMutationInput["entityType"], (db: Database.Database,
  * 这样一条冲突不会回滚同批次已成功的其他条目。
  */
 export function applyMutation(
-  db: Database.Database,
+  db: DatabaseSync,
   input: ApplyMutationInput,
 ): ApplyMutationResult {
   const already = findApplied(db, input.mutationId, input.userId);
@@ -682,6 +682,6 @@ export function applyMutation(
  * 供服务端内部的"从别处导入/回填"路径使用；
  * 常规 push 不走这里，因为其他设备必须看到这些变更。
  */
-export function applyWithoutFeed<T>(db: Database.Database, fn: () => T): T {
+export function applyWithoutFeed<T>(db: DatabaseSync, fn: () => T): T {
   return runChangeFeedSuppressed(db, fn);
 }

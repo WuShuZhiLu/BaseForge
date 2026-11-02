@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { EncryptedNotePayloadError, encryptedBlocksInContent, guardEncryptedNoteMutation } from "./encryptedNotes.js";
 
 /** Only explicit whole-save/Sync writers may change envelopes; derived writers retain every copy. */
 export function withEncryptedBlockWrite<T>(
-  db: Database.Database, noteId: string, content: string, contentFormat: string,
+  db: DatabaseSync, noteId: string, content: string, contentFormat: string,
   write: () => T, encryptedBlocksVersion?: unknown,
 ): T {
   return db.transaction(() => {
@@ -29,7 +29,7 @@ export function withEncryptedBlockWrite<T>(
   })();
 }
 
-export function assertEncryptedBlockCollaborationAllowed(db: Database.Database, noteId: string): void {
+export function assertEncryptedBlockCollaborationAllowed(db: DatabaseSync, noteId: string): void {
   const note = db.prepare("SELECT content, contentFormat FROM notes WHERE id = ?").get(noteId) as
     { content: string; contentFormat: string } | undefined;
   if (note && (note.contentFormat.startsWith("encrypted-") || /nowen-encrypted/i.test(note.content))) {

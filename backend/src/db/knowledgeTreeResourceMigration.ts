@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_RESOURCE_SCHEMA_VERSION = 61;
 
-export function ensureKnowledgeTreeResourceViews(db: Database.Database): void {
+export function ensureKnowledgeTreeResourceViews(db: DatabaseSync): void {
   // Keep this DDL local. Importing mindmap-schema here would import db/schema while the feature
   // migration list is still being registered, freezing CURRENT_SCHEMA_VERSION at the old value.
   db.exec(`

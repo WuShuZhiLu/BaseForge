@@ -551,9 +551,9 @@ export function listRoundTripImportBatches(
   const limit = Math.max(1, Math.min(Number(options.limit) || 30, 100));
   const rows = options.workspaceId === undefined
     ? getDb().prepare("SELECT * FROM roundtrip_import_batches WHERE userId = ? ORDER BY createdAt DESC LIMIT ?")
-      .all(userId, limit) as BatchRow[]
+      .all(userId, limit) as unknown as BatchRow[]
     : getDb().prepare("SELECT * FROM roundtrip_import_batches WHERE userId = ? AND workspaceScope = ? ORDER BY createdAt DESC LIMIT ?")
-      .all(userId, workspaceScope(options.workspaceId), limit) as BatchRow[];
+      .all(userId, workspaceScope(options.workspaceId), limit) as unknown as BatchRow[];
   return rows.map((row) => {
     const detail = publicBatch(row);
     const { preview: _preview, result: _result, ...summary } = detail;

@@ -28,7 +28,7 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 import JSZip from "jszip";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { closeDb, getDb, getDbSchemaVersion } from "../db/schema.js";
 import { requireSqliteVecForStoredTables } from "../db/sqlite-vec-extension.js";
 import { noteVersionsRepository } from "../repositories";
@@ -388,9 +388,9 @@ function cleanupWalShm(dbPath: string): void {
 }
 
 function checkSqliteIntegrity(dbPath: string, label: string): void {
-  let db: Database.Database | null = null;
+  let db: DatabaseSync | null = null;
   try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    db = new DatabaseSync(dbPath, { readOnly: true });
     requireSqliteVecForStoredTables(db, label);
     const row = db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     if (row.integrity_check !== "ok") {
@@ -1134,10 +1134,9 @@ export class BackupManager {
       );
       fs.writeFileSync(tmp, bytes);
       try {
-        const Database = (await import("better-sqlite3")).default;
-        let probe: InstanceType<typeof Database> | null = null;
+        let probe: DatabaseSync | null = null;
         try {
-          probe = new Database(tmp, { readonly: true });
+          probe = new DatabaseSync(tmp, { readOnly: true });
         } catch (e) {
           // 打不开也不要硬失败——导入阶段不需要行数统计。透传警告、静默用 0。
           // 主路径（落盘 + 生成 meta）仍会继续，避免"导入一份合法 .bak 却因
@@ -1373,11 +1372,10 @@ export class BackupManager {
       );
       fs.writeFileSync(tmpDb, await dbFile.async("nodebuffer"));
       try {
-        // 用 better-sqlite3 直接打开（独立连接）
-        const Database = (await import("better-sqlite3")).default;
-        let tmp: InstanceType<typeof Database> | null = null;
+        // 用 node:sqlite 直接打开（独立连接）
+        let tmp: DatabaseSync | null = null;
         try {
-          tmp = new Database(tmpDb, { readonly: true });
+          tmp = new DatabaseSync(tmpDb, { readOnly: true });
           requireSqliteVecForStoredTables(tmp, "备份预览");
         } catch (e) {
           try { tmp?.close(); } catch { /* ignore */ }
@@ -1602,7 +1600,7 @@ export class BackupManager {
     if (dryRun) {
       // 用 readonly 临时打开备份 DB，统计行数
       const Database = (await import("better-sqlite3")).default;
-      const tmp = new Database(filePath, { readonly: true });
+      const tmp = new DatabaseSync(filePath, { readOnly: true });
       try {
         requireSqliteVecForStoredTables(tmp, "备份预览");
       } catch (error) {

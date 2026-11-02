@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { Hono, type Context } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema";
 import { getUserWorkspaceRole } from "../middleware/acl";
 import {
@@ -188,7 +188,7 @@ function buildPlainSnippet(source: string, terms: string[], label?: string): str
   return `${label ? `${escapeHtml(label)}：` : ""}${prefix}${marked}${suffix}`;
 }
 
-function ensureSearchSqlFunctions(db: Database.Database): void {
+function ensureSearchSqlFunctions(db: DatabaseSync): void {
   if (registeredSearchDatabases.has(db as object)) return;
   db.function(
     "nowen_search_normalize",
@@ -255,12 +255,12 @@ function buildSearchScope(
   };
 }
 
-function getUserRole(db: Database.Database, userId: string): string | null {
+function getUserRole(db: DatabaseSync, userId: string): string | null {
   const row = db.prepare("SELECT role FROM users WHERE id = ?").get(userId) as { role?: string } | undefined;
   return row?.role || null;
 }
 
-function checkFtsIntegrity(db: Database.Database): { healthy: boolean; detail: string } {
+function checkFtsIntegrity(db: DatabaseSync): { healthy: boolean; detail: string } {
   try {
     db.prepare("INSERT INTO notes_fts(notes_fts, rank) VALUES('integrity-check', 1)").run();
     return { healthy: true, detail: "ok" };
@@ -272,7 +272,7 @@ function checkFtsIntegrity(db: Database.Database): { healthy: boolean; detail: s
   }
 }
 
-function getFtsRowCount(db: Database.Database): number {
+function getFtsRowCount(db: DatabaseSync): number {
   try {
     const row = db.prepare("SELECT COUNT(*) AS count FROM notes_search_fts").get() as { count?: number } | undefined;
     return Number(row?.count) || 0;
@@ -284,7 +284,7 @@ function getFtsRowCount(db: Database.Database): number {
 const TERM_CANDIDATE_PAGE_SIZE = 500;
 
 function canViewSearchCandidate(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   userId: string,
 ): boolean {
@@ -293,7 +293,7 @@ function canViewSearchCandidate(
 }
 
 function fetchFtsTermCandidates(
-  db: Database.Database,
+  db: DatabaseSync,
   term: string,
   scope: SearchScope,
   userId: string,
@@ -339,7 +339,7 @@ AND COALESCE(n.contentFormat, 'tiptap-json') <> 'mindmap'
 }
 
 function fetchMetadataTermCandidates(
-  db: Database.Database,
+  db: DatabaseSync,
   term: string,
   scope: SearchScope,
   userId: string,
@@ -398,7 +398,7 @@ AND (
 }
 
 function fetchLiteralTermCandidates(
-  db: Database.Database,
+  db: DatabaseSync,
   term: string,
   scope: SearchScope,
   userId: string,
@@ -462,7 +462,7 @@ function intersectCandidateSets(sets: Set<string>[]): Set<string> {
 }
 
 function collectCandidates(
-  db: Database.Database,
+  db: DatabaseSync,
   terms: string[],
   scope: SearchScope,
   userId: string,
@@ -505,7 +505,7 @@ function collectCandidates(
 }
 
 function filterVisibleCandidates(
-  db: Database.Database,
+  db: DatabaseSync,
   candidateIds: Set<string>,
   userId: string,
 ): Set<string> {
@@ -518,7 +518,7 @@ function filterVisibleCandidates(
 }
 
 function fetchFtsScores(
-  db: Database.Database,
+  db: DatabaseSync,
   searchTerm: string,
   scope: SearchScope,
   candidateIds: Set<string>,
@@ -551,7 +551,7 @@ function fetchFtsScores(
 }
 
 function fetchCandidateRows(
-  db: Database.Database,
+  db: DatabaseSync,
   candidateIds: Set<string>,
   userId: string,
   scope: SearchScope,
@@ -714,7 +714,7 @@ type MindMapSearchRow = {
 };
 
 function fetchMindMapResults(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | undefined,
   terms: string[],
@@ -871,7 +871,7 @@ function parseSheetSearchValues(raw: string): string[] {
 }
 
 function fetchSheetResults(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scope: SearchScope,
   terms: string[],

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_MINDMAP_FOLDER_SCHEMA_VERSION = 105;
@@ -16,7 +16,7 @@ function sameScope(a: LegacyFolder, b: LegacyFolder): boolean {
 }
 
 /** Project legacy folders as ordinary notebook nodes; retain the original rows for old clients. */
-export function ensureKnowledgeTreeMindmapFolders(db: Database.Database): void {
+export function ensureKnowledgeTreeMindmapFolders(db: DatabaseSync): void {
   const existingNotebookIds = new Set((db.prepare(
     "SELECT id FROM notebooks WHERE id GLOB ?",
   ).all(`${MINDMAP_LEGACY_NOTEBOOK_PREFIX}*`) as Array<{ id: string }>).map((row) => row.id));

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { hasKnowledgeCapability, resolveKnowledgeNodeAccess } from "../services/knowledgeCapabilities.js";
 import { SyncError } from "./errors.js";
 import { resolveAuthorizedScope } from "./scope.js";
@@ -29,7 +29,7 @@ export interface KnowledgeTreeStructureMutation {
   payload?: Record<string, unknown>;
 }
 
-function readNode(db: Database.Database, id: string): TreeRow | undefined {
+function readNode(db: DatabaseSync, id: string): TreeRow | undefined {
   return db.prepare(`
     SELECT id, userId, workspaceId, scopeKey, parentId, resourceType,
            resourceId, sortOrder, isDeleted
@@ -64,7 +64,7 @@ function parseStructure(payload: Record<string, unknown>, prefix: "" | "base"): 
 }
 
 function assertNodeAccess(
-  db: Database.Database, nodeId: string, userId: string,
+  db: DatabaseSync, nodeId: string, userId: string,
   capability: "canView" | "canMove" | "canDelete",
 ): void {
   const access = resolveKnowledgeNodeAccess(nodeId, userId, db, { includeDeleted: true });
@@ -79,7 +79,7 @@ function assertNodeAccess(
  * snapshot, pull/apply and subscription negotiation can consume the same contract.
  */
 export function applyKnowledgeTreeStructureMutation(
-  db: Database.Database,
+  db: DatabaseSync,
   input: KnowledgeTreeStructureMutation,
 ): void {
   const scopeKey = input.workspaceId ? `workspace:${input.workspaceId}` : "personal";

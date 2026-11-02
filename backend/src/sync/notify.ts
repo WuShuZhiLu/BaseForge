@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { logSyncInfo } from "./log";
 import { parseSyncScopeKey, resolveAuthorizedScope } from "./scope";
 
@@ -46,7 +46,7 @@ export function setSyncBroadcaster(fn: UserBroadcaster | null): void {
  * 客户端拿着自己的凭据去 /changes，服务端照常按 userId 隔离。
  */
 export function notifySyncChanged(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scopeKey = "personal",
 ): void {

@@ -1,5 +1,5 @@
 import { EncryptedNotePayloadError, withEncryptedBlocksSupport } from "../lib/encryptedNotes.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 import { getDb } from "../db/schema";
 import {
@@ -97,7 +97,7 @@ function clampInt(raw: string | undefined, fallback: number, min: number, max: n
 }
 
 function currentSequence(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
 ): number {
@@ -115,7 +115,7 @@ function currentSequence(
  * 否则会静默丢失那段变更。
  */
 function minAvailableSequence(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   entityTypes: readonly SyncNegotiatedEntityType[],
@@ -145,7 +145,7 @@ function guard(c: any): Response | null {
 }
 
 function canViewWorkspaceEntity(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   entityType: SyncNegotiatedEntityType,
@@ -199,7 +199,7 @@ function scopeError(c: any, error: unknown): Response {
 
 function requestScope(
   c: any,
-  db: Database.Database,
+  db: DatabaseSync,
   access: "read" | "write" = "read",
 ): SyncScopeDescriptor {
   // 旧客户端曾尝试传 workspaceId。新协议只接受 scopeKey；静默忽略会把
@@ -229,7 +229,7 @@ function explicitSubscriptionDevice(c: any): string | null {
 }
 
 function hasBoundSubscription(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scopeKey: string,
   deviceId: string,
@@ -338,7 +338,7 @@ app.get("/changes", (c) => {
       AND entityType IN (${subscription.types.map(() => "?").join(",")})
     ORDER BY sequence ASC
     LIMIT ?
-  `).all(after, scope.workspaceId, scope.workspaceId, userId, ...subscription.types, limit) as ChangeRowV2[];
+  `).all(after, scope.workspaceId, scope.workspaceId, userId, ...subscription.types, limit) as unknown as ChangeRowV2[];
   const rows = scannedRows.filter((row) => row.operation === "delete" || canViewWorkspaceEntity(
     db,userId,scope.workspaceId,row.entityType,row.entityId,row.noteId,
   ));
@@ -397,7 +397,7 @@ function parseCursor(
 }
 
 function snapshotPage(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   type: SyncNegotiatedEntityType,
@@ -495,7 +495,7 @@ function snapshotPage(
 }
 
 function authorizedSnapshotPage(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   type: SyncNegotiatedEntityType,

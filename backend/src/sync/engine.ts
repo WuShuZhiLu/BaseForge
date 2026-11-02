@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import {
   SYNC_PERSONAL_SCOPE_KEY,
   SYNC_PUSH_MAX_MUTATIONS,
@@ -92,7 +92,7 @@ export interface SyncEngineStatus {
 }
 
 export interface SyncEngineOptions {
-  db: Database.Database;
+  db: DatabaseSync;
   profileId: string;
   deviceId: string;
   userId: string;
@@ -147,7 +147,7 @@ export class SyncEngine {
   /** 老服务器不支持 negotiated entityTypes 时，本次进程不重复探测。 */
   private readonly unsupportedTreeScopes = new Set<string>();
 
-  private readonly db: Database.Database;
+  private readonly db: DatabaseSync;
   private readonly profileId: string;
   private readonly deviceId: string;
   private readonly userId: string;

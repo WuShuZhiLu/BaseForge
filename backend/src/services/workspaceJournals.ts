@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import {
@@ -94,7 +94,7 @@ function noteSortOrder(dateKey: string): number {
   return -Number(dateKey.replaceAll("-", ""));
 }
 
-function readWorkspaceOwner(db: Database.Database, workspaceId: string): string | null {
+function readWorkspaceOwner(db: DatabaseSync, workspaceId: string): string | null {
   const owner = db.prepare(`
     SELECT userId
     FROM workspace_members
@@ -106,7 +106,7 @@ function readWorkspaceOwner(db: Database.Database, workspaceId: string): string 
 }
 
 function resolveAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
   actorUserId: string,
 ): { role: WorkspaceRole | "system-admin"; canWrite: boolean; ownerUserId: string } {
@@ -142,7 +142,7 @@ function resolveAccess(
 }
 
 function ensureWorkspaceFolder(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     workspaceId: string;
     ownerUserId: string;
@@ -249,7 +249,7 @@ function ensureWorkspaceFolder(
 }
 
 function ensureFolders(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     workspaceId: string;
     ownerUserId: string;
@@ -299,7 +299,7 @@ function ensureFolders(
 }
 
 function readBoundJournal(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
   dateKey: string,
 ): WorkspaceJournalRecord | null {
@@ -336,7 +336,7 @@ function validateBoundJournal(
 }
 
 function placeBoundJournal(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     workspaceId: string;
     actorUserId: string;
@@ -373,7 +373,7 @@ function placeBoundJournal(
 }
 
 export function checkWorkspaceJournal(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   workspaceId: string;
   actorUserId: string;
   dateKey: string;
@@ -397,7 +397,7 @@ export function checkWorkspaceJournal(input: {
 }
 
 export function getOrCreateWorkspaceJournal(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   workspaceId: string;
   actorUserId: string;
   dateKey: string;

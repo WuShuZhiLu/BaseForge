@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_LEGACY_SYNC_SCHEMA_VERSION = 63;
@@ -8,7 +8,7 @@ export const KNOWLEDGE_TREE_LEGACY_SYNC_SCHEMA_VERSION = 63;
  * inside a broad UPDATE trigger lets SQLite resolve the RHS against NEW in some trigger contexts,
  * collapsing a folder-under-document relationship back to its physical notebook container.
  */
-export function ensureKnowledgeTreeLegacySync(db: Database.Database): void {
+export function ensureKnowledgeTreeLegacySync(db: DatabaseSync): void {
   db.exec(`
     DROP TRIGGER IF EXISTS knowledge_tree_notebooks_au;
     DROP TRIGGER IF EXISTS knowledge_tree_notebooks_parent_au;

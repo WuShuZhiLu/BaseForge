@@ -51,7 +51,7 @@ export const workspaceInvitesRepository = {
     const db = getDb();
     return db
       .prepare("SELECT * FROM workspace_invites WHERE \"workspaceId\" = ? ORDER BY \"createdAt\" DESC")
-      .all(workspaceId) as WorkspaceInviteRecord[];
+      .all(workspaceId) as unknown as WorkspaceInviteRecord[];
   },
 
   /**
@@ -122,7 +122,7 @@ export const workspaceInvitesRepository = {
     const result = db
       .prepare("UPDATE workspace_invites SET code = ?, \"useCount\" = 0 WHERE id = ? AND \"workspaceId\" = ?")
       .run(newCode, inviteId, workspaceId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -135,7 +135,7 @@ export const workspaceInvitesRepository = {
   transferOwnership(fromUserId: string, toUserId: string): number {
     const db = getDb();
     const result = db.prepare("UPDATE workspace_invites SET \"createdBy\" = ? WHERE \"createdBy\" = ?").run(toUserId, fromUserId);
-    return result.changes;
+    return result.changes as number;
   },
 
   async getByIdAsync(inviteId: string): Promise<WorkspaceInviteRecord | undefined> {

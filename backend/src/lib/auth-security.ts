@@ -387,7 +387,7 @@ export interface AccountLockRow {
  * 会自动清理过期锁和过期的失败计数。
  */
 export function checkAccountLock(
-  db: import("better-sqlite3").Database,
+  db: import("node:sqlite").DatabaseSync,
   userId: string,
 ): { lockedUntil: string; remainingSec: number } | null {
   const row = db
@@ -430,7 +430,7 @@ export function checkAccountLock(
  * 返回：本次处理后的计数与锁定信息（如果刚刚触发锁定）。
  */
 export function recordLoginFailure(
-  db: import("better-sqlite3").Database,
+  db: import("node:sqlite").DatabaseSync,
   userId: string,
 ): { attempts: number; lockedUntil: string | null } {
   const row = db
@@ -460,7 +460,7 @@ export function recordLoginFailure(
 }
 
 /** 登录成功后重置失败计数与锁定 */
-export function resetLoginFailure(db: import("better-sqlite3").Database, userId: string) {
+export function resetLoginFailure(db: import("node:sqlite").DatabaseSync, userId: string) {
   db.prepare(
     `UPDATE users
      SET failedLoginAttempts = 0, lastFailedLoginAt = NULL, lockedUntil = NULL
@@ -469,7 +469,7 @@ export function resetLoginFailure(db: import("better-sqlite3").Database, userId:
 }
 
 /** 使该用户所有已签发的 JWT 立即失效（tokenVersion++）。返回新的 tokenVersion */
-export function bumpTokenVersion(db: import("better-sqlite3").Database, userId: string): number {
+export function bumpTokenVersion(db: import("node:sqlite").DatabaseSync, userId: string): number {
   db.prepare("UPDATE users SET tokenVersion = tokenVersion + 1 WHERE id = ?").run(userId);
   const row = db.prepare("SELECT tokenVersion FROM users WHERE id = ?").get(userId) as
     | { tokenVersion: number }

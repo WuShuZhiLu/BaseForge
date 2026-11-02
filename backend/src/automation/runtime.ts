@@ -53,7 +53,7 @@ class AutomationRuntime {
         .run(INSTANCE_ID, new Date().toISOString(), event.id).changes;
       if (!claimed) continue;
       try {
-        const workflows = getDb().prepare("SELECT * FROM automation_workflows WHERE enabled=1 AND triggerType='event'").all() as WorkflowRecord[];
+        const workflows = getDb().prepare("SELECT * FROM automation_workflows WHERE enabled=1 AND triggerType='event'").all() as unknown as WorkflowRecord[];
         for (const workflow of workflows) {
           const trigger = JSON.parse(workflow.triggerConfigJson) as { event?: string };
           if (trigger.event !== event.type) continue;

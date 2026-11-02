@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 
@@ -39,7 +39,7 @@ function chunkIds(ids: string[]): string[][] {
   return out;
 }
 
-export function knowledgeNodeStats(nodeId: string, db: Database.Database = getDb()): KnowledgeNodeStats {
+export function knowledgeNodeStats(nodeId: string, db: DatabaseSync = getDb()): KnowledgeNodeStats {
   const subtree = db.prepare(`
     WITH RECURSIVE subtree(id, nodeType, resourceType, resourceId, isDeleted, updatedAt) AS (
       SELECT id, nodeType, resourceType, resourceId, isDeleted, updatedAt

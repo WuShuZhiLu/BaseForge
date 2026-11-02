@@ -12,10 +12,10 @@
  *   所有 DDL 都是幂等的（IF NOT EXISTS + PRAGMA 探测），可安全重复调用。
  */
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema";
 
-export function ensureMindmapSchema(db?: Database.Database): void {
+export function ensureMindmapSchema(db?: DatabaseSync): void {
   const _db = db ?? getDb();
 
   // ---- 1. mindmaps 表 ----

@@ -94,7 +94,7 @@ export const noteVersionsRepository = {
          ORDER BY nv.version DESC
          LIMIT ? OFFSET ?`,
       )
-      .all(...[noteId, ...(kind ? [kind] : []), ...(source ? [source] : []), limit, offset]) as NoteVersionListItem[];
+      .all(...[noteId, ...(kind ? [kind] : []), ...(source ? [source] : []), limit, offset]) as unknown as NoteVersionListItem[];
   },
 
   /**
@@ -213,7 +213,7 @@ export const noteVersionsRepository = {
   deleteByNoteId(noteId: string): number {
     const db = getDb();
     const result = db.prepare('DELETE FROM note_versions WHERE "noteId" = ?').run(noteId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -244,7 +244,7 @@ export const noteVersionsRepository = {
           LIMIT ?
         )
     `).run(keepRecent);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -267,7 +267,7 @@ export const noteVersionsRepository = {
          FROM note_versions
          WHERE "noteId" IN (${placeholders})`,
       )
-      .all(...noteIds) as NoteVersionRecord[];
+      .all(...noteIds) as unknown as NoteVersionRecord[];
   },
 
   /**
@@ -292,7 +292,7 @@ export const noteVersionsRepository = {
   transferOwnership(fromUserId: string, toUserId: string): number {
     const db = getDb();
     const result = db.prepare('UPDATE note_versions SET "userId" = ? WHERE "userId" = ?').run(toUserId, fromUserId);
-    return result.changes;
+    return result.changes as number;
   },
 
   async listByNoteIdAsync(noteId: string, limit: number, offset: number): Promise<NoteVersionListItem[]> {
@@ -727,7 +727,7 @@ export const noteVersionsRepository = {
     const result = db
       .prepare('DELETE FROM version_attachment_refs WHERE "versionId" NOT IN (SELECT id FROM note_versions)')
       .run();
-    return result.changes;
+    return result.changes as number;
   },
 };
 

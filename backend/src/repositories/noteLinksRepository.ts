@@ -40,7 +40,7 @@ export const noteLinksRepository = {
           AND n.isUnlisted = 0
         ORDER BY n.updatedAt DESC
         LIMIT ?
-      `).all(targetNoteId, _userId, limit) as BacklinkItem[];
+      `).all(targetNoteId, _userId, limit) as unknown as BacklinkItem[];
     } catch (error) {
       console.warn("[noteLinksRepository.getBacklinks] failed:", error instanceof Error ? error.message : error);
       return [];

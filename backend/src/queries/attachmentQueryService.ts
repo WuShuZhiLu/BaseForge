@@ -67,7 +67,7 @@ export const attachmentQueryService = {
          ORDER BY path
          LIMIT ?`,
       )
-      .all(limit) as AttachmentPathEntry[];
+      .all(limit) as unknown as AttachmentPathEntry[];
   },
 
   /**
@@ -183,6 +183,6 @@ export const attachmentQueryService = {
           WHERE ar.attachmentId = ?
             AND n.userId = ? AND n.workspaceId IS NULL
           ORDER BY n.updatedAt DESC`;
-    return db.prepare(sql).all(attachmentId, workspaceId ?? userId) as NoteReference[];
+    return db.prepare(sql).all(attachmentId, workspaceId ?? userId) as unknown as NoteReference[];
   },
 };

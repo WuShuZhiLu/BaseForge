@@ -58,7 +58,7 @@ async function findLiveCompanion(row: SourceRow, identifier: string): Promise<So
   const candidates = getDb().prepare(`SELECT id, noteId, userId, workspaceId, mimeType, filename, path FROM attachments
     WHERE noteId = ? AND userId = ? AND workspaceId IS ? AND id != ?
     AND (mimeType LIKE 'video/%' OR lower(filename) LIKE '%.mov' OR lower(filename) LIKE '%.mp4')`)
-    .all(row.noteId, row.userId, row.workspaceId, row.id) as SourceRow[];
+    .all(row.noteId, row.userId, row.workspaceId, row.id) as unknown as SourceRow[];
   for (const candidate of candidates) {
     let analysis: MediaAnalysis;
     try { analysis = await loadAnalysis(candidate, () => readAttachmentObject(candidate.path)); }

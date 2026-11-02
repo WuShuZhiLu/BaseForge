@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema.js";
 
 const installedDatabases = new WeakSet<object>();
 
-function columnNames(db: Database.Database, table: string): Set<string> {
+function columnNames(db: DatabaseSync, table: string): Set<string> {
   return new Set(
     (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((row) => row.name),
   );
@@ -17,7 +17,7 @@ function columnNames(db: Database.Database, table: string): Set<string> {
  * notebooks directly. These triggers make parent/scope/cycle invariants impossible to
  * violate regardless of the write entry point.
  */
-export function installNotebookTreeIntegrityGuards(db: Database.Database): void {
+export function installNotebookTreeIntegrityGuards(db: DatabaseSync): void {
   if (installedDatabases.has(db as object)) return;
 
   const notebookColumns = columnNames(db, "notebooks");

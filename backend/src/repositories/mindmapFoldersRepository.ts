@@ -9,7 +9,7 @@
 
 import { getDb } from "../db/schema";
 import { SqliteAdapter } from "../db/adapters";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 function getAdapter() {
   return new SqliteAdapter(getDb());
@@ -59,11 +59,11 @@ export const mindmapFoldersRepository = {
     if (workspaceId) {
       return db
         .prepare("SELECT * FROM mindmap_folders WHERE workspaceId = ? ORDER BY sortOrder, name")
-        .all(workspaceId) as MindmapFolderRecord[];
+        .all(workspaceId) as unknown as MindmapFolderRecord[];
     } else {
       return db
         .prepare("SELECT * FROM mindmap_folders WHERE userId = ? AND workspaceId IS NULL ORDER BY sortOrder, name")
-        .all(userId) as MindmapFolderRecord[];
+        .all(userId) as unknown as MindmapFolderRecord[];
     }
   },
 

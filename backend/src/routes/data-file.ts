@@ -25,7 +25,7 @@ import { Hono } from "hono";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { getDb, getDbPath, closeDb } from "../db/schema.js";
 import { verifySudoFromRequest } from "../lib/auth-security.js";
 import { getAttachmentsDir } from "./attachments.js";
@@ -254,7 +254,7 @@ app.post("/import", async (c) => {
     // 4) 先把新数据写到临时文件，并用 better-sqlite3 打开校验（能 PRAGMA 读到 schema 才算合法）
     fs.writeFileSync(tmpPath, bytes);
     try {
-      const probe = new Database(tmpPath, { readonly: true });
+      const probe = new DatabaseSync(tmpPath, { readOnly: true });
       try {
         probe.prepare("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1").get();
       } finally {

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { markBlockAuthorityMismatch, rebuildBlockAuthorityStore } from "../lib/blockAuthorityStore";
 import { syncNoteBlocks } from "../lib/noteBlocks";
 
@@ -20,7 +20,7 @@ export interface BlockAuthorityRecoveryResult {
  * 单笔失败保留 notes.content，并标记已有 shadow 为 mismatch，不影响同批其他笔记。
  */
 export function synchronizeRecoveredBlockAuthority(
-  db: Database.Database,
+  db: DatabaseSync,
   noteIds: Iterable<string>,
 ): BlockAuthorityRecoveryResult {
   const skipped: string[] = [];

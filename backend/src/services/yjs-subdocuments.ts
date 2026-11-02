@@ -1,6 +1,6 @@
 import { assertEncryptedBlockCollaborationAllowed } from "../lib/encryptedBlockWrites.js";
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import * as Y from "yjs";
 import { rebuildBlockAuthorityStore } from "../lib/blockAuthorityStore.js";
 import { syncNoteBlocks } from "../lib/noteBlocks.js";
@@ -34,7 +34,7 @@ export function isYjsSubdocumentsEnabled(): boolean {
 }
 
 export function rebuildYjsSubdocumentsIfEnabled(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   contentFormat: string,
@@ -94,7 +94,7 @@ export function splitYjsSubdocumentSections(noteId: string, content: string, max
   });
 }
 
-export function ensureYjsSubdocumentTables(db: Database.Database): void {
+export function ensureYjsSubdocumentTables(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS note_y_subdocument_manifests (
       noteId TEXT PRIMARY KEY,
@@ -173,7 +173,7 @@ function buildRootSnapshot(noteId: string, sections: YjsSubdocumentSection[]): {
   return { rootGuid, rootSnapshot };
 }
 
-function readManifest(db: Database.Database, noteId: string): YjsSubdocumentManifest | null {
+function readManifest(db: DatabaseSync, noteId: string): YjsSubdocumentManifest | null {
   const manifest = db.prepare(`
     SELECT rootGuid, generation, structureVersion
     FROM note_y_subdocument_manifests WHERE noteId = ?
@@ -206,7 +206,7 @@ function readManifest(db: Database.Database, noteId: string): YjsSubdocumentMani
 }
 
 export function assertYjsSubdocumentGeneration(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   expectedGeneration: number,
 ): YjsSubdocumentManifest {
@@ -232,7 +232,7 @@ function sameSectionStructure(
 }
 
 function replaceYjsSubdocumentRows(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   sections: YjsSubdocumentSection[],
@@ -281,7 +281,7 @@ function replaceYjsSubdocumentRows(
 }
 
 export function rebuildYjsSubdocuments(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   maxBlocks = 250,
@@ -296,7 +296,7 @@ export function rebuildYjsSubdocuments(
 
 /** 读取健康清单；只有缺失或与 notes.content 漂移时才重建，普通 GET 不得改写 Y.js 历史。 */
 export function prepareYjsSubdocuments(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   maxBlocks = 250,
@@ -371,7 +371,7 @@ export function prepareYjsSubdocuments(
 }
 
 export function readYjsSubdocumentBundle(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   notesContent: string,
 ): { source: "subdocuments" | "notes"; content: string; status: "healthy" | "missing" | "mismatch" } {
@@ -411,7 +411,7 @@ export function readYjsSubdocumentBundle(
 }
 
 export function getYjsSubdocumentSnapshot(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   sectionId: string,
 ): { guid: string; snapshot: Uint8Array } | null {
@@ -443,7 +443,7 @@ export function createYjsSubdocumentContentUpdate(
 }
 
 export function applyYjsSubdocumentUpdate(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   sectionId: string,
   update: Uint8Array,

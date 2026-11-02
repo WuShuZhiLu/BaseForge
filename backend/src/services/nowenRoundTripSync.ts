@@ -474,7 +474,7 @@ function loadLinks(
   return db.prepare(`
     SELECT * FROM roundtrip_import_links
      WHERE userId = ? AND workspaceScope = ? AND sourceInstanceId = ?
-  `).all(userId, workspaceScope(workspaceId), sourceInstanceId) as LinkRow[];
+  `).all(userId, workspaceScope(workspaceId), sourceInstanceId) as unknown as LinkRow[];
 }
 
 function linkKey(resourceType: LinkRow["resourceType"], sourceResourceId: string): string {
@@ -534,7 +534,7 @@ function notebookRowsForScope(userId: string, workspaceId: string | null): Noteb
     SELECT id, parentId, name, description, icon, color, sortOrder, isExpanded, createdAt, updatedAt
       FROM notebooks
      WHERE userId = ? AND ${scope.sql} AND (isDeleted IS NULL OR isDeleted = 0)
-  `).all(userId, ...scope.params) as NotebookRow[];
+  `).all(userId, ...scope.params) as unknown as NotebookRow[];
 }
 
 function noteRowsForScope(userId: string, workspaceId: string | null): NoteRow[] {
@@ -545,7 +545,7 @@ function noteRowsForScope(userId: string, workspaceId: string | null): NoteRow[]
       FROM notes
      WHERE userId = ? AND ${scope.sql} AND (isTrashed IS NULL OR isTrashed = 0)
      ORDER BY rowid
-  `).all(userId, ...scope.params) as NoteRow[];
+  `).all(userId, ...scope.params) as unknown as NoteRow[];
 }
 
 function attachmentRowsForScope(userId: string, workspaceId: string | null): AttachmentRow[] {
@@ -556,7 +556,7 @@ function attachmentRowsForScope(userId: string, workspaceId: string | null): Att
       JOIN notes n ON n.id = a.noteId
      WHERE n.userId = ? AND n.${scope.sql}
      ORDER BY a.rowid
-  `).all(userId, ...scope.params) as AttachmentRow[];
+  `).all(userId, ...scope.params) as unknown as AttachmentRow[];
 }
 
 function withSyncAvailability(result: any, model: PackageModel, userId: string, workspaceId: string | null): any {
@@ -1251,7 +1251,7 @@ export async function importRoundTripPackageSync(
       const target = db.prepare(`
         SELECT id, parentId, name, description, icon, color, sortOrder, isExpanded, createdAt, updatedAt
           FROM notebooks WHERE id = ?
-      `).get(plan.targetId) as NotebookRow;
+      `).get(plan.targetId) as unknown as NotebookRow;
       upsertLink(db, {
         userId: params.userId,
         workspaceId,

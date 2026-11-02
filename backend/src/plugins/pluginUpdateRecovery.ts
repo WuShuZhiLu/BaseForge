@@ -42,7 +42,7 @@ export function recoverPluginUpdates(): { recovered: number; disabled: number } 
       'downloaded','verified','staged','preflight','switching',
       'probation','rollback_pending','rolling_back'
     )
-    ORDER BY createdAt`).all() as RecoveryOperation[];
+    ORDER BY createdAt`).all() as unknown as RecoveryOperation[];
   const lifecycle = new PluginLifecycle();
   const installer = new PluginPackageInstaller();
   let recovered = 0;

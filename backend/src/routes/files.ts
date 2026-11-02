@@ -614,7 +614,7 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
         ORDER BY ${orderSql}
         LIMIT ? OFFSET ?`,
     )
-    .all(...params, pageSize, (page - 1) * pageSize) as FileRow[];
+    .all(...params, pageSize, (page - 1) * pageSize) as unknown as FileRow[];
 
   return c.json({
     items: rows.map(toFileOut),
@@ -1047,7 +1047,7 @@ app.post("/batch-delete", async (c) => {
       `SELECT id, noteId, userId, workspaceId, uploadSource, path
          FROM attachments WHERE id IN (${placeholders})`,
     )
-    .all(...ids) as Array<FileAttachmentAccessRow & {
+    .all(...ids) as unknown as Array<FileAttachmentAccessRow & {
       id: string;
       path: string;
     }>;
@@ -1180,7 +1180,7 @@ app.post("/batch-move", async (c) => {
       `SELECT id, noteId, userId, workspaceId, uploadSource, folderId
          FROM attachments WHERE id IN (${placeholders})`,
     )
-    .all(...ids) as Array<
+    .all(...ids) as unknown as Array<
       FileAttachmentAccessRow & { id: string; folderId: string | null }
     >;
 

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 type ForeignKeyViolation = {
@@ -13,7 +13,7 @@ type ForeignKeyViolation = {
  * 会话本身属于可丢弃的认证缓存，不包含用户内容；v59 是历史上首次执行全库
  * foreign_key_check 的迁移，因此这些既有脏记录会让无关的标签迁移反复失败。
  */
-function repairLegacyOrphanedUserSessions(db: Database.Database): void {
+function repairLegacyOrphanedUserSessions(db: DatabaseSync): void {
   const table = db.prepare(`
     SELECT 1
     FROM sqlite_master
@@ -51,7 +51,7 @@ function repairLegacyOrphanedUserSessions(db: Database.Database): void {
 export const tagScopeUniquenessMigration: Migration = {
   version: 59,
   name: "tag-scope-unique-names",
-  up: (db: Database.Database) => {
+  up: (db: DatabaseSync) => {
     repairLegacyOrphanedUserSessions(db);
 
     db.exec(`

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Context, Next } from "hono";
 
 import { getDb } from "../db/schema.js";
@@ -62,7 +62,7 @@ function appendNoteScope(
  * “来源笔记/引用笔记”展示；删除正文图片后 attachment_references 会立即清掉。
  */
 export function getCurrentReferenceNotes(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentIds: string[],
   scope: FilesScope,
   userId: string,
@@ -117,7 +117,7 @@ export function getCurrentReferenceNotes(
 
 /** 返回本批附件里由文件管理手动上传、因此受自动清理保护的 id。 */
 export function getProtectedManualUploadIds(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentIds: string[],
   scope: FilesScope,
   userId: string,

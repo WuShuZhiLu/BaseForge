@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { recordConflict } from "./conflict.js";
 import { SyncError } from "./errors.js";
 import {
@@ -24,7 +24,7 @@ export interface KnowledgeTreeBaselineResult {
 }
 
 interface BaselineOptions {
-  db: Database.Database;
+  db: DatabaseSync;
   profileId: string;
   deviceId: string;
   userId: string;
@@ -43,7 +43,7 @@ function sameStructure(a: Record<string, unknown>, b: Record<string, unknown>): 
 }
 
 function hasUnresolvedConflict(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string,
   entityId: string,
@@ -58,7 +58,7 @@ function hasUnresolvedConflict(
 }
 
 function preparedLocalOverrideMatches(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string,
   entityId: string,
@@ -88,7 +88,7 @@ function preparedLocalOverrideMatches(
 }
 
 function recordBaselineConflict(
-  db: Database.Database,
+  db: DatabaseSync,
   options: Pick<BaselineOptions, "profileId" | "scopeKey">,
   entityId: string,
   local: Record<string, unknown> | null,

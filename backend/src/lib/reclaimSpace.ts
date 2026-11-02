@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 /**
  * 磁盘空间回收工具。
@@ -43,7 +43,7 @@ const AUTO_VACUUM_INCREMENTAL = 2;
  * 调用位置：`getDb()` 初始化连接时。失败不抛错——能跑就跑，失败只是回退到
  * 历史"占用只增不减"行为，不影响数据正确性。
  */
-export function enableIncrementalAutoVacuum(db: Database.Database): void {
+export function enableIncrementalAutoVacuum(db: DatabaseSync): void {
   try {
     const row = db.prepare("PRAGMA auto_vacuum").get() as { auto_vacuum: number } | undefined;
     const cur = row?.auto_vacuum ?? AUTO_VACUUM_NONE;
@@ -114,7 +114,7 @@ export interface ReclaimResult {
  *
  * 返回执行结果供调用方写审计 / 返回给前端做 toast。
  */
-export function reclaimSpace(db: Database.Database, opts: ReclaimOptions = {}): ReclaimResult {
+export function reclaimSpace(db: DatabaseSync, opts: ReclaimOptions = {}): ReclaimResult {
   const {
     freedBytesEstimate = 0,
     vacuumThresholdBytes = Number(

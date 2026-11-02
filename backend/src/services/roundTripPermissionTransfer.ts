@@ -388,7 +388,7 @@ function targetUserByExactEmail(email: string): PublicTargetUser[] {
       FROM users
      WHERE COALESCE(isDisabled, 0) = 0 AND LOWER(COALESCE(email, '')) = ?
      ORDER BY username
-  `).all(email) as PublicTargetUser[];
+  `).all(email) as unknown as PublicTargetUser[];
 }
 
 function targetUserByExactUsername(username: string): PublicTargetUser[] {
@@ -398,7 +398,7 @@ function targetUserByExactUsername(username: string): PublicTargetUser[] {
       FROM users
      WHERE COALESCE(isDisabled, 0) = 0 AND LOWER(username) = ?
      ORDER BY username
-  `).all(username) as PublicTargetUser[];
+  `).all(username) as unknown as PublicTargetUser[];
 }
 
 export async function inspectRoundTripPermissions(
@@ -894,7 +894,7 @@ export async function addPermissionsToNowenPackageExport<TStats extends object>(
           FROM users
          WHERE id IN (${principalIds.map(() => "?").join(",")})
          ORDER BY username
-      `).all(...principalIds) as PermissionPrincipal[]
+      `).all(...principalIds) as unknown as PermissionPrincipal[]
     : [];
 
   const permissions: RoundTripPermissionsManifestV2 = {

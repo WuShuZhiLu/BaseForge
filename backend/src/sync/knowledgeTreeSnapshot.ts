@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { hasKnowledgeCapability, resolveKnowledgeNodeAccess } from "../services/knowledgeCapabilities.js";
 import { SyncError } from "./errors.js";
 import { resolveAuthorizedScope } from "./scope.js";
@@ -29,7 +29,7 @@ export interface KnowledgeTreeSnapshotItem {
  * Legacy clients never receive this phase; only devices that request the complete negotiated set do.
  */
 export function prepareKnowledgeTreeSnapshot(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
 ): KnowledgeTreeSnapshotItem[] {
@@ -40,7 +40,7 @@ export function prepareKnowledgeTreeSnapshot(
     FROM knowledge_tree_nodes
     WHERE workspaceId IS ? AND (? IS NOT NULL OR userId = ?)
       AND id NOT GLOB 'notebook:__nowen_root_documents__:*'
-  `).all(workspaceId, workspaceId, userId) as TreeRow[];
+  `).all(workspaceId, workspaceId, userId) as unknown as TreeRow[];
   const byId = new Map(rows.map((row) => [row.id, row]));
   const visible = new Map<string, boolean>();
   const canView = (row: TreeRow): boolean => {
@@ -91,7 +91,7 @@ export function prepareKnowledgeTreeSnapshot(
 }
 
 export function knowledgeTreeSnapshotPage(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   afterId: string | null,

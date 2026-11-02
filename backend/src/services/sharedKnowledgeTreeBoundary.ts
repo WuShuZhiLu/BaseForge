@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -11,7 +11,7 @@ type NodeScopeRow = {
   isDeleted: number;
 };
 
-function participatesInWorkspace(db: Database.Database, workspaceId: string, userId: string): boolean {
+function participatesInWorkspace(db: DatabaseSync, workspaceId: string, userId: string): boolean {
   const owner = db.prepare("SELECT ownerId FROM workspaces WHERE id = ?")
     .get(workspaceId) as { ownerId: string } | undefined;
   if (owner?.ownerId === userId) return true;
@@ -31,7 +31,7 @@ function participatesInWorkspace(db: Database.Database, workspaceId: string, use
 export function resolveSharedKnowledgeRoot(
   nodeId: string,
   actorUserId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): string | null {
   ensureKnowledgeTreeTables(db);
   const node = db.prepare(`

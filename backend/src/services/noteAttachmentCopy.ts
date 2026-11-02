@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { extractAttachmentIdsFromContent } from "../lib/attachmentRefs.js";
@@ -112,7 +112,7 @@ export async function copyStoredAttachmentObjects(
 }
 
 export async function copyReferencedNoteAttachments(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
   noteId: string;
   content: string;

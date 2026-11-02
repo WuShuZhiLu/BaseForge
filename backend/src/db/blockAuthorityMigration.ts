@@ -1,10 +1,10 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const blockAuthorityMigration: Migration = {
   version: 55,
   name: "block-authority-store",
-  up: (db: Database.Database) => {
+  up: (db: DatabaseSync) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS note_block_documents (
         noteId TEXT PRIMARY KEY,

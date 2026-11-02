@@ -2,7 +2,7 @@ import archiver from "archiver";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 export interface BackupDirectoryStats {
   count: number;
@@ -21,7 +21,7 @@ export interface FullBackupFileStats {
  * dangling projects whose files were intentionally excluded from the archive.
  */
 export function scrubPluginStudioProjectsFromBackup(dbPath: string): void {
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     const tables = new Set((db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'plugin_studio_%'",

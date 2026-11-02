@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { deleteAttachmentFilesByNoteIds } from "../routes/attachments.js";
 import { yDestroyDoc } from "./yjs.js";
 
@@ -47,7 +47,7 @@ interface NoteRefRow {
  * 只读：调用方负责删除磁盘附件与数据库行。
  */
 export function findOrphanAnonymousNoteIds(
-  db: Database.Database,
+  db: DatabaseSync,
   options: { graceHours?: number } = {},
 ): string[] {
   // 绝大多数资料库没有匿名文档：先做一次轻量存在性检查，避免每次保存都扫全部正文。
@@ -55,7 +55,7 @@ export function findOrphanAnonymousNoteIds(
 
   const rows = db.prepare(
     "SELECT id, content, isUnlisted, createdAt FROM notes",
-  ).all() as NoteRefRow[];
+  ).all() as unknown as NoteRefRow[];
 
   const byId = new Map(rows.map((row) => [row.id, row]));
   const refsById = new Map(rows.map((row) => [row.id, extractEmbeddedDocumentIds(row.content)]));
@@ -95,7 +95,7 @@ export function findOrphanAnonymousNoteIds(
  *
  * 调用方负责在宿主内容变化 / 永久删除之后触发；失败只记录日志，不影响主请求。
  */
-export function sweepOrphanAnonymousNotes(db: Database.Database): void {
+export function sweepOrphanAnonymousNotes(db: DatabaseSync): void {
   try {
     const ids = findOrphanAnonymousNoteIds(db);
     if (ids.length === 0) return;

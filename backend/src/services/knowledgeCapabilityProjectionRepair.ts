@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import {
@@ -41,7 +41,7 @@ function sameNullable(a: string | null, b: string | null): boolean {
 }
 
 function readProjectionRows(
-  db: Database.Database,
+  db: DatabaseSync,
   resourceType: RepairableKnowledgeResourceType,
   resourceId: string,
 ): ProjectionRow[] {
@@ -54,7 +54,7 @@ function readProjectionRows(
 }
 
 function parentIsValid(
-  db: Database.Database,
+  db: DatabaseSync,
   parentId: string | null,
   expectedScopeKey: string,
 ): boolean {
@@ -68,7 +68,7 @@ function parentIsValid(
 }
 
 function projectionMatches(
-  db: Database.Database,
+  db: DatabaseSync,
   projection: ProjectionRow,
   authoritative: {
     userId: string;
@@ -95,7 +95,7 @@ export function repairKnowledgeResourceProjectionIfStale(
   resourceType: RepairableKnowledgeResourceType,
   resourceId: string,
   actorUserId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): boolean {
   const projections = readProjectionRows(db, resourceType, resourceId);
   if (projections.length > 1) return false;

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -52,7 +52,7 @@ function isPreferredCandidate(next: CandidateRow, current: CandidateRow): boolea
 export function listSharedKnowledgeTree(input: {
   userId: string;
   workspaceId: string | null;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): SharedKnowledgeTreeNode[] {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);

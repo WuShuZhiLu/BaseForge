@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import type { NoteBlockIndexRow, NoteBlockType } from "./noteBlocks.js";
 import type { IncrementalPatchIndexPlan } from "./blockPatchIncrementalIndexes.js";
@@ -135,13 +135,13 @@ function analyzeTiptap(noteId: string, content: string): TiptapAnalysis | null {
   };
 }
 
-function loadExistingRows(db: Database.Database, noteId: string): ExistingIndexRow[] {
+function loadExistingRows(db: DatabaseSync, noteId: string): ExistingIndexRow[] {
   return db.prepare(`
     SELECT blockId, blockType, parentBlockId, blockOrder, plainText, contentHash, path
     FROM note_blocks_index
     WHERE noteId = ?
     ORDER BY blockOrder ASC
-  `).all(noteId) as ExistingIndexRow[];
+  `).all(noteId) as unknown as ExistingIndexRow[];
 }
 
 function rowsMirrorAnalysis(existing: ExistingIndexRow[], analysis: TiptapAnalysis): boolean {
@@ -180,7 +180,7 @@ function collectAncestorIds(
  * persisted index is an exact mirror of the authoritative pre-patch document.
  */
 export function canUseIncrementalListMoveIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   operations: TiptapBlockPatchOperation[],
@@ -204,7 +204,7 @@ export function canUseIncrementalListMoveIndexes(
  * sources must remain unchanged; only aggregate ancestors and structural coordinates may differ.
  */
 export function planIncrementalListMoveIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   operations: TiptapBlockPatchOperation[],

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_SCOPE_TRIGGER_REPAIR_SCHEMA_VERSION = 85;
@@ -7,7 +7,7 @@ export const KNOWLEDGE_TREE_SCOPE_TRIGGER_REPAIR_SCHEMA_VERSION = 85;
  * 运行期写入可能先落库笔记，再补 workspaceId。树触发器必须只在父节点与当前
  * scope 一致时建立 parentId，不能让临时 scope 组合被结构守卫误判为跨域父子关系。
  */
-export function ensureKnowledgeTreeScopeAwareTriggers(db: Database.Database): void {
+export function ensureKnowledgeTreeScopeAwareTriggers(db: DatabaseSync): void {
   db.exec(`
     DROP TRIGGER IF EXISTS knowledge_tree_notebooks_ai;
     CREATE TRIGGER knowledge_tree_notebooks_ai

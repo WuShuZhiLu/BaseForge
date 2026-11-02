@@ -1,10 +1,10 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_MINDMAP_SCHEMA_VERSION = 104;
 
 /** Keep existing mindmaps visible in the unified tree without changing their data or legacy folders. */
-export function ensureKnowledgeTreeMindmaps(db: Database.Database): void {
+export function ensureKnowledgeTreeMindmaps(db: DatabaseSync): void {
   db.exec(`
     INSERT OR IGNORE INTO knowledge_tree_nodes (
       id, userId, workspaceId, scopeKey, parentId, nodeType, resourceType,

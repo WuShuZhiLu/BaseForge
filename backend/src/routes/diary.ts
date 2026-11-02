@@ -412,7 +412,7 @@ diary.post("/", requireWorkspaceFeature("diaries"), async (c) => {
     return c.json({ error: `发布失败：${err?.message || err}` }, 500);
   }
 
-  const created = db.prepare("SELECT * FROM diaries WHERE id = ?").get(id) as DiaryRow;
+  const created = db.prepare("SELECT * FROM diaries WHERE id = ?").get(id) as unknown as DiaryRow;
   return c.json(rowToDiary(created), 201);
 });
 
@@ -541,7 +541,7 @@ diary.get("/timeline", requireWorkspaceFeature("diaries"), (c) => {
        ORDER BY diaries.createdAt DESC
        LIMIT ?`,
     )
-    .all(...finalArgs, limit) as DiaryRow[];
+    .all(...finalArgs, limit) as unknown as DiaryRow[];
 
   const hasMore = rows.length === limit;
   const nextCursor = rows.length > 0 ? rows[rows.length - 1].createdAt : null;
@@ -721,7 +721,7 @@ diary.put("/:id", (c) => {
            FROM diaries LEFT JOIN users ON users.id = diaries.userId
           WHERE diaries.id = ?`,
       )
-      .get(id) as DiaryRow;
+      .get(id) as unknown as DiaryRow;
     return c.json(rowToDiary(updated));
   })();
 });

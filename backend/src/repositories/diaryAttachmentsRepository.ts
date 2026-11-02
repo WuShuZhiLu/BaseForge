@@ -132,7 +132,7 @@ export const diaryAttachmentsRepository = {
     const db = getDb();
     const placeholders = attachmentIds.map(() => "?").join(",");
     const result = db.prepare(`DELETE FROM diary_attachments WHERE id IN (${placeholders})`).run(...attachmentIds);
-    return result.changes;
+    return result.changes as number;
   },
 
   async getByIdAsync(attachmentId: string): Promise<{ id: string; mimeType: string; path: string } | undefined> {

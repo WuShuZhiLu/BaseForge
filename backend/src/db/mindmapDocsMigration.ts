@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 import { collectMindmapTexts, defaultMindmapContent } from "../lib/mindmapData.js";
 import { resolveMindmapFallbackNotebook } from "../services/mindmapDocs.js";
@@ -26,7 +26,7 @@ interface LegacyNodeRow {
 
 /** 兜底建表 DDL 保持本地：import mindmap-schema 会拉起 db/schema，把迁移列表注册期间的
  *  CURRENT_SCHEMA_VERSION 冻结在旧值（见 knowledgeTreeResourceMigration 同款注释）。 */
-function ensureMindmapsTableLocal(db: Database.Database): void {
+function ensureMindmapsTableLocal(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS mindmaps (
       id TEXT PRIMARY KEY,
@@ -58,13 +58,13 @@ export const mindmapDocsMigration: Migration = {
   up(db) {
     ensureMindmapsTableLocal(db);
 
-    const maps = db.prepare("SELECT * FROM mindmaps").all() as LegacyMindmapRow[];
+    const maps = db.prepare("SELECT * FROM mindmaps").all() as unknown as LegacyMindmapRow[];
     if (maps.length > 0) {
       const legacyNodes = new Map<string, LegacyNodeRow>();
       for (const node of db.prepare(`
         SELECT resourceId, parentId, sortOrder, isDeleted, deletedAt
         FROM knowledge_tree_nodes WHERE resourceType = 'mindmap'
-      `).all() as LegacyNodeRow[]) {
+      `).all() as unknown as LegacyNodeRow[]) {
         legacyNodes.set(node.resourceId, node);
       }
 

@@ -38,7 +38,7 @@ export const apiTokensRepository = {
          FROM api_tokens WHERE "userId" = ?
          ORDER BY "revokedAt" IS NOT NULL, "createdAt" DESC`,
       )
-      .all(userId) as ApiTokenListItem[];
+      .all(userId) as unknown as ApiTokenListItem[];
   },
 
   /**
@@ -147,7 +147,7 @@ export const apiTokensRepository = {
          GROUP BY u.day
          ORDER BY u.day ASC`,
       )
-      .all(userId, startDay, endDay) as ApiTokenUsageRow[];
+      .all(userId, startDay, endDay) as unknown as ApiTokenUsageRow[];
   },
 
   /**

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { isEncryptedNoteFormat, isEncryptedBlockLanguage } from "./encryptedNotes.js";
 import { plainTextFromNoteContent, syncNoteBlocks } from "./noteBlocks";
 import { stripLegacyInternalMarkdownMarkers } from "./markdownUserContent";
@@ -82,7 +82,7 @@ export function extractSearchableText(
   }
 }
 
-function listSearchSourceRows(db: Database.Database): SearchSourceRow[] {
+function listSearchSourceRows(db: DatabaseSync): SearchSourceRow[] {
   return db.prepare(`
     SELECT id, COALESCE(content, '') AS content,
            COALESCE(contentText, '') AS contentText,
@@ -95,7 +95,7 @@ function isSearchTextStale(row: SearchSourceRow, extracted: string): boolean {
   return normalizeSearchText(row.contentText || "") !== normalizeSearchText(extracted);
 }
 
-export function inspectSearchContentText(db: Database.Database): SearchContentDiagnostics {
+export function inspectSearchContentText(db: DatabaseSync): SearchContentDiagnostics {
   const rows = listSearchSourceRows(db);
   let indexedNoteCount = 0;
   let emptyContentTextCount = 0;
@@ -122,7 +122,7 @@ export function inspectSearchContentText(db: Database.Database): SearchContentDi
  * Re-extract all note bodies without changing updatedAt/version. The surrounding
  * migration or rebuild endpoint already runs inside a transaction.
  */
-export function repairSearchContentText(db: Database.Database): SearchContentRepairResult {
+export function repairSearchContentText(db: DatabaseSync): SearchContentRepairResult {
   const rows = listSearchSourceRows(db);
   const update = db.prepare("UPDATE notes SET contentText = ? WHERE id = ?");
   let repairedCount = 0;
@@ -152,7 +152,7 @@ export function repairSearchContentText(db: Database.Database): SearchContentRep
  * intentionally preserves note updatedAt/version while rebuilding block rows and
  * contentText, so links/search stop leaking the historical metadata permanently.
  */
-export function repairLegacyMarkdownBlockMetadata(db: Database.Database): number {
+export function repairLegacyMarkdownBlockMetadata(db: DatabaseSync): number {
   const rows = db.prepare(`
     SELECT id, COALESCE(content, '') AS content
     FROM notes
@@ -168,7 +168,7 @@ export function repairLegacyMarkdownBlockMetadata(db: Database.Database): number
   return repairedCount;
 }
 
-function createNormalizedSearchFts(db: Database.Database): void {
+function createNormalizedSearchFts(db: DatabaseSync): void {
   if (!normalizedSearchFunctionDatabases.has(db as object)) {
     db.function(
       "nowen_search_normalize",
@@ -227,7 +227,7 @@ function createNormalizedSearchFts(db: Database.Database): void {
   `);
 }
 
-export function rebuildNormalizedSearchFts(db: Database.Database): void {
+export function rebuildNormalizedSearchFts(db: DatabaseSync): void {
   db.exec(`
     DROP TRIGGER IF EXISTS notes_search_ai;
     DROP TRIGGER IF EXISTS notes_search_ad;
@@ -244,13 +244,13 @@ export function rebuildNormalizedSearchFts(db: Database.Database): void {
   `).run();
 }
 
-function readSystemSetting(db: Database.Database, key: string): string | null {
+function readSystemSetting(db: DatabaseSync, key: string): string | null {
   const row = db.prepare("SELECT value FROM system_settings WHERE key = ?")
     .get(key) as { value?: string } | undefined;
   return row?.value ?? null;
 }
 
-function writeSystemSetting(db: Database.Database, key: string, value: string): void {
+function writeSystemSetting(db: DatabaseSync, key: string, value: string): void {
   db.prepare(`
     INSERT INTO system_settings (key, value, updatedAt)
     VALUES (?, ?, datetime('now'))
@@ -264,7 +264,7 @@ function writeSystemSetting(db: Database.Database, key: string, value: string): 
  * Repair persisted user-visible text whenever extraction semantics are upgraded.
  * The version marker is written last, making an interrupted startup safely retryable.
  */
-function ensureSearchContentExtractorVersion(db: Database.Database): boolean {
+function ensureSearchContentExtractorVersion(db: DatabaseSync): boolean {
   if (readSystemSetting(db, SEARCH_CONTENT_EXTRACTOR_VERSION_KEY) === SEARCH_CONTENT_EXTRACTOR_VERSION) {
     return false;
   }
@@ -283,7 +283,7 @@ function ensureSearchContentExtractorVersion(db: Database.Database): boolean {
 }
 
 /** Ensure the normalized candidate index and its triggers exist after startup. */
-export function ensureNormalizedSearchFts(db: Database.Database): void {
+export function ensureNormalizedSearchFts(db: DatabaseSync): void {
   createNormalizedSearchFts(db);
   if (ensureSearchContentExtractorVersion(db)) return;
   const noteCount = Number((db.prepare("SELECT COUNT(*) AS count FROM notes").get() as { count?: number })?.count) || 0;
@@ -291,7 +291,7 @@ export function ensureNormalizedSearchFts(db: Database.Database): void {
   if (noteCount !== indexCount) rebuildNormalizedSearchFts(db);
 }
 
-export function getNormalizedSearchFtsCount(db: Database.Database): number {
+export function getNormalizedSearchFtsCount(db: DatabaseSync): number {
   try {
     const row = db.prepare("SELECT COUNT(*) AS count FROM notes_search_fts").get() as { count?: number } | undefined;
     return Number(row?.count) || 0;
@@ -301,7 +301,7 @@ export function getNormalizedSearchFtsCount(db: Database.Database): number {
 }
 
 export function markSearchIndexRebuilt(
-  db: Database.Database,
+  db: DatabaseSync,
   rebuiltAt = new Date().toISOString(),
 ): void {
   db.prepare(`
@@ -313,7 +313,7 @@ export function markSearchIndexRebuilt(
   `).run(SEARCH_REBUILT_AT_KEY, rebuiltAt);
 }
 
-export function getSearchIndexRebuiltAt(db: Database.Database): string | null {
+export function getSearchIndexRebuiltAt(db: DatabaseSync): string | null {
   const row = db.prepare("SELECT value FROM system_settings WHERE key = ?")
     .get(SEARCH_REBUILT_AT_KEY) as { value?: string } | undefined;
   return row?.value || null;

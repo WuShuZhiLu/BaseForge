@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { syncReferences } from "../lib/attachmentRefs.js";
@@ -83,7 +83,7 @@ export class DuplicateNoteError extends Error {
   }
 }
 
-function readSourceNote(db: Database.Database, noteId: string): SourceNoteRow | null {
+function readSourceNote(db: DatabaseSync, noteId: string): SourceNoteRow | null {
   return (db.prepare(`
     SELECT note.id, note.workspaceId, note.title,
            note.content, note.contentText, note.contentFormat,
@@ -104,7 +104,7 @@ function duplicateTitleBase(title: string): string {
 }
 
 function nextDuplicateTitle(
-  db: Database.Database,
+  db: DatabaseSync,
   scopeKey: string,
   parentId: string | null,
   title: string,
@@ -130,7 +130,7 @@ function nextDuplicateTitle(
 
 /** 副本落点：默认与源笔记同级；目录深拷贝时由调用方显式指定目标目录。 */
 function resolveCopyContainer(
-  db: Database.Database,
+  db: DatabaseSync,
   source: SourceNoteRow,
   targetParentId: string | null,
 ): { parentId: string | null; scopeKey: string } {

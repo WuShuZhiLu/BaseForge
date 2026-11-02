@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_SCHEMA_VERSION = 60;
@@ -9,7 +9,7 @@ export const KNOWLEDGE_TREE_SCHEMA_VERSION = 60;
  * Business entities remain in their existing tables. This schema owns only navigation,
  * ordering, inherited capability overrides and structural history.
  */
-export function ensureKnowledgeTreeTables(db: Database.Database): void {
+export function ensureKnowledgeTreeTables(db: DatabaseSync): void {
   ensureKnowledgeTreeReferenceTable(db);
   db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_tree_nodes (
@@ -309,7 +309,7 @@ export const knowledgeTreeMigration: Migration = {
  * 单独建表而不动 knowledge_tree_nodes 的 UNIQUE(scopeKey, resourceType, resourceId)：
  * 重建那张表会让 ACL/历史的外键级联丢数据。
  */
-export function ensureKnowledgeTreeReferenceTable(db: Database.Database): void {
+export function ensureKnowledgeTreeReferenceTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS knowledge_tree_references (
       id TEXT PRIMARY KEY,

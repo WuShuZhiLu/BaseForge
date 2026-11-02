@@ -52,7 +52,7 @@ export class PluginPermissions {
 
   list(pluginId: string): PermissionRow[] {
     return getDb().prepare("SELECT * FROM plugin_permissions WHERE pluginId=? ORDER BY permission")
-      .all(pluginId) as PermissionRow[];
+      .all(pluginId) as unknown as PermissionRow[];
   }
 
   replaceGrants(pluginId: string, requested: string[], grantedBy: string): PermissionRow[] {

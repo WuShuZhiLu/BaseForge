@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
-export function ensureYjsOperationReceiptsSchema(db: Database.Database): void {
+export function ensureYjsOperationReceiptsSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS yjs_operation_receipts (
       noteId TEXT NOT NULL,

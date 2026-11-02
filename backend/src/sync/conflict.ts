@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { SYNC_PERSONAL_SCOPE_KEY, SYNC_TABLES } from "./constants";
 import { EncryptedNotePayloadError, guardEncryptedNoteMutation, guardEncryptedBlockWriter } from "../lib/encryptedNotes.js";
 import { SyncError } from "./errors";
@@ -35,7 +35,7 @@ function serialize(value: Record<string, unknown> | null | undefined): string | 
 
 /** Push conflicts and later snapshot fills must not persist invalid encrypted payloads. */
 export function validateEncryptedConflictPayload(
-  db: Database.Database,
+  db: DatabaseSync,
   entityType: SyncNegotiatedEntityType,
   entityId: string,
   payload: Record<string, unknown> | null | undefined,
@@ -64,7 +64,7 @@ export function validateEncryptedConflictPayload(
  * 不提供三方合并。
  */
 export function recordConflict(
-  db: Database.Database,
+  db: DatabaseSync,
   input: RecordConflictInput,
 ): string {
   if (input.localPayload == null && input.remotePayload == null) {
@@ -104,7 +104,7 @@ export function recordConflict(
 
 /** 冲突中心列表：只列未解决项，按发生时间正序便于逐个处理。 */
 export function listUnresolvedConflicts(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId?: string,
   scopeKey?: string,
 ): SyncConflictRow[] {
@@ -114,18 +114,18 @@ export function listUnresolvedConflicts(
       WHERE profileId = ? AND status = 'unresolved'
         ${scopeKey ? "AND scopeKey = ?" : ""}
       ORDER BY createdAt ASC
-    `).all(...(scopeKey ? [profileId, scopeKey] : [profileId])) as SyncConflictRow[];
+    `).all(...(scopeKey ? [profileId, scopeKey] : [profileId])) as unknown as SyncConflictRow[];
   }
   return db.prepare(`
     SELECT * FROM ${SYNC_TABLES.conflicts}
     WHERE status = 'unresolved'
     ORDER BY createdAt ASC
-  `).all() as SyncConflictRow[];
+  `).all() as unknown as SyncConflictRow[];
 }
 
 /** 已解决历史：最近处理的排在前面，供冲突中心回看和重新选择。 */
 export function listResolvedConflicts(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId?: string,
   scopeKey?: string,
   limit = 50,
@@ -144,7 +144,7 @@ export function listResolvedConflicts(
       LIMIT ? OFFSET ?
     `).all(...(scopeKey
       ? [profileId, scopeKey, ...(entityType ? [entityType] : []), safeLimit, safeOffset]
-      : [profileId, ...(entityType ? [entityType] : []), safeLimit, safeOffset])) as SyncConflictRow[];
+      : [profileId, ...(entityType ? [entityType] : []), safeLimit, safeOffset])) as unknown as SyncConflictRow[];
   }
   return db.prepare(`
     SELECT * FROM ${SYNC_TABLES.conflicts}
@@ -154,12 +154,12 @@ export function listResolvedConflicts(
     LIMIT ? OFFSET ?
   `).all(...(entityType
     ? [entityType, safeLimit, safeOffset]
-    : [safeLimit, safeOffset])) as SyncConflictRow[];
+    : [safeLimit, safeOffset])) as unknown as SyncConflictRow[];
 }
 
 /** 已解决历史总数：与列表使用完全相同的 Profile、Scope 和实体筛选。 */
 export function countResolvedConflicts(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId?: string,
   scopeKey?: string,
   entityType?: SyncNegotiatedEntityType,
@@ -179,7 +179,7 @@ export function countResolvedConflicts(
 }
 
 export function countUnresolvedConflicts(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId?: string,
   scopeKey?: string,
 ): number {
@@ -194,7 +194,7 @@ export function countUnresolvedConflicts(
 }
 
 export function getConflict(
-  db: Database.Database,
+  db: DatabaseSync,
   conflictId: string,
   profileId?: string,
 ): SyncConflictRow | null {
@@ -210,7 +210,7 @@ export function getConflict(
  * 注意只改状态、不删除记录：三方内容继续保留，
  * 用户事后发现选错了仍可回到冲突详情取回另一版本。
  */
-export function resolveConflict(db: Database.Database, conflictId: string): void {
+export function resolveConflict(db: DatabaseSync, conflictId: string): void {
   db.prepare(`
     UPDATE ${SYNC_TABLES.conflicts}
     SET status = 'resolved', resolvedAt = datetime('now')
@@ -225,7 +225,7 @@ export function resolveConflict(db: Database.Database, conflictId: string): void
  * 自动回滚会误删用户在解决冲突后的新修改，风险高于保留现状并显式重选。
  */
 export function reopenConflict(
-  db: Database.Database,
+  db: DatabaseSync,
   conflictId: string,
   profileId?: string,
 ): boolean {

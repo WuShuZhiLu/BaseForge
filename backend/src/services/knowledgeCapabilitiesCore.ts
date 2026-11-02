@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { getDb } from "../db/schema.js";
@@ -189,7 +189,7 @@ export function parseKnowledgeRolePreset(value: unknown): KnowledgeRolePreset | 
     : null;
 }
 
-function readNode(db: Database.Database, nodeId: string): TreeNodeRow | null {
+function readNode(db: DatabaseSync, nodeId: string): TreeNodeRow | null {
   return (db.prepare(`
     SELECT id, userId, workspaceId, parentId, resourceType, resourceId, isDeleted
     FROM knowledge_tree_nodes WHERE id = ?
@@ -199,7 +199,7 @@ function readNode(db: Database.Database, nodeId: string): TreeNodeRow | null {
 export function findKnowledgeNodeByResource(
   resourceType: TreeNodeRow["resourceType"],
   resourceId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): TreeNodeRow | null {
   ensureKnowledgeTreeTables(db);
   return (db.prepare(`
@@ -211,7 +211,7 @@ export function findKnowledgeNodeByResource(
   `).get(resourceType, resourceId) as TreeNodeRow | undefined) || null;
 }
 
-function nearestExplicitAcl(db: Database.Database, nodeId: string, userId: string): AclRow | null {
+function nearestExplicitAcl(db: DatabaseSync, nodeId: string, userId: string): AclRow | null {
   return (db.prepare(`
     WITH RECURSIVE ancestors(id, parentId, depth) AS (
       SELECT id, parentId, 0 FROM knowledge_tree_nodes WHERE id = ?
@@ -229,7 +229,7 @@ function nearestExplicitAcl(db: Database.Database, nodeId: string, userId: strin
 }
 
 function legacyAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   node: TreeNodeRow,
   userId: string,
 ): Pick<EffectiveKnowledgeAccess, "rolePreset" | "capabilities"> {
@@ -254,7 +254,7 @@ function legacyAccess(
 export function resolveKnowledgeNodeAccess(
   nodeId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): EffectiveKnowledgeAccess {
   ensureKnowledgeTreeTables(db);
   const node = readNode(db, nodeId);
@@ -309,7 +309,7 @@ export function resolveResourceKnowledgeAccess(
   resourceType: TreeNodeRow["resourceType"],
   resourceId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): EffectiveKnowledgeAccess {
   const node = findKnowledgeNodeByResource(resourceType, resourceId, db);
   return node ? resolveKnowledgeNodeAccess(node.id, userId, db) : noAccess("");
@@ -324,7 +324,7 @@ export function hasKnowledgeCapability(
 }
 
 function writeHistory(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     nodeId: string;
     action: "permission_set" | "permission_clear";
@@ -352,7 +352,7 @@ export function setKnowledgeNodeRole(input: {
   targetUserId: string;
   rolePreset: KnowledgeRolePreset;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): AclRow {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -418,7 +418,7 @@ export function clearKnowledgeNodeRole(input: {
   nodeId: string;
   targetUserId: string;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): boolean {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -443,7 +443,7 @@ export function clearKnowledgeNodeRole(input: {
 
 export function listKnowledgeNodeRoles(
   nodeId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ) {
   ensureKnowledgeTreeTables(db);
   const direct = db.prepare(`
@@ -466,7 +466,7 @@ export function listKnowledgeNodeRoles(
 
 export function resolveKnowledgePermissionSubject(
   subject: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): { id: string; username: string; displayName: string | null; email: string | null } | null {
   const normalized = subject.trim();
   if (!normalized) return null;

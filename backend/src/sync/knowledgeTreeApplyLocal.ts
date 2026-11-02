@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { runWithOutboxSuppressed } from "./context.js";
 import { SyncError } from "./errors.js";
 import { runChangeFeedSuppressed } from "./suppression.js";
@@ -24,7 +24,7 @@ const ALLOWED_NODE_TYPES: Record<string, string[]> = {
 
 /** Apply a complete, parent-first tree Snapshot after all business entities have been applied. */
 export function applyKnowledgeTreeSnapshotLocal(
-  db: Database.Database,
+  db: DatabaseSync,
   items: KnowledgeTreeSnapshotItem[],
   options: { userId: string; workspaceId: string | null },
 ): void {
@@ -135,7 +135,7 @@ export function applyKnowledgeTreeSnapshotLocal(
 
 /** Apply one incremental tree batch; a failed dependency or pending local edit rolls back all rows. */
 export function applyKnowledgeTreeChangesLocal(
-  db: Database.Database,
+  db: DatabaseSync,
   changes: Array<(KnowledgeTreeSnapshotItem & { operation: "upsert" })
     | { entityId: string; operation: "delete" }>,
   options: { userId: string; workspaceId: string | null },

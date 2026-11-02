@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -18,7 +18,7 @@ type SelectionRow = {
 };
 
 /** 树节点和引用都能被选中：引用只是一条额外路径，父级从引用表读。 */
-function readSelectionRow(db: Database.Database, nodeId: string): SelectionRow | undefined {
+function readSelectionRow(db: DatabaseSync, nodeId: string): SelectionRow | undefined {
   const node = db.prepare(`
     SELECT id, parentId FROM knowledge_tree_nodes WHERE id = ? AND isDeleted = 0
   `).get(nodeId) as SelectionRow | undefined;
@@ -51,7 +51,7 @@ function normalizeNodeIds(nodeIds: unknown): string[] {
 
 export function reduceKnowledgeTreeSelection(
   nodeIds: unknown,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): string[] {
   ensureKnowledgeTreeTables(db);
   const normalized = normalizeNodeIds(nodeIds);
@@ -89,7 +89,7 @@ export function moveKnowledgeNodesBatch(input: {
   actorUserId: string;
   nodeIds: unknown;
   parentId: string | null;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): { success: true; nodeIds: string[]; nodes: KnowledgeTreeNode[] } {
   const db = input.db || getDb();
   const nodeIds = reduceKnowledgeTreeSelection(input.nodeIds, db);
@@ -109,7 +109,7 @@ export function moveKnowledgeNodesBatch(input: {
 export function deleteKnowledgeNodesBatch(input: {
   actorUserId: string;
   nodeIds: unknown;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): {
   success: true;
   nodeIds: string[];

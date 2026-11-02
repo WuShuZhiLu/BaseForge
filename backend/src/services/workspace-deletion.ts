@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 interface WorkspaceNotebookRow {
   id: string;
@@ -13,7 +13,7 @@ interface WorkspaceNotebookRow {
  * move notes and notebooks, then restore the original parent relationships.
  */
 export function transferWorkspaceNotesToOwner(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
   ownerId: string,
 ): void {
@@ -21,7 +21,7 @@ export function transferWorkspaceNotesToOwner(
     SELECT id, parentId
     FROM notebooks
     WHERE workspaceId = ?
-  `).all(workspaceId) as WorkspaceNotebookRow[];
+  `).all(workspaceId) as unknown as WorkspaceNotebookRow[];
 
   db.prepare(`
     UPDATE notebooks

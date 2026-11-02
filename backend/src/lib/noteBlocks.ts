@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { stripLegacyInternalMarkdownMarkers } from "./markdownUserContent";
 import { mindmapPlainText } from "./mindmapData";
 import { pdfAnnotationsPlainText } from "./pdfAnnotations";
@@ -335,7 +335,7 @@ function parseMarkdown(noteId: string, content: string): {
   return { normalizedContent, candidates, changed: normalizedContent !== content };
 }
 
-export function ensureNoteBlockTables(db: Database.Database): void {
+export function ensureNoteBlockTables(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS note_blocks_index (
       noteId TEXT NOT NULL,
@@ -371,7 +371,7 @@ export function ensureNoteBlockTables(db: Database.Database): void {
 }
 
 function assignCandidateIds(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   candidates: BlockCandidate[],
 ): void {
@@ -445,7 +445,7 @@ function contentTextFromCandidates(candidates: BlockCandidate[]): string {
 }
 
 export function syncNoteBlocks(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   contentFormat: string,
@@ -546,7 +546,7 @@ export function syncNoteBlocks(
   return { content: normalizedContent, contentText, blocks: rows, changed };
 }
 
-export function ensureNoteIndexed(db: Database.Database, noteId: string): NoteBlockIndexRow[] {
+export function ensureNoteIndexed(db: DatabaseSync, noteId: string): NoteBlockIndexRow[] {
   ensureNoteBlockTables(db);
   const note = db.prepare("SELECT content, contentFormat FROM notes WHERE id = ?").get(noteId) as
     | { content: string; contentFormat: string }
@@ -555,7 +555,7 @@ export function ensureNoteIndexed(db: Database.Database, noteId: string): NoteBl
   return syncNoteBlocks(db, noteId, note.content || "", note.contentFormat || "tiptap-json").blocks;
 }
 
-export function getNoteBlocks(db: Database.Database, noteId: string, limit = 500): NoteBlockIndexRow[] {
+export function getNoteBlocks(db: DatabaseSync, noteId: string, limit = 500): NoteBlockIndexRow[] {
   ensureNoteBlockTables(db);
   return db.prepare(`
     SELECT noteId, blockId, blockType, parentBlockId, blockOrder, plainText,
@@ -564,11 +564,11 @@ export function getNoteBlocks(db: Database.Database, noteId: string, limit = 500
     WHERE noteId = ?
     ORDER BY blockOrder ASC
     LIMIT ?
-  `).all(noteId, limit) as NoteBlockIndexRow[];
+  `).all(noteId, limit) as unknown as NoteBlockIndexRow[];
 }
 
 export function getNoteBlock(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   blockId: string,
 ): NoteBlockIndexRow | null {
@@ -582,7 +582,7 @@ export function getNoteBlock(
 }
 
 export function searchNoteBlocks(
-  db: Database.Database,
+  db: DatabaseSync,
   query: string,
   options: { notebookId?: string; allowedNotebookIds?: string[]; limit?: number } = {},
 ): Array<NoteBlockIndexRow & { title: string; notebookId: string; updatedAt: string }> {
@@ -609,7 +609,7 @@ export function searchNoteBlocks(
     WHERE ${clauses.join(" AND ")}
     ORDER BY n.updatedAt DESC, b.blockOrder ASC
     LIMIT ?
-  `).all(...params) as Array<NoteBlockIndexRow & { title: string; notebookId: string; updatedAt: string }>;
+  `).all(...params) as unknown as Array<NoteBlockIndexRow & { title: string; notebookId: string; updatedAt: string }>;
 }
 
 export function plainTextFromNoteContent(content: string, contentFormat: string): string {

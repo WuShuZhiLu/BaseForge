@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 import { ensureKnowledgeTreeScopeAwareTriggers } from "./knowledgeTreeScopeTriggerRepairMigration.js";
 
@@ -11,5 +11,5 @@ export const KNOWLEDGE_TREE_RUNTIME_TRIGGER_REPAIR_SCHEMA_VERSION = 92;
 export const knowledgeTreeRuntimeTriggerRepairMigration: Migration = {
   version: KNOWLEDGE_TREE_RUNTIME_TRIGGER_REPAIR_SCHEMA_VERSION,
   name: "knowledge-tree-runtime-trigger-repair",
-  up: (db: Database.Database) => ensureKnowledgeTreeScopeAwareTriggers(db),
+  up: (db: DatabaseSync) => ensureKnowledgeTreeScopeAwareTriggers(db),
 };

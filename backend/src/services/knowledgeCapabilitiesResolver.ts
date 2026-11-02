@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -73,14 +73,14 @@ function noAccess(nodeId: string, sourceNodeId: string | null = null): Effective
   };
 }
 
-function readNode(db: Database.Database, nodeId: string): TreeNodeRow | null {
+function readNode(db: DatabaseSync, nodeId: string): TreeNodeRow | null {
   return (db.prepare(`
     SELECT id, userId, workspaceId, parentId, resourceType, resourceId, isDeleted
     FROM knowledge_tree_nodes WHERE id = ?
   `).get(nodeId) as TreeNodeRow | undefined) || null;
 }
 
-function nearestExplicitAcl(db: Database.Database, nodeId: string, userId: string): AclRow | null {
+function nearestExplicitAcl(db: DatabaseSync, nodeId: string, userId: string): AclRow | null {
   return (db.prepare(`
     WITH RECURSIVE ancestors(id, parentId, depth) AS (
       SELECT id, parentId, 0 FROM knowledge_tree_nodes WHERE id = ?
@@ -135,13 +135,13 @@ function legacyPermission(
   return { rolePreset: "none", capabilities: clone(NONE) };
 }
 
-function workspaceOwnerId(db: Database.Database, workspaceId: string): string | null {
+function workspaceOwnerId(db: DatabaseSync, workspaceId: string): string | null {
   return ((db.prepare("SELECT ownerId FROM workspaces WHERE id = ?").get(workspaceId) as
     | { ownerId: string }
     | undefined)?.ownerId) || null;
 }
 
-function legacyAccess(db: Database.Database, node: TreeNodeRow, userId: string) {
+function legacyAccess(db: DatabaseSync, node: TreeNodeRow, userId: string) {
   if (node.resourceType === "notebook") {
     const member = memberQueryService.getNotebookMemberAccess(node.resourceId, userId);
     if (member) return legacyPermission(member.role);
@@ -177,7 +177,7 @@ function legacyAccess(db: Database.Database, node: TreeNodeRow, userId: string) 
 export function resolveKnowledgeNodeAccess(
   nodeId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
   options: KnowledgeAccessResolveOptions = {},
 ): EffectiveKnowledgeAccess {
   ensureKnowledgeTreeTables(db);
@@ -234,7 +234,7 @@ export function resolveKnowledgeNodeAccess(
 }
 
 function resourceNode(
-  db: Database.Database,
+  db: DatabaseSync,
   resourceType: TreeNodeRow["resourceType"],
   resourceId: string,
 ): TreeNodeRow | null {
@@ -251,7 +251,7 @@ export function resolveResourceKnowledgeAccess(
   resourceType: TreeNodeRow["resourceType"],
   resourceId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): EffectiveKnowledgeAccess {
   ensureKnowledgeTreeTables(db);
   const node = resourceNode(db, resourceType, resourceId);
@@ -269,7 +269,7 @@ export function resolveResourceKnowledgeAccessForTombstone(
   resourceType: TreeNodeRow["resourceType"],
   resourceId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): EffectiveKnowledgeAccess {
   ensureKnowledgeTreeTables(db);
   const node = resourceNode(db, resourceType, resourceId);

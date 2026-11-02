@@ -117,7 +117,7 @@ class WebhookDispatcher {
       const db = getDb();
       const webhooks = db.prepare(
         "SELECT * FROM webhooks WHERE userId = ? AND isActive = 1"
-      ).all(userId) as WebhookConfig[];
+      ).all(userId) as unknown as WebhookConfig[];
 
       for (const webhook of webhooks) {
         const events: string[] = JSON.parse(webhook.events as any);

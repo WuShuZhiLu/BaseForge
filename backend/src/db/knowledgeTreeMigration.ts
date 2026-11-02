@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 import {
   KNOWLEDGE_TREE_SCHEMA_VERSION,
@@ -10,7 +10,7 @@ import { ensureKnowledgeTreeScopeAwareTriggers } from "./knowledgeTreeScopeTrigg
 
 export { KNOWLEDGE_TREE_SCHEMA_VERSION };
 
-const initializedConnections = new WeakSet<Database.Database>();
+const initializedConnections = new WeakSet<DatabaseSync>();
 
 /**
  * Install the tree schema and hardened triggers once for each open database connection.
@@ -20,7 +20,7 @@ const initializedConnections = new WeakSet<Database.Database>();
  * deleted. getDb() already runs registered migrations before serving requests, so service-level
  * calls only need a per-connection fallback for direct tests and old embedding entry points.
  */
-export function ensureKnowledgeTreeTables(db: Database.Database): void {
+export function ensureKnowledgeTreeTables(db: DatabaseSync): void {
   if (initializedConnections.has(db)) return;
   ensureBaseKnowledgeTreeTables(db);
   ensureKnowledgeTreeLegacySync(db);

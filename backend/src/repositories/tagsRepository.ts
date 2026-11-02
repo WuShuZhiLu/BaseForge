@@ -54,7 +54,7 @@ export const tagsRepository = {
           ORDER BY t.name ASC
           `,
         )
-        .all(workspaceId, workspaceId) as TagWithCount[];
+        .all(workspaceId, workspaceId) as unknown as TagWithCount[];
     } else {
       // 个人空间：仅看自己的、且 workspaceId IS NULL 的标签
       return db
@@ -73,7 +73,7 @@ export const tagsRepository = {
           ORDER BY t.name ASC
           `,
         )
-        .all(userId, userId) as TagWithCount[];
+        .all(userId, userId) as unknown as TagWithCount[];
     }
   },
 

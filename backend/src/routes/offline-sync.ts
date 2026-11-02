@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 import { getDb } from "../db/schema";
 import { getUserWorkspaceRole } from "../middleware/acl";
@@ -85,14 +85,14 @@ function clampInt(raw: string | undefined, fallback: number, min: number, max: n
   return Math.max(min, Math.min(max, Math.floor(value)));
 }
 
-function currentSequence(db: Database.Database): number {
+function currentSequence(db: DatabaseSync): number {
   const row = db.prepare("SELECT MAX(sequence) AS sequence FROM offline_sync_changes").get() as
     | { sequence: number | null }
     | undefined;
   return Number(row?.sequence || 0);
 }
 
-function minAvailableSequence(db: Database.Database): number {
+function minAvailableSequence(db: DatabaseSync): number {
   const row = db.prepare("SELECT MIN(sequence) AS sequence FROM offline_sync_changes").get() as
     | { sequence: number | null }
     | undefined;
@@ -117,7 +117,7 @@ function resolveScope(c: any): { scope?: SyncScope; response?: Response } {
   return { scope: { key: `workspace:${requested}`, workspaceId: requested, role } };
 }
 
-function personalNotebookAccess(db: Database.Database, userId: string): {
+function personalNotebookAccess(db: DatabaseSync, userId: string): {
   rows: NotebookRow[];
   ids: Set<string>;
   fingerprintParts: string[];
@@ -156,7 +156,7 @@ function personalNotebookAccess(db: Database.Database, userId: string): {
     FROM notebooks n
     INNER JOIN accessible a ON a.id = n.id
     ORDER BY n.id ASC
-  `).all(userId, userId) as NotebookRow[];
+  `).all(userId, userId) as unknown as NotebookRow[];
   const ids = new Set(rows.map((row) => row.id));
   const fingerprintParts = [
     ...rows.map((row) => `n:${row.id}:${row.parentId || ""}:${row.userId}:${row.updatedAt}:${row.isDeleted || 0}`),
@@ -168,7 +168,7 @@ function personalNotebookAccess(db: Database.Database, userId: string): {
 }
 
 function workspaceNotebookAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
   role: string | null,
 ): { rows: NotebookRow[]; ids: Set<string>; fingerprintParts: string[] } {
@@ -178,7 +178,7 @@ function workspaceNotebookAccess(
     FROM notebooks
     WHERE workspaceId = ?
     ORDER BY id ASC
-  `).all(workspaceId) as NotebookRow[];
+  `).all(workspaceId) as unknown as NotebookRow[];
   return {
     rows,
     ids: new Set(rows.map((row) => row.id)),
@@ -190,7 +190,7 @@ function workspaceNotebookAccess(
 }
 
 function resolveNotebookAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scope: SyncScope,
 ): { rows: NotebookRow[]; ids: Set<string>; accessFingerprint: string } {
@@ -241,22 +241,22 @@ function personalNoteAccess(
 }
 
 function listAllAccessibleNotes(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scope: SyncScope,
   notebookIds: Set<string>,
 ): NoteRow[] {
   if (scope.workspaceId) {
     return db.prepare(`${noteSelectSql()} WHERE n.workspaceId = ? ORDER BY n.id ASC`)
-      .all(userId, scope.workspaceId) as NoteRow[];
+      .all(userId, scope.workspaceId) as unknown as NoteRow[];
   }
   const access = personalNoteAccess(userId, notebookIds);
   return db.prepare(`${noteSelectSql()} WHERE ${access.clause} ORDER BY n.id ASC`)
-    .all(userId, ...access.params) as NoteRow[];
+    .all(userId, ...access.params) as unknown as NoteRow[];
 }
 
 function listSnapshotPage(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scope: SyncScope,
   notebookIds: Set<string>,
@@ -266,11 +266,11 @@ function listSnapshotPage(
   const target = limit + 1;
   const rows = scope.workspaceId
     ? db.prepare(`${noteSelectSql()} WHERE n.workspaceId = ? AND n.id > ? ORDER BY n.id ASC LIMIT ?`)
-        .all(userId, scope.workspaceId, cursor, target) as NoteRow[]
+        .all(userId, scope.workspaceId, cursor, target) as unknown as NoteRow[]
     : (() => {
         const access = personalNoteAccess(userId, notebookIds);
         return db.prepare(`${noteSelectSql()} WHERE ${access.clause} AND n.id > ? ORDER BY n.id ASC LIMIT ?`)
-          .all(userId, ...access.params, cursor, target) as NoteRow[];
+          .all(userId, ...access.params, cursor, target) as unknown as NoteRow[];
       })();
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
@@ -290,7 +290,7 @@ function chunks<T>(items: T[], size: number): T[][] {
 }
 
 function attachmentMapForNotes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteIds: string[],
 ): Map<string, AttachmentRow[]> {
   const result = new Map<string, AttachmentRow[]>();
@@ -301,7 +301,7 @@ function attachmentMapForNotes(
       FROM attachments
       WHERE noteId IN (${batch.map(() => "?").join(",")})
       ORDER BY noteId ASC, id ASC
-    `).all(...batch) as AttachmentRow[];
+    `).all(...batch) as unknown as AttachmentRow[];
     for (const row of rows) {
       const list = result.get(row.noteId) || [];
       list.push(row);
@@ -311,7 +311,7 @@ function attachmentMapForNotes(
   return result;
 }
 
-function tagMapForNotes(db: Database.Database, noteIds: string[]): Map<string, any[]> {
+function tagMapForNotes(db: DatabaseSync, noteIds: string[]): Map<string, any[]> {
   const result = new Map<string, any[]>();
   for (const batch of chunks(noteIds, 400)) {
     if (batch.length === 0) continue;
@@ -332,7 +332,7 @@ function tagMapForNotes(db: Database.Database, noteIds: string[]): Map<string, a
   return result;
 }
 
-function buildBundles(db: Database.Database, userId: string, notes: NoteRow[]) {
+function buildBundles(db: DatabaseSync, userId: string, notes: NoteRow[]) {
   const noteIds = notes.map((note) => note.id);
   const attachmentsByNote = attachmentMapForNotes(db, noteIds);
   const tagsByNote = tagMapForNotes(db, noteIds);
@@ -355,7 +355,7 @@ function buildBundles(db: Database.Database, userId: string, notes: NoteRow[]) {
 }
 
 function listTagsForScope(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scope: SyncScope,
   accessibleNotes: NoteRow[],
@@ -485,13 +485,13 @@ app.get("/changes", (c) => {
         WHERE sequence > ? AND workspaceId = ?
         ORDER BY sequence ASC
         LIMIT ?
-      `).all(after, scope.workspaceId, limit) as ChangeRow[]
+      `).all(after, scope.workspaceId, limit) as unknown as ChangeRow[]
     : db.prepare(`
         SELECT * FROM offline_sync_changes
         WHERE sequence > ? AND workspaceId IS NULL
         ORDER BY sequence ASC
         LIMIT ?
-      `).all(after, limit) as ChangeRow[];
+      `).all(after, limit) as unknown as ChangeRow[];
 
   const nextSequence = raw.length < limit ? serverSequence : raw[raw.length - 1].sequence;
   const latestByNote = new Map<string, ChangeRow>();
@@ -512,7 +512,7 @@ app.get("/changes", (c) => {
   for (const batch of chunks(candidateIds, 400)) {
     if (batch.length === 0) continue;
     currentNotes.push(...db.prepare(`${noteSelectSql()} WHERE n.id IN (${batch.map(() => "?").join(",")})`)
-      .all(userId, ...batch) as NoteRow[]);
+      .all(userId, ...batch) as unknown as NoteRow[]);
   }
   const bundles = new Map(
     buildBundles(db, userId, currentNotes)

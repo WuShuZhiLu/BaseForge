@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -80,7 +80,7 @@ function scopeKey(userId: string, workspaceId: string | null): string {
   return workspaceId ? `workspace:${workspaceId}` : `personal:${userId}`;
 }
 
-function ensureKnowledgeTreeStorage(db: Database.Database): void {
+function ensureKnowledgeTreeStorage(db: DatabaseSync): void {
   const exists = db.prepare(
     "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = 'knowledge_tree_nodes'",
   ).get() as { found: number } | undefined;
@@ -95,7 +95,7 @@ function expectedNodeId(resourceType: LegacyHierarchyResourceType, resourceId: s
 }
 
 function readNodesForResource(
-  db: Database.Database,
+  db: DatabaseSync,
   resourceType: LegacyHierarchyResourceType,
   resourceId: string,
 ): KnowledgeNodeRow[] {
@@ -105,11 +105,11 @@ function readNodesForResource(
     FROM knowledge_tree_nodes
     WHERE resourceType = ? AND resourceId = ?
     ORDER BY createdAt, id
-  `).all(resourceType, resourceId) as KnowledgeNodeRow[];
+  `).all(resourceType, resourceId) as unknown as KnowledgeNodeRow[];
 }
 
 function requireUniqueNode(
-  db: Database.Database,
+  db: DatabaseSync,
   resourceType: LegacyHierarchyResourceType,
   resourceId: string,
 ): KnowledgeNodeRow {
@@ -131,7 +131,7 @@ function requireUniqueNode(
   return nodes[0];
 }
 
-function readNotebook(db: Database.Database, notebookId: string): NotebookRow {
+function readNotebook(db: DatabaseSync, notebookId: string): NotebookRow {
   const row = db.prepare(`
     SELECT id, userId, workspaceId, parentId, sortOrder, isExpanded, isDeleted,
            deletedAt, createdAt, updatedAt
@@ -147,7 +147,7 @@ function readNotebook(db: Database.Database, notebookId: string): NotebookRow {
   return row;
 }
 
-function readNote(db: Database.Database, noteId: string): NoteRow {
+function readNote(db: DatabaseSync, noteId: string): NoteRow {
   const row = db.prepare(`
     SELECT id, userId, workspaceId, notebookId, contentFormat, note_type, sortOrder,
            isTrashed, trashedAt, createdAt, updatedAt
@@ -170,7 +170,7 @@ function noteNodeType(note: NoteRow): "note" | "markdown" | "word" {
 }
 
 function validParent(
-  db: Database.Database,
+  db: DatabaseSync,
   parentId: string | null,
   expectedScope: string,
 ): string | null {
@@ -183,7 +183,7 @@ function validParent(
 }
 
 function recordHistory(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     nodeId: string;
     actorUserId: string;
@@ -213,7 +213,7 @@ function recordHistory(
 }
 
 function updateNode(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     node: KnowledgeNodeRow;
     userId: string;
@@ -294,7 +294,7 @@ function updateNode(
 }
 
 function ensureNotebookNode(
-  db: Database.Database,
+  db: DatabaseSync,
   notebookId: string,
   visited = new Set<string>(),
   cache?: Map<string, KnowledgeNodeRow>,
@@ -341,7 +341,7 @@ function ensureNotebookNode(
 }
 
 function ensureNoteNodeFromRow(
-  db: Database.Database,
+  db: DatabaseSync,
   note: NoteRow,
   notebookNode: KnowledgeNodeRow,
 ): KnowledgeNodeRow {
@@ -371,14 +371,14 @@ function ensureNoteNodeFromRow(
   return requireUniqueNode(db, "note", note.id);
 }
 
-function ensureNoteNode(db: Database.Database, noteId: string): KnowledgeNodeRow {
+function ensureNoteNode(db: DatabaseSync, noteId: string): KnowledgeNodeRow {
   const note = readNote(db, noteId);
   const notebookNode = ensureNotebookNode(db, note.notebookId);
   return ensureNoteNodeFromRow(db, note, notebookNode);
 }
 
 export function synchronizeLegacyNotebookHierarchy(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   notebookId: string;
   actorUserId: string;
   reason: LegacyHierarchyReason;
@@ -421,7 +421,7 @@ export function synchronizeLegacyNotebookHierarchy(input: {
 }
 
 export function synchronizeLegacyNoteHierarchy(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   noteId: string;
   actorUserId: string;
   reason: LegacyHierarchyReason;
@@ -469,7 +469,7 @@ export function synchronizeLegacyNoteHierarchy(input: {
  * 普通增删改仍走单资源同步入口，保持既有行为不变。
  */
 export function synchronizeLegacyImportHierarchy(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   notebookIds: string[];
   createdNotebookIds?: string[];
   noteIds: string[];
@@ -531,7 +531,7 @@ export function synchronizeLegacyImportHierarchy(input: {
   return { notebooks: uniqueNotebookIds.length, notes: uniqueNoteIds.length };
 }
 
-function nearestNotebookResourceId(db: Database.Database, nodeId: string | null): string | null {
+function nearestNotebookResourceId(db: DatabaseSync, nodeId: string | null): string | null {
   let cursor = nodeId;
   const visited = new Set<string>();
   while (cursor) {
@@ -548,7 +548,7 @@ function nearestNotebookResourceId(db: Database.Database, nodeId: string | null)
 }
 
 export function auditLegacyKnowledgeHierarchy(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId?: string;
   workspaceId?: string | null;
 }): LegacyHierarchyConsistencyIssue[] {

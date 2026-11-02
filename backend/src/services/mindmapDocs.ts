@@ -5,7 +5,7 @@
  * /api/mindmaps 路由保留为门面——SDK / 移动端 / 嵌入卡片的契约不变，
  * 读写全部落到 notes 表。迁移（db/mindmapDocsMigration）与门面共用本模块。
  */
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuidv4 } from "uuid";
 
 export const MINDMAP_DOC_FORMAT = "mindmap";
@@ -42,7 +42,7 @@ export function noteRowToMindmapPayload(row: {
  * 优先复用同名兜底笔记本，否则创建一个（树投影触发器会自动建对应文件夹节点）。
  */
 export function resolveMindmapFallbackNotebook(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
 ): string {

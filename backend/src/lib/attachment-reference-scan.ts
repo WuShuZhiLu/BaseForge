@@ -29,7 +29,7 @@
  * 常数级（uuid 长度），大库仍可接受；比每个 id 单独跑一次 LIKE '%..%' 快数百倍。
  * 顺带累加两类的字节数，让 stats 不再为同一批 id 再跑一次 `IN (...)` 聚合。
  */
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 export interface ReferenceScan {
   orphanIds: Set<string>;
@@ -44,7 +44,7 @@ export interface ReferenceScanScope {
 }
 
 export function scanAttachmentReferences(
-  db: Database.Database,
+  db: DatabaseSync,
   scope: ReferenceScanScope,
   userId: string,
 ): ReferenceScan {

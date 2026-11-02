@@ -72,7 +72,7 @@ export const noteAclRepository = {
   transferOwnership(fromUserId: string, toUserId: string): number {
     const db = getDb();
     const result = db.prepare("UPDATE note_acl SET userId = ? WHERE userId = ?").run(toUserId, fromUserId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 
@@ -113,7 +113,7 @@ function noteSortOrder(dateKey: string): number {
 }
 
 function recordHistory(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     nodeId: string;
     action: "create" | "move";
@@ -139,7 +139,7 @@ function recordHistory(
 }
 
 function ensureArchiveFolder(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     userId: string;
     stableId: string;
@@ -238,7 +238,7 @@ function ensureArchiveFolder(
 }
 
 function ensureFoldersInternal(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   dateKey: string,
   stats: FolderStats,
@@ -295,7 +295,7 @@ function ensureFoldersInternal(
 }
 
 export function ensureJournalArchiveRoot(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
 }): {
   rootNotebookId: string;
@@ -329,7 +329,7 @@ export function ensureJournalArchiveRoot(input: {
 }
 
 export function ensureJournalArchiveFolders(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
   dateKey: string;
 }): JournalArchiveFolderPath & Pick<JournalArchivePlacementResult, "foldersCreated" | "foldersAdopted" | "foldersReused"> {
@@ -345,7 +345,7 @@ export function ensureJournalArchiveFolders(input: {
 }
 
 function ensureNoteTreeRow(
-  db: Database.Database,
+  db: DatabaseSync,
   note: JournalRow,
   target: JournalArchiveFolderPath,
   sortOrder: number,
@@ -383,7 +383,7 @@ function ensureNoteTreeRow(
 }
 
 function placeJournalInternal(
-  db: Database.Database,
+  db: DatabaseSync,
   input: { userId: string; noteId: string; dateKey?: string },
   sharedStats?: FolderStats,
 ): JournalArchivePlacementResult {
@@ -461,7 +461,7 @@ function placeJournalInternal(
 }
 
 export function ensureJournalArchivePlacement(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
   noteId: string;
   dateKey?: string;
@@ -471,7 +471,7 @@ export function ensureJournalArchivePlacement(input: {
 }
 
 export function organizeJournalArchive(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   userId: string;
 }): JournalArchiveOrganizeResult {
   const execute = (): JournalArchiveOrganizeResult => {
@@ -482,7 +482,7 @@ export function organizeJournalArchive(input: {
       FROM notes
       WHERE userId = ? AND note_type = 'journal' AND isTrashed = 0
       ORDER BY journal_date ASC, createdAt ASC
-    `).all(input.userId) as JournalRow[];
+    `).all(input.userId) as unknown as JournalRow[];
 
     const stats: FolderStats = { created: 0, adopted: 0, reused: 0 };
     let organized = 0;

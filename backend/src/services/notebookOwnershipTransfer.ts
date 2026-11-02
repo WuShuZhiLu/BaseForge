@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema";
 import { ensureNotebookAclOverridesTable } from "../queries/memberQueryService";
 
@@ -34,7 +34,7 @@ function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(",");
 }
 
-function tableExists(db: Database.Database, table: string): boolean {
+function tableExists(db: DatabaseSync, table: string): boolean {
   return Boolean(db.prepare(
     "SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = ?",
   ).get(table));
@@ -52,7 +52,7 @@ function tableExists(db: Database.Database, table: string): boolean {
  */
 export function transferNotebookOwnership(
   input: TransferNotebookOwnershipInput,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): TransferNotebookOwnershipResult {
   const notebookId = String(input.notebookId || "").trim();
   const actorUserId = String(input.actorUserId || "").trim();
@@ -201,7 +201,7 @@ export function transferNotebookOwnership(
             SET userId = ?, workspaceId = NULL
           WHERE noteId IN (${noteMarks})`,
       ).run(targetUserId, ...noteIds);
-      attachmentCount = attachmentResult.changes;
+      attachmentCount = attachmentResult.changes as number;
     }
 
     db.prepare(

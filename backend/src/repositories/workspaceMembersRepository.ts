@@ -114,7 +114,7 @@ export const workspaceMembersRepository = {
   transferOwnership(fromUserId: string, toUserId: string): number {
     const db = getDb();
     const result = db.prepare("UPDATE workspace_members SET \"userId\" = ? WHERE \"userId\" = ?").run(toUserId, fromUserId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**

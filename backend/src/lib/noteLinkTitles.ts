@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { plainTextFromNoteContent, syncNoteBlocks } from "./noteBlocks";
 import { syncNoteLinks } from "./noteLinks";
 
@@ -33,7 +33,7 @@ function targetIdFromHref(href: unknown): string | null {
  * standard Link `rel` attribute and are intentionally never modified.
  */
 export function syncAutomaticNoteLinkTitles(
-  db: Database.Database,
+  db: DatabaseSync,
   targetNoteId: string,
   oldTitle: string,
   newTitle: string,
@@ -45,7 +45,7 @@ export function syncAutomaticNoteLinkTitles(
     FROM note_links nl
     JOIN notes n ON n.id = nl.sourceNoteId AND n.isTrashed = 0
     WHERE nl.targetNoteId = ? AND n.contentFormat = 'tiptap-json'
-  `).all(targetNoteId) as SourceNoteRow[];
+  `).all(targetNoteId) as unknown as SourceNoteRow[];
 
   const updated: string[] = [];
   for (const row of rows) {

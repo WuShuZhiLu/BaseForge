@@ -37,7 +37,7 @@
  *     "新增的"演化登记到 MIGRATIONS。
  */
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 /** 单条迁移声明 */
 export interface Migration {
@@ -49,7 +49,7 @@ export interface Migration {
    * 执行迁移；调用方已经把它包在事务里，函数内部抛任何异常都会触发回滚。
    * 不要在函数里再开嵌套事务。
    */
-  up(db: Database.Database): void;
+  up(db: DatabaseSync): void;
 }
 
 // ===== 已登记迁移 =====
@@ -2114,7 +2114,7 @@ export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
 );
 
 /** 创建迁移记录表（幂等）。 */
-function ensureMigrationsTable(db: Database.Database): void {
+function ensureMigrationsTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -2125,7 +2125,7 @@ function ensureMigrationsTable(db: Database.Database): void {
 }
 
 /** 读取当前 DB 已应用的最高版本号（无记录返回 0）。 */
-export function getCurrentSchemaVersion(db: Database.Database): number {
+export function getCurrentSchemaVersion(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   const row = db
     .prepare("SELECT MAX(version) AS v FROM schema_migrations")
@@ -2144,7 +2144,7 @@ export function getCurrentSchemaVersion(db: Database.Database): number {
  *
  * @returns 实际执行的迁移数量
  */
-export function runMigrations(db: Database.Database): number {
+export function runMigrations(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   const cur = getCurrentSchemaVersion(db);
 

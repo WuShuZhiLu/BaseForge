@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_PASSWORD_SCHEMA_VERSION = 65;
 
-export function ensureKnowledgeTreePasswordTable(db: Database.Database): void {
+export function ensureKnowledgeTreePasswordTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS notebook_passwords (
       notebookId TEXT PRIMARY KEY,

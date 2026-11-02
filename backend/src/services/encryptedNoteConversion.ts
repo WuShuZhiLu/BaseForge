@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { ENCRYPTED_NOTE_FORMAT, encryptedBlocksInContent, parseEncryptedNote } from "../lib/encryptedNotes.js";
 import { rebuildNormalizedSearchFts } from "../lib/searchIndex.js";
 import { inspectEncryptedNoteConversion } from "./encryptedNoteConversionPreflight.js";
@@ -39,7 +39,7 @@ function isTextOnlySource(content: string, format: string): boolean {
 }
 
 /** Internal storage primitive only. No API/UI conversion is enabled by this function. */
-export function convertEncryptedNoteStorage(db: Database.Database, input: EncryptedNoteConversionInput) {
+export function convertEncryptedNoteStorage(db: DatabaseSync, input: EncryptedNoteConversionInput) {
   const preserveHistory = Array.isArray(input.encryptedHistory) && input.discardHistory === undefined;
   if (db.inTransaction || (!preserveHistory && (input.discardHistory !== true || input.encryptedHistory !== undefined)) || !Number.isSafeInteger(input.version)
     || !/^[a-f0-9]{64}$/.test(input.sourceDigest)) throw new EncryptedNoteConversionError("INVALID_CONVERSION");

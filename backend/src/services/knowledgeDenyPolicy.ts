@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { getDb } from "../db/schema.js";
@@ -10,9 +10,9 @@ export interface KnowledgeDenyMatch {
   depth: number;
 }
 
-const initializedDatabases = new WeakSet<Database.Database>();
+const initializedDatabases = new WeakSet<DatabaseSync>();
 
-export function ensureKnowledgeDenyTable(db: Database.Database = getDb()): void {
+export function ensureKnowledgeDenyTable(db: DatabaseSync = getDb()): void {
   if (initializedDatabases.has(db)) return;
   ensureKnowledgeTreeTables(db);
   db.exec(`
@@ -37,7 +37,7 @@ export function ensureKnowledgeDenyTable(db: Database.Database = getDb()): void 
 export function findNearestKnowledgeDenial(
   nodeId: string,
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): KnowledgeDenyMatch | null {
   ensureKnowledgeDenyTable(db);
   return (db.prepare(`
@@ -57,7 +57,7 @@ export function findNearestKnowledgeDenial(
   `).get(nodeId, userId) as KnowledgeDenyMatch | undefined) || null;
 }
 
-function writeHistory(db: Database.Database, input: {
+function writeHistory(db: DatabaseSync, input: {
   nodeId: string;
   actorUserId: string;
   targetUserId: string;
@@ -81,7 +81,7 @@ export function setKnowledgeNodeDenied(input: {
   nodeId: string;
   targetUserId: string;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): void {
   const db = input.db || getDb();
   ensureKnowledgeDenyTable(db);
@@ -107,7 +107,7 @@ export function clearKnowledgeNodeDenied(input: {
   nodeId: string;
   targetUserId: string;
   actorUserId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): boolean {
   const db = input.db || getDb();
   ensureKnowledgeDenyTable(db);
@@ -122,7 +122,7 @@ export function clearKnowledgeNodeDenied(input: {
 
 export function listKnowledgeNodeDenials(
   nodeId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): Array<{
   nodeId: string;
   userId: string;

@@ -1,5 +1,5 @@
 import { validateSheetData } from "./sheetData.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 import { defaultMindmapContent } from "../lib/mindmapData.js";
 
@@ -65,7 +65,7 @@ function scopeKey(userId: string, workspaceId: string | null): string {
   return workspaceId ? `workspace:${workspaceId}` : `personal:${userId}`;
 }
 
-function readNode(db: Database.Database, nodeId: string, includeDeleted = false): NodeRow | null {
+function readNode(db: DatabaseSync, nodeId: string, includeDeleted = false): NodeRow | null {
   return (db.prepare(`
     SELECT id, userId, workspaceId, scopeKey, parentId, nodeType, resourceType,
            resourceId, sortOrder, isExpanded, isDeleted, deletedAt, createdAt, updatedAt
@@ -74,14 +74,14 @@ function readNode(db: Database.Database, nodeId: string, includeDeleted = false)
   `).get(nodeId) as NodeRow | undefined) || null;
 }
 
-function requireNode(db: Database.Database, nodeId: string, includeDeleted = false): NodeRow {
+function requireNode(db: DatabaseSync, nodeId: string, includeDeleted = false): NodeRow {
   const node = readNode(db, nodeId, includeDeleted);
   if (!node) throw new KnowledgeTreeError("KNOWLEDGE_NODE_NOT_FOUND", 404, "内容节点不存在");
   return node;
 }
 
 function requireCapability(
-  db: Database.Database,
+  db: DatabaseSync,
   nodeId: string,
   userId: string,
   capability: KnowledgeCapabilityName,
@@ -97,7 +97,7 @@ function requireCapability(
   return access;
 }
 
-function workspaceRootAccess(db: Database.Database, userId: string, workspaceId: string | null): EffectiveKnowledgeAccess {
+function workspaceRootAccess(db: DatabaseSync, userId: string, workspaceId: string | null): EffectiveKnowledgeAccess {
   if (!workspaceId) {
     return {
       nodeId: "",
@@ -144,7 +144,7 @@ function workspaceRootAccess(db: Database.Database, userId: string, workspaceId:
 }
 
 function resolveTargetAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   targetParentId: string | null,
   userId: string,
   workspaceId: string | null,
@@ -168,7 +168,7 @@ export function listKnowledgeTree(input: {
   userId: string;
   workspaceId: string | null;
   includeDeleted?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode[] {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -190,14 +190,14 @@ export function listKnowledgeTree(input: {
     LEFT JOIN files file ON node.resourceType = 'file' AND file.id = node.resourceId
     WHERE node.scopeKey = ? ${input.includeDeleted ? "" : "AND node.isDeleted = 0"}
     ORDER BY node.parentId IS NOT NULL, node.parentId, node.sortOrder, lower(title), node.id
-  `).all(key) as Array<NodeRow & { title: string; childCount: number }>;
+  `).all(key) as unknown as Array<NodeRow & { title: string; childCount: number }>;
 
   return rows
     .map((row) => ({ ...row, access: resolveKnowledgeNodeAccess(row.id, input.userId, db) }))
     .filter((row) => row.access.capabilities.canView);
 }
 
-function nearestNotebookContainer(db: Database.Database, nodeId: string | null): string | null {
+function nearestNotebookContainer(db: DatabaseSync, nodeId: string | null): string | null {
   let cursor = nodeId;
   const visited = new Set<string>();
   while (cursor) {
@@ -215,7 +215,7 @@ function nearestNotebookContainer(db: Database.Database, nodeId: string | null):
   return null;
 }
 
-function recordHistory(db: Database.Database, input: {
+function recordHistory(db: DatabaseSync, input: {
   nodeId: string;
   action: "create" | "move" | "reorder" | "delete_subtree" | "delete_promote" | "restore";
   actorUserId: string;
@@ -234,7 +234,7 @@ function recordHistory(db: Database.Database, input: {
   );
 }
 
-function maxSortOrder(db: Database.Database, scope: string, parentId: string | null): number {
+function maxSortOrder(db: DatabaseSync, scope: string, parentId: string | null): number {
   const row = parentId
     ? db.prepare("SELECT COALESCE(MAX(sortOrder), -1) AS value FROM knowledge_tree_nodes WHERE scopeKey = ? AND parentId = ? AND isDeleted = 0")
       .get(scope, parentId) as { value: number }
@@ -243,7 +243,7 @@ function maxSortOrder(db: Database.Database, scope: string, parentId: string | n
   return Number(row?.value ?? -1) + 1;
 }
 
-function nodeForResource(db: Database.Database, resourceType: KnowledgeResourceType, resourceId: string): NodeRow {
+function nodeForResource(db: DatabaseSync, resourceType: KnowledgeResourceType, resourceId: string): NodeRow {
   const row = db.prepare(`
     SELECT id, userId, workspaceId, scopeKey, parentId, nodeType, resourceType,
            resourceId, sortOrder, isExpanded, isDeleted, deletedAt, createdAt, updatedAt
@@ -262,7 +262,7 @@ export function createKnowledgeChild(input: {
   encryptedContent?: string;
   encryptedNoteId?: string;
   sheetData?: unknown;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -391,7 +391,7 @@ export function createKnowledgeChild(input: {
   };
 }
 
-function isDescendant(db: Database.Database, ancestorId: string, candidateId: string): boolean {
+function isDescendant(db: DatabaseSync, ancestorId: string, candidateId: string): boolean {
   const row = db.prepare(`
     WITH RECURSIVE descendants(id) AS (
       SELECT id FROM knowledge_tree_nodes WHERE parentId = ? AND isDeleted = 0
@@ -406,7 +406,7 @@ function isDescendant(db: Database.Database, ancestorId: string, candidateId: st
   return !!row;
 }
 
-function syncBusinessParent(db: Database.Database, node: NodeRow, treeParentId: string | null): void {
+function syncBusinessParent(db: DatabaseSync, node: NodeRow, treeParentId: string | null): void {
   const notebookContainer = nearestNotebookContainer(db, treeParentId);
   if (node.resourceType === "note") {
     if (!notebookContainer) {
@@ -446,7 +446,7 @@ export function moveKnowledgeNode(input: {
   beforeId?: string;
   /** 插到该兄弟节点之后（与 parentId 同级，二选一）。 */
   afterId?: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -558,7 +558,7 @@ export function moveKnowledgeNode(input: {
   };
 }
 
-function readNodeTitle(db: Database.Database, node: NodeRow): string {
+function readNodeTitle(db: DatabaseSync, node: NodeRow): string {
   if (node.resourceType === "notebook") {
     return (db.prepare("SELECT name FROM notebooks WHERE id = ?").get(node.resourceId) as { name: string } | undefined)?.name || "未命名文件夹";
   }
@@ -571,12 +571,12 @@ function readNodeTitle(db: Database.Database, node: NodeRow): string {
   return node.resourceId;
 }
 
-function countChildren(db: Database.Database, nodeId: string): number {
+function countChildren(db: DatabaseSync, nodeId: string): number {
   return Number((db.prepare("SELECT COUNT(*) AS count FROM knowledge_tree_nodes WHERE parentId = ? AND isDeleted = 0")
     .get(nodeId) as { count: number }).count || 0);
 }
 
-function descendantNodes(db: Database.Database, nodeId: string): NodeRow[] {
+function descendantNodes(db: DatabaseSync, nodeId: string): NodeRow[] {
   return db.prepare(`
     WITH RECURSIVE subtree(id, depth) AS (
       SELECT id, 0 FROM knowledge_tree_nodes WHERE id = ?
@@ -591,7 +591,7 @@ function descendantNodes(db: Database.Database, nodeId: string): NodeRow[] {
            node.isExpanded, node.isDeleted, node.deletedAt, node.createdAt, node.updatedAt
     FROM subtree JOIN knowledge_tree_nodes node ON node.id = subtree.id
     ORDER BY subtree.depth DESC
-  `).all(nodeId) as NodeRow[];
+  `).all(nodeId) as unknown as NodeRow[];
 }
 
 /** 引用节点的 id 前缀：引用不属于 knowledge_tree_nodes，操作前先按它分流。 */
@@ -609,7 +609,7 @@ function noteNodeType(contentFormat: string | null, noteType: string | null): Kn
 }
 
 /** 删掉挂在这些目录下的引用（目录被删时引用跟着消失，但正文不动）。 */
-function deleteReferencesUnder(db: Database.Database, parentIds: Set<string>): void {
+function deleteReferencesUnder(db: DatabaseSync, parentIds: Set<string>): void {
   if (parentIds.size === 0) return;
   const ids = [...parentIds];
   for (let index = 0; index < ids.length; index += 200) {
@@ -627,7 +627,7 @@ function deleteReferencesUnder(db: Database.Database, parentIds: Set<string>): v
  * 而是把主节点搬到最早那条引用的目录，并消掉那条引用（避免同一位置出现两项）。
  */
 function adoptReferenceLocation(
-  db: Database.Database,
+  db: DatabaseSync,
   node: NodeRow,
   subtreeIds: Set<string>,
 ): boolean {
@@ -668,21 +668,21 @@ type KnowledgeReferenceRow = {
   updatedAt: string;
 };
 
-function readReference(db: Database.Database, referenceId: string): KnowledgeReferenceRow | null {
+function readReference(db: DatabaseSync, referenceId: string): KnowledgeReferenceRow | null {
   return (db.prepare(`
     SELECT id, userId, workspaceId, scopeKey, parentId, resourceId, title, sortOrder, createdAt, updatedAt
     FROM knowledge_tree_references WHERE id = ? AND isDeleted = 0
   `).get(referenceId) as KnowledgeReferenceRow | undefined) || null;
 }
 
-function requireReference(db: Database.Database, referenceId: string): KnowledgeReferenceRow {
+function requireReference(db: DatabaseSync, referenceId: string): KnowledgeReferenceRow {
   const reference = readReference(db, referenceId);
   if (!reference) throw new KnowledgeTreeError("KNOWLEDGE_NODE_NOT_FOUND", 404, "内容节点不存在");
   return reference;
 }
 
 /** 同一目录下，树节点与引用共用一条排序序列。 */
-function nextChildSortOrder(db: Database.Database, scope: string, parentId: string): number {
+function nextChildSortOrder(db: DatabaseSync, scope: string, parentId: string): number {
   const nodeMax = db.prepare(`
     SELECT COALESCE(MAX(sortOrder), -1) AS value FROM knowledge_tree_nodes
     WHERE scopeKey = ? AND parentId = ? AND isDeleted = 0
@@ -695,7 +695,7 @@ function nextChildSortOrder(db: Database.Database, scope: string, parentId: stri
 }
 
 function referenceToNode(
-  db: Database.Database,
+  db: DatabaseSync,
   reference: KnowledgeReferenceRow,
   actorUserId: string,
 ): KnowledgeTreeNode {
@@ -741,7 +741,7 @@ export function createKnowledgeReference(input: {
   actorUserId: string;
   nodeId: string;
   parentId?: string | null;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -804,7 +804,7 @@ export function moveKnowledgeReference(input: {
   referenceId: string;
   parentId: string | null;
   sortOrder?: number;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -845,7 +845,7 @@ export function renameKnowledgeReference(input: {
   actorUserId: string;
   referenceId: string;
   title: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -867,7 +867,7 @@ export function renameKnowledgeReference(input: {
 
 /** 删一条路径不动正文：正文只在最后一条路径消失时才被回收（见 adoptReferenceLocation）。 */
 function deleteKnowledgeReferenceNode(input: {
-  db: Database.Database;
+  db: DatabaseSync;
   actorUserId: string;
   referenceId: string;
 }): { success: true; mode: KnowledgeDeleteMode; affectedNodeIds: string[]; promotedNodeIds: string[] } {
@@ -881,7 +881,7 @@ function deleteKnowledgeReferenceNode(input: {
   return { success: true, mode: "subtree", affectedNodeIds: [reference.id], promotedNodeIds: [] };
 }
 
-function softDeleteBusinessNode(db: Database.Database, node: NodeRow): void {
+function softDeleteBusinessNode(db: DatabaseSync, node: NodeRow): void {
   if (node.resourceType === "note") {
     db.prepare(`
       UPDATE notes SET isTrashed = 1, trashedAt = datetime('now'), updatedAt = datetime('now')
@@ -904,7 +904,7 @@ export function deleteKnowledgeNode(input: {
   actorUserId: string;
   nodeId: string;
   mode: KnowledgeDeleteMode;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): { success: true; mode: KnowledgeDeleteMode; affectedNodeIds: string[]; promotedNodeIds: string[] } {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -924,7 +924,7 @@ export function deleteKnowledgeNode(input: {
         SELECT id, userId, workspaceId, scopeKey, parentId, nodeType, resourceType,
                resourceId, sortOrder, isExpanded, isDeleted, deletedAt, createdAt, updatedAt
         FROM knowledge_tree_nodes WHERE parentId = ? AND isDeleted = 0 ORDER BY sortOrder, id
-      `).all(node.id) as NodeRow[];
+      `).all(node.id) as unknown as NodeRow[];
       let order = maxSortOrder(db, node.scopeKey, node.parentId);
       for (const child of children) {
         syncBusinessParent(db, child, node.parentId);
@@ -969,7 +969,7 @@ export function restoreKnowledgeNode(input: {
   actorUserId: string;
   nodeId: string;
   includeSubtree?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): { success: true; restoredNodeIds: string[] } {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -1008,7 +1008,7 @@ export function restoreKnowledgeNode(input: {
 export function reorderKnowledgeNodes(input: {
   actorUserId: string;
   items: Array<{ id: string; sortOrder: number }>;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): { success: true; updated: number } {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -1055,7 +1055,7 @@ export function reorderKnowledgeNodes(input: {
   return { success: true, updated };
 }
 
-export function listKnowledgeTreeHistory(nodeId: string, userId: string, db: Database.Database = getDb()) {
+export function listKnowledgeTreeHistory(nodeId: string, userId: string, db: DatabaseSync = getDb()) {
   ensureKnowledgeTreeTables(db);
   requireCapability(db, nodeId, userId, "canView");
   return db.prepare(`

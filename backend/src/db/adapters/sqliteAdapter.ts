@@ -12,11 +12,11 @@
  * - 禁止 db.transaction(async () => {})——会导致事务边界失真
  */
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { DatabaseAdapter, DbRunResult } from "./types";
 
 export class SqliteAdapter implements DatabaseAdapter {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: DatabaseSync) {}
 
   async queryOne<T>(sql: string, params: unknown[] = []): Promise<T | undefined> {
     return this.db.prepare(sql).get(...params) as T | undefined;
@@ -29,7 +29,7 @@ export class SqliteAdapter implements DatabaseAdapter {
   async execute(sql: string, params: unknown[] = []): Promise<DbRunResult> {
     const result = this.db.prepare(sql).run(...params);
     return {
-      changes: result.changes,
+      changes: result.changes as number,
       lastInsertRowid: result.lastInsertRowid,
     };
   }
@@ -46,7 +46,7 @@ export class SqliteAdapter implements DatabaseAdapter {
     const runBatch = this.db.transaction((items: unknown[][]) => {
       for (const params of items) {
         const result = stmt.run(...params);
-        totalChanges += result.changes;
+        totalChanges += result.changes as number;
         lastRowid = result.lastInsertRowid;
       }
     });
@@ -64,7 +64,7 @@ export class SqliteAdapter implements DatabaseAdapter {
       let changes = 0;
       for (const item of items) {
         const result = this.db.prepare(item.sql).run(...(item.params ?? []));
-        changes += result.changes;
+        changes += result.changes as number;
       }
       return changes;
     });

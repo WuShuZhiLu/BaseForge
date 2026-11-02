@@ -25,7 +25,7 @@ import { workspaceAvatarMigration } from "./workspaceAvatarMigration.js";
  * column and clears impossible stale values. v45 introduces an append-only task
  * activity ledger used by records, trends and heatmaps.
  */
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { encryptedBlocksMigration } from "./encryptedBlocksMigration.js";
 import { encryptedNotesMigration } from "./encryptedNotesMigration.js";
 import { markSearchIndexRebuilt, rebuildNormalizedSearchFts, repairSearchContentText } from "../lib/searchIndex.js";
@@ -99,7 +99,7 @@ import { noteCommentNotificationsMigration } from "./noteCommentNotificationsMig
 
 export type { Migration } from "./migrations.impl.js";
 
-function ensureTaskActivitySchema(db: Database.Database): void {
+function ensureTaskActivitySchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_activity_events (
       id TEXT PRIMARY KEY,
@@ -469,7 +469,7 @@ export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
   0,
 );
 
-function ensureMigrationsTable(db: Database.Database): void {
+function ensureMigrationsTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -492,13 +492,13 @@ function validateMigrationRegistry(): void {
   }
 }
 
-function getAppliedMigrationVersions(db: Database.Database): Set<number> {
+function getAppliedMigrationVersions(db: DatabaseSync): Set<number> {
   ensureMigrationsTable(db);
   const rows = db.prepare("SELECT version FROM schema_migrations").all() as Array<{ version: number }>;
   return new Set(rows.map((row) => row.version));
 }
 
-export function getPendingMigrations(db: Database.Database): Migration[] {
+export function getPendingMigrations(db: DatabaseSync): Migration[] {
   validateMigrationRegistry();
   const applied = getAppliedMigrationVersions(db);
   return MIGRATIONS
@@ -506,7 +506,7 @@ export function getPendingMigrations(db: Database.Database): Migration[] {
     .sort((a, b) => a.version - b.version);
 }
 
-export function getCurrentSchemaVersion(db: Database.Database): number {
+export function getCurrentSchemaVersion(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   const row = db
     .prepare("SELECT MAX(version) AS version FROM schema_migrations")
@@ -514,7 +514,7 @@ export function getCurrentSchemaVersion(db: Database.Database): number {
   return row?.version ?? 0;
 }
 
-export function runMigrations(db: Database.Database): number {
+export function runMigrations(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   validateMigrationRegistry();
 

@@ -172,7 +172,7 @@ function dispatchTaskDeadlines(setting: DigestSettings, local: { day: string; ti
 
 export function dispatchScheduledTaskDigests(now = new Date()): number {
   init();
-  const settings = getDb().prepare("SELECT * FROM task_digest_settings WHERE morningEnabled=1 OR eveningEnabled=1 OR dueEnabled=1").all() as DigestSettings[];
+  const settings = getDb().prepare("SELECT * FROM task_digest_settings WHERE morningEnabled=1 OR eveningEnabled=1 OR dueEnabled=1").all() as unknown as DigestSettings[];
   let emitted = 0;
   for (const setting of settings) {
     try {

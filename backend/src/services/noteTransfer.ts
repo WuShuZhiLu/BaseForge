@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema.js";
 import {
   getUserWorkspaceRole,
@@ -194,7 +194,7 @@ function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(",");
 }
 
-function loadNotes(db: Database.Database, ids: string[]): NoteRow[] {
+function loadNotes(db: DatabaseSync, ids: string[]): NoteRow[] {
   if (ids.length === 0) return [];
   const rows = db.prepare(`
     SELECT id, userId, workspaceId, notebookId, title, content, contentText,
@@ -207,7 +207,7 @@ function loadNotes(db: Database.Database, ids: string[]): NoteRow[] {
   return ids.map((id) => byId.get(id)).filter((row): row is NoteRow => !!row);
 }
 
-function loadAttachments(db: Database.Database, noteIds: string[]): AttachmentRow[] {
+function loadAttachments(db: DatabaseSync, noteIds: string[]): AttachmentRow[] {
   if (noteIds.length === 0) return [];
   return db.prepare(`
     SELECT id, noteId, userId, workspaceId, filename, mimeType, size, path,
@@ -218,7 +218,7 @@ function loadAttachments(db: Database.Database, noteIds: string[]): AttachmentRo
   `).all(...noteIds) as AttachmentRow[];
 }
 
-function loadTags(db: Database.Database, noteIds: string[]): TagRow[] {
+function loadTags(db: DatabaseSync, noteIds: string[]): TagRow[] {
   if (noteIds.length === 0) return [];
   return db.prepare(`
     SELECT DISTINCT t.id, t.userId, t.workspaceId, t.name, t.color
@@ -468,7 +468,7 @@ function assertExecutable(analysis: TransferAnalysis): void {
   });
 }
 
-function nextSortOrder(db: Database.Database, notebookId: string): number {
+function nextSortOrder(db: DatabaseSync, notebookId: string): number {
   const row = db.prepare(
     "SELECT COALESCE(MAX(sortOrder), -1) AS maxOrder FROM notes WHERE notebookId = ?",
   ).get(notebookId) as { maxOrder: number };
@@ -491,7 +491,7 @@ function attachmentSignature(rows: AttachmentRow[]): string {
 }
 
 function targetTagFor(
-  db: Database.Database,
+  db: DatabaseSync,
   source: TagRow,
   actorUserId: string,
   targetWorkspaceId: string | null,
@@ -511,7 +511,7 @@ function targetTagFor(
   return { id, created: true };
 }
 
-function noteTagIds(db: Database.Database, noteId: string): string[] {
+function noteTagIds(db: DatabaseSync, noteId: string): string[] {
   return (db.prepare("SELECT tagId FROM note_tags WHERE noteId = ?").all(noteId) as Array<{ tagId: string }>)
     .map((row) => row.tagId);
 }

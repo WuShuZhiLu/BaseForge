@@ -1,5 +1,5 @@
 import { isProtectedNotePayload, withEncryptedBlocksSupport } from "../lib/encryptedNotes.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { SYNC_TABLES } from "./constants";
 import { SyncError } from "./errors";
@@ -119,7 +119,7 @@ export function toConflictDetail(row: SyncConflictRow): ConflictDetail {
  * 否则冲突中心只能显示"服务器版本 v7"而看不到内容，用户无法做选择。
  */
 export function fillRemotePayload(
-  db: Database.Database,
+  db: DatabaseSync,
   entityType: SyncNegotiatedEntityType,
   entityId: string,
   remotePayload: Record<string, unknown>,
@@ -136,7 +136,7 @@ export function fillRemotePayload(
     entityType,
     entityId,
   );
-  return result.changes;
+  return result.changes as number;
 }
 
 /**
@@ -146,7 +146,7 @@ export function fillRemotePayload(
  * 不允许出现"标记已解决但内容没写入"这种状态。
  */
 export function applyConflictResolution(
-  db: Database.Database,
+  db: DatabaseSync,
   input: ResolveConflictInput,
 ): { conflictId: string; resolution: ConflictResolution } {
   const row = getConflict(db, input.conflictId);
@@ -301,7 +301,7 @@ export function applyConflictResolution(
  * 但绝不自动执行，否则知识树会被冲突副本淹没。
  */
 export function forkConflictVersion(
-  db: Database.Database,
+  db: DatabaseSync,
   input: {
     conflictId: string;
     side: "local" | "remote";

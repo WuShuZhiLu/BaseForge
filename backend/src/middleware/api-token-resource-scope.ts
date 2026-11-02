@@ -55,7 +55,7 @@ function loadNotebookGrants(tokenId: string): Map<string, number> {
     SELECT id AS notebookId, MAX(level) AS level
     FROM scoped
     GROUP BY id
-  `).all(tokenId) as NotebookGrant[];
+  `).all(tokenId) as unknown as NotebookGrant[];
 
   return new Map(rows.map((row) => [row.notebookId, Number(row.level) || 1]));
 }

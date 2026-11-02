@@ -294,7 +294,7 @@ export function createPmRepository() {
       }
       const rows = getDb()
         .prepare(`SELECT * FROM pm_work_items WHERE ${clauses.join(" AND ")} ORDER BY "sortOrder" ASC, "updatedAt" DESC`)
-        .all(...params) as ItemRow[];
+        .all(...params) as unknown as ItemRow[];
       const items = rows.map(rowToItem);
       if (filter?.tag) {
         return items.filter((item) => item.tags.includes(filter.tag!));
@@ -429,7 +429,7 @@ export function createPmRepository() {
            WHERE "userId" = ? AND "itemId" = ?
            ORDER BY "createdAt" DESC, rowid DESC LIMIT 100`,
         )
-        .all(userId, id) as PmWorkItemLog[];
+        .all(userId, id) as unknown as PmWorkItemLog[];
     },
     /** 多文档关联列表（LEFT JOIN 核心笔记表取标题；回收站笔记照常返回并由前端标记）。 */
     listItemNotes(userId: string, id: string): PmItemNoteLink[] {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import type { NoteLinkEntry } from "../repositories/types.js";
 import type { NoteBlockIndexRow, NoteBlockType } from "./noteBlocks.js";
@@ -160,13 +160,13 @@ function analyzeTiptap(noteId: string, content: string): TiptapAnalysis | null {
   };
 }
 
-function loadExistingRows(db: Database.Database, noteId: string): ExistingIndexRow[] {
+function loadExistingRows(db: DatabaseSync, noteId: string): ExistingIndexRow[] {
   return db.prepare(`
     SELECT blockId, blockType, parentBlockId, blockOrder, plainText, contentHash, path
     FROM note_blocks_index
     WHERE noteId = ?
     ORDER BY blockOrder ASC
-  `).all(noteId) as ExistingIndexRow[];
+  `).all(noteId) as unknown as ExistingIndexRow[];
 }
 
 function rowsMirrorAnalysis(existing: ExistingIndexRow[], analysis: TiptapAnalysis): boolean {
@@ -263,7 +263,7 @@ function extractLinks(node: any, sourceBlockId: string, plainText: string): Note
 }
 
 function filterExistingTargets(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   links: NoteLinkEntry[],
 ): NoteLinkEntry[] {
@@ -276,7 +276,7 @@ function filterExistingTargets(
 
 /** Allow normalization bypass when a bounded list batch starts from an exact index mirror. */
 export function canUseIncrementalListStructureIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   operations: unknown[],
@@ -305,7 +305,7 @@ export function canUseIncrementalListStructureIndexes(
 
 /** Build a minimal post-patch plan for a scoped list batch, including split content changes. */
 export function planIncrementalListStructureIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   operations: unknown[],

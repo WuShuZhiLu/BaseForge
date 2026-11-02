@@ -42,7 +42,7 @@ export function createCustomFontsRepository(
         .prepare(
           'SELECT id, name, "fileName", format, "fileSize", "createdAt" FROM custom_fonts ORDER BY "createdAt" DESC',
         )
-        .all() as CustomFont[];
+        .all() as unknown as CustomFont[];
     },
 
     /**

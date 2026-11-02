@@ -206,7 +206,7 @@ function queryScopeNotebooks(userId: string, workspaceId: string | null | undefi
         FROM notebooks
        WHERE workspaceId = ? AND (isDeleted IS NULL OR isDeleted = 0)
        ORDER BY parentId, sortOrder, createdAt, id
-    `).all(workspaceId) as ExportNotebook[];
+    `).all(workspaceId) as unknown as ExportNotebook[];
   }
   return db.prepare(`
     SELECT id, userId, workspaceId, parentId, name, description, icon, color,
@@ -214,7 +214,7 @@ function queryScopeNotebooks(userId: string, workspaceId: string | null | undefi
       FROM notebooks
      WHERE userId = ? AND workspaceId IS NULL AND (isDeleted IS NULL OR isDeleted = 0)
      ORDER BY parentId, sortOrder, createdAt, id
-  `).all(userId) as ExportNotebook[];
+  `).all(userId) as unknown as ExportNotebook[];
 }
 
 /**
@@ -242,7 +242,7 @@ function querySelectedRootDocumentNotebooks(
       JOIN notebooks nb ON nb.id = n.notebookId
      WHERE n.id IN (${placeholders})
        AND ${scopeSql}
-  `).all(...noteIds, workspaceId || userId) as ExportNotebook[];
+  `).all(...noteIds, workspaceId || userId) as unknown as ExportNotebook[];
   return rows.filter((notebook) => notebook.id.startsWith(ROOT_DOCUMENT_NOTEBOOK_PREFIX));
 }
 
@@ -487,7 +487,7 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
           FROM notes
          WHERE notebookId IN (${Array.from(allScopeNotebookIds).map(() => "?").join(",")}) ${trashedSql}
          ORDER BY notebookId, sortOrder, createdAt, id
-      `).all(...allScopeNotebookIds) as ExportNote[]
+      `).all(...allScopeNotebookIds) as unknown as ExportNote[]
     : [];
 
   const selectedIdSet = noteIds ? new Set(noteIds) : null;
@@ -529,7 +529,7 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
     : [];
   const tagIds = Array.from(new Set(noteTags.map((item) => item.tagId)));
   const tags = tagIds.length
-    ? db.prepare(`SELECT id, name, color, createdAt FROM tags WHERE id IN (${tagIds.map(() => "?").join(",")})`).all(...tagIds) as ExportTag[]
+    ? db.prepare(`SELECT id, name, color, createdAt FROM tags WHERE id IN (${tagIds.map(() => "?").join(",")})`).all(...tagIds) as unknown as ExportTag[]
     : [];
   const dbAttachments = noteIdList.length
     ? db.prepare(`
@@ -537,7 +537,7 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
           FROM attachments
          WHERE noteId IN (${notePlaceholders})
          ORDER BY noteId, createdAt, id
-      `).all(...noteIdList) as ExportAttachment[]
+      `).all(...noteIdList) as unknown as ExportAttachment[]
     : [];
 
   const { pathById, exportNameById, roots } = buildExportPaths(notebooks);

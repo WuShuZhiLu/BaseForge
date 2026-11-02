@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 import { resolveKnowledgeNodeAccess } from "../services/knowledgeCapabilities.js";
@@ -7,7 +7,7 @@ import { listSharedKnowledgeTree } from "../services/sharedKnowledgeTreeListing.
 
 type NoteNodeRow = { id: string; resourceId: string };
 
-function visibleNoteIds(rows: NoteNodeRow[], userId: string, db: Database.Database): string[] {
+function visibleNoteIds(rows: NoteNodeRow[], userId: string, db: DatabaseSync): string[] {
   return rows
     .filter((row) => resolveKnowledgeNodeAccess(row.id, userId, db).capabilities.canView)
     .map((row) => row.resourceId);
@@ -15,7 +15,7 @@ function visibleNoteIds(rows: NoteNodeRow[], userId: string, db: Database.Databa
 
 /** Resolve note resources by their unified knowledge-tree parent, not by notes.notebookId. */
 export function resolveKnowledgeTreeNoteScopeIds(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   workspaceId: string | null,
   parentId: string | null,

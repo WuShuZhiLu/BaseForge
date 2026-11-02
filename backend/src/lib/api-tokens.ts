@@ -4,7 +4,7 @@
  * 支持粗粒度 scopes、过期/吊销、使用统计，以及可选的笔记本资源级授权。
  */
 import crypto from "crypto";
-import type { Database as BetterSqliteDB } from "better-sqlite3";
+import type { DatabaseSync as BetterSqliteDB } from "node:sqlite";
 import { apiTokensRepository } from "../repositories";
 
 export const API_TOKEN_PREFIX = "nkn_";

@@ -21,7 +21,7 @@
 //   - 绝不清空本地已有数据
 //   - 可中断、可重试、幂等
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { logSyncInfo, logSyncWarn } from "./log";
 import { SyncError } from "./errors";
@@ -103,7 +103,7 @@ const ENTITY_ORDER: SyncEntityType[] = [
  * 绝大多数安装（Full 用户、新装用户）永远不会用到它。
  * 放进全局 migration 会让所有部署都多一张永远为空的表。
  */
-function ensureStateTable(db: Database.Database): void {
+function ensureStateTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS ${MIGRATION_TABLE} (
       singletonKey INTEGER PRIMARY KEY CHECK (singletonKey = 1),
@@ -135,7 +135,7 @@ interface StateRow {
   verification: string | null;
 }
 
-function readState(db: Database.Database): StateRow {
+function readState(db: DatabaseSync): StateRow {
   ensureStateTable(db);
   const row = db.prepare(`
     SELECT stage, remoteUrl, profileId, snapshotSequence, cursor,
@@ -156,7 +156,7 @@ function readState(db: Database.Database): StateRow {
   };
 }
 
-function writeState(db: Database.Database, patch: Partial<StateRow>): void {
+function writeState(db: DatabaseSync, patch: Partial<StateRow>): void {
   ensureStateTable(db);
   const current = readState(db);
   const next = { ...current, ...patch };
@@ -193,7 +193,7 @@ function writeState(db: Database.Database, patch: Partial<StateRow>): void {
 }
 
 /** 当前迁移进度。 */
-export function getLiteMigrationProgress(db: Database.Database): LiteMigrationProgress {
+export function getLiteMigrationProgress(db: DatabaseSync): LiteMigrationProgress {
   const state = readState(db);
   const pending = countPendingAttachmentDownloads(db);
   return {
@@ -211,7 +211,7 @@ export function getLiteMigrationProgress(db: Database.Database): LiteMigrationPr
   };
 }
 
-function countPendingAttachmentDownloads(db: Database.Database): number {
+function countPendingAttachmentDownloads(db: DatabaseSync): number {
   try {
     const row = db.prepare(`
       SELECT COUNT(*) AS c FROM attachment_sync_state WHERE remoteOnly = 1
@@ -222,7 +222,7 @@ function countPendingAttachmentDownloads(db: Database.Database): number {
   }
 }
 
-function countAvailableAttachments(db: Database.Database): number {
+function countAvailableAttachments(db: DatabaseSync): number {
   try {
     const row = db.prepare(`
       SELECT COUNT(*) AS c FROM attachment_sync_state WHERE remoteOnly = 0
@@ -239,7 +239,7 @@ function countAvailableAttachments(db: Database.Database): number {
  * 只统计个人空间：Sync V2 第一版范围，工作区数据不在迁移范围内
  * （工作区本身就在服务端，Lite 用户切到 Local 后仍通过同步访问）。
  */
-function countLocal(db: Database.Database, userId: string): Record<string, number> {
+function countLocal(db: DatabaseSync, userId: string): Record<string, number> {
   const q = (sql: string): number => {
     try {
       return (db.prepare(sql).get(userId) as { c: number }).c;
@@ -256,7 +256,7 @@ function countLocal(db: Database.Database, userId: string): Record<string, numbe
 }
 
 export interface LiteMigrationOptions {
-  db: Database.Database;
+  db: DatabaseSync;
   /** 远端 Lite 服务器地址。 */
   remoteUrl: string;
   /** 本机 Desktop 账号 ID（数据落到这个用户名下）。 */
@@ -481,7 +481,7 @@ export async function runLiteMigration(
  *   3. 附件元数据数量一致（二进制可以延后补，元数据不能缺）。
  */
 async function verifyMigration(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   plan: Awaited<ReturnType<SyncRemoteClient["plan"]>>,
   client: SyncRemoteClient,
@@ -537,7 +537,7 @@ async function verifyMigration(
  * 只清进度，**不动任何已下载的业务数据** —— 那些数据是正确的，
  * 重跑时 upsert 会自然覆盖，重新下载一遍纯属浪费。
  */
-export function resetLiteMigration(db: Database.Database): LiteMigrationProgress {
+export function resetLiteMigration(db: DatabaseSync): LiteMigrationProgress {
   ensureStateTable(db);
   writeState(db, {
     stage: "pending",
@@ -552,6 +552,6 @@ export function resetLiteMigration(db: Database.Database): LiteMigrationProgress
 }
 
 /** 迁移是否已完成，供 Electron 决定能否切换到 Local Runtime。 */
-export function isLiteMigrationComplete(db: Database.Database): boolean {
+export function isLiteMigrationComplete(db: DatabaseSync): boolean {
   return readState(db).stage === "complete";
 }

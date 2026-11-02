@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import type { NoteLinkEntry } from "../repositories/types.js";
 import type { NoteBlockIndexRow, NoteBlockType } from "./noteBlocks.js";
@@ -161,13 +161,13 @@ function analyzeTiptap(noteId: string, content: string): TiptapAnalysis | null {
   };
 }
 
-function loadExistingRows(db: Database.Database, noteId: string): ExistingIndexRow[] {
+function loadExistingRows(db: DatabaseSync, noteId: string): ExistingIndexRow[] {
   return db.prepare(`
     SELECT blockId, blockType, parentBlockId, blockOrder, plainText, contentHash, path
     FROM note_blocks_index
     WHERE noteId = ?
     ORDER BY blockOrder ASC
-  `).all(noteId) as ExistingIndexRow[];
+  `).all(noteId) as unknown as ExistingIndexRow[];
 }
 
 function structuresMatch(
@@ -373,7 +373,7 @@ function validateMixedBase(
 }
 
 function filterExistingTargets(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   links: NoteLinkEntry[],
 ): NoteLinkEntry[] {
@@ -425,7 +425,7 @@ function classifyStructuralDelta(
 }
 
 function linksForSources(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   analysis: TiptapAnalysis,
   sourceBlockIds: string[],
@@ -440,7 +440,7 @@ function linksForSources(
 }
 
 function planLeafIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   analysis: TiptapAnalysis,
   operations: LeafPatchOperation[],
@@ -465,7 +465,7 @@ function planLeafIndexes(
 }
 
 function planStructuralIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   analysis: TiptapAnalysis,
   operations: StructuralPatchOperation[],
@@ -515,7 +515,7 @@ function planStructuralIndexes(
 }
 
 function planMixedIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   analysis: TiptapAnalysis,
   leaf: LeafPatchOperation[],
@@ -598,7 +598,7 @@ function planMixedIndexes(
  * the requested operation class has a fail-closed incremental implementation.
  */
 export function canUseIncrementalPatchIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   operations: TiptapBlockPatchOperation[],
@@ -617,7 +617,7 @@ export function canUseIncrementalPatchIndexes(
 
 /** Build a post-patch incremental update plan without mutating persistence. */
 export function planIncrementalPatchIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   _userId: string,
   noteId: string,
   content: string,
@@ -637,7 +637,7 @@ export function planIncrementalPatchIndexes(
 
 /** Apply one previously validated incremental plan inside the caller's SQLite transaction. */
 export function applyIncrementalPatchIndexes(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   noteId: string,
   plan: IncrementalPatchIndexPlan,

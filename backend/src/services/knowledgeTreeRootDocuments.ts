@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -28,7 +28,7 @@ function scopeKey(userId: string, workspaceId: string | null): string {
 }
 
 function resolveContainerOwner(
-  db: Database.Database,
+  db: DatabaseSync,
   actorUserId: string,
   workspaceId: string | null,
 ): string {
@@ -39,7 +39,7 @@ function resolveContainerOwner(
 }
 
 function activateRootContainer(
-  db: Database.Database,
+  db: DatabaseSync,
   actorUserId: string,
   workspaceId: string | null,
 ): { notebookId: string; nodeId: string; ownerUserId: string; scope: string } {
@@ -82,7 +82,7 @@ function activateRootContainer(
   return { notebookId, nodeId, ownerUserId, scope };
 }
 
-function hideRootContainer(db: Database.Database, notebookId: string, nodeId: string): void {
+function hideRootContainer(db: DatabaseSync, notebookId: string, nodeId: string): void {
   db.prepare(`
     UPDATE notebooks
        SET isDeleted = 1, deletedAt = datetime('now'), updatedAt = datetime('now')
@@ -92,7 +92,7 @@ function hideRootContainer(db: Database.Database, notebookId: string, nodeId: st
 }
 
 function rootDocumentContainerForParent(
-  db: Database.Database,
+  db: DatabaseSync,
   parentId: string,
 ): { ownerUserId: string; workspaceId: string | null } | null {
   ensureKnowledgeTreeTables(db);
@@ -112,7 +112,7 @@ function rootDocumentContainerForParent(
   return { ownerUserId: parent.ownerUserId, workspaceId: parent.workspaceId || null };
 }
 
-function nextRootSortOrder(db: Database.Database, scope: string, nodeId: string): number {
+function nextRootSortOrder(db: DatabaseSync, scope: string, nodeId: string): number {
   const row = db.prepare(`
     SELECT COALESCE(MAX(sortOrder), -1) + 1 AS value
       FROM knowledge_tree_nodes
@@ -122,7 +122,7 @@ function nextRootSortOrder(db: Database.Database, scope: string, nodeId: string)
 }
 
 function detachDocumentAtRoot(
-  db: Database.Database,
+  db: DatabaseSync,
   node: KnowledgeTreeNode,
   scope: string,
   temporaryParentId: string,
@@ -155,7 +155,7 @@ export function createKnowledgeChild(input: {
   encryptedNoteId?: string;
   /** 轻量表格：可选的初始表格数据，缺省时由核心层生成默认空表。 */
   sheetData?: unknown;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   if (input.parentId !== null) {
     const db = input.db || getDb();
@@ -203,7 +203,7 @@ export function moveKnowledgeNode(input: {
   sortOrder?: number;
   beforeId?: string;
   afterId?: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode {
   // 引用只是一条额外路径：直接改引用行，不能走根文档特例（引用必须有文件夹）。
   if (isKnowledgeReferenceId(input.nodeId)) {

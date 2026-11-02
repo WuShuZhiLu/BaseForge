@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_PARENT_PRESERVATION_SCHEMA_VERSION = 62;
@@ -8,7 +8,7 @@ export const KNOWLEDGE_TREE_PARENT_PRESERVATION_SCHEMA_VERSION = 62;
  * from a document node back to the nearest physical notebook container. Only a real legacy
  * parentId change is allowed to replace the unified-tree parent.
  */
-export function ensureKnowledgeTreeParentPreservation(db: Database.Database): void {
+export function ensureKnowledgeTreeParentPreservation(db: DatabaseSync): void {
   db.exec(`
     DROP TRIGGER IF EXISTS knowledge_tree_notebooks_au;
     CREATE TRIGGER knowledge_tree_notebooks_au

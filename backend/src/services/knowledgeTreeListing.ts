@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -32,7 +32,7 @@ export function listKnowledgeTree(input: {
   userId: string;
   workspaceId: string | null;
   includeDeleted?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode[] {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);

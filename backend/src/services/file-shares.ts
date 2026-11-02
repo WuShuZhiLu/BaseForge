@@ -163,7 +163,7 @@ export function ensureStableFileShare(
         WHERE id = ?
       `).run(nextExpiresAt, nextAllowDownload, active.id);
     }
-    return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(active.id) as FileShareRecord;
+    return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(active.id) as unknown as FileShareRecord;
   }
 
   const id = crypto.randomUUID();
@@ -185,7 +185,7 @@ export function ensureStableFileShare(
     allowDownload,
   );
 
-  return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(id) as FileShareRecord;
+  return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(id) as unknown as FileShareRecord;
 }
 
 export function resolveStableFileShare(

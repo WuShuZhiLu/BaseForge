@@ -7,7 +7,7 @@ function now(): string {
 
 export class PluginRegistry {
   list(): PluginRegistryRecord[] {
-    return getDb().prepare("SELECT * FROM plugin_registry ORDER BY name COLLATE NOCASE").all() as PluginRegistryRecord[];
+    return getDb().prepare("SELECT * FROM plugin_registry ORDER BY name COLLATE NOCASE").all() as unknown as PluginRegistryRecord[];
   }
 
   get(id: string): PluginRegistryRecord | undefined {
@@ -159,7 +159,7 @@ export class PluginRegistry {
   }
 
   listVersions(id: string): PluginVersionRecord[] {
-    return getDb().prepare("SELECT * FROM plugin_versions WHERE pluginId=? ORDER BY installedAt DESC").all(id) as PluginVersionRecord[];
+    return getDb().prepare("SELECT * FROM plugin_versions WHERE pluginId=? ORDER BY installedAt DESC").all(id) as unknown as PluginVersionRecord[];
   }
 
   getVersion(id: string, version: string): PluginVersionRecord | undefined {
