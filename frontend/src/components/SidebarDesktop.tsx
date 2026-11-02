@@ -62,6 +62,7 @@ import {
   Magnet,
   Paperclip,
   Store,
+  SlidersHorizontal,
   Unlock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -627,7 +628,7 @@ export default function SidebarDesktop() {
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
   const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
   // 插件列表（后端 GET /plugins）
-  const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "admin">("builtin");
+  const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "config">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
   // 插件面板入口上的计数（市场条目数 / 可用更新数），带 5 分钟缓存的轻量请求
   const [pluginCounts, setPluginCounts] = useState<PluginCounts | null>(() => peekPluginCounts());
@@ -3454,8 +3455,8 @@ export default function SidebarDesktop() {
             <div className="px-1 pb-2 pt-1">
               {([
                 { key: "catalog", icon: Store, label: "市场", hint: pluginCounts?.catalog ? `${pluginCounts.catalog} 个` : "", hot: false },
-                { key: "admin", icon: RefreshCw, label: "更新", hint: pluginCounts?.updates ? `${pluginCounts.updates} 个` : "", hot: Boolean(pluginCounts?.updates) },
-                { key: "installed", icon: LayoutGrid, label: "管理全部插件", hint: String(BUILTIN_PLUGINS.length + plugins.length), hot: false },
+                { key: "installed", icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length), hot: false },
+                { key: "config", icon: SlidersHorizontal, label: "配置", hint: "", hot: false },
               ] as const).map((entry) => {
                 const Icon = entry.icon;
                 return (

@@ -108,7 +108,7 @@ function installedPlugin(overrides: Record<string, unknown> = {}): Record<string
 }
 
 /** 分组导航在侧栏，主区通过事件切分组 */
-async function openGroup(group: "builtin" | "installed" | "catalog" | "admin") {
+async function openGroup(group: "builtin" | "installed" | "catalog" | "config") {
   await act(async () => {
     window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group } }));
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -225,31 +225,59 @@ describe("PluginsWorkspace 插件详情页", () => {
     act(() => { root.unmount(); });
   });
 
-  it("管理分组：管理员可装载本地包、检查更新与 Registry 来源", async () => {
+  it("管理分组：列表之外并入检查更新与安装插件包（仅管理员）", async () => {
     const { host, root } = await renderWorkspace();
 
     // 主区不再带分组 tab，分组只由侧栏事件驱动
     expect(Array.from(host.querySelectorAll("button")).map((button) => button.textContent)).not.toContain("管理");
-    await openGroup("admin");
+    await openGroup("installed");
 
     const content = text(host);
-    expect(content).toContain("安装插件包");
     expect(content).toContain("检查更新");
-    expect(content).toContain("Registry 来源与国内镜像");
-    expect(content).toContain("开发者模式");
+    expect(content).toContain("安装插件包");
 
     act(() => { root.unmount(); });
   });
 
-  it("非管理员进入管理分组只看到权限提示", async () => {
+  it("配置分组：保留执行边界、Registry 来源与开发者模式", async () => {
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("config");
+
+    const content = text(host);
+    expect(content).toContain("执行边界");
+    expect(content).toContain("Registry 来源与国内镜像");
+    expect(content).toContain("开发者模式");
+    // 已搬去「管理」分组的内容不再出现在配置分组
+    expect(content).not.toContain("安装插件包");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("非管理员进入配置分组只看到权限提示", async () => {
     mocks.role = "user";
     const { host, root } = await renderWorkspace();
 
-    await openGroup("admin");
+    await openGroup("config");
 
     const content = text(host);
-    expect(content).toContain("插件管理仅对管理员开放");
+    expect(content).toContain("插件配置仅对管理员开放");
     expect(content).not.toContain("安装插件包");
+    expect(content).not.toContain("Registry 来源与国内镜像");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("非管理员进入管理分组只有插件列表，看不到更新与装包入口", async () => {
+    mocks.role = "user";
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("installed");
+
+    const content = text(host);
+    expect(content).not.toContain("检查更新");
+    expect(content).not.toContain("安装插件包");
+    expect(content).toContain("内置插件");
 
     act(() => { root.unmount(); });
   });

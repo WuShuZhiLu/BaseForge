@@ -6,11 +6,12 @@
  * - builtin：官方内置插件（builtin registry），页内启停 + 打开面板/主区；
  * - installed：已安装第三方插件（GET /plugins），管理员启停/回滚/卸载；
  * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
- * 页内 Tab 分组（内置/已安装/市场/管理）；侧栏点击内置插件 → nowen:plugin-selected 直达详情，
- * 侧栏点「市场」→ nowen:plugin-group 切到市场分组。
+ * 页内 Tab 分组（管理/市场/配置）；侧栏点击内置插件 → nowen:plugin-selected 直达详情，
+ * 侧栏点「市场」「管理」「配置」→ nowen:plugin-group 切到对应分组。
  *
- * 管理分组（仅管理员）收口原先在 设置 → 插件 里的全局能力：本地安装、检查更新、
- * Runtime 策略、Registry 来源、开发者模式；单插件配置在详情页「设置与运行」分区。
+ * 管理分组 = 已装列表 + 检查更新 + 安装插件包（原先 PluginAdminPanel 的两个分区并入同页）；
+ * 配置分组（仅管理员）保留 Registry 来源、执行边界、开发者模式；单插件配置在详情页
+ * 「设置与运行」分区。
  *
  * 选中状态经 nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
  * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
@@ -38,7 +39,11 @@ import { useAppActions } from "@/store/AppContext";
 import { pluginApi, type InstalledPlugin, type PluginPermissionRow } from "@/lib/pluginApi";
 import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import { PluginConfigSections } from "@/components/plugins/PluginConfigSections";
-import { PluginAdminPanel } from "@/components/plugins/PluginAdminPanel";
+import {
+  PluginConfigPanel,
+  PluginPackageInstallSection,
+  PluginUpdatesSection,
+} from "@/components/plugins/PluginAdminPanel";
 import { ExternalHostList } from "@/components/plugins/ExternalHostList";
 import {
   BUILTIN_ORIGIN_LABEL,
@@ -57,8 +62,8 @@ const BUILTIN_CHANGED_EVENT = "nowen:builtin-plugins-changed";
 const MARKET_SOURCE_ID = "official-v2";
 
 type DetailSource = "builtin" | "installed" | "catalog";
-/** 管理分组不对应任何可选中对象，只承载全局管理能力 */
-type GroupKey = DetailSource | "admin";
+/** 配置分组不对应任何可选中对象，只承载全局配置能力（Registry 来源/执行边界/开发者模式） */
+type GroupKey = DetailSource | "config";
 type CatalogExtension = Awaited<ReturnType<typeof pluginApi.registryCatalog>>[number];
 
 /** 与详情页共用的一份权限中文名（工作区的权限分区不再单独维护） */
@@ -80,9 +85,9 @@ const INSTALLED_STATUS_LABELS: Record<InstalledPlugin["status"], string> = {
 };
 
 const GROUP_TABS: Array<[GroupKey, string]> = [
-  ["installed", "已安装"],
+  ["installed", "管理"],
   ["catalog", "市场"],
-  ["admin", "管理"],
+  ["config", "配置"],
 ];
 
 function iconFor(plug: BuiltinPluginDef, size: number) {
@@ -459,7 +464,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
   onInstall: (extension: CatalogExtension) => void;
 }) {
   const latest = sortVersionsDesc(extension.versions)[0];
-  // 与插件市场的安装门槛一致：Node Runtime 插件需管理员先在「管理」分组放行
+  // 与插件市场的安装门槛一致：Node Runtime 插件需管理员先在「配置」分组放行
   const needsPolicy = extension.runtime === "node-action" && nodeRuntimeAllowed !== true;
   const permissions = latest?.permissions || [];
   // 市场索引里的外网白名单在版本级 permissionConfig（后端 ecosystemRegistry 原样透传）
@@ -519,7 +524,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
           )}
           {isAdmin && needsPolicy && (
             <p className="text-xs text-amber-600">
-              {nodeRuntimeAllowed === null ? "正在读取 Runtime 策略" : "此插件需要 Node Runtime，请先到本页「管理」分组放行"}
+              {nodeRuntimeAllowed === null ? "正在读取 Runtime 策略" : "此插件需要 Node Runtime，请先到本页「配置」分组放行"}
             </p>
           )}
         </div>
@@ -712,7 +717,7 @@ export default function PluginsWorkspace() {
     clearActionState();
   };
 
-  /** 分组导航在侧栏插件视图（内置/已安装/市场/管理），主区只跟事件跑，不再重复一排 tab。 */
+  /** 分组导航在侧栏插件视图（管理/市场/配置），主区只跟事件跑，不再重复一排 tab。 */
   const groupLabel = GROUP_TABS.find(([key]) => key === group)?.[1] ?? "";
 
   return (
@@ -722,7 +727,7 @@ export default function PluginsWorkspace() {
         <Puzzle size={18} className="shrink-0 text-tx-secondary" />
         <h2 className="text-[15px] font-semibold text-tx-primary">插件</h2>
         <span className="hidden truncate text-xs text-tx-tertiary sm:inline">
-          {detail ? "查看插件详情" : group === "admin" ? "安装源、更新与执行边界" : groupLabel}
+          {detail ? "查看插件详情" : group === "config" ? "安装源、执行边界与开发者模式" : groupLabel}
         </span>
         <span className="flex-1" />
         {detail ? (
@@ -815,8 +820,22 @@ export default function PluginsWorkspace() {
               </div>
             )}
 
-            {group === "admin" && (
-              <PluginAdminPanel
+            {/* 管理分组 = 列表 + 更新 + 本地安装，一页搞定（更新/装包仅管理员可见） */}
+            {group === "installed" && isAdmin && (
+              <>
+                <PluginUpdatesSection />
+                <PluginPackageInstallSection
+                  onInstalled={async () => {
+                    await refreshInstalled();
+                    goGroup("installed");
+                    clearActionState();
+                  }}
+                />
+              </>
+            )}
+
+            {group === "config" && (
+              <PluginConfigPanel
                 isAdmin={isAdmin}
                 onInstalled={async () => {
                   await refreshInstalled();
