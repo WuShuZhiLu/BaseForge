@@ -212,5 +212,6 @@ export const EDITOR_COMMAND_CONTRIBUTION_LIMITS = deepFreeze({
   "when": [
     "editorFocused",
     "noteOpen"
-  ]
+  ],
+  "maxCategoryLength": 20
 } as const);

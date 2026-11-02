@@ -45,6 +45,6 @@
   "noteTemplate": {"schemaVersion":1,"maxTemplatesPerPlugin":100,"maxBodyBytes":262144},
   "promptPack": {"schemaVersion":1,"maxPromptsPerPlugin":100,"maxPromptBytes":65536},
   "uiComponent": {"schemaVersion":1,"kinds":["action"],"slots":["floating-layer"],"actions":["navigation.open"],"maxComponentsPerPlugin":50},
-  "editorCommand": {"schemaVersion":1,"maxCommandsPerPlugin":50,"when":["editorFocused","noteOpen"]},
+  "editorCommand": {"schemaVersion":1,"maxCommandsPerPlugin":50,"when":["editorFocused","noteOpen"],"maxCategoryLength":20},
   "sidebarPanel": {"schemaVersion":1,"maxPanelsPerPlugin":10}
 }

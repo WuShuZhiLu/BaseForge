@@ -150,7 +150,6 @@ import {
   type ShareCenterRisk,
 } from "@/lib/shareCenter";
 import { loadPluginCounts, peekPluginCounts, PLUGIN_COUNTS_EVENT, type PluginCounts } from "@/lib/pluginCounts";
-import { requestPluginAdminFocus } from "@/lib/pluginAdminFocus";
 import {
   getShareCenterUiVersion,
   getShareGroup,
@@ -548,6 +547,32 @@ export default function SidebarDesktop() {
     }
     return "kb";
   });
+  // 挂载早于路由恢复的兜底：若挂载时 URL 还不是模块路径（如经登录重定向后才落到
+  // /plugins），等第一次 viewMode 变化（路由恢复驱动）时重读 URL 对齐一次。
+  // 只消费一次，且只对齐到 URL 当前的模块视图——不会随之后每次 viewMode 变化强改侧栏。
+  const pendingSidebarRouteAlignRef = useRef(getCurrentAppRoute().kind !== "module");
+  const alignPrevViewModeRef = useRef(state.viewMode);
+  useEffect(() => {
+    if (alignPrevViewModeRef.current === state.viewMode) return;
+    alignPrevViewModeRef.current = state.viewMode;
+    if (!pendingSidebarRouteAlignRef.current) return;
+    pendingSidebarRouteAlignRef.current = false;
+    const route = getCurrentAppRoute();
+    if (route.kind !== "module") return;
+    const map: Partial<Record<string, SidebarView>> = {
+      trash: "trash",
+      files: "files",
+      plugins: "plugins",
+      projects: "projects",
+      shares: "shares",
+      favorites: "kb",
+      notebook: "kb",
+    };
+    const v = map[route.viewMode];
+    if (v && sidebarView !== v) applySidebarView(v);
+    // applySidebarView 是稳定引用；sidebarView 只用于避免重复设置
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.viewMode]);
 
   // 收藏 / 回收站 / 文件管理数据
   const [starDocs, setStarDocs] = useState<NoteListItem[]>([]);
@@ -3457,21 +3482,6 @@ export default function SidebarDesktop() {
                   </div>
                 );
               })}
-            </div>
-            <div className="border-t border-app-border px-1 py-2">
-              <button
-                type="button"
-                className="w-full rounded-md border border-app-border bg-app-surface px-2 py-1.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
-                onClick={() => {
-                  setPlugCat("admin");
-                  window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: "admin" } }));
-                  // 落到管理分组后把「安装插件包」分区滚进视口并聚焦（否则视口停在更新区附近，像跳到了「更新」）
-                  requestPluginAdminFocus("install");
-                  if (state.viewMode !== "plugins") actions.setViewMode("plugins");
-                }}
-              >
-                安装本地插件
-              </button>
             </div>
           </div>
         )}

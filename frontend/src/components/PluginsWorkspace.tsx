@@ -12,7 +12,7 @@
  * 管理分组（仅管理员）收口原先在 设置 → 插件 里的全局能力：本地安装、检查更新、
  * Runtime 策略、Registry 来源、开发者模式；单插件配置在详情页「设置与运行」分区。
  *
- * 选中状态经 localStorage + nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
+ * 选中状态经 nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
  * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
  * README/Changelog/Dependencies 区块在 Registry V2 索引提供数据前隐藏。
  */
@@ -49,7 +49,6 @@ import {
   type BuiltinPluginId,
 } from "@/plugins/builtin/registry";
 
-const SELECTED_KEY = "nowen-plugins-workspace-selected";
 const PLUGIN_SELECTED_EVENT = "nowen:plugin-selected";
 /** 侧栏插件视图点「市场」→ 工作区切到对应分组 */
 const PLUGIN_GROUP_EVENT = "nowen:plugin-group";
@@ -531,14 +530,8 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
 }
 
 export default function PluginsWorkspace() {
-  const [selectedId, setSelectedId] = useState<BuiltinPluginId | null>(() => {
-    try {
-      const raw = localStorage.getItem(SELECTED_KEY);
-      return raw && BUILTIN_PLUGINS.some((p) => p.id === raw) ? (raw as BuiltinPluginId) : null;
-    } catch {
-      return null;
-    }
-  });
+  // /plugins 语义上默认进列表；选中态只由显式事件（侧栏点击 / 行点击）设置，不持久化
+  const [selectedId, setSelectedId] = useState<BuiltinPluginId | null>(null);
   // 页内分组 Tab + 非内置插件选中态（不持久化；侧栏仅联动内置插件）
   const [group, setGroup] = useState<GroupKey>("installed");
   const [installedSelection, setInstalledSelection] = useState<string | null>(null);
@@ -563,10 +556,11 @@ export default function PluginsWorkspace() {
     }
   }, []);
 
-  /** 分组切换统一出口：主区自己换分组（如安装后跳已安装）时也广播出去，侧栏分类跟着高亮 */
+  /** 分组切换统一出口：主区自己换分组（如安装后跳已安装）时也广播出去，侧栏分类跟着高亮。
+   *  自派事件带 source:"workspace"，onGroup 收到时不回清选中态（选中已由调用方显式管理）。 */
   const goGroup = useCallback((next: GroupKey) => {
     setGroup(next);
-    window.dispatchEvent(new CustomEvent(PLUGIN_GROUP_EVENT, { detail: { group: next } }));
+    window.dispatchEvent(new CustomEvent(PLUGIN_GROUP_EVENT, { detail: { group: next, source: "workspace" } }));
   }, []);
 
   useEffect(() => {
@@ -583,11 +577,17 @@ export default function PluginsWorkspace() {
       setInstalledSelection(id);
       goGroup("installed");
     };
-    // 侧栏插件视图的「市场」分类 → 切到本页的市场分组
+    // 侧栏插件视图的「市场」分类 → 切到本页的市场分组；外部切分组即回列表态，
+    // 否则详情页还挂着，看起来像点击没反应。主区自派的分组事件不动选中态。
     const onGroup = (event: Event) => {
-      const next = (event as CustomEvent<{ group?: GroupKey }>).detail?.group;
+      const detail = (event as CustomEvent<{ group?: GroupKey; source?: string }>).detail;
+      const next = detail?.group;
       if (!next || !GROUP_TABS.some(([key]) => key === next)) return;
       setGroup(next);
+      if (detail?.source === "workspace") return;
+      setSelectedId(null);
+      setInstalledSelection(null);
+      setCatalogSelection(null);
       setActionError("");
     };
     const onChanged = () => setVersion((v) => v + 1);
@@ -639,7 +639,6 @@ export default function PluginsWorkspace() {
         : null;
 
   const selectBuiltin = (id: BuiltinPluginId) => {
-    try { localStorage.setItem(SELECTED_KEY, id); } catch { /* ignore */ }
     setSelectedId(id);
     setInstalledSelection(null);
     goGroup("installed");

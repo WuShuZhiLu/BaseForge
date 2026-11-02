@@ -1076,16 +1076,29 @@ export function getDefaultSlashCommands(
 /**
  * 已启用插件声明的编辑器命令（`contributes.editorCommands`）：与内置项同形，
  * 执行时走插件 Action 通道，因此斜杠菜单无需感知插件细节。
+ * 分组按声明的 category 归类（同一 category 的命令排在一起，组名即 category；
+ * 未声明时归入「插件」缺省组）。
  */
 export function getPluginSlashCommands(noteId?: string | null): SlashCommandItem[] {
-  return listPluginEditorCommands().map((command) => {
+  const registered = listPluginEditorCommands();
+  // 同一 category 的命令排在一起（菜单按相邻 category 渲染分组头）；
+  // 缺省组固定在最后，其余按组名稳定排序（同组保持声明顺序）。
+  const ordered = registered
+    .map((command, index) => ({ command, index, group: command.category || "" }))
+    .sort((a, b) => {
+      if (a.group === b.group) return a.index - b.index;
+      if (a.group === "") return 1;
+      if (b.group === "") return -1;
+      return a.group.localeCompare(b.group);
+    });
+  return ordered.map(({ command }) => {
     const shortcut = command.chord ? formatKeybinding(command.chord) : "";
     return {
       id: `plugin:${command.id}`,
       label: command.title,
       description: shortcut ? `插件 · ${command.pluginId} · ${shortcut}` : `插件 · ${command.pluginId}`,
       icon: <Puzzle size={16} />,
-      category: "插件",
+      category: command.category || "插件",
       keywords: [...command.keywords, "plugin", "插件", command.pluginId, command.localId],
       action: () => {
         void executePluginEditorCommand(command, { noteId }).catch((error: unknown) => {

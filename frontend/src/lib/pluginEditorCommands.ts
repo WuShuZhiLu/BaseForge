@@ -30,6 +30,8 @@ export interface RegisteredPluginEditorCommand {
   /** 已校验的快捷键组合；非法或未声明时为 undefined（仅出现在斜杠菜单） */
   chord?: ShortcutChord;
   when?: PluginEditorCommandWhen;
+  /** 斜杠菜单分组名（1-20 字，缺省「插件」） */
+  category?: string;
   action: string;
 }
 
@@ -77,7 +79,7 @@ function normalizeKeywords(value: unknown): string[] {
 function toRegistered(pluginId: string, contribution: unknown): RegisteredPluginEditorCommand | null {
   if (!contribution || typeof contribution !== "object" || Array.isArray(contribution)) return null;
   const item = contribution as {
-    id?: unknown; title?: unknown; keywords?: unknown; keybinding?: unknown; when?: unknown; action?: unknown;
+    id?: unknown; title?: unknown; keywords?: unknown; keybinding?: unknown; when?: unknown; category?: unknown; action?: unknown;
   };
   if (typeof item.id !== "string" || !item.id.startsWith(`${pluginId}.`)) return null;
   const localId = item.id.slice(pluginId.length + 1);
@@ -88,6 +90,10 @@ function toRegistered(pluginId: string, contribution: unknown): RegisteredPlugin
   const when = typeof item.when === "string" && SUPPORTED_WHEN.has(item.when as PluginEditorCommandWhen)
     ? (item.when as PluginEditorCommandWhen)
     : undefined;
+  // 分组名：与后端 manifest 校验同规则（1-20 字）；非法/缺省交给展示层兜底
+  const category = typeof item.category === "string" && item.category.length > 0 && item.category.length <= 20
+    ? item.category
+    : undefined;
   return {
     id: item.id,
     pluginId,
@@ -96,6 +102,7 @@ function toRegistered(pluginId: string, contribution: unknown): RegisteredPlugin
     keywords: normalizeKeywords(item.keywords),
     ...(chord ? { chord } : {}),
     ...(when ? { when } : {}),
+    ...(category ? { category } : {}),
     action: item.action,
   };
 }

@@ -335,12 +335,20 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     window.addEventListener("nowen:sidebar-view", onSwitch);
     return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
   }, []);
-  // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮
+  // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮。
+  // 刷新/深链恢复时不经 Rail 点击（没有 nowen:sidebar-view 事件），各模块视图
+  // 都要按 viewMode 补齐高亮——否则刷新 /plugins 后高亮停在知识库。
   useEffect(() => {
     if (state.viewMode === "favorites") setActiveView("star");
     else if (state.viewMode === "trash") setActiveView("trash");
     else if (state.viewMode === "files") setActiveView("files");
     else if (state.viewMode === "notebook") setActiveView("kb");
+    else if (state.viewMode === "plugins") setActiveView("plugins");
+    else if (state.viewMode === "shares") setActiveView("shares");
+    else if (state.viewMode === "projects") setActiveView("projects");
+    else if (state.viewMode === "tasks") setActiveView("tasks");
+    else if (state.viewMode === "diary") setActiveView("diary");
+    else if (state.viewMode === "ai-chat") setActiveView("ai-chat");
   }, [state.viewMode]);
 
   const activeMode: NavItemMode | null = useMemo(() => {

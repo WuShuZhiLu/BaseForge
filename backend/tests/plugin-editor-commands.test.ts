@@ -43,6 +43,43 @@ test("editorCommands 与已声明 Action 一起通过 V2 校验", () => {
   assert.equal(manifest.apiVersion === 2 && manifest.runtime !== "declarative" ? manifest.contributes?.editorCommands?.length : 0, 2);
 });
 
+test("editorCommands category：合法值保留，缺省与超长分别通过/拒绝", () => {
+  const firstCategory = (value: unknown): string | undefined => {
+    const manifest = parsePluginManifest(value);
+    return manifest.apiVersion === 2 && manifest.runtime !== "declarative"
+      ? manifest.contributes?.editorCommands?.[0]?.category
+      : undefined;
+  };
+
+  // 合法：1-20 字的自定义分组名原样保留
+  const withCategory = {
+    ...raw,
+    contributes: { editorCommands: [{ id: "nowenlab.editor-kit.timestamp", title: "x", category: "示例", action: "insert-timestamp" }] },
+  };
+  assert.equal(firstCategory(withCategory), "示例");
+
+  // 缺省：不报错，字段保持 undefined（前端展示层兜底为「插件」）
+  const withoutCategory = {
+    ...raw,
+    contributes: { editorCommands: [{ id: "nowenlab.editor-kit.timestamp", title: "x", action: "insert-timestamp" }] },
+  };
+  assert.equal(firstCategory(withoutCategory), undefined);
+
+  // 超长：超过 20 字拒绝
+  const tooLong = {
+    ...raw,
+    contributes: { editorCommands: [{ id: "nowenlab.editor-kit.timestamp", title: "x", category: "a".repeat(21), action: "insert-timestamp" }] },
+  };
+  assert.match(firstIssue(tooLong), /at most 20/);
+
+  // 空串：min(1) 拒绝
+  const empty = {
+    ...raw,
+    contributes: { editorCommands: [{ id: "nowenlab.editor-kit.timestamp", title: "x", category: "", action: "insert-timestamp" }] },
+  };
+  assert.match(firstIssue(empty), /at least 1 character/);
+});
+
 test("editorCommands id 必须是 插件id.动作 前缀命名", () => {
   const wrongPrefix = { ...raw, contributes: { editorCommands: [{ id: "other.plugin.timestamp", title: "x", action: "insert-timestamp" }] } };
   assert.match(firstIssue(wrongPrefix), /Editor Command id 必须形如 nowenlab\.editor-kit\.<动作>/);

@@ -30,6 +30,7 @@
         "keywords": ["hello", "greeting", "问候"],
         "keybinding": "Mod-Alt-H",
         "when": "editorFocused",
+        "category": "示例",
         "action": "hello"
       }
     ]

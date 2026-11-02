@@ -268,6 +268,8 @@ export interface PluginEditorCommandContribution {
   /** 形如 Mod-Alt-K；修饰键仅支持 Mod/Alt/Shift */
   keybinding?: string;
   when?: PluginEditorCommandWhen;
+  /** 斜杠菜单分组名（1-20 字，缺省「插件」），与契约 editorCommand.maxCategoryLength 一致 */
+  category?: string;
   /** 指向同一插件已声明的 Action id */
   action: string;
 }

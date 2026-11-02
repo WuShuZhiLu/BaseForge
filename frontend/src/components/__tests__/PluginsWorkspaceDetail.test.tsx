@@ -2,7 +2,7 @@
 
 /**
  * PluginsWorkspace 详情页冒烟测试：
- * - 内置插件：localStorage 预选 → 渲染名称/版本/功能贡献区；
+ * - 内置插件：nowen:plugin-selected 事件选中 → 渲染名称/版本/功能贡献区；
  * - 已安装插件：mock pluginApi.list → 页内选中 → 渲染唯一 ID/版本历史/权限区。
  */
 import React, { act } from "react";
@@ -148,8 +148,13 @@ afterEach(() => {
 
 describe("PluginsWorkspace 插件详情页", () => {
   it("内置插件：渲染名称、版本与功能贡献区", async () => {
-    localStorage.setItem("nowen-plugins-workspace-selected", "tasks");
     const { host, root } = await renderWorkspace();
+
+    // 选中态只由显式事件设置：侧栏点行 → nowen:plugin-selected 直达详情
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: "tasks" } }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     const content = text(host);
     expect(content).toContain("待办事项");

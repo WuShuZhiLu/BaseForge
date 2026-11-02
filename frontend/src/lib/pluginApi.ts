@@ -80,6 +80,8 @@ export interface PluginEditorCommandContribution {
   keywords?: string[];
   keybinding?: string;
   when?: PluginEditorCommandWhen;
+  /** 斜杠菜单分组名（1-20 字，缺省「插件」） */
+  category?: string;
   action: string;
 }
 

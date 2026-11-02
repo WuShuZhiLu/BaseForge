@@ -261,6 +261,8 @@ const editorCommandSchema = z.object({
   keywords: z.array(z.string().min(1).max(50)).max(10).optional(),
   keybinding: z.string().min(1).max(50).optional(),
   when: z.enum(["editorFocused", "noteOpen"]).optional(),
+  /** 斜杠菜单分组名（缺省「插件」）；长度上限与契约 editorCommand.maxCategoryLength 一致 */
+  category: z.string().min(1).max(20).optional(),
   action: z.string().min(1).max(64),
 }).strict().superRefine((command, ctx) => {
   if (command.keybinding === undefined) return;
