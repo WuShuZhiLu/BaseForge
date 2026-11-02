@@ -1,5 +1,12 @@
 export const PLUGIN_API_VERSION = 2;
-export const NOWEN_VERSION = "1.5.0";
+/**
+ * 宿主对插件声明的兼容版本基线（对应上游 nowen note 的功能层级）。
+ * 本仓库基线是 v1.5.1（上游 tag bd6f4f73），此前误写 1.5.0，导致 examples 里
+ * 声明 `nowen >=1.5.1` 的插件装不上——宿主明明包含 1.5.1 的全部能力却自称 1.5.0。
+ * 注意：不要为了"让某个插件装上"随手抬高，这个值是对插件开发者的能力承诺。
+ */
+export const NOWEN_VERSION = "1.5.1";
+/** v2.1 扩展平台的目标版本：低于此版本的宿主不启用 extensionsV21 相关贡献点 */
 export const EXTENSION_V21_TARGET_NOWEN_VERSION = "1.6.0";
 
 export interface ExtensionPlatformFeatureFlags {
