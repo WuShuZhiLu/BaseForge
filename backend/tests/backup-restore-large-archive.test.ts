@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { loadSqliteVec } from "../src/db/sqlite-vec-extension.js";
 
@@ -58,7 +58,9 @@ async function writeFullBackup(
 ): Promise<string> {
   const snapshot = path.join(backupDir, `snapshot-${crypto.randomUUID()}.db`);
   await getDb().backup(snapshot);
-  const snapshotDb = new Database(snapshot);
+  // 与运行时同驱动（node:sqlite）：跨驱动重复加载 vec0 会让扩展的全局
+  // sqlite3_api 指针被覆盖，随后访问虚表直接原生崩溃。
+  const snapshotDb = new DatabaseSync(snapshot, { allowExtension: true });
   try {
     assert.equal(loadSqliteVec(snapshotDb).loaded, true);
     snapshotDb.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)")

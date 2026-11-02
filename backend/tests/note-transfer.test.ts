@@ -2,24 +2,41 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test, { after, beforeEach } from "node:test";
+import test, { after, before, beforeEach } from "node:test";
+import type { DatabaseSync } from "node:sqlite";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-transfer-"));
 process.env.DB_PATH = path.join(tempDir, "test.db");
 process.env.ELECTRON_USER_DATA = tempDir;
 process.env.JWT_SECRET = "note-transfer-test-secret";
 
-const { closeDb, getDb } = await import("../src/db/schema.js");
-const { initAuditTables } = await import("../src/services/audit.js");
-const {
-  executeNoteTransfer,
-  NoteTransferError,
-  previewNoteTransfer,
-} = await import("../src/services/noteTransfer.js");
-const { getAttachmentsDir } = await import("../src/services/attachment-storage.js");
+// 这些模块在加载期就会读 DB_PATH / ELECTRON_USER_DATA（比如 ATTACHMENTS_DIR），
+// 所以必须等上面的 env 赋值之后才 import。改用 before() 内的动态 import 保证顺序，
+// 同时避免顶层 await —— tsx 按 CJS 转译 .ts 时不支持顶层 await。
+let db: DatabaseSync;
+let closeDb: () => void;
+let initAuditTables: () => void;
+let getAttachmentsDir: () => string;
+let executeNoteTransfer: typeof import("../src/services/noteTransfer.js").executeNoteTransfer;
+let previewNoteTransfer: typeof import("../src/services/noteTransfer.js").previewNoteTransfer;
+let NoteTransferError: typeof import("../src/services/noteTransfer.js").NoteTransferError;
 
-const db = getDb();
-initAuditTables();
+before(async () => {
+  const schema = await import("../src/db/schema.js");
+  const audit = await import("../src/services/audit.js");
+  const transfer = await import("../src/services/noteTransfer.js");
+  const storage = await import("../src/services/attachment-storage.js");
+
+  db = schema.getDb();
+  closeDb = schema.closeDb;
+  initAuditTables = audit.initAuditTables;
+  getAttachmentsDir = storage.getAttachmentsDir;
+  executeNoteTransfer = transfer.executeNoteTransfer;
+  previewNoteTransfer = transfer.previewNoteTransfer;
+  NoteTransferError = transfer.NoteTransferError;
+
+  initAuditTables();
+});
 
 const NOTE_ONE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const NOTE_TWO = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

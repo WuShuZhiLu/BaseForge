@@ -2,22 +2,42 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test, { after, beforeEach } from "node:test";
+import test, { after, before, beforeEach } from "node:test";
+import type { DatabaseSync } from "node:sqlite";
+import type { Hono } from "hono";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-transfer-hardening-"));
 process.env.DB_PATH = path.join(tempDir, "test.db");
 process.env.ELECTRON_USER_DATA = tempDir;
 process.env.JWT_SECRET = "note-transfer-hardening-test-secret";
 
-const { closeDb, getDb } = await import("../src/db/schema.js");
-const { initAuditTables } = await import("../src/services/audit.js");
-const { getAttachmentsDir } = await import("../src/services/attachment-storage.js");
-const { executeNoteTransferSafe } = await import("../src/services/noteTransferSafety.js");
-const { NoteTransferError } = await import("../src/services/noteTransfer.js");
-const noteTransfersRouter = (await import("../src/routes/note-transfers.js")).default;
+// 这些模块在加载期就会读 DB_PATH / ELECTRON_USER_DATA，所以必须等上面的 env 赋值之后
+// 才 import。用 before() 内的动态 import 保证顺序，并避免顶层 await（tsx 按 CJS
+// 转译 .ts 时不支持顶层 await）。
+let db: DatabaseSync;
+let closeDb: () => void;
+let getAttachmentsDir: () => string;
+let executeNoteTransferSafe: typeof import("../src/services/noteTransferSafety.js").executeNoteTransferSafe;
+let NoteTransferError: typeof import("../src/services/noteTransfer.js").NoteTransferError;
+let noteTransfersRouter: Hono;
 
-const db = getDb();
-initAuditTables();
+before(async () => {
+  const schema = await import("../src/db/schema.js");
+  const audit = await import("../src/services/audit.js");
+  const storage = await import("../src/services/attachment-storage.js");
+  const safety = await import("../src/services/noteTransferSafety.js");
+  const transfer = await import("../src/services/noteTransfer.js");
+  const router = await import("../src/routes/note-transfers.js");
+
+  db = schema.getDb();
+  closeDb = schema.closeDb;
+  getAttachmentsDir = storage.getAttachmentsDir;
+  executeNoteTransferSafe = safety.executeNoteTransferSafe;
+  NoteTransferError = transfer.NoteTransferError;
+  noteTransfersRouter = router.default;
+
+  audit.initAuditTables();
+});
 
 const NOTE_ONE = "11111111-1111-4111-8111-111111111111";
 const NOTE_TWO = "22222222-2222-4222-8222-222222222222";

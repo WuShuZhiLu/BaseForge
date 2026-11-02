@@ -390,7 +390,9 @@ function cleanupWalShm(dbPath: string): void {
 function checkSqliteIntegrity(dbPath: string, label: string): void {
   let db: DatabaseSync | null = null;
   try {
-    db = new DatabaseSync(dbPath, { readOnly: true });
+    // allowExtension：备份里可能存着 vec0 虚表，node:sqlite 默认禁止 loadExtension，
+    // 不开这个开关会让"含向量索引的备份"直接卡在完整性检查（no such module: vec0）。
+    db = new DatabaseSync(dbPath, { readOnly: true, allowExtension: true });
     requireSqliteVecForStoredTables(db, label);
     const row = db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     if (row.integrity_check !== "ok") {
@@ -1375,7 +1377,7 @@ export class BackupManager {
         // 用 node:sqlite 直接打开（独立连接）
         let tmp: DatabaseSync | null = null;
         try {
-          tmp = new DatabaseSync(tmpDb, { readOnly: true });
+          tmp = new DatabaseSync(tmpDb, { readOnly: true, allowExtension: true });
           requireSqliteVecForStoredTables(tmp, "备份预览");
         } catch (e) {
           try { tmp?.close(); } catch { /* ignore */ }
@@ -1599,8 +1601,7 @@ export class BackupManager {
   private async restoreFromDbOnly(filePath: string, dryRun: boolean): Promise<RestoreResult> {
     if (dryRun) {
       // 用 readonly 临时打开备份 DB，统计行数
-      const Database = (await import("better-sqlite3")).default;
-      const tmp = new DatabaseSync(filePath, { readOnly: true });
+      const tmp = new DatabaseSync(filePath, { readOnly: true, allowExtension: true });
       try {
         requireSqliteVecForStoredTables(tmp, "备份预览");
       } catch (error) {

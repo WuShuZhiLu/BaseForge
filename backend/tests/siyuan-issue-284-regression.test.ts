@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test, { after, before } from "node:test";
+import type { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-issue-284-"));
@@ -14,9 +15,13 @@ const WORKSPACE_ID = "issue-284-workspace";
 const MARKDOWN_NOTEBOOK_ID = "issue-284-markdown";
 const RICH_NOTEBOOK_ID = "issue-284-rich";
 
-const { closeDb, getDb } = await import("../src/db/schema.js");
-const { importSiyuanPackageFromZipFile } = await import("../src/services/siyuanPackageImport.js");
-const db = getDb();
+// 模块在加载期会读 DB_PATH / ELECTRON_USER_DATA，必须等上面的 env 赋值之后再 import。
+// 放进 before() 里做动态 import，既保证顺序，也避免顶层 await（tsx 按 CJS 转译 .ts
+// 时不支持顶层 await）。
+let db: DatabaseSync;
+let closeDb: () => void;
+let importSiyuanPackageFromZipFile:
+  typeof import("../src/services/siyuanPackageImport.js").importSiyuanPackageFromZipFile;
 
 function fixturePath(): string {
   const relative = path.join("tests", "fixtures", "siyuan", "issue-284", "20260719010101-demo284.sy");
@@ -50,7 +55,14 @@ function flatten(node: TiptapNode): TiptapNode[] {
   return [node, ...(node.content || []).flatMap(flatten)];
 }
 
-before(() => {
+before(async () => {
+  const schema = await import("../src/db/schema.js");
+  const siyuanImport = await import("../src/services/siyuanPackageImport.js");
+
+  db = schema.getDb();
+  closeDb = schema.closeDb;
+  importSiyuanPackageFromZipFile = siyuanImport.importSiyuanPackageFromZipFile;
+
   db.prepare("INSERT INTO users (id, username, passwordHash) VALUES (?, ?, 'x')").run(USER_ID, USER_ID);
   db.prepare("INSERT INTO workspaces (id, name, ownerId) VALUES (?, ?, ?)").run(WORKSPACE_ID, "Issue 284", USER_ID);
   db.prepare("INSERT INTO workspace_members (workspaceId, userId, role) VALUES (?, ?, 'owner')").run(WORKSPACE_ID, USER_ID);

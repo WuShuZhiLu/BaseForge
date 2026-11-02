@@ -193,7 +193,9 @@ export function upsertVectors(
         continue;
       }
       const buf = Buffer.from(new Float32Array(r.vector).buffer);
-      stmt.run(r.rowid, buf);
+      // vec0 的 rowid 是 INTEGER PRIMARY KEY：node:sqlite 把 JS number 按 REAL 绑定，
+      // 传 number 会报 "Only integers are allows for primary key values"，必须转 BigInt。
+      stmt.run(BigInt(r.rowid), buf);
       written++;
     }
   });
@@ -211,7 +213,8 @@ export function deleteVectorsByRowids(rowids: number[]): number {
   const placeholders = rowids.map(() => "?").join(",");
   const info = db.prepare(
     `DELETE FROM vec_note_chunks WHERE rowid IN (${placeholders})`,
-  ).run(...rowids);
+    // rowid 比对同样要求整数类型，统一转 BigInt（见上方 insert 的注释）
+  ).run(...rowids.map((id) => BigInt(id)));
   return info.changes as number;
 }
 

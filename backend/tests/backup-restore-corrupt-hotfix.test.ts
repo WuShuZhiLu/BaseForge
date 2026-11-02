@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { loadSqliteVec } from "../src/db/sqlite-vec-extension.js";
 
@@ -77,7 +77,10 @@ function assertNoWalShm() {
 async function createBackupDb(marker: string) {
   const backupDbPath = path.join(backupDir, `valid-${crypto.randomUUID()}.db`);
   await getDb().backup(backupDbPath);
-  const db = new Database(backupDbPath);
+  // 与运行时同驱动（node:sqlite）。这里若用另一套 SQLite（better-sqlite3）再加载
+  // 同一个 vec0 扩展，扩展的全局 sqlite3_api 指针会被后加载方覆盖，回主连接访问
+  // vec0 虚表时直接原生崩溃（0xC0000005）。
+  const db = new DatabaseSync(backupDbPath, { allowExtension: true });
   try {
     assert.equal(loadSqliteVec(db).loaded, true);
     db.prepare("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)").run(markerKey, marker);
