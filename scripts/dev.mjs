@@ -1,6 +1,6 @@
 import path from "node:path"
 import process from "node:process"
-import { spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { forceReleasePorts } from "./dev-port-manager.mjs"
@@ -59,6 +59,33 @@ assertFile(tsxCli, "npm run install:all")
 assertFile(viteCli, "npm run install:all")
 assertFile(backendEntry, "确认 backend/src/index.hardened.ts 是否存在")
 assertFile(viteDevConfig, "确认 frontend/vite.dev.config.ts 是否存在")
+
+// 原生模块 ABI 必须与运行时一致：better-sqlite3 是按 node 22（ABI 127）编译的，
+// 若用 node 24（ABI 137）启动会在后端启动瞬间 ERR_DLOPEN_FAILED，且报错埋在日志里很难辨认。
+// 这里先探一次，失败即给出可直接执行的修复命令。
+console.log("[dev] 检查原生模块与当前 node 的 ABI 是否匹配…")
+{
+  const probe = spawnSync(
+    process.execPath,
+    ["-e", "require('better-sqlite3')"],
+    { cwd: backendDir, encoding: "utf8" },
+  )
+  if (probe.status !== 0) {
+    console.error(
+      [
+        "",
+        `[dev] better-sqlite3 无法在当前 node 下加载（当前 ${process.version}，ABI ${process.versions.modules}）。`,
+        "      常见原因：PATH 里的 node 不是 22（比如系统装了 node 24），ABI 与已编译的原生模块不一致。",
+        "      任选其一修复：",
+        "        1) 用 node 22 启动：nvm use 22（或把 node 22 放到 PATH 前面）后重跑 npm run dev",
+        "        2) 固化到当前 node：",
+        `           cd backend/node_modules/better-sqlite3 && npx prebuild-install --runtime node --target ${process.versions.node} --arch ${process.arch} --platform ${process.platform}`,
+        "",
+      ].join("\n"),
+    )
+    process.exit(1)
+  }
+}
 
 console.log("\n[dev] 正在检查开发端口...")
 try {
