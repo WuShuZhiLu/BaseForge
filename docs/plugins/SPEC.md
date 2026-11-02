@@ -405,8 +405,10 @@ token 规则：颜色 token（`surface` `text` `heading` `muted` `border` `accen
 | 注册表刷新 | 每次拉取 `/plugins/contributions` 全量替换；插件停用/卸载后命令随之注销，不残留快捷键 |
 | 支持范围 | 斜杠菜单目前只接了 Tiptap（`getDefaultSlashCommands`）；Markdown 编辑器的 `MarkdownSlashMenu` 尚未接入插件命令，但**快捷键对所有编辑器通用**（`.cm-editor` 也在焦点判定内） |
 
-前端会按与后端一致的正则**再校验一次**，不通过的条目（id 前缀不匹配、`title` 超长、`keywords` 元素超 50 字符等）
-不会注册、也不会报错——排障时先确认命令是否真的注册上了。修饰键大小写的错误更早：安装期就会被拒。
+前端会按与后端一致的正则**再校验一次**，分两档处理：`id` 前缀/localId、`title`、`action` 不合法 →
+**整条命令跳过**（斜杠菜单里不出现，无报错无日志）；`keybinding` 非法 → 命令仍可用但**不绑快捷键**，
+`when` 未知值 → 忽略并回落 `editorFocused`，`keywords` 单项非法 → 只丢该项（整体非数组当空数组，超 10 项截断）。
+排障时先确认命令是否真的注册上了。修饰键大小写的错误更早：安装期就会被拒。
 
 
 ---
