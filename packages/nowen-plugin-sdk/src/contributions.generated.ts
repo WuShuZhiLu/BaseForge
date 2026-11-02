@@ -132,10 +132,12 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     "id": "sidebarPanels",
     "since": "2.2",
     "runtimes": [
-      "declarative"
+      "declarative",
+      "sandbox-js",
+      "node-action"
     ],
     "declarative": true,
-    "description": "Declarative sidebar panels rendered by the host inside the sidebar panel container"
+    "description": "Host-rendered sidebar panels; any runtime may declare them, the host renders the content declaratively"
   },
   {
     "id": "uiComponents",

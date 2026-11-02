@@ -24,6 +24,9 @@ export const PLUGIN_PERMISSIONS = [
   "notebooks:read", "notebooks:write",
   "tags:read", "tags:write",
   "tasks:read", "tasks:write",
+  // attachments:write 目前没有对应的 Host 方法（host-api-contract 只有 attachments.get / list），
+  // 保留只是为了不破坏已发布的 v1 manifest；Plugin API V2 会直接拒绝声明它。
+  // 等真正开放附件写入再补方法，否则新插件不要请求这个权限。
   "attachments:read", "attachments:write",
   "diary:read", "diary:write",
   "mindmaps:read", "mindmaps:write",

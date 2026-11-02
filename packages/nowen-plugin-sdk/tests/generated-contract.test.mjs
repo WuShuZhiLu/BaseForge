@@ -37,7 +37,10 @@ test("contribution contract v6 声明 sidebarPanels / mainViewPanels，且不再
   const sidebarPanels = CONTRIBUTION_CONTRACT.find((entry) => entry.id === "sidebarPanels");
   assert.equal(sidebarPanels.since, "2.2");
   assert.equal(sidebarPanels.declarative, true);
-  assert.deepEqual([...sidebarPanels.runtimes], ["declarative"]);
+  // 契约原写 declarative-only，但宿主 manifest schema 与 contributions() 都不按 runtime 过滤，
+  // sandbox-js / node-action 插件声明面板本来就能装上；契约按实际行为放开，避免"文档说不行、
+  // 实际能装"的偏差。
+  assert.deepEqual([...sidebarPanels.runtimes], ["declarative", "sandbox-js", "node-action"]);
 
   // activityBadges 已从契约移除：宿主 manifest schema 从未支持该字段（strict 会拒），
   // 契约却对外宣称可用，属于"承诺了但装不上"。等真正实现（schema + 渲染）再加回来。

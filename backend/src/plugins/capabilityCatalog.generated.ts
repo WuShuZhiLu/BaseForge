@@ -7,7 +7,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "8423187ffe5a182b97fc4063648152ea6edbd48b610ecb65a0d017861044e3b4" as const;
+export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "70439f1ebc136f239b072edb3fd01b915b6d240bd608d64eb4ea74c40887202c" as const;
 export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
   "catalogVersion": 1,
   "hostApi": {
@@ -1159,10 +1159,12 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "id": "sidebarPanels",
         "since": "2.2",
         "runtimes": [
-          "declarative"
+          "declarative",
+          "sandbox-js",
+          "node-action"
         ],
         "declarative": true,
-        "description": "Declarative sidebar panels rendered by the host inside the sidebar panel container"
+        "description": "Host-rendered sidebar panels; any runtime may declare them, the host renders the content declaratively"
       },
       {
         "id": "uiComponents",
