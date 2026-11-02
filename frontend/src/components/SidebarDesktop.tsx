@@ -3439,7 +3439,6 @@ export default function SidebarDesktop() {
                   </div>
                 );
               })}
-              <p className="sbx-view-empty">已启用的插件在左侧导航栏直接打开，此处不再重复列。</p>
             </div>
             <div className="border-t border-app-border px-1 py-2">
               <button
