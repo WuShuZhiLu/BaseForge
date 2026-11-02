@@ -87,7 +87,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`FAIL ${error?.code ? `[${error.code}] ` : ""}${error?.message || error}`);
+  const headline = error?.issues?.[0]?.message || error?.message || String(error);
+  console.error(`FAIL ${error?.code ? `[${error.code}] ` : ""}${headline}`);
   if (error?.issues) for (const issue of error.issues) console.error(`     - ${issue.path?.join(".") || "(root)"}: ${issue.message}`);
   process.exit(1);
 });

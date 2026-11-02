@@ -399,15 +399,15 @@ token 规则：颜色 token（`surface` `text` `heading` `muted` `border` `accen
 | --- | --- |
 | `when` 缺省 | 按 `editorFocused` 处理，不会在普通输入框/侧栏抢键。`editorFocused` 的判定是：事件目标 `isContentEditable`，或 `closest(".ProseMirror, .cm-editor, [data-editor-root]")` 命中。`noteOpen` 只要求当前有打开的笔记（`!!noteId`），不要求焦点 |
 | `Mod` 语义 | macOS → `metaKey`（⌘），其他平台 → `ctrlKey`；`Alt`→`altKey`、`Shift`→`shiftKey` 严格相等匹配 |
-| 大小写 | **主按键**大小写不敏感（解析时统一转大写，`Mod-Alt-k` ≡ `Mod-Alt-K`）；**修饰键必须精确写 `Mod`/`Alt`/`Shift`**，写成 `mod-alt-k` 会在前端被判非法并**静默丢弃**（该命令只剩斜杠菜单入口，没有快捷键） |
+| 大小写 | **主按键**大小写不敏感（解析时统一转大写，`Mod-Alt-k` ≡ `Mod-Alt-K`）；**修饰键必须精确写 `Mod`/`Alt`/`Shift`**，`mod-alt-k` 在**安装期**就被后端拒（`快捷键修饰键只支持 Mod / Alt / Shift`）。若历史记录绕过安装校验，前端解析同样失败并**静默不注册快捷键**（命令仍出现在斜杠菜单） |
 | 展示形式 | 平台化渲染，如 `Ctrl+Alt+K` / `⌘⌥K` |
 | 按键拦截 | `PluginEditorCommandBridge` 在捕获阶段监听，命中且 `when` 成立时 `preventDefault()`，再经既有插件 Action 通道执行 |
 | 执行入参 | 只传该 Action `input` **显式声明过**的字段；目前最多带 `noteId`，且仅当声明了 `noteId` 才带，否则传 `{}`。未声明的字段永不注入（否则 `validateActionInput` 会以"未知参数"拒绝） |
 | 注册表刷新 | 每次拉取 `/plugins/contributions` 全量替换；插件停用/卸载后命令随之注销，不残留快捷键 |
 | 支持范围 | 斜杠菜单目前只接了 Tiptap（`getDefaultSlashCommands`）；Markdown 编辑器的 `MarkdownSlashMenu` 尚未接入插件命令，但**快捷键对所有编辑器通用**（`.cm-editor` 也在焦点判定内） |
 
-前端会按与后端一致的正则**再校验一次**，不通过的条目（含 `mod-alt-k` 这种修饰键大小写错误、id 前缀不匹配、
-`title` 超长）不会注册，也不会报错——排障时先确认命令是否真的注册上了。
+前端会按与后端一致的正则**再校验一次**，不通过的条目（id 前缀不匹配、`title` 超长、`keywords` 元素超 50 字符等）
+不会注册、也不会报错——排障时先确认命令是否真的注册上了。修饰键大小写的错误更早：安装期就会被拒。
 
 
 ---
@@ -494,7 +494,13 @@ token 规则：颜色 token（`surface` `text` `heading` `muted` `border` `accen
 
 ## 8. 校验与打包命令
 
+> `examples/plugins/my-plugin` 是脚手架的**生成产物**，仓库里默认没有这个目录；先跑下面第 4 条命令生成，
+> 再执行其余命令。校验器可以指向任意插件目录，也可以指向已打包的插件包。
+
 ```sh
+# 生成骨架（内部会自动跑一次下面的校验）
+node scripts/create-plugin.mjs my-plugin
+
 # 用后端真实校验链验证目录（manifest zod → ZIP 规则 → 资源存在性 → 限额 → sha256）
 node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs examples/plugins/my-plugin
 
@@ -505,9 +511,6 @@ node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs \
 # 声明式/受门禁贡献需要指定宿主版本并开门禁
 node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs examples/plugins/floating-dock \
   --extensions-v21 --nowen-version=1.6.0
-
-# 生成骨架（内部自动跑一次上面的校验）
-node scripts/create-plugin.mjs my-plugin
 
 # 打包成可安装 ZIP
 cd examples/plugins/my-plugin && node ../../../packages/nowen-plugin-cli/bin/nowen-plugin.mjs pack

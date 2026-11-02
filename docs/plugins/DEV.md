@@ -273,7 +273,7 @@ SPEC §5.11）：
 
 1. **`id` 必须是 `<pluginId>.<localId>`**（例：`nowenlab.my-plugin.insert-stamp`，不是 `insert-stamp`），
    `localId` 部分匹配 `^[a-z][a-z0-9-]{0,63}$`。
-2. **修饰键大小写敏感**：`Mod-Alt-K` 合法，`mod-alt-k` 会被前端静默丢弃（命令不报错，但只剩斜杠菜单入口）；
+2. **修饰键大小写敏感**：`Mod-Alt-K` 合法，`mod-alt-k` 会在安装期被拒（`快捷键修饰键只支持 Mod / Alt / Shift`）；
    主按键大小写无所谓。含 `Mod` 时不能用 `A/C/V/X/Z`（基础快捷键）和 `R/W/Q`（系统保留）。
 3. **`Action` 收不到 `noteId` 是因为没声明**：宿主只注入该 Action `input` 里显式声明过的字段，目前最多带
    `noteId`。要拿当前笔记 id，就在 `actions[].input` 里加 `"noteId": {"type":"string"}`。
