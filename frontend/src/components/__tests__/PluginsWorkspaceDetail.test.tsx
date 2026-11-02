@@ -91,7 +91,7 @@ function installedPlugin(overrides: Record<string, unknown> = {}): Record<string
   return {
     id: "acme.notesync",
     name: "Note Sync",
-    description: "第三方笔记同步插件",
+    description: "社区笔记同步插件",
     version: "1.2.0",
     runtime: "sandbox-js",
     status: "enabled",
@@ -173,7 +173,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     mocks.installed = [{
       id: "acme.notesync",
       name: "Note Sync",
-      description: "第三方笔记同步插件",
+      description: "社区笔记同步插件",
       version: "1.2.0",
       runtime: "sandbox-js",
       status: "enabled",
@@ -225,7 +225,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     act(() => { root.unmount(); });
   });
 
-  it("管理分组：列表之外并入检查更新与安装插件包（仅管理员）", async () => {
+  it("管理分组：社区插件区在上，检查更新与安装插件包挂在区头部（仅管理员）", async () => {
     const { host, root } = await renderWorkspace();
 
     // 主区不再带分组 tab，分组只由侧栏事件驱动
@@ -233,8 +233,21 @@ describe("PluginsWorkspace 插件详情页", () => {
     await openGroup("installed");
 
     const content = text(host);
+    // 分区顺序：社区插件（主流场景）在上，内置插件折叠分区在下；操作不再夹在两份列表中间
+    expect(content).toContain("社区插件");
+    expect(content).toContain("内置插件");
+    expect(content).toContain("· 5 个");
+    expect(content.indexOf("社区插件")).toBeLessThan(content.indexOf("内置插件"));
+    // 检查更新 / 安装插件包挂在社区插件区头部
     expect(content).toContain("检查更新");
     expect(content).toContain("安装插件包");
+
+    // 内置插件默认折叠：分区头可展开，展开后才出现内置插件行
+    expect(content).not.toContain("待办事项");
+    const builtinHeader = host.querySelector('button[aria-expanded="false"]');
+    expect(builtinHeader?.textContent).toContain("内置插件");
+    click(builtinHeader as HTMLElement);
+    expect(text(host)).toContain("待办事项");
 
     act(() => { root.unmount(); });
   });
@@ -268,7 +281,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     act(() => { root.unmount(); });
   });
 
-  it("非管理员进入管理分组只有插件列表，看不到更新与装包入口", async () => {
+  it("非管理员进入管理分组只有社区插件列表，看不到更新与装包入口", async () => {
     mocks.role = "user";
     const { host, root } = await renderWorkspace();
 

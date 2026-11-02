@@ -4,12 +4,14 @@
  * 三分区模型：插件徽章 → 侧栏插件列表 + 本工作区详情页。
  * 详情源归一为三类，信息架构统一：
  * - builtin：官方内置插件（builtin registry），页内启停 + 打开面板/主区；
- * - installed：已安装第三方插件（GET /plugins），管理员启停/回滚/卸载；
+ * - installed：已安装社区插件（GET /plugins），管理员启停/回滚/卸载；
  * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
  * 页内 Tab 分组（管理/市场/配置）；侧栏点击内置插件 → nowen:plugin-selected 直达详情，
  * 侧栏点「市场」「管理」「配置」→ nowen:plugin-group 切到对应分组。
  *
- * 管理分组 = 已装列表 + 检查更新 + 安装插件包（原先 PluginAdminPanel 的两个分区并入同页）；
+ * 管理分组自上而下：社区插件区（列表 + 区头部的「检查更新」「安装插件包」，管理员可见）
+ * → 内置插件区（默认折叠的次级分区，展开后启停）。更新与安装从属于社区插件区，
+ * 不再夹在两份列表中间；
  * 配置分组（仅管理员）保留 Registry 来源、执行边界、开发者模式；单插件配置在详情页
  * 「设置与运行」分区。
  *
@@ -42,7 +44,8 @@ import { PluginConfigSections } from "@/components/plugins/PluginConfigSections"
 import {
   PluginConfigPanel,
   PluginPackageInstallSection,
-  PluginUpdatesSection,
+  PluginUpdatesResult,
+  usePluginUpdateCheck,
 } from "@/components/plugins/PluginAdminPanel";
 import { ExternalHostList } from "@/components/plugins/ExternalHostList";
 import {
@@ -552,6 +555,10 @@ export default function PluginsWorkspace() {
   const [nodeRuntimeAllowed, setNodeRuntimeAllowed] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  // 内置插件为次级分区：默认折叠，点分区头展开
+  const [builtinExpanded, setBuiltinExpanded] = useState(false);
+  // 「检查更新」状态上提：触发按钮在社区插件区头部，结果区展示在同一分区内
+  const { updates, updateSource, setUpdateSource, checking, check: checkUpdates } = usePluginUpdateCheck();
 
   const refreshInstalled = useCallback(async () => {
     try {
@@ -578,7 +585,7 @@ export default function PluginsWorkspace() {
         goGroup("installed");
         return;
       }
-      // 第三方插件：侧栏行点击 → 切到已安装分组并选中同一插件
+      // 社区插件：侧栏行点击 → 切到已安装分组并选中同一插件
       setInstalledSelection(id);
       goGroup("installed");
     };
@@ -772,66 +779,39 @@ export default function PluginsWorkspace() {
 
         {!detail && (
           <div>
+            {/* 管理分组自上而下：社区插件区（主流场景）→ 内置插件折叠区（次级）。
+                「检查更新」「安装插件包」挂在社区插件区头部，与列表的从属关系一目了然（仅管理员可见） */}
             {group === "installed" && (
-              <div>
-                <div className="mb-2 text-[11px] text-tx-tertiary">内置插件</div>
-                <div className="space-y-2">
-                  {BUILTIN_PLUGINS.map((item) => {
-                    const itemEnabled = isBuiltinPluginEnabled(item.id);
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => selectBuiltin(item.id)}
-                        className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
-                          {iconFor(item, 18)}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-sm font-medium text-tx-primary">{item.name}</span>
-                            <Badge tone="info">{BUILTIN_ORIGIN_LABEL[item.origin]}</Badge>
-                            <Badge tone={itemEnabled ? "ok" : "neutral"}>{itemEnabled ? "已启用" : "已停用"}</Badge>
-                          </span>
-                          <span className="mt-0.5 block truncate text-xs text-tx-tertiary">{item.description}</span>
-                        </span>
-                        <span
-                          role="switch"
-                          aria-checked={itemEnabled}
-                          title={itemEnabled ? "停用插件" : "启用插件"}
-                          onClick={(e) => { e.stopPropagation(); setBuiltinPluginDisabled(item.id, itemEnabled); }}
-                          className={cn(
-                            "relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full transition-colors",
-                            itemEnabled ? "bg-accent-primary" : "bg-app-border",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white transition-all",
-                              itemEnabled ? "left-4" : "left-0.5",
-                            )}
-                          />
-                        </span>
-                        <span className="shrink-0 text-tx-tertiary">›</span>
-                      </div>
-                    );
-                  })}
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-tx-primary">社区插件</h3>
+                  <p className="mt-0.5 text-[11px] text-tx-tertiary">从市场或插件包安装的插件。</p>
                 </div>
+                {isAdmin && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={checking}
+                      onClick={() => void checkUpdates()}
+                      className="shrink-0 rounded-md bg-accent-primary px-2.5 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {checking ? "检查中…" : "检查更新"}
+                    </button>
+                    <PluginPackageInstallSection
+                      onInstalled={async () => {
+                        await refreshInstalled();
+                        goGroup("installed");
+                        clearActionState();
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            {/* 管理分组 = 列表 + 更新 + 本地安装，一页搞定（更新/装包仅管理员可见） */}
+            {/* 检查更新结果：挂在社区插件分区内展示，可改更新源后再次点「检查更新」 */}
             {group === "installed" && isAdmin && (
-              <>
-                <PluginUpdatesSection />
-                <PluginPackageInstallSection
-                  onInstalled={async () => {
-                    await refreshInstalled();
-                    goGroup("installed");
-                    clearActionState();
-                  }}
-                />
-              </>
+              <PluginUpdatesResult updates={updates} updateSource={updateSource} onSourceChange={setUpdateSource} />
             )}
 
             {group === "config" && (
@@ -846,10 +826,9 @@ export default function PluginsWorkspace() {
             )}
 
             {group === "installed" && (
-              <div className="mt-6">
-                <div className="mb-2 text-[11px] text-tx-tertiary">第三方插件</div>
+              <div>
               {installed === null ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载已安装插件</div>
+                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载社区插件</div>
               ) : installed.length ? (
                 <div className="space-y-2">
                   {installed.map((item) => (
@@ -874,9 +853,70 @@ export default function PluginsWorkspace() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
-                  尚未安装第三方插件，可到「市场」浏览。
+                  尚未安装社区插件，可到「市场」浏览。
                 </div>
               )}
+              </div>
+            )}
+
+            {/* 内置插件区：次级分区，默认折叠，点分区头展开后启停 */}
+            {group === "installed" && (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  aria-expanded={builtinExpanded}
+                  onClick={() => setBuiltinExpanded((value) => !value)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-left transition-colors hover:bg-app-hover"
+                >
+                  <span className={cn("shrink-0 text-tx-tertiary transition-transform", builtinExpanded && "rotate-90")}>›</span>
+                  <span className="text-sm font-medium text-tx-primary">内置插件</span>
+                  <span className="text-xs text-tx-tertiary">· {BUILTIN_PLUGINS.length} 个</span>
+                  <span className="ml-auto text-[11px] text-tx-tertiary">随应用内置，可启停</span>
+                </button>
+                {builtinExpanded && (
+                  <div className="mt-2 space-y-2">
+                    {BUILTIN_PLUGINS.map((item) => {
+                      const itemEnabled = isBuiltinPluginEnabled(item.id);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => selectBuiltin(item.id)}
+                          className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
+                        >
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
+                            {iconFor(item, 18)}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium text-tx-primary">{item.name}</span>
+                              <Badge tone="info">{BUILTIN_ORIGIN_LABEL[item.origin]}</Badge>
+                              <Badge tone={itemEnabled ? "ok" : "neutral"}>{itemEnabled ? "已启用" : "已停用"}</Badge>
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-tx-tertiary">{item.description}</span>
+                          </span>
+                          <span
+                            role="switch"
+                            aria-checked={itemEnabled}
+                            title={itemEnabled ? "停用插件" : "启用插件"}
+                            onClick={(e) => { e.stopPropagation(); setBuiltinPluginDisabled(item.id, itemEnabled); }}
+                            className={cn(
+                              "relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full transition-colors",
+                              itemEnabled ? "bg-accent-primary" : "bg-app-border",
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white transition-all",
+                                itemEnabled ? "left-4" : "left-0.5",
+                              )}
+                            />
+                          </span>
+                          <span className="shrink-0 text-tx-tertiary">›</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

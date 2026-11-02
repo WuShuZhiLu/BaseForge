@@ -1,14 +1,15 @@
 /**
  * 插件中心的全局能力分区（仅管理员）
  * ---------------------------------------------------------------------------
- * 原先是单个「管理」分组面板；按最新信息架构拆成三块，供工作区分组组合：
- * - PluginUpdatesSection：「检查更新」（挂在主区「管理」分组，与已装列表同页）；
- * - PluginPackageInstallSection：「安装插件包」+ 安装确认弹窗（同上，挂在「管理」分组）；
+ * 原先是单个「管理」分组面板；按最新信息架构拆成几块，供工作区分组组合：
+ * - usePluginUpdateCheck + PluginUpdatesResult：「检查更新」触发与结果区
+ *   （触发按钮挂在主区「管理」分组的社区插件区头部，结果也展示在该分区内）；
+ * - PluginPackageInstallSection：「安装插件包」按钮 + 安装确认弹窗（同上，社区插件区头部）；
  * - PluginConfigPanel：「执行边界」「Registry 来源与国内镜像」「开发者模式」
  *   等配置类内容（挂在主区「配置」分组）。
  * 单插件的配置（设置项/连接/Actions）在插件详情页的「设置与运行」分区，不在这里。
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import { Code2, Loader2, PackagePlus, ShieldCheck } from "lucide-react";
 import {
@@ -62,36 +63,49 @@ const PERMISSION_LABELS: Record<string, string> = {
   "mindmaps:read": "读取思维导图", "mindmaps:write": "创建和修改思维导图",
 };
 
-/** 「检查更新」分区：签名 Registry 的版本比对，管理员人工确认权限/Runtime 变化 */
-export function PluginUpdatesSection() {
+/**
+ * 「检查更新」触发逻辑：签名 Registry 的版本比对，管理员人工确认权限/Runtime 变化。
+ * 状态上提给调用方，让触发按钮（社区插件区头部）与结果区（同分区内）共享。
+ */
+export function usePluginUpdateCheck() {
   const [updates, setUpdates] = useState<PluginUpdate[] | null>(null);
   const [updateSource, setUpdateSource] = useState("official-v2");
+  const [checking, setChecking] = useState(false);
 
+  const check = useCallback(async () => {
+    setChecking(true);
+    try {
+      setUpdates(await pluginApi.checkUpdates(updateSource));
+    } catch (error) {
+      void alert({ title: "检查更新失败", description: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setChecking(false);
+    }
+  }, [updateSource]);
+
+  return { updates, updateSource, setUpdateSource, checking, check };
+}
+
+/** 「检查更新」结果区：仅在检查过一次后显示；可改更新源后再次点「检查更新」复核 */
+export function PluginUpdatesResult({ updates, updateSource, onSourceChange }: {
+  updates: PluginUpdate[] | null;
+  updateSource: string;
+  onSourceChange: (value: string) => void;
+}) {
+  if (updates === null) return null;
   return (
-    <Panel title="检查更新" description="仅接受签名 Registry 的不可变版本；新增权限、Runtime 或 API 变化必须人工确认。">
-      <div className="mt-3 flex gap-2">
+    <div className="mt-3 rounded-lg border border-app-border bg-app-bg p-3" data-plugin-updates-result>
+      <label className="flex items-center gap-2 text-[11px] text-tx-tertiary">
+        更新源
         <input
           value={updateSource}
-          onChange={(event) => setUpdateSource(event.target.value)}
+          onChange={(event) => onSourceChange(event.target.value)}
           placeholder="V2 Registry Source ID"
-          className={FIELD}
+          className={`${FIELD} max-w-56`}
         />
-        <button
-          type="button"
-          className="shrink-0 rounded-md bg-accent-primary px-3 py-1.5 text-xs text-white disabled:opacity-50"
-          onClick={async () => {
-            try {
-              setUpdates(await pluginApi.checkUpdates(updateSource));
-            } catch (error) {
-              void alert({ title: "检查更新失败", description: error instanceof Error ? error.message : String(error) });
-            }
-          }}
-        >
-          检查更新
-        </button>
-      </div>
-      {updates === null ? null : updates.length ? (
-        <div className="mt-3 space-y-2">
+      </label>
+      {updates.length ? (
+        <div className="mt-2 space-y-2">
           {updates.map((update) => (
             <div key={update.pluginId} className="rounded-lg bg-app-hover p-3 text-xs text-tx-secondary">
               <div className="font-mono text-tx-primary">{update.pluginId}</div>
@@ -104,13 +118,13 @@ export function PluginUpdatesSection() {
           ))}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-tx-tertiary">没有可用更新。</p>
+        <p className="mt-2 text-xs text-tx-tertiary">没有可用更新。</p>
       )}
-    </Panel>
+    </div>
   );
 }
 
-/** 「安装插件包」分区：本地插件包与市场安装走同一套签名、校验和与兼容性校验 */
+/** 「安装插件包」紧凑操作：按钮 + 安装确认弹窗（挂在社区插件区头部，与市场安装走同一套校验） */
 export function PluginPackageInstallSection({ onInstalled }: {
   /** 安装成功后的回调：刷新工作区列表并跳到「管理」列表 */
   onInstalled: () => Promise<void>;
@@ -158,8 +172,8 @@ export function PluginPackageInstallSection({ onInstalled }: {
   const pendingRuntime = pending ? getPluginRuntimePresentation(pending.manifest) : null;
 
   return (
-    <div>
-      <Panel title="安装插件包" description="本地插件包与市场安装走同一套签名、校验和与兼容性校验。">
+    <>
+      <div className="inline-flex shrink-0">
         <input
           ref={inputRef}
           type="file"
@@ -170,11 +184,11 @@ export function PluginPackageInstallSection({ onInstalled }: {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+          className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-xs text-tx-primary transition-colors hover:bg-app-hover"
         >
-          <PackagePlus size={14} />选择插件包
+          <PackagePlus size={13} />安装插件包
         </button>
-      </Panel>
+      </div>
 
       {pending && pendingRuntime && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 p-4">
@@ -195,7 +209,7 @@ export function PluginPackageInstallSection({ onInstalled }: {
                 <span>
                   {pending.nodeRuntimeConfirmationRequired
                     ? "此插件将在独立 Node 进程中执行二进制/Node 代码，可使用获准的文件系统与网络权限，且不能由 QuickJS/WASM Sandbox 隔离。请仅在完全信任来源时继续。"
-                    : "此插件包含第三方可执行代码；安装前将校验兼容性、信任等级和 Runtime 策略。"}
+                    : "此插件包含社区开发者的可执行代码；安装前将校验兼容性、信任等级和 Runtime 策略。"}
                 </span>
               </div>
             )}
@@ -243,7 +257,7 @@ export function PluginPackageInstallSection({ onInstalled }: {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

@@ -6,7 +6,7 @@
  * - contributes.mainViewPanels 主区全屏中心（TaskWorkspace / DiaryWorkspace 原组件）
  * - 启停状态持久化到 localStorage；停用后侧栏/Rail 入口消失、主区不可达，数据保留。
  *
- * 与第三方插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条
+ * 与社区插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条
  * contributions 消费链路（registry → host → 面板），未来可平移为独立插件包。
  */
 export type BuiltinPluginId = "tasks" | "diary" | "ai" | "remote-files" | "pm";
