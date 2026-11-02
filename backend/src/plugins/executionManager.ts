@@ -12,7 +12,7 @@ import type { HostApiBroker } from "./hostApiBroker.js";
 import { pluginManifestActions, type PluginExecutionContext, type PluginExecutionResult, type PluginManifest, type PluginRegistryRecord } from "./types.js";
 
 const EXPECTED_HOST_FAILURE_CODES = new Set([
-  "RESOURCE_FORBIDDEN", "PLUGIN_PERMISSION_DENIED",
+  "RESOURCE_FORBIDDEN", "PLUGIN_PERMISSION_DENIED", "PLUGIN_RATE_LIMITED",
   "CAPTURE_URL_DENIED", "CAPTURE_FETCH_FAILED", "CAPTURE_TOO_LARGE", "CAPTURE_EXTRACTION_FAILED",
 ]);
 const executionSlots = {

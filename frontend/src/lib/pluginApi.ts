@@ -15,8 +15,17 @@ export interface ExtensionPlatformFeatureFlags {
 
 export interface PluginPermissionRow {
   permission: string;
+  /** 权限配置，external:fetch 为 { hosts: string[] } */
   configJson: string;
   granted: number;
+  /** external:fetch 的域名白名单。后端 PermissionView 已解析平铺（plugins/permissions.ts）；
+   *  旧响应没有该字段时，前端回退解析 configJson.hosts */
+  hosts?: string[];
+}
+
+/** manifest 外网白名单：市场索引与安装确认弹窗共用 */
+export interface PluginPermissionConfig {
+  externalFetchHosts?: string[];
 }
 
 export interface PluginAction {
@@ -63,6 +72,17 @@ export interface PluginUiActionContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 
+export type PluginEditorCommandWhen = "editorFocused" | "noteOpen";
+export interface PluginEditorCommandContribution {
+  /** 必须为 `${pluginId}.${localId}` */
+  id: string;
+  title: string;
+  keywords?: string[];
+  keybinding?: string;
+  when?: PluginEditorCommandWhen;
+  action: string;
+}
+
 export interface PluginContributionRecord {
   pluginId: string;
   publisher?: string;
@@ -70,6 +90,7 @@ export interface PluginContributionRecord {
   noteTemplates?: PluginNoteTemplateContribution[];
   promptPacks?: PluginPromptPackContribution[];
   uiComponents?: PluginUiActionContribution[];
+  editorCommands?: PluginEditorCommandContribution[];
   [key: string]: unknown;
 }
 
@@ -108,6 +129,7 @@ export interface InstalledPlugin {
     noteTemplates?: PluginNoteTemplateContribution[];
     promptPacks?: PluginPromptPackContribution[];
     uiComponents?: PluginUiActionContribution[];
+    editorCommands?: PluginEditorCommandContribution[];
   };
   versions?: PluginVersion[];
   permissionDiff?: { added: string[]; removed: string[] };
@@ -201,7 +223,7 @@ export const pluginApi = {
   registrySources: () => request<RegistrySource[]>("/plugins/ecosystem/sources"),
   setRegistrySource: (source: Pick<RegistrySource, "id" | "name" | "indexUrl" | "registryKeyId" | "registryPublicKey"> & { enabled?: boolean }) => request<RegistrySource[]>("/plugins/ecosystem/sources", { method: "PUT", body: JSON.stringify(source) }),
   registryCatalog: async (source = "official-v2") => {
-    const index = await request<{ extensions: Array<Omit<RegistryPlugin, "latestVersion"> & { versions: Array<{ version: string; runtime?: InstalledPlugin["runtime"]; publishedAt?: string; permissions?: string[]; channel?: string }> }> }>(`/plugins/ecosystem/catalog?source=${encodeURIComponent(source)}`);
+    const index = await request<{ extensions: Array<Omit<RegistryPlugin, "latestVersion"> & { versions: Array<{ version: string; runtime?: InstalledPlugin["runtime"]; publishedAt?: string; permissions?: string[]; permissionConfig?: PluginPermissionConfig; channel?: string }> }> }>(`/plugins/ecosystem/catalog?source=${encodeURIComponent(source)}`);
     return index.extensions.map((extension) => {
       const latest = [...extension.versions].sort((left, right) => right.version.localeCompare(left.version, undefined, { numeric: true }))[0];
       return { ...extension, latestVersion: latest?.version || "", runtime: latest?.runtime };

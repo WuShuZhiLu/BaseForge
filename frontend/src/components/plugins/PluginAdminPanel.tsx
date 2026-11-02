@@ -16,6 +16,7 @@ import {
 import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import { alert, confirm } from "@/components/ui/confirm";
 import { PluginRuntimePolicySettings } from "@/components/settings/plugins/PluginRuntimePolicySettings";
+import { ExternalHostList } from "@/components/plugins/ExternalHostList";
 
 type PendingManifest = {
   id?: string;
@@ -337,11 +338,11 @@ function AdminBody({ onInstalled }: { onInstalled: () => Promise<void> }) {
                   </li>
                 )}
               </ul>
-              {(pending.manifest.permissionConfig?.externalFetchHosts?.length ?? 0) > 0 && (
-                <p className="mt-2 text-xs text-tx-tertiary">
-                  网络访问：{pending.manifest.permissionConfig?.externalFetchHosts?.join(", ")}
-                </p>
-              )}
+              {/* external:fetch 的具体域名来自 manifest.permissionConfig.externalFetchHosts */}
+              <ExternalHostList
+                hosts={pending.manifest.permissionConfig?.externalFetchHosts || []}
+                className="mt-2 pl-0"
+              />
             </div>
             <p className="text-xs text-tx-tertiary">
               {pendingRuntime.declarative

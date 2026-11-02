@@ -19,16 +19,28 @@ import {
 } from "./hostApiContract.js";
 import { PluginPermissions, type PermissionRow } from "./permissions.js";
 import { PluginRegistry } from "./registry.js";
+import { pluginExternalFetchLimiter, PLUGIN_RATE_LIMITED, type PluginExternalFetchLimiter } from "./pluginRateLimiter.js";
 import { secureExternalFetch, type ExternalFetchRequest } from "./secureExternalFetch.js";
 import { PluginSecrets } from "./secrets.js";
 import crypto from "node:crypto";
 import { importArticleUrl } from "../services/article-import.js";
+import { logAudit } from "../services/audit.js";
 import type { HostCall, PluginExecutionContext, PluginManifest } from "./types.js";
 
 type JsonObject = Record<string, any>;
 
 function forbidden(message: string, code = "RESOURCE_FORBIDDEN"): never {
   throw Object.assign(new Error(message), { code });
+}
+
+/** 审计只记录目标主机，避免把 URL 查询串中的敏感信息写进日志。 */
+function auditHost(url: unknown): string {
+  if (typeof url !== "string") return "";
+  try {
+    return new URL(url).host;
+  } catch {
+    return "";
+  }
 }
 
 function argsObject(args: unknown): JsonObject {
@@ -85,6 +97,7 @@ export class HostApiBroker {
     private readonly secrets = new PluginSecrets(),
     private readonly commands = new ApplicationCommandGateway(),
     private readonly registry = new PluginRegistry(),
+    private readonly externalLimiter: PluginExternalFetchLimiter = pluginExternalFetchLimiter,
   ) {}
 
   async call(context: PluginExecutionContext, call: HostCall): Promise<unknown> {
@@ -410,32 +423,52 @@ export class HostApiBroker {
     } catch {
       forbidden("external.fetch 白名单配置无效", "EXTERNAL_FETCH_DENIED");
     }
-    const trustedHeaders: Record<string, string> = {};
-    if (args.connection) {
-      this.permissions.require(context.pluginId, requireV2CombinationPermission("secrets:use"));
-      const connectionId = String(args.connection);
-      const record = this.registry.get(context.pluginId);
-      const manifest = record ? JSON.parse(record.manifestJson) as PluginManifest : undefined;
-      const connection = manifest?.connections?.find((item) => item.id === connectionId);
-      if (!connection) forbidden(`Manifest 未声明 Connection: ${connectionId}`, "INVALID_ARGUMENT");
-      const secret = this.secrets.get(context.pluginId, context.userId, connectionId);
-      if (connection.type === "bearer") trustedHeaders.Authorization = `Bearer ${secret}`;
-      else if (connection.type === "api-key-header") trustedHeaders[connection.headerName || "X-API-Key"] = secret;
-      else trustedHeaders.Authorization = `Basic ${Buffer.from(secret, "utf8").toString("base64")}`;
+    let releaseExternalSlot: (() => void) | undefined;
+    try {
+      // 配额在取密钥、发请求之前占用：执行、报错、超时都必须走 finally 释放并发计数。
+      releaseExternalSlot = this.externalLimiter.acquire(context.pluginId);
+      const trustedHeaders: Record<string, string> = {};
+      if (args.connection) {
+        this.permissions.require(context.pluginId, requireV2CombinationPermission("secrets:use"));
+        const connectionId = String(args.connection);
+        const record = this.registry.get(context.pluginId);
+        const manifest = record ? JSON.parse(record.manifestJson) as PluginManifest : undefined;
+        const connection = manifest?.connections?.find((item) => item.id === connectionId);
+        if (!connection) forbidden(`Manifest 未声明 Connection: ${connectionId}`, "INVALID_ARGUMENT");
+        const secret = this.secrets.get(context.pluginId, context.userId, connectionId);
+        if (connection.type === "bearer") trustedHeaders.Authorization = `Bearer ${secret}`;
+        else if (connection.type === "api-key-header") trustedHeaders[connection.headerName || "X-API-Key"] = secret;
+        else trustedHeaders.Authorization = `Basic ${Buffer.from(secret, "utf8").toString("base64")}`;
+      }
+      return await secureExternalFetch({
+        url: requireString(args.url, "url"),
+        method: typeof args.method === "string" ? args.method : undefined,
+        headers: args.headers && typeof args.headers === "object" && !Array.isArray(args.headers)
+          ? args.headers as ExternalFetchRequest["headers"]
+          : undefined,
+        body: args.body,
+        trustedHeaders,
+      }, {
+        allowedHosts: Array.isArray(config.hosts) ? config.hosts.filter((host): host is string => typeof host === "string") : [],
+        timeoutMs: 10_000,
+        maxRedirects: 5,
+        maxResponseBytes: 2 * 1024 * 1024,
+      });
+    } catch (error) {
+      const coded = error as Error & { code?: string };
+      if (coded.code === "EXTERNAL_FETCH_DENIED" || coded.code === PLUGIN_RATE_LIMITED) {
+        logAudit(context.userId, "plugin", "external_fetch_denied", {
+          pluginId: context.pluginId,
+          actionId: context.actionId,
+          executionId: context.executionId,
+          host: auditHost(args.url),
+          code: coded.code,
+          message: coded.message,
+        }, { targetType: "plugin", targetId: context.pluginId, level: "warn" });
+      }
+      throw error;
+    } finally {
+      releaseExternalSlot?.();
     }
-    return await secureExternalFetch({
-      url: requireString(args.url, "url"),
-      method: typeof args.method === "string" ? args.method : undefined,
-      headers: args.headers && typeof args.headers === "object" && !Array.isArray(args.headers)
-        ? args.headers as ExternalFetchRequest["headers"]
-        : undefined,
-      body: args.body,
-      trustedHeaders,
-    }, {
-      allowedHosts: Array.isArray(config.hosts) ? config.hosts.filter((host): host is string => typeof host === "string") : [],
-      timeoutMs: 10_000,
-      maxRedirects: 5,
-      maxResponseBytes: 2 * 1024 * 1024,
-    });
   }
 }

@@ -86,12 +86,52 @@ function text(host: HTMLElement): string {
   return host.textContent || "";
 }
 
+/** 完整的已安装插件记录：详情页会读 runtime/contributes/versions，字段缺失会渲染成空态 */
+function installedPlugin(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "acme.notesync",
+    name: "Note Sync",
+    description: "第三方笔记同步插件",
+    version: "1.2.0",
+    runtime: "sandbox-js",
+    status: "enabled",
+    trustLevel: "community",
+    signatureState: "verified",
+    publisher: "acme",
+    permissions: [],
+    contributes: {},
+    versions: [
+      { version: "1.2.0", checksum: "a".repeat(64), source: "official-v2", trustLevel: "community", status: "enabled", installedAt: "2026-10-01T00:00:00Z" },
+    ],
+    ...overrides,
+  };
+}
+
 /** 分组导航在侧栏，主区通过事件切分组 */
 async function openGroup(group: "builtin" | "installed" | "catalog" | "admin") {
   await act(async () => {
     window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group } }));
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+}
+
+/** 已安装分组：点列表行进入插件详情 */
+async function openInstalledDetail(host: HTMLElement, pluginId: string) {
+  await openGroup("installed");
+  const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes(pluginId));
+  expect(row).toBeTruthy();
+  click(row!);
+  await flush();
+}
+
+/** 市场分组：点列表行进入插件详情（市场目录首次进入才懒加载） */
+async function openCatalogDetail(host: HTMLElement, pluginId: string) {
+  await openGroup("catalog");
+  await flush();
+  const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes(pluginId));
+  expect(row).toBeTruthy();
+  click(row!);
+  await flush();
 }
 
 beforeEach(() => {
@@ -205,6 +245,62 @@ describe("PluginsWorkspace 插件详情页", () => {
     const content = text(host);
     expect(content).toContain("插件管理仅对管理员开放");
     expect(content).not.toContain("安装插件包");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("已安装插件：external:fetch 展示会访问的域名，超过 6 条折叠", async () => {
+    const hosts = [
+      "api.openai.com", "api.anthropic.com", "cf.example.com",
+      "d.example.com", "e.example.com", "f.example.com",
+      "g.example.com", "h.example.com",
+    ];
+    mocks.installed = [installedPlugin({
+      permissions: [{ permission: "external:fetch", configJson: "{}", granted: 0, hosts }],
+    })];
+    const { host, root } = await renderWorkspace();
+
+    await openInstalledDetail(host, "acme.notesync");
+
+    const content = text(host);
+    expect(content).toContain("将访问以下域名：");
+    expect(content).toContain("api.openai.com");
+    expect(content).toContain("f.example.com"); // 第 6 条仍在内
+    expect(content).not.toContain("g.example.com"); // 第 7 条起折叠
+    const more = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes("还有 2 个"));
+    expect(more).toBeTruthy();
+
+    click(more!);
+    expect(text(host)).toContain("h.example.com");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("市场详情：external:fetch 也展示会访问的域名", async () => {
+    mocks.catalog = [{
+      id: "acme.weather",
+      publisher: "acme",
+      name: "Weather",
+      description: "天气插件",
+      trustLevel: "community",
+      latestVersion: "2.0.0",
+      runtime: "sandbox-js",
+      versions: [{
+        version: "2.0.0",
+        runtime: "sandbox-js",
+        publishedAt: "2026-10-01T00:00:00Z",
+        permissions: ["external:fetch"],
+        permissionConfig: { externalFetchHosts: ["api.openweathermap.org", "*.weather.example.com"] },
+      }],
+    }];
+    const { host, root } = await renderWorkspace();
+
+    await openCatalogDetail(host, "acme.weather");
+
+    const content = text(host);
+    expect(content).toContain("将访问以下域名：");
+    expect(content).toContain("api.openweathermap.org");
+    expect(content).toContain("*.weather.example.com");
 
     act(() => { root.unmount(); });
   });

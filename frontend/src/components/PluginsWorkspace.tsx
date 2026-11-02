@@ -39,6 +39,7 @@ import { pluginApi, type InstalledPlugin, type PluginPermissionRow } from "@/lib
 import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import { PluginConfigSections } from "@/components/plugins/PluginConfigSections";
 import { PluginAdminPanel } from "@/components/plugins/PluginAdminPanel";
+import { ExternalHostList } from "@/components/plugins/ExternalHostList";
 import {
   BUILTIN_ORIGIN_LABEL,
   BUILTIN_PLUGINS,
@@ -106,6 +107,27 @@ function formatDay(iso?: string | null): string {
 
 function permissionLabel(permission: string): string {
   return PERMISSION_LABELS[permission] || permission;
+}
+
+/** 权限行归一：列表只关心"名字 / 是否已授予 / 附带的外网域名" */
+type PermissionItem = { permission: string; granted: boolean; hosts?: string[] };
+
+/**
+ * 取 external:fetch 的域名白名单。
+ * 后端 PermissionView 已把 manifest.permissionConfig.externalFetchHosts 解析成权限行的 hosts
+ * （backend/src/plugins/permissions.ts）；旧响应没有 hosts 时回退解析 configJson.hosts。
+ */
+function permissionHosts(row: PluginPermissionRow): string[] {
+  if (row.permission !== "external:fetch") return [];
+  const isHostList = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === "string");
+  if (isHostList(row.hosts)) return row.hosts;
+  try {
+    const parsed = JSON.parse(row.configJson || "{}") as { hosts?: unknown };
+    return isHostList(parsed.hosts) ? parsed.hosts : [];
+  } catch {
+    return [];
+  }
 }
 
 function Badge({ tone = "neutral", children }: { tone?: "ok" | "warn" | "bad" | "info" | "neutral"; children: React.ReactNode }) {
@@ -188,18 +210,19 @@ function OverviewSection({ description, repository, homepage, license, published
   );
 }
 
-function PermissionList({ rows, emptyText }: { rows: PluginPermissionRow[] | string[]; emptyText: string }) {
-  if (!rows.length) return <p className="mt-2 text-xs text-tx-tertiary">{emptyText}</p>;
-  const items = (rows as Array<PluginPermissionRow | string>).map((row) =>
-    typeof row === "string" ? { permission: row, granted: true } : row,
-  );
+function PermissionList({ items, emptyText }: { items: PermissionItem[]; emptyText: string }) {
+  if (!items.length) return <p className="mt-2 text-xs text-tx-tertiary">{emptyText}</p>;
   return (
     <ul className="mt-2 space-y-1">
       {items.map((item) => (
-        <li key={item.permission} className="flex items-baseline gap-2 text-xs text-tx-secondary">
-          <ShieldCheck size={12} className={cn("mt-0.5 shrink-0", item.granted ? "text-emerald-500" : "text-amber-500")} />
-          <span>{permissionLabel(item.permission)}</span>
-          <span className="ml-auto shrink-0 font-mono text-[10px] text-tx-tertiary">{item.permission}</span>
+        <li key={item.permission}>
+          <div className="flex items-baseline gap-2 text-xs text-tx-secondary">
+            <ShieldCheck size={12} className={cn("mt-0.5 shrink-0", item.granted ? "text-emerald-500" : "text-amber-500")} />
+            <span>{permissionLabel(item.permission)}</span>
+            <span className="ml-auto shrink-0 font-mono text-[10px] text-tx-tertiary">{item.permission}</span>
+          </div>
+          {/* external:fetch 直接列出会访问的外部域名，缺数据时只显示上面的权限名 */}
+          {item.hosts && item.hosts.length > 0 && <ExternalHostList hosts={item.hosts} />}
         </li>
       ))}
     </ul>
@@ -357,7 +380,11 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
       </SectionCard>
       <SectionCard title="权限">
         <PermissionList
-          rows={plugin.permissions}
+          items={plugin.permissions.map((row) => ({
+            permission: row.permission,
+            granted: Boolean(row.granted),
+            hosts: permissionHosts(row),
+          }))}
           emptyText={presentation.declarative ? "零数据权限（Manifest 安装阶段强制）" : "不请求数据权限"}
         />
       </SectionCard>
@@ -436,6 +463,8 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
   // 与插件市场的安装门槛一致：Node Runtime 插件需管理员先在「管理」分组放行
   const needsPolicy = extension.runtime === "node-action" && nodeRuntimeAllowed !== true;
   const permissions = latest?.permissions || [];
+  // 市场索引里的外网白名单在版本级 permissionConfig（后端 ecosystemRegistry 原样透传）
+  const externalHosts = latest?.permissionConfig?.externalFetchHosts || [];
   return (
     <div>
       <DetailHeader
@@ -461,7 +490,14 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
       )}
       {permissions.length > 0 && (
         <SectionCard title="权限">
-          <PermissionList rows={permissions} emptyText="不请求数据权限" />
+          <PermissionList
+            items={permissions.map((permission) => ({
+              permission,
+              granted: true,
+              hosts: permission === "external:fetch" ? externalHosts : [],
+            }))}
+            emptyText="不请求数据权限"
+          />
         </SectionCard>
       )}
       <VersionHistory
