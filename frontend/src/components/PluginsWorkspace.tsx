@@ -80,7 +80,6 @@ const INSTALLED_STATUS_LABELS: Record<InstalledPlugin["status"], string> = {
 };
 
 const GROUP_TABS: Array<[GroupKey, string]> = [
-  ["builtin", "内置"],
   ["installed", "已安装"],
   ["catalog", "市场"],
   ["admin", "管理"],
@@ -505,7 +504,7 @@ export default function PluginsWorkspace() {
     }
   });
   // 页内分组 Tab + 非内置插件选中态（不持久化；侧栏仅联动内置插件）
-  const [group, setGroup] = useState<GroupKey>("builtin");
+  const [group, setGroup] = useState<GroupKey>("installed");
   const [installedSelection, setInstalledSelection] = useState<string | null>(null);
   const [catalogSelection, setCatalogSelection] = useState<string | null>(null);
   // 启停状态变化时重渲染（本组件与侧栏都可改）
@@ -540,7 +539,8 @@ export default function PluginsWorkspace() {
       if (!id) return;
       if (BUILTIN_PLUGINS.some((p) => p.id === id)) {
         setSelectedId(id as BuiltinPluginId);
-        goGroup("builtin");
+        setInstalledSelection(null);
+        goGroup("installed");
         return;
       }
       // 第三方插件：侧栏行点击 → 切到已安装分组并选中同一插件
@@ -597,15 +597,16 @@ export default function PluginsWorkspace() {
   const marketExt = group === "catalog" && catalogSelection && catalog
     ? catalog.find((e) => e.id === catalogSelection) ?? null
     : null;
-  const detail = group === "builtin" && plug ? { source: "builtin" as const, plug }
+  const detail = group === "catalog" && marketExt ? { source: "catalog" as const, ext: marketExt }
     : group === "installed" && installedPlug ? { source: "installed" as const, plug: installedPlug }
-      : group === "catalog" && marketExt ? { source: "catalog" as const, ext: marketExt }
+      : plug ? { source: "builtin" as const, plug }
         : null;
 
   const selectBuiltin = (id: BuiltinPluginId) => {
     try { localStorage.setItem(SELECTED_KEY, id); } catch { /* ignore */ }
     setSelectedId(id);
-    goGroup("builtin");
+    setInstalledSelection(null);
+    goGroup("installed");
   };
 
   const clearActionState = () => {
@@ -670,7 +671,7 @@ export default function PluginsWorkspace() {
   };
 
   const backToList = () => {
-    if (group === "builtin") setSelectedId(null);
+    setSelectedId(null);
     if (group === "installed") setInstalledSelection(null);
     if (group === "catalog") setCatalogSelection(null);
     clearActionState();
@@ -700,7 +701,7 @@ export default function PluginsWorkspace() {
         ) : <span />}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-2xl p-6 pt-5">
+      <div className="w-full px-4 py-3">
         {detail?.source === "builtin" && <div key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
         {detail?.source === "installed" && (
           <div className="mt-6">
@@ -731,27 +732,51 @@ export default function PluginsWorkspace() {
 
         {!detail && (
           <div>
-            {group === "builtin" && (
-              <div className="space-y-2">
-                {BUILTIN_PLUGINS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => selectBuiltin(item.id)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
-                  >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
-                      {iconFor(item, 18)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
-                      <span className="block truncate text-xs text-tx-tertiary">v{item.version} · {item.description}</span>
-                    </span>
-                    <Badge tone={isBuiltinPluginEnabled(item.id) ? "ok" : "neutral"}>
-                      {isBuiltinPluginEnabled(item.id) ? "已启用" : "已停用"}
-                    </Badge>
-                  </button>
-                ))}
+            {group === "installed" && (
+              <div>
+                <div className="mb-2 text-[11px] text-tx-tertiary">内置插件</div>
+                <div className="space-y-2">
+                  {BUILTIN_PLUGINS.map((item) => {
+                    const itemEnabled = isBuiltinPluginEnabled(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => selectBuiltin(item.id)}
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
+                          {iconFor(item, 18)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-sm font-medium text-tx-primary">{item.name}</span>
+                            <Badge tone="info">{BUILTIN_ORIGIN_LABEL[item.origin]}</Badge>
+                            <Badge tone={itemEnabled ? "ok" : "neutral"}>{itemEnabled ? "已启用" : "已停用"}</Badge>
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-tx-tertiary">{item.description}</span>
+                        </span>
+                        <span
+                          role="switch"
+                          aria-checked={itemEnabled}
+                          title={itemEnabled ? "停用插件" : "启用插件"}
+                          onClick={(e) => { e.stopPropagation(); setBuiltinPluginDisabled(item.id, itemEnabled); }}
+                          className={cn(
+                            "relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full transition-colors",
+                            itemEnabled ? "bg-accent-primary" : "bg-app-border",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white transition-all",
+                              itemEnabled ? "left-4" : "left-0.5",
+                            )}
+                          />
+                        </span>
+                        <span className="shrink-0 text-tx-tertiary">›</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
@@ -767,7 +792,9 @@ export default function PluginsWorkspace() {
             )}
 
             {group === "installed" && (
-              installed === null ? (
+              <div className="mt-6">
+                <div className="mb-2 text-[11px] text-tx-tertiary">第三方插件</div>
+              {installed === null ? (
                 <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载已安装插件</div>
               ) : installed.length ? (
                 <div className="space-y-2">
@@ -795,7 +822,8 @@ export default function PluginsWorkspace() {
                 <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
                   尚未安装第三方插件，可到「市场」浏览。
                 </div>
-              )
+              )}
+              </div>
             )}
 
             {group === "catalog" && (

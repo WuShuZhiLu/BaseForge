@@ -58,8 +58,10 @@ import {
   EyeOff,
   Ghost,
   Layers,
+  LayoutGrid,
   Magnet,
   Paperclip,
+  Store,
   Unlock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -3379,98 +3381,55 @@ export default function SidebarDesktop() {
           </div>
         )}
 
-        {/* ===== 插件视图 ===== */}
+        {/* ===== 插件视图（方案 B：侧栏只做入口，不列插件） ===== */}
         {sidebarView === "plugins" && (
           <div className="sbx-view">
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-2.5 pr-1.5 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
               <span className="min-w-0 truncate text-xs font-medium text-tx-primary">插件</span>
             </div>
-            {/* 分组与主区同一套（内置/已安装/市场/管理）：侧栏是导航，主区是列表与详情 */}
-            <div className="sbx-chips">
-              {([["builtin", "内置"], ["installed", "已安装"], ["catalog", "市场"], ["admin", "管理"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
-                <span
-                  key={cat}
-                  className={cn("sbx-chip", plugCat === cat && "on")}
-                  onClick={() => {
-                    setPlugCat(cat);
-                    window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: cat } }));
-                    if (state.viewMode !== "plugins") actions.setViewMode("plugins");
-                  }}
-                >
-                  {label}
-                </span>
-              ))}
-            </div>
-            {/* 行内只留名称 + 开关：副标题、描述、长说明都收到 title 或主区，侧栏不再堆字 */}
-            <div className="px-1 pb-2">
-              {plugCat === "builtin" && BUILTIN_PLUGINS.map((plug) => {
-                const enabled = isBuiltinPluginEnabled(plug.id) && !builtinDisabled.has(plug.id);
+            {/* 侧栏零插件列表：插件启用后在左侧导航栏徽章里直接打开，这里只负责"去哪找" */}
+            <div className="px-1 pb-2 pt-1">
+              {([
+                { key: "catalog", icon: Store, label: "市场", hint: "" },
+                { key: "admin", icon: RefreshCw, label: "更新", hint: "" },
+                { key: "installed", icon: LayoutGrid, label: "管理全部插件", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
+              ] as const).map((entry) => {
+                const Icon = entry.icon;
                 return (
                   <div
-                    key={plug.id}
+                    key={entry.key}
                     className="sbx-row group items-center"
-                    title={plug.description ? `查看插件详情 · ${plug.description}` : "查看插件详情"}
+                    title={entry.label}
                     onClick={() => {
-                      // VSCode 式：点击插件 → 工作区显示详情页
-                      try { localStorage.setItem("nowen-plugins-workspace-selected", plug.id); } catch { /* ignore */ }
-                      window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: plug.id } }));
+                      setPlugCat(entry.key);
+                      window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
                       if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                     }}
                   >
-                    <span className="sbx-ico">{plug.icon === "tasks" ? <ListTodo size={14} className="text-violet-500" /> : plug.icon === "diary" ? <RefreshCw size={14} className="text-amber-500" /> : plug.icon === "ai" ? <Sparkles size={14} className="text-accent-primary" /> : <Link2 size={14} className="text-tx-tertiary" />}</span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{plug.name}</span>
+                    <span className="sbx-ico"><Icon size={14} className="text-tx-tertiary" /></span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{entry.label}</span>
+                    {entry.hint && <span className="shrink-0 text-[10px] text-tx-tertiary">{entry.hint}</span>}
                     <span className="sbx-acts">
-                      {enabled && (
-                        <button
-                          type="button"
-                          title="打开面板"
-                          onClick={(e) => { e.stopPropagation(); setOpenPluginPanel(plug.id); setSidebarView("kb"); }}
-                          className="sbx-btn"
-                        >
-                          <ChevronDown size={12} className="-rotate-90" />
-                        </button>
-                      )}
+                      <span className="sbx-btn"><ChevronDown size={12} className="-rotate-90" /></span>
                     </span>
-                    <span
-                      className={cn("sbx-switch", enabled && "on")}
-                      title={enabled ? "停用插件" : "启用插件"}
-                      onClick={() => setBuiltinPluginDisabled(plug.id, enabled)}
-                    />
                   </div>
                 );
               })}
-              {plugCat === "installed" && plugins.map((plug) => (
-                <div
-                  key={plug.id}
-                  className="sbx-row group items-center"
-                  title={`查看插件详情 · v${plug.version}${plug.description ? ` · ${plug.description}` : ""}`}
-                  onClick={() => {
-                    // 第三方插件与内置插件一致：点行 → 工作区详情
-                    window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: plug.id } }));
-                    if (state.viewMode !== "plugins") actions.setViewMode("plugins");
-                  }}
-                >
-                  <span className="sbx-ico"><Puzzle size={14} className="text-tx-tertiary" /></span>
-                  <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{plug.name}</span>
-                  <span
-                    className={cn("sbx-switch", plug.status === "enabled" && "on")}
-                    title={plug.status === "enabled" ? "停用插件" : "启用插件"}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const action = plug.status === "enabled" ? api.plugins.disable(plug.id) : api.plugins.enable(plug.id);
-                      action
-                        .then(() => api.plugins.list().then((list) => setPlugins(list)).catch(() => undefined))
-                        .catch(() => undefined);
-                    }}
-                  />
-                </div>
-              ))}
-              {plugCat === "installed" && plugins.length === 0 && (
-                <p className="sbx-view-empty">尚未安装第三方插件，去「市场」看看</p>
-              )}
-              {plugCat === "catalog" && <p className="sbx-view-empty">市场在主区：选中条目可查看权限并安装</p>}
-              {plugCat === "admin" && <p className="sbx-view-empty">管理在主区：安装包、检查更新、Registry 与执行边界</p>}
+              <p className="sbx-view-empty">已启用的插件在左侧导航栏直接打开，此处不再重复列。</p>
+            </div>
+            <div className="border-t border-app-border px-1 py-2">
+              <button
+                type="button"
+                className="w-full rounded-md border border-app-border bg-app-surface px-2 py-1.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
+                onClick={() => {
+                  setPlugCat("admin");
+                  window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: "admin" } }));
+                  if (state.viewMode !== "plugins") actions.setViewMode("plugins");
+                }}
+              >
+                安装本地插件
+              </button>
             </div>
           </div>
         )}
