@@ -7,7 +7,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "9f71e9450fefc6a07f1f33cd1a24c0d556e51b70de2c24da45268b74c4865850" as const;
+export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "76bfc89b5bd5e30d14e2c17da3d87093bd8c5b7c563c28d2654eaa6b313564cc" as const;
 export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
   "catalogVersion": 1,
   "hostApi": {
@@ -1041,7 +1041,7 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
     ]
   },
   "contributions": {
-    "contractVersion": 4,
+    "contractVersion": 6,
     "namespaceTemplate": "<pluginId>/<contributionId>",
     "runtimes": [
       "declarative",
@@ -1049,6 +1049,15 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
       "node-action"
     ],
     "types": [
+      {
+        "id": "activityBadges",
+        "since": "2.2",
+        "runtimes": [
+          "declarative"
+        ],
+        "declarative": true,
+        "description": "Declarative activity-bar badges that open a sidebar panel or a tool tab"
+      },
       {
         "id": "automationTemplates",
         "since": "2.0",
@@ -1069,6 +1078,16 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         ],
         "declarative": false,
         "description": "Command palette and host command registrations"
+      },
+      {
+        "id": "editorCommands",
+        "since": "2.3",
+        "runtimes": [
+          "sandbox-js",
+          "node-action"
+        ],
+        "declarative": false,
+        "description": "Editor slash-menu entries and keybindings that dispatch declared plugin actions"
       },
       {
         "id": "inboundWebhooks",
@@ -1135,6 +1154,15 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "description": "Host-rendered extension settings"
       },
       {
+        "id": "sidebarPanels",
+        "since": "2.2",
+        "runtimes": [
+          "declarative"
+        ],
+        "declarative": true,
+        "description": "Declarative sidebar panels rendered by the host inside the sidebar panel container"
+      },
+      {
         "id": "uiComponents",
         "since": "2.1",
         "runtimes": [
@@ -1145,58 +1173,7 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "declarative": true,
         "description": "Host-rendered UI actions placed in user-controlled extension slots"
       }
-    ],
-    "noteTheme": {
-      "schemaVersion": 1,
-      "bases": [
-        "nowen.default"
-      ],
-      "editableTokens": [
-        "surface",
-        "text",
-        "heading",
-        "muted",
-        "border",
-        "accent",
-        "accentHover",
-        "inlineCodeBackground",
-        "inlineCodeText",
-        "preBackground",
-        "preText",
-        "quoteBorder",
-        "quoteText",
-        "softBackground",
-        "tableStripe",
-        "markBackground",
-        "selection",
-        "contentMaxWidth",
-        "lineHeight"
-      ],
-      "maxThemesPerPlugin": 20
-    },
-    "noteTemplate": {
-      "schemaVersion": 1,
-      "maxTemplatesPerPlugin": 100,
-      "maxBodyBytes": 262144
-    },
-    "promptPack": {
-      "schemaVersion": 1,
-      "maxPromptsPerPlugin": 100,
-      "maxPromptBytes": 65536
-    },
-    "uiComponent": {
-      "schemaVersion": 1,
-      "kinds": [
-        "action"
-      ],
-      "slots": [
-        "floating-layer"
-      ],
-      "actions": [
-        "navigation.open"
-      ],
-      "maxComponentsPerPlugin": 50
-    }
+    ]
   },
   "errors": {
     "contractVersion": 2,

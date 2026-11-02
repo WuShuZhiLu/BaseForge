@@ -1,6 +1,5 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
-// 【2026-10-16 手工同步注明】生成器脚本已不在仓库内（文件头引用缺失）；按 .cmp/COLLAB-BOARD.md 6.8 B-7，
-// 由 B 线按既有生成格式手工追加 sidebarPanels / activityBadges（contractVersion 4 → 5）。
+// 此文件由 scripts/generate-plugin-contracts.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
+// 重新生成：node scripts/generate-plugin-contracts.mjs
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const nested of Object.values(value)) deepFreeze(nested);
