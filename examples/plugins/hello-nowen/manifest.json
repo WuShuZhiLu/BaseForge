@@ -1,14 +1,18 @@
 {
-  "id": "com.nowen.hello",
+  "id": "nowen.hello",
   "name": "Hello Nowen",
-  "description": "Nowen Extension Platform V1 最小示例",
-  "version": "1.0.0",
-  "apiVersion": 1,
-  "engines": { "nowen": ">=1.5.0 <2.0.0" },
-  "runtime": "node-action",
-  "main": "dist/index.mjs",
-  "author": { "name": "Nowen" },
-  "permissions": [],
+  "description": "Nowen Extension Platform 最小示例：问候 Action、外网白名单声明与编辑器命令",
+  "version": "1.1.0",
+  "apiVersion": 2,
+  "publisher": "nowen",
+  "categories": ["productivity"],
+  "repository": "https://github.com/cropflre/nowen-note",
+  "license": "MIT",
+  "engines": { "nowen": ">=1.5.1 <2.0.0" },
+  "runtime": "sandbox-js",
+  "main": "index.js",
+  "permissions": ["external:fetch"],
+  "permissionConfig": { "externalFetchHosts": ["api.example.com"] },
   "actions": [
     {
       "id": "hello",
@@ -17,5 +21,17 @@
       "execution": "interactive",
       "input": { "name": { "type": "string", "required": false } }
     }
-  ]
+  ],
+  "contributes": {
+    "editorCommands": [
+      {
+        "id": "nowen.hello.insert-greeting",
+        "title": "插入 Hello 问候",
+        "keywords": ["hello", "greeting", "问候"],
+        "keybinding": "Mod-Alt-H",
+        "when": "editorFocused",
+        "action": "hello"
+      }
+    ]
+  }
 }

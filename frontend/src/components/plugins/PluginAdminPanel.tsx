@@ -5,7 +5,7 @@
  * Runtime 策略、Registry 来源与国内镜像、开发者模式。
  * 单插件的配置（设置项/连接/Actions）在插件详情页的「设置与运行」分区，不在这里。
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import { Code2, Loader2, PackagePlus, ShieldCheck } from "lucide-react";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/lib/pluginApi";
 import { getPluginRuntimePresentation } from "@/lib/pluginRuntimePresentation";
 import { alert, confirm } from "@/components/ui/confirm";
+import { consumePluginAdminFocus, onPluginAdminFocus } from "@/lib/pluginAdminFocus";
 import { PluginRuntimePolicySettings } from "@/components/settings/plugins/PluginRuntimePolicySettings";
 import { ExternalHostList } from "@/components/plugins/ExternalHostList";
 
@@ -33,9 +34,13 @@ type PendingPackage = { file: File; manifest: PendingManifest; nodeRuntimeConfir
 const FIELD = "w-full rounded-md border border-app-border bg-transparent px-2 py-1.5 text-xs text-tx-primary";
 const BUTTON = "rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-xs text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50";
 
-function Panel({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Panel({ title, description, highlight, panelRef, children }: { title: string; description?: string; highlight?: boolean; panelRef?: React.Ref<HTMLDivElement>; children: React.ReactNode }) {
   return (
-    <div className="mt-4 rounded-lg border border-app-border bg-app-surface p-4">
+    <div
+      ref={panelRef}
+      className={`mt-4 rounded-lg border bg-app-surface p-4 transition-shadow ${highlight ? "border-accent-primary ring-2 ring-accent-primary/30" : "border-app-border"}`}
+      data-plugin-admin-panel={title}
+    >
       <h3 className="text-sm font-semibold text-tx-primary">{title}</h3>
       {description && <p className="mt-1 text-xs text-tx-tertiary">{description}</p>}
       {children}
@@ -86,6 +91,28 @@ function AdminBody({ onInstalled }: { onInstalled: () => Promise<void> }) {
   const [devDirectory, setDevDirectory] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // 「安装本地插件」入口的定位：滚动到「安装插件包」分区并短暂高亮
+  const installPanelRef = useRef<HTMLDivElement>(null);
+  const installButtonRef = useRef<HTMLButtonElement>(null);
+  const [installHighlight, setInstallHighlight] = useState(false);
+
+  const focusInstallSection = useCallback(() => {
+    installPanelRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    installButtonRef.current?.focus({ preventScroll: true });
+    setInstallHighlight(true);
+    window.setTimeout(() => setInstallHighlight(false), 2000);
+  }, []);
+
+  useEffect(() => {
+    // 挂载时消费落槽的请求（分组/主区是刚切过来的，事件可能早于挂载发出）
+    if (consumePluginAdminFocus("install")) focusInstallSection();
+    // 面板已挂载时直接收事件；顺带清槽避免重复消费
+    return onPluginAdminFocus((section) => {
+      if (section !== "install") return;
+      consumePluginAdminFocus("install");
+      focusInstallSection();
+    });
+  }, [focusInstallSection]);
 
   useEffect(() => {
     void pluginApi.registrySources().then(setSources).catch(() => setSources([]));
@@ -159,7 +186,7 @@ function AdminBody({ onInstalled }: { onInstalled: () => Promise<void> }) {
 
   return (
     <div>
-      <Panel title="安装插件包" description="本地插件包与市场安装走同一套签名、校验和与兼容性校验。">
+      <Panel title="安装插件包" description="本地插件包与市场安装走同一套签名、校验和与兼容性校验。" highlight={installHighlight} panelRef={installPanelRef}>
         <input
           ref={inputRef}
           type="file"
@@ -169,6 +196,7 @@ function AdminBody({ onInstalled }: { onInstalled: () => Promise<void> }) {
         />
         <button
           type="button"
+          ref={installButtonRef}
           onClick={() => inputRef.current?.click()}
           className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-accent-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
         >

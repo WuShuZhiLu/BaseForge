@@ -140,7 +140,7 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname, hasInAppForwardNavigationOccurred } from "@/lib/appPathNavigation";
-import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
+import { getCurrentAppRoute, kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import {
   shareCenterApi,
@@ -150,6 +150,7 @@ import {
   type ShareCenterRisk,
 } from "@/lib/shareCenter";
 import { loadPluginCounts, peekPluginCounts, PLUGIN_COUNTS_EVENT, type PluginCounts } from "@/lib/pluginCounts";
+import { requestPluginAdminFocus } from "@/lib/pluginAdminFocus";
 import {
   getShareCenterUiVersion,
   getShareGroup,
@@ -529,7 +530,24 @@ export default function SidebarDesktop() {
   // ===== 侧栏活动栏视图（FR-IA-02）：kb / star / trash / files / plugins =====
   // Rail 点击经 nowen:sidebar-view 事件切换；主区视图不变（语雀式）
   type SidebarView = "kb" | "trash" | "files" | "plugins" | "projects" | "shares";
-  const [sidebarView, setSidebarView] = useState<SidebarView>("kb");
+  const [sidebarView, setSidebarView] = useState<SidebarView>(() => {
+    // 刷新/深链首次挂载：与 App 从 URL 恢复的主区 viewMode 对齐一次（如 /plugins → 插件侧栏）。
+    // 只在初始化时对齐，之后用户可自由切换侧栏，不在 viewMode 变化时强改。
+    const route = getCurrentAppRoute();
+    if (route.kind === "module") {
+      const map: Partial<Record<string, SidebarView>> = {
+        trash: "trash",
+        files: "files",
+        plugins: "plugins",
+        projects: "projects",
+        shares: "shares",
+        favorites: "kb",
+      };
+      const v = map[route.viewMode];
+      if (v) return v;
+    }
+    return "kb";
+  });
 
   // 收藏 / 回收站 / 文件管理数据
   const [starDocs, setStarDocs] = useState<NoteListItem[]>([]);
@@ -3447,6 +3465,8 @@ export default function SidebarDesktop() {
                 onClick={() => {
                   setPlugCat("admin");
                   window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: "admin" } }));
+                  // 落到管理分组后把「安装插件包」分区滚进视口并聚焦（否则视口停在更新区附近，像跳到了「更新」）
+                  requestPluginAdminFocus("install");
                   if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                 }}
               >

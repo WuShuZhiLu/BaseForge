@@ -11,7 +11,12 @@
           "version": "1.0.0",
           "download": "https://example.com/hello-nowen-1.0.0.nowen-plugin",
           "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "nowen": ">=1.5.0 <2.0.0"
+          "nowen": ">=1.5.0 <2.0.0",
+          "apiVersion": 2,
+          "runtime": "sandbox-js",
+          "permissions": ["external:fetch"],
+          "permissionConfig": { "externalFetchHosts": ["api.example.com"] },
+          "publishedAt": "2026-11-01T00:00:00.000Z"
         }
       ]
     }
