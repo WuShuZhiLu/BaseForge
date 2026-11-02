@@ -9,7 +9,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export type PluginContributionRuntime = "declarative" | "sandbox-js" | "node-action";
-export type PluginContributionType = "activityBadges" | "automationTemplates" | "commands" | "editorCommands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
+export type PluginContributionType = "automationTemplates" | "commands" | "editorCommands" | "inboundWebhooks" | "mainViewPanels" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
 
 export interface PluginContributionContractEntry {
   id: PluginContributionType;
@@ -22,15 +22,6 @@ export interface PluginContributionContractEntry {
 export const CONTRIBUTION_CONTRACT_VERSION = 6 as const;
 export const CONTRIBUTION_NAMESPACE_TEMPLATE = "<pluginId>/<contributionId>" as const;
 export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] = deepFreeze([
-  {
-    "id": "activityBadges",
-    "since": "2.2",
-    "runtimes": [
-      "declarative"
-    ],
-    "declarative": true,
-    "description": "Declarative activity-bar badges that open a sidebar panel or a tool tab"
-  },
   {
     "id": "automationTemplates",
     "since": "2.0",
@@ -71,6 +62,17 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     ],
     "declarative": false,
     "description": "Host-owned capability-token HTTP callbacks with bounded requests and responses"
+  },
+  {
+    "id": "mainViewPanels",
+    "since": "2.2",
+    "runtimes": [
+      "declarative",
+      "sandbox-js",
+      "node-action"
+    ],
+    "declarative": true,
+    "description": "Host-rendered main-area panels that occupy the workspace view"
   },
   {
     "id": "menus",
@@ -184,14 +186,6 @@ export const PROMPT_PACK_CONTRIBUTION_LIMITS = deepFreeze({
   "schemaVersion": 1,
   "maxPromptsPerPlugin": 100,
   "maxPromptBytes": 65536
-} as const);
-export const ACTIVITY_BADGE_CONTRIBUTION_LIMITS = deepFreeze({
-  "schemaVersion": 1,
-  "maxBadgesPerPlugin": 10,
-  "targets": [
-    "panel",
-    "tool"
-  ]
 } as const);
 export const SIDEBAR_PANEL_CONTRIBUTION_LIMITS = deepFreeze({
   "schemaVersion": 1,

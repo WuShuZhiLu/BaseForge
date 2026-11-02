@@ -7,7 +7,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "76bfc89b5bd5e30d14e2c17da3d87093bd8c5b7c563c28d2654eaa6b313564cc" as const;
+export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "8423187ffe5a182b97fc4063648152ea6edbd48b610ecb65a0d017861044e3b4" as const;
 export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
   "catalogVersion": 1,
   "hostApi": {
@@ -1050,15 +1050,6 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
     ],
     "types": [
       {
-        "id": "activityBadges",
-        "since": "2.2",
-        "runtimes": [
-          "declarative"
-        ],
-        "declarative": true,
-        "description": "Declarative activity-bar badges that open a sidebar panel or a tool tab"
-      },
-      {
         "id": "automationTemplates",
         "since": "2.0",
         "runtimes": [
@@ -1098,6 +1089,17 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         ],
         "declarative": false,
         "description": "Host-owned capability-token HTTP callbacks with bounded requests and responses"
+      },
+      {
+        "id": "mainViewPanels",
+        "since": "2.2",
+        "runtimes": [
+          "declarative",
+          "sandbox-js",
+          "node-action"
+        ],
+        "declarative": true,
+        "description": "Host-rendered main-area panels that occupy the workspace view"
       },
       {
         "id": "menus",
