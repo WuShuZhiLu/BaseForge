@@ -30,6 +30,34 @@ const connectionSchema = z.object({
   description: z.string().max(500).optional(),
 }).strict();
 
+const EXTERNAL_HOST_PATTERN = /^(\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
+const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".localdomain", ".localhost", ".lan", ".home.arpa"];
+
+/**
+ * 外网白名单的静态校验：只接受正常域名（可带 *. 前缀），拒绝 IP 字面量与内网域名。
+ * 运行时的 CIDR 拦截只能挡住"解析后落在内网"的情况，挡不住 manifest 里直接写
+ * 127.0.0.1 / localhost / *.internal 这类意图明显的声明，所以在安装校验阶段就拒掉。
+ */
+function validateExternalHost(value: string): string | null {
+  const host = value.trim().toLowerCase();
+  if (!host) return "域名不能为空";
+  if (/^[\d.]+$/.test(host) || host.includes(":")) return "不能使用 IP 字面量，请填写域名";
+  if (host === "localhost" || BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return "不能使用内网/本机域名";
+  }
+  if (!EXTERNAL_HOST_PATTERN.test(host)) return "域名格式不合法（允许 example.com 或 *.example.com）";
+  return null;
+}
+
+const permissionConfigSchema = z.object({
+  externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional(),
+}).strict().superRefine((config, ctx) => {
+  for (const [index, host] of (config.externalFetchHosts ?? []).entries()) {
+    const problem = validateExternalHost(host);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["externalFetchHosts", index], message: problem });
+  }
+});
+
 export const pluginManifestV1Schema = z.object({
   id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(150),
   name: z.string().min(1).max(100),
@@ -50,7 +78,7 @@ export const pluginManifestV1Schema = z.object({
   connections: z.array(connectionSchema).max(20).optional(),
   output: z.record(z.unknown()).optional(),
   permissions: z.array(z.enum(PLUGIN_PERMISSIONS)).max(32).default([]),
-  permissionConfig: z.object({ externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional() }).strict().optional(),
+  permissionConfig: permissionConfigSchema.optional(),
   actions: z.array(actionSchema).min(1).max(50),
   events: z.array(z.string().min(1).max(100)).max(50).optional(),
   eventHandlers: z.array(z.object({ event: z.string().min(1).max(100), action: z.string().min(1).max(64) }).strict()).max(50).optional(),
@@ -228,7 +256,7 @@ const v2BaseShape = {
   runtimePlatform: z.array(z.enum(["server", "desktop-full"])).min(1).max(2).optional(),
   uiPlatform: z.array(z.enum(["web", "desktop", "android", "ios"])).max(4).optional(),
   output: z.record(z.unknown()).optional(),
-  permissionConfig: z.object({ externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional() }).strict().optional(),
+  permissionConfig: permissionConfigSchema.optional(),
   extensionDependencies: z.record(z.string().min(1).max(100)).optional(),
 };
 
