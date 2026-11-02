@@ -1,6 +1,6 @@
 # Nowen 插件安全模型（SECURITY）
 
-> 与代码同步于提交 `e47d57072`（分支 `feat/space-and-plugins`）。
+> 与代码同步于提交 `28634416c`（分支 `feat/space-and-plugins`）。
 > 依据：`backend/src/plugins/` 下 `manifest.ts`、`packageValidator.ts`、`packageInstaller.ts`、`permissions.ts`、
 > `secureExternalFetch.ts`、`pluginRateLimiter.ts`、`secrets.ts`、`hostApiBroker.ts`、`sandboxRunner.ts`、
 > `sandbox-child.mjs`、`runner.ts`、`runner-child.mjs`、`inboundWebhooks.ts`、`registryTrust.ts`、
@@ -97,7 +97,7 @@
 | 层 | 控制 |
 | --- | --- |
 | 协议 | 仅 `https:`；拒绝 URL 内嵌凭证、fragment、反斜杠、控制/零宽字符 |
-| 目标 | 必须命中 `permissionConfig.externalFetchHosts` 的 `host:port`（默认 443）精确匹配 |
+| 目标 | 必须命中 `permissionConfig.externalFetchHosts` 的 `host:port`（默认 443）精确匹配；**声明期就拒绝通配符与端口**，运行期遇到含 `*` 的条目（如历史配置）按非法配置 fail-closed，整次调用拒绝 |
 | DNS | 自解析 CNAME 链（≤16 层、每层唯一、无环）+ A/AAAA；解析结果**全部**必须是公网地址 |
 | 连接固定 | 用自定义 `lookup` 把已校验 IP 钉给本次 TLS 连接，防止解析漂移/rebinding；`servername` 显式指定，`rejectUnauthorized: true` |
 | 私网 | IPv4 按 18 个保留段黑名单；IPv6 按 IANA 分配表**正向白名单**，并额外排除 `2001::/23`、`2001:db8::/32`、`2002::/16`、`3fff::/20`、IPv4-mapped |
@@ -211,7 +211,7 @@
 ## 8. 给插件作者的安全底线
 
 1. 能只读就不要写；能 `[]` 权限就不要申请权限。
-2. 需要外网时只写**精确域名**（`*.example.com` 在运行时会被拒，见 `SPEC.md` §9）。
+2. 需要外网时只写**精确域名**（`*.example.com` 与带端口的条目在安装期就被拒，见 `SPEC.md` §7）。
 3. 不要把用户数据拼进 URL 查询串（审计不记录它，但中间代理会）。
 4. 凭据只放在 `connections` + `secrets:use`，不要落盘到 `plugin-storage`。
 5. 声明式能表达就别写代码；确实要写代码优先 `sandbox-js`，因为只有它是真隔离。

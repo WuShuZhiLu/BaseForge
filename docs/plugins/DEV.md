@@ -1,6 +1,6 @@
 # Nowen 插件开发指南（DEV）
 
-> 与代码同步于提交 `e47d57072`（分支 `feat/space-and-plugins`）。
+> 与代码同步于提交 `28634416c`（分支 `feat/space-and-plugins`）。
 > 规范细节见 [SPEC.md](./SPEC.md)，安全边界见 [SECURITY.md](./SECURITY.md)。
 
 环境要求：Node ≥ 20（后端开发本身要求 ≥ 22.5），仓库已 `npm install`（`backend/node_modules` 里要有 `tsx`、`jszip`）。
@@ -290,8 +290,8 @@ SPEC §5.11）：
 
 1. 只加真正用到的权限；`permissions` 里每一项都会出现在安装确认页。
 2. 加 `external:fetch` 时必须同时写 `permissionConfig.externalFetchHosts`，否则每次请求都被拒（白名单为空）。
-   **只写精确域名**：`*.example.com` 能过安装校验，但运行期 `normalizeAllowedHost` 会抛 `EXTERNAL_FETCH_DENIED`，
-   并且会让整次调用失败（见 SPEC §9）。
+   **只写精确域名**：`*.example.com` 在**安装期**就被拒（`不支持通配符，请逐个填写精确域名`），
+   `api.example.com:8443` 也会被拒（声明期不接受端口）。运行期同样是精确匹配，别指望通配（见 SPEC §7）。
 3. 加 `connections` 时必须同时申请 `secrets:use`，否则 manifest 校验直接报"声明 connections 必须请求 secrets:use"。
 4. 已发布插件新增权限时，更新检查会算出 `permissionDiff.added` / `addedHosts`，用户需要重新确认；
    不要指望"更新静默继承授权"——`initialize()` 会把 `granted` 重置为 0。

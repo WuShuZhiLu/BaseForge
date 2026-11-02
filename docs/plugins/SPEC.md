@@ -1,8 +1,7 @@
 # Nowen 插件规范（SPEC）
 
-> 与代码同步于提交 `e47d57072`（分支 `feat/space-and-plugins`）。
-> 注意：该分支上 `editorCommands` 等少数能力仍是工作区未提交改动，本文按**当前工作区代码**描述，
-> 涉及未提交能力的段落已单独标注。
+> 与代码同步于提交 `28634416c`（分支 `feat/space-and-plugins`）。
+> 该提交已包含 `editorCommands`（`cb93ad77f`）与"白名单仅精确域名"（`28634416c`）两处行为变更。
 > 本文所有字段名、正则、限额均取自 `backend/src/plugins/manifest.ts`、`packageValidator.ts`、`types.ts`、
 > `secureExternalFetch.ts`、`pluginRateLimiter.ts` 与 `packages/nowen-plugin-sdk/host-api-contract.json`，
 > 改代码必须同步改本文。
@@ -232,7 +231,7 @@ V2 是两个 schema 的联合：**executable**（`sandbox-js` | `node-action`）
 | `noteTemplates` | executable + declarative | 100 | 2.1 |
 | `promptPacks` | executable + declarative | 100 | 2.1 |
 | `uiComponents` | executable + declarative | 50 | 2.1（UI 门禁） |
-| `editorCommands` | executable（**工作区新增，`since 2.3`**） | 50 | 2.3 |
+| `editorCommands` | executable | 50 | 2.3 |
 | `sidebarPanels` | executable + declarative | 10 | 2.2 |
 | `mainViewPanels` | executable + declarative | 5 | 未列入契约 JSON（见 §9） |
 
@@ -371,7 +370,7 @@ token 规则：颜色 token（`surface` `text` `heading` `muted` `border` `accen
 | `builtinId` | string | 是 | 目前仅 `tasks` / `diary` |
 | `uiPlatform` | string[] | 否 | 1–4 项 |
 
-### 5.11 `editorCommands[]`（`since 2.3`，仅 executable，**工作区未提交**）
+### 5.11 `editorCommands[]`（`since 2.3`，仅 executable）
 
 出现在编辑器斜杠菜单、可绑定快捷键，执行时调用本插件已声明的 Action。
 
@@ -449,30 +448,37 @@ token 规则：颜色 token（`surface` `text` `heading` `muted` `border` `accen
 
 ## 7. 外网白名单（`permissionConfig.externalFetchHosts`）
 
-### 7.1 声明期校验（安装时，`validateExternalHost`）
+**只写精确域名**：声明期禁通配符、禁端口；运行期按 `host:port` 精确匹配（默认 443）。两侧语义一致，
+不会出现"装得上、跑不通"。
+
+### 7.1 声明期校验（安装/升级/市场安装，`validateExternalHost`）
 
 | 情形 | 结果 |
 | --- | --- |
-| `example.com` | 通过 |
-| `*.example.com` | **通过**（schema 允许一级通配前缀） |
-| `api.example.com:8443` | 拒（含 `:` 一律按 IP 字面量处理）：`不能使用 IP 字面量，请填写域名`。运行期虽支持 `host:port`，但 manifest 无法声明非 443 端口，见 §9 |
+| `example.com` / `api.example.com` | 通过 |
+| `*.example.com` | **拒**：`不支持通配符，请逐个填写精确域名` |
+| `api.example.com:8443` | **拒**：`不能使用 IP 字面量，请填写域名`（含 `:` 一律按 IP 字面量处理，声明期不接受端口） |
 | `127.0.0.1` / `8.8.8.8` | 拒：`不能使用 IP 字面量，请填写域名` |
 | 含 `:` 的 IPv6 字面量 | 同上 |
 | `localhost` | 拒：`不能使用内网/本机域名` |
-| `*.local` `.internal` `.localdomain` `.localhost` `.lan` `.home.arpa` 后缀 | 同上 |
+| `.local` `.internal` `.localdomain` `.localhost` `.lan` `.home.arpa` 后缀 | 同上 |
 | `127.0.0.1.nip.io`（合法域名但解析到内网） | **声明期通过**，运行时被 CIDR 拦截（§7.2） |
-| 空串 / 超 253 字符 / 非法字符（`_`、空格、CIDR 写法 `10.0.0.0/8`） | 拒：`域名格式不合法（允许 example.com 或 *.example.com）` |
+| 空串 / 超 253 字符 / 非法字符（`_`、空格、CIDR 写法 `10.0.0.0/8`） | 拒：`域名格式不合法（请填写类似 api.example.com 的精确域名）` |
 | 数组超过 50 项 | schema 拒绝 |
 
-域名正则：`^(\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$`（大小写不敏感，存储时转小写）。
+域名正则：`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$`（大小写不敏感，存储时转小写）。
+
+> 发布侧提醒：`packages/nowen-extension-registry/src/security/manifestV2.ts` 目前只校验
+> `externalFetchHosts` 是 `string[]`（长度 ≤50、每项 ≤253），**不校验域名格式**。所以注册表可能在发布时收下一份含
+> 通配符的 manifest，但用户端 `parsePluginManifest` 安装时会拒。对外表述请用"用户端安装时拒绝"。
 
 ### 7.2 运行期校验（`secureExternalFetch`，每次请求）
 
 | 检查 | 规则 |
 | --- | --- |
 | URL | 仅 `https:`；不允许 `user:pass@`、不允许 `#fragment`、不允许反斜杠、不允许控制字符/零宽字符 |
-| 白名单匹配 | 按 `host:port` 精确匹配（缺省端口 443）；条目可写 `api.example.com` / `api.example.com:8443` / `[2001:db8::1]:443` |
-| 通配 | **运行时实现不支持 `*`**：条目含 `*` 会抛 `EXTERNAL_FETCH_DENIED`（"白名单包含无效主机"），并使本次调用整体失败。见 §9 |
+| 白名单匹配 | 按 `host:port` 精确匹配（缺省端口 443）；条目可写 `api.example.com` / `api.example.com:8443` / `[2001:db8::1]:443`。带端口只是防御性兼容实现，**对外契约仍是"仅 443 的精确域名"**，manifest 无法声明端口 |
+| 通配 | 条目含 `*` 视为**非法配置**并 fail-closed：`allowedHosts.map(normalizeAllowedHost)` 阶段抛 `EXTERNAL_FETCH_DENIED`（"白名单包含无效主机"），本次 `external.fetch` 整体拒绝，不会降级为通配放行（库里的历史 wildcard 配置同样不会被解释成"允许所有子域"） |
 | DNS | 自行 `resolveCname`（≤16 层、每层必须唯一别名、必须无环）+ `resolve4`/`resolve6`，解析结果**全部**必须是公网地址，否则拒 |
 | IP 固定 | 解析出的地址通过自定义 `lookup` 固定给本次连接，避免二次解析（DNS rebinding） |
 | 非公网判定 | IPv4 拒绝 0/8、10/8、100.64/10、127/8、169.254/16、172.16/12、192.0.0/24、192.0.2/24、192.31.196/24、192.52.193/24、192.88.99/24、192.168/16、192.175.48/24、198.18/15、198.51.100/24、203.0.113/24、224/4、240/4；IPv6 采用"正向白名单"（仅 IANA 已分配全球单播段），并额外拒绝 2001::/23、2001:db8::/32、2002::/16、3fff::/20，以及 IPv4-mapped 地址按内嵌 IPv4 判定 |
@@ -518,18 +524,20 @@ cd examples/plugins/my-plugin && node ../../../packages/nowen-plugin-cli/bin/now
 
 ---
 
-## 9. 与代码不一致的已知点（只记录，未修改代码）
+## 9. 已知边界与不一致点（只记录，未修改代码）
 
-1. **`*.example.com` 名义支持、运行时不支持。** `manifest.ts` 的 `validateExternalHost` 接受 `*.` 前缀，
-   但 `secureExternalFetch.ts` 的 `normalizeAllowedHost` 对含 `*` 的条目直接抛 `EXTERNAL_FETCH_DENIED`，
-   且该异常会让整次 `external.fetch` 失败（不是忽略该条）。当前**唯一可用写法是精确域名**。
+1. **白名单两侧语义已对齐，但发布侧没对齐。** 声明期与运行期都只接受精确域名：`*.example.com` 在安装期即报
+   `不支持通配符，请逐个填写精确域名`，运行期遇到库里的历史 wildcard 配置也 fail-closed。
+   残留缺口在**注册表侧**：`packages/nowen-extension-registry/src/security/manifestV2.ts` 只校验
+   `externalFetchHosts` 是 `string[]`、不校验域名格式，因此"发布时就会拦"这件事目前还不成立，只能保证
+   "用户端安装时拒绝"。
 2. **宿主版本常量落后于示例。** `types.ts` 的 `NOWEN_VERSION = "1.5.0"`，而 `examples/plugins/task-digest`
    要求 `>=1.5.1`、`productivity-pack`/`floating-dock` 要求 `>=1.6.0`，默认参数下这些示例无法通过包校验。
 3. **贡献契约与 manifest schema 不同步。** `contribution-contract.json` 声明了 `activityBadges`（since 2.2，
    declarative），但 `manifest.ts` 无该字段（strict schema 会报未知键）；反向地，`mainViewPanels` 在 schema 中存在
    但契约 JSON 未列出。
-4. **声明期与运行期的白名单语法不同。** 声明期禁止端口（`api.example.com:8443` 会被拒），运行期却按
-   `host:port` 匹配并支持带端口条目——插件无法通过 manifest 声明非 443 端口。
+4. **端口：声明期禁、运行期保留。** manifest 里写 `api.example.com:8443` 会被拒（含 `:` 按 IP 字面量处理），
+   对外契约就是"仅 443 的精确域名"；运行期 `host:port` 匹配逻辑保留，只作为遗留/未来配置的防御性实现。
 5. **`attachments:write` 处于半废弃状态。** 它在 `PLUGIN_PERMISSIONS` 与 V1 白名单中，但不在
    `host-api-contract.json` 的权限表、也没有对应 Host API 方法，V2 manifest 直接拒。
 6. **`sidebarPanels` 的运行时期望与 schema 不一致。** 契约 JSON（工作区 `contractVersion: 6`）把它限定为
