@@ -149,6 +149,7 @@ import {
   type ShareCenterObjectKind,
   type ShareCenterRisk,
 } from "@/lib/shareCenter";
+import { loadPluginCounts, peekPluginCounts, PLUGIN_COUNTS_EVENT, type PluginCounts } from "@/lib/pluginCounts";
 import {
   getShareCenterUiVersion,
   getShareGroup,
@@ -585,6 +586,8 @@ export default function SidebarDesktop() {
   // 插件列表（后端 GET /plugins）
   const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "admin">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
+  // 插件面板入口上的计数（市场条目数 / 可用更新数），带 5 分钟缓存的轻量请求
+  const [pluginCounts, setPluginCounts] = useState<PluginCounts | null>(() => peekPluginCounts());
   const [joinOpen, setJoinOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -657,6 +660,22 @@ export default function SidebarDesktop() {
     window.addEventListener("nowen:open-plugin-panel", onOpenPanel);
     return () => window.removeEventListener("nowen:open-plugin-panel", onOpenPanel);
   }, []);
+
+  // 插件面板入口的计数：进入插件视图时取一次（带 5 分钟缓存），并跟随刷新事件更新
+  useEffect(() => {
+    if (sidebarView !== "plugins") return;
+    let alive = true;
+    const onCounts = (event: Event) => {
+      const detail = (event as CustomEvent<PluginCounts>).detail;
+      if (alive && detail) setPluginCounts(detail);
+    };
+    window.addEventListener(PLUGIN_COUNTS_EVENT, onCounts);
+    void loadPluginCounts().then((counts) => { if (alive) setPluginCounts(counts); }).catch(() => undefined);
+    return () => {
+      alive = false;
+      window.removeEventListener(PLUGIN_COUNTS_EVENT, onCounts);
+    };
+  }, [sidebarView]);
 
   // PM 主区激活时，侧栏跟随切到项目面板（URL 直达/刷新恢复不走 Rail 点击，需主动跟随）
   useEffect(() => {
@@ -3391,9 +3410,9 @@ export default function SidebarDesktop() {
             {/* 侧栏零插件列表：插件启用后在左侧导航栏徽章里直接打开，这里只负责"去哪找" */}
             <div className="px-1 pb-2 pt-1">
               {([
-                { key: "catalog", icon: Store, label: "市场", hint: "" },
-                { key: "admin", icon: RefreshCw, label: "更新", hint: "" },
-                { key: "installed", icon: LayoutGrid, label: "管理全部插件", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
+                { key: "catalog", icon: Store, label: "市场", hint: pluginCounts?.catalog ? `${pluginCounts.catalog} 个` : "", hot: false },
+                { key: "admin", icon: RefreshCw, label: "更新", hint: pluginCounts?.updates ? `${pluginCounts.updates} 个` : "", hot: Boolean(pluginCounts?.updates) },
+                { key: "installed", icon: LayoutGrid, label: "管理全部插件", hint: String(BUILTIN_PLUGINS.length + plugins.length), hot: false },
               ] as const).map((entry) => {
                 const Icon = entry.icon;
                 return (
@@ -3409,7 +3428,11 @@ export default function SidebarDesktop() {
                   >
                     <span className="sbx-ico"><Icon size={14} className="text-tx-tertiary" /></span>
                     <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{entry.label}</span>
-                    {entry.hint && <span className="shrink-0 text-[10px] text-tx-tertiary">{entry.hint}</span>}
+                    {entry.hint && (
+                      <span className={cn("shrink-0 text-[10px]", entry.hot ? "rounded-full border border-red-200 bg-red-50 px-1.5 text-red-600" : "text-tx-tertiary")}>
+                        {entry.hint}
+                      </span>
+                    )}
                     <span className="sbx-acts">
                       <span className="sbx-btn"><ChevronDown size={12} className="-rotate-90" /></span>
                     </span>
