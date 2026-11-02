@@ -6,6 +6,7 @@ import {
   CONTRIBUTION_CONTRACT,
   ACTIVITY_BADGE_CONTRIBUTION_LIMITS,
   SIDEBAR_PANEL_CONTRIBUTION_LIMITS,
+  EDITOR_COMMAND_CONTRIBUTION_LIMITS,
   NOWEN_PLUGIN_ERROR_CATALOG,
   createHostApiCallMock,
 } from "../dist/index.js";
@@ -29,8 +30,8 @@ test("generated capability contracts expose V2.1 contributions without shrinking
   assert.equal(mock.calls.length, 0);
 });
 
-test("contribution contract v5 adds declarative sidebarPanels + activityBadges（B-7 契约先行，运行链路由宿主后续接线）", () => {
-  assert.equal(CONTRIBUTION_CONTRACT_VERSION, 5);
+test("contribution contract v5+ adds declarative sidebarPanels + activityBadges（B-7 契约先行，运行链路由宿主后续接线）", () => {
+  assert.equal(CONTRIBUTION_CONTRACT_VERSION, 6);
   const contributionIds = new Set(CONTRIBUTION_CONTRACT.map((entry) => entry.id));
   assert.equal(contributionIds.has("sidebarPanels"), true);
   assert.equal(contributionIds.has("activityBadges"), true);
@@ -48,4 +49,13 @@ test("contribution contract v5 adds declarative sidebarPanels + activityBadges�
   assert.deepEqual([...ACTIVITY_BADGE_CONTRIBUTION_LIMITS.targets], ["panel", "tool"]);
   assert.equal(ACTIVITY_BADGE_CONTRIBUTION_LIMITS.maxBadgesPerPlugin, 10);
   assert.equal(SIDEBAR_PANEL_CONTRIBUTION_LIMITS.maxPanelsPerPlugin, 10);
+});
+
+test("contribution contract v6 adds executable editorCommands（斜杠菜单 + 快捷键，执行走插件 action）", () => {
+  const editorCommands = CONTRIBUTION_CONTRACT.find((entry) => entry.id === "editorCommands");
+  assert.equal(editorCommands.since, "2.3");
+  assert.equal(editorCommands.declarative, false);
+  assert.deepEqual([...editorCommands.runtimes], ["sandbox-js", "node-action"]);
+  assert.equal(EDITOR_COMMAND_CONTRIBUTION_LIMITS.maxCommandsPerPlugin, 50);
+  assert.deepEqual([...EDITOR_COMMAND_CONTRIBUTION_LIMITS.when], ["editorFocused", "noteOpen"]);
 });

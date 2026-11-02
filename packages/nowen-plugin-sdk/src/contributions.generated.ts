@@ -10,7 +10,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export type PluginContributionRuntime = "declarative" | "sandbox-js" | "node-action";
-export type PluginContributionType = "activityBadges" | "automationTemplates" | "commands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
+export type PluginContributionType = "activityBadges" | "automationTemplates" | "commands" | "editorCommands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
 
 export interface PluginContributionContractEntry {
   id: PluginContributionType;
@@ -20,7 +20,7 @@ export interface PluginContributionContractEntry {
   description: string;
 }
 
-export const CONTRIBUTION_CONTRACT_VERSION = 5 as const;
+export const CONTRIBUTION_CONTRACT_VERSION = 6 as const;
 export const CONTRIBUTION_NAMESPACE_TEMPLATE = "<pluginId>/<contributionId>" as const;
 export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] = deepFreeze([
   {
@@ -52,6 +52,16 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     ],
     "declarative": false,
     "description": "Command palette and host command registrations"
+  },
+  {
+    "id": "editorCommands",
+    "since": "2.3",
+    "runtimes": [
+      "sandbox-js",
+      "node-action"
+    ],
+    "declarative": false,
+    "description": "Editor slash-menu entries and keybindings that dispatch declared plugin actions"
   },
   {
     "id": "inboundWebhooks",
@@ -200,4 +210,12 @@ export const UI_COMPONENT_CONTRIBUTION_LIMITS = deepFreeze({
     "navigation.open"
   ],
   "maxComponentsPerPlugin": 50
+} as const);
+export const EDITOR_COMMAND_CONTRIBUTION_LIMITS = deepFreeze({
+  "schemaVersion": 1,
+  "maxCommandsPerPlugin": 50,
+  "when": [
+    "editorFocused",
+    "noteOpen"
+  ]
 } as const);

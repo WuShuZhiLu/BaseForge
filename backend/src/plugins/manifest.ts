@@ -233,6 +233,38 @@ const sidebarPanelSchema = z.object({
   }
 });
 
+/**
+ * Editor Command 快捷键的静态校验：只接受 `修饰键-...-主按键` 的写法，
+ * 例如 Mod-Alt-K。要求至少含 Mod 或 Alt，避免占用普通输入/IME；
+ * 同时拒绝平台基础快捷键（复制粘贴等），因为宿主的捕获监听会先吃掉按键。
+ */
+export function validateKeybinding(value: string): string | null {
+  const tokens = value.split("-");
+  if (tokens.length < 2 || tokens.length > 4) return "快捷键必须包含 1-3 个修饰键与 1 个主按键，如 Mod-Alt-K";
+  const primary = tokens[tokens.length - 1];
+  if (!/^[A-Za-z0-9]$/.test(primary)) return "快捷键主按键只能是单个字母或数字";
+  const modifiers = tokens.slice(0, -1);
+  if (modifiers.some((modifier) => !["Mod", "Alt", "Shift"].includes(modifier))) return "快捷键修饰键只支持 Mod / Alt / Shift";
+  if (new Set(modifiers).size !== modifiers.length) return "快捷键修饰键不能重复";
+  if (!modifiers.includes("Mod") && !modifiers.includes("Alt")) return "快捷键必须包含 Mod 或 Alt";
+  if (modifiers.includes("Mod") && /^[acvxz]$/i.test(primary)) return "快捷键不能占用平台基础快捷键（复制/粘贴/剪切/全选/撤销）";
+  if (modifiers.includes("Mod") && /^[rwq]$/i.test(primary)) return "快捷键不能占用浏览器或系统保留快捷键";
+  return null;
+}
+
+const editorCommandSchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(200),
+  title: z.string().min(1).max(100),
+  keywords: z.array(z.string().min(1).max(50)).max(10).optional(),
+  keybinding: z.string().min(1).max(50).optional(),
+  when: z.enum(["editorFocused", "noteOpen"]).optional(),
+  action: z.string().min(1).max(64),
+}).strict().superRefine((command, ctx) => {
+  if (command.keybinding === undefined) return;
+  const problem = validateKeybinding(command.keybinding);
+  if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["keybinding"], message: problem });
+});
+
 const mainViewPanelSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
   title: z.string().min(1).max(100),
@@ -275,6 +307,7 @@ const executableContributesSchema = z.object({
   noteTemplates: z.array(noteTemplateSchema).max(100).optional(),
   promptPacks: z.array(promptPackSchema).max(100).optional(),
   uiComponents: z.array(uiComponentSchema).max(50).optional(),
+  editorCommands: z.array(editorCommandSchema).max(50).optional(),
   sidebarPanels: sidebarPanelsField,
   mainViewPanels: mainViewPanelsField,
 }).strict().optional();
@@ -344,6 +377,22 @@ export const pluginManifestV2Schema = z.union([executableV2Schema, declarativeV2
     if (new Set(hook.methods).size !== hook.methods.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "inboundWebhooks"], message: "Inbound Webhook methods 不能重复" });
   }
   for (const command of manifest.contributes?.commands || []) if (!actionIds.has(command.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "commands"], message: `Command Action 不存在: ${command.action}` });
+  const editorCommands = manifest.contributes?.editorCommands || [];
+  const editorCommandIds = new Set<string>();
+  const editorCommandKeybindings = new Set<string>();
+  for (const command of editorCommands) {
+    if (editorCommandIds.has(command.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command id 不能重复: ${command.id}` });
+    editorCommandIds.add(command.id);
+    if (!command.id.startsWith(`${manifest.id}.`) || !/^[a-z][a-z0-9-]{0,63}$/.test(command.id.slice(manifest.id.length + 1))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command id 必须形如 ${manifest.id}.<动作>（插件 id 前缀 + 小写动作名）` });
+    }
+    if (!actionIds.has(command.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command Action 不存在: ${command.action}` });
+    if (command.keybinding) {
+      const normalized = command.keybinding.toLowerCase();
+      if (editorCommandKeybindings.has(normalized)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command 快捷键不能重复: ${command.keybinding}` });
+      editorCommandKeybindings.add(normalized);
+    }
+  }
   const commandIds = new Set((manifest.contributes?.commands || []).map((command) => command.id));
   for (const menu of manifest.contributes?.menus || []) if (!commandIds.has(menu.command)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "menus"], message: `Menu Command 不存在: ${menu.command}` });
   for (const handler of manifest.eventHandlers || []) if (!actionIds.has(handler.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["eventHandlers"], message: `Event Handler Action 不存在: ${handler.action}` });

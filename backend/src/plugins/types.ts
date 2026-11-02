@@ -199,6 +199,8 @@ export interface PluginContributionManifest {
   noteTemplates?: PluginNoteTemplateContribution[];
   promptPacks?: PluginPromptPackContribution[];
   uiComponents?: PluginUiActionContribution[];
+  /** 编辑器命令（V2.3，斜杠菜单 + 快捷键，仅可执行插件） */
+  editorCommands?: PluginEditorCommandContribution[];
   /** 侧栏/主区插件面板（V2.1，受 uiExtensions flag 门禁） */
   sidebarPanels?: PluginSidebarPanelContribution[];
   mainViewPanels?: PluginMainViewPanelContribution[];
@@ -242,6 +244,22 @@ export interface PluginInboundWebhookContribution {
   methods: Array<"GET" | "POST">;
   maxBodyBytes: number;
   backgroundAction?: string;
+}
+
+/** when 条件：编辑器获得焦点 / 有笔记处于打开状态 */
+export type PluginEditorCommandWhen = "editorFocused" | "noteOpen";
+
+/** 编辑器命令：出现在斜杠菜单，可绑定快捷键，执行时调用已声明的插件 Action */
+export interface PluginEditorCommandContribution {
+  /** 必须为 `${pluginId}.${localId}`（如 nowen.example.insert-timestamp） */
+  id: string;
+  title: string;
+  keywords?: string[];
+  /** 形如 Mod-Alt-K；修饰键仅支持 Mod/Alt/Shift */
+  keybinding?: string;
+  when?: PluginEditorCommandWhen;
+  /** 指向同一插件已声明的 Action id */
+  action: string;
 }
 
 export interface PluginDeclarativeContributionManifest {

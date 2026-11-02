@@ -65,6 +65,7 @@ import {
 } from "@/lib/shortcutRegistry";
 import CommandPalette from "@/components/common/CommandPalette";
 import FloatingLayerHost from "@/components/FloatingLayerHost";
+import PluginEditorCommandBridge from "@/components/PluginEditorCommandBridge";
 import AppRouteSync from "@/components/AppRouteSync";
 import OfflineSyncRuntime from "@/components/OfflineSyncRuntime";
 import UpdateNotifier from "@/components/common/UpdateNotifier";
@@ -1002,6 +1003,9 @@ function AppLayout() {
 
       {/* 插件 UI 贡献的浮动层宿主：把插件注册的悬浮入口/面板渲染到全局层 */}
       <FloatingLayerHost />
+
+      {/* 插件编辑器命令宿主：斜杠菜单/快捷键注册与注销（执行走插件 Action 通道） */}
+      <PluginEditorCommandBridge />
 
       {/* 统一路由所有者：URL ⇄ 状态单向流 + 自回声抑制（取代旧笔记深链桥与墓碑） */}
       <AppRouteSync />
