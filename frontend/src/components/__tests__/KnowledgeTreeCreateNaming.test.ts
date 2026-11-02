@@ -41,10 +41,10 @@ describe("knowledge tree create naming", () => {
     expect(menuSource).toContain('toast.success("副本已创建到子目录")');
     expect(menuSource).toContain('reason: "note-duplicated-as-child"');
 
-    // `...` / 右键菜单仍然使用原 duplicateNote 调用，保持创建到同级目录的历史行为。
+    // `...` / 右键菜单的"复制"语义已改为"引用连接"：不复制正文，只多一条指向同一内容的路径。
     expect(nodeMenuSource).toContain('id: "duplicate"');
     expect(nodeMenuSource).toContain('case "duplicate": await duplicateCurrentNote(); break;');
-    expect(nodeMenuSource).toContain("api.duplicateNote(node.resourceId)");
+    expect(nodeMenuSource).toContain("knowledgeTreeApi.createReference(node.resourceId");
   });
 
   it("uses the tree-style anchored menu and inline naming in quick browse", () => {

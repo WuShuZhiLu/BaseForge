@@ -49,13 +49,12 @@ try {
   process.exit(1)
 }
 
-const electronCli = path.join(rootDir, "node_modules", "electron", "cli.js")
+// 开发环境只用系统 node 22 跑前后端，不依赖 Electron（迁移/测试也走同一运行时）。
 const tsxCli = path.join(backendDir, "node_modules", "tsx", "dist", "cli.mjs")
 const backendEntry = path.join(backendDir, "src", "index.hardened.ts")
 const viteCli = path.join(frontendDir, "node_modules", "vite", "bin", "vite.js")
 const viteDevConfig = path.join(frontendDir, "vite.dev.config.ts")
 
-assertFile(electronCli, "npm install")
 assertFile(tsxCli, "npm run install:all")
 assertFile(viteCli, "npm run install:all")
 assertFile(backendEntry, "确认 backend/src/index.hardened.ts 是否存在")
