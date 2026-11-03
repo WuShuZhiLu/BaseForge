@@ -3457,7 +3457,7 @@ const moveToTrash = useCallback(async () => {
 
       {/* Desktop Editor Header（分屏时由宿主 portal 到全宽位置：顶栏 + 工具栏各一条，都在内容分栏之上） */}
       <EditorToolbarPortal target={chromeSlot}>
-      <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-1.5 border-b border-app-border bg-app-surface/30 transition-colors">
+      <div className="hidden md:flex h-12 shrink-0 min-w-0 items-center justify-between gap-3 px-4 border-b border-app-border bg-app-surface/30 transition-colors">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {/* �ʼ��б����۵�ʱ���������ṩ��չ������ť��δ�۵�ʱ���ء�
               ����������м��࣬�����ڡ���˭���б���ס�ˡ������֪��һ�ۿ����� */}
