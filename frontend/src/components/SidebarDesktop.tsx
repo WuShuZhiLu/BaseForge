@@ -393,7 +393,7 @@ function PanelSection({ label, extra, children }: {
   return (
     <div className="border-b border-app-border px-2 py-1.5">
       <div className="flex items-center justify-between px-1 pb-1">
-        <span className="text-[10.5px] text-tx-tertiary">{label}</span>
+        <span className="text-[12px] font-semibold text-tx-secondary">{label}</span>
         {extra}
       </div>
       {children}
@@ -3139,7 +3139,7 @@ export default function SidebarDesktop() {
           <div className="sbx-view">
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
-              <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">回收站</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">回收站</span>
             </div>
             {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter） */}
             <PanelSection
@@ -3241,7 +3241,7 @@ export default function SidebarDesktop() {
           <div>
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><KanbanSquare size={13} /></span>
-              <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">项目管理</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">项目管理</span>
             </div>
             {!panelCollapsed.projects && <ProjectsSidePanel />}
           </div>
@@ -3252,7 +3252,7 @@ export default function SidebarDesktop() {
           <div>
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
-              <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">分享中心</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">分享中心</span>
             </div>
             {!panelCollapsed.shares && <SharesSidePanel />}
           </div>
@@ -3264,7 +3264,7 @@ export default function SidebarDesktop() {
           <div className="sbx-view">
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-[13px] pr-2 text-xs">
               <Inbox size={14} className="mx-[1px] shrink-0 text-tx-tertiary" />
-              <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">文件管理</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">文件管理</span>
             </div>
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
             <div className="border-b border-app-border px-2 py-1.5">
@@ -3276,7 +3276,7 @@ export default function SidebarDesktop() {
                     type="button"
                     aria-pressed={getFilesSource() === key}
                     onClick={() => setFilesUi({ source: key })}
-                    className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[11.5px] ${getFilesSource() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] ${getFilesSource() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >
                     <span>{emoji}</span>
                     <span className="min-w-0 flex-1 truncate text-left">{label}</span>
@@ -3298,7 +3298,7 @@ export default function SidebarDesktop() {
                     type="button"
                     aria-pressed={getFilesCategory() === key}
                     onClick={() => setFilesUi({ category: key })}
-                    className={`flex w-full items-center rounded-md border px-2 py-1 text-[11.5px] ${getFilesCategory() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`flex w-full items-center rounded-md border px-2 py-1 text-[12px] ${getFilesCategory() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                     title={key === "referenced" ? "被至少一篇笔记正文引用着的附件" : key === "unreferenced" ? "没被任何笔记正文引用的附件（手动上传的会显示盾牌，不会被自动清理）" : undefined}
                   >
                     {label}
@@ -3435,7 +3435,7 @@ export default function SidebarDesktop() {
           <div className="sbx-view">
             <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
-              <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">插件</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">插件</span>
             </div>
             {/* 侧栏零插件列表：插件启用后在左侧导航栏徽章里直接打开，这里只负责"去哪找" */}
             <div className="pb-2 pt-1">
