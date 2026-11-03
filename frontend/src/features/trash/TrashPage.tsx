@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, RotateCcw, Search, Trash2, RefreshCw } from "lucide-react";
+import { Lock, RotateCcw, Search, Trash2, RefreshCw, X } from "lucide-react";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { getCurrentWorkspace } from "@/lib/api";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
@@ -148,7 +148,8 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
           <TrashPreview item={active} retentionDays={retentionDays} disabled={disabled} expanded={expanded} onExpand={setExpanded}
             onRestore={() => void operate("restore", [active.id])}
             onRestoreTo={() => setRestoreToItem(active)}
-            onPurge={() => void operate("permanent", [active.id])} />
+            onPurge={() => void operate("permanent", [active.id])}
+            onClose={() => setActiveId(null)} />
         </aside>
       )}
     </div>
@@ -244,16 +245,28 @@ function TrashPreviewBody({ item, large = false }: { item: TrashItem; large?: bo
   return <p className="whitespace-pre-wrap">{preview.text}</p>;
 }
 
-function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRestore, onRestoreTo, onPurge }: {
+function TrashPreview({ item, retentionDays, disabled, expanded, onExpand, onRestore, onRestoreTo, onPurge, onClose }: {
   item: TrashItem; retentionDays: number; disabled: boolean; expanded: boolean; onExpand: (next: boolean) => void;
-  onRestore: () => void; onRestoreTo: () => void; onPurge: () => void;
+  onRestore: () => void; onRestoreTo: () => void; onPurge: () => void; onClose: () => void;
 }) {
   const { t } = useTranslation();
   const typeKey = trashTypeKey(item.resourceType, item.contentFormat);
   const daysLeft = retentionDaysLeft(item.deletedAt, retentionDays);
   const date = parseServerTime(item.deletedAt);
   return <>
-    <div className="flex h-12 shrink-0 items-center border-b border-app-border px-4 text-[12.5px] font-semibold">{t("trashCenter.previewTitle", { defaultValue: "详情预览" })}</div>
+    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4 text-[12.5px] font-semibold">
+      <span className="min-w-0 truncate">{t("trashCenter.previewTitle", { defaultValue: "详情预览" })}</span>
+      <span className="flex-1" />
+      <button
+        type="button"
+        onClick={onClose}
+        title={t("trashCenter.closePreview", { defaultValue: "关闭预览" })}
+        aria-label={t("trashCenter.closePreview", { defaultValue: "关闭预览" })}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+      >
+        <X size={14} />
+      </button>
+    </div>
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3.5">
       <div className="flex shrink-0 items-center gap-2 text-[15px] font-semibold"><span>{trashTypeEmoji(typeKey)}</span><span className="min-w-0 truncate">{item.title}</span>{item.isLocked && <Lock size={13} className="text-tx-tertiary" />}</div>
       <dl className="mt-3 grid shrink-0 grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
