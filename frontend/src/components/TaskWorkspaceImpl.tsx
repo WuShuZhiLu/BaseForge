@@ -94,12 +94,25 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
   type HabitListMode = "active" | "archived" | "all";
 
   const FILTERS: { key: TaskFilter; label: string; icon: React.ReactNode }[] = [
-    { key: "all", label: t("tasks.allTasks"), icon: <Inbox size={16} /> },
-    { key: "today", label: t("tasks.today"), icon: <CalendarDays size={16} /> },
-    { key: "week", label: t("tasks.next7Days"), icon: <Calendar size={16} /> },
-    { key: "overdue", label: t("tasks.overdue"), icon: <AlertTriangle size={16} /> },
-    { key: "completed", label: t("tasks.completed"), icon: <CheckCheck size={16} /> },
+    { key: "all", label: t("tasks.allTasks"), icon: <Inbox size={14} /> },
+    { key: "today", label: t("tasks.today"), icon: <CalendarDays size={14} /> },
+    { key: "week", label: t("tasks.next7Days"), icon: <Calendar size={14} /> },
+    { key: "overdue", label: t("tasks.overdue"), icon: <AlertTriangle size={14} /> },
+    { key: "completed", label: t("tasks.completed"), icon: <CheckCheck size={14} /> },
   ];
+
+  // 统一筛选 chips / 按钮：选中 accent-primary/10 + accent 文字，未选中描边
+  const chipCls = (active: boolean) =>
+    cn(
+      "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+      active
+        ? "border-accent-primary/30 bg-accent-primary/10 font-medium text-accent-primary"
+        : "border-app-border bg-app-surface text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
+    );
+  const primaryBtnCls =
+    "inline-flex items-center gap-1.5 rounded-[6px] bg-accent-primary px-2.5 py-1 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40";
+  const secondaryBtnCls =
+    "inline-flex items-center gap-1.5 rounded-[6px] border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:opacity-40";
 
   const selectTaskFilter = (nextFilter: TaskFilter) => {
     setCenterMode("tasks");
@@ -868,34 +881,34 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
       {!hideSidebar && (
       <div className="hidden md:flex w-56 shrink-0 flex-col border-r border-app-border bg-app-surface overflow-y-auto" style={{ paddingTop: "var(--safe-area-top)" }}>
         <nav className="flex-1 px-2 py-1.5 space-y-0.5">
-          <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
+          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
             {t("tasks.title")}
           </div>
           <button
             style={{ display: isTaskCenterModuleVisible("inbox", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-              centerMode === "inbox" ? "bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400" : "text-tx-secondary hover:bg-app-hover",
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+              centerMode === "inbox" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
             )}
           >
-            <Inbox size={16} />
-            <span className="flex-1 text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
+            <Inbox size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
           </button>
           {FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => selectTaskFilter(f.key)}
               className={cn(
-                "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+                "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
               )}
             >
-              {f.icon}
-              <span className="flex-1 text-left">{f.label}</span>
+              <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{f.icon}</span>
+              <span className="flex-1 truncate text-left">{f.label}</span>
               <span className={cn(
-                "text-xs min-w-[20px] text-center rounded-full px-1.5 py-0.5",
-                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/20 text-accent-primary" : "text-tx-tertiary"
+                "min-w-4 shrink-0 text-right text-[10px] tabular-nums",
+                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "text-accent-primary" : "text-tx-tertiary"
               )}>
                 {filterCount(f.key)}
               </span>
@@ -904,7 +917,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
           {(isTaskCenterModuleVisible("my-day", userPrefs.hiddenTaskCenterModules) ||
             isTaskCenterModuleVisible("planner", userPrefs.hiddenTaskCenterModules)) && (
-            <div className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
+            <div className="px-2 pb-1 pt-3 text-[11px] font-medium text-tx-tertiary">
               {t("tasks.planning", { defaultValue: "计划" })}
             </div>
           )}
@@ -912,38 +925,38 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             style={{ display: isTaskCenterModuleVisible("my-day", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("my-day"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-              centerMode === "my-day" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+              centerMode === "my-day" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
             )}
           >
-            <Sun size={16} />
-            <span className="flex-1 text-left">{t("tasks.myDay", { defaultValue: "我的一天" })}</span>
+            <Sun size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">{t("tasks.myDay", { defaultValue: "我的一天" })}</span>
           </button>
           <button
             style={{ display: isTaskCenterModuleVisible("planner", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("planner"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-              centerMode === "planner" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+              centerMode === "planner" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
             )}
           >
-            <CalendarClock size={16} />
-            <span className="flex-1 text-left">{t("tasks.timePlanning", { defaultValue: "时间规划" })}</span>
+            <CalendarClock size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">{t("tasks.timePlanning", { defaultValue: "时间规划" })}</span>
           </button>
 
           <button
             style={{ display: isTaskCenterModuleVisible("habits", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("habits"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
             className={cn(
-              "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-              centerMode === "habits" ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+              centerMode === "habits" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
             )}
           >
-            <ListTodo size={16} />
-            <span className="flex-1 text-left">{t("habits.title")}</span>
+            <ListTodo size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">{t("habits.title")}</span>
             <span className={cn(
-              "text-xs min-w-[20px] text-center rounded-full px-1.5 py-0.5",
-              centerMode === "habits" ? "bg-accent-primary/20 text-accent-primary" : "text-tx-tertiary"
+              "min-w-4 shrink-0 text-right text-[10px] tabular-nums",
+              centerMode === "habits" ? "text-accent-primary" : "text-tx-tertiary"
             )}>
               {pendingHabitCount}
             </span>
@@ -953,21 +966,21 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             style={{ display: isTaskCenterModuleVisible("stats", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("stats"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
             className={cn(
-              "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-              centerMode === "stats" ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+              centerMode === "stats" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
             )}
           >
-            <BarChart3 size={16} />
-            <span className="flex-1 text-left">{t("stats.title")}</span>
+            <BarChart3 size={14} className="shrink-0" />
+            <span className="flex-1 truncate text-left">{t("stats.title")}</span>
           </button>
 
           {/* Projects section */}
-          <div className="mt-3 mb-0.5 px-3">
+          <div className="mt-3 mb-0.5 px-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-tx-tertiary uppercase tracking-wider">{t("tasks.projects")}</span>
+              <span className="text-[11px] font-medium text-tx-tertiary">{t("tasks.projects")}</span>
               <button
                 onClick={() => setShowNewProject(true)}
-                className="p-0.5 rounded hover:bg-app-hover text-tx-tertiary hover:text-accent-primary transition-colors"
+                className="rounded p-0.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
                 title={t("tasks.newProject")}
               >
                 <Plus size={12} />
@@ -976,14 +989,14 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
           </div>
 
           {showNewProject && (
-            <div className="px-2 pb-1">
+            <div className="px-1 pb-1">
               <input
                 type="text"
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); if (e.key === "Escape") setShowNewProject(false); }}
                 placeholder={t("tasks.projectName")}
-                className="w-full px-2 py-1 text-xs rounded-md bg-app-bg border border-app-border text-tx-primary focus:outline-none focus:border-accent-primary"
+                className="w-full rounded-[6px] border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-primary focus:border-accent-primary focus:outline-none"
                 autoFocus
               />
             </div>
@@ -991,36 +1004,34 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
           {projects.map((p) => (
             <div key={p.id} className="relative">
-              <button
-                onClick={() => { setCenterMode("tasks"); setSelectedProjectId(p.id); setFilter("all"); setSelectedTaskId(null); setSearchQuery(""); }}
+              <div
                 className={cn(
-                  "flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-sm transition-colors group",
-                  centerMode === "tasks" && selectedProjectId === p.id ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+                  "group flex h-8 w-full items-center rounded-md pr-1 transition-colors",
+                  centerMode === "tasks" && selectedProjectId === p.id ? "bg-accent-primary/10 text-accent-primary" : "text-tx-secondary hover:bg-app-hover"
                 )}
               >
-                <FolderOpen size={14} style={{ color: p.color }} />
-                <span className="flex-1 text-left truncate">{p.name}</span>
-                <span className="text-[10px] text-tx-tertiary">{p.completedCount ?? 0}/{p.taskCount ?? 0}</span>
+                <button
+                  onClick={() => { setCenterMode("tasks"); setSelectedProjectId(p.id); setFilter("all"); setSelectedTaskId(null); setSearchQuery(""); }}
+                  className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2 text-[13px]"
+                >
+                  <FolderOpen size={14} className="shrink-0" style={{ color: p.color }} />
+                  <span className={cn("flex-1 truncate text-left", centerMode === "tasks" && selectedProjectId === p.id && "font-medium")}>{p.name}</span>
+                  <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary group-hover:opacity-0">{p.completedCount ?? 0}/{p.taskCount ?? 0}</span>
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowProjectMenu(showProjectMenu === p.id ? null : p.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-app-hover text-tx-tertiary transition-all"
+                  className="shrink-0 rounded p-0.5 text-tx-tertiary opacity-0 transition-all hover:bg-app-hover hover:text-tx-primary group-hover:opacity-100"
                 >
                   <MoreHorizontal size={12} />
                 </button>
-              </button>
-              {/* Progress bar */}
-              {(p.taskCount ?? 0) > 0 && (
-                <div className="mx-3 mb-1 h-1 rounded-full bg-app-border overflow-hidden">
-                  <div className="h-full rounded-full bg-accent-primary transition-all" style={{ width: `${p.progress ?? 0}%` }} />
-                </div>
-              )}
+              </div>
               {/* Project menu */}
               {showProjectMenu === p.id && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-lg border border-app-border bg-app-surface shadow-lg py-1">
+                <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-[10px] border border-app-border bg-app-surface py-1 shadow-lg">
                   <button onClick={() => { setEditingProject(p); setEditProjectName(p.name); setEditProjectColor(p.color); setShowProjectMenu(null); }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-tx-secondary hover:bg-app-hover">{t("tasks.projectName")}</button>
+                    className="w-full px-3 py-1.5 text-left text-[11px] text-tx-secondary hover:bg-app-hover">{t("tasks.projectName")}</button>
                   <button onClick={() => handleDeleteProject(p.id)}
-                    className="w-full text-left px-3 py-1.5 text-xs text-accent-danger hover:bg-accent-danger/10">{t("tasks.deleteProject")}</button>
+                    className="w-full px-3 py-1.5 text-left text-[11px] text-accent-danger hover:bg-app-hover">{t("tasks.deleteProject")}</button>
                 </div>
               )}
             </div>
@@ -1043,16 +1054,16 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
       {hideSidebar && sidebarOverlayOpen && (
         <>
           <div className="fixed inset-0 z-[70]" onClick={() => setSidebarOverlayOpen(false)} />
-          <div className="fixed left-0 top-0 z-[75] h-full w-56 flex-col border-r border-app-border bg-app-surface overflow-y-auto pt-[var(--safe-area-top)] hidden md:flex">
+          <div className="fixed left-0 top-0 z-[75] hidden h-full w-56 flex-col overflow-y-auto border-r border-app-border bg-app-surface pt-[var(--safe-area-top)] md:flex">
             <button
               type="button"
               onClick={() => setSidebarOverlayOpen(false)}
-              className="mx-2 mt-2 flex h-7 items-center justify-end rounded px-2 text-xs text-tx-tertiary hover:bg-app-hover"
+              className="mx-2 mt-2 flex h-7 items-center justify-end rounded px-2 text-[11px] text-tx-tertiary hover:bg-app-hover"
             >
               收起
             </button>
-            <nav className="flex-1 px-2 py-1.5 space-y-0.5">
-              <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
+            <nav className="flex-1 space-y-0.5 px-2 py-1.5">
+              <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
                 {t("tasks.title")}
               </div>
               {(() => {
@@ -1062,24 +1073,24 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                     key={f.key}
                     onClick={() => { selectTaskFilter(f.key); setSidebarOverlayOpen(false); }}
                     className={cn(
-                      "flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm transition-colors",
-                      centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 text-accent-primary font-medium" : "text-tx-secondary hover:bg-app-hover"
+                      "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+                      centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                     )}
                   >
-                    {f.icon}
-                    <span className="flex-1 text-left">{f.label}</span>
+                    <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{f.icon}</span>
+                    <span className="flex-1 truncate text-left">{f.label}</span>
                   </button>
                 ));
               })()}
               <button
                 onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); setSidebarOverlayOpen(false); }}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-                  centerMode === "inbox" ? "bg-amber-500/10 font-medium text-amber-600 dark:text-amber-400" : "text-tx-secondary hover:bg-app-hover",
+                  "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
+                  centerMode === "inbox" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
                 )}
               >
-                <Inbox size={16} />
-                <span className="flex-1 text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
+                <Inbox size={14} className="shrink-0" />
+                <span className="flex-1 truncate text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
               </button>
             </nav>
           </div>
@@ -1088,33 +1099,25 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
       {/* Center: Task List */}
       <div className={TASK_CENTER_MAIN_CLASS}>
-        {/* Mobile: horizontal filter bar */}
+        {/* Mobile: horizontal filter bar —— 单行 chips，选中态 accent/10 + accent 文字 */}
         <div className={TASK_MOBILE_FILTER_BAR_CLASS}>
           <button
             style={{ display: isTaskCenterModuleVisible("inbox", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              centerMode === "inbox" ? "bg-amber-500/15 text-amber-600" : "bg-app-hover/50 text-tx-secondary active:bg-app-active",
-            )}
+            className={chipCls(centerMode === "inbox")}
           >
-            <Inbox size={14} /> {t("tasks.inbox", { defaultValue: "收集箱" })}
+            <Inbox size={12} /> {t("tasks.inbox", { defaultValue: "收集箱" })}
           </button>
           {FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => selectTaskFilter(f.key)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0",
-                centerMode === "tasks" && filter === f.key
-                  ? "bg-accent-primary/15 text-accent-primary"
-                  : "text-tx-secondary bg-app-hover/50 active:bg-app-active"
-              )}
+              className={chipCls(centerMode === "tasks" && filter === f.key)}
             >
-              {f.icon}
+              <span className="[&>svg]:h-3 [&>svg]:w-3">{f.icon}</span>
               {f.label}
               <span className={cn(
-                "text-[10px] min-w-[16px] text-center",
+                "min-w-3 text-center text-[10px] tabular-nums",
                 centerMode === "tasks" && filter === f.key ? "text-accent-primary" : "text-tx-tertiary"
               )}>
                 {filterCount(f.key)}
@@ -1124,35 +1127,26 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
           <button
             style={{ display: isTaskCenterModuleVisible("my-day", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("my-day"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              centerMode === "my-day" ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover/50 text-tx-secondary active:bg-app-active",
-            )}
+            className={chipCls(centerMode === "my-day")}
           >
-            <Sun size={14} /> {t("tasks.myDay", { defaultValue: "我的一天" })}
+            <Sun size={12} /> {t("tasks.myDay", { defaultValue: "我的一天" })}
           </button>
           <button
             style={{ display: isTaskCenterModuleVisible("planner", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("planner"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-              centerMode === "planner" ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover/50 text-tx-secondary active:bg-app-active",
-            )}
+            className={chipCls(centerMode === "planner")}
           >
-            <CalendarClock size={14} /> {t("tasks.timePlanning", { defaultValue: "时间规划" })}
+            <CalendarClock size={12} /> {t("tasks.timePlanning", { defaultValue: "时间规划" })}
           </button>
           <button
             style={{ display: isTaskCenterModuleVisible("habits", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("habits"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0",
-              centerMode === "habits" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary bg-app-hover/50 active:bg-app-active"
-            )}
+            className={chipCls(centerMode === "habits")}
           >
-            <ListTodo size={14} />
+            <ListTodo size={12} />
             {t("habits.title")}
             <span className={cn(
-              "text-[10px] min-w-[16px] text-center",
+              "min-w-3 text-center text-[10px] tabular-nums",
               centerMode === "habits" ? "text-accent-primary" : "text-tx-tertiary"
             )}>
               {pendingHabitCount}
@@ -1161,12 +1155,9 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
           <button
             style={{ display: isTaskCenterModuleVisible("stats", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
             onClick={() => { setCenterMode("stats"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors shrink-0",
-              centerMode === "stats" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary bg-app-hover/50 active:bg-app-active"
-            )}
+            className={chipCls(centerMode === "stats")}
           >
-            <BarChart3 size={14} />
+            <BarChart3 size={12} />
             {t("stats.title")}
           </button>
           {centerMode === "tasks" && (
@@ -1181,7 +1172,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
               {/* 移动端依次切换列表、看板、日历、时间线，并记住选择。 */}
               <button
                 onClick={() => changeViewMode(viewMode === "list" ? "board" : viewMode === "board" ? "calendar" : viewMode === "calendar" ? "timeline" : "list")}
-                className="flex items-center gap-1 px-2 py-1.5 rounded-full text-xs shrink-0 text-tx-secondary bg-app-hover/50 active:bg-app-active"
+                className={cn(chipCls(false), "px-2")}
                 title={viewMode === "list" ? t("tasks.boardView") : viewMode === "board" ? t("tasks.calendarView") : viewMode === "calendar" ? t("tasks.timelineView") : t("tasks.listView")}
                 aria-label={t("tasks.view", { defaultValue: "视图" })}
               >
@@ -1197,9 +1188,9 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
         {/* Header desktop with batch controls */}
         {centerMode === "tasks" ? (
-          <div className="hidden items-center gap-3 border-b border-app-border px-5 py-3 md:flex">
+          <div className="hidden items-center gap-3 border-b border-app-border px-5 py-2.5 md:flex">
             <div className="min-w-0 flex-1">
-              <h1 className="text-sm font-semibold text-tx-primary">
+              <h1 className="truncate text-[14px] font-semibold text-tx-primary">
                 {selectedProjectId
                   ? projects.find((p) => p.id === selectedProjectId)?.name || t("tasks.allTasks")
                   : FILTERS.find((f) => f.key === filter)?.label || t("tasks.allTasks")}
@@ -1211,31 +1202,31 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             <div className="flex items-center gap-2">
               {selectMode ? (
                 <>
-                  <span className="text-xs text-tx-tertiary">{t("tasks.selectedCount", { count: selectedIds.size })}</span>
+                  <span className="text-[11px] text-tx-tertiary">{t("tasks.selectedCount", { count: selectedIds.size })}</span>
                   <button
                     onClick={selectedIds.size === flatOrderedTasks.length ? handleDeselectAll : handleSelectAll}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md text-tx-secondary hover:bg-app-hover transition-colors"
+                    className={secondaryBtnCls}
                   >
-                    <CheckSquare size={14} />
+                    <CheckSquare size={12} />
                     {selectedIds.size === flatOrderedTasks.length ? t("tasks.deselectAll") : t("tasks.selectAll")}
                   </button>
                   <button
                     onClick={handleBatchComplete}
                     disabled={selectedIds.size === 0}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/20 disabled:opacity-40 transition-colors"
+                    className={secondaryBtnCls}
                   >
-                    <CheckSquare size={14} /> {t("tasks.batchComplete")}
+                    <CheckSquare size={12} /> {t("tasks.batchComplete")}
                   </button>
                   <button
                     onClick={handleBatchDelete}
                     disabled={selectedIds.size === 0}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-40 transition-colors"
+                    className={cn(secondaryBtnCls, "text-accent-danger hover:text-accent-danger")}
                   >
-                    <Trash2 size={14} /> {t("tasks.batchDelete")}
+                    <Trash2 size={12} /> {t("tasks.batchDelete")}
                   </button>
                   <button
                     onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
-                    className="text-xs text-tx-tertiary hover:text-tx-secondary px-2 py-1 transition-colors"
+                    className="px-2 py-1 text-[11.5px] text-tx-tertiary transition-colors hover:text-tx-secondary"
                   >
                     {t("tasks.batchCancel")}
                   </button>
@@ -1245,17 +1236,17 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                   <button
                     type="button"
                     onClick={() => openTaskQuickCapture({ sourceType: "manual" })}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                    className={primaryBtnCls}
                   >
-                    <ClipboardPlus size={14} />
+                    <ClipboardPlus size={12} />
                     {t("tasks.quickCaptureToInbox", { defaultValue: "快速捕获" })}
                   </button>
-                  <label className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-bg px-2 py-1 text-xs text-tx-secondary">
+                  <label className="inline-flex items-center gap-1.5 rounded-[6px] border border-app-border bg-app-surface px-2 py-1 text-[11.5px] text-tx-secondary">
                     <span className="text-tx-tertiary">{t("tasks.view", { defaultValue: "视图" })}</span>
                     <select
                       value={viewMode}
                       onChange={(event) => changeViewMode(event.target.value as TaskViewMode)}
-                      className="bg-transparent text-xs text-tx-primary outline-none"
+                      className="bg-transparent text-[11.5px] text-tx-primary outline-none"
                     >
                       <option value="list">{t("tasks.listView")}</option>
                       <option value="board">{t("tasks.boardView")}</option>
@@ -1268,93 +1259,88 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                     onClick={toggleDueSort}
                     aria-pressed={sortByDueTime}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors",
-                      sortByDueTime ? "bg-accent-primary/10 text-accent-primary" : "text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
+                      "inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-1 text-[11.5px] transition-colors",
+                      sortByDueTime
+                        ? "border-accent-primary/30 bg-accent-primary/10 font-medium text-accent-primary"
+                        : "border-app-border bg-app-surface text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
                     )}
                     title={sortByDueTime ? t("tasks.backToManualOrder") : t("tasks.sortByDueTime")}
                   >
-                    <CalendarDays size={14} />
+                    <CalendarDays size={12} />
                     <span>{sortByDueTime ? t("tasks.dueSoonFirst") : t("tasks.sortByDueTime")}</span>
                   </button>
                   <button
                     onClick={() => setSelectMode(true)}
-                    className="rounded-md p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
+                    className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
                     title={t("tasks.selectMode")}
                   >
-                    <CheckSquare size={14} />
+                    <CheckSquare size={13} />
                   </button>
                   <button
                     onClick={() => setTaskFullscreen((v) => !v)}
-                    className="rounded-md p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
+                    className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
                     title={taskFullscreen ? t("tasks.exitFullscreen") : t("tasks.enterFullscreen")}
                   >
-                    {taskFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                    {taskFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
                   </button>
                 </>
               )}
             </div>
           </div>
         ) : centerMode === "habits" ? (
-          <div className="hidden md:flex items-center justify-between px-5 py-3 border-b border-app-border">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-tx-primary">{t("habits.title")}</h1>
-            </div>
-            <div className="text-xs text-tx-tertiary">{t("habits.summary")}</div>
+          <div className="hidden items-center justify-between gap-3 border-b border-app-border px-5 py-2.5 md:flex">
+            <h1 className="text-[14px] font-semibold text-tx-primary">{t("habits.title")}</h1>
+            <p className="min-w-0 truncate text-[11px] text-tx-tertiary">{t("habits.summary")}</p>
           </div>
         ) : centerMode === "stats" ? (
-          <div className="hidden md:flex items-center justify-between px-5 py-3 border-b border-app-border">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-tx-primary">{t("stats.title")}</h1>
-            </div>
-            <div className="text-xs text-tx-tertiary">{t("stats.subtitle")}</div>
+          <div className="hidden items-center justify-between gap-3 border-b border-app-border px-5 py-2.5 md:flex">
+            <h1 className="text-[14px] font-semibold text-tx-primary">{t("stats.title")}</h1>
+            <p className="min-w-0 truncate text-[11px] text-tx-tertiary">{t("stats.subtitle")}</p>
           </div>
         ) : null}
 
         {/* Search bar */}
         {centerMode === "tasks" ? (
-          <div className="flex items-center gap-2 px-4 md:px-5 py-1.5 border-b border-app-border">
-            <Search size={14} className="text-tx-tertiary shrink-0" />
+          <div className="flex items-center gap-2 border-b border-app-border px-4 py-1.5 md:px-5">
+            <Search size={13} className="shrink-0 text-tx-tertiary" />
             <input
               ref={searchRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("tasks.searchPlaceholder")}
-              className="flex-1 bg-transparent text-sm text-tx-primary placeholder:text-tx-tertiary focus:outline-none"
+              className="flex-1 bg-transparent text-[13px] text-tx-primary placeholder:text-tx-tertiary focus:outline-none"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="text-tx-tertiary hover:text-tx-secondary transition-colors">
-                <XIcon size={14} />
+              <button onClick={() => setSearchQuery("")} className="text-tx-tertiary transition-colors hover:text-tx-secondary">
+                <XIcon size={13} />
               </button>
             )}
           </div>
         ) : centerMode === "habits" ? (
-          <div className="flex items-center gap-2 px-4 md:px-5 py-2 border-b border-app-border">
-            <div className="flex flex-1 items-center gap-2">
+          <div className="flex items-center gap-2 border-b border-app-border px-4 py-1.5 md:px-5">
+            <div className="flex flex-1 items-center gap-1.5">
               <input
                 type="text"
                 value={newHabitTitle}
                 onChange={(e) => setNewHabitTitle(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleCreateHabit(); }}
                 placeholder={t("habits.createPlaceholder")}
-                className="flex-1 rounded-md border border-app-border bg-app-bg px-3 py-2 text-sm text-tx-primary placeholder:text-tx-tertiary focus:outline-none focus:border-accent-primary"
+                className="flex-1 rounded-[6px] border border-app-border bg-app-bg px-2.5 py-1.5 text-[13px] text-tx-primary placeholder:text-tx-tertiary focus:border-accent-primary focus:outline-none"
               />
               <button
                 onClick={handleCreateHabit}
-                className="rounded-md bg-accent-primary px-3 py-2 text-sm text-white transition-opacity hover:opacity-90"
+                className={primaryBtnCls}
               >
                 {t("habits.add")}
               </button>
             </div>
-            <div className="flex items-center gap-1 rounded-lg bg-app-bg p-1">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               {(["active", "archived", "all"] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setHabitListMode(mode)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1.5 text-xs transition-colors",
-                    habitListMode === mode ? "bg-accent-primary text-white" : "text-tx-secondary hover:bg-app-hover"
-                  )}
+                  className={chipCls(habitListMode === mode)}
                 >
                   {mode === "active" ? t("habits.filters.active") : mode === "archived" ? t("habits.filters.archived") : t("habits.filters.all")}
                 </button>
@@ -1362,7 +1348,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             </div>
           </div>
         ) : centerMode === "stats" ? (
-          <div className="border-b border-app-border px-4 md:px-5 py-2 text-xs text-tx-tertiary">
+          <div className="border-b border-app-border px-4 py-1.5 text-[11px] text-tx-tertiary md:px-5">
             {t("stats.summaryHint")}
           </div>
         ) : null}
@@ -1383,43 +1369,38 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                 type="button"
                 onClick={toggleDueSort}
                 aria-pressed={sortByDueTime}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors md:hidden",
-                  sortByDueTime
-                    ? "bg-accent-primary/10 font-medium text-accent-primary"
-                    : "text-tx-secondary hover:bg-app-hover",
-                )}
+                className={cn(chipCls(sortByDueTime), "md:hidden")}
                 title={sortByDueTime ? t("tasks.backToManualOrder") : t("tasks.sortByDueTime")}
               >
-                <CalendarDays size={13} />
+                <CalendarDays size={12} />
                 <span>{sortByDueTime ? t("tasks.dueSoonFirst") : t("tasks.sortByDueTime")}</span>
               </button>
               <details className="group relative">
-                <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-2 py-1 text-xs text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary">
-                  <MoreHorizontal size={13} />
+                <summary className={cn(secondaryBtnCls, "cursor-pointer list-none")}>
+                  <MoreHorizontal size={12} />
                   {t("tasks.moreTools", { defaultValue: "更多工具" })}
                   {reminderBadgeCount > 0 && (
-                    <span className="min-w-[16px] rounded-full bg-amber-500 px-1 text-center text-[9px] leading-4 text-white">
+                    <span className="min-w-4 rounded-full bg-accent-primary/10 px-1 text-center text-[9px] leading-4 tabular-nums text-accent-primary">
                       {reminderBadgeCount}
                     </span>
                   )}
                 </summary>
-                <div className="absolute right-0 top-full z-30 mt-1 flex w-52 flex-col gap-1 rounded-xl border border-app-border bg-app-elevated p-2 shadow-xl">
+                <div className="absolute right-0 top-full z-30 mt-1 flex w-52 flex-col gap-0.5 rounded-[10px] border border-app-border bg-app-surface p-1.5 shadow-lg">
                   <button
                     type="button"
                     onClick={() => setShowTemplatePicker(true)}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-tx-secondary hover:bg-app-hover"
+                    className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                   >
-                    <FileText size={14} /> {t("tasks.templates.button")}
+                    <FileText size={12} /> {t("tasks.templates.button")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowReminderCenter(true)}
-                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs text-tx-secondary hover:bg-app-hover"
+                    className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                   >
-                    <Bell size={14} /> {t("tasks.reminderCenter.open")}
+                    <Bell size={12} /> {t("tasks.reminderCenter.open")}
                   </button>
-                  <div className="border-t border-app-border pt-1">
+                  <div className="mt-0.5 border-t border-app-border pt-1">
                     <TaskCalendarFeedSettings />
                     <CalendarExportTargetSettings />
                   </div>
@@ -1466,13 +1447,13 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             onRefresh={loadStatsCenter}
           />
         ) : centerMode === "habits" ? (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-5 py-3">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-2 md:px-5">
             {visibleHabits.length === 0 ? (
-              <div className="flex h-40 items-center justify-center text-sm text-tx-tertiary">
+              <div className="flex h-40 items-center justify-center text-[13px] text-tx-tertiary">
                 {t("habits.empty")}
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="divide-y divide-app-border/60">
                 {visibleHabits.map((habit) => (
                   <HabitRow
                     key={habit.id}
@@ -1506,13 +1487,13 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
             onUpdateTaskDateRange={handleUpdateTaskDateRange}
           />
         ) : (
-          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-5 py-2">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-1 md:px-5">
             {isLoading ? (
-              <div className="flex items-center justify-center h-32 text-tx-tertiary text-sm">
+              <div className="flex h-32 items-center justify-center text-[13px] text-tx-tertiary">
                 {t("common.loading")}
               </div>
             ) : displayTasks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-tx-tertiary">
+              <div className="flex h-40 flex-col items-center justify-center text-tx-tertiary">
                 {searchQuery ? (
                   <TaskEmptyState type="no-search" compact onAction={() => setSearchQuery("")} />
                 ) : (
@@ -1520,7 +1501,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                 )}
               </div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="divide-y divide-app-border/60">
                 <AnimatePresence mode="popLayout">
                   {isTreeMode ? (
                     displayFlatOrdered.map((item) => (
@@ -1539,11 +1520,11 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                         {selectMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleSelectId(item.node.id); }}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1"
+                            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 p-1"
                           >
                             {selectedIds.has(item.node.id)
-                              ? <CheckSquare size={16} className="text-accent-primary" />
-                              : <Square size={16} className="text-tx-tertiary" />}
+                              ? <CheckSquare size={14} className="text-accent-primary" />
+                              : <Square size={14} className="text-tx-tertiary" />}
                           </button>
                         )}
                         <TaskTreeRow
@@ -1577,11 +1558,11 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
                         {selectMode && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleSelectId(task.id); }}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1"
+                            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 p-1"
                           >
                             {selectedIds.has(task.id)
-                              ? <CheckSquare size={16} className="text-accent-primary" />
-                              : <Square size={16} className="text-tx-tertiary" />}
+                              ? <CheckSquare size={14} className="text-accent-primary" />
+                              : <Square size={14} className="text-tx-tertiary" />}
                           </button>
                         )}
                         <FlatTaskRow
@@ -1605,24 +1586,24 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
         {/* Mobile: batch action bar at bottom */}
         {selectMode && (
-          <div className="md:hidden flex items-center justify-between gap-2 px-4 py-3 border-t border-app-border bg-app-surface">
-            <span className="text-xs text-tx-tertiary">{t("tasks.selectedCount", { count: selectedIds.size })}</span>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 border-t border-app-border bg-app-surface px-4 py-2.5 md:hidden">
+            <span className="text-[11px] text-tx-tertiary">{t("tasks.selectedCount", { count: selectedIds.size })}</span>
+            <div className="flex items-center gap-1.5">
               <button onClick={selectedIds.size === flatOrderedTasks.length ? handleDeselectAll : handleSelectAll}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-full text-tx-secondary hover:bg-app-hover">
-                <CheckSquare size={14} />
+                className={secondaryBtnCls}>
+                <CheckSquare size={12} />
                 {selectedIds.size === flatOrderedTasks.length ? t("tasks.deselectAll") : t("tasks.selectAll")}
               </button>
               <button onClick={handleBatchComplete} disabled={selectedIds.size === 0}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-full bg-accent-primary/10 text-accent-primary disabled:opacity-40">
-                <CheckSquare size={14} /> {t("tasks.batchComplete")}
+                className={secondaryBtnCls}>
+                <CheckSquare size={12} /> {t("tasks.batchComplete")}
               </button>
               <button onClick={handleBatchDelete} disabled={selectedIds.size === 0}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs rounded-full bg-red-500/10 text-red-500 disabled:opacity-40">
-                <Trash2 size={14} /> {t("tasks.batchDelete")}
+                className={cn(secondaryBtnCls, "text-accent-danger hover:text-accent-danger")}>
+                <Trash2 size={12} /> {t("tasks.batchDelete")}
               </button>
               <button onClick={() => { setSelectMode(false); setSelectedIds(new Set()); }}
-                className="text-xs text-tx-tertiary px-2 py-1.5">
+                className="px-2 py-1 text-[11.5px] text-tx-tertiary">
                 {t("tasks.batchCancel")}
               </button>
             </div>
@@ -1633,23 +1614,23 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
       {/* Project edit dialog */}
       {editingProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setEditingProject(null)}>
-          <div className="bg-app-surface rounded-xl border border-app-border shadow-xl p-5 w-72 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-sm font-semibold text-tx-primary">{t("tasks.projectName")}</h3>
+          <div className="w-72 space-y-3 rounded-[10px] border border-app-border bg-app-surface p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[13px] font-semibold text-tx-primary">{t("tasks.projectName")}</h3>
             <input type="text" value={editProjectName} onChange={(e) => setEditProjectName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleUpdateProject(); }}
-              className="w-full px-3 py-2 rounded-md bg-app-bg border border-app-border text-sm text-tx-primary focus:outline-none focus:border-accent-primary"
+              className="w-full rounded-[6px] border border-app-border bg-app-bg px-2.5 py-1.5 text-[13px] text-tx-primary focus:border-accent-primary focus:outline-none"
               autoFocus />
             <div className="flex items-center gap-2">
-              <span className="text-xs text-tx-tertiary">{t("tasks.projectColor")}</span>
+              <span className="text-[11px] text-tx-tertiary">{t("tasks.projectColor")}</span>
               {["#6366f1", "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280"].map((c) => (
                 <button key={c} onClick={() => setEditProjectColor(c)}
-                  className={cn("w-5 h-5 rounded-full border-2 transition-all", editProjectColor === c ? "border-tx-primary scale-110" : "border-transparent")}
+                  className={cn("h-4 w-4 rounded-full border-2 transition-all", editProjectColor === c ? "border-tx-primary scale-110" : "border-transparent")}
                   style={{ backgroundColor: c }} />
               ))}
             </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setEditingProject(null)} className="px-3 py-1.5 text-xs text-tx-secondary rounded-md hover:bg-app-hover">{t("tasks.batchCancel")}</button>
-              <button onClick={handleUpdateProject} className="px-3 py-1.5 text-xs text-white bg-accent-primary rounded-md hover:opacity-90">{t("tasks.save")}</button>
+            <div className="flex justify-end gap-1.5">
+              <button onClick={() => setEditingProject(null)} className={secondaryBtnCls}>{t("tasks.batchCancel")}</button>
+              <button onClick={handleUpdateProject} className={primaryBtnCls}>{t("tasks.save")}</button>
             </div>
           </div>
         </div>

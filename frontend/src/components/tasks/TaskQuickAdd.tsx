@@ -109,8 +109,8 @@ export function TaskQuickAdd({
     }));
   };
   const togglePanel = (panel: "deadline" | "reminder") => setMetaPanel((prev) => prev === panel ? null : panel);
-  const chipClass = "flex items-center gap-1.5 rounded-md border border-app-border px-2 py-1 text-xs text-tx-secondary hover:bg-app-hover disabled:opacity-40";
-  const fieldClass = "rounded-md border border-app-border bg-app-bg px-2 py-1.5 text-xs text-tx-primary outline-none focus:border-accent-primary";
+  const chipClass = "flex items-center gap-1.5 rounded-full border border-app-border bg-app-surface px-2 py-0.5 text-[11px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary disabled:opacity-40";
+  const fieldClass = "rounded-[6px] border border-app-border bg-app-bg px-2 py-1.5 text-[11px] text-tx-primary outline-none focus:border-accent-primary";
   const recognizedRanges = quickAddPreview.recognizedRanges;
   const hasRecognizedRanges = value.length > 0 && recognizedRanges.length > 0;
   const recognizedPreviewParts = hasRecognizedRanges
@@ -223,10 +223,10 @@ export function TaskQuickAdd({
     <div
       data-task-quick-add=""
       className={cn(
-        "rounded-xl border px-3 py-3 transition-all md:px-4",
+        "rounded-[10px] border px-3 py-2.5 transition-colors md:px-4",
         dragOver
-          ? "border-accent-primary bg-accent-primary/10 ring-2 ring-accent-primary/20"
-          : "border-accent-primary/20 bg-accent-primary/[0.035] hover:border-accent-primary/35 focus-within:border-accent-primary/45 focus-within:ring-2 focus-within:ring-accent-primary/10",
+          ? "border-accent-primary bg-accent-primary/5"
+          : "border-app-border bg-app-surface focus-within:border-accent-primary/60",
       )}
       onDragEnter={(e) => {
         if (!e.dataTransfer.types.includes("Files")) return;
@@ -257,13 +257,13 @@ export function TaskQuickAdd({
         if (files.length > 0) void uploadFiles(files);
       }}
     >
-      <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary/12 text-accent-primary">
-            <Plus size={15} strokeWidth={2.2} />
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-app-hover text-tx-secondary">
+            <Plus size={13} strokeWidth={1.8} />
           </span>
           <div className="min-w-0">
-            <div className="text-xs font-semibold text-tx-primary">
+            <div className="text-[13px] font-semibold text-tx-primary">
               {t("tasks.newTask", { defaultValue: "新建任务" })}
             </div>
             <div className="hidden text-[11px] text-tx-tertiary sm:block">
@@ -271,17 +271,17 @@ export function TaskQuickAdd({
             </div>
           </div>
         </div>
-        <span className="hidden shrink-0 rounded-md border border-app-border bg-app-bg px-1.5 py-0.5 text-[10px] text-tx-tertiary md:inline-flex">
+        <span className="hidden shrink-0 rounded-[6px] border border-app-border bg-app-bg px-1.5 py-0.5 text-[10px] text-tx-tertiary md:inline-flex">
           Enter
         </span>
       </div>
 
-      <div className="flex items-center gap-2 rounded-lg border border-app-border bg-app-bg px-3 py-2 shadow-sm transition-colors focus-within:border-accent-primary/55">
+      <div className="flex items-center gap-2 rounded-[6px] border border-app-border bg-app-bg px-2.5 py-1.5 transition-colors focus-within:border-accent-primary/60">
         <div className="relative min-w-0 flex-1">
           {hasRecognizedRanges && (
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-sm text-tx-primary"
+              className="pointer-events-none absolute inset-0 flex items-center overflow-hidden whitespace-pre text-[13px] text-tx-primary"
             >
               {recognizedPreviewParts.map((part) => (
                 <span
@@ -303,7 +303,7 @@ export function TaskQuickAdd({
             placeholder={t('tasks.addTaskPlaceholder')}
             aria-label={t("tasks.newTask", { defaultValue: "新建任务" })}
             className={cn(
-              "relative z-10 w-full bg-transparent text-sm text-tx-primary placeholder:text-tx-tertiary focus:outline-none",
+              "relative z-10 w-full bg-transparent text-[13px] text-tx-primary placeholder:text-tx-tertiary focus:outline-none",
               hasRecognizedRanges && "text-transparent caret-tx-primary",
             )}
           />
@@ -313,18 +313,18 @@ export function TaskQuickAdd({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           title={t('tasks.insertImage')}
-          className="flex-shrink-0 rounded-md p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-accent-primary disabled:opacity-50"
+          className="flex-shrink-0 rounded-[6px] p-1 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:opacity-50"
         >
           {uploading
-            ? <Loader2 size={16} className="animate-spin" />
-            : <ImagePlus size={16} />}
+            ? <Loader2 size={14} className="animate-spin" />
+            : <ImagePlus size={14} />}
         </button>
         <button
           type="button"
           onClick={() => void handleSubmit()}
           aria-label={t("tasks.add")}
           disabled={!value.trim() || uploading || submitting}
-          className="flex-shrink-0 rounded-lg bg-accent-primary px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
+          className="flex-shrink-0 rounded-[6px] bg-accent-primary px-2.5 py-1 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-35"
         >
           {t('tasks.add')}
         </button>
@@ -354,13 +354,13 @@ export function TaskQuickAdd({
         </button>
       </div>
       {metaPanel === "deadline" && (
-        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-app-border bg-app-bg p-2">
-          <label className="flex flex-col gap-1 text-xs text-tx-secondary">
+        <div className="mt-2 flex flex-wrap items-end gap-2 rounded-[6px] border border-app-border bg-app-bg p-2">
+          <label className="flex flex-col gap-1 text-[11px] text-tx-tertiary">
             {t("tasks.dueDate")}
             <input type="date" aria-label={t("tasks.dueDate")} className={fieldClass} value={dueDate}
               onChange={(e) => setManualMeta((prev) => ({ ...prev, dueDate: e.target.value || null }))} />
           </label>
-          <label className="flex flex-col gap-1 text-xs text-tx-secondary">
+          <label className="flex flex-col gap-1 text-[11px] text-tx-tertiary">
             {t("tasks.dueAt")}
             <input type="time" aria-label={t("tasks.dueAt")} className={fieldClass} value={dueTime} disabled={!dueDate}
               onChange={(e) => setManualMeta((prev) => ({ ...prev, dueTime: e.target.value || null }))} />
@@ -371,11 +371,11 @@ export function TaskQuickAdd({
         </div>
       )}
       {metaPanel === "reminder" && (
-        <div className="mt-2 space-y-2 rounded-lg border border-app-border bg-app-bg p-2">
-          {!dueDate && <p className="text-xs text-tx-tertiary">{t("tasks.reminder.needDueDate")}</p>}
+        <div className="mt-2 space-y-2 rounded-[6px] border border-app-border bg-app-bg p-2">
+          {!dueDate && <p className="text-[11px] text-tx-tertiary">{t("tasks.reminder.needDueDate")}</p>}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {reminderOptions.map((offset) => (
-              <label key={offset} className="flex items-center gap-1 text-xs text-tx-secondary">
+              <label key={offset} className="flex items-center gap-1 text-[11px] text-tx-secondary">
                 <input type="checkbox" disabled={!dueDate} checked={reminderOffsets.includes(offset)} onChange={() => toggleReminder(offset)} />
                 {reminderLabel(offset)}
               </label>
@@ -385,7 +385,7 @@ export function TaskQuickAdd({
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-xs text-tx-secondary">
+            <label className="flex items-center gap-2 text-[11px] text-tx-tertiary">
               {t("tasks.quickAdd.customReminder")}
               <input type="number" min="1" max={MAX_REMINDER_OFFSET_MINUTES} step="1" disabled={!dueDate} aria-label={t("tasks.quickAdd.customReminder")}
                 className={cn(fieldClass, "w-20")} value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} />

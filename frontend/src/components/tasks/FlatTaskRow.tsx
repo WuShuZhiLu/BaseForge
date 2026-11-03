@@ -76,28 +76,27 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, x: -20, transition: { duration: 0.15 } }}
         className={cn(
-          "group flex items-start gap-3 w-full min-w-0 px-3 py-2 rounded-lg border transition-all cursor-pointer",
-          isCompleted
-            ? "border-transparent bg-app-hover/50 opacity-60"
-            : "border-app-border bg-app-elevated hover:shadow-md hover:border-accent-primary/30"
+          "group flex min-h-10 w-full min-w-0 cursor-pointer items-start gap-2.5 px-2 py-2 transition-colors",
+          isCompleted ? "opacity-60" : "hover:bg-app-hover"
         )}
         onClick={() => onSelect(task)}
       >
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(task.id); }}
-          className="flex-shrink-0 mt-0.5 transition-transform hover:scale-110"
+          className="mt-0.5 flex-shrink-0 transition-colors"
+          aria-pressed={isCompleted}
         >
           {isCompleted ? (
-            <CheckCircle2 className="w-5 h-5 text-indigo-500" />
+            <CheckCircle2 size={15} className="text-accent-primary" />
           ) : (
-            <Circle className="w-5 h-5 text-tx-tertiary group-hover:text-indigo-400 transition-colors" />
+            <Circle size={15} className="text-tx-tertiary transition-colors group-hover:text-accent-primary" />
           )}
         </button>
 
-        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           {/* Parent task breadcrumb */}
           {parentPath.length > 0 && (
-            <div className="flex items-center gap-1 text-[10px] text-tx-tertiary min-w-0 mb-0.5">
+            <div className="mb-0.5 flex min-w-0 items-center gap-1 text-[11px] text-tx-tertiary">
               {parentPath.map((p, i) => (
                 <React.Fragment key={p.id}>
                   {i > 0 && <span className="opacity-50">/</span>}
@@ -118,7 +117,7 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
 
           <span
             className={cn(
-              "text-[13px] md:text-sm leading-relaxed break-words [overflow-wrap:anywhere] line-clamp-2 transition-all",
+              "text-[13px] leading-relaxed break-words [overflow-wrap:anywhere] line-clamp-2 transition-all",
               isCompleted ? "line-through text-tx-tertiary" : "text-tx-primary"
             )}
             title={task.title}
@@ -126,19 +125,19 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
             <TitleView title={task.title} compact isCompleted={isCompleted} />
           </span>
           {descriptionPreview && (
-            <p className="text-xs text-tx-tertiary leading-snug line-clamp-1 break-words [overflow-wrap:anywhere]">
+            <p className="text-[11px] leading-snug line-clamp-1 break-words [overflow-wrap:anywhere] text-tx-tertiary">
               {descriptionPreview}
             </p>
           )}
           {(task.dueDate || showCreator) && (
-            <div className="md:hidden flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 md:hidden">
               <DateBadge dateStr={task.dueDate} dueAt={task.dueAt} isCompleted={isCompleted} />
               {showCreator && (
                 <span
-                  className="flex items-center gap-1 text-[10px] text-tx-tertiary min-w-0"
+                  className="flex min-w-0 items-center gap-1 text-[11px] text-tx-tertiary"
                   title={t('common.createdBy', { name: task.creatorName })}
                 >
-                  <UserIcon size={10} className="shrink-0" />
+                  <UserIcon size={11} className="shrink-0" />
                   <span className="truncate">{task.creatorName}</span>
                 </span>
               )}
@@ -146,21 +145,21 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
           )}
           {showCreator && (
             <span
-              className="hidden md:flex items-center gap-1 text-[10px] text-tx-tertiary truncate"
+              className="hidden items-center gap-1 truncate text-[11px] text-tx-tertiary md:flex"
               title={t('common.createdBy', { name: task.creatorName })}
             >
-              <UserIcon size={10} className="shrink-0" />
+              <UserIcon size={11} className="shrink-0" />
               <span className="truncate">{task.creatorName}</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
+        <div className="mt-0.5 flex flex-shrink-0 items-center gap-1.5">
           {/* Add subtask button */}
           {onCreateChild && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowSubtaskInput(true); }}
-              className="opacity-100 md:opacity-0 md:group-hover:opacity-100 flex-shrink-0 p-0.5 rounded hover:bg-app-hover text-tx-tertiary hover:text-accent-primary transition-all"
+              className="flex-shrink-0 rounded p-0.5 text-tx-tertiary opacity-100 transition-all hover:bg-app-hover hover:text-accent-primary md:opacity-0 md:group-hover:opacity-100"
               title={t('tasks.addChild')}
             >
               <Plus size={14} />
@@ -169,11 +168,11 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
           <span className="hidden md:inline-flex">
             <DateBadge dateStr={task.dueDate} dueAt={task.dueAt} isCompleted={isCompleted} />
           </span>
-          {hasEnabledReminder(task) && <span title={t("tasks.reminder.title")}><Bell size={12} className="text-accent-primary/70" /></span>}
-          {isRepeatingTask(task) && <span title={t(`tasks.repeat.${task.repeatRule}`)}><Repeat size={12} className="text-accent-primary/60" /></span>}
-          {blockedByDependency && !isCompleted && <span title={t("tasks.dependencies.blockedByIncomplete")}><Link2 size={12} className="text-amber-500" /></span>}
+          {hasEnabledReminder(task) && <span title={t("tasks.reminder.title")}><Bell size={12} className="text-tx-tertiary" /></span>}
+          {isRepeatingTask(task) && <span title={t(`tasks.repeat.${task.repeatRule}`)}><Repeat size={12} className="text-tx-tertiary" /></span>}
+          {blockedByDependency && !isCompleted && <span title={t("tasks.dependencies.blockedByIncomplete")}><Link2 size={12} className="text-accent-warning" /></span>}
           <Flag
-            size={14}
+            size={13}
             className={cn(
               pri.flagClass,
               task.priority < 3 && "md:opacity-0 md:group-hover:opacity-100",
@@ -182,9 +181,9 @@ export const FlatTaskRow = React.forwardRef<HTMLDivElement, {
           />
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-            className="hidden md:inline-flex md:opacity-0 md:group-hover:opacity-100 text-tx-tertiary hover:text-accent-danger transition-all"
+            className="hidden text-tx-tertiary transition-all hover:text-accent-danger md:inline-flex md:opacity-0 md:group-hover:opacity-100"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </div>
       </motion.div>

@@ -22,23 +22,23 @@ interface TaskEmptyStateProps {
 }
 
 const ICONS: Record<TaskEmptyStateType, React.ReactNode> = {
-  "no-tasks": <Inbox size={36} />,
-  "no-search": <Search size={36} />,
-  "no-scheduled": <CalendarDays size={36} />,
-  "no-templates": <FileText size={36} />,
-  "no-reminders": <BellOff size={36} />,
-  "no-dependencies": <Link2 size={36} />,
-  "no-projects": <FolderOpen size={36} />,
+  "no-tasks": <Inbox size={28} strokeWidth={1.5} />,
+  "no-search": <Search size={28} strokeWidth={1.5} />,
+  "no-scheduled": <CalendarDays size={28} strokeWidth={1.5} />,
+  "no-templates": <FileText size={28} strokeWidth={1.5} />,
+  "no-reminders": <BellOff size={28} strokeWidth={1.5} />,
+  "no-dependencies": <Link2 size={28} strokeWidth={1.5} />,
+  "no-projects": <FolderOpen size={28} strokeWidth={1.5} />,
 };
 
 const COMPACT_ICONS: Record<TaskEmptyStateType, React.ReactNode> = {
-  "no-tasks": <Inbox size={24} />,
-  "no-search": <Search size={24} />,
-  "no-scheduled": <CalendarDays size={24} />,
-  "no-templates": <FileText size={24} />,
-  "no-reminders": <BellOff size={24} />,
-  "no-dependencies": <Link2 size={24} />,
-  "no-projects": <FolderOpen size={24} />,
+  "no-tasks": <Inbox size={20} strokeWidth={1.5} />,
+  "no-search": <Search size={20} strokeWidth={1.5} />,
+  "no-scheduled": <CalendarDays size={20} strokeWidth={1.5} />,
+  "no-templates": <FileText size={20} strokeWidth={1.5} />,
+  "no-reminders": <BellOff size={20} strokeWidth={1.5} />,
+  "no-dependencies": <Link2 size={20} strokeWidth={1.5} />,
+  "no-projects": <FolderOpen size={20} strokeWidth={1.5} />,
 };
 
 export function TaskEmptyState({ type, title, description, actionLabel, onAction, compact }: TaskEmptyStateProps) {
@@ -51,16 +51,16 @@ export function TaskEmptyState({ type, title, description, actionLabel, onAction
   return (
     <div className={cn(
       "flex flex-col items-center justify-center text-tx-tertiary",
-      compact ? "py-6 px-4" : "py-12 px-4"
+      compact ? "px-4 py-5" : "px-4 py-10"
     )}>
-      <div className="mb-3 opacity-40">
+      <div className="mb-2.5 opacity-70">
         {compact ? COMPACT_ICONS[type] : ICONS[type]}
       </div>
-      <span className={cn("text-center font-medium", compact ? "text-xs" : "text-sm")}>
+      <span className={cn("text-center font-medium text-tx-secondary", compact ? "text-[12px]" : "text-[13px]")}>
         {resolvedTitle}
       </span>
       {resolvedDescription && (
-        <span className={cn("text-center mt-1 max-w-[280px]", compact ? "text-[11px]" : "text-xs")}>
+        <span className="mt-1 max-w-[280px] text-center text-[11px] text-tx-tertiary">
           {resolvedDescription}
         </span>
       )}
@@ -68,10 +68,7 @@ export function TaskEmptyState({ type, title, description, actionLabel, onAction
         <button
           type="button"
           onClick={onAction}
-          className={cn(
-            "mt-3 px-3 py-1.5 rounded-md text-white bg-accent-primary hover:bg-accent-primary/90 transition-colors",
-            compact ? "text-[11px]" : "text-xs"
-          )}
+          className="mt-3 rounded-[6px] border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
         >
           {resolvedAction}
         </button>

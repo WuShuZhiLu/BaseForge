@@ -39,6 +39,15 @@ export function HabitRow({
     toast.error(error instanceof Error ? error.message : "操作失败，请稍后重试");
   };
 
+  // 打卡按钮：默认描边，选中态 accent/10 + accent 文字
+  const actionCls = (active: boolean) =>
+    cn(
+      "inline-flex items-center gap-1 rounded-[6px] border px-2 py-1 text-[11px] transition-colors disabled:opacity-50",
+      active
+        ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+        : "border-app-border bg-app-surface text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
+    );
+
   const runCheckin = async (status: HabitCheckinStatus) => {
     if (!canManage || submitting || isArchived) return;
     setSubmitting(true);
@@ -74,29 +83,29 @@ export function HabitRow({
   };
 
   return (
-    <div className="rounded-xl border border-app-border bg-app-surface px-4 py-3 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 h-3 w-3 rounded-full" style={{ backgroundColor: habit.color || "#10b981" }} />
+    <div className="px-1 py-2.5 transition-colors hover:bg-app-hover/60">
+      <div className="flex items-start gap-2.5">
+        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: habit.color || "#10b981" }} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <div className="truncate text-sm font-medium text-tx-primary">{habit.title}</div>
+            <div className="truncate text-[13px] font-medium text-tx-primary">{habit.title}</div>
             {habit.todayStatus && (
               <span className={cn(
-                "rounded-full px-2 py-0.5 text-[10px]",
-                habit.todayStatus === "success" && "bg-emerald-500/10 text-emerald-600",
-                habit.todayStatus === "partial" && "bg-amber-500/10 text-amber-600",
-                habit.todayStatus === "failure" && "bg-red-500/10 text-red-600",
+                "text-[11px]",
+                habit.todayStatus === "success" && "text-emerald-600 dark:text-emerald-400",
+                habit.todayStatus === "partial" && "text-amber-600 dark:text-amber-400",
+                habit.todayStatus === "failure" && "text-accent-danger",
               )}>
                 {statusLabel[habit.todayStatus]}
               </span>
             )}
             {isArchived && (
-              <span className="rounded-full bg-app-hover px-2 py-0.5 text-[10px] text-tx-tertiary">
+              <span className="text-[11px] text-tx-tertiary">
                 {t("habits.status.archived")}
               </span>
             )}
             {habit.creatorName && (
-              <span className="text-[10px] text-tx-tertiary">{habit.creatorName}</span>
+              <span className="text-[11px] text-tx-tertiary">{habit.creatorName}</span>
             )}
           </div>
           <input
@@ -105,39 +114,39 @@ export function HabitRow({
             onChange={(e) => setNote(e.target.value)}
             disabled={!canManage || submitting || archiving || deleting || isArchived}
             placeholder={t("habits.notePlaceholder")}
-            className="mt-2 w-full rounded-md border border-app-border bg-app-bg px-2.5 py-2 text-xs text-tx-primary placeholder:text-tx-tertiary focus:outline-none focus:border-accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-1.5 w-full rounded-[6px] border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-primary placeholder:text-tx-tertiary focus:border-accent-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
           {canManage && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {!isArchived ? (
                 <>
                   <button
                     onClick={() => runCheckin("success")}
                     disabled={submitting || archiving || deleting}
-                    className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2.5 py-1.5 text-xs text-emerald-600 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                    className={actionCls(habit.todayStatus === "success")}
                   >
-                    <Check size={13} /> {t("habits.actions.success")}
+                    <Check size={12} /> {t("habits.actions.success")}
                   </button>
                   <button
                     onClick={() => runCheckin("partial")}
                     disabled={submitting || archiving || deleting}
-                    className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-600 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                    className={actionCls(habit.todayStatus === "partial")}
                   >
-                    <Minus size={13} /> {t("habits.actions.partial")}
+                    <Minus size={12} /> {t("habits.actions.partial")}
                   </button>
                   <button
                     onClick={() => runCheckin("failure")}
                     disabled={submitting || archiving || deleting}
-                    className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2.5 py-1.5 text-xs text-red-600 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                    className={actionCls(habit.todayStatus === "failure")}
                   >
-                    <CircleSlash size={13} /> {t("habits.actions.failure")}
+                    <CircleSlash size={12} /> {t("habits.actions.failure")}
                   </button>
                   <button
                     onClick={() => runArchiveToggle(true)}
                     disabled={submitting || archiving || deleting}
-                    className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary disabled:opacity-50"
+                    className="ml-auto inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-[11px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary disabled:opacity-50"
                   >
-                    <Archive size={13} /> {t("habits.actions.archive")}
+                    <Archive size={12} /> {t("habits.actions.archive")}
                   </button>
                 </>
               ) : (
@@ -145,18 +154,18 @@ export function HabitRow({
                   <button
                     onClick={() => runArchiveToggle(false)}
                     disabled={submitting || archiving || deleting}
-                    className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-2.5 py-1.5 text-xs text-sky-700 transition-colors hover:bg-sky-500/20 disabled:opacity-50"
+                    className={actionCls(false)}
                   >
-                    <RotateCcw size={13} /> {t("habits.actions.unarchive")}
+                    <RotateCcw size={12} /> {t("habits.actions.unarchive")}
                   </button>
                 </>
               )}
               <button
                 onClick={runDelete}
                 disabled={submitting || archiving || deleting}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-rose-600 transition-colors hover:bg-rose-500/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-[11px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-accent-danger disabled:opacity-50"
               >
-                <Trash2 size={13} /> {t("habits.actions.delete")}
+                <Trash2 size={12} /> {t("habits.actions.delete")}
               </button>
             </div>
           )}

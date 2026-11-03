@@ -55,22 +55,22 @@ export function DateBadge({
   if (isCompleted) {
     // 已完成任务只展示日期本身，不再标红"已逾期"
     label = formatted;
-    cls = "bg-app-hover text-tx-tertiary";
+    cls = "text-tx-tertiary";
   } else if (isToday(d)) {
     label = t('tasks.today');
-    cls = "bg-indigo-500/10 text-indigo-500";
+    cls = "text-accent-primary";
   } else if (isTomorrow(d)) {
     label = t('tasks.tomorrow');
-    cls = "bg-blue-500/10 text-blue-500";
+    cls = "text-tx-secondary";
   } else if (isPast(d) && !isToday(d)) {
     label = t('tasks.overdue');
-    cls = "bg-red-500/10 text-red-500";
+    cls = "text-accent-danger";
   } else if (isThisWeek(d, { weekStartsOn: 1 })) {
     label = format(d, "EEEE", { locale: dateLocale });
-    cls = "bg-emerald-500/10 text-emerald-500";
+    cls = "text-tx-secondary";
   } else {
     label = formatted;
-    cls = "bg-app-hover text-tx-secondary";
+    cls = "text-tx-tertiary";
   }
 
   // 如果有 dueAt，附加时间显示
@@ -80,8 +80,8 @@ export function DateBadge({
     : label;
 
   return (
-    <span className={cn("inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full", cls)}>
-      <Calendar size={10} />
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap text-[11px] tabular-nums", cls)}>
+      <Calendar size={11} className="shrink-0 opacity-70" />
       {displayLabel}
     </span>
   );
