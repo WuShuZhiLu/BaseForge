@@ -64,6 +64,8 @@ import {
   Store,
   SlidersHorizontal,
   Unlock,
+  FolderOpen,
+  Cloud,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -384,7 +386,7 @@ interface RowMenuState {
   y: number;
 }
 
-/** 面板内可折叠分区：与知识库区段同一折叠交互（箭头 + panelCollapsed 持久化）。 */
+/** 面板内分区标题：统一的小圆点装饰 + 12px/600 标签（所有分区同一个符号，不做区分）。 */
 function PanelSection({ label, extra, children }: {
   label: string;
   extra?: React.ReactNode;
@@ -392,8 +394,11 @@ function PanelSection({ label, extra, children }: {
 }) {
   return (
     <div className="border-b border-app-border px-2 py-1.5">
-      <div className="flex items-center justify-between px-1 pb-1">
-        <span className="text-[12px] font-semibold text-tx-secondary">{label}</span>
+      <div className="flex items-center justify-between pl-1 pr-1 pb-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Circle size={6} aria-hidden className="shrink-0 fill-current text-tx-tertiary" />
+          <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">{label}</span>
+        </span>
         {extra}
       </div>
       {children}
@@ -3163,7 +3168,6 @@ export default function SidebarDesktop() {
                       }}
                       className={`flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${trashFilter.includes(key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                     >
-                      <span>{key === "all" ? "🗂" : TRASH_TYPE_META.find((meta) => meta.key === key)?.emoji}</span>
                       <span className="min-w-0 flex-1 truncate text-left">{key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label}</span>
                       <span className="tabular-nums text-tx-tertiary">{count}</span>
                     </button>
@@ -3267,18 +3271,17 @@ export default function SidebarDesktop() {
               <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">文件管理</span>
             </div>
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">来源</div>
-              <div className="space-y-1">
-                {([["all", "📁", "文件"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", "☁️", "远程文件"]] : [])] as Array<[FilesSource, string, string]>).map(([key, emoji, label]) => (
+            <PanelSection label="来源">
+              <div className="space-y-0.5">
+                {([["all", FolderOpen, "文件"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", Cloud, "远程文件"]] : [])] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
                   <button
                     key={key}
                     type="button"
                     aria-pressed={getFilesSource() === key}
                     onClick={() => setFilesUi({ source: key })}
-                    className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] ${getFilesSource() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${getFilesSource() === key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
                   >
-                    <span>{emoji}</span>
+                    <Icon size={14} className="shrink-0 opacity-80" />
                     <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                     {/* 角标：统一文件总数（远程文件的条目数由面板自管，不在此统计） */}
                     {key === "all" && fileStats && (
@@ -3287,21 +3290,21 @@ export default function SidebarDesktop() {
                   </button>
                 ))}
               </div>
-            </div>
+            </PanelSection>
             {getFilesSource() !== "remote" && (<>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">分类</div>
-              <div className="space-y-1">
-                {([["all", "🗂 全部"], ["myUploads", "📤 我的上传"], ["referenced", "📄 文档引用"], ["unreferenced", "✨ 未引用"]] as Array<[string, string]>).map(([key, label]) => (
+            <PanelSection label="分类">
+              <div className="space-y-0.5">
+                {([[ "all", Layers, "全部"], ["myUploads", Upload, "我的上传"], ["referenced", FileText, "文档引用"], ["unreferenced", Sparkles, "未引用"]] as Array<[string, typeof Layers, string]>).map(([key, Icon, label]) => (
                   <button
                     key={key}
                     type="button"
                     aria-pressed={getFilesCategory() === key}
                     onClick={() => setFilesUi({ category: key })}
-                    className={`flex w-full items-center rounded-md border px-2 py-1 text-[12px] ${getFilesCategory() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${getFilesCategory() === key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
                     title={key === "referenced" ? "被至少一篇笔记正文引用着的附件" : key === "unreferenced" ? "没被任何笔记正文引用的附件（手动上传的会显示盾牌，不会被自动清理）" : undefined}
                   >
-                    {label}
+                    <Icon size={14} className="shrink-0 opacity-80" />
+                    <span className="min-w-0 flex-1 truncate text-left">{label}</span>
                     {fileStats && <span className="ml-auto tabular-nums text-tx-tertiary">{
                       key === "all" ? fileStats.total
                       : key === "myUploads" ? fileStats.myUploads?.total ?? 0
@@ -3310,10 +3313,9 @@ export default function SidebarDesktop() {
                   </button>
                 ))}
               </div>
-            </div>
+            </PanelSection>
             {/* 分享状态：只看生效中（未关闭且未过期）的只读分享链接。 */}
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">分享状态</div>
+            <PanelSection label="分享状态">
               <div className="flex flex-wrap gap-1 px-1">
                 {FILE_SHARE_OPTIONS.map((opt) => (
                   <button
@@ -3326,9 +3328,8 @@ export default function SidebarDesktop() {
                   >{opt.label}</button>
                 ))}
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">上传时间</div>
+            </PanelSection>
+            <PanelSection label="上传时间">
               <div className="flex flex-wrap gap-1 px-1">
                 {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"]] as Array<[string, string]>).map(([key, label]) => (
                   <button
@@ -3340,9 +3341,8 @@ export default function SidebarDesktop() {
                   >{label}</button>
                 ))}
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序</div>
+            </PanelSection>
+            <PanelSection label="排序">
               <div className="flex flex-wrap gap-1 px-1">
                 {FILE_SORT_OPTIONS.map((opt) => (
                   <button
@@ -3354,36 +3354,35 @@ export default function SidebarDesktop() {
                   >{opt.label}</button>
                 ))}
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">展示</div>
+            </PanelSection>
+            <PanelSection label="展示">
               <div className="grid grid-cols-2 gap-1 px-1">
-                {([["list", "📃 列表"], ["grid", "▦ 网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
+                {([[ "list", "列表"], ["grid", "网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
                   <button
                     key={mode}
                     type="button"
                     aria-pressed={getFilesViewMode() === mode}
                     onClick={() => setFilesUi({ view: mode })}
-                    className={`rounded-md border px-2 py-1 text-[11px] ${getFilesViewMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${getFilesViewMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >{label}</button>
                 ))}
               </div>
               <div className="mt-1 grid grid-cols-3 gap-1 px-1">
-                {([["flat", "扁平"], ["notebook", "按库"], ["folder", "按文件夹"]] as Array<[FilesGroupMode, string]>).map(([mode, label]) => (
+                {([[ "flat", "扁平"], ["notebook", "按库"], ["folder", "按文件夹"]] as Array<[FilesGroupMode, string]>).map(([mode, label]) => (
                   <button
                     key={mode}
                     type="button"
                     aria-pressed={getFilesGroupMode() === mode}
                     onClick={() => setFilesUi({ group: mode })}
-                    className={`rounded-md border px-1 py-1 text-[11px] ${getFilesGroupMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    className={`rounded-md border px-1 py-1 text-[11px] transition-colors ${getFilesGroupMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >{label}</button>
                 ))}
               </div>
-            </div>
+            </PanelSection>
             </>)}
             {getFilesSource() === "remote" && (<>
             <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
+              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
               <div className="flex flex-wrap gap-1 px-1">
                 {FILE_REMOTE_TYPE_CHIPS.map((chip) => (
                   <button
@@ -3400,7 +3399,7 @@ export default function SidebarDesktop() {
               </div>
             </div>
             <div className="border-b border-app-border px-2 py-1.5">
-              <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">排序</div>
+              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">排序</div>
               <div className="flex flex-wrap gap-1 px-1">
                 {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
                   <button
@@ -3448,13 +3447,13 @@ export default function SidebarDesktop() {
               const active = plugCat === entry.key;
               return (
                 <PanelSection key={entry.key} label={entry.group}>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <div
                       className={cn(
-                        "flex w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] transition-colors",
+                        "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
                         active
-                          ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
-                          : "border-app-border bg-app-bg text-tx-primary hover:bg-app-hover",
+                          ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                          : "text-tx-secondary hover:bg-app-hover",
                       )}
                       title={entry.label}
                       onClick={() => {
@@ -4132,9 +4131,8 @@ function SharesSidePanel() {
 
   return (
     <div className="sbx-view">
-      <div className="border-b border-app-border px-2 py-1.5">
-        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">状态</div>
-        <div className="space-y-1">
+      <PanelSection label="状态">
+        <div className="space-y-0.5">
           <ShareCategoryRow active={group === "all"} icon={<Layers size={12} />} label="全部" count={counts?.total ?? 0} onClick={() => pick({ group: "all" })} />
           <ShareCategoryRow active={group === "active"} icon={shareDot("text-emerald-500")} label="生效中" count={counts?.groups.active ?? 0} onClick={() => pick({ group: "active" })} />
           <ShareCategoryRow active={group === "attention"} icon={shareDot("text-amber-500")} label="需要处理" count={counts?.groups.attention ?? 0}
@@ -4142,10 +4140,9 @@ function SharesSidePanel() {
             onClick={() => pick({ group: "attention" })} />
           <ShareCategoryRow active={group === "disabled"} icon={shareDot("text-tx-tertiary")} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
         </div>
-      </div>
+      </PanelSection>
 
-      <div className="border-b border-app-border px-2 py-1.5">
-        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">对象类型</div>
+      <PanelSection label="对象类型">
         <div className="space-y-1">
           {([["note", "笔记链接", <FileText key="note" size={12} />], ["file", "文件链接", <Paperclip key="file" size={12} />], ["notebook", "目录 / 知识库", <BookOpen key="notebook" size={12} />]] as Array<[ShareCenterObjectKind, string, React.ReactNode]>).map(([kind, label, icon]) => (
             <ShareCategoryRow
@@ -4158,11 +4155,10 @@ function SharesSidePanel() {
             />
           ))}
         </div>
-      </div>
+      </PanelSection>
 
-      <div className="border-b border-app-border px-2 py-1.5">
-        <div className="px-1 pb-1 text-[10.5px] text-tx-tertiary">风险</div>
-        <div className="space-y-1">
+      <PanelSection label="风险">
+        <div className="space-y-0.5">
           {(["open_ended", "orphan", "unused"] as ShareCenterRisk[]).map((value) => (
             <ShareCategoryRow
               key={value}
@@ -4184,7 +4180,7 @@ function SharesSidePanel() {
             onClick={() => pick({ risk: risk === "bare" ? "all" : "bare" })}
           />
         </div>
-      </div>
+      </PanelSection>
 
       <div className="border-b border-app-border px-2 py-1.5">
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.08] p-2.5 text-[11px] leading-5 text-amber-800 dark:text-amber-200">
