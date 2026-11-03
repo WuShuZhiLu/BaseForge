@@ -35,16 +35,16 @@ type PendingManifest = {
 type PendingPackage = { file: File; manifest: PendingManifest; nodeRuntimeConfirmationRequired: boolean };
 
 const FIELD = "w-full rounded-md border border-app-border bg-transparent px-2 py-1.5 text-xs text-tx-primary";
-const BUTTON = "rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-xs text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50";
+const BUTTON = "rounded-md border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50";
 
 function Panel({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div
-      className="mt-4 rounded-lg border border-app-border bg-app-surface p-4"
+      className="mt-2.5 rounded-[10px] border border-app-border bg-app-surface p-3.5"
       data-plugin-admin-panel={title}
     >
-      <h3 className="text-sm font-semibold text-tx-primary">{title}</h3>
-      {description && <p className="mt-1 text-xs text-tx-tertiary">{description}</p>}
+      <h3 className="text-[12.5px] font-semibold text-tx-primary">{title}</h3>
+      {description && <p className="mt-1 text-[11px] leading-relaxed text-tx-tertiary">{description}</p>}
       {children}
     </div>
   );
@@ -94,7 +94,7 @@ export function PluginUpdatesResult({ updates, updateSource, onSourceChange }: {
 }) {
   if (updates === null) return null;
   return (
-    <div className="mt-3 rounded-lg border border-app-border bg-app-bg p-3" data-plugin-updates-result>
+    <div className="rounded-[10px] border border-app-border bg-app-surface px-3 py-2.5" data-plugin-updates-result>
       <label className="flex items-center gap-2 text-[11px] text-tx-tertiary">
         更新源
         <input
@@ -105,20 +105,20 @@ export function PluginUpdatesResult({ updates, updateSource, onSourceChange }: {
         />
       </label>
       {updates.length ? (
-        <div className="mt-2 space-y-2">
+        <div className="mt-2 space-y-1.5">
           {updates.map((update) => (
-            <div key={update.pluginId} className="rounded-lg bg-app-hover p-3 text-xs text-tx-secondary">
+            <div key={update.pluginId} className="rounded-md border border-app-border/60 bg-app-bg px-2.5 py-2 text-[11px] text-tx-secondary">
               <div className="font-mono text-tx-primary">{update.pluginId}</div>
-              <div className="mt-1">{update.currentVersion} → {update.availableVersion}</div>
+              <div className="mt-0.5">{update.currentVersion} → {update.availableVersion}</div>
               {update.permissionDiff.added.length > 0 && (
-                <div className="mt-1 text-amber-600">新增权限：{update.permissionDiff.added.join("、")}</div>
+                <div className="mt-0.5 text-amber-600">新增权限：{update.permissionDiff.added.join("、")}</div>
               )}
-              <div className="mt-1 text-tx-tertiary">{update.confirmationRequired ? "需要管理员确认" : "符合自动更新条件"}</div>
+              <div className="mt-0.5 text-tx-tertiary">{update.confirmationRequired ? "需要管理员确认" : "符合自动更新条件"}</div>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-tx-tertiary">没有可用更新。</p>
+        <p className="mt-2 text-[11px] text-tx-tertiary">没有可用更新。</p>
       )}
     </div>
   );
@@ -184,7 +184,7 @@ export function PluginPackageInstallSection({ onInstalled }: {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-xs text-tx-primary transition-colors hover:bg-app-hover"
+          className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-primary transition-colors hover:bg-app-hover"
         >
           <PackagePlus size={13} />安装插件包
         </button>
@@ -286,8 +286,12 @@ export function PluginConfigPanel({ isAdmin, onInstalled }: {
 
   if (!isAdmin) {
     return (
-      <div className="mt-6 rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
-        插件配置仅对管理员开放。
+      <div className="mt-2.5 flex flex-col items-center justify-center rounded-[10px] border border-app-border bg-app-surface px-4 py-12 text-center">
+        <span className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-app-hover text-tx-tertiary">
+          <ShieldCheck size={17} />
+        </span>
+        <p className="text-[12.5px] text-tx-primary">插件配置仅对管理员开放</p>
+        <p className="mt-1 text-[11px] text-tx-tertiary">安装源、执行边界与开发者模式需要管理员账号才能调整。</p>
       </div>
     );
   }

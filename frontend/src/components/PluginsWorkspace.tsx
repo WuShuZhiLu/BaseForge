@@ -21,18 +21,22 @@
  */
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
+  ChevronRight,
   ClipboardList,
   Download,
   ExternalLink,
   FolderOpen,
   ListTodo,
   Loader2,
+  PackageOpen,
   PenLine,
   Puzzle,
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Store,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -146,7 +150,7 @@ function Badge({ tone = "neutral", children }: { tone?: "ok" | "warn" | "bad" | 
         tone === "warn" && "bg-amber-500/15 text-amber-600",
         tone === "bad" && "bg-red-500/15 text-red-600",
         tone === "info" && "bg-indigo-500/15 text-indigo-600",
-        tone === "neutral" && "bg-zinc-500/15 text-tx-secondary",
+        tone === "neutral" && "bg-app-hover text-tx-secondary",
       )}
     >
       {children}
@@ -156,9 +160,142 @@ function Badge({ tone = "neutral", children }: { tone?: "ok" | "warn" | "bad" | 
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mt-4 rounded-lg border border-app-border bg-app-surface p-4">
-      <h3 className="text-sm font-semibold text-tx-primary">{title}</h3>
+    <section className="mt-3 rounded-[10px] border border-app-border bg-app-surface p-4">
+      <h3 className="text-[12.5px] font-semibold text-tx-primary">{title}</h3>
       {children}
+    </section>
+  );
+}
+
+/** 分组标题：与文件管理分区头同一规格（14px/600 标题 + 11px 三级色说明 + 右侧操作） */
+function GroupHeader({ title, description, actions }: {
+  title: string;
+  description: string;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
+      <div className="min-w-0">
+        <h3 className="text-[14px] font-semibold text-tx-primary">{title}</h3>
+        <p className="mt-0.5 text-[11px] text-tx-tertiary">{description}</p>
+      </div>
+      {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}
+    </div>
+  );
+}
+
+/** 列表容器：一块 surface + 1px 描边，行之间用细线分隔，不再一行一张卡 */
+function RowList({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-[10px] border border-app-border bg-app-surface">{children}</div>
+  );
+}
+
+const STATUS_DOT: Record<"ok" | "warn" | "bad" | "neutral", string> = {
+  ok: "bg-emerald-500",
+  warn: "bg-amber-500",
+  bad: "bg-red-500",
+  neutral: "bg-tx-tertiary/50",
+};
+
+/** 统一行：图标 + 名称/次级信息 +（常驻控件）+（hover 操作） */
+function PluginRow({ rowId, icon, name, meta, state, controls, hoverActions, onOpen }: {
+  rowId: string;
+  icon: React.ReactNode;
+  name: string;
+  meta: string;
+  state?: { label: string; tone: "ok" | "warn" | "bad" | "neutral" };
+  controls?: React.ReactNode;
+  hoverActions?: React.ReactNode;
+  onOpen?: () => void;
+}) {
+  return (
+    <div
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      data-plugin-row={rowId}
+      onClick={onOpen}
+      onKeyDown={onOpen
+        ? (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onOpen();
+          }
+        }
+        : undefined}
+      className={cn(
+        "group flex min-h-[44px] items-center gap-2.5 border-b border-app-border/60 px-3 py-1.5 outline-none transition-colors last:border-b-0",
+        onOpen ? "cursor-pointer hover:bg-app-hover focus-visible:bg-app-hover" : "hover:bg-app-hover",
+      )}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-app-border bg-app-bg">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-[12.5px] text-tx-primary">{name}</span>
+          {state && (
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-tx-tertiary">
+              <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[state.tone])} />
+              {state.label}
+            </span>
+          )}
+        </span>
+        <span className="mt-0.5 block truncate text-[11px] text-tx-tertiary">{meta}</span>
+      </span>
+      {hoverActions && (
+        <span
+          className="hidden shrink-0 items-center gap-0.5 group-hover:flex group-focus-within:flex"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {hoverActions}
+        </span>
+      )}
+      {controls}
+      {onOpen && <ChevronRight size={13} className="shrink-0 text-tx-tertiary" />}
+    </div>
+  );
+}
+
+/** 启停开关：与侧栏设置项同一套 17×30 胶囊规格 */
+function RowSwitch({ checked, label, disabled, onToggle }: {
+  checked: boolean;
+  label: string;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={(event) => { event.stopPropagation(); onToggle(); }}
+      className={cn(
+        "relative h-[17px] w-[30px] shrink-0 rounded-full transition-colors disabled:opacity-50",
+        checked ? "bg-accent-primary" : "bg-app-border",
+      )}
+    >
+      <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all", checked ? "left-[15px]" : "left-0.5")} />
+    </button>
+  );
+}
+
+/** 空态：中性卡 + 线性图标 + 主文案 + 次说明（+ 可选文字按钮） */
+function EmptyPanel({ icon, title, description, action }: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-[10px] border border-app-border bg-app-surface px-4 py-12 text-center">
+      <span className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-app-hover text-tx-tertiary">{icon}</span>
+      <p className="text-[12.5px] text-tx-primary">{title}</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-tx-tertiary">{description}</p>
+      {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );
 }
@@ -172,18 +309,18 @@ function DetailHeader({ icon, name, uniqueId, version, badges, description }: {
   description: string;
 }) {
   return (
-    <div className="flex items-start gap-4">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-app-border bg-app-surface">
+    <div className="flex items-start gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-app-border bg-app-surface">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="truncate text-lg font-semibold text-tx-primary">{name}</h2>
+          <h2 className="truncate text-[14px] font-semibold text-tx-primary">{name}</h2>
           {badges}
         </div>
         <p className="mt-0.5 truncate font-mono text-[11px] text-tx-tertiary">{uniqueId}</p>
-        <p className="mt-1 text-sm text-tx-secondary">{description}</p>
-        <p className="mt-1 text-xs text-tx-tertiary">v{version}</p>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-tx-secondary">{description}</p>
+        <p className="mt-1 text-[11px] text-tx-tertiary">v{version}</p>
       </div>
     </div>
   );
@@ -202,7 +339,7 @@ function OverviewSection({ description, repository, homepage, license, published
   if (license) links.push(["许可证", license]);
   return (
     <SectionCard title="概述">
-      <p className="mt-1 text-sm text-tx-secondary">{description || "暂无说明"}</p>
+      <p className="mt-1 text-[11.5px] leading-relaxed text-tx-secondary">{description || "暂无说明"}</p>
       {(links.length > 0 || publishedAt) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-tx-tertiary">
           {links.map(([label, href]) => (
@@ -272,7 +409,7 @@ function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
   return (
     <div>
       <DetailHeader
-        icon={iconFor(plug, 28)}
+        icon={iconFor(plug, 22)}
         name={plug.name}
         uniqueId={`内置插件 · ${plug.id}`}
         version={plug.version}
@@ -289,7 +426,7 @@ function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
           type="button"
           onClick={toggleEnabled}
           className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            "rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors",
             enabled
               ? "border border-app-border bg-app-surface text-tx-primary hover:bg-app-hover"
               : "bg-accent-primary text-white hover:opacity-90",
@@ -346,7 +483,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
   return (
     <div>
       <DetailHeader
-        icon={<Puzzle size={28} className="text-tx-tertiary" />}
+        icon={<Puzzle size={22} className="text-tx-tertiary" />}
         name={plugin.name}
         uniqueId={plugin.id}
         version={plugin.version}
@@ -415,7 +552,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
                   type="button"
                   disabled={busy}
                   onClick={() => onToggle(plugin)}
-                  className="rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
+                  className="rounded-md border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
                 >
                   禁用
                 </button>
@@ -424,7 +561,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
                   type="button"
                   disabled={busy}
                   onClick={() => onToggle(plugin)}
-                  className="rounded-md bg-accent-primary px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
+                  className="rounded-md bg-accent-primary px-2.5 py-1 text-[11.5px] text-white transition-colors hover:opacity-90 disabled:opacity-50"
                 >
                   {presentation.enableLabel}
                 </button>
@@ -434,7 +571,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
                   type="button"
                   disabled={busy}
                   onClick={() => onRollback(plugin)}
-                  className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-3 py-1.5 text-sm text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50"
                 >
                   <RotateCcw size={13} />回滚到 v{plugin.previousVersion}
                 </button>
@@ -443,7 +580,7 @@ function InstalledDetail({ plugin, isAdmin, busy, actionError, onToggle, onRollb
                 type="button"
                 disabled={busy}
                 onClick={() => onUninstall(plugin)}
-                className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-[11.5px] text-red-600 transition-colors hover:bg-red-500/10 disabled:opacity-50"
               >
                 <Trash2 size={13} />卸载
               </button>
@@ -475,7 +612,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
   return (
     <div>
       <DetailHeader
-        icon={<Puzzle size={28} className="text-tx-tertiary" />}
+        icon={<Puzzle size={22} className="text-tx-tertiary" />}
         name={extension.name}
         uniqueId={extension.id}
         version={extension.latestVersion}
@@ -518,7 +655,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
               type="button"
               disabled={busy || needsPolicy}
               onClick={() => onInstall(extension)}
-              className="inline-flex items-center gap-1 rounded-md bg-accent-primary px-3 py-1.5 text-sm text-white transition-colors hover:opacity-90 disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-md bg-accent-primary px-2.5 py-1 text-[11.5px] text-white transition-colors hover:opacity-90 disabled:opacity-50"
             >
               <Download size={13} />{busy ? "正在安装" : "安装"}
             </button>
@@ -725,33 +862,39 @@ export default function PluginsWorkspace() {
   };
 
   /** 分组导航在侧栏插件视图（管理/市场/配置），主区只跟事件跑，不再重复一排 tab。 */
-  const groupLabel = GROUP_TABS.find(([key]) => key === group)?.[1] ?? "";
-
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
-      {/* 标题行 h-12：与侧栏工作区头同一节奏；返回/分组 tab 右置 */}
+      {/* 标题行 h-12：与侧栏工作区头同一节奏；返回右置 */}
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
-        <Puzzle size={18} className="shrink-0 text-tx-secondary" />
-        <h2 className="text-[15px] font-semibold text-tx-primary">插件</h2>
-        <span className="hidden truncate text-xs text-tx-tertiary sm:inline">
-          {detail ? "查看插件详情" : group === "config" ? "安装源、执行边界与开发者模式" : groupLabel}
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-primary/10 text-accent-primary">
+          <Puzzle size={15} />
+        </span>
+        <h2 className="text-[14px] font-semibold text-tx-primary">插件</h2>
+        <span className="hidden truncate text-[11px] text-tx-tertiary sm:inline">
+          {detail
+            ? "查看插件详情"
+            : group === "config"
+              ? "安装源、执行边界与开发者模式"
+              : group === "catalog"
+                ? "浏览公开 Registry"
+                : "社区插件与内置插件"}
         </span>
         <span className="flex-1" />
-        {detail ? (
+        {detail && (
           <button
             type="button"
             onClick={backToList}
-            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-xs text-tx-secondary transition-colors hover:bg-app-hover"
+            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
           >
             <ArrowLeft size={12} />返回列表
           </button>
-        ) : <span />}
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="w-full px-4 py-3">
         {detail?.source === "builtin" && <div key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
         {detail?.source === "installed" && (
-          <div className="mt-6">
+          <div className="mt-4">
             <InstalledDetail
               plugin={detail.plug}
               isAdmin={isAdmin}
@@ -765,7 +908,7 @@ export default function PluginsWorkspace() {
           </div>
         )}
         {detail?.source === "catalog" && (
-          <div className="mt-6">
+          <div className="mt-4">
             <CatalogDetail
               extension={detail.ext}
               isAdmin={isAdmin}
@@ -778,22 +921,20 @@ export default function PluginsWorkspace() {
         )}
 
         {!detail && (
-          <div>
+          <div className="pb-2">
             {/* 管理分组自上而下：社区插件区（主流场景）→ 内置插件折叠区（次级）。
                 「检查更新」「安装插件包」挂在社区插件区头部，与列表的从属关系一目了然（仅管理员可见） */}
             {group === "installed" && (
-              <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-tx-primary">社区插件</h3>
-                  <p className="mt-0.5 text-[11px] text-tx-tertiary">从市场或插件包安装的插件。</p>
-                </div>
-                {isAdmin && (
-                  <div className="flex shrink-0 items-center gap-2">
+              <GroupHeader
+                title="社区插件"
+                description="从市场或插件包安装的插件。"
+                actions={isAdmin ? (
+                  <>
                     <button
                       type="button"
                       disabled={checking}
                       onClick={() => void checkUpdates()}
-                      className="shrink-0 rounded-md bg-accent-primary px-2.5 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                      className="shrink-0 rounded-md bg-accent-primary px-2.5 py-1 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                     >
                       {checking ? "检查中…" : "检查更新"}
                     </button>
@@ -804,156 +945,173 @@ export default function PluginsWorkspace() {
                         clearActionState();
                       }}
                     />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 检查更新结果：挂在社区插件分区内展示，可改更新源后再次点「检查更新」 */}
-            {group === "installed" && isAdmin && (
-              <PluginUpdatesResult updates={updates} updateSource={updateSource} onSourceChange={setUpdateSource} />
-            )}
-
-            {group === "config" && (
-              <PluginConfigPanel
-                isAdmin={isAdmin}
-                onInstalled={async () => {
-                  await refreshInstalled();
-                  goGroup("installed");
-                  clearActionState();
-                }}
+                  </>
+                ) : null}
               />
             )}
 
-            {group === "installed" && (
-              <div>
-              {installed === null ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载社区插件</div>
-              ) : installed.length ? (
-                <div className="space-y-2">
-                  {installed.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => { setInstalledSelection(item.id); clearActionState(); }}
-                      className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
-                        <Puzzle size={16} className="text-tx-tertiary" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
-                        <span className="block truncate font-mono text-[11px] text-tx-tertiary">{item.id} · v{item.version}</span>
-                      </span>
-                      <Badge tone={item.status === "enabled" ? "ok" : item.status === "error" ? "bad" : "warn"}>
-                        {INSTALLED_STATUS_LABELS[item.status]}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
-                  尚未安装社区插件，可到「市场」浏览。
-                </div>
-              )}
+            {/* 检查更新结果：挂在社区插件分区内展示，可改更新源后再次点「检查更新」 */}
+            {group === "installed" && isAdmin && updates !== null && (
+              <div className="mb-2.5">
+                <PluginUpdatesResult updates={updates} updateSource={updateSource} onSourceChange={setUpdateSource} />
               </div>
+            )}
+
+            {group === "config" && (
+              <>
+                <GroupHeader title="配置" description="安装源、执行边界与开发者模式。" />
+                <PluginConfigPanel
+                  isAdmin={isAdmin}
+                  onInstalled={async () => {
+                    await refreshInstalled();
+                    goGroup("installed");
+                    clearActionState();
+                  }}
+                />
+              </>
+            )}
+
+            {group === "installed" && (
+              installed === null ? (
+                <div className="flex items-center gap-2 py-8 text-[12px] text-tx-tertiary"><Loader2 size={14} className="animate-spin" />正在加载社区插件</div>
+              ) : installed.length ? (
+                <RowList>
+                  {installed.map((item) => {
+                    const enabled = item.status === "enabled";
+                    return (
+                      <PluginRow
+                        key={item.id}
+                        rowId={item.id}
+                        icon={<Puzzle size={14} className="text-tx-tertiary" />}
+                        name={item.name}
+                        meta={`${item.publisher || item.id} · v${item.version}`}
+                        state={{
+                          label: INSTALLED_STATUS_LABELS[item.status],
+                          tone: enabled ? "ok" : item.status === "error" ? "bad" : "warn",
+                        }}
+                        controls={isAdmin ? (
+                          <RowSwitch
+                            checked={enabled}
+                            disabled={busy}
+                            label={enabled ? "停用插件" : "启用插件"}
+                            onToggle={() => toggleInstalled(item)}
+                          />
+                        ) : null}
+                        hoverActions={isAdmin ? (
+                          <button
+                            type="button"
+                            title="卸载插件"
+                            aria-label={`卸载 ${item.name}`}
+                            disabled={busy}
+                            onClick={() => uninstallInstalled(item)}
+                            className="flex h-6 w-6 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-border/60 hover:text-red-600 disabled:opacity-50"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        ) : null}
+                        onOpen={() => { setInstalledSelection(item.id); clearActionState(); }}
+                      />
+                    );
+                  })}
+                </RowList>
+              ) : (
+                <EmptyPanel
+                  icon={<PackageOpen size={17} />}
+                  title="尚未安装社区插件"
+                  description="到「市场」浏览公开 Registry，安装后会出现在这里。"
+                  action={(
+                    <button
+                      type="button"
+                      onClick={() => goGroup("catalog")}
+                      className="text-[11.5px] text-accent-primary hover:underline"
+                    >
+                      去市场
+                    </button>
+                  )}
+                />
+              )
             )}
 
             {/* 内置插件区：次级分区，默认折叠，点分区头展开后启停 */}
             {group === "installed" && (
-              <div className="mt-6">
+              <div className="mt-5">
                 <button
                   type="button"
                   aria-expanded={builtinExpanded}
                   onClick={() => setBuiltinExpanded((value) => !value)}
-                  className="flex w-full items-center gap-2 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-left transition-colors hover:bg-app-hover"
+                  className="group flex w-full items-center gap-1.5 px-0.5 pb-1.5 text-left"
                 >
-                  <span className={cn("shrink-0 text-tx-tertiary transition-transform", builtinExpanded && "rotate-90")}>›</span>
-                  <span className="text-sm font-medium text-tx-primary">内置插件</span>
-                  <span className="text-xs text-tx-tertiary">· {BUILTIN_PLUGINS.length} 个</span>
+                  <ChevronRight
+                    size={12}
+                    className={cn("shrink-0 text-tx-tertiary transition-transform", builtinExpanded && "rotate-90")}
+                  />
+                  <span className="text-[11.5px] font-medium text-tx-secondary group-hover:text-tx-primary">内置插件</span>
+                  <span className="text-[11px] text-tx-tertiary">· {BUILTIN_PLUGINS.length} 个</span>
                   <span className="ml-auto text-[11px] text-tx-tertiary">随应用内置，可启停</span>
                 </button>
                 {builtinExpanded && (
-                  <div className="mt-2 space-y-2">
+                  <RowList>
                     {BUILTIN_PLUGINS.map((item) => {
                       const itemEnabled = isBuiltinPluginEnabled(item.id);
                       return (
-                        <div
+                        <PluginRow
                           key={item.id}
-                          onClick={() => selectBuiltin(item.id)}
-                          className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
-                        >
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
-                            {iconFor(item, 18)}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium text-tx-primary">{item.name}</span>
-                              <Badge tone="info">{BUILTIN_ORIGIN_LABEL[item.origin]}</Badge>
-                              <Badge tone={itemEnabled ? "ok" : "neutral"}>{itemEnabled ? "已启用" : "已停用"}</Badge>
-                            </span>
-                            <span className="mt-0.5 block truncate text-xs text-tx-tertiary">{item.description}</span>
-                          </span>
-                          <span
-                            role="switch"
-                            aria-checked={itemEnabled}
-                            title={itemEnabled ? "停用插件" : "启用插件"}
-                            onClick={(e) => { e.stopPropagation(); setBuiltinPluginDisabled(item.id, itemEnabled); }}
-                            className={cn(
-                              "relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full transition-colors",
-                              itemEnabled ? "bg-accent-primary" : "bg-app-border",
-                            )}
-                          >
-                            <span
-                              className={cn(
-                                "absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white transition-all",
-                                itemEnabled ? "left-4" : "left-0.5",
-                              )}
+                          rowId={`builtin-${item.id}`}
+                          icon={iconFor(item, 14)}
+                          name={item.name}
+                          meta={item.description}
+                          state={{ label: itemEnabled ? "已启用" : "已停用", tone: itemEnabled ? "ok" : "neutral" }}
+                          controls={(
+                            <RowSwitch
+                              checked={itemEnabled}
+                              label={itemEnabled ? "停用插件" : "启用插件"}
+                              onToggle={() => setBuiltinPluginDisabled(item.id, itemEnabled)}
                             />
-                          </span>
-                          <span className="shrink-0 text-tx-tertiary">›</span>
-                        </div>
+                          )}
+                          onOpen={() => selectBuiltin(item.id)}
+                        />
                       );
                     })}
-                  </div>
+                  </RowList>
                 )}
               </div>
             )}
 
             {group === "catalog" && (
-              catalogLoading ? (
-                <div className="flex items-center gap-2 py-8 text-sm text-tx-tertiary"><Loader2 size={15} className="animate-spin" />正在加载市场目录</div>
-              ) : catalogError ? (
-                <div className="rounded-lg border border-red-200 bg-red-500/5 px-4 py-8 text-center text-sm text-red-600">
-                  <div className="font-medium">市场目录加载失败</div>
-                  <div className="mt-1 text-xs opacity-80">{catalogError}</div>
-                </div>
-              ) : catalog && catalog.length ? (
-                <div className="space-y-2">
-                  {catalog.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => { setCatalogSelection(item.id); clearActionState(); }}
-                      className="flex w-full items-center gap-3 rounded-lg border border-app-border bg-app-surface p-3 text-left transition-colors hover:bg-app-hover"
-                    >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-bg">
-                        <Puzzle size={16} className="text-tx-tertiary" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-tx-primary">{item.name}</span>
-                        <span className="block truncate font-mono text-[11px] text-tx-tertiary">{item.id} · v{item.latestVersion}</span>
-                        {item.description && <span className="block truncate text-xs text-tx-tertiary">{item.description}</span>}
-                      </span>
-                      <Badge tone="neutral">{item.trustLevel || "community"}</Badge>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-app-border py-10 text-center text-sm text-tx-tertiary">
-                  Registry 暂无可显示插件。
-                </div>
-              )
+              <>
+                <GroupHeader title="市场" description="公开 Registry 上的社区插件，安装后进入「管理」。" />
+                {catalogLoading ? (
+                  <div className="flex items-center gap-2 py-8 text-[12px] text-tx-tertiary"><Loader2 size={14} className="animate-spin" />正在加载市场目录</div>
+                ) : catalogError ? (
+                  <EmptyPanel
+                    icon={<AlertCircle size={17} />}
+                    title="市场目录加载失败"
+                    description={catalogError}
+                  />
+                ) : catalog && catalog.length ? (
+                  <RowList>
+                    {catalog.map((item) => (
+                      <PluginRow
+                        key={item.id}
+                        rowId={item.id}
+                        icon={<Puzzle size={14} className="text-tx-tertiary" />}
+                        name={item.name}
+                        meta={`${item.id} · v${item.latestVersion}`}
+                        controls={(
+                          <span className="shrink-0 text-[11px] text-tx-tertiary">{item.trustLevel || "community"}</span>
+                        )}
+                        onOpen={() => { setCatalogSelection(item.id); clearActionState(); }}
+                      />
+                    ))}
+                  </RowList>
+                ) : (
+                  <EmptyPanel
+                    icon={<Store size={17} />}
+                    title="市场暂无可显示的插件"
+                    description="Registry 暂无条目，可在「配置」中检查安装源或稍后重试。"
+                  />
+                )}
+              </>
             )}
           </div>
         )}

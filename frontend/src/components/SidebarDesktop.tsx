@@ -3438,34 +3438,34 @@ export default function SidebarDesktop() {
               <span className="min-w-0 truncate text-xs font-medium text-tx-primary">插件</span>
             </div>
             {/* 侧栏零插件列表：插件启用后在左侧导航栏徽章里直接打开，这里只负责"去哪找" */}
-            <div className="px-1 pb-2 pt-1">
+            <div className="pb-2 pt-1">
               {([
-                { key: "catalog", icon: Store, label: "市场", hint: pluginCounts?.catalog ? `${pluginCounts.catalog} 个` : "", hot: false },
-                { key: "installed", icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length), hot: false },
-                { key: "config", icon: SlidersHorizontal, label: "配置", hint: "", hot: false },
-              ] as const).map((entry) => {
+                { group: "浏览", key: "catalog", icon: Store, label: "市场", hint: pluginCounts?.catalog ? String(pluginCounts.catalog) : "" },
+                { group: "已安装", key: "installed", icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
+                { group: "设置", key: "config", icon: SlidersHorizontal, label: "配置", hint: "" },
+              ] as const).map((entry, index, list) => {
                 const Icon = entry.icon;
+                const active = plugCat === entry.key;
+                const showGroup = index === 0 || list[index - 1].group !== entry.group;
                 return (
-                  <div
-                    key={entry.key}
-                    className="sbx-row group items-center"
-                    title={entry.label}
-                    onClick={() => {
-                      setPlugCat(entry.key);
-                      window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
-                      if (state.viewMode !== "plugins") actions.setViewMode("plugins");
-                    }}
-                  >
-                    <span className="sbx-ico"><Icon size={14} className="text-tx-tertiary" /></span>
-                    <span className="min-w-0 flex-1 truncate text-xs text-tx-primary">{entry.label}</span>
-                    {entry.hint && (
-                      <span className={cn("shrink-0 text-[10px]", entry.hot ? "rounded-full border border-red-200 bg-red-50 px-1.5 text-red-600" : "text-tx-tertiary")}>
-                        {entry.hint}
-                      </span>
-                    )}
-                    <span className="sbx-acts">
-                      <span className="sbx-btn"><ChevronDown size={12} className="-rotate-90" /></span>
-                    </span>
+                  <div key={entry.key}>
+                    {showGroup && <div className="px-3 pb-1 pt-2 text-[10px] text-tx-tertiary">{entry.group}</div>}
+                    <div
+                      className={cn(
+                        "sbx-row group items-center",
+                        active && "bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/15",
+                      )}
+                      title={entry.label}
+                      onClick={() => {
+                        setPlugCat(entry.key);
+                        window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
+                        if (state.viewMode !== "plugins") actions.setViewMode("plugins");
+                      }}
+                    >
+                      <span className="sbx-ico"><Icon size={14} className={active ? "text-accent-primary" : "text-tx-tertiary"} /></span>
+                      <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "text-accent-primary" : "text-tx-primary")}>{entry.label}</span>
+                      {entry.hint && <span className={cn("sbx-meta", active && "text-accent-primary/80")}>{entry.hint}</span>}
+                    </div>
                   </div>
                 );
               })}

@@ -115,10 +115,15 @@ async function openGroup(group: "builtin" | "installed" | "catalog" | "config") 
   });
 }
 
+/** 列表行统一是 [data-plugin-row]（行内还要放启停开关，不能整行塞进 button） */
+function pluginRow(host: HTMLElement, rowId: string): HTMLElement | null {
+  return host.querySelector(`[data-plugin-row="${rowId}"]`);
+}
+
 /** 已安装分组：点列表行进入插件详情 */
 async function openInstalledDetail(host: HTMLElement, pluginId: string) {
   await openGroup("installed");
-  const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes(pluginId));
+  const row = pluginRow(host, pluginId);
   expect(row).toBeTruthy();
   click(row!);
   await flush();
@@ -128,7 +133,7 @@ async function openInstalledDetail(host: HTMLElement, pluginId: string) {
 async function openCatalogDetail(host: HTMLElement, pluginId: string) {
   await openGroup("catalog");
   await flush();
-  const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes(pluginId));
+  const row = pluginRow(host, pluginId);
   expect(row).toBeTruthy();
   click(row!);
   await flush();
@@ -202,7 +207,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     // 侧栏切到「已安装」分组 → 点击插件进入详情
     await openGroup("installed");
 
-    const row = Array.from(host.querySelectorAll("button")).find((button) => text(button).includes("acme.notesync"));
+    const row = pluginRow(host, "acme.notesync");
     expect(row).toBeTruthy();
     click(row!);
     await flush();
@@ -233,6 +238,14 @@ describe("PluginsWorkspace 插件详情页", () => {
     await openGroup("installed");
 
     const content = text(host);
+    // 主区头与分区头同一规格：14px/600 标题 + 11px 三级色说明
+    const pageTitle = host.querySelector("h2");
+    expect(pageTitle?.className).toContain("text-[14px]");
+    expect(pageTitle?.className).toContain("font-semibold");
+    const sectionTitle = Array.from(host.querySelectorAll("h3")).find((el) => el.textContent === "社区插件");
+    expect(sectionTitle?.className).toContain("text-[14px]");
+    const sectionNote = sectionTitle?.parentElement?.querySelector("p");
+    expect(sectionNote?.className).toContain("text-[11px]");
     // 分区顺序：社区插件（主流场景）在上，内置插件折叠分区在下；操作不再夹在两份列表中间
     expect(content).toContain("社区插件");
     expect(content).toContain("内置插件");
@@ -242,12 +255,42 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(content).toContain("检查更新");
     expect(content).toContain("安装插件包");
 
+    // 空态：中性卡 + 主文案 + 次说明 + 「去市场」文字按钮（不再是虚线框）
+    expect(content).toContain("尚未安装社区插件");
+    const toMarket = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "去市场");
+    expect(toMarket).toBeTruthy();
+
     // 内置插件默认折叠：分区头可展开，展开后才出现内置插件行
     expect(content).not.toContain("待办事项");
     const builtinHeader = host.querySelector('button[aria-expanded="false"]');
     expect(builtinHeader?.textContent).toContain("内置插件");
     click(builtinHeader as HTMLElement);
     expect(text(host)).toContain("待办事项");
+    // 展开后是行（图标 + 名称 + 次级说明 + 启停开关），不是一张张圆角卡
+    const builtinRow = pluginRow(host, "builtin-tasks");
+    expect(builtinRow).toBeTruthy();
+    expect(builtinRow?.querySelector('[role="switch"]')).toBeTruthy();
+    expect(builtinRow?.className).toContain("min-h-[44px]");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("社区插件行：右侧启停开关 + 卸载 hover 操作（管理员）", async () => {
+    mocks.installed = [installedPlugin()];
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("installed");
+
+    const row = pluginRow(host, "acme.notesync");
+    expect(row).toBeTruthy();
+    const toggle = row?.querySelector('[role="switch"]');
+    expect(toggle?.getAttribute("aria-checked")).toBe("true");
+    const uninstall = row?.querySelector('button[aria-label="卸载 Note Sync"]');
+    expect(uninstall).toBeTruthy();
+    // 点行内开关不能跳进详情页
+    click(toggle as Element);
+    await flush();
+    expect(text(host)).not.toContain("版本历史");
 
     act(() => { root.unmount(); });
   });
@@ -288,8 +331,10 @@ describe("PluginsWorkspace 插件详情页", () => {
     await openGroup("installed");
 
     const content = text(host);
-    expect(content).not.toContain("检查更新");
-    expect(content).not.toContain("安装插件包");
+    // 只看按钮级入口：空态说明文案里出现「插件包」不算入口
+    const buttonLabels = Array.from(host.querySelectorAll("button")).map((button) => (button.textContent || "").trim());
+    expect(buttonLabels).not.toContain("检查更新");
+    expect(buttonLabels).not.toContain("安装插件包");
     expect(content).toContain("内置插件");
 
     act(() => { root.unmount(); });
