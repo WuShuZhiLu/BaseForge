@@ -483,11 +483,18 @@ export default function PmWorkspace() {
   useEffect(() => {
     const onNewItem = () => { setNewItemOpen(true); setNewItemParentId(null); };
     const onNewProject = () => setNewProjectOpen(true);
+    // 侧栏项目面板点某个项目 → 主区切到该项目（模块内导航，不跨模块）
+    const onFocusProject = (event: Event) => {
+      const projectId = (event as CustomEvent<{ projectId?: string }>).detail?.projectId;
+      if (projectId) setPmActiveProject(projectId);
+    };
     window.addEventListener("nowen:pm-new-item", onNewItem);
     window.addEventListener("nowen:pm-new-project", onNewProject);
+    window.addEventListener("nowen:pm-focus-project", onFocusProject);
     return () => {
       window.removeEventListener("nowen:pm-new-item", onNewItem);
       window.removeEventListener("nowen:pm-new-project", onNewProject);
+      window.removeEventListener("nowen:pm-focus-project", onFocusProject);
     };
   }, []);
 

@@ -1,8 +1,9 @@
 /**
- * 内置官方插件的侧栏迷你面板：待办 / 每日记录。
+ * 内置插件的侧栏迷你面板：待办 / 每日记录 / 项目管理。
  *
- * 由 PluginPanelHost 按 builtinId 渲染；数据走统一 api；
- * "在主区打开"切 viewMode（主区全屏中心仍在 App.tsx）。
+ * 由 PluginPanelHost 按 builtinId 渲染；数据走统一 api。
+ * 注意：模块切换是导航栏（Rail）的职责，侧栏不放"在主区打开/返回知识库"这类跨模块跳转按钮——
+ * 侧栏里出现跨模块入口会让"侧栏属于当前模块"这个前提失效，状态直接乱掉。
  */
 import React, { useCallback, useEffect, useState } from "react";
 import { ListTodo, Plus, RefreshCw } from "lucide-react";
@@ -13,33 +14,23 @@ import { getTaskInbox } from "@/lib/taskInboxApi";
 import type { Task } from "@/types";
 import { cn } from "@/lib/utils";
 
-type OpenMainView = (viewMode: "tasks" | "diary" | "projects") => void;
-
 interface MiniPanelShellProps {
   title: string;
-  onOpenMain: () => void;
   onRefresh: () => void;
   children: React.ReactNode;
 }
 
-function MiniPanelShell({ title, onOpenMain, onRefresh, children }: MiniPanelShellProps) {
+function MiniPanelShell({ title, onRefresh, children }: MiniPanelShellProps) {
   return (
     <div className="sbx-view">
       <div className="sbx-view-head">
         <span>{title}</span>
-        <span className="sbx-mini-tag">官方插件</span>
         <span className="flex-1" />
         <button type="button" title="刷新" onClick={onRefresh} className="sbx-btn">
           <RefreshCw size={12} />
         </button>
       </div>
       {children}
-      <div className="sbx-foot-row">
-        <span className="sbx-foot-tip" />
-        <button type="button" onClick={onOpenMain} className="sbx-foot-link">
-          在主区打开
-        </button>
-      </div>
     </div>
   );
 }
@@ -49,7 +40,7 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 /** ============ 项目管理迷你面板 ============ */
-export function PmMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+export function PmMiniPanel() {
   const [projects, setProjects] = useState<PmProject[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -78,7 +69,7 @@ export function PmMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
   useEffect(() => { reload(); }, [reload]);
 
   return (
-    <MiniPanelShell title="项目管理" onOpenMain={() => onOpenMain("projects")} onRefresh={reload}>
+    <MiniPanelShell title="项目管理" onRefresh={reload}>
       {loading ? (
         <EmptyHint text="加载中…" />
       ) : projects.length === 0 ? (
@@ -89,7 +80,7 @@ export function PmMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
             <button
               key={p.id}
               type="button"
-              onClick={() => onOpenMain("projects")}
+              onClick={() => window.dispatchEvent(new CustomEvent("nowen:pm-focus-project", { detail: { projectId: p.id } }))}
               className="sbx-row w-full text-left flex items-center gap-2"
             >
               <ListTodo size={11} className="shrink-0 text-accent-primary" />
@@ -104,7 +95,7 @@ export function PmMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
 }
 
 /** ============ 待办迷你面板 ============ */
-export function TasksMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+export function TasksMiniPanel() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"inbox" | "today" | "all">("inbox");
@@ -146,7 +137,7 @@ export function TasksMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
   }, [quickText, reload]);
 
   return (
-    <MiniPanelShell title="待办" onOpenMain={() => onOpenMain("tasks")} onRefresh={reload}>
+    <MiniPanelShell title="待办" onRefresh={reload}>
       <div className="sbx-chips">
         {([["inbox", "收件箱"], ["today", "今日"], ["all", "任务"]] as Array<[typeof mode, string]>).map(([value, label]) => (
           <span
@@ -211,7 +202,7 @@ interface JournalItem {
 }
 
 /** ============ 每日记录迷你面板 ============ */
-export function DiaryMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
+export function DiaryMiniPanel() {
   const [items, setItems] = useState<JournalItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -226,14 +217,14 @@ export function DiaryMiniPanel({ onOpenMain }: { onOpenMain: OpenMainView }) {
   useEffect(() => { reload(); }, [reload]);
 
   return (
-    <MiniPanelShell title="日记" onOpenMain={() => onOpenMain("diary")} onRefresh={reload}>
+    <MiniPanelShell title="日记" onRefresh={reload}>
       <div className="px-1 pb-2">
         {loading ? (
           <EmptyHint text="加载中…" />
         ) : items.length === 0 ? (
           <EmptyHint text="暂无记录" />
         ) : items.map((item) => (
-          <div key={item.id} className="sbx-row group" onClick={() => onOpenMain("diary")}>
+          <div key={item.id} className="sbx-row group">
             <span className="min-w-0 flex-1">
               <div className="truncate text-xs text-tx-primary">{item.title || item.journalDate}</div>
               <div className="sbx-sub">{item.subtitle || item.journalDate}</div>

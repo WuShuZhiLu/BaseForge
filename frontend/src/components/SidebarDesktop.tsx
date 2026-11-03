@@ -3076,7 +3076,7 @@ export default function SidebarDesktop() {
         </div>
       )}
 
-      {/* 内置官方插件的侧栏迷你面板（打开时遮盖知识库，带返回条） */}
+      {/* 内置插件的侧栏面板：模块切换归导航栏（Rail）管，侧栏不放"返回知识库"这类跨模块入口 */}
         {openPluginPanel && (
           <div className="shrink-0">
             {(() => {
@@ -3084,30 +3084,16 @@ export default function SidebarDesktop() {
               if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
               return (
                 <>
-                  <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-1 py-1">
-                    <button
-                      type="button"
-                      onClick={() => setOpenPluginPanel(null)}
-                      title="返回知识库"
-                      className="flex h-5 w-5 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
-                    >
-                      <ChevronDown size={13} className="rotate-90" />
-                    </button>
+                  <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-2 py-1">
                     <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{def.sidebarPanel.title}</span>
                   </div>
-                  {def.id === "tasks" && <TasksMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
-                  {def.id === "diary" && <DiaryMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
-                  {def.id === "pm" && <PmMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
+                  {def.id === "tasks" && <TasksMiniPanel />}
+                  {def.id === "diary" && <DiaryMiniPanel />}
+                  {def.id === "pm" && <PmMiniPanel />}
                   {def.id === "ai" && (
                     <div className="sbx-view">
                       <div className="px-2 pb-2">
                         <p className="sbx-view-empty">AI 基于知识库回答问题，支持检索引用与上下文来源。</p>
-                        <div className="sbx-foot-row">
-                          <span className="sbx-foot-tip" />
-                          <button type="button" className="sbx-foot-link" onClick={() => actions.setViewMode("ai-chat")}>
-                            在主区打开
-                          </button>
-                        </div>
                       </div>
                     </div>
                   )}
@@ -3257,7 +3243,7 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><KanbanSquare size={13} /></span>
               <span className="min-w-0 truncate text-xs font-medium text-tx-primary">项目管理</span>
             </div>
-            {!panelCollapsed.projects && <ProjectsSidePanel onOpenMain={() => actions.setViewMode("projects")} />}
+            {!panelCollapsed.projects && <ProjectsSidePanel />}
           </div>
         )}
 
@@ -3268,7 +3254,7 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
               <span className="min-w-0 truncate text-xs font-medium text-tx-primary">分享中心</span>
             </div>
-            {!panelCollapsed.shares && <SharesSidePanel onOpenMain={() => actions.setViewMode("shares")} />}
+            {!panelCollapsed.shares && <SharesSidePanel />}
           </div>
         )}
 
@@ -3851,8 +3837,7 @@ export function isNextSidebarEnabled(): boolean {
 
 
 /** 项目管理侧栏面板（官方插件 pm · 视觉重设计）：项目选择 + 状态分组导航 + 工单速览快改 */
-function ProjectsSidePanel(props: { onOpenMain: () => void }) {
-  const { onOpenMain } = props;
+function ProjectsSidePanel() {
   const [projects, setProjects] = useState<PmProject[]>([]);
   const [activeId, setActiveId] = useState("");
   const [items, setItems] = useState<PmWorkItem[]>([]);
@@ -3942,7 +3927,6 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         <span>项目管理</span>
         <span className="flex-1" />
         <button type="button" title="刷新" className="sbx-btn" onClick={() => void reload()}>↻</button>
-        <button type="button" title="在主区打开" className="sbx-btn" onClick={onOpenMain}>↗</button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -4024,14 +4008,6 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
                                       <Check size={11} />
                                     </button>
                                   ) : null}
-                                  <button
-                                    type="button"
-                                    title="在主区打开"
-                                    className="rounded p-0.5 text-zinc-400 hover:bg-app-hover"
-                                    onClick={onOpenMain}
-                                  >
-                                    <ExternalLink size={11} />
-                                  </button>
                                 </span>
                               </div>
                             ))
@@ -4046,13 +4022,12 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         )}
       </div>
 
-      {/* 底部动作：新建走主区表单（事件通知），打开看板切换主区 */}
+      {/* 底部动作：新建走事件通知主区表单（模块内动作，不跨模块切换） */}
       <div className="border-t border-app-border px-2 py-1.5">
         <button
           type="button"
           className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] font-medium text-accent-primary hover:bg-app-hover"
           onClick={() => {
-            onOpenMain();
             window.dispatchEvent(new CustomEvent("nowen:pm-new-item"));
           }}
         >
@@ -4061,15 +4036,7 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         <button
           type="button"
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
-          onClick={onOpenMain}
-        >
-          <ListTodo size={12} /> 在主区打开看板
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
           onClick={() => {
-            onOpenMain();
             window.dispatchEvent(new CustomEvent("nowen:pm-new-project"));
           }}
         >
@@ -4119,7 +4086,7 @@ function shareDot(className: string) {
  * 每行徽标 = 点它之后看到的条数（后端按同一集合统计），因此「条数 = 徽标数」。
  * 主区不重复渲染分类，两侧共用 features/shares/shareCenterUi 里的筛选状态。
  */
-function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
+function SharesSidePanel() {
   const actions = useAppActions();
   const [counts, setCounts] = useState<ShareCenterCounts | null>(null);
   const [bareCount, setBareCount] = useState(0);
@@ -4156,7 +4123,6 @@ function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
    */
   const pick = (patch: Parameters<typeof setShareCenterUi>[0]) => {
     setShareCenterUi({ group: "all", objectKind: "all", risk: "all", ...patch });
-    onOpenMain();
   };
 
   return (
