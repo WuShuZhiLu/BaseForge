@@ -38,6 +38,8 @@ export interface TrashItem {
   canDeletePermanently: boolean;
   isLocked: boolean;
   restoreIncludesAncestors: boolean;
+  /** 内容字符数（notes.content / sheets.data），排序用；取不到为 null。 */
+  size: number | null;
 }
 type Scope = { userId: string; workspaceId: string | null };
 
@@ -79,6 +81,7 @@ export function listTrash(scope: Scope): TrashItem[] {
       canDeletePermanently &&= canManageResource(node.userId, node.workspaceId, scope.userId);
     }
     const preview = buildTrashPreview(node.resourceType, node.contentFormat || null, node.resourceId);
+    const size = trashItemSize(node.resourceType, node.contentFormat || null, node.resourceId);
     return {
       id: node.id, resourceId: node.resourceId,
       resourceType: node.noteType === "sheet" ? "sheet" : node.resourceType as TrashResourceType,
@@ -89,6 +92,7 @@ export function listTrash(scope: Scope): TrashItem[] {
       canRestore: node.access.capabilities.canDelete && deletedAncestors.every((parent) => resolveKnowledgeNodeAccess(parent.id, scope.userId, getDb(), { includeDeleted: true }).capabilities.canDelete),
       canDeletePermanently, isLocked: !!node.isLocked,
       restoreIncludesAncestors: deletedAncestors.length > 0,
+      size,
     };
   }).sort((a, b) => (b.deletedAt || "").localeCompare(a.deletedAt || "") || a.id.localeCompare(b.id));
 }
@@ -171,6 +175,23 @@ function boardInfo(content: string): TrashPreview["board"] | null {
       shapes: elements.filter((element) => element.type !== "text").length,
       texts: elements.filter((element) => element.type === "text").length,
     };
+  } catch {
+    return null;
+  }
+}
+
+/** 回收站条目的"大小"＝内容字符数（notes.content / sheets.data），用于侧栏排序；取不到为 null。 */
+function trashItemSize(resourceType: string, contentFormat: string | null, resourceId: string): number | null {
+  try {
+    if (resourceType === "note" || resourceType === "mindmap") {
+      const note = getDb().prepare("SELECT content FROM notes WHERE id = ?").get(resourceId) as { content?: string | null } | undefined;
+      return note?.content ? note.content.length : null;
+    }
+    if (resourceType === "sheet") {
+      const row = getDb().prepare("SELECT data FROM sheets WHERE noteId = ?").get(resourceId) as { data?: string } | undefined;
+      return row?.data ? row.data.length : null;
+    }
+    return null;
   } catch {
     return null;
   }

@@ -89,9 +89,12 @@ import {
   getRetentionDays,
   getTrashSetting,
   getTrashTimeFilter,
+  getTrashSortFilter,
   getTrashTypeFilter,
   setTrashSetting,
+  setTrashSortFilter,
   setTrashTimeFilter,
+  TRASH_SORT_META,
   TRASH_TIME_META,
 
   retentionColor,
@@ -104,6 +107,7 @@ import {
   trashTypeKey,
   trashTypeLabel,
   type TrashTimeFilter,
+  type TrashSortFilter,
   type TrashTypeFilterKey,
   type TrashTypeKey,
 } from "@/features/trash/trashUi";
@@ -604,6 +608,7 @@ export default function SidebarDesktop() {
   const [trashFilter, setTrashFilterState] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
   const [retentionDays, setRetentionDaysState] = useState(() => getRetentionDays());
   const [timeFilter, setTimeFilterState] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
+  const [trashSort, setTrashSortState] = useState<TrashSortFilter>(() => getTrashSortFilter());
   const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
   const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
   const setTrashTypeFilter = useCallback((keys: TrashTypeFilterKey[]) => { setTrashFilterState(keys); persistTrashTypeFilter(keys); }, []);
@@ -3262,6 +3267,23 @@ export default function SidebarDesktop() {
                     aria-pressed={timeFilter === meta.key}
                     onClick={() => { setTimeFilterState(meta.key); setTrashTimeFilter(meta.key); }}
                     className={`rounded-full border px-2 py-0.5 text-[11px] ${timeFilter === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+            </PanelSection>
+            <PanelSection
+              label="排序"
+            >
+              <div className="flex flex-wrap gap-1 px-1">
+                {TRASH_SORT_META.map((meta) => (
+                  <button
+                    key={meta.key}
+                    type="button"
+                    aria-pressed={trashSort === meta.key}
+                    onClick={() => { setTrashSortState(meta.key); setTrashSortFilter(meta.key); }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${trashSort === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >
                     {meta.label}
                   </button>

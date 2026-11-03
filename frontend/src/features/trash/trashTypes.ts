@@ -15,6 +15,8 @@ export interface TrashItem {
   canDeletePermanently: boolean;
   isLocked: boolean;
   restoreIncludesAncestors: boolean;
+  /** 内容字符数（后端计算），排序用；取不到为 null。 */
+  size: number | null;
 }
 export interface TrashBatchResult {
   succeededIds: string[];

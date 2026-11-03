@@ -142,3 +142,45 @@ export function setTrashSetting(key: "notifyExpiry" | "weeklySummary", value: bo
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   window.dispatchEvent(new CustomEvent("nowen:trash-settings"));
 }
+
+/** 排序（对齐文件管理的排序 chips；TrashItem 无 size 字段，先只做时间/名称两维） */
+export type TrashSortFilter = "deletedDesc" | "deletedAsc" | "nameAsc" | "nameDesc" | "sizeDesc" | "sizeAsc";
+export const TRASH_SORT_META: Array<{ key: TrashSortFilter; label: string }> = [
+  { key: "deletedDesc", label: "最近删除" },
+  { key: "deletedAsc", label: "最早删除" },
+  { key: "nameAsc", label: "名称 A-Z" },
+  { key: "nameDesc", label: "名称 Z-A" },
+  { key: "sizeDesc", label: "大小 ↓" },
+  { key: "sizeAsc", label: "大小 ↑" },
+];
+const SORT_KEY = "trash.sortFilter";
+
+export function getTrashSortFilter(): TrashSortFilter {
+  const raw = localStorage.getItem(SORT_KEY) as TrashSortFilter | null;
+  return raw && TRASH_SORT_META.some((meta) => meta.key === raw) ? raw : "deletedDesc";
+}
+
+export function setTrashSortFilter(value: TrashSortFilter): void {
+  localStorage.setItem(SORT_KEY, value);
+  window.dispatchEvent(new CustomEvent("nowen:trash-filter"));
+}
+
+export function sortTrashItems<T extends { title: string; deletedAt: string | null; size?: number | null }>(items: T[], sort: TrashSortFilter): T[] {
+  const sorted = [...items];
+  sorted.sort((a, b) => {
+    if (sort === "nameAsc" || sort === "nameDesc") {
+      const cmp = a.title.localeCompare(b.title, "zh-Hans-CN");
+      return sort === "nameAsc" ? cmp : -cmp;
+    }
+    if (sort === "sizeDesc" || sort === "sizeAsc") {
+      const as = a.size ?? -1;
+      const bs = b.size ?? -1;
+      const cmp = as - bs || a.title.localeCompare(b.title, "zh-Hans-CN");
+      return sort === "sizeDesc" ? -cmp : cmp;
+    }
+    const at = a.deletedAt ? new Date(a.deletedAt).getTime() : 0;
+    const bt = b.deletedAt ? new Date(b.deletedAt).getTime() : 0;
+    return sort === "deletedDesc" ? bt - at : at - bt;
+  });
+  return sorted;
+}

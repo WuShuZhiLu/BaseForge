@@ -18,16 +18,21 @@ import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi
 import { permanentSelection, type TrashItem } from "./trashTypes";
 import {
   getRetentionDays,
+  getTrashSortFilter,
   getTrashTimeFilter,
   getTrashTypeFilter,
   retentionColor,
   retentionDaysLeft,
   setRetentionDays,
+  setTrashSortFilter,
+  sortTrashItems,
+  TRASH_SORT_META,
   trashTypeEmoji,
   trashTimeMatches,
   trashTypeKey,
   trashTypeLabel,
   type TrashTimeFilter,
+  type TrashSortFilter,
   type TrashTypeFilterKey,
   type TrashTypeKey,
 } from "./trashUi";
@@ -47,6 +52,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   const trash = useTrash(workspaceId, refreshToken);
   const [typeFilter, setTypeFilter] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
   const [timeFilter, setTimeFilter] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
+  const [sortFilter, setSortFilter] = useState<TrashSortFilter>(() => getTrashSortFilter());
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -57,7 +63,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
 
   // 侧栏的类型筛选与保留期设置跨组件同步
   useEffect(() => {
-    const onFilter = () => { setTypeFilter(getTrashTypeFilter()); setTimeFilter(getTrashTimeFilter()); };
+    const onFilter = () => { setTypeFilter(getTrashTypeFilter()); setTimeFilter(getTrashTimeFilter()); setSortFilter(getTrashSortFilter()); };
     const onSettings = () => setRetention(getRetentionDays());
     window.addEventListener("nowen:trash-filter", onFilter);
     window.addEventListener("nowen:trash-settings", onSettings);
@@ -67,11 +73,11 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
     };
   }, []);
 
-  const visible = useMemo(() => trash.items.filter((item) => {
+  const visible = useMemo(() => sortTrashItems(trash.items.filter((item) => {
     if (typeFilter[0] !== "all" && !typeFilter.includes(trashTypeKey(item.resourceType, item.contentFormat))) return false;
     if (!trashTimeMatches(item.deletedAt, timeFilter)) return false;
     return `${item.title} ${item.originalPath.join(" / ")}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
-  }), [trash.items, typeFilter, timeFilter, query]);
+  }), sortFilter), [trash.items, typeFilter, timeFilter, query, sortFilter]);
   const selectedItems = trash.items.filter((item) => selected.includes(item.id));
   const active = visible.find((item) => item.id === activeId) ?? null;
   const disabled = trash.loading || trash.busy || trash.error !== null;
@@ -116,7 +122,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
     <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border px-4">
       <label className="flex h-7 w-56 items-center gap-1.5 rounded-lg bg-app-hover px-2.5 text-tx-tertiary"><Search size={13} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("trashCenter.search")} aria-label={t("trashCenter.search")} className="min-w-0 flex-1 border-none bg-transparent text-xs text-tx-primary outline-none no-focus-ring" /></label>
       <span className="flex-1" />
-      <span className="text-xs text-tx-tertiary">{t("trashCenter.sortHint", { defaultValue: "排序：最近删除" })}</span>
+      <span className="text-xs text-tx-tertiary">排序：{TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label}</span>
     </div>
     <div className="flex min-h-0 flex-1">
       {/* 列表 */}
