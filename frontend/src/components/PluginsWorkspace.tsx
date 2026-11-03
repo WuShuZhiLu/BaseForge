@@ -19,10 +19,11 @@
  * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
  * README/Changelog/Dependencies 区块在 Registry V2 索引提供数据前隐藏。
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   ArrowLeft,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   Download,
@@ -34,12 +35,15 @@ import {
   PenLine,
   Puzzle,
   RotateCcw,
+  Search,
   ShieldCheck,
   Sparkles,
   Store,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useAppActions } from "@/store/AppContext";
 import { pluginApi, type InstalledPlugin, type PluginPermissionRow } from "@/lib/pluginApi";
@@ -96,6 +100,39 @@ const GROUP_TABS: Array<[GroupKey, string]> = [
   ["catalog", "市场"],
   ["config", "配置"],
 ];
+
+/** 头部行标题：分组即当前范围，与分享中心「头部行 = 当前分类」同一读法 */
+const GROUP_TITLES: Record<GroupKey, string> = {
+  installed: "插件",
+  catalog: "插件市场",
+  config: "插件配置",
+  builtin: "插件",
+};
+
+type InstalledFilter = "all" | "enabled" | "disabled";
+type InstalledSort = "recent" | "name";
+type CatalogSort = "recent" | "name";
+
+const INSTALLED_FILTER_CHIPS: Array<{ value: InstalledFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "enabled", label: "已启用" },
+  { value: "disabled", label: "已停用" },
+];
+
+const INSTALLED_SORT_OPTIONS: Array<{ value: InstalledSort; label: string }> = [
+  { value: "recent", label: "最近更新" },
+  { value: "name", label: "名称 A-Z" },
+];
+
+const CATALOG_SORT_OPTIONS: Array<{ value: CatalogSort; label: string }> = [
+  { value: "recent", label: "最近发布" },
+  { value: "name", label: "名称 A-Z" },
+];
+
+/** 「最近更新」取最新版本的安装时间；缺失时排到最后，而不是让空串混进比较 */
+function installedUpdatedAt(plugin: InstalledPlugin): string {
+  return plugin.versions?.[0]?.installedAt || "";
+}
 
 function iconFor(plug: BuiltinPluginDef, size: number) {
   switch (plug.icon) {
@@ -167,27 +204,129 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-/** 分组标题：与文件管理分区头同一规格（14px/600 标题 + 11px 三级色说明 + 右侧操作） */
-function GroupHeader({ title, description, actions }: {
-  title: string;
-  description: string;
-  actions?: React.ReactNode;
-}) {
+/** 工具条行：与分享中心同一规格（h-10 + 底边线，左搜索框 + 中 chips + 右排序） */
+function ToolbarRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
-      <div className="min-w-0">
-        <h3 className="text-[14px] font-semibold text-tx-primary">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-tx-tertiary">{description}</p>
-      </div>
-      {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4 text-xs text-tx-secondary">
+      {children}
     </div>
   );
 }
 
-/** 列表容器：一块 surface + 1px 描边，行之间用细线分隔，不再一行一张卡 */
-function RowList({ children }: { children: React.ReactNode }) {
+/** 搜索框：尺寸照分享中心，左置 14px 线性图标 */
+function ToolbarSearch({ label, value, placeholder, onChange }: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <div className="overflow-hidden rounded-[10px] border border-app-border bg-app-surface">{children}</div>
+    <label className="relative block w-[210px] shrink-0">
+      <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+      <Input
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-8 pl-8 text-xs"
+      />
+    </label>
+  );
+}
+
+/** 快捷筛选 chips：11px 圆角胶囊，选中 accent/10 + accent 文字 */
+function FilterChips<T extends string>({ value, options, onChange }: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "rounded-full border px-2.5 py-[3px] text-[11px] transition-colors",
+            value === option.value
+              ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
+              : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 排序下拉：与分享中心的「排序：xxx ▾」同一交互与尺寸 */
+function SortMenu({ value, options, onChange }: {
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+      >
+        排序：<span className="font-medium text-tx-primary">{options.find((option) => option.value === value)?.label}</span>
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={value === option.value}
+              onClick={() => { onChange(option.value); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover",
+                value === option.value ? "text-accent-primary" : "text-tx-secondary",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 列表容器：一块 surface + 1px 描边，行之间用细线分隔；空态时容器本身是虚线框 */
+function ListPanel({ empty, children }: { empty?: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      data-plugin-list-panel
+      className={cn(
+        "overflow-hidden rounded-[10px] border bg-app-surface",
+        empty ? "border-dashed border-app-border" : "border-app-border",
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -283,7 +422,7 @@ function RowSwitch({ checked, label, disabled, onToggle }: {
   );
 }
 
-/** 空态：中性卡 + 线性图标 + 主文案 + 次说明（+ 可选文字按钮） */
+/** 空态：虚线容器内的中性内容（32px 线性图标 + 13px 主文案 + 11px 说明），入口用 chips 样式 */
 function EmptyPanel({ icon, title, description, action }: {
   icon: React.ReactNode;
   title: string;
@@ -291,9 +430,9 @@ function EmptyPanel({ icon, title, description, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[10px] border border-app-border bg-app-surface px-4 py-12 text-center">
-      <span className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-app-hover text-tx-tertiary">{icon}</span>
-      <p className="text-[12.5px] text-tx-primary">{title}</p>
+    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+      <span className="text-tx-tertiary">{icon}</span>
+      <p className="mt-2.5 text-[13px] text-tx-primary">{title}</p>
       <p className="mt-1 text-[11px] leading-relaxed text-tx-tertiary">{description}</p>
       {action ? <div className="mt-3">{action}</div> : null}
     </div>
@@ -694,7 +833,13 @@ export default function PluginsWorkspace() {
   const [actionError, setActionError] = useState("");
   // 内置插件为次级分区：默认折叠，点分区头展开
   const [builtinExpanded, setBuiltinExpanded] = useState(false);
-  // 「检查更新」状态上提：触发按钮在社区插件区头部，结果区展示在同一分区内
+  // 工具条：搜索 / 状态筛选 / 排序全部在前端做，只过滤已拉到的列表
+  const [installedQuery, setInstalledQuery] = useState("");
+  const [installedFilter, setInstalledFilter] = useState<InstalledFilter>("all");
+  const [installedSort, setInstalledSort] = useState<InstalledSort>("recent");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogSort, setCatalogSort] = useState<CatalogSort>("recent");
+  // 「检查更新」状态上提：触发按钮在头部行，结果区展示在列表上方（仅管理员）
   const { updates, updateSource, setUpdateSource, checking, check: checkUpdates } = usePluginUpdateCheck();
 
   const refreshInstalled = useCallback(async () => {
@@ -793,6 +938,46 @@ export default function PluginsWorkspace() {
     goGroup("installed");
   };
 
+  /** 头部徽标 = 该分组的对象总数（管理=已装社区插件数，市场=目录条目数，配置无计数） */
+  const headerCount = group === "installed"
+    ? (installed === null ? null : installed.length)
+    : group === "catalog"
+      ? (catalog === null ? null : catalog.length)
+      : null;
+
+  /** 工具条只做前端过滤 / 排序：数据来源与启停事件都不变 */
+  const installedRows = useMemo(() => {
+    const keyword = installedQuery.trim().toLowerCase();
+    const rows = (installed || []).filter((plugin) => {
+      if (installedFilter === "enabled" && plugin.status !== "enabled") return false;
+      if (installedFilter === "disabled" && plugin.status === "enabled") return false;
+      if (!keyword) return true;
+      return plugin.name.toLowerCase().includes(keyword) || plugin.id.toLowerCase().includes(keyword);
+    });
+    return [...rows].sort((a, b) => {
+      if (installedSort === "name") return a.name.localeCompare(b.name, "zh-Hans");
+      const left = installedUpdatedAt(a);
+      const right = installedUpdatedAt(b);
+      if (left === right) return a.name.localeCompare(b.name, "zh-Hans");
+      return right.localeCompare(left);
+    });
+  }, [installed, installedFilter, installedQuery, installedSort]);
+
+  const catalogRows = useMemo(() => {
+    const keyword = catalogQuery.trim().toLowerCase();
+    const rows = (catalog || []).filter((extension) => {
+      if (!keyword) return true;
+      return extension.name.toLowerCase().includes(keyword) || extension.id.toLowerCase().includes(keyword);
+    });
+    return [...rows].sort((a, b) => {
+      if (catalogSort === "name") return a.name.localeCompare(b.name, "zh-Hans");
+      const left = sortVersionsDesc(a.versions)[0]?.publishedAt || "";
+      const right = sortVersionsDesc(b.versions)[0]?.publishedAt || "";
+      if (left === right) return a.name.localeCompare(b.name, "zh-Hans");
+      return right.localeCompare(left);
+    });
+  }, [catalog, catalogQuery, catalogSort]);
+
   const clearActionState = () => {
     setActionError("");
     setVersion((v) => v + 1);
@@ -864,33 +1049,73 @@ export default function PluginsWorkspace() {
   /** 分组导航在侧栏插件视图（管理/市场/配置），主区只跟事件跑，不再重复一排 tab。 */
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app-bg">
-      {/* 标题行 h-12：与侧栏工作区头同一节奏；返回右置 */}
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-primary/10 text-accent-primary">
-          <Puzzle size={15} />
-        </span>
-        <h2 className="text-[14px] font-semibold text-tx-primary">插件</h2>
-        <span className="hidden truncate text-[11px] text-tx-tertiary sm:inline">
-          {detail
-            ? "查看插件详情"
-            : group === "config"
-              ? "安装源、执行边界与开发者模式"
-              : group === "catalog"
-                ? "浏览公开 Registry"
-                : "社区插件与内置插件"}
-        </span>
-        <span className="flex-1" />
-        {detail && (
-          <button
-            type="button"
-            onClick={backToList}
-            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-surface px-2 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
-          >
-            <ArrowLeft size={12} />返回列表
-          </button>
-        )}
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* ① 头部行：照分享中心（h-12 + 18px 图标 + 15px/600 标题 + 计数徽标 + 右侧次/主按钮），
+          分组标题不再单独占一层 */}
+      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
+        <h1 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-tx-primary">
+          <Puzzle size={18} className="shrink-0 text-accent-primary" />
+          <span className="truncate">{GROUP_TITLES[group]}</span>
+          {headerCount !== null && (
+            <span className="shrink-0 rounded-full border border-app-border px-2 py-0.5 text-[11px] font-normal tabular-nums text-tx-tertiary">
+              {headerCount} 个
+            </span>
+          )}
+        </h1>
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {detail ? (
+            <Button size="sm" variant="outline" onClick={backToList}>
+              <ArrowLeft size={14} className="mr-1" />返回列表
+            </Button>
+          ) : group === "installed" && isAdmin ? (
+            <>
+              <PluginPackageInstallSection
+                onInstalled={async () => {
+                  await refreshInstalled();
+                  goGroup("installed");
+                  clearActionState();
+                }}
+              />
+              <Button size="sm" disabled={checking} onClick={() => void checkUpdates()}>
+                <RotateCcw size={14} className={cn("mr-1", checking && "animate-spin")} />
+                {checking ? "检查中…" : "检查更新"}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </header>
+
+      {/* ② 工具条行：搜索 + 状态 chips + 排序（配置分组没有列表，不出工具条） */}
+      {!detail && group !== "config" && (
+        <ToolbarRow>
+          {group === "installed" ? (
+            <>
+              <ToolbarSearch
+                label="搜索已安装插件"
+                value={installedQuery}
+                placeholder="搜索插件名称 / ID"
+                onChange={setInstalledQuery}
+              />
+              <FilterChips value={installedFilter} options={INSTALLED_FILTER_CHIPS} onChange={setInstalledFilter} />
+              <SortMenu value={installedSort} options={INSTALLED_SORT_OPTIONS} onChange={(value) => setInstalledSort(value as InstalledSort)} />
+            </>
+          ) : (
+            <>
+              <ToolbarSearch
+                label="搜索市场插件"
+                value={catalogQuery}
+                placeholder="搜索插件名称 / ID"
+                onChange={setCatalogQuery}
+              />
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1 truncate text-[11px] text-tx-tertiary">
+                公开 Registry 上的社区插件，安装后进入「管理」
+              </span>
+              <SortMenu value={catalogSort} options={CATALOG_SORT_OPTIONS} onChange={(value) => setCatalogSort(value as CatalogSort)} />
+            </>
+          )}
+        </ToolbarRow>
+      )}
+
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-app-bg">
       <div className="w-full px-4 py-3">
         {detail?.source === "builtin" && <div key={`${detail.plug.id}-${version}`}><BuiltinDetail plug={detail.plug} /></div>}
         {detail?.source === "installed" && (
@@ -922,35 +1147,7 @@ export default function PluginsWorkspace() {
 
         {!detail && (
           <div className="pb-2">
-            {/* 管理分组自上而下：社区插件区（主流场景）→ 内置插件折叠区（次级）。
-                「检查更新」「安装插件包」挂在社区插件区头部，与列表的从属关系一目了然（仅管理员可见） */}
-            {group === "installed" && (
-              <GroupHeader
-                title="社区插件"
-                description="从市场或插件包安装的插件。"
-                actions={isAdmin ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={checking}
-                      onClick={() => void checkUpdates()}
-                      className="shrink-0 rounded-md bg-accent-primary px-2.5 py-1 text-[11.5px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                    >
-                      {checking ? "检查中…" : "检查更新"}
-                    </button>
-                    <PluginPackageInstallSection
-                      onInstalled={async () => {
-                        await refreshInstalled();
-                        goGroup("installed");
-                        clearActionState();
-                      }}
-                    />
-                  </>
-                ) : null}
-              />
-            )}
-
-            {/* 检查更新结果：挂在社区插件分区内展示，可改更新源后再次点「检查更新」 */}
+            {/* 检查更新结果：头部触发、列表上方展示，可改更新源后再次点「检查更新」 */}
             {group === "installed" && isAdmin && updates !== null && (
               <div className="mb-2.5">
                 <PluginUpdatesResult updates={updates} updateSource={updateSource} onSourceChange={setUpdateSource} />
@@ -958,160 +1155,160 @@ export default function PluginsWorkspace() {
             )}
 
             {group === "config" && (
-              <>
-                <GroupHeader title="配置" description="安装源、执行边界与开发者模式。" />
-                <PluginConfigPanel
-                  isAdmin={isAdmin}
-                  onInstalled={async () => {
-                    await refreshInstalled();
-                    goGroup("installed");
-                    clearActionState();
-                  }}
-                />
-              </>
+              <PluginConfigPanel
+                isAdmin={isAdmin}
+                onInstalled={async () => {
+                  await refreshInstalled();
+                  goGroup("installed");
+                  clearActionState();
+                }}
+              />
             )}
 
             {group === "installed" && (
               installed === null ? (
                 <div className="flex items-center gap-2 py-8 text-[12px] text-tx-tertiary"><Loader2 size={14} className="animate-spin" />正在加载社区插件</div>
-              ) : installed.length ? (
-                <RowList>
-                  {installed.map((item) => {
-                    const enabled = item.status === "enabled";
-                    return (
-                      <PluginRow
-                        key={item.id}
-                        rowId={item.id}
-                        icon={<Puzzle size={14} className="text-tx-tertiary" />}
-                        name={item.name}
-                        meta={`${item.publisher || item.id} · v${item.version}`}
-                        state={{
-                          label: INSTALLED_STATUS_LABELS[item.status],
-                          tone: enabled ? "ok" : item.status === "error" ? "bad" : "warn",
-                        }}
-                        controls={isAdmin ? (
-                          <RowSwitch
-                            checked={enabled}
-                            disabled={busy}
-                            label={enabled ? "停用插件" : "启用插件"}
-                            onToggle={() => toggleInstalled(item)}
-                          />
-                        ) : null}
-                        hoverActions={isAdmin ? (
-                          <button
-                            type="button"
-                            title="卸载插件"
-                            aria-label={`卸载 ${item.name}`}
-                            disabled={busy}
-                            onClick={() => uninstallInstalled(item)}
-                            className="flex h-6 w-6 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-border/60 hover:text-red-600 disabled:opacity-50"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        ) : null}
-                        onOpen={() => { setInstalledSelection(item.id); clearActionState(); }}
-                      />
-                    );
-                  })}
-                </RowList>
               ) : (
-                <EmptyPanel
-                  icon={<PackageOpen size={17} />}
-                  title="尚未安装社区插件"
-                  description="到「市场」浏览公开 Registry，安装后会出现在这里。"
-                  action={(
-                    <button
-                      type="button"
-                      onClick={() => goGroup("catalog")}
-                      className="text-[11.5px] text-accent-primary hover:underline"
-                    >
-                      去市场
-                    </button>
-                  )}
-                />
-              )
-            )}
-
-            {/* 内置插件区：次级分区，默认折叠，点分区头展开后启停 */}
-            {group === "installed" && (
-              <div className="mt-5">
-                <button
-                  type="button"
-                  aria-expanded={builtinExpanded}
-                  onClick={() => setBuiltinExpanded((value) => !value)}
-                  className="group flex w-full items-center gap-1.5 px-0.5 pb-1.5 text-left"
-                >
-                  <ChevronRight
-                    size={12}
-                    className={cn("shrink-0 text-tx-tertiary transition-transform", builtinExpanded && "rotate-90")}
-                  />
-                  <span className="text-[11.5px] font-medium text-tx-secondary group-hover:text-tx-primary">内置插件</span>
-                  <span className="text-[11px] text-tx-tertiary">· {BUILTIN_PLUGINS.length} 个</span>
-                  <span className="ml-auto text-[11px] text-tx-tertiary">随应用内置，可启停</span>
-                </button>
-                {builtinExpanded && (
-                  <RowList>
-                    {BUILTIN_PLUGINS.map((item) => {
-                      const itemEnabled = isBuiltinPluginEnabled(item.id);
+                /* ③ 内容容器：社区插件行与内置插件分区同在一个面板里，行之间只用细线分隔 */
+                <ListPanel empty={installed.length === 0}>
+                  {installed.length === 0 ? (
+                    <EmptyPanel
+                      icon={<PackageOpen size={32} />}
+                      title="尚未安装社区插件"
+                      description="到市场浏览公开 Registry，安装后会出现在这里"
+                      action={(
+                        <button
+                          type="button"
+                          onClick={() => goGroup("catalog")}
+                          className="rounded-full border border-app-border bg-app-bg px-2.5 py-[3px] text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+                        >
+                          去市场看看
+                        </button>
+                      )}
+                    />
+                  ) : installedRows.length === 0 ? (
+                    <EmptyPanel
+                      icon={<Search size={32} />}
+                      title="没有匹配的插件"
+                      description="换个关键词，或把筛选切回「全部」"
+                    />
+                  ) : (
+                    installedRows.map((item) => {
+                      const enabled = item.status === "enabled";
                       return (
                         <PluginRow
                           key={item.id}
-                          rowId={`builtin-${item.id}`}
-                          icon={iconFor(item, 14)}
+                          rowId={item.id}
+                          icon={<Puzzle size={14} className="text-tx-tertiary" />}
                           name={item.name}
-                          meta={item.description}
-                          state={{ label: itemEnabled ? "已启用" : "已停用", tone: itemEnabled ? "ok" : "neutral" }}
-                          controls={(
+                          meta={`${item.publisher || item.id} · v${item.version}`}
+                          state={{
+                            label: INSTALLED_STATUS_LABELS[item.status],
+                            tone: enabled ? "ok" : item.status === "error" ? "bad" : "warn",
+                          }}
+                          controls={isAdmin ? (
                             <RowSwitch
-                              checked={itemEnabled}
-                              label={itemEnabled ? "停用插件" : "启用插件"}
-                              onToggle={() => setBuiltinPluginDisabled(item.id, itemEnabled)}
+                              checked={enabled}
+                              disabled={busy}
+                              label={enabled ? "停用插件" : "启用插件"}
+                              onToggle={() => toggleInstalled(item)}
                             />
-                          )}
-                          onOpen={() => selectBuiltin(item.id)}
+                          ) : null}
+                          hoverActions={isAdmin ? (
+                            <button
+                              type="button"
+                              title="卸载插件"
+                              aria-label={`卸载 ${item.name}`}
+                              disabled={busy}
+                              onClick={() => uninstallInstalled(item)}
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-border/60 hover:text-red-600 disabled:opacity-50"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          ) : null}
+                          onOpen={() => { setInstalledSelection(item.id); clearActionState(); }}
                         />
                       );
-                    })}
-                  </RowList>
-                )}
-              </div>
+                    })
+                  )}
+
+                  {/* 内置插件分区：同一个容器内的一行，点开后续接行列表 */}
+                  <button
+                    type="button"
+                    data-plugin-builtin-section
+                    aria-expanded={builtinExpanded}
+                    onClick={() => setBuiltinExpanded((value) => !value)}
+                    className="group flex h-8 w-full items-center gap-1.5 border-t border-app-border px-3 text-left transition-colors hover:bg-app-hover"
+                  >
+                    <ChevronRight
+                      size={12}
+                      className={cn("shrink-0 text-tx-tertiary transition-transform", builtinExpanded && "rotate-90")}
+                    />
+                    <span className="text-[11.5px] font-medium text-tx-secondary group-hover:text-tx-primary">内置插件</span>
+                    <span className="text-[11px] text-tx-tertiary">· {BUILTIN_PLUGINS.length} 个</span>
+                    <span className="ml-auto text-[11px] text-tx-tertiary">随应用内置，可启停</span>
+                  </button>
+                  {builtinExpanded && BUILTIN_PLUGINS.map((item) => {
+                    const itemEnabled = isBuiltinPluginEnabled(item.id);
+                    return (
+                      <PluginRow
+                        key={item.id}
+                        rowId={`builtin-${item.id}`}
+                        icon={iconFor(item, 14)}
+                        name={item.name}
+                        meta={item.description}
+                        state={{ label: itemEnabled ? "已启用" : "已停用", tone: itemEnabled ? "ok" : "neutral" }}
+                        controls={(
+                          <RowSwitch
+                            checked={itemEnabled}
+                            label={itemEnabled ? "停用插件" : "启用插件"}
+                            onToggle={() => setBuiltinPluginDisabled(item.id, itemEnabled)}
+                          />
+                        )}
+                        onOpen={() => selectBuiltin(item.id)}
+                      />
+                    );
+                  })}
+                </ListPanel>
+              )
             )}
 
             {group === "catalog" && (
-              <>
-                <GroupHeader title="市场" description="公开 Registry 上的社区插件，安装后进入「管理」。" />
-                {catalogLoading ? (
-                  <div className="flex items-center gap-2 py-8 text-[12px] text-tx-tertiary"><Loader2 size={14} className="animate-spin" />正在加载市场目录</div>
-                ) : catalogError ? (
+              catalogLoading ? (
+                <div className="flex items-center gap-2 py-8 text-[12px] text-tx-tertiary"><Loader2 size={14} className="animate-spin" />正在加载市场目录</div>
+              ) : catalogError ? (
+                <ListPanel empty>
                   <EmptyPanel
-                    icon={<AlertCircle size={17} />}
+                    icon={<AlertCircle size={32} />}
                     title="市场目录加载失败"
                     description={catalogError}
                   />
-                ) : catalog && catalog.length ? (
-                  <RowList>
-                    {catalog.map((item) => (
-                      <PluginRow
-                        key={item.id}
-                        rowId={item.id}
-                        icon={<Puzzle size={14} className="text-tx-tertiary" />}
-                        name={item.name}
-                        meta={`${item.id} · v${item.latestVersion}`}
-                        controls={(
-                          <span className="shrink-0 text-[11px] text-tx-tertiary">{item.trustLevel || "community"}</span>
-                        )}
-                        onOpen={() => { setCatalogSelection(item.id); clearActionState(); }}
-                      />
-                    ))}
-                  </RowList>
-                ) : (
-                  <EmptyPanel
-                    icon={<Store size={17} />}
-                    title="市场暂无可显示的插件"
-                    description="Registry 暂无条目，可在「配置」中检查安装源或稍后重试。"
-                  />
-                )}
-              </>
+                </ListPanel>
+              ) : (
+                <ListPanel empty={!catalogRows.length}>
+                  {catalogRows.length ? catalogRows.map((item) => (
+                    <PluginRow
+                      key={item.id}
+                      rowId={item.id}
+                      icon={<Puzzle size={14} className="text-tx-tertiary" />}
+                      name={item.name}
+                      meta={`${item.id} · v${item.latestVersion}`}
+                      controls={(
+                        <span className="shrink-0 text-[11px] text-tx-tertiary">{item.trustLevel || "community"}</span>
+                      )}
+                      onOpen={() => { setCatalogSelection(item.id); clearActionState(); }}
+                    />
+                  )) : (
+                    <EmptyPanel
+                      icon={<Store size={32} />}
+                      title={catalog && catalog.length ? "没有匹配的插件" : "市场暂无可显示的插件"}
+                      description={catalog && catalog.length
+                        ? "换个关键词，或清掉搜索再试"
+                        : "Registry 暂无条目，可在「配置」中检查安装源或稍后重试"}
+                    />
+                  )}
+                </ListPanel>
+              )
             )}
           </div>
         )}

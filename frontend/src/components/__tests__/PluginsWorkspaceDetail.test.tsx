@@ -61,6 +61,15 @@ function click(element: Element) {
   });
 }
 
+/** 受控 input 只能通过原生 setter + input 事件驱动（直接改 value 不会触发 React onChange） */
+function typeInto(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 async function flush() {
   // 等待 mount 时的异步加载（getMe / pluginApi.list）落定并触发重渲染
   await act(async () => {
@@ -118,6 +127,15 @@ async function openGroup(group: "builtin" | "installed" | "catalog" | "config") 
 /** 列表行统一是 [data-plugin-row]（行内还要放启停开关，不能整行塞进 button） */
 function pluginRow(host: HTMLElement, rowId: string): HTMLElement | null {
   return host.querySelector(`[data-plugin-row="${rowId}"]`);
+}
+
+/** 当前渲染的行顺序（内置插件分区的行也带同一属性，未展开时不会出现） */
+function rowIds(host: HTMLElement): string[] {
+  return Array.from(host.querySelectorAll("[data-plugin-row]")).map((el) => el.getAttribute("data-plugin-row") || "");
+}
+
+function buttonByLabel(host: HTMLElement, label: string): HTMLButtonElement | undefined {
+  return Array.from(host.querySelectorAll("button")).find((button) => (button.textContent || "").trim() === label);
 }
 
 /** 已安装分组：点列表行进入插件详情 */
@@ -230,7 +248,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     act(() => { root.unmount(); });
   });
 
-  it("管理分组：社区插件区在上，检查更新与安装插件包挂在区头部（仅管理员）", async () => {
+  it("管理分组：单一头部行 + 工具条，空态为虚线框，内置插件是同一容器内的分区", async () => {
     const { host, root } = await renderWorkspace();
 
     // 主区不再带分组 tab，分组只由侧栏事件驱动
@@ -238,39 +256,125 @@ describe("PluginsWorkspace 插件详情页", () => {
     await openGroup("installed");
 
     const content = text(host);
-    // 主区头与分区头同一规格：14px/600 标题 + 11px 三级色说明
-    const pageTitle = host.querySelector("h2");
-    expect(pageTitle?.className).toContain("text-[14px]");
-    expect(pageTitle?.className).toContain("font-semibold");
-    const sectionTitle = Array.from(host.querySelectorAll("h3")).find((el) => el.textContent === "社区插件");
-    expect(sectionTitle?.className).toContain("text-[14px]");
-    const sectionNote = sectionTitle?.parentElement?.querySelector("p");
-    expect(sectionNote?.className).toContain("text-[11px]");
-    // 分区顺序：社区插件（主流场景）在上，内置插件折叠分区在下；操作不再夹在两份列表中间
-    expect(content).toContain("社区插件");
-    expect(content).toContain("内置插件");
-    expect(content).toContain("· 5 个");
-    expect(content.indexOf("社区插件")).toBeLessThan(content.indexOf("内置插件"));
-    // 检查更新 / 安装插件包挂在社区插件区头部
-    expect(content).toContain("检查更新");
-    expect(content).toContain("安装插件包");
+    // ① 头部只有一行：图标 + 15px/600 标题 + 计数徽标；「社区插件」这层二级标题已删除
+    const headers = host.querySelectorAll("h1");
+    expect(headers).toHaveLength(1);
+    expect(headers[0].className).toContain("text-[15px]");
+    expect(headers[0].className).toContain("font-semibold");
+    expect(headers[0].textContent).toContain("插件");
+    expect(headers[0].textContent).toContain("0 个");
+    expect(headers[0].querySelector("svg")).toBeTruthy();
+    // 「社区插件」不再作为标题/说明出现在页面上（只剩空态主文案里的字样）
+    expect(content).not.toContain("从市场或插件包安装的插件");
+    expect(Array.from(host.querySelectorAll("h2, h3")).some((el) => el.textContent === "社区插件")).toBe(false);
+    expect(host.querySelector("h3")).toBeNull();
 
-    // 空态：中性卡 + 主文案 + 次说明 + 「去市场」文字按钮（不再是虚线框）
+    // ② 工具条：搜索框 + 状态 chips + 排序，三者同处一行
+    expect(host.querySelector('input[aria-label="搜索已安装插件"]')).toBeTruthy();
+    ["全部", "已启用", "已停用"].forEach((label) => {
+      expect(buttonByLabel(host, label)).toBeTruthy();
+    });
+    const sortTrigger = Array.from(host.querySelectorAll("button")).find((button) => (button.textContent || "").includes("排序："));
+    expect(sortTrigger).toBeTruthy();
+    const toolbar = host.querySelector('input[aria-label="搜索已安装插件"]')?.closest("div.flex");
+    expect(toolbar?.className).toContain("h-10");
+    // 管理员操作在头部行右侧：[安装插件包 次按钮][检查更新 主按钮]
+    expect(buttonByLabel(host, "安装插件包")).toBeTruthy();
+    expect(buttonByLabel(host, "检查更新")).toBeTruthy();
+
+    // ③ 空态：虚线容器 + 13px 主文案 + 11px 说明，入口不再用蓝色文字按钮
+    const panel = host.querySelector("[data-plugin-list-panel]");
+    expect(panel?.className).toContain("border-dashed");
     expect(content).toContain("尚未安装社区插件");
-    const toMarket = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "去市场");
-    expect(toMarket).toBeTruthy();
+    expect(content).toContain("到市场浏览公开 Registry，安装后会出现在这里");
+    const emptyTitle = Array.from(host.querySelectorAll("p")).find((el) => el.textContent === "尚未安装社区插件");
+    expect(emptyTitle?.className).toContain("text-[13px]");
+    const emptyNote = Array.from(host.querySelectorAll("p")).find((el) => (el.textContent || "").includes("公开 Registry"));
+    expect(emptyNote?.className).toContain("text-[11px]");
+    expect(buttonByLabel(host, "去市场")).toBeUndefined();
+    expect(buttonByLabel(host, "去市场看看")?.className).toContain("rounded-full");
 
-    // 内置插件默认折叠：分区头可展开，展开后才出现内置插件行
+    // 内置插件在同一容器内：32px 分区行，点开才把行接在下面
+    const builtinSection = panel?.querySelector("[data-plugin-builtin-section]") as HTMLElement | null;
+    expect(builtinSection?.textContent).toContain("内置插件");
+    expect(builtinSection?.textContent).toContain("· 5 个");
+    expect(builtinSection?.className).toContain("h-8");
     expect(content).not.toContain("待办事项");
-    const builtinHeader = host.querySelector('button[aria-expanded="false"]');
-    expect(builtinHeader?.textContent).toContain("内置插件");
-    click(builtinHeader as HTMLElement);
+    click(builtinSection as HTMLElement);
     expect(text(host)).toContain("待办事项");
-    // 展开后是行（图标 + 名称 + 次级说明 + 启停开关），不是一张张圆角卡
-    const builtinRow = pluginRow(host, "builtin-tasks");
+    const builtinRow = panel?.querySelector('[data-plugin-row="builtin-tasks"]');
     expect(builtinRow).toBeTruthy();
     expect(builtinRow?.querySelector('[role="switch"]')).toBeTruthy();
     expect(builtinRow?.className).toContain("min-h-[44px]");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("工具条：搜索 / 状态 chips / 排序对已装列表真过滤真排序", async () => {
+    mocks.installed = [
+      installedPlugin({
+        id: "acme.beta",
+        name: "Beta Sync",
+        versions: [{ version: "1.2.0", checksum: "a".repeat(64), source: "official-v2", trustLevel: "community", status: "enabled", installedAt: "2026-10-02T00:00:00Z" }],
+      }),
+      installedPlugin({
+        id: "acme.alpha",
+        name: "Alpha Notes",
+        status: "disabled",
+        versions: [{ version: "0.9.0", checksum: "b".repeat(64), source: "official-v2", trustLevel: "community", status: "disabled", installedAt: "2026-09-01T00:00:00Z" }],
+      }),
+    ];
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("installed");
+    // 默认「最近更新」：10-02 的 Beta 在前
+    expect(rowIds(host)).toEqual(["acme.beta", "acme.alpha"]);
+
+    // 排序：名称 A-Z
+    click(Array.from(host.querySelectorAll("button")).find((button) => (button.textContent || "").includes("排序：")) as Element);
+    click(buttonByLabel(host, "名称 A-Z") as Element);
+    expect(rowIds(host)).toEqual(["acme.alpha", "acme.beta"]);
+
+    // chips：已停用 / 已启用
+    click(buttonByLabel(host, "已停用") as Element);
+    expect(rowIds(host)).toEqual(["acme.alpha"]);
+    click(buttonByLabel(host, "已启用") as Element);
+    expect(rowIds(host)).toEqual(["acme.beta"]);
+
+    // 搜索：按名称 / ID 前端过滤
+    typeInto(host.querySelector('input[aria-label="搜索已安装插件"]') as HTMLInputElement, "beta");
+    expect(rowIds(host)).toEqual(["acme.beta"]);
+    typeInto(host.querySelector('input[aria-label="搜索已安装插件"]') as HTMLInputElement, "zzz");
+    expect(text(host)).toContain("没有匹配的插件");
+
+    act(() => { root.unmount(); });
+  });
+
+  it("市场 / 配置分组同样是头部行 + 工具条 + 面板容器，不再有二级标题", async () => {
+    mocks.catalog = [
+      { id: "acme.weather", publisher: "acme", name: "Weather", description: "天气插件", trustLevel: "community", latestVersion: "2.0.0", runtime: "sandbox-js", versions: [{ version: "2.0.0", runtime: "sandbox-js", publishedAt: "2026-10-01T00:00:00Z", permissions: [] }] },
+    ];
+    const { host, root } = await renderWorkspace();
+
+    await openGroup("catalog");
+    await flush();
+
+    // 市场：头部行标题 + 计数徽标，工具条带搜索与排序，容器内是行列表
+    expect(host.querySelector("h1")?.textContent).toContain("插件市场");
+    expect(host.querySelector("h1")?.textContent).toContain("1 个");
+    expect(host.querySelector("h3")).toBeNull();
+    expect(host.querySelector('input[aria-label="搜索市场插件"]')).toBeTruthy();
+    expect(Array.from(host.querySelectorAll("button")).some((button) => (button.textContent || "").includes("排序："))).toBe(true);
+    expect(host.querySelector("[data-plugin-list-panel]")?.className).not.toContain("border-dashed");
+    expect(pluginRow(host, "acme.weather")).toBeTruthy();
+
+    // 配置：同一套头部行，没有列表工具条
+    await openGroup("config");
+    await flush();
+    expect(host.querySelector("h1")?.textContent).toContain("插件配置");
+    expect(host.querySelector("h3")).toBeTruthy();
+    expect(host.querySelector('input[aria-label="搜索已安装插件"]')).toBeNull();
+    expect(host.querySelector('input[aria-label="搜索市场插件"]')).toBeNull();
 
     act(() => { root.unmount(); });
   });

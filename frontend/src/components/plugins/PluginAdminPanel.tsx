@@ -184,9 +184,9 @@ export function PluginPackageInstallSection({ onInstalled }: {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-md border border-app-border bg-app-surface px-2.5 py-1 text-[11.5px] text-tx-primary transition-colors hover:bg-app-hover"
+          className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-app-border bg-transparent px-3 text-xs text-tx-primary transition-colors hover:bg-app-hover"
         >
-          <PackagePlus size={13} />安装插件包
+          <PackagePlus size={14} />安装插件包
         </button>
       </div>
 
