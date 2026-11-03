@@ -3137,7 +3137,7 @@ export default function SidebarDesktop() {
              职责 = 浏览 + 单条恢复/删除；清空、批量、筛选只在主区完整工作区。 */}
         {sidebarView === "trash" && (
           <div className="sbx-view">
-            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2 text-xs">
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
               <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">回收站</span>
             </div>
@@ -3239,7 +3239,7 @@ export default function SidebarDesktop() {
         {/* ===== 项目管理视图 ===== */}
         {sidebarView === "projects" && (
           <div>
-            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2 text-xs">
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><KanbanSquare size={13} /></span>
               <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">项目管理</span>
             </div>
@@ -3250,7 +3250,7 @@ export default function SidebarDesktop() {
         {/* ===== 分享中心视图 ===== */}
         {sidebarView === "shares" && (
           <div>
-            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2 text-xs">
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
               <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">分享中心</span>
             </div>
@@ -3262,8 +3262,8 @@ export default function SidebarDesktop() {
              侧栏 = 来源选择 + 该来源的筛选/设置；列表与批量在主区。 */}
         {sidebarView === "files" && (
           <div className="sbx-view">
-            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2 text-xs">
-              <Inbox size={14} className="shrink-0 text-tx-tertiary" />
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-[13px] pr-2 text-xs">
+              <Inbox size={14} className="mx-[1px] shrink-0 text-tx-tertiary" />
               <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">文件管理</span>
             </div>
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
@@ -3433,7 +3433,7 @@ export default function SidebarDesktop() {
         {/* ===== 插件视图（方案 B：侧栏只做入口，不列插件） ===== */}
         {sidebarView === "plugins" && (
           <div className="sbx-view">
-            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2 text-xs">
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
               <span className="min-w-0 truncate text-[12.5px] font-medium text-tx-primary">插件</span>
             </div>
