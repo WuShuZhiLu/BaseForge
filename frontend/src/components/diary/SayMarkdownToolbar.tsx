@@ -146,17 +146,17 @@ export default function SayMarkdownToolbar({
     icon: React.ReactNode;
     mobilePrimary?: boolean;
   }> = [
-    { action: "bold", label: t("diary.markdownBold"), icon: <Bold size={14} />, mobilePrimary: true },
-    { action: "bulletList", label: t("diary.markdownBulletList"), icon: <List size={14} />, mobilePrimary: true },
-    { action: "taskList", label: t("diary.markdownTaskList"), icon: <CheckSquare size={14} />, mobilePrimary: true },
-    { action: "orderedList", label: t("diary.markdownOrderedList"), icon: <ListOrdered size={14} /> },
-    { action: "quote", label: t("diary.markdownQuote"), icon: <Quote size={14} /> },
-    { action: "inlineCode", label: t("diary.markdownInlineCode"), icon: <Code2 size={14} /> },
+    { action: "bold", label: t("diary.markdownBold"), icon: <Bold size={13} />, mobilePrimary: true },
+    { action: "bulletList", label: t("diary.markdownBulletList"), icon: <List size={13} />, mobilePrimary: true },
+    { action: "taskList", label: t("diary.markdownTaskList"), icon: <CheckSquare size={13} />, mobilePrimary: true },
+    { action: "orderedList", label: t("diary.markdownOrderedList"), icon: <ListOrdered size={13} /> },
+    { action: "quote", label: t("diary.markdownQuote"), icon: <Quote size={13} /> },
+    { action: "inlineCode", label: t("diary.markdownInlineCode"), icon: <Code2 size={13} /> },
   ];
   const secondaryActions = actions.filter((item) => !item.mobilePrimary);
 
   const actionButtonClass = (mobilePrimary?: boolean) => cn(
-    "grid h-10 w-10 shrink-0 place-items-center rounded-lg text-tx-tertiary transition-colors sm:h-7 sm:w-7 sm:rounded-md",
+    "grid h-6 w-6 shrink-0 place-items-center rounded-[4px] text-tx-tertiary transition-colors max-sm:h-8 max-sm:w-8",
     !mobilePrimary && "hidden sm:grid",
     mode === "write"
       ? "hover:bg-app-hover hover:text-tx-primary"
@@ -165,11 +165,11 @@ export default function SayMarkdownToolbar({
 
   return (
     <div
-      className="mt-2 border-t border-app-border/40 pt-2"
+      className="mt-2 border-t border-app-border/60 pt-2"
       data-diary-markdown-toolbar=""
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1">
+        <div className="flex min-w-0 items-center gap-0.5">
           {actions.map((item) => (
             <button
               key={item.action}
@@ -190,7 +190,7 @@ export default function SayMarkdownToolbar({
           <details className="relative shrink-0 sm:hidden">
             <summary
               className={cn(
-                "grid h-10 w-10 cursor-pointer list-none place-items-center rounded-lg text-tx-tertiary transition-colors [&::-webkit-details-marker]:hidden",
+                "grid h-8 w-8 cursor-pointer list-none place-items-center rounded-[4px] text-tx-tertiary transition-colors [&::-webkit-details-marker]:hidden",
                 mode === "write"
                   ? "hover:bg-app-hover hover:text-tx-primary"
                   : "pointer-events-none opacity-40",
@@ -198,9 +198,9 @@ export default function SayMarkdownToolbar({
               title={t("diary.media.more")}
               aria-label={t("diary.media.more")}
             >
-              <MoreHorizontal size={16} />
+              <MoreHorizontal size={14} />
             </summary>
-            <div className="absolute left-0 top-full z-50 mt-2 w-36 rounded-xl border border-app-border bg-app-elevated p-1.5 shadow-lg">
+            <div className="absolute left-0 top-full z-50 mt-2 w-36 rounded-[8px] border border-app-border bg-app-elevated p-1 shadow-lg">
               {secondaryActions.map((item) => (
                 <button
                   key={item.action}
@@ -211,7 +211,7 @@ export default function SayMarkdownToolbar({
                     apply(item.action);
                     event.currentTarget.closest("details")?.removeAttribute("open");
                   }}
-                  className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex min-h-8 w-full items-center gap-2 rounded-[4px] px-2.5 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {item.icon}
                   <span>{item.label}</span>
@@ -222,7 +222,7 @@ export default function SayMarkdownToolbar({
         </div>
 
         <div
-          className="flex shrink-0 items-center rounded-lg bg-app-hover/60 p-0.5"
+          className="flex shrink-0 items-center gap-0.5"
           data-diary-markdown-mode=""
         >
           <button
@@ -230,8 +230,10 @@ export default function SayMarkdownToolbar({
             onClick={() => onModeChange("write")}
             title={t("diary.markdownWrite")}
             className={cn(
-              "flex h-9 items-center gap-1 rounded-md px-2 text-[11px] transition-colors sm:h-auto sm:py-1",
-              mode === "write" ? "bg-app-surface text-tx-primary shadow-sm" : "text-tx-tertiary hover:text-tx-secondary",
+              "inline-flex h-6 items-center gap-1 rounded-[4px] px-2 text-[11px] transition-colors",
+              mode === "write"
+                ? "bg-accent-primary/10 text-accent-primary"
+                : "text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
             )}
           >
             <Pencil size={12} />
@@ -242,8 +244,10 @@ export default function SayMarkdownToolbar({
             onClick={() => onModeChange("preview")}
             title={t("diary.markdownPreview")}
             className={cn(
-              "flex h-9 items-center gap-1 rounded-md px-2 text-[11px] transition-colors sm:h-auto sm:py-1",
-              mode === "preview" ? "bg-app-surface text-tx-primary shadow-sm" : "text-tx-tertiary hover:text-tx-secondary",
+              "inline-flex h-6 items-center gap-1 rounded-[4px] px-2 text-[11px] transition-colors",
+              mode === "preview"
+                ? "bg-accent-primary/10 text-accent-primary"
+                : "text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
             )}
           >
             <Eye size={12} />

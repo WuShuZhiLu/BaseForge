@@ -84,17 +84,17 @@ export default function DailyRecordsHub() {
       data-daily-records-hub=""
     >
       <header
-        className="shrink-0 border-b border-app-border bg-app-surface/80 px-0 pt-3 backdrop-blur sm:px-4 sm:pt-4 lg:px-6"
+        className="shrink-0 border-b border-app-border bg-app-surface/80 px-0 pt-2.5 backdrop-blur sm:px-4 sm:pt-3 lg:px-6"
         data-daily-records-header=""
       >
         <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-0">
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight text-tx-primary">每日记录</h1>
-              <p className="mt-0.5 text-xs text-tx-tertiary">瞬间负责捕获，日记负责整理</p>
+              <h1 className="text-sm font-semibold tracking-tight text-tx-primary">每日记录</h1>
+              <p className="mt-0.5 text-[11px] text-tx-tertiary">瞬间负责捕获，日记负责整理</p>
             </div>
             <nav
-              className="grid w-full grid-cols-3 items-center gap-1 rounded-xl bg-app-hover/60 p-1 sm:flex sm:w-auto"
+              className="flex w-full items-center gap-1.5 sm:w-auto"
               aria-label="每日记录视图"
               data-daily-records-views=""
             >
@@ -104,14 +104,14 @@ export default function DailyRecordsHub() {
                   type="button"
                   onClick={() => setView(key)}
                   className={cn(
-                    "flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all sm:min-h-0 sm:px-3 sm:py-1.5",
+                    "inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium transition-colors sm:h-7 sm:flex-none",
                     view === key
-                      ? "bg-app-surface text-accent-primary shadow-sm"
-                      : "text-tx-tertiary hover:text-tx-primary",
+                      ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+                      : "border-app-border text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
                   )}
                   aria-current={view === key ? "page" : undefined}
                 >
-                  <Icon size={14} className="shrink-0" />
+                  <Icon size={13} className="shrink-0" />
                   <span className="truncate">{label}</span>
                 </button>
               ))}
@@ -119,24 +119,25 @@ export default function DailyRecordsHub() {
           </div>
 
           <div
-            className="-mx-4 mt-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mt-4 sm:px-0"
+            className="-mx-4 mt-2 flex flex-wrap items-center gap-1.5 px-4 pb-2.5 sm:mx-0 sm:px-0"
             data-daily-records-shortcuts=""
           >
             <button
               type="button"
               onClick={() => selectJournalDate(relativeLocalDateKey(0))}
-              className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-tx-primary hover:border-accent-primary/40 hover:bg-app-hover"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-[6px] bg-accent-primary px-3 text-[11.5px] font-medium text-white transition-colors hover:bg-accent-primary/90 sm:h-7"
             >
-              <BookOpen size={14} className="text-accent-primary" />
+              <BookOpen size={13} />
               今天日记
             </button>
             <button
               type="button"
               onClick={() => void copyCurrentTime()}
-              className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover"
+              title="复制当前时间"
+              aria-label="复制当前时间"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] border border-app-border text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary sm:h-7 sm:w-7"
             >
-              <Clock3 size={14} className="text-accent-primary" />
-              现在
+              <Clock3 size={13} />
             </button>
             {[
               { label: "昨天", offset: -1 },
@@ -148,14 +149,14 @@ export default function DailyRecordsHub() {
                 key={item.label}
                 type="button"
                 onClick={() => selectJournalDate(relativeLocalDateKey(item.offset))}
-                className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover"
+                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary sm:h-7"
               >
-                <CalendarDays size={14} className="text-accent-primary" />
+                <CalendarDays size={13} className="text-tx-tertiary" />
                 {item.label}
               </button>
             ))}
-            <label className="flex min-h-10 shrink-0 snap-start cursor-pointer items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover">
-              <CalendarDays size={14} className="text-accent-primary" />
+            <label className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary sm:h-7">
+              <CalendarDays size={13} className="text-tx-tertiary" />
               选择日期
               <input
                 type="date"

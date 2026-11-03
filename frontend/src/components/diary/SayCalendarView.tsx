@@ -87,35 +87,35 @@ export default function SayCalendarView({
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-app-bg">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-app-border bg-app-surface/40">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-app-border bg-app-surface/40">
         <div className="flex items-center gap-1">
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-app-hover/60 text-tx-secondary hover:bg-app-hover transition-all"
+            className="inline-flex h-7 items-center gap-1 rounded-[6px] border border-app-border px-2.5 text-[11.5px] font-medium text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
           >
             {t("diary.exitCalendar")}
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={goPrev}
-            className="p-1.5 rounded-lg text-tx-tertiary hover:text-tx-secondary hover:bg-app-hover transition-all"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
           >
-            <ChevronLeft size={16} />
+            <ChevronLeft size={15} />
           </button>
-          <div className="text-sm font-semibold text-tx-primary min-w-[120px] text-center">
+          <div className="min-w-[110px] text-center text-[12.5px] font-medium text-tx-primary">
             {monthLabel(year, month, t)}
           </div>
           <button
             onClick={goNext}
-            className="p-1.5 rounded-lg text-tx-tertiary hover:text-tx-secondary hover:bg-app-hover transition-all"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-[4px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
           >
-            <ChevronRight size={16} />
+            <ChevronRight size={15} />
           </button>
         </div>
         <button
           onClick={goToday}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-medium bg-app-hover/60 text-tx-secondary hover:bg-app-hover transition-all"
+          className="inline-flex h-7 items-center gap-1 rounded-[6px] border border-app-border px-2.5 text-[11.5px] font-medium text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
         >
           {t("diary.calendarToday")}
         </button>
@@ -147,16 +147,16 @@ export default function SayCalendarView({
                       key={cell.dateKey}
                       onClick={() => setSelectedDateKey(cell.dateKey)}
                       className={cn(
-                        "group relative flex flex-col items-start p-2 min-h-[72px] sm:min-h-[88px] rounded-xl border transition-all",
+                        "group relative flex flex-col items-start p-2 min-h-[72px] sm:min-h-[88px] rounded-[8px] border transition-colors",
                         isSelected
-                          ? "border-accent-primary bg-accent-primary/5 shadow-sm shadow-accent-primary/10"
+                          ? "border-accent-primary/40 bg-accent-primary/5"
                           : "border-app-border/60 bg-app-surface/30 hover:border-accent-primary/30 hover:bg-app-surface/50"
                       )}
                     >
                       <div className="flex w-full items-center justify-between">
                         <span
                           className={cn(
-                            "text-xs font-semibold",
+                            "text-[11px] font-medium",
                             !cell.isCurrentMonth
                               ? "text-tx-tertiary/60"
                               : isToday
@@ -167,7 +167,7 @@ export default function SayCalendarView({
                           {cell.date}
                         </span>
                         {count > 0 && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-accent-primary/10 text-accent-primary">
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-accent-primary/10 text-accent-primary tabular-nums">
                             {count}
                           </span>
                         )}
