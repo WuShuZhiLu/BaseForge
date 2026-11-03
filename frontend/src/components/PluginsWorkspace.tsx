@@ -321,8 +321,8 @@ function ListPanel({ empty, children }: { empty?: boolean; children: React.React
     <div
       data-plugin-list-panel
       className={cn(
-        "overflow-hidden rounded-[10px] border bg-app-surface",
-        empty ? "border-dashed border-app-border" : "border-app-border",
+        "overflow-hidden rounded-[10px] border border-app-border bg-app-surface",
+        empty && "pb-3",
       )}
     >
       {children}
@@ -430,11 +430,11 @@ function EmptyPanel({ icon, title, description, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+    <div className="m-3 flex flex-col items-center justify-center rounded-[10px] border border-dashed border-app-border px-6 py-7 text-center">
       <span className="text-tx-tertiary">{icon}</span>
-      <p className="mt-2.5 text-[13px] text-tx-primary">{title}</p>
+      <p className="mt-2 text-[13px] text-tx-primary">{title}</p>
       <p className="mt-1 text-[11px] leading-relaxed text-tx-tertiary">{description}</p>
-      {action ? <div className="mt-3">{action}</div> : null}
+      {action ? <div className="mt-2.5">{action}</div> : null}
     </div>
   );
 }
@@ -940,7 +940,7 @@ export default function PluginsWorkspace() {
 
   /** 头部徽标 = 该分组的对象总数（管理=已装社区插件数，市场=目录条目数，配置无计数） */
   const headerCount = group === "installed"
-    ? (installed === null ? null : installed.length)
+    ? (installed === null ? null : installed.length + BUILTIN_PLUGINS.length)
     : group === "catalog"
       ? (catalog === null ? null : catalog.length)
       : null;

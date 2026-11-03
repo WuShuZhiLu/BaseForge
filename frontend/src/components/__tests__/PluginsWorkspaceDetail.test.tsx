@@ -262,7 +262,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(headers[0].className).toContain("text-[15px]");
     expect(headers[0].className).toContain("font-semibold");
     expect(headers[0].textContent).toContain("插件");
-    expect(headers[0].textContent).toContain("0 个");
+    expect(headers[0].textContent).toContain("5 个");
     expect(headers[0].querySelector("svg")).toBeTruthy();
     // 「社区插件」不再作为标题/说明出现在页面上（只剩空态主文案里的字样）
     expect(content).not.toContain("从市场或插件包安装的插件");
@@ -284,7 +284,9 @@ describe("PluginsWorkspace 插件详情页", () => {
 
     // ③ 空态：虚线容器 + 13px 主文案 + 11px 说明，入口不再用蓝色文字按钮
     const panel = host.querySelector("[data-plugin-list-panel]");
-    expect(panel?.className).toContain("border-dashed");
+    // 虚线只包住空态自身那块，容器本身是实线（否则会把内置插件区也圈进"空"里）
+    expect(panel?.className).not.toContain("border-dashed");
+    expect(panel?.querySelector(".border-dashed")).toBeTruthy();
     expect(content).toContain("尚未安装社区插件");
     expect(content).toContain("到市场浏览公开 Registry，安装后会出现在这里");
     const emptyTitle = Array.from(host.querySelectorAll("p")).find((el) => el.textContent === "尚未安装社区插件");

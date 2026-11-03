@@ -3437,23 +3437,24 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
               <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">插件</span>
             </div>
-            {/* 侧栏零插件列表：插件启用后在左侧导航栏徽章里直接打开，这里只负责"去哪找" */}
-            <div className="pb-2 pt-1">
-              {([
-                { group: "浏览", key: "catalog", icon: Store, label: "市场", hint: pluginCounts?.catalog ? String(pluginCounts.catalog) : "" },
-                { group: "已安装", key: "installed", icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
-                { group: "设置", key: "config", icon: SlidersHorizontal, label: "配置", hint: "" },
-              ] as const).map((entry, index, list) => {
-                const Icon = entry.icon;
-                const active = plugCat === entry.key;
-                const showGroup = index === 0 || list[index - 1].group !== entry.group;
-                return (
-                  <div key={entry.key}>
-                    {showGroup && <div className="px-3 pb-1 pt-2 text-[10px] text-tx-tertiary">{entry.group}</div>}
+            {/* 侧栏只做入口：插件启用后在导航栏徽章里直接打开，这里只负责"去哪找"。
+                结构与文件管理/回收站同源：PanelSection（12px/600 标签 + 底边线）+ 每行独立描边条。 */}
+            {([
+              { group: "浏览", key: "catalog" as const, icon: Store, label: "市场", hint: pluginCounts?.catalog ? String(pluginCounts.catalog) : "" },
+              { group: "已安装", key: "installed" as const, icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
+              { group: "设置", key: "config" as const, icon: SlidersHorizontal, label: "配置", hint: "" },
+            ]).map((entry) => {
+              const Icon = entry.icon;
+              const active = plugCat === entry.key;
+              return (
+                <PanelSection key={entry.key} label={entry.group}>
+                  <div className="space-y-1">
                     <div
                       className={cn(
-                        "sbx-row group items-center",
-                        active && "bg-accent-primary/10 text-accent-primary hover:bg-accent-primary/15",
+                        "flex w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-[12px] transition-colors",
+                        active
+                          ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
+                          : "border-app-border bg-app-bg text-tx-primary hover:bg-app-hover",
                       )}
                       title={entry.label}
                       onClick={() => {
@@ -3462,14 +3463,18 @@ export default function SidebarDesktop() {
                         if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                       }}
                     >
-                      <span className="sbx-ico"><Icon size={14} className={active ? "text-accent-primary" : "text-tx-tertiary"} /></span>
-                      <span className={cn("min-w-0 flex-1 truncate text-xs", active ? "text-accent-primary" : "text-tx-primary")}>{entry.label}</span>
-                      {entry.hint && <span className={cn("sbx-meta", active && "text-accent-primary/80")}>{entry.hint}</span>}
+                      <Icon size={14} className={active ? "shrink-0 text-accent-primary" : "shrink-0 text-tx-tertiary"} />
+                      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                      {entry.hint && (
+                        <span className={cn("shrink-0 text-[10px] tabular-nums", active ? "text-accent-primary/80" : "text-tx-tertiary")}>
+                          {entry.hint}
+                        </span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </PanelSection>
+              );
+            })}
           </div>
         )}
       </div>
