@@ -551,7 +551,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       </div>
 
       <div
-        className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onContextMenu={(e) => {
           if ((e.target as HTMLElement).closest("button")) return;
           e.preventDefault();
