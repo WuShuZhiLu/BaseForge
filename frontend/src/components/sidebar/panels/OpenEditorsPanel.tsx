@@ -79,7 +79,7 @@ export default function OpenEditorsPanel() {
   const idleRowClass = "text-tx-secondary hover:bg-app-hover hover:text-tx-primary";
 
   if (openTabs.length === 0 && toolTabs.length === 0) {
-    return <p className="px-3 py-3 text-[11.5px] text-tx-tertiary">{t("sidebar.noOpenEditors", { defaultValue: "没有打开的内容" })}</p>;
+    return <p className="px-3 py-3 text-[12px] text-tx-tertiary">{t("sidebar.noOpenEditors", { defaultValue: "没有打开的内容" })}</p>;
   }
 
   return (

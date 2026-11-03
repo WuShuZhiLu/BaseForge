@@ -674,6 +674,8 @@ export default function SidebarDesktop() {
   const [uploadOpen, setUploadOpen] = useState(false);
   // 侧栏内嵌打开的插件面板（runtimeId），null = 未打开（返回条隐藏）
   const [openPluginPanel, setOpenPluginPanel] = useState<string | null>(null);
+  // 独立插件模块（待办/日记/AI）：界面与知识库无关，侧栏只显示插件自己的顶块与内容
+  const standalonePluginPanel = openPluginPanel === "tasks" || openPluginPanel === "diary" || openPluginPanel === "ai";
   // 知识树统一选中系统：单选/ctrl 多选/shift 范围选；点空白清空
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(() => {
     try {
@@ -2729,7 +2731,7 @@ export default function SidebarDesktop() {
       {/* ===== 头部：位置 + 搜索 —— 仅知识库视图显示；模块视图有自己的面板头 ===== */}
       <header
         className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2"
-        style={sidebarView === "kb" ? undefined : { display: "none" }}
+        style={sidebarView === "kb" && !standalonePluginPanel ? undefined : { display: "none" }}
       >
         <div ref={spaceRef} className="relative shrink-0">
           <button
@@ -3105,24 +3107,34 @@ export default function SidebarDesktop() {
         </div>
       )}
 
-      {/* 内置插件的侧栏面板：模块切换归导航栏（Rail）管，侧栏不放"返回知识库"这类跨模块入口 */}
+      {/* 内置插件的侧栏面板：模块切换归导航栏（Rail）管，侧栏不放"返回知识库"这类跨模块入口。
+          待办/日记/AI 界面独立：顶块 = 插件模块顶块（与文件管理/回收站同规格），KB 树不渲染。 */}
         {openPluginPanel && (
           <div className="shrink-0">
             {(() => {
               const def = BUILTIN_PLUGINS.find((p) => p.id === openPluginPanel);
               if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
+              const standalone = def.id === "tasks" || def.id === "diary" || def.id === "ai";
+              const PanelIcon = def.id === "tasks" ? ListTodo : def.id === "diary" ? BookOpen : Sparkles;
               return (
                 <>
-                  <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-2 py-1">
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{def.sidebarPanel.title}</span>
-                  </div>
+                  {standalone ? (
+                    <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><PanelIcon size={13} /></span>
+                      <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">{def.sidebarPanel.title}</span>
+                    </div>
+                  ) : (
+                    <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-2 py-1">
+                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{def.sidebarPanel.title}</span>
+                    </div>
+                  )}
                   {def.id === "tasks" && <TasksMiniPanel />}
                   {def.id === "diary" && <DiaryMiniPanel />}
                   {def.id === "pm" && <PmMiniPanel />}
                   {def.id === "ai" && (
                     <div className="sbx-view">
-                      <div className="px-2 pb-2">
-                        <p className="sbx-view-empty">AI 基于知识库回答问题，支持检索引用与上下文来源。</p>
+                      <div className="px-3 py-2">
+                        <p className="text-[12px] leading-relaxed text-tx-secondary">AI 基于知识库回答问题，支持检索引用与上下文来源。</p>
                       </div>
                     </div>
                   )}
