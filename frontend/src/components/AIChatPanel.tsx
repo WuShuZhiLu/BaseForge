@@ -976,8 +976,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
             >
               <Menu size={14} />
             </button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 shadow-sm shadow-violet-500/20">
-              <Bot size={14} className="text-white" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-primary/10">
+              <Bot size={14} className="text-accent-primary" />
             </div>
             <div className="min-w-0">
               <div className="max-w-96 truncate text-sm font-semibold text-tx-primary">
@@ -1034,8 +1034,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
             {!historyLoading && !messages.length && (
               <div className="flex flex-col items-center justify-center py-10 text-center md:py-16">
-                <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-500 shadow-lg shadow-violet-500/15">
-                  <Sparkles size={24} className="text-white" />
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-[10px] bg-accent-primary/10">
+                  <Sparkles size={20} className="text-accent-primary" />
                 </div>
                 <p className="mb-1 text-base font-semibold text-tx-primary">{t("aiChat.empty")}</p>
                 <p className="mb-6 max-w-sm text-xs leading-5 text-tx-tertiary">{t("aiChat.emptyHint")}</p>
@@ -1239,7 +1239,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                     "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
                     isUser
                       ? "bg-app-hover text-tx-secondary"
-                      : "bg-gradient-to-br from-violet-500 to-indigo-500 text-white shadow-sm shadow-violet-500/20",
+                      : "bg-accent-primary text-white",
                   )}>
                     {isUser ? <User size={13} /> : <Bot size={13} />}
                   </div>

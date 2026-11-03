@@ -68,14 +68,14 @@ export default function DiarySidebar({
       {/* 日历入口卡片 */}
       <button
         onClick={onOpenCalendar}
-        className="w-full p-4 rounded-xl bg-gradient-to-br from-violet-500/5 to-pink-500/5 border border-violet-200/30 dark:border-violet-500/10 hover:from-violet-500/10 hover:to-pink-500/10 transition-all group"
+        className="w-full p-3 rounded-[10px] bg-app-surface border border-app-border hover:bg-app-hover transition-all group"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-            <Calendar size={20} className="text-white" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-accent-primary/10 flex items-center justify-center">
+            <Calendar size={16} className="text-accent-primary" />
           </div>
           <div className="text-left">
-            <div className="text-sm font-semibold text-tx-primary">
+            <div className="text-xs font-medium text-tx-primary">
               {t("diary.calendarTitle") || "日历视图"}
             </div>
             <div className="text-[11px] text-tx-tertiary">

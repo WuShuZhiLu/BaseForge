@@ -1199,7 +1199,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
         {centerMode === "tasks" ? (
           <div className="hidden items-center gap-3 border-b border-app-border px-5 py-3 md:flex">
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-bold text-tx-primary">
+              <h1 className="text-sm font-semibold text-tx-primary">
                 {selectedProjectId
                   ? projects.find((p) => p.id === selectedProjectId)?.name || t("tasks.allTasks")
                   : FILTERS.find((f) => f.key === filter)?.label || t("tasks.allTasks")}
@@ -1297,14 +1297,14 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
         ) : centerMode === "habits" ? (
           <div className="hidden md:flex items-center justify-between px-5 py-3 border-b border-app-border">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-tx-primary">{t("habits.title")}</h1>
+              <h1 className="text-sm font-semibold text-tx-primary">{t("habits.title")}</h1>
             </div>
             <div className="text-xs text-tx-tertiary">{t("habits.summary")}</div>
           </div>
         ) : centerMode === "stats" ? (
           <div className="hidden md:flex items-center justify-between px-5 py-3 border-b border-app-border">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-tx-primary">{t("stats.title")}</h1>
+              <h1 className="text-sm font-semibold text-tx-primary">{t("stats.title")}</h1>
             </div>
             <div className="text-xs text-tx-tertiary">{t("stats.subtitle")}</div>
           </div>

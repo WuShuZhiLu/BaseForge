@@ -714,7 +714,7 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
     <div
       data-nowen-media-owner="diary"
       className={cn(
-        "relative z-0 bg-app-surface/60 backdrop-blur-sm rounded-2xl border border-app-border shadow-sm transition-all",
+        "relative z-0 bg-app-surface rounded-[10px] border border-app-border transition-all",
         isDragging && "ring-2 ring-accent-primary/50 border-accent-primary/40",
       )}
       onDragEnter={handleDragEnter}
@@ -1576,7 +1576,7 @@ function DiaryEditor({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
-      className="bg-app-surface/60 backdrop-blur-sm rounded-2xl border border-accent-primary/40 ring-1 ring-accent-primary/20 shadow-sm"
+      className="bg-app-surface rounded-[10px] border border-accent-primary/40 ring-1 ring-accent-primary/20"
     >
       <div className="p-4 pb-2">
         <div className="flex items-center gap-1.5 mb-2 text-[11px] text-accent-primary">
@@ -1962,10 +1962,10 @@ function FilterBar({
           key={key}
           onClick={() => onChange(key, customRange)}
           className={cn(
-            "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all",
+            "px-2.5 py-1 rounded-full text-[11px] border transition-all",
             preset === key
-              ? "bg-accent-primary text-white shadow-sm shadow-accent-primary/20"
-              : "bg-app-hover/60 text-tx-tertiary hover:text-tx-secondary hover:bg-app-hover",
+              ? "border-transparent bg-accent-primary/10 text-accent-primary font-medium"
+              : "border-app-border text-tx-tertiary hover:text-tx-secondary hover:bg-app-hover",
           )}
         >
           {label}
@@ -2311,13 +2311,13 @@ export default function DiaryWorkspace() {
               {/* 顶部标题 + 统计 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                    <MessageCircle size={20} className="text-white" />
+                  <div className="w-8 h-8 rounded-lg bg-accent-primary/10 flex items-center justify-center">
+                    <MessageCircle size={16} className="text-accent-primary" />
                   </div>
                   <div>
-                    <h1 className="text-xl font-bold text-tx-primary leading-tight">{t("diary.title")}</h1>
+                    <h1 className="text-sm font-semibold text-tx-primary leading-tight">{t("diary.title")}</h1>
                     {stats && (
-                      <p className="text-xs text-tx-tertiary mt-0.5">
+                      <p className="text-[11px] text-tx-tertiary mt-0.5">
                         {t("diary.statsLine")
                           .replace("{{total}}", String(stats.total))
                           .replace("{{today}}", String(stats.todayCount))}
@@ -2337,7 +2337,6 @@ export default function DiaryWorkspace() {
 
               {/* 发布框 */}
               <div className={cn("relative", state.mobileSidebarOpen && "hidden md:block")}>
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500/5 to-pink-500/5 rounded-2xl" />
                 <div className="relative">
                   <ComposeBox key={getCurrentWorkspace() || "personal"} onPost={handlePost} />
                 </div>
@@ -2413,8 +2412,8 @@ export default function DiaryWorkspace() {
                 </div>
               ) : items.length === 0 ? (
                 <div className="flex flex-col items-center py-20 text-center">
-                  <div className="w-16 h-16 rounded-2xl bg-app-hover/60 flex items-center justify-center mb-4">
-                    <MessageCircle size={28} className="text-tx-tertiary" />
+                  <div className="w-12 h-12 rounded-[10px] bg-app-hover/60 flex items-center justify-center mb-4">
+                    <MessageCircle size={22} className="text-tx-tertiary" />
                   </div>
                   <p className="text-sm text-tx-secondary font-medium">
                     {isFiltering ? t("diary.emptyFiltered") : t("diary.empty")}
