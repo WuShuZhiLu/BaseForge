@@ -142,14 +142,15 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
         <span className="flex-1" />
         <button className="text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
       </div>
-      {/* 详情预览 */}
-      <aside className="flex w-[430px] shrink-0 flex-col border-l border-app-border bg-app-bg">
-        {active ? <TrashPreview item={active} retentionDays={retentionDays} disabled={disabled} expanded={expanded} onExpand={setExpanded}
-          onRestore={() => void operate("restore", [active.id])}
-          onRestoreTo={() => setRestoreToItem(active)}
-          onPurge={() => void operate("permanent", [active.id])} />
-          : <div className="flex flex-1 flex-col items-center justify-center gap-2 text-tx-tertiary"><span className="text-[26px]">👈</span><p className="text-[12.5px] text-center leading-relaxed">点一条内容<br/>先看内容预览，确认后恢复</p></div>}
-      </aside>
+      {/* 详情预览：仅在选中一条被删内容时出现，未选中时列表占满整宽（不留空占位） */}
+      {active && (
+        <aside className="flex w-[430px] shrink-0 flex-col border-l border-app-border bg-app-bg">
+          <TrashPreview item={active} retentionDays={retentionDays} disabled={disabled} expanded={expanded} onExpand={setExpanded}
+            onRestore={() => void operate("restore", [active.id])}
+            onRestoreTo={() => setRestoreToItem(active)}
+            onPurge={() => void operate("permanent", [active.id])} />
+        </aside>
+      )}
     </div>
     {/* 恢复到…：目标目录选择器 */}
     {restoreToItem && (
