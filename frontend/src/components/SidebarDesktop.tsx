@@ -66,6 +66,10 @@ import {
   Unlock,
   FolderOpen,
   Cloud,
+  FileCode,
+  Network,
+  PenTool,
+  Table,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -387,6 +391,19 @@ interface RowMenuState {
 }
 
 /** 面板内分区标题：统一的小圆点装饰 + 12px/600 标签（所有分区同一个符号，不做区分）。 */
+/** 回收站侧栏类型行的线性图标（与文件管理/插件行同一套 14px 线性图标语言）。 */
+function trashTypeIcon(key: string) {
+  switch (key) {
+    case "all": return <Layers size={14} className="shrink-0" />;
+    case "markdown": return <FileCode size={14} className="shrink-0" />;
+    case "mindmap": return <Network size={14} className="shrink-0" />;
+    case "board": return <PenTool size={14} className="shrink-0" />;
+    case "sheet": return <Table size={14} className="shrink-0" />;
+    case "attach": return <Paperclip size={14} className="shrink-0" />;
+    default: return <FileText size={14} className="shrink-0" />;
+  }
+}
+
 function PanelSection({ label, extra, children }: {
   label: string;
   extra?: React.ReactNode;
@@ -590,6 +607,8 @@ export default function SidebarDesktop() {
   const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
   const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
   const setTrashTypeFilter = useCallback((keys: TrashTypeFilterKey[]) => { setTrashFilterState(keys); persistTrashTypeFilter(keys); }, []);
+  const [trashTypesOpen, setTrashTypesOpen] = useState(false);
+  const [trashTypesQuery, setTrashTypesQuery] = useState("");
   // 回收站视图激活时，恢复/删除/清空等操作后即时刷新计数与类型分布
   useEffect(() => {
     if (sidebarView !== "trash") return;
@@ -3146,35 +3165,92 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
               <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">回收站</span>
             </div>
-            {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter） */}
-            <PanelSection
-              label="类型 · 可多选"
-              extra={<button type="button" className="text-[10.5px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>}
-            >
-              <div className="grid grid-cols-2 gap-1">
-                {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => {
-                  const count = key === "all"
-                    ? trashItems.length
-                    : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      aria-pressed={trashFilter.includes(key)}
-                      onClick={() => {
-                        const next = key === "all" ? ["all" as TrashTypeKey]
-                          : trashFilter.includes(key) ? trashFilter.filter((k) => k !== key) : [...trashFilter.filter((k) => k !== "all"), key];
-                        setTrashTypeFilter(next.length ? next : ["all"]);
-                      }}
-                      className={`flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${trashFilter.includes(key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                    >
-                      <span className="min-w-0 flex-1 truncate text-left">{key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label}</span>
-                      <span className="tabular-nums text-tx-tertiary">{count}</span>
-                    </button>
-                  );
-                })}
+            {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter）。
+                收成一行触发器 + 覆盖式弹层（两列勾选），类型增多也不撑高侧栏。 */}
+            <div className="relative border-b border-app-border px-2 py-1.5">
+              <div className="flex items-center justify-between pl-1 pr-1 pb-1">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-tx-tertiary" />
+                  <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">类型 · 可多选</span>
+                </span>
+                {trashFilter.length > 1 || (trashFilter.length === 1 && trashFilter[0] !== "all") ? (
+                  <button type="button" className="text-[11px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>
+                ) : null}
               </div>
-            </PanelSection>
+              <button
+                type="button"
+                aria-expanded={trashTypesOpen}
+                onClick={() => setTrashTypesOpen((value) => !value)}
+                className={`flex h-8 w-full items-center gap-2 rounded-md border px-2 text-[12px] transition-colors ${trashTypesOpen ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+              >
+                <span className="shrink-0 text-tx-tertiary">{trashTypeIcon("all")}</span>
+                <span className="min-w-0 flex-1 truncate text-left">
+                  {trashFilter.length === 1 && trashFilter[0] === "all"
+                    ? "全部"
+                    : trashFilter.length === 1
+                      ? TRASH_TYPE_META.find((meta) => meta.key === trashFilter[0])?.label || "已选 1 项"
+                      : `已选 ${trashFilter.length} 项`}
+                </span>
+                <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">{trashItems.length}</span>
+                <ChevronDown size={12} className={cn("shrink-0 text-tx-tertiary transition-transform", trashTypesOpen && "rotate-180")} />
+              </button>
+              {trashTypesOpen && (
+                <div className="absolute inset-x-2 top-full z-30 mt-1 overflow-hidden rounded-lg border border-app-border bg-app-elevated shadow-lg">
+                  <div className="flex items-center gap-1.5 border-b border-app-border bg-app-panel px-2 py-1.5">
+                    <input
+                      value={trashTypesQuery}
+                      onChange={(event) => setTrashTypesQuery(event.target.value)}
+                      placeholder="搜索类型"
+                      className="h-6 min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-1.5 text-[11.5px] outline-none focus:border-accent-primary/40"
+                    />
+                    <button
+                      type="button"
+                      className="shrink-0 text-[11px] text-accent-primary"
+                      onClick={() => setTrashTypeFilter(["all", ...TRASH_TYPE_META.map((meta) => meta.key)])}
+                    >
+                      全选
+                    </button>
+                  </div>
+                  <div className="grid max-h-40 grid-cols-2 gap-0.5 overflow-y-auto p-1.5">
+                    {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[])
+                      .filter((key) => {
+                        const label = key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || "";
+                        return label.toLowerCase().includes(trashTypesQuery.trim().toLowerCase());
+                      })
+                      .map((key) => {
+                        const count = key === "all"
+                          ? trashItems.length
+                          : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length;
+                        const on = trashFilter.includes(key);
+                        const label = key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            role="option"
+                            aria-selected={on}
+                            onClick={() => {
+                              const next = key === "all" ? (on ? ["all" as TrashTypeKey] : ["all" as TrashTypeKey])
+                                : on ? trashFilter.filter((k) => k !== key) : [...trashFilter.filter((k) => k !== "all"), key];
+                              setTrashTypeFilter(next.length ? next : ["all"]);
+                            }}
+                            className={`flex h-7 min-w-0 items-center gap-1.5 rounded px-1.5 text-[11px] transition-colors ${on ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+                          >
+                            <span className={cn("flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border text-[8px] leading-none", on ? "border-accent-primary bg-accent-primary text-white" : "border-app-border text-transparent")}>✓</span>
+                            <span className="shrink-0 text-tx-tertiary">{trashTypeIcon(key)}</span>
+                            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                            <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary">{count}</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                  <div className="flex items-center justify-between border-t border-app-border bg-app-panel px-2 py-1 text-[10.5px] text-tx-tertiary">
+                    <span>共 {TRASH_TYPE_META.length + 1} 种类型</span>
+                    <button type="button" className="text-[11px] text-accent-primary" onClick={() => { setTrashTypesOpen(false); setTrashTypesQuery(""); }}>关闭</button>
+                  </div>
+                </div>
+              )}
+            </div>
             <PanelSection
               label="删除时间"
             >
@@ -3195,7 +3271,7 @@ export default function SidebarDesktop() {
             <PanelSection
               label="自动清理"
             >
-              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
                 <span>保留期限</span>
                 <span className="flex gap-1">
                   {TRASH_RETENTION_OPTIONS.map((days) => (
@@ -3211,7 +3287,7 @@ export default function SidebarDesktop() {
                   ))}
                 </span>
               </div>
-              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
                 <span>到期前提醒我</span>
                 <button
                   type="button"
@@ -3223,7 +3299,7 @@ export default function SidebarDesktop() {
                   <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${notifyExpiry ? "left-[15px]" : "left-0.5"}`} />
                 </button>
               </div>
-              <div className="flex items-center justify-between px-1 py-1 text-[11.5px] text-tx-secondary">
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
                 <span>每周清理摘要</span>
                 <button
                   type="button"
