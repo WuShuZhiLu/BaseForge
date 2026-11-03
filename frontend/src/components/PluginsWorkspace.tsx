@@ -6,8 +6,9 @@
  * - builtin：官方内置插件（builtin registry），页内启停 + 打开面板/主区；
  * - installed：已安装社区插件（GET /plugins），管理员启停/回滚/卸载；
  * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
- * 页内 Tab 分组（管理/市场/配置）；侧栏点击内置插件 → nowen:plugin-selected 直达详情，
- * 侧栏点「市场」「管理」「配置」→ nowen:plugin-group 切到对应分组。
+ * 分组（管理/市场/配置）由侧栏插件视图驱动：侧栏点「市场」「管理」「配置」→
+ * nowen:plugin-group 切到对应分组，主区不再重复一排分组 Tab；
+ * 侧栏点击内置插件 → nowen:plugin-selected 直达详情。
  *
  * 管理分组自上而下：社区插件区（列表 + 区头部的「检查更新」「安装插件包」，管理员可见）
  * → 内置插件区（默认折叠的次级分区，展开后启停）。更新与安装从属于社区插件区，
@@ -816,7 +817,7 @@ function CatalogDetail({ extension, isAdmin, nodeRuntimeAllowed, busy, actionErr
 export default function PluginsWorkspace() {
   // /plugins 语义上默认进列表；选中态只由显式事件（侧栏点击 / 行点击）设置，不持久化
   const [selectedId, setSelectedId] = useState<BuiltinPluginId | null>(null);
-  // 页内分组 Tab + 非内置插件选中态（不持久化；侧栏仅联动内置插件）
+  // 分组（侧栏事件驱动）+ 非内置插件选中态（不持久化；侧栏仅联动内置插件）
   const [group, setGroup] = useState<GroupKey>("installed");
   const [installedSelection, setInstalledSelection] = useState<string | null>(null);
   const [catalogSelection, setCatalogSelection] = useState<string | null>(null);

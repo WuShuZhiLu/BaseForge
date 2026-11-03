@@ -2184,6 +2184,22 @@ export default function DiaryWorkspace() {
     return () => window.removeEventListener("nowen:workspace-changed", onWs);
   }, [loadTimeline, loadStats]);
 
+  // 侧栏迷你面板跳转：收到 nowen:diary-open-date 后滚动定位到对应日期分组。
+  // 当前已加载列表里没有该日期时静默忽略。
+  useEffect(() => {
+    const onOpenDate = (e: Event) => {
+      const date = (e as CustomEvent<{ date?: string }>).detail?.date;
+      if (!date) return;
+      const container = scrollRef.current;
+      if (!container) return;
+      const target = container.querySelector<HTMLElement>(`[data-diary-date="${date}"]`);
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener("nowen:diary-open-date", onOpenDate);
+    return () => window.removeEventListener("nowen:diary-open-date", onOpenDate);
+  }, []);
+
   // 筛选变化 → 重新拉首屏 + 重新算统计。
   // 用 activeRange 的 from/to 字符串做依赖（而非对象引用），避免 useMemo 引用换了
   // 但内容没换时多余触发；JSON.stringify 简单可靠且数据量极小。
@@ -2432,8 +2448,8 @@ export default function DiaryWorkspace() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {groupedItems.map(({ label, items: dayItems }) => (
-                    <div key={label}>
+                  {groupedItems.map(({ date, label, items: dayItems }) => (
+                    <div key={date} data-diary-date={date}>
                       {/* 日期分割 - 列表分组头 */}
                       <div className="sticky top-0 z-10 flex items-center gap-2 bg-app-bg/90 px-1 py-1.5 backdrop-blur-sm">
                         <span className="text-[11px] font-semibold text-tx-secondary">
@@ -2521,7 +2537,7 @@ export default function DiaryWorkspace() {
 function groupByDate(
   items: Diary[],
   t: (key: string) => string
-): { label: string; items: Diary[] }[] {
+): { date: string; label: string; items: Diary[] }[] {
   const groups: Map<string, Diary[]> = new Map();
   const today = new Date();
   const todayStr = formatDateKey(today);
@@ -2541,7 +2557,7 @@ function groupByDate(
     let label = key;
     if (key === todayStr) label = t("diary.today");
     else if (key === yesterdayStr) label = t("diary.yesterday");
-    return { label, items: dayItems };
+    return { date: key, label, items: dayItems };
   });
 }
 

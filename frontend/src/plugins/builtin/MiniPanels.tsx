@@ -7,12 +7,11 @@
  * 项目管理（pm）维持旧浮层卡规格（用户拍板暂不统一）。
  */
 import React, { useCallback, useEffect, useState } from "react";
-import { Check, ListTodo, Plus, RefreshCw } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarDays, CheckCheck, Clock3, FolderOpen, Inbox, ListTodo, Plus, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { api } from "@/lib/api";
-import type { PmProject, PmWorkItem } from "@/types";
-import { getTaskInbox } from "@/lib/taskInboxApi";
-import type { Task } from "@/types";
+import type { PmProject, PmWorkItem, TaskFilter, TaskProject } from "@/types";
 import { cn } from "@/lib/utils";
 
 /** 统一规格的分区标题：实心圆点 + 12px/600 灰字（与 SidebarDesktop PanelSection 一致）。 */
@@ -38,32 +37,6 @@ function SectionRefresh({ onClick }: { onClick: () => void }) {
 
 function EmptyHint({ text }: { text: string }) {
   return <p className="px-2 py-4 text-center text-[12px] text-tx-tertiary">{text}</p>;
-}
-
-/** 统一规格的任务行：h32、13px 复选框、12px 标题、10.5px 日期。 */
-function TaskRow({ task, onToggle }: { task: Task; onToggle: (task: Task) => void }) {
-  const done = Boolean(task.isCompleted);
-  return (
-    <div
-      className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-app-hover"
-      onClick={() => onToggle(task)}
-    >
-      <span
-        className={cn(
-          "flex h-[13px] w-[13px] shrink-0 items-center justify-center rounded border",
-          done ? "border-accent-primary bg-accent-primary" : "border-app-border bg-app-bg",
-        )}
-      >
-        {done && <Check size={9} className="text-white" />}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-[12px]", done ? "text-tx-tertiary line-through" : "text-tx-primary")}>
-          {task.title}
-        </span>
-      </span>
-      {task.dueAt && <span className="shrink-0 text-[10.5px] tabular-nums text-tx-tertiary">{task.dueAt.slice(0, 10)}</span>}
-    </div>
-  );
 }
 
 /** ============ 项目管理迷你面板（旧规格保留，暂不统一） ============ */
@@ -136,32 +109,42 @@ export function PmMiniPanel() {
   );
 }
 
-/** ============ 待办迷你面板（统一规格） ============ */
+/**
+ * 待办迷你面板（统一规格）：侧栏待办导航层。
+ *
+ * 主区（TaskWorkspaceImpl）左栏已移除，本面板是唯一导航层：
+ * - 「视图」分区行点击 dispatch `nowen:task-filter-select`（key 与主区 FILTERS 一致）；
+ * - 「清单」分区行点击 dispatch `nowen:task-focus-project`；
+ * - 选中态为本地记录（主区暂无回传事件）。
+ */
+const TASK_PANEL_VIEWS: { key: TaskFilter; labelKey: string; icon: React.ReactNode }[] = [
+  { key: "all", labelKey: "tasks.allTasks", icon: <Inbox size={14} /> },
+  { key: "today", labelKey: "tasks.today", icon: <CalendarDays size={14} /> },
+  { key: "week", labelKey: "tasks.next7Days", icon: <Calendar size={14} /> },
+  { key: "overdue", labelKey: "tasks.overdue", icon: <AlertTriangle size={14} /> },
+  { key: "completed", labelKey: "tasks.completed", icon: <CheckCheck size={14} /> },
+];
+
 export function TasksMiniPanel() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<"inbox" | "today" | "all">("inbox");
+  const { t } = useTranslation();
+  // 本地记录最近点击的视图 / 项目（主区暂无回传事件，仅做选中高亮）
+  const [selectedView, setSelectedView] = useState<TaskFilter>("all");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<TaskProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [quickText, setQuickText] = useState("");
   const [adding, setAdding] = useState(false);
 
-  const reload = useCallback(() => {
-    setLoading(true);
-    const load = mode === "inbox"
-      ? getTaskInbox().then((r) => r.items as Task[])
-      : api.getTasks(mode === "today" ? "today" : undefined);
-    load
-      .then((items) => setTasks(items))
-      .catch(() => setTasks([]))
-      .finally(() => setLoading(false));
-  }, [mode]);
+  const reloadProjects = useCallback(() => {
+    setProjectsLoading(true);
+    // 与 TaskWorkspaceImpl 的 useTaskProjects 相同取数：api.getTaskProjects()
+    api.getTaskProjects()
+      .then((data) => setProjects(data))
+      .catch(() => setProjects([]))
+      .finally(() => setProjectsLoading(false));
+  }, []);
 
-  useEffect(() => { reload(); }, [reload]);
-
-  const toggleDone = useCallback((task: Task) => {
-    api.updateTask(task.id, { isCompleted: task.isCompleted ? 0 : 1 } as never)
-      .then(() => reload())
-      .catch(() => undefined);
-  }, [reload]);
+  useEffect(() => { reloadProjects(); }, [reloadProjects]);
 
   const quickAdd = useCallback(async () => {
     const title = quickText.trim();
@@ -170,40 +153,81 @@ export function TasksMiniPanel() {
     try {
       await api.createTask({ title } as never);
       setQuickText("");
-      reload();
+      reloadProjects();
     } catch (error) {
       console.error("[TasksMiniPanel] quick add failed:", error);
     } finally {
       setAdding(false);
     }
-  }, [quickText, reload]);
+  }, [quickText, reloadProjects]);
+
+  const selectView = useCallback((key: TaskFilter) => {
+    setSelectedView(key);
+    setSelectedProjectId(null);
+    window.dispatchEvent(new CustomEvent("nowen:task-filter-select", { detail: { key } }));
+  }, []);
+
+  const selectProject = useCallback((projectId: string) => {
+    setSelectedProjectId(projectId);
+    window.dispatchEvent(new CustomEvent("nowen:task-focus-project", { detail: { projectId } }));
+  }, []);
+
+  // 行规格：12px / h32 / 无边框 / hover 变色 / 选中 #e8efff
+  const rowCls = (active: boolean) =>
+    cn(
+      "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
+      active ? "bg-[#e8efff]" : "hover:bg-app-hover",
+    );
 
   return (
     <div>
-      <div className="border-b border-app-border px-2 py-1.5">
+      <div className="px-2 py-1.5">
         <PanelSectionHead label="视图" />
-        <div className="flex flex-wrap gap-1 px-1">
-          {([["inbox", "收件箱"], ["today", "今日"], ["all", "任务"]] as Array<[typeof mode, string]>).map(([value, label]) => (
-            <span
-              key={value}
+        <div className="space-y-0.5">
+          {TASK_PANEL_VIEWS.map((view) => (
+            <div
+              key={view.key}
               role="button"
               tabIndex={0}
-              className={cn(
-                "cursor-pointer rounded-full border px-2 py-0.5 text-[11px] transition-colors",
-                mode === value
-                  ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary"
-                  : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => {
-                setMode(value);
-                // 同步主区：切到对应过滤视图
-                window.dispatchEvent(new CustomEvent("nowen:task-panel-navigate", { detail: { target: value } }));
-              }}
-            >{label}</span>
+              className={rowCls(selectedView === view.key)}
+              onClick={() => selectView(view.key)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") selectView(view.key); }}
+            >
+              <span className="shrink-0 text-tx-tertiary">{view.icon}</span>
+              <span className="min-w-0 flex-1 truncate text-tx-primary">{t(view.labelKey)}</span>
+            </div>
           ))}
         </div>
       </div>
-      <div className="border-b border-app-border px-2 py-1.5">
+      <div className="px-2 py-1.5">
+        <PanelSectionHead label="清单" action={<SectionRefresh onClick={reloadProjects} />} />
+        {projectsLoading ? (
+          <EmptyHint text="加载中…" />
+        ) : projects.length === 0 ? (
+          <EmptyHint text="暂无清单，在主区新建" />
+        ) : (
+          <div className="space-y-0.5">
+            {projects.map((p) => (
+              <div
+                key={p.id}
+                role="button"
+                tabIndex={0}
+                className={rowCls(selectedProjectId === p.id)}
+                onClick={() => selectProject(p.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") selectProject(p.id); }}
+              >
+                <FolderOpen size={14} className="shrink-0 text-tx-tertiary" style={{ color: p.color }} />
+                <span className="min-w-0 flex-1 truncate text-tx-primary">{p.name}</span>
+                <span className="shrink-0 text-[10.5px] tabular-nums text-tx-tertiary">
+                  {Math.max(0, (p.taskCount ?? 0) - (p.completedCount ?? 0))}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="px-2 py-1.5">
+        <PanelSectionHead label="快速添加" />
         <div className="px-1 pb-1">
           <div className="flex h-8 items-center gap-2 rounded-md border border-app-border bg-app-bg px-2">
             <Plus size={13} className="shrink-0 text-tx-tertiary" />
@@ -222,20 +246,6 @@ export function TasksMiniPanel() {
           </div>
         </div>
       </div>
-      <div className="px-2 py-1.5">
-        <PanelSectionHead label={mode === "all" ? "任务" : mode === "today" ? "今日任务" : "收件箱"} action={<SectionRefresh onClick={reload} />} />
-        {loading ? (
-          <EmptyHint text="加载中…" />
-        ) : tasks.length === 0 ? (
-          <EmptyHint text="暂无任务" />
-        ) : (
-          <div className="space-y-0.5">
-            {tasks.slice(0, 30).map((task) => (
-              <TaskRow key={task.id} task={task} onToggle={toggleDone} />
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -247,10 +257,34 @@ interface JournalItem {
   journalDate: string;
 }
 
-/** ============ 每日记录迷你面板（统一规格） ============ */
+/** ============ 每日记录迷你面板（统一规格；视图/日期导航上移侧栏） ============ */
+
+const DIARY_VIEW_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: "moments", label: "瞬间" },
+  { key: "calendar", label: "日历" },
+  { key: "journal", label: "日记" },
+];
+
+const DIARY_DATE_OPTIONS: Array<{ label: string; offset: number }> = [
+  { label: "昨天", offset: -1 },
+  { label: "今天", offset: 0 },
+  { label: "明天", offset: 1 },
+  { label: "后天", offset: 2 },
+];
+
+function localDateKey(offset: number): string {
+  const value = new Date();
+  value.setDate(value.getDate() + offset);
+  const month = `${value.getMonth() + 1}`.padStart(2, "0");
+  const day = `${value.getDate()}`.padStart(2, "0");
+  return `${value.getFullYear()}-${month}-${day}`;
+}
+
 export function DiaryMiniPanel() {
   const [items, setItems] = useState<JournalItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("journal");
+  const [activeDate, setActiveDate] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -262,8 +296,97 @@ export function DiaryMiniPanel() {
 
   useEffect(() => { reload(); }, [reload]);
 
+  // 主区（或本面板）切换模式时同步高亮
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: string }>).detail;
+      if (detail?.view) setView(detail.view);
+    };
+    window.addEventListener("nowen:diary-view-changed", onChanged);
+    return () => window.removeEventListener("nowen:diary-view-changed", onChanged);
+  }, []);
+
+  const openDate = useCallback((date: string) => {
+    setActiveDate(date);
+    window.dispatchEvent(new CustomEvent("nowen:diary-open-date", { detail: { date } }));
+  }, []);
+
   return (
     <div>
+      <div className="border-b border-app-border px-2 py-1.5">
+        <PanelSectionHead label="视图" />
+        <div className="space-y-0.5">
+          {DIARY_VIEW_OPTIONS.map(({ key, label }) => (
+            <div
+              key={key}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setView(key);
+                window.dispatchEvent(new CustomEvent("nowen:diary-set-view", { detail: { view: key } }));
+              }}
+              className={cn(
+                "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
+                view === key
+                  ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                  : "text-tx-secondary hover:bg-app-hover",
+              )}
+            >
+              <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="border-b border-app-border px-2 py-1.5">
+        <PanelSectionHead
+          label="日期"
+          action={
+            <button
+              type="button"
+              title="复制当前时间"
+              aria-label="复制当前时间"
+              onClick={() => {
+                const value = new Date().toLocaleString("zh-CN", { hour12: false });
+                void navigator.clipboard?.writeText(value).catch(() => undefined);
+              }}
+              className="text-tx-tertiary hover:text-tx-primary"
+            >
+              <Clock3 size={12} />
+            </button>
+          }
+        />
+        <div className="space-y-0.5">
+          {DIARY_DATE_OPTIONS.map(({ label, offset }) => {
+            const date = localDateKey(offset);
+            return (
+              <div
+                key={label}
+                role="button"
+                tabIndex={0}
+                onClick={() => openDate(date)}
+                className={cn(
+                  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
+                  activeDate === date
+                    ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                    : "text-tx-secondary hover:bg-app-hover",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                <span className="shrink-0 text-[10.5px] tabular-nums text-tx-tertiary">{date.slice(5)}</span>
+              </div>
+            );
+          })}
+          <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] text-tx-secondary transition-colors hover:bg-app-hover">
+            <span className="min-w-0 flex-1 truncate text-left">选择日期…</span>
+            <CalendarDays size={13} className="shrink-0 text-tx-tertiary" />
+            <input
+              type="date"
+              className="sr-only"
+              onChange={(event) => event.target.value && openDate(event.target.value)}
+            />
+          </label>
+        </div>
+      </div>
       <div className="px-2 py-1.5">
         <PanelSectionHead label="记录" action={<SectionRefresh onClick={reload} />} />
         {loading ? (
@@ -275,7 +398,10 @@ export function DiaryMiniPanel() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 transition-colors hover:bg-app-hover"
+                className={cn(
+                  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 transition-colors",
+                  activeDate === item.journalDate ? "bg-app-hover" : "hover:bg-app-hover",                )}
+                onClick={() => openDate(item.journalDate)}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12px] text-tx-primary">{item.title || item.journalDate}</span>

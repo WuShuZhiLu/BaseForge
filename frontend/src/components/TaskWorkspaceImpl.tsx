@@ -5,7 +5,7 @@ import {
   CalendarDays, AlertTriangle, CheckCheck, Inbox,
   Search, X as XIcon, GripVertical,
   CheckSquare, Trash2, Square,
-  LayoutGrid, LayoutList, Calendar as CalendarIcon, BarChart3, FolderOpen, Plus, ChevronRight, Bell, Maximize2, Minimize2,
+  LayoutGrid, LayoutList, Calendar as CalendarIcon, BarChart3, ChevronRight, Bell, Maximize2, Minimize2,
   MoreHorizontal, Trash2 as TrashIcon, FileText, ClipboardPlus, Sun, CalendarClock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -59,6 +59,18 @@ import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { isTaskCenterModuleVisible } from "@/lib/navigationVisibility";
 import { confirm } from "@/components/ui/confirm";
 
+/* ===== Filter 导航契约（应用侧栏与主区共享）=====
+ * 应用侧栏按这里的 key 发 nowen:task-filter-select { key } 事件，
+ * 主区监听后切换对应筛选；labelKey 供侧栏渲染同名 i18n 文案。
+ */
+export const FILTERS: { key: TaskFilter; labelKey: string; icon: React.ReactNode }[] = [
+  { key: "all", labelKey: "tasks.allTasks", icon: <Inbox size={14} /> },
+  { key: "today", labelKey: "tasks.today", icon: <CalendarDays size={14} /> },
+  { key: "week", labelKey: "tasks.next7Days", icon: <Calendar size={14} /> },
+  { key: "overdue", labelKey: "tasks.overdue", icon: <AlertTriangle size={14} /> },
+  { key: "completed", labelKey: "tasks.completed", icon: <CheckCheck size={14} /> },
+];
+
 export function formatLocalDateKey(date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -86,20 +98,15 @@ function getQuickAddCreatePatch(parsed: TaskQuickAddParseResult): Partial<Task> 
 }
 
 /* ===== Main Component ===== */
-export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: boolean } = {}) {
+export default function TaskWorkspace(_props: { hideSidebar?: boolean } = {}) {
   const { t } = useTranslation();
   const { prefs: userPrefs } = useUserPreferences();
 
   type CenterMode = "inbox" | "tasks" | "my-day" | "planner" | "habits" | "stats";
   type HabitListMode = "active" | "archived" | "all";
 
-  const FILTERS: { key: TaskFilter; label: string; icon: React.ReactNode }[] = [
-    { key: "all", label: t("tasks.allTasks"), icon: <Inbox size={14} /> },
-    { key: "today", label: t("tasks.today"), icon: <CalendarDays size={14} /> },
-    { key: "week", label: t("tasks.next7Days"), icon: <Calendar size={14} /> },
-    { key: "overdue", label: t("tasks.overdue"), icon: <AlertTriangle size={14} /> },
-    { key: "completed", label: t("tasks.completed"), icon: <CheckCheck size={14} /> },
-  ];
+  // 主区渲染用：由模块级 FILTERS 派生（label 走当前语言）
+  const filterItems = FILTERS.map((f) => ({ key: f.key, label: t(f.labelKey), icon: f.icon }));
 
   // 统一筛选 chips / 按钮：选中 accent-primary/10 + accent 文字，未选中描边
   const chipCls = (active: boolean) =>
@@ -125,8 +132,6 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats | null>(null);
   const [centerMode, setCenterMode] = useState<CenterMode>("tasks");
-  // 侧栏接管过滤导航后主区左栏默认隐藏；浮动按钮可临时展开为 overlay
-  const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(false);
 
   // 侧栏迷你面板 chips → 主区切换对应视图
   useEffect(() => {
@@ -223,6 +228,36 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
     if (pendingTaskId) queueMicrotask(() => openTaskFromNotification(pendingTaskId));
     return () => window.removeEventListener(TASK_NOTIFICATION_OPEN_EVENT, onOpen);
   }, [openTaskFromNotification]);
+
+  // 聚焦某项目：应用侧栏事件与移动端项目选择共用（原内部左栏项目行点击逻辑）
+  const focusTaskProject = useCallback((projectId: string) => {
+    if (!projects.some((p) => p.id === projectId)) return;
+    setCenterMode("tasks");
+    setSelectedProjectId(projectId);
+    setFilter("all");
+    setSelectedTaskId(null);
+    setSearchQuery("");
+  }, [projects, setSelectedProjectId]);
+
+  // 应用侧栏导航事件 → 主区：切换筛选 / 聚焦项目
+  useEffect(() => {
+    const onFilterSelect = (event: Event) => {
+      const key = (event as CustomEvent<{ key?: string }>).detail?.key;
+      if (!key || !FILTERS.some((f) => f.key === key)) return;
+      selectTaskFilter(key as TaskFilter);
+    };
+    const onFocusProject = (event: Event) => {
+      const projectId = (event as CustomEvent<{ projectId?: string }>).detail?.projectId;
+      if (!projectId) return;
+      focusTaskProject(projectId);
+    };
+    window.addEventListener("nowen:task-filter-select", onFilterSelect);
+    window.addEventListener("nowen:task-focus-project", onFocusProject);
+    return () => {
+      window.removeEventListener("nowen:task-filter-select", onFilterSelect);
+      window.removeEventListener("nowen:task-focus-project", onFocusProject);
+    };
+  }, [focusTaskProject]);
 
   const [viewMode, setViewMode] = useState<TaskViewMode>(loadTaskViewMode);
   const changeViewMode = (mode: TaskViewMode) => {
@@ -877,226 +912,6 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
 
   return (
     <div ref={pageRootRef} className={cn(TASK_WORKSPACE_ROOT_CLASS, "min-h-0 flex-1", taskFullscreen && "fixed inset-0 z-[80] bg-app-bg")}>
-      {/* Left: SidebarMobile Filters + Projects (desktop)——侧栏接管导航后默认隐藏，可浮动展开 */}
-      {!hideSidebar && (
-      <div className="hidden md:flex w-56 shrink-0 flex-col border-r border-app-border bg-app-surface overflow-y-auto" style={{ paddingTop: "var(--safe-area-top)" }}>
-        <nav className="flex-1 px-2 py-1.5 space-y-0.5">
-          <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
-            {t("tasks.title")}
-          </div>
-          <button
-            style={{ display: isTaskCenterModuleVisible("inbox", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
-            onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-              centerMode === "inbox" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-            )}
-          >
-            <Inbox size={14} className="shrink-0" />
-            <span className="flex-1 truncate text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
-          </button>
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => selectTaskFilter(f.key)}
-              className={cn(
-                "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-              )}
-            >
-              <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{f.icon}</span>
-              <span className="flex-1 truncate text-left">{f.label}</span>
-              <span className={cn(
-                "min-w-4 shrink-0 text-right text-[10px] tabular-nums",
-                centerMode === "tasks" && filter === f.key && !selectedProjectId ? "text-accent-primary" : "text-tx-tertiary"
-              )}>
-                {filterCount(f.key)}
-              </span>
-            </button>
-          ))}
-
-          {(isTaskCenterModuleVisible("my-day", userPrefs.hiddenTaskCenterModules) ||
-            isTaskCenterModuleVisible("planner", userPrefs.hiddenTaskCenterModules)) && (
-            <div className="px-2 pb-1 pt-3 text-[11px] font-medium text-tx-tertiary">
-              {t("tasks.planning", { defaultValue: "计划" })}
-            </div>
-          )}
-          <button
-            style={{ display: isTaskCenterModuleVisible("my-day", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
-            onClick={() => { setCenterMode("my-day"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-              centerMode === "my-day" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-            )}
-          >
-            <Sun size={14} className="shrink-0" />
-            <span className="flex-1 truncate text-left">{t("tasks.myDay", { defaultValue: "我的一天" })}</span>
-          </button>
-          <button
-            style={{ display: isTaskCenterModuleVisible("planner", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
-            onClick={() => { setCenterMode("planner"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-              centerMode === "planner" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-            )}
-          >
-            <CalendarClock size={14} className="shrink-0" />
-            <span className="flex-1 truncate text-left">{t("tasks.timePlanning", { defaultValue: "时间规划" })}</span>
-          </button>
-
-          <button
-            style={{ display: isTaskCenterModuleVisible("habits", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
-            onClick={() => { setCenterMode("habits"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-              centerMode === "habits" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-            )}
-          >
-            <ListTodo size={14} className="shrink-0" />
-            <span className="flex-1 truncate text-left">{t("habits.title")}</span>
-            <span className={cn(
-              "min-w-4 shrink-0 text-right text-[10px] tabular-nums",
-              centerMode === "habits" ? "text-accent-primary" : "text-tx-tertiary"
-            )}>
-              {pendingHabitCount}
-            </span>
-          </button>
-
-          <button
-            style={{ display: isTaskCenterModuleVisible("stats", userPrefs.hiddenTaskCenterModules) ? undefined : "none" }}
-            onClick={() => { setCenterMode("stats"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); }}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-              centerMode === "stats" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-            )}
-          >
-            <BarChart3 size={14} className="shrink-0" />
-            <span className="flex-1 truncate text-left">{t("stats.title")}</span>
-          </button>
-
-          {/* Projects section */}
-          <div className="mt-3 mb-0.5 px-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-tx-tertiary">{t("tasks.projects")}</span>
-              <button
-                onClick={() => setShowNewProject(true)}
-                className="rounded p-0.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-                title={t("tasks.newProject")}
-              >
-                <Plus size={12} />
-              </button>
-            </div>
-          </div>
-
-          {showNewProject && (
-            <div className="px-1 pb-1">
-              <input
-                type="text"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleCreateProject(); if (e.key === "Escape") setShowNewProject(false); }}
-                placeholder={t("tasks.projectName")}
-                className="w-full rounded-[6px] border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-primary focus:border-accent-primary focus:outline-none"
-                autoFocus
-              />
-            </div>
-          )}
-
-          {projects.map((p) => (
-            <div key={p.id} className="relative">
-              <div
-                className={cn(
-                  "group flex h-8 w-full items-center rounded-md pr-1 transition-colors",
-                  centerMode === "tasks" && selectedProjectId === p.id ? "bg-accent-primary/10 text-accent-primary" : "text-tx-secondary hover:bg-app-hover"
-                )}
-              >
-                <button
-                  onClick={() => { setCenterMode("tasks"); setSelectedProjectId(p.id); setFilter("all"); setSelectedTaskId(null); setSearchQuery(""); }}
-                  className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2 text-[13px]"
-                >
-                  <FolderOpen size={14} className="shrink-0" style={{ color: p.color }} />
-                  <span className={cn("flex-1 truncate text-left", centerMode === "tasks" && selectedProjectId === p.id && "font-medium")}>{p.name}</span>
-                  <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary group-hover:opacity-0">{p.completedCount ?? 0}/{p.taskCount ?? 0}</span>
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowProjectMenu(showProjectMenu === p.id ? null : p.id); }}
-                  className="shrink-0 rounded p-0.5 text-tx-tertiary opacity-0 transition-all hover:bg-app-hover hover:text-tx-primary group-hover:opacity-100"
-                >
-                  <MoreHorizontal size={12} />
-                </button>
-              </div>
-              {/* Project menu */}
-              {showProjectMenu === p.id && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-36 rounded-[10px] border border-app-border bg-app-surface py-1 shadow-lg">
-                  <button onClick={() => { setEditingProject(p); setEditProjectName(p.name); setEditProjectColor(p.color); setShowProjectMenu(null); }}
-                    className="w-full px-3 py-1.5 text-left text-[11px] text-tx-secondary hover:bg-app-hover">{t("tasks.projectName")}</button>
-                  <button onClick={() => handleDeleteProject(p.id)}
-                    className="w-full px-3 py-1.5 text-left text-[11px] text-accent-danger hover:bg-app-hover">{t("tasks.deleteProject")}</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </nav>
-      </div>
-      )}
-
-      {/* 侧栏隐藏时的浮动展开按钮 */}
-      {hideSidebar && (
-        <button
-          type="button"
-          onClick={() => setSidebarOverlayOpen(true)}
-          title="任务导航"
-          className="absolute left-2 top-1/2 z-30 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-app-border bg-app-elevated text-tx-tertiary shadow-sm hover:text-tx-primary md:flex"
-        >
-          <ListTodo size={14} />
-        </button>
-      )}
-      {hideSidebar && sidebarOverlayOpen && (
-        <>
-          <div className="fixed inset-0 z-[70]" onClick={() => setSidebarOverlayOpen(false)} />
-          <div className="fixed left-0 top-0 z-[75] hidden h-full w-56 flex-col overflow-y-auto border-r border-app-border bg-app-surface pt-[var(--safe-area-top)] md:flex">
-            <button
-              type="button"
-              onClick={() => setSidebarOverlayOpen(false)}
-              className="mx-2 mt-2 flex h-7 items-center justify-end rounded px-2 text-[11px] text-tx-tertiary hover:bg-app-hover"
-            >
-              收起
-            </button>
-            <nav className="flex-1 space-y-0.5 px-2 py-1.5">
-              <div className="px-2 pb-1 pt-2 text-[11px] font-medium text-tx-tertiary">
-                {t("tasks.title")}
-              </div>
-              {(() => {
-                // overlay 内渲染与左栏一致的导航（简化：复用同源渲染块——通过 CSS 复制代价高，这里提供主过滤项）
-                return FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => { selectTaskFilter(f.key); setSidebarOverlayOpen(false); }}
-                    className={cn(
-                      "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-                      centerMode === "tasks" && filter === f.key && !selectedProjectId ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-                    )}
-                  >
-                    <span className="shrink-0 [&>svg]:h-3.5 [&>svg]:w-3.5">{f.icon}</span>
-                    <span className="flex-1 truncate text-left">{f.label}</span>
-                  </button>
-                ));
-              })()}
-              <button
-                onClick={() => { setCenterMode("inbox"); setSelectedTaskId(null); setSearchQuery(""); setSelectedProjectId(null); setSidebarOverlayOpen(false); }}
-                className={cn(
-                  "flex h-8 w-full items-center gap-2 rounded-md px-2 text-[13px] transition-colors",
-                  centerMode === "inbox" ? "bg-accent-primary/10 font-medium text-accent-primary" : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-                )}
-              >
-                <Inbox size={14} className="shrink-0" />
-                <span className="flex-1 truncate text-left">{t("tasks.inbox", { defaultValue: "收集箱" })}</span>
-              </button>
-            </nav>
-          </div>
-        </>
-      )}
-
       {/* Center: Task List */}
       <div className={TASK_CENTER_MAIN_CLASS}>
         {/* Mobile: horizontal filter bar —— 单行 chips，选中态 accent/10 + accent 文字 */}
@@ -1108,7 +923,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
           >
             <Inbox size={12} /> {t("tasks.inbox", { defaultValue: "收集箱" })}
           </button>
-          {FILTERS.map((f) => (
+          {filterItems.map((f) => (
             <button
               key={f.key}
               onClick={() => selectTaskFilter(f.key)}
@@ -1193,7 +1008,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
               <h1 className="truncate text-[14px] font-semibold text-tx-primary">
                 {selectedProjectId
                   ? projects.find((p) => p.id === selectedProjectId)?.name || t("tasks.allTasks")
-                  : FILTERS.find((f) => f.key === filter)?.label || t("tasks.allTasks")}
+                  : filterItems.find((f) => f.key === filter)?.label || t("tasks.allTasks")}
               </h1>
               <p className="mt-0.5 text-[11px] text-tx-tertiary">
                 {t("tasks.visibleTaskCount", { count: displayTasks.length, defaultValue: `${displayTasks.length} 条任务` })}
@@ -1642,7 +1457,7 @@ export default function TaskWorkspace({ hideSidebar = false }: { hideSidebar?: b
           projects={projects}
           selectedProjectId={selectedProjectId}
           onClose={() => setMobileProjectOpen(false)}
-          onSelect={(id) => { setSelectedProjectId(id); setFilter("all"); setSelectedTaskId(null); setSearchQuery(""); setMobileProjectOpen(false); }}
+          onSelect={(id) => { if (id === null) setSelectedProjectId(null); else focusTaskProject(id); setMobileProjectOpen(false); }}
           onCreate={async (name) => { await handleCreateProject(name); setMobileProjectOpen(false); }}
           t={t}
         />

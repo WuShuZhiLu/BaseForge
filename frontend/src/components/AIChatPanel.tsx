@@ -12,14 +12,11 @@ import {
   FileUp,
   FolderUp,
   Loader2,
-  Menu,
   MessageCircleQuestion,
-  MessageSquare,
   Paperclip,
   Pencil,
   Plus,
   RotateCcw,
-  Search,
   Send,
   Sparkles,
   Square,
@@ -30,7 +27,6 @@ import {
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { confirm as confirmDialog } from "@/components/ui/confirm";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, resolveAttachmentUrl } from "@/lib/api";
@@ -85,10 +81,6 @@ interface ConversationSummary {
 }
 
 const HISTORY_LIMIT = 100;
-const DEFAULT_CONVERSATION_SIDEBAR_WIDTH = 256;
-const MIN_CONVERSATION_SIDEBAR_WIDTH = 220;
-const MAX_CONVERSATION_SIDEBAR_WIDTH = 480;
-const CONVERSATION_SIDEBAR_WIDTH_KEY = "nowen-ai-conversation-sidebar-width";
 const deriveTitleFromQuestion = (question: string) => question.trim().replace(/\s+/g, " ").slice(0, 20);
 
 function formatMessageTime(value?: string): string {
@@ -101,17 +93,6 @@ function formatMessageTime(value?: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function formatConversationTime(value?: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return date.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
 }
 
 function mapHistoryMessage(message: {
@@ -158,24 +139,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [currentConvId, setCurrentConvId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarResizing, setSidebarResizing] = useState(false);
-  const [conversationSidebarWidth, setConversationSidebarWidth] = useState(() => {
-    if (typeof window === "undefined") return DEFAULT_CONVERSATION_SIDEBAR_WIDTH;
-    try {
-      const raw = window.localStorage.getItem(CONVERSATION_SIDEBAR_WIDTH_KEY);
-      if (!raw) return DEFAULT_CONVERSATION_SIDEBAR_WIDTH;
-      const stored = Number(raw);
-      if (!Number.isFinite(stored)) return DEFAULT_CONVERSATION_SIDEBAR_WIDTH;
-      return Math.max(MIN_CONVERSATION_SIDEBAR_WIDTH, Math.min(MAX_CONVERSATION_SIDEBAR_WIDTH, stored));
-    } catch {
-      return DEFAULT_CONVERSATION_SIDEBAR_WIDTH;
-    }
-  });
-  const [conversationQuery, setConversationQuery] = useState("");
   const [expandedReferenceIds, setExpandedReferenceIds] = useState<Set<string>>(() => new Set());
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -185,7 +149,6 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const stopRequestedRef = useRef(false);
 
@@ -253,6 +216,10 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
     }
   }, [currentConvId, isLoading]);
 
+  const notifyConversationsChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nowen:ai-conversations-changed"));
+  }, []);
+
   const handleNewConversation = useCallback(async () => {
     if (isLoading) return;
     try {
@@ -260,59 +227,34 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
       setConversations((previous) => [result.conversation, ...previous]);
       setCurrentConvId(result.conversation.id);
       setMessages([]);
+      notifyConversationsChanged();
     } catch {
       setCurrentConvId(null);
       setMessages([]);
     }
-  }, [isLoading]);
+  }, [isLoading, notifyConversationsChanged]);
 
-  const handleStartRename = (conversation: ConversationSummary) => {
-    setRenamingId(conversation.id);
-    setRenameDraft(conversation.title || "");
-  };
+  // 侧栏会话行点击 → 加载对应会话（复用 handleSelectConversation）。
+  useEffect(() => {
+    const handleOpenConversation = (event: Event) => {
+      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (conversationId) void handleSelectConversation(conversationId);
+    };
+    window.addEventListener("nowen:ai-open-conversation", handleOpenConversation);
+    return () => window.removeEventListener("nowen:ai-open-conversation", handleOpenConversation);
+  }, [handleSelectConversation]);
 
-  const handleCancelRename = () => {
-    setRenamingId(null);
-    setRenameDraft("");
-  };
+  // 侧栏新建会话 → 刷新本区会话列表（标题展示依赖 conversations）。
+  useEffect(() => {
+    window.addEventListener("nowen:ai-conversations-changed", reloadConversations);
+    return () => window.removeEventListener("nowen:ai-conversations-changed", reloadConversations);
+  }, [reloadConversations]);
 
-  const handleSubmitRename = useCallback(async () => {
-    if (!renamingId) return;
-    const title = renameDraft.trim().slice(0, 100);
-    try {
-      await api.aiConversations.update(renamingId, { title });
-      setConversations((previous) => previous.map((item) => item.id === renamingId ? { ...item, title } : item));
-    } catch {
-      // Preserve the old title when the server rejects the rename.
-    } finally {
-      handleCancelRename();
-    }
-  }, [renameDraft, renamingId]);
-
-  const handleDeleteConversation = useCallback(async (conversationId: string) => {
-    if (isLoading) return;
-    const confirmed = await confirmDialog({
-      title: t("common.delete"),
-      description: t("aiChat.deleteConversationConfirm"),
-      confirmText: t("common.delete"),
-      cancelText: t("common.cancel"),
-      danger: true,
-    });
-    if (!confirmed) return;
-    try {
-      await api.aiConversations.remove(conversationId);
-    } catch {
-      // The next list refresh will reconcile a failed optimistic removal.
-    }
-    const remaining = conversations.filter((item) => item.id !== conversationId);
-    setConversations(remaining);
-    if (conversationId !== currentConvId) return;
-    if (remaining[0]) await handleSelectConversation(remaining[0].id);
-    else {
-      setCurrentConvId(null);
-      setMessages([]);
-    }
-  }, [conversations, currentConvId, handleSelectConversation, isLoading, t]);
+  // 选中态同步给侧栏（侧栏据此高亮当前会话行）。
+  useEffect(() => {
+    if (!currentConvId) return;
+    window.dispatchEvent(new CustomEvent("nowen:ai-conversation-selected", { detail: { conversationId: currentConvId } }));
+  }, [currentConvId]);
 
   const persistConversationSnapshot = useCallback(async (nextMessages: ChatMessage[]) => {
     if (!currentConvId) return;
@@ -329,10 +271,11 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
         });
       }
       await reloadConversations();
+      notifyConversationsChanged();
     } catch {
       // Local editing remains usable offline; reopening the conversation will reconcile it.
     }
-  }, [currentConvId, reloadConversations]);
+  }, [currentConvId, notifyConversationsChanged, reloadConversations]);
 
   const handleStopGeneration = useCallback(() => {
     if (!isLoading) return;
@@ -420,8 +363,9 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
         }).catch(() => {});
       }
       reloadConversations().catch(() => {});
+      notifyConversationsChanged();
     }
-  }, [nbIncludeChildren, nbScope, nbScopeId, persistConversationSnapshot, reloadConversations, t]);
+  }, [nbIncludeChildren, nbScope, nbScopeId, notifyConversationsChanged, persistConversationSnapshot, reloadConversations, t]);
 
   const handleSend = useCallback(async (override?: string) => {
     const question = (override ?? input).trim();
@@ -434,6 +378,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
         conversationId = result.conversation.id;
         setConversations((previous) => [result.conversation, ...previous]);
         setCurrentConvId(conversationId);
+        notifyConversationsChanged();
       } catch {
         // Old backends create a default conversation when history is appended.
       }
@@ -478,6 +423,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
           setConversations((previous) => previous.map((item) =>
             item.id === conversationId ? { ...item, title } : item
           ));
+          notifyConversationsChanged();
         }
       }
     }
@@ -489,7 +435,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
       conversationId,
       baseMessages,
     });
-  }, [conversations, currentConvId, input, isLoading, messages, streamAssistantReply]);
+  }, [conversations, currentConvId, input, isLoading, messages, notifyConversationsChanged, streamAssistantReply]);
 
   const handleRegenerate = useCallback(async (assistantId: string) => {
     if (isLoading) return;
@@ -579,6 +525,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
           ? { ...conversation, messageCount: 0, lastMessage: null, lastRole: null }
           : conversation
       ));
+      notifyConversationsChanged();
     } else {
       api.clearAiChatHistory().catch(() => {});
     }
@@ -719,12 +666,6 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
     t("aiChat.suggestTodo"),
   ];
 
-  const normalizedConversationQuery = conversationQuery.trim().toLocaleLowerCase();
-  const filteredConversations = normalizedConversationQuery
-    ? conversations.filter((conversation) =>
-        `${conversation.title} ${conversation.lastMessage || ""}`.toLocaleLowerCase().includes(normalizedConversationQuery)
-      )
-    : conversations;
   const currentConversation = conversations.find((conversation) => conversation.id === currentConvId);
 
   const toggleReferences = (messageId: string) => {
@@ -745,237 +686,11 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
     }
   };
 
-  const clampConversationSidebarWidth = useCallback((width: number) => {
-    const panelWidth = panelRef.current?.getBoundingClientRect().width || window.innerWidth;
-    const responsiveMax = Math.min(
-      MAX_CONVERSATION_SIDEBAR_WIDTH,
-      Math.max(MIN_CONVERSATION_SIDEBAR_WIDTH, panelWidth * 0.45),
-    );
-    return Math.max(MIN_CONVERSATION_SIDEBAR_WIDTH, Math.min(responsiveMax, width));
-  }, []);
-
-  const persistConversationSidebarWidth = useCallback((width: number) => {
-    try {
-      window.localStorage.setItem(CONVERSATION_SIDEBAR_WIDTH_KEY, String(Math.round(width)));
-    } catch {
-      // 隐私模式下存储可能不可用，当前会话内仍可正常调整宽度。
-    }
-  }, []);
-
-  const handleConversationSidebarResizeStart = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = conversationSidebarWidth;
-    let latestWidth = startWidth;
-    setSidebarResizing(true);
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      latestWidth = clampConversationSidebarWidth(startWidth + moveEvent.clientX - startX);
-      setConversationSidebarWidth(latestWidth);
-    };
-    const handleMouseUp = () => {
-      setSidebarResizing(false);
-      persistConversationSidebarWidth(latestWidth);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  }, [clampConversationSidebarWidth, conversationSidebarWidth, persistConversationSidebarWidth]);
-
-  const setConversationSidebarWidthAndPersist = useCallback((width: number) => {
-    const nextWidth = clampConversationSidebarWidth(width);
-    setConversationSidebarWidth(nextWidth);
-    persistConversationSidebarWidth(nextWidth);
-  }, [clampConversationSidebarWidth, persistConversationSidebarWidth]);
-
-  useEffect(() => {
-    const clampToCurrentPanel = () => {
-      setConversationSidebarWidth((width) => clampConversationSidebarWidth(width));
-    };
-    clampToCurrentPanel();
-    window.addEventListener("resize", clampToCurrentPanel);
-    return () => window.removeEventListener("resize", clampToCurrentPanel);
-  }, [clampConversationSidebarWidth]);
-
   return (
-    <div ref={panelRef} className="flex h-full min-h-0 min-w-0 flex-1 max-w-full bg-app-bg">
-      <aside className={cn(
-        "flex shrink-0 flex-col overflow-hidden border-r border-app-border bg-app-surface/45",
-        !sidebarResizing && "transition-[width] duration-200",
-      )} style={{ width: sidebarOpen ? conversationSidebarWidth : 0 }}>
-        <div className="flex items-center justify-between px-3 pb-2 pt-3">
-          <div>
-            <div className="text-xs font-semibold text-tx-primary">{t("aiChat.conversations")}</div>
-            <div className="mt-0.5 text-[11px] text-tx-tertiary">{conversations.length} 个会话</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleNewConversation()}
-            disabled={isLoading}
-            title={t("aiChat.newConversation")}
-            className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-accent-primary text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-[8px] border border-app-border bg-app-bg px-2.5 py-1.5 text-tx-tertiary transition-colors focus-within:border-accent-primary/50 focus-within:ring-2 focus-within:ring-accent-primary/30">
-            <Search size={12} className="shrink-0" />
-            <input
-              value={conversationQuery}
-              onChange={(event) => setConversationQuery(event.target.value)}
-              placeholder="搜索对话"
-              aria-label="搜索历史对话"
-              className="min-w-0 flex-1 bg-transparent text-[11px] text-tx-primary outline-none placeholder:text-tx-tertiary"
-            />
-            {conversationQuery && (
-              <button
-                type="button"
-                onClick={() => setConversationQuery("")}
-                title="清空搜索"
-                className="rounded-[6px] p-0.5 hover:bg-app-hover hover:text-tx-primary"
-              >
-                <X size={10} />
-              </button>
-            )}
-          </div>
-        </div>
-        <ScrollArea className="min-w-0 flex-1">
-          <div
-            className="min-w-0 space-y-1 overflow-hidden px-2 pb-3"
-            style={{ width: Math.max(0, conversationSidebarWidth - 1) }}
-          >
-            {!conversations.length && (
-              <div className="px-2 py-4 text-center text-[11px] text-tx-tertiary">{t("aiChat.noConversations")}</div>
-            )}
-            {!!conversations.length && !filteredConversations.length && (
-              <div className="px-2 py-6 text-center text-[11px] text-tx-tertiary">没有匹配的对话</div>
-            )}
-            {filteredConversations.map((conversation) => {
-              const active = conversation.id === currentConvId;
-              const displayTitle = conversation.title || t("aiChat.untitledConversation");
-              const isRenaming = renamingId === conversation.id;
-              return (
-                <div
-                  key={conversation.id}
-                  className={cn(
-                    "group relative flex w-full min-w-0 cursor-pointer gap-2 rounded-[10px] border border-transparent px-2.5 py-2.5 text-xs transition-colors",
-                    active
-                      ? "border-accent-primary/25 bg-accent-primary/10 text-accent-primary"
-                      : "text-tx-secondary hover:bg-app-hover",
-                  )}
-                  onClick={() => !isRenaming && void handleSelectConversation(conversation.id)}
-                >
-                  {active && <span className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-accent-primary" />}
-                  <div className={cn(
-                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]",
-                    active ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover text-tx-tertiary",
-                  )}>
-                    <MessageSquare size={11} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex w-full min-w-0 max-w-full items-start gap-1.5 overflow-hidden">
-                      {isRenaming ? (
-                        <input
-                          autoFocus
-                          value={renameDraft}
-                          onChange={(event) => setRenameDraft(event.target.value)}
-                          onBlur={() => void handleSubmitRename()}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void handleSubmitRename();
-                            } else if (event.key === "Escape") {
-                              event.preventDefault();
-                              handleCancelRename();
-                            }
-                          }}
-                          onClick={(event) => event.stopPropagation()}
-                          className="min-w-0 flex-1 rounded-[6px] border border-accent-primary/40 bg-app-bg px-1 py-0.5 text-[11px] text-tx-primary outline-none"
-                        />
-                      ) : (
-                        <span className="block min-w-0 flex-1 truncate font-medium leading-4" title={displayTitle}>{displayTitle}</span>
-                      )}
-                      {!isRenaming && (
-                        <span className="shrink-0 pt-0.5 text-[10px] text-tx-tertiary">{formatConversationTime(conversation.updatedAt)}</span>
-                      )}
-                    </div>
-                    {!isRenaming && (
-                      <div className="mt-1 flex min-w-0 items-center gap-1.5">
-                        <span className="min-w-0 flex-1 truncate text-[11px] text-tx-tertiary">
-                          {conversation.lastMessage || "还没有消息"}
-                        </span>
-                        <span className="shrink-0 text-[10px] text-tx-tertiary">{conversation.messageCount}</span>
-                        <div className="ml-0.5 flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                          <button
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); handleStartRename(conversation); }}
-                            title={t("aiChat.renameConversation")}
-                            className="flex h-5 w-5 items-center justify-center rounded-[6px] text-tx-tertiary hover:bg-app-surface hover:text-tx-primary"
-                          >
-                            <Pencil size={10} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); void handleDeleteConversation(conversation.id); }}
-                            title={t("aiChat.deleteConversation")}
-                            className="flex h-5 w-5 items-center justify-center rounded-[6px] text-tx-tertiary hover:bg-red-500/10 hover:text-red-500"
-                          >
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-      </aside>
-
-      {sidebarOpen && (
-        <div
-          role="separator"
-          aria-label="调整历史对话栏宽度"
-          aria-orientation="vertical"
-          aria-valuemin={MIN_CONVERSATION_SIDEBAR_WIDTH}
-          aria-valuemax={MAX_CONVERSATION_SIDEBAR_WIDTH}
-          aria-valuenow={Math.round(conversationSidebarWidth)}
-          tabIndex={0}
-          onMouseDown={handleConversationSidebarResizeStart}
-          onDoubleClick={() => setConversationSidebarWidthAndPersist(DEFAULT_CONVERSATION_SIDEBAR_WIDTH)}
-          onKeyDown={(event) => {
-            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-            event.preventDefault();
-            setConversationSidebarWidthAndPersist(
-              conversationSidebarWidth + (event.key === "ArrowRight" ? 16 : -16),
-            );
-          }}
-          title="拖拽调整历史对话栏宽度，双击恢复默认"
-          className="group relative z-10 -ml-0.5 hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center outline-none transition-colors hover:bg-accent-primary/10 focus:bg-accent-primary/10 active:bg-accent-primary/15 md:flex"
-        >
-          <div className="h-10 w-0.5 rounded-full bg-transparent transition-colors group-hover:bg-accent-primary/60 group-focus:bg-accent-primary/60" />
-        </div>
-      )}
-
+    <div className="flex h-full min-h-0 min-w-0 flex-1 max-w-full bg-app-bg">
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-14 items-center justify-between border-b border-app-border bg-app-surface/70 px-4 py-2.5 md:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen((value) => !value)}
-              title={sidebarOpen ? t("aiChat.collapseSidebar") : t("aiChat.expandSidebar")}
-              className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
-            >
-              <Menu size={14} />
-            </button>
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-accent-primary/10">
               <Bot size={14} className="text-accent-primary" />
             </div>

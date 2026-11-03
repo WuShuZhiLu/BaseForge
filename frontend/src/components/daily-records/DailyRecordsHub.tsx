@@ -59,12 +59,33 @@ export default function DailyRecordsHub() {
   const setView = (next: DailyRecordsView) => {
     setViewState(next);
     saveDailyRecordsView(next);
+    // 同步侧栏高亮（侧栏「视图」分区监听）
+    window.dispatchEvent(new CustomEvent("nowen:diary-view-changed", { detail: { view: next } }));
   };
 
   const selectJournalDate = (dateKey: string) => {
     setSelectedDate(dateKey);
     setView("journal");
   };
+
+  // 侧栏是唯一导航层：模式与日期筛选由侧栏驱动（主区头部不再重复这两组控件）
+  useEffect(() => {
+    const onView = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: string }>).detail;
+      if (detail?.view && VIEW_OPTIONS.some((option) => option.key === detail.view)) setView(detail.view as DailyRecordsView);
+    };
+    const onDate = (event: Event) => {
+      const detail = (event as CustomEvent<{ date?: string }>).detail;
+      if (detail?.date) selectJournalDate(detail.date);
+    };
+    window.addEventListener("nowen:diary-set-view", onView);
+    window.addEventListener("nowen:diary-open-date", onDate);
+    return () => {
+      window.removeEventListener("nowen:diary-set-view", onView);
+      window.removeEventListener("nowen:diary-open-date", onDate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const copyCurrentTime = async () => {
     const value = formatCurrentTimestamp();
@@ -87,83 +108,22 @@ export default function DailyRecordsHub() {
         className="shrink-0 border-b border-app-border bg-app-surface/80 px-0 backdrop-blur sm:px-4 lg:px-6"
         data-daily-records-header=""
       >
-        {/* 标题行：与文件管理/分享中心/插件页同为 h-12 一条线 */}
+        {/* 标题行：与文件管理/分享中心/插件页同为 h-12 一条线。
+            模式切换与日期筛选已上移侧栏（唯一导航层）；顶栏放高频动作「复制当前时间」。 */}
         <div className="flex h-12 items-center gap-3 px-3 sm:px-4">
           <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-tx-primary">每日记录</h1>
           <span className="hidden min-w-0 truncate text-[11px] text-tx-tertiary sm:inline">瞬间负责捕获，日记负责整理</span>
-          <nav
-            className="ml-auto flex shrink-0 items-center gap-1.5"
-            aria-label="每日记录视图"
-            data-daily-records-views=""
-          >
-            {VIEW_OPTIONS.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setView(key)}
-                className={cn(
-                  "inline-flex h-7 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[11.5px] font-medium transition-colors",
-                  view === key
-                    ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
-                    : "border-app-border text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
-                )}
-                aria-current={view === key ? "page" : undefined}
-              >
-                <Icon size={13} className="shrink-0" />
-                <span className="truncate">{label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* 工具条行：h-10，与其它模块的工具条同高 */}
-        <div
-          className="flex h-10 items-center gap-1.5 overflow-x-auto border-t border-app-border px-3 [scrollbar-width:none] sm:px-4 [&::-webkit-scrollbar]:hidden"
-          data-daily-records-shortcuts=""
-        >
-          <button
-            type="button"
-            onClick={() => selectJournalDate(relativeLocalDateKey(0))}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[6px] bg-accent-primary px-3 text-[11.5px] font-medium text-white transition-colors hover:bg-accent-primary/90"
-          >
-            <BookOpen size={13} />
-            今天日记
-          </button>
-          <button
-            type="button"
-            onClick={() => void copyCurrentTime()}
-            title="复制当前时间"
-            aria-label="复制当前时间"
-            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-app-border text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          >
-            <Clock3 size={13} />
-          </button>
-          {[
-            { label: "昨天", offset: -1 },
-            { label: "今天", offset: 0 },
-            { label: "明天", offset: 1 },
-            { label: "后天", offset: 2 },
-          ].map((item) => (
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <button
-              key={item.label}
               type="button"
-              onClick={() => selectJournalDate(relativeLocalDateKey(item.offset))}
-              className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              onClick={() => void copyCurrentTime()}
+              title="复制当前时间"
+              className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
             >
-              <CalendarDays size={13} className="text-tx-tertiary" />
-              {item.label}
+              <Clock3 size={13} />
+              复制当前时间
             </button>
-          ))}
-          <label className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-[6px] border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary">
-            <CalendarDays size={13} className="text-tx-tertiary" />
-            选择日期
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(event) => event.target.value && selectJournalDate(event.target.value)}
-              className="sr-only"
-            />
-          </label>
+          </div>
         </div>
       </header>
 

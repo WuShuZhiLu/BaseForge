@@ -427,6 +427,121 @@ function PanelSection({ label, extra, children }: {
   );
 }
 
+interface AiConversationRow {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+function formatAiConversationRelativeTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} 天前`;
+  return date.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
+}
+
+/** AI 会话列表面板（方案 A）：会话列表上移到侧栏，主区 AIChatPanel 对话占全宽。
+ *  行点击 → nowen:ai-open-conversation 通知主区加载；列表变化 → nowen:ai-conversations-changed 刷新。 */
+function AiConversationsMiniPanel() {
+  const [conversations, setConversations] = useState<AiConversationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const reload = () => {
+      api.aiConversations.list()
+        .then((result) => { if (!cancelled) setConversations(result.conversations); })
+        .catch(() => { if (!cancelled) setConversations([]); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+    reload();
+    const handleConversationsChanged = () => reload();
+    const handleConversationSelected = (event: Event) => {
+      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (conversationId) setSelectedId(conversationId);
+    };
+    window.addEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
+    window.addEventListener("nowen:ai-conversation-selected", handleConversationSelected);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
+      window.removeEventListener("nowen:ai-conversation-selected", handleConversationSelected);
+    };
+  }, []);
+
+  const openConversation = useCallback((conversationId: string) => {
+    setSelectedId(conversationId);
+    window.dispatchEvent(new CustomEvent("nowen:ai-open-conversation", { detail: { conversationId } }));
+  }, []);
+
+  const handleCreateConversation = useCallback(() => {
+    void api.aiConversations.create()
+      .then((result) => {
+        setConversations((previous) => [result.conversation, ...previous]);
+        window.dispatchEvent(new CustomEvent("nowen:ai-conversations-changed"));
+        openConversation(result.conversation.id);
+      })
+      .catch(() => {});
+  }, [openConversation]);
+
+  return (
+    <div className="sbx-view">
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="flex items-center justify-between pl-1 pr-1 pb-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-tx-tertiary" />
+            <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">会话</span>
+          </span>
+          <button
+            type="button"
+            onClick={handleCreateConversation}
+            title="新建会话"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+        <div className="max-h-72 space-y-0.5 overflow-y-auto">
+          {loading && (
+            <div className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</div>
+          )}
+          {!loading && !conversations.length && (
+            <div className="px-2 py-2 text-[11px] text-tx-tertiary">暂无会话，点右上角新建</div>
+          )}
+          {!loading && conversations.map((conversation) => {
+            const active = conversation.id === selectedId;
+            const displayTitle = conversation.title || "未命名会话";
+            return (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => openConversation(conversation.id)}
+                title={displayTitle}
+                className={cn(
+                  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors",
+                  active
+                    ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                    : "text-tx-secondary hover:bg-app-hover",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{displayTitle}</span>
+                <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary">{formatAiConversationRelativeTime(conversation.updatedAt)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SidebarDesktop() {
   const { t } = useTranslation();
   const { state } = useApp();
@@ -3131,13 +3246,7 @@ export default function SidebarDesktop() {
                   {def.id === "tasks" && <TasksMiniPanel />}
                   {def.id === "diary" && <DiaryMiniPanel />}
                   {def.id === "pm" && <PmMiniPanel />}
-                  {def.id === "ai" && (
-                    <div className="sbx-view">
-                      <div className="px-3 py-2">
-                        <p className="text-[12px] leading-relaxed text-tx-secondary">AI 基于知识库回答问题，支持检索引用与上下文来源。</p>
-                      </div>
-                    </div>
-                  )}
+                  {def.id === "ai" && <AiConversationsMiniPanel />}
                 </>
               );
             })()}
