@@ -132,7 +132,7 @@ function mapHistoryMessage(message: {
 
 const aiChatMarkdownComponents: Components = {
   pre: ({ children }) => (
-    <pre className="my-2 max-w-full overflow-x-auto rounded-lg bg-black/5 p-3 dark:bg-white/5">
+    <pre className="my-2 max-w-full overflow-x-auto rounded-[8px] border border-app-border bg-app-bg p-3">
       {children}
     </pre>
   ),
@@ -812,34 +812,34 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
         <div className="flex items-center justify-between px-3 pb-2 pt-3">
           <div>
             <div className="text-xs font-semibold text-tx-primary">{t("aiChat.conversations")}</div>
-            <div className="mt-0.5 text-[10px] text-tx-tertiary">{conversations.length} 个会话</div>
+            <div className="mt-0.5 text-[11px] text-tx-tertiary">{conversations.length} 个会话</div>
           </div>
           <button
             type="button"
             onClick={() => void handleNewConversation()}
             disabled={isLoading}
             title={t("aiChat.newConversation")}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-primary text-white transition hover:bg-accent-primary/90 disabled:opacity-50"
+            className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-accent-primary text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50"
           >
             <Plus size={14} />
           </button>
         </div>
         <div className="px-3 pb-2">
-          <div className="flex items-center gap-2 rounded-lg border border-app-border bg-app-bg px-2.5 py-1.5 text-tx-tertiary focus-within:border-accent-primary/50 focus-within:ring-2 focus-within:ring-accent-primary/10">
+          <div className="flex items-center gap-2 rounded-[8px] border border-app-border bg-app-bg px-2.5 py-1.5 text-tx-tertiary transition-colors focus-within:border-accent-primary/50 focus-within:ring-2 focus-within:ring-accent-primary/30">
             <Search size={12} className="shrink-0" />
             <input
               value={conversationQuery}
               onChange={(event) => setConversationQuery(event.target.value)}
               placeholder="搜索对话"
               aria-label="搜索历史对话"
-              className="min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
+              className="min-w-0 flex-1 bg-transparent text-[11px] text-tx-primary outline-none placeholder:text-tx-tertiary"
             />
             {conversationQuery && (
               <button
                 type="button"
                 onClick={() => setConversationQuery("")}
                 title="清空搜索"
-                className="rounded p-0.5 hover:bg-app-hover hover:text-tx-primary"
+                className="rounded-[6px] p-0.5 hover:bg-app-hover hover:text-tx-primary"
               >
                 <X size={10} />
               </button>
@@ -865,17 +865,17 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 <div
                   key={conversation.id}
                   className={cn(
-                    "group relative flex w-full min-w-0 cursor-pointer gap-2 rounded-xl px-2.5 py-2.5 text-xs transition-colors",
+                    "group relative flex w-full min-w-0 cursor-pointer gap-2 rounded-[10px] border border-transparent px-2.5 py-2.5 text-xs transition-colors",
                     active
-                      ? "bg-accent-primary/10 text-accent-primary"
+                      ? "border-accent-primary/25 bg-accent-primary/10 text-accent-primary"
                       : "text-tx-secondary hover:bg-app-hover",
                   )}
                   onClick={() => !isRenaming && void handleSelectConversation(conversation.id)}
                 >
                   {active && <span className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full bg-accent-primary" />}
                   <div className={cn(
-                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg",
-                    active ? "bg-accent-primary text-white" : "bg-app-hover text-tx-tertiary",
+                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px]",
+                    active ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover text-tx-tertiary",
                   )}>
                     <MessageSquare size={11} />
                   </div>
@@ -897,27 +897,27 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                             }
                           }}
                           onClick={(event) => event.stopPropagation()}
-                          className="min-w-0 flex-1 rounded border border-accent-primary/40 bg-app-bg px-1 py-0.5 text-xs text-tx-primary outline-none"
+                          className="min-w-0 flex-1 rounded-[6px] border border-accent-primary/40 bg-app-bg px-1 py-0.5 text-[11px] text-tx-primary outline-none"
                         />
                       ) : (
                         <span className="block min-w-0 flex-1 truncate font-medium leading-4" title={displayTitle}>{displayTitle}</span>
                       )}
                       {!isRenaming && (
-                        <span className="shrink-0 pt-0.5 text-[9px] text-tx-tertiary">{formatConversationTime(conversation.updatedAt)}</span>
+                        <span className="shrink-0 pt-0.5 text-[10px] text-tx-tertiary">{formatConversationTime(conversation.updatedAt)}</span>
                       )}
                     </div>
                     {!isRenaming && (
                       <div className="mt-1 flex min-w-0 items-center gap-1.5">
-                        <span className="min-w-0 flex-1 truncate text-[10px] text-tx-tertiary">
+                        <span className="min-w-0 flex-1 truncate text-[11px] text-tx-tertiary">
                           {conversation.lastMessage || "还没有消息"}
                         </span>
-                        <span className="shrink-0 text-[9px] text-tx-tertiary">{conversation.messageCount}</span>
+                        <span className="shrink-0 text-[10px] text-tx-tertiary">{conversation.messageCount}</span>
                         <div className="ml-0.5 flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                           <button
                             type="button"
                             onClick={(event) => { event.stopPropagation(); handleStartRename(conversation); }}
                             title={t("aiChat.renameConversation")}
-                            className="flex h-5 w-5 items-center justify-center rounded-md text-tx-tertiary hover:bg-app-surface hover:text-tx-primary"
+                            className="flex h-5 w-5 items-center justify-center rounded-[6px] text-tx-tertiary hover:bg-app-surface hover:text-tx-primary"
                           >
                             <Pencil size={10} />
                           </button>
@@ -925,7 +925,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                             type="button"
                             onClick={(event) => { event.stopPropagation(); void handleDeleteConversation(conversation.id); }}
                             title={t("aiChat.deleteConversation")}
-                            className="flex h-5 w-5 items-center justify-center rounded-md text-tx-tertiary hover:bg-red-500/10 hover:text-red-500"
+                            className="flex h-5 w-5 items-center justify-center rounded-[6px] text-tx-tertiary hover:bg-red-500/10 hover:text-red-500"
                           >
                             <Trash2 size={10} />
                           </button>
@@ -967,35 +967,35 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-14 items-center justify-between border-b border-app-border bg-app-surface/70 px-4 py-2.5 md:px-6">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
             <button
               type="button"
               onClick={() => setSidebarOpen((value) => !value)}
               title={sidebarOpen ? t("aiChat.collapseSidebar") : t("aiChat.expandSidebar")}
-              className="rounded-lg p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
+              className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
             >
               <Menu size={14} />
             </button>
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-primary/10">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-accent-primary/10">
               <Bot size={14} className="text-accent-primary" />
             </div>
             <div className="min-w-0">
               <div className="max-w-96 truncate text-sm font-semibold text-tx-primary">
                 {currentConversation?.title || t("aiChat.title")}
               </div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-tx-tertiary">
+              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-tx-tertiary">
                 <span>{t("aiChat.title")}</span>
                 {stats && <><span>·</span><span>{t("aiChat.statsNotes", { count: stats.noteCount })}</span></>}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => void handleNewConversation()}
               disabled={isLoading}
               title={t("aiChat.newConversation")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1.5 text-[11px] font-medium text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent-primary px-2.5 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50"
             >
               <Plus size={14} />
               <span className="hidden lg:inline">{t("aiChat.newConversation")}</span>
@@ -1005,7 +1005,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 type="button"
                 onClick={clearChat}
                 title={t("aiChat.clearChat")}
-                className="rounded-md p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-red-500"
+                className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-red-500"
               >
                 <Trash2 size={14} />
               </button>
@@ -1013,7 +1013,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
+              title="关闭"
+              className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary"
             >
               <X size={14} />
             </button>
@@ -1025,7 +1026,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
           scrollbarClassName="w-3 bg-app-surface/70"
           thumbClassName="bg-tx-tertiary/50 hover:bg-tx-secondary/70"
         >
-          <div className="mx-auto w-full min-w-0 max-w-4xl space-y-7 px-5 py-6 md:px-8 md:py-8">
+          <div className="mx-auto w-full min-w-0 max-w-4xl space-y-4 px-5 py-6 md:px-8 md:py-8">
             {historyLoading && !messages.length && (
               <div className="flex items-center justify-center py-8 text-tx-tertiary">
                 <Loader2 size={16} className="animate-spin" />
@@ -1034,29 +1035,29 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
             {!historyLoading && !messages.length && (
               <div className="flex flex-col items-center justify-center py-10 text-center md:py-16">
-                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-[10px] bg-accent-primary/10">
+                <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-[10px] border border-app-border bg-accent-primary/10">
                   <Sparkles size={20} className="text-accent-primary" />
                 </div>
-                <p className="mb-1 text-base font-semibold text-tx-primary">{t("aiChat.empty")}</p>
-                <p className="mb-6 max-w-sm text-xs leading-5 text-tx-tertiary">{t("aiChat.emptyHint")}</p>
+                <p className="mb-1 text-sm font-semibold text-tx-primary">{t("aiChat.empty")}</p>
+                <p className="mb-6 max-w-sm text-[11px] leading-5 text-tx-tertiary">{t("aiChat.emptyHint")}</p>
 
                 {stats && stats.noteCount > 0 && (
                   <div className="mb-6 w-full max-w-md">
                     <div className="mb-3 grid grid-cols-3 gap-2">
-                      <div className="flex flex-col items-center rounded-xl border border-app-border bg-app-surface px-2 py-2.5">
-                        <BookOpen size={16} className="mb-1 text-indigo-500/70" />
-                        <span className="text-base font-bold text-tx-primary">{stats.noteCount}</span>
-                        <span className="text-[10px] text-tx-tertiary">{t("aiChat.statNotes")}</span>
+                      <div className="flex flex-col items-center rounded-[10px] border border-app-border bg-app-surface px-2 py-2.5">
+                        <BookOpen size={16} className="mb-1 text-accent-primary/70" />
+                        <span className="text-sm font-semibold text-tx-primary">{stats.noteCount}</span>
+                        <span className="text-[11px] text-tx-tertiary">{t("aiChat.statNotes")}</span>
                       </div>
-                      <div className="flex flex-col items-center rounded-xl border border-app-border bg-app-surface px-2 py-2.5">
-                        <Database size={16} className="mb-1 text-emerald-500/70" />
-                        <span className="text-base font-bold text-tx-primary">{stats.ftsCount}</span>
-                        <span className="text-[10px] text-tx-tertiary">{t("aiChat.statIndexed")}</span>
+                      <div className="flex flex-col items-center rounded-[10px] border border-app-border bg-app-surface px-2 py-2.5">
+                        <Database size={16} className="mb-1 text-accent-primary/70" />
+                        <span className="text-sm font-semibold text-tx-primary">{stats.ftsCount}</span>
+                        <span className="text-[11px] text-tx-tertiary">{t("aiChat.statIndexed")}</span>
                       </div>
-                      <div className="flex flex-col items-center rounded-xl border border-app-border bg-app-surface px-2 py-2.5">
-                        <FileText size={16} className="mb-1 text-amber-500/70" />
-                        <span className="text-base font-bold text-tx-primary">{stats.notebookCount}</span>
-                        <span className="text-[10px] text-tx-tertiary">{t("aiChat.statNotebooks")}</span>
+                      <div className="flex flex-col items-center rounded-[10px] border border-app-border bg-app-surface px-2 py-2.5">
+                        <FileText size={16} className="mb-1 text-accent-primary/70" />
+                        <span className="text-sm font-semibold text-tx-primary">{stats.notebookCount}</span>
+                        <span className="text-[11px] text-tx-tertiary">{t("aiChat.statNotebooks")}</span>
                       </div>
                     </div>
                   </div>
@@ -1066,11 +1067,11 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                   <button
                     type="button"
                     onClick={() => setShowTools((value) => !value)}
-                    className="flex w-full items-center justify-center gap-1.5 py-1.5 text-[10px] text-tx-tertiary transition-colors hover:text-accent-primary"
+                    className="flex w-full items-center justify-center gap-1.5 py-1.5 text-[11px] text-tx-tertiary transition-colors hover:text-accent-primary"
                   >
-                    <Wand2 size={10} />
+                    <Wand2 size={11} />
                     {t("aiChat.toolsSection")}
-                    {showTools ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                    {showTools ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                   </button>
 
                   {showTools && (
@@ -1078,17 +1079,17 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                       <div
                         {...docDropHandlers}
                         className={cn(
-                          "rounded-xl border bg-app-surface p-3 transition-colors",
+                          "rounded-[10px] border bg-app-surface p-3 transition-colors",
                           docDragOver
-                            ? "border-blue-500 bg-blue-500/5 ring-2 ring-blue-500/30"
+                            ? "border-accent-primary/50 bg-accent-primary/5 ring-2 ring-accent-primary/30"
                             : "border-app-border",
                         )}
                       >
                         <div className="mb-1.5 flex items-center gap-2">
-                          <FileUp size={14} className="text-blue-500" />
+                          <FileUp size={14} className="text-accent-primary" />
                           <span className="text-xs font-medium text-tx-primary">{t("aiChat.docParse")}</span>
                         </div>
-                        <p className="mb-2 text-[10px] text-tx-tertiary">{t("aiChat.docParseDesc")}</p>
+                        <p className="mb-2 text-[11px] text-tx-tertiary">{t("aiChat.docParseDesc")}</p>
                         <input
                           ref={docInputRef}
                           type="file"
@@ -1100,21 +1101,21 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                           type="button"
                           onClick={() => docInputRef.current?.click()}
                           disabled={docParsing}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 px-3 py-1.5 text-xs text-blue-600 transition-colors hover:bg-blue-500/20 disabled:opacity-50 dark:text-blue-400"
+                          className="flex w-full items-center justify-center gap-1.5 rounded-[6px] border border-app-border px-3 py-1.5 text-[11.5px] text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50"
                         >
                           {docParsing ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                           {docParsing ? t("aiChat.parsing") : t("aiChat.uploadDoc")}
                         </button>
-                        <p className="mt-1 text-center text-[9px] text-tx-tertiary">{t("aiChat.uploadDocHint")}</p>
+                        <p className="mt-1 text-center text-[10px] text-tx-tertiary">{t("aiChat.uploadDocHint")}</p>
                         {docResult && (
-                          <div className="mt-2 rounded-lg border border-app-border bg-app-bg">
+                          <div className="mt-2 rounded-[8px] border border-app-border bg-app-bg">
                             <div className="flex items-center justify-between border-b border-app-border px-2 py-1">
-                              <span className="truncate text-[10px] text-tx-secondary">{docFileName}</span>
+                              <span className="truncate text-[11px] text-tx-secondary">{docFileName}</span>
                               <div className="flex gap-1">
                                 <button
                                   type="button"
                                   onClick={() => navigator.clipboard.writeText(docResult).catch(() => {})}
-                                  className="rounded p-0.5 text-tx-tertiary hover:bg-app-hover"
+                                  className="rounded-[6px] p-0.5 text-tx-tertiary hover:bg-app-hover"
                                   title={t("aiChat.copyMarkdown")}
                                 >
                                   <Copy size={10} />
@@ -1122,14 +1123,14 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                                 <button
                                   type="button"
                                   onClick={() => setDocResult(null)}
-                                  className="rounded p-0.5 text-tx-tertiary hover:bg-app-hover"
+                                  className="rounded-[6px] p-0.5 text-tx-tertiary hover:bg-app-hover"
                                   title={t("aiChat.closePreview")}
                                 >
                                   <X size={10} />
                                 </button>
                               </div>
                             </div>
-                            <div className="max-h-40 overflow-auto whitespace-pre-wrap p-2 text-[10px] text-tx-secondary">
+                            <div className="max-h-40 overflow-auto whitespace-pre-wrap p-2 text-[11px] text-tx-secondary">
                               {docResult.slice(0, 1000)}{docResult.length > 1000 && "..."}
                             </div>
                           </div>
@@ -1139,17 +1140,17 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                       <div
                         {...importDropHandlers}
                         className={cn(
-                          "rounded-xl border bg-app-surface p-3 transition-colors",
+                          "rounded-[10px] border bg-app-surface p-3 transition-colors",
                           importDragOver
-                            ? "border-emerald-500 bg-emerald-500/5 ring-2 ring-emerald-500/30"
+                            ? "border-accent-primary/50 bg-accent-primary/5 ring-2 ring-accent-primary/30"
                             : "border-app-border",
                         )}
                       >
                         <div className="mb-1.5 flex items-center gap-2">
-                          <FolderUp size={14} className="text-emerald-500" />
+                          <FolderUp size={14} className="text-accent-primary" />
                           <span className="text-xs font-medium text-tx-primary">{t("aiChat.importKnowledge")}</span>
                         </div>
-                        <p className="mb-2 text-[10px] text-tx-tertiary">{t("aiChat.importKnowledgeDesc")}</p>
+                        <p className="mb-2 text-[11px] text-tx-tertiary">{t("aiChat.importKnowledgeDesc")}</p>
                         <input
                           ref={importInputRef}
                           type="file"
@@ -1162,38 +1163,38 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                           type="button"
                           onClick={() => importInputRef.current?.click()}
                           disabled={importLoading}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-600 transition-colors hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-400"
+                          className="flex w-full items-center justify-center gap-1.5 rounded-[6px] border border-app-border px-3 py-1.5 text-[11.5px] text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50"
                         >
                           {importLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderUp size={12} />}
                           {importLoading ? t("aiChat.importing") : t("aiChat.importFiles")}
                         </button>
-                        <p className="mt-1 text-center text-[9px] text-tx-tertiary">{t("aiChat.importFilesHint")}</p>
+                        <p className="mt-1 text-center text-[10px] text-tx-tertiary">{t("aiChat.importFilesHint")}</p>
                         {importResult && (
-                          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1.5 text-[10px] text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                          <div className="mt-2 flex items-center gap-1.5 rounded-[8px] border border-app-border bg-app-hover/60 px-2 py-1.5 text-[11px] text-tx-secondary">
                             <Check size={10} />
                             {importResult}
                           </div>
                         )}
                       </div>
 
-                      <div className="rounded-xl border border-app-border bg-app-surface p-3">
+                      <div className="rounded-[10px] border border-app-border bg-app-surface p-3">
                         <div className="mb-1.5 flex items-center gap-2">
-                          <Wand2 size={14} className="text-amber-500" />
+                          <Wand2 size={14} className="text-accent-primary" />
                           <span className="text-xs font-medium text-tx-primary">{t("aiChat.batchFormat")}</span>
                         </div>
-                        <p className="mb-2 text-[10px] text-tx-tertiary">{t("aiChat.batchFormatDesc")}</p>
+                        <p className="mb-2 text-[11px] text-tx-tertiary">{t("aiChat.batchFormatDesc")}</p>
                         <button
                           type="button"
                           onClick={() => void handleBatchFormat()}
                           disabled={batchLoading}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 transition-colors hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-400"
+                          className="flex w-full items-center justify-center gap-1.5 rounded-[6px] border border-app-border px-3 py-1.5 text-[11.5px] text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50"
                         >
                           {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
                           {batchLoading ? t("aiChat.formatting") : t("aiChat.batchFormat")}
                         </button>
-                        <p className="mt-1 text-center text-[9px] text-tx-tertiary">{t("aiChat.selectNotesHint")}</p>
+                        <p className="mt-1 text-center text-[10px] text-tx-tertiary">{t("aiChat.selectNotesHint")}</p>
                         {batchResult && (
-                          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[10px] text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
+                          <div className="mt-2 flex items-center gap-1.5 rounded-[8px] border border-app-border bg-app-hover/60 px-2 py-1.5 text-[11px] text-tx-secondary">
                             <Check size={10} />
                             {batchResult}
                           </div>
@@ -1204,8 +1205,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 </div>
 
                 <div className="w-full max-w-md space-y-2">
-                  <p className="mb-2 flex items-center justify-center gap-1 text-[10px] uppercase tracking-wider text-tx-tertiary">
-                    <MessageCircleQuestion size={10} />
+                  <p className="mb-2 flex items-center justify-center gap-1 text-[11px] uppercase tracking-wider text-tx-tertiary">
+                    <MessageCircleQuestion size={11} />
                     {t("aiChat.trySuggestions")}
                   </p>
                   {suggestedQuestions.map((question) => (
@@ -1213,7 +1214,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                       key={question}
                       type="button"
                       onClick={() => { if (!isLoading) void handleSend(question); }}
-                      className="group flex w-full items-center justify-between rounded-xl border border-app-border bg-app-surface px-3.5 py-2.5 text-left text-xs text-tx-secondary shadow-sm transition-all hover:-translate-y-0.5 hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary"
+                      className="group flex w-full items-center justify-between rounded-[10px] border border-app-border bg-app-surface px-3.5 py-2.5 text-left text-[11.5px] text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary"
                     >
                       <span>{question}</span>
                       <ArrowRight size={12} className="ml-2 shrink-0 text-tx-tertiary transition-colors group-hover:text-accent-primary" />
@@ -1236,20 +1237,20 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                   )}
                 >
                   <div className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px]",
                     isUser
                       ? "bg-app-hover text-tx-secondary"
-                      : "bg-accent-primary text-white",
+                      : "bg-accent-primary/10 text-accent-primary",
                   )}>
                     {isUser ? <User size={13} /> : <Bot size={13} />}
                   </div>
 
                   <div className={cn("min-w-0", isUser ? "max-w-[78%] text-right" : "flex-1")}>
                     <div className={cn(
-                      "inline-block min-w-0 text-left text-sm leading-7 [overflow-wrap:anywhere]",
+                      "inline-block min-w-0 text-left text-sm leading-6 [overflow-wrap:anywhere]",
                       isUser
-                        ? "max-w-full rounded-2xl rounded-tr-md bg-accent-primary px-4 py-2.5 text-white shadow-sm selection:bg-white/35 selection:text-white"
-                        : "w-full py-0.5 text-tx-primary selection:bg-accent-primary/25 selection:text-tx-primary",
+                        ? "max-w-full rounded-[10px] border border-app-border bg-app-surface px-3.5 py-2.5 text-tx-primary selection:bg-accent-primary/20"
+                        : "w-full rounded-[10px] border border-app-border bg-app-hover/50 px-3.5 py-2.5 text-tx-primary selection:bg-accent-primary/20",
                     )}>
                       {isUser ? (
                         editing ? (
@@ -1268,13 +1269,13 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                                 }
                               }}
                               rows={3}
-                              className="w-full min-w-0 max-w-full resize-y rounded-lg border border-white/30 bg-white/10 px-2 py-1.5 text-sm text-white outline-none placeholder:text-white/60"
+                              className="w-full min-w-0 max-w-full resize-y rounded-[8px] border border-app-border bg-app-bg px-2.5 py-1.5 text-sm text-tx-primary outline-none placeholder:text-tx-tertiary focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/30"
                             />
                             <div className="flex justify-end gap-1">
                               <button
                                 type="button"
                                 onClick={() => { setEditingMessageId(null); setEditDraft(""); }}
-                                className="rounded-md px-2 py-1 text-[11px] text-white/80 hover:bg-white/10"
+                                className="rounded-[6px] border border-app-border px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
                               >
                                 取消
                               </button>
@@ -1282,7 +1283,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                                 type="button"
                                 onClick={() => void handleSaveMessageEdit(message.id)}
                                 disabled={!editDraft.trim()}
-                                className="rounded-md bg-white px-2 py-1 text-[11px] font-medium text-accent-primary disabled:opacity-50"
+                                className="rounded-[6px] bg-accent-primary px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50"
                               >
                                 保存
                               </button>
@@ -1297,8 +1298,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                           prose-headings:my-2 prose-headings:font-semibold
                           prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
                           prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0.5
-                          prose-code:break-words prose-code:rounded-md prose-code:bg-black/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none dark:prose-code:bg-white/10
-                          prose-blockquote:my-2 prose-blockquote:border-violet-400 prose-blockquote:text-tx-secondary
+                          prose-code:break-words prose-code:rounded-[4px] prose-code:bg-app-hover prose-code:px-1.5 prose-code:py-0.5 prose-code:text-xs prose-code:before:content-none prose-code:after:content-none
+                          prose-blockquote:my-2 prose-blockquote:border-app-border prose-blockquote:text-tx-secondary
                           prose-hr:my-3 prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline
                           prose-strong:text-tx-primary prose-th:px-2 prose-th:py-1 prose-td:px-2 prose-td:py-1
                           [&_a]:[overflow-wrap:anywhere] [&_code]:[overflow-wrap:anywhere]
@@ -1329,18 +1330,18 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
 
                     {!!message.references?.length && (
                       <div className={cn("mt-3 min-w-0", isUser && "ml-auto")}>
-                        <div className="overflow-hidden rounded-xl border border-app-border bg-app-surface/70">
+                        <div className="overflow-hidden rounded-[10px] border border-app-border bg-app-surface">
                           <button
                             type="button"
                             onClick={() => toggleReferences(message.id)}
                             aria-expanded={expandedReferenceIds.has(message.id)}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
                           >
-                            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-accent-primary/10 text-accent-primary">
+                            <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-accent-primary/10 text-accent-primary">
                               <FileText size={10} />
                             </span>
                             <span className="font-medium">{t("aiChat.references")}</span>
-                            <span className="rounded-full bg-app-hover px-1.5 py-0.5 text-[9px] text-tx-tertiary">
+                            <span className="rounded-full border border-app-border px-1.5 py-0.5 text-[10px] text-tx-tertiary">
                               {message.references.length}
                             </span>
                             <span className="ml-auto text-tx-tertiary">
@@ -1360,12 +1361,12 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                                       onClick={() => handleReferenceClick(reference)}
                                       title={isAttachment ? reference.attachmentFilename || reference.title : reference.title}
                                       className={cn(
-                                        "flex w-full min-w-0 max-w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] transition-colors",
-                                        clickable ? "cursor-pointer hover:bg-accent-primary/5" : "cursor-default",
+                                        "flex w-full min-w-0 max-w-full items-center gap-2 rounded-[8px] px-2.5 py-2 text-left text-[11px] transition-colors",
+                                        clickable ? "cursor-pointer hover:bg-app-hover" : "cursor-default",
                                       )}
                                     >
-                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-app-hover font-semibold text-accent-primary">{index + 1}</span>
-                                      {isAttachment ? <Paperclip size={11} className="shrink-0 text-amber-500" /> : <FileText size={11} className="shrink-0 text-violet-500" />}
+                                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] bg-app-hover font-semibold text-accent-primary">{index + 1}</span>
+                                      {isAttachment ? <Paperclip size={11} className="shrink-0 text-tx-tertiary" /> : <FileText size={11} className="shrink-0 text-tx-tertiary" />}
                                       <span className="min-w-0 flex-1 truncate text-tx-secondary">{reference.title}</span>
                                       {clickable && <ArrowRight size={10} className="shrink-0 text-tx-tertiary" />}
                                     </button>
@@ -1389,7 +1390,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                           onClick={() => void handleCopyMessage(message)}
                           disabled={!message.content}
                           title="复制"
-                          className="rounded p-1 opacity-65 transition hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
+                          className="rounded-[6px] p-1 opacity-65 transition-colors hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
                         >
                           {copiedMessageId === message.id ? <Check size={11} /> : <Copy size={11} />}
                         </button>
@@ -1399,7 +1400,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                             onClick={() => handleStartEditMessage(message)}
                             disabled={isLoading}
                             title="编辑"
-                            className="rounded p-1 opacity-65 transition hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
+                            className="rounded-[6px] p-1 opacity-65 transition-colors hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
                           >
                             <Pencil size={11} />
                           </button>
@@ -1410,7 +1411,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                             onClick={() => void handleRegenerate(message.id)}
                             disabled={isLoading}
                             title="重新生成"
-                            className="rounded p-1 opacity-65 transition hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
+                            className="rounded-[6px] p-1 opacity-65 transition-colors hover:bg-app-hover hover:opacity-100 disabled:opacity-30"
                           >
                             <RotateCcw size={11} />
                           </button>
@@ -1420,7 +1421,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                           onClick={() => void handleDeleteMessage(message.id)}
                           disabled={isLoading || message.isStreaming}
                           title="删除"
-                          className="rounded p-1 opacity-65 transition hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 disabled:opacity-30"
+                          className="rounded-[6px] p-1 opacity-65 transition-colors hover:bg-red-500/10 hover:text-red-500 hover:opacity-100 disabled:opacity-30"
                         >
                           <Trash2 size={11} />
                         </button>
@@ -1435,8 +1436,8 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
         </ScrollArea>
 
         <div className="shrink-0 border-t border-app-border bg-app-surface/80 px-4 py-3 backdrop-blur md:px-6 md:py-4">
-          <div className="mx-auto max-w-4xl rounded-2xl border border-app-border bg-app-bg shadow-sm transition-shadow focus-within:border-accent-primary/40 focus-within:shadow-md focus-within:shadow-accent-primary/5">
-            <div className="flex min-h-8 flex-wrap items-center gap-2 border-b border-app-border/70 px-3 py-1.5 text-[10px]">
+          <div className="mx-auto max-w-4xl rounded-[10px] border border-app-border bg-app-surface transition-colors focus-within:border-accent-primary/40 focus-within:ring-2 focus-within:ring-accent-primary/30">
+            <div className="flex min-h-9 flex-wrap items-center gap-1.5 border-b border-app-border/70 px-2.5 py-1.5 text-[11px]">
               <div className="flex min-w-0 items-center gap-1.5 text-tx-tertiary">
                 <Database size={11} className="shrink-0 text-accent-primary" />
                 <span className="shrink-0">{t("aiChat.knowledgeScope") || "知识库范围"}</span>
@@ -1456,7 +1457,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 />
               </div>
               {nbScope === "notebook" && (
-                <label className="flex shrink-0 cursor-pointer select-none items-center gap-1 text-tx-tertiary">
+                <label className="flex shrink-0 cursor-pointer select-none items-center gap-1.5 rounded-full border border-app-border px-2.5 py-1 text-[11px] text-tx-tertiary transition-colors hover:border-accent-primary/30 hover:text-tx-secondary">
                   <input
                     type="checkbox"
                     checked={nbIncludeChildren}
@@ -1467,7 +1468,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 </label>
               )}
               <PluginPromptPicker disabled={isLoading} onSelect={(value) => { setInput(value); requestAnimationFrame(() => inputRef.current?.focus()); }} />
-              <span className="ml-auto hidden text-tx-tertiary lg:inline">Enter 发送 · Shift + Enter 换行</span>
+              <span className="ml-auto hidden text-[11px] text-tx-tertiary lg:inline">Enter 发送 · Shift + Enter 换行</span>
             </div>
             <div className="flex items-end gap-2 p-2">
               <textarea
@@ -1478,7 +1479,7 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 placeholder={t("aiChat.placeholder")}
                 rows={1}
                 disabled={isLoading}
-                className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-tx-primary outline-none placeholder:text-tx-tertiary disabled:opacity-70"
+                className="max-h-32 min-h-10 flex-1 resize-none rounded-[8px] border border-app-border bg-app-bg px-3 py-2 text-sm leading-6 text-tx-primary outline-none transition-colors placeholder:text-tx-tertiary focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/30 disabled:opacity-70"
                 onInput={(event) => {
                   const target = event.target as HTMLTextAreaElement;
                   target.style.height = "auto";
@@ -1491,20 +1492,20 @@ export default function AIChatPanel({ onClose, onNavigateToNote }: {
                 disabled={!isLoading && !input.trim()}
                 title={isLoading ? "停止生成" : "发送"}
                 className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all",
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] transition-colors",
                   isLoading
-                    ? "bg-red-500 text-white shadow-sm hover:bg-red-600"
+                    ? "border border-red-500/40 text-red-500 hover:bg-red-500/10"
                     : input.trim()
-                      ? "bg-accent-primary text-white shadow-sm shadow-accent-primary/20 hover:bg-accent-primary/90"
+                      ? "bg-accent-primary text-white hover:bg-accent-primary/90"
                       : "bg-app-hover text-tx-tertiary",
                 )}
               >
-                {isLoading ? <Square size={14} fill="currentColor" /> : <Send size={16} />}
+                {isLoading ? <Square size={13} fill="currentColor" /> : <Send size={14} />}
               </button>
             </div>
           </div>
           {isLoading && (
-            <p className="mx-auto mt-1.5 max-w-4xl text-right text-[10px] text-tx-tertiary">正在生成回答，点击红色方块可随时停止</p>
+            <p className="mx-auto mt-1.5 max-w-4xl text-right text-[11px] text-tx-tertiary">正在生成回答，可随时停止</p>
           )}
         </div>
       </div>

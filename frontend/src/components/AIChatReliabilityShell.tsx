@@ -59,11 +59,9 @@ function StatusPill({ status }: { status: ReliableStatus | null }) {
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        !status.enabled
-          ? "border-zinc-300 bg-zinc-100 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-          : stale
-            ? "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-300"
-            : "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-950/30 dark:text-emerald-300",
+        !status.enabled || stale
+          ? "border-amber-500/30 text-amber-600 dark:text-amber-400"
+          : "border-app-border text-tx-tertiary",
       )}
     >
       <ShieldCheck size={11} />
@@ -196,11 +194,11 @@ export default function AIChatReliabilityShell(props: Props) {
             </div>
             <div className="hidden min-w-0 lg:block">
               <div className="truncate text-xs font-semibold text-tx-primary">上下文来源</div>
-              <div className="max-w-48 truncate text-[10px] text-tx-tertiary">{statusSummary}</div>
+              <div className="max-w-48 truncate text-[11px] text-tx-tertiary">{statusSummary}</div>
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-1 items-center gap-1 rounded-xl bg-app-hover/70 p-1 sm:flex-none">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {MODE_OPTIONS.map((item) => {
               const Icon = item.icon;
               const disabled = item.id === "current-note" && !activeNote?.id;
@@ -212,10 +210,10 @@ export default function AIChatReliabilityShell(props: Props) {
                   onClick={() => setMode(item.id)}
                   title={item.description}
                   className={cn(
-                    "flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition",
+                    "flex min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                     mode === item.id
-                      ? "bg-app-surface text-accent-primary shadow-sm ring-1 ring-app-border"
-                      : "text-tx-tertiary hover:text-tx-primary",
+                      ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+                      : "border-app-border text-tx-tertiary hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-tx-primary",
                     disabled && "cursor-not-allowed opacity-40",
                   )}
                 >
@@ -231,7 +229,7 @@ export default function AIChatReliabilityShell(props: Props) {
             <button
               type="button"
               onClick={() => setContextCollapsed((value) => !value)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+              className="inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-[11px] font-medium text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
               title={contextCollapsed ? "展开上下文详情" : "收起上下文详情"}
               aria-expanded={!contextCollapsed}
             >
@@ -241,7 +239,7 @@ export default function AIChatReliabilityShell(props: Props) {
             <button
               type="button"
               onClick={() => void refreshStatus()}
-              className="rounded-lg p-1.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-primary"
+              className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
               title="刷新模型与索引状态"
             >
               <RefreshCw size={14} className={loadingStatus ? "animate-spin" : ""} />
@@ -257,18 +255,18 @@ export default function AIChatReliabilityShell(props: Props) {
                 onChange={(event) => setSelectedText(event.target.value)}
                 placeholder="粘贴选中文本，支持 Markdown、HTML 和富文本 JSON…"
                 rows={3}
-                className="mt-2 max-h-[35vh] min-h-20 w-full resize-y rounded-xl border border-app-border bg-app-bg px-3 py-2 text-xs leading-5 text-tx-primary outline-none placeholder:text-tx-tertiary focus:border-accent-primary"
+                className="mt-2 max-h-[35vh] min-h-20 w-full resize-y rounded-[8px] border border-app-border bg-app-bg px-3 py-2 text-[11.5px] leading-5 text-tx-primary outline-none transition-colors placeholder:text-tx-tertiary focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/30"
               />
             )}
 
             {contextWarning && (
-              <p className="mt-2 rounded-lg border border-amber-300/60 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-300">
+              <p className="mt-2 rounded-[8px] border border-amber-500/30 px-2.5 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
                 {contextWarning}
               </p>
             )}
             {statusError && <p className="mt-1 text-[11px] text-red-500">{statusError}</p>}
 
-            <div className="mt-2 max-h-[45vh] overflow-auto rounded-xl border border-app-border bg-app-bg p-3 text-[11px] text-tx-secondary shadow-sm">
+            <div className="mt-2 max-h-[45vh] overflow-auto rounded-[10px] border border-app-border bg-app-surface p-3 text-[11px] text-tx-secondary">
                 <div className="mb-3 flex items-center justify-between gap-3 border-b border-app-border pb-2">
                   <div>
                     <div className="font-medium text-tx-primary">上下文详情</div>
@@ -279,10 +277,10 @@ export default function AIChatReliabilityShell(props: Props) {
                       type="button"
                       onClick={() => setExpanded((value) => !value)}
                       className={cn(
-                        "inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-medium transition-colors",
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors",
                         expanded
-                          ? "bg-accent-primary/10 text-accent-primary"
-                          : "bg-app-hover text-tx-secondary hover:text-tx-primary",
+                          ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+                          : "border-app-border text-tx-secondary hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-tx-primary",
                       )}
                     >
                       <Layers3 size={11} />
@@ -321,7 +319,7 @@ export default function AIChatReliabilityShell(props: Props) {
                   <div className="mt-3 space-y-1.5 border-t border-app-border pt-2">
                     <div className="font-medium text-tx-primary">命中的笔记或分块</div>
                     {diagnostics.hits.map((hit, index) => (
-                      <div key={`${hit.kind}-${hit.id}-${index}`} className="rounded-lg bg-app-hover px-2 py-1.5">
+                      <div key={`${hit.kind}-${hit.id}-${index}`} className="rounded-[8px] border border-app-border bg-app-surface px-2 py-1.5">
                         <div className="flex items-center gap-2">
                           <span className="min-w-0 flex-1 truncate font-medium text-tx-primary">{index + 1}. {hit.title}</span>
                           <span className="shrink-0 text-tx-tertiary">
@@ -338,7 +336,7 @@ export default function AIChatReliabilityShell(props: Props) {
                   <button
                     type="button"
                     onClick={() => exportDiagnosticsFile(diagnostics)}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-app-border px-2.5 py-1.5 font-medium text-tx-secondary hover:bg-app-hover"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded-[6px] border border-app-border px-2.5 py-1.5 font-medium text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary"
                   >
                     <Download size={12} />
                     导出脱敏诊断 JSON

@@ -33,18 +33,17 @@ interface ProviderPreset {
   url: string;
   defaultModel: string;
   needsKey: boolean;
-  color: string;
 }
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
-  { id: "qwen", name: "通义千问", desc: "DashScope OpenAI 兼容接口", url: "https://dashscope.aliyuncs.com/compatible-mode/v1", defaultModel: "qwen-plus", needsKey: true, color: "from-violet-500 to-blue-500" },
-  { id: "openai", name: "OpenAI", desc: "OpenAI 官方接口", url: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini", needsKey: true, color: "from-emerald-500 to-teal-500" },
-  { id: "gemini", name: "Google Gemini", desc: "Gemini OpenAI 兼容接口", url: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.0-flash", needsKey: true, color: "from-blue-500 to-cyan-500" },
-  { id: "deepseek", name: "DeepSeek", desc: "DeepSeek 官方接口", url: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat", needsKey: true, color: "from-sky-500 to-indigo-500" },
-  { id: "doubao", name: "豆包（火山引擎）", desc: "火山方舟 OpenAI 兼容接口", url: "https://ark.cn-beijing.volces.com/api/v3", defaultModel: "doubao-1.5-pro-32k", needsKey: true, color: "from-orange-500 to-pink-500" },
-  { id: "lmstudio", name: "LM Studio", desc: "本地或局域网 OpenAI 兼容服务", url: "http://127.0.0.1:1234/v1", defaultModel: "", needsKey: false, color: "from-cyan-500 to-blue-600" },
-  { id: "ollama", name: "Ollama", desc: "本地或局域网模型", url: "http://localhost:11434/v1", defaultModel: "qwen2.5:7b", needsKey: false, color: "from-zinc-500 to-zinc-700" },
-  { id: "custom", name: "自定义 API", desc: "任意 OpenAI 兼容服务", url: "", defaultModel: "", needsKey: true, color: "from-purple-500 to-indigo-500" },
+  { id: "qwen", name: "通义千问", desc: "DashScope OpenAI 兼容接口", url: "https://dashscope.aliyuncs.com/compatible-mode/v1", defaultModel: "qwen-plus", needsKey: true },
+  { id: "openai", name: "OpenAI", desc: "OpenAI 官方接口", url: "https://api.openai.com/v1", defaultModel: "gpt-4o-mini", needsKey: true },
+  { id: "gemini", name: "Google Gemini", desc: "Gemini OpenAI 兼容接口", url: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.0-flash", needsKey: true },
+  { id: "deepseek", name: "DeepSeek", desc: "DeepSeek 官方接口", url: "https://api.deepseek.com/v1", defaultModel: "deepseek-chat", needsKey: true },
+  { id: "doubao", name: "豆包（火山引擎）", desc: "火山方舟 OpenAI 兼容接口", url: "https://ark.cn-beijing.volces.com/api/v3", defaultModel: "doubao-1.5-pro-32k", needsKey: true },
+  { id: "lmstudio", name: "LM Studio", desc: "本地或局域网 OpenAI 兼容服务", url: "http://127.0.0.1:1234/v1", defaultModel: "", needsKey: false },
+  { id: "ollama", name: "Ollama", desc: "本地或局域网模型", url: "http://localhost:11434/v1", defaultModel: "qwen2.5:7b", needsKey: false },
+  { id: "custom", name: "自定义 API", desc: "任意 OpenAI 兼容服务", url: "", defaultModel: "", needsKey: true },
 ];
 
 const EMPTY_DRAFT: AIProfileDraft = {
@@ -54,6 +53,8 @@ const EMPTY_DRAFT: AIProfileDraft = {
   apiKey: "",
   model: "gpt-4o-mini",
 };
+
+const FIELD_CLASS = "w-full rounded-[8px] border border-app-border bg-app-bg px-2.5 py-1.5 text-[11.5px] text-tx-primary outline-none transition-colors placeholder:text-tx-tertiary focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/30";
 
 function getCopy() {
   const language = (localStorage.getItem("i18nextLng") || navigator.language || "").toLowerCase();
@@ -324,26 +325,26 @@ export default function AISettingsPanel() {
   };
 
   if (loading) {
-    return <div className="flex min-h-[320px] items-center justify-center text-zinc-400"><Loader2 className="animate-spin" size={22} /></div>;
+    return <div className="flex min-h-[320px] items-center justify-center text-tx-tertiary"><Loader2 className="animate-spin" size={22} /></div>;
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-sm">
-          <Bot size={18} />
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-app-border bg-accent-primary/10 text-accent-primary">
+          <Bot size={16} />
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">{copy.title}</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{copy.description}</p>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-tx-primary">{copy.title}</h3>
+          <p className="mt-0.5 text-[11px] text-tx-tertiary">{copy.description}</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-2 dark:border-zinc-800 dark:bg-zinc-900/30">
+        <aside className="rounded-[10px] border border-app-border bg-app-surface/60 p-2">
           <div className="mb-2 flex items-center justify-between px-1">
-            <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">{copy.profiles}</span>
-            <button type="button" onClick={startNew} className="rounded-md p-1.5 text-zinc-500 hover:bg-white hover:text-accent-primary dark:hover:bg-zinc-800" title={copy.newProfile}>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">{copy.profiles}</span>
+            <button type="button" onClick={startNew} className="rounded-[6px] p-1.5 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-accent-primary" title={copy.newProfile}>
               <Plus size={14} />
             </button>
           </div>
@@ -357,67 +358,67 @@ export default function AISettingsPanel() {
                   type="button"
                   onClick={() => selectProfile(profile)}
                   className={cn(
-                    "w-full rounded-lg border px-3 py-2.5 text-left transition-colors",
+                    "w-full rounded-[8px] border px-2.5 py-2 text-left transition-colors",
                     selected
-                      ? "border-accent-primary/50 bg-white shadow-sm dark:bg-zinc-900"
-                      : "border-transparent hover:bg-white dark:hover:bg-zinc-800/70",
+                      ? "border-accent-primary/30 bg-accent-primary/10"
+                      : "border-transparent hover:bg-app-hover",
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">{profile.name}</span>
-                    {active && <CheckCircle2 size={14} className="shrink-0 text-emerald-500" />}
+                    <span className={cn("min-w-0 flex-1 truncate text-[11.5px] font-medium", selected ? "text-accent-primary" : "text-tx-primary")}>{profile.name}</span>
+                    {active && <CheckCircle2 size={13} className="shrink-0 text-accent-primary" />}
                   </div>
-                  <div className="mt-1 truncate text-[10px] text-zinc-400">{profile.model || profile.provider}</div>
+                  <div className="mt-0.5 truncate text-[10px] text-tx-tertiary">{profile.model || profile.provider}</div>
                 </button>
               );
             })}
             {selectedId === null && (
-              <div className="rounded-lg border border-dashed border-accent-primary/50 bg-accent-primary/5 px-3 py-2.5 text-sm font-medium text-accent-primary">
+              <div className="rounded-[8px] border border-dashed border-accent-primary/40 bg-accent-primary/5 px-2.5 py-2 text-[11.5px] font-medium text-accent-primary">
                 {copy.newProfile}
               </div>
             )}
           </div>
         </aside>
 
-        <section className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+        <section className="space-y-4 rounded-[10px] border border-app-border bg-app-surface p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{copy.profileName}</span>
-              <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900" />
+              <span className="text-[11px] font-medium text-tx-tertiary">{copy.profileName}</span>
+              <input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} className={FIELD_CLASS} />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{copy.provider}</span>
+              <span className="text-[11px] font-medium text-tx-tertiary">{copy.provider}</span>
               <div className="relative">
-                <select value={draft.provider} onChange={(event) => changeProvider(event.target.value)} className="w-full appearance-none rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-8 text-sm outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900">
+                <select value={draft.provider} onChange={(event) => changeProvider(event.target.value)} className={cn(FIELD_CLASS, "appearance-none pr-8")}>
                   {PROVIDER_PRESETS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-tx-tertiary" />
               </div>
             </label>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2 dark:bg-zinc-800/40">
-            <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br text-white", preset.color)}><Zap size={13} /></div>
+          <div className="flex items-center gap-2.5 rounded-[8px] border border-app-border bg-app-hover/50 px-2.5 py-2">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-accent-primary/10 text-accent-primary"><Zap size={13} /></div>
             <div className="min-w-0">
-              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{preset.name}</div>
-              <div className="truncate text-[10px] text-zinc-400">{preset.desc}</div>
+              <div className="text-[11.5px] font-medium text-tx-primary">{preset.name}</div>
+              <div className="truncate text-[10px] text-tx-tertiary">{preset.desc}</div>
             </div>
             {selectedId === activeProfileId && selectedId !== null && (
-              <span className="ml-auto rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">{copy.active}</span>
+              <span className="ml-auto shrink-0 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-2 py-0.5 text-[10px] font-medium text-accent-primary">{copy.active}</span>
             )}
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{copy.apiUrl}</span>
-            <input value={draft.apiUrl} onChange={(event) => setDraft((current) => ({ ...current, apiUrl: event.target.value }))} placeholder="https://api.example.com/v1" className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900" />
+            <span className="text-[11px] font-medium text-tx-tertiary">{copy.apiUrl}</span>
+            <input value={draft.apiUrl} onChange={(event) => setDraft((current) => ({ ...current, apiUrl: event.target.value }))} placeholder="https://api.example.com/v1" className={FIELD_CLASS} />
           </label>
 
           {needsKey && (
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{copy.apiKey}</span>
+              <span className="text-[11px] font-medium text-tx-tertiary">{copy.apiKey}</span>
               <div className="relative">
-                <input type={showKey ? "text" : "password"} value={draft.apiKey} onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))} placeholder={selectedProfile?.apiKeySet ? copy.keyConfigured : "sk-..."} className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-10 text-sm outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900" />
-                <button type="button" onClick={() => setShowKey((value) => !value)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                <input type={showKey ? "text" : "password"} value={draft.apiKey} onChange={(event) => setDraft((current) => ({ ...current, apiKey: event.target.value }))} placeholder={selectedProfile?.apiKeySet ? copy.keyConfigured : "sk-..."} className={cn(FIELD_CLASS, "pr-9")} />
+                <button type="button" onClick={() => setShowKey((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[6px] p-1 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-secondary">
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
@@ -426,21 +427,21 @@ export default function AISettingsPanel() {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{copy.model}</span>
-              <button type="button" onClick={() => void discoverModels(false)} disabled={loadingModels || !draft.apiUrl} className="inline-flex items-center gap-1 text-[10px] text-accent-primary disabled:opacity-40">
+              <span className="text-[11px] font-medium text-tx-tertiary">{copy.model}</span>
+              <button type="button" onClick={() => void discoverModels(false)} disabled={loadingModels || !draft.apiUrl} className="inline-flex items-center gap-1 rounded-[6px] px-1 py-0.5 text-[10px] text-accent-primary transition-colors hover:bg-accent-primary/5 disabled:opacity-40">
                 {loadingModels ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                 {copy.fetchModels}
               </button>
             </div>
             <div className="relative">
-              <input value={draft.model} onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))} onFocus={() => models.length > 0 && setModelOpen(true)} placeholder={preset.defaultModel || copy.customModel} className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 pr-9 text-sm outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900" />
-              {models.length > 0 && <button type="button" onClick={() => setModelOpen((value) => !value)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400"><ChevronDown size={14} /></button>}
+              <input value={draft.model} onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))} onFocus={() => models.length > 0 && setModelOpen(true)} placeholder={preset.defaultModel || copy.customModel} className={cn(FIELD_CLASS, "pr-9")} />
+              {models.length > 0 && <button type="button" onClick={() => setModelOpen((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-[6px] p-1 text-tx-tertiary hover:bg-app-hover"><ChevronDown size={14} /></button>}
               {modelOpen && models.length > 0 && (
                 <>
                   <button type="button" aria-label="close" className="fixed inset-0 z-40 cursor-default" onClick={() => setModelOpen(false)} />
-                  <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-zinc-200 bg-white py-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+                  <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-[8px] border border-app-border bg-app-elevated py-1 shadow-lg shadow-black/10">
                     {models.map((model) => (
-                      <button key={model.id} type="button" onClick={() => { setDraft((current) => ({ ...current, model: model.id })); setModelOpen(false); }} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-700 hover:bg-accent-primary/5 hover:text-accent-primary dark:text-zinc-200">
+                      <button key={model.id} type="button" onClick={() => { setDraft((current) => ({ ...current, model: model.id })); setModelOpen(false); }} className="flex w-full items-center justify-between px-2.5 py-1.5 text-left text-[11.5px] text-tx-secondary transition-colors hover:bg-accent-primary/5 hover:text-accent-primary">
                         <span className="truncate">{model.name}</span>
                         {draft.model === model.id && <Check size={13} className="shrink-0" />}
                       </button>
@@ -450,35 +451,35 @@ export default function AISettingsPanel() {
               )}
             </div>
             <div className="min-h-4 text-[10px]">
-              {loadingModels ? <span className="text-zinc-400">{copy.fetching}</span>
+              {loadingModels ? <span className="text-tx-tertiary">{copy.fetching}</span>
                 : modelError ? <span className="text-amber-600 dark:text-amber-400">{modelError}</span>
-                : <span className="text-zinc-400">{copy.autoModels}</span>}
+                : <span className="text-tx-tertiary">{copy.autoModels}</span>}
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-4 dark:border-zinc-800">
-            <button type="button" onClick={() => void saveProfile()} disabled={saving || testing} className="inline-flex items-center gap-1.5 rounded-lg bg-accent-primary px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50">
+          <div className="flex flex-wrap items-center gap-2 border-t border-app-border pt-3.5">
+            <button type="button" onClick={() => void saveProfile()} disabled={saving || testing} className="inline-flex items-center gap-1.5 rounded-[6px] bg-accent-primary px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-accent-primary/90 disabled:opacity-50">
               {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
               {copy.save}
             </button>
-            <button type="button" onClick={() => void testConnection()} disabled={testing || saving || !draft.apiUrl} className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 px-4 py-2 text-xs font-medium text-zinc-700 hover:border-accent-primary/50 hover:text-accent-primary disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300">
+            <button type="button" onClick={() => void testConnection()} disabled={testing || saving || !draft.apiUrl} className="inline-flex items-center gap-1.5 rounded-[6px] border border-app-border px-3 py-1.5 text-[11.5px] font-medium text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50">
               {testing ? <Loader2 size={13} className="animate-spin" /> : <Bot size={13} />}
               {copy.test}
             </button>
             {selectedId && selectedId !== activeProfileId && (
-              <button type="button" onClick={() => void activateProfile()} disabled={activating || testing} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 px-4 py-2 text-xs font-medium text-emerald-600 hover:bg-emerald-500/5 disabled:opacity-50 dark:text-emerald-400">
+              <button type="button" onClick={() => void activateProfile()} disabled={activating || testing} className="inline-flex items-center gap-1.5 rounded-[6px] border border-app-border px-3 py-1.5 text-[11.5px] font-medium text-tx-secondary transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary disabled:opacity-50">
                 {activating ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
                 {copy.activate}
               </button>
             )}
             {selectedId && (
-              <button type="button" onClick={() => void deleteProfile()} disabled={saving || testing} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-500/5 disabled:opacity-50">
+              <button type="button" onClick={() => void deleteProfile()} disabled={saving || testing} className="inline-flex items-center gap-1.5 rounded-[6px] border border-transparent px-2.5 py-1.5 text-[11.5px] font-medium text-tx-tertiary transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-500 disabled:opacity-50">
                 <Trash2 size={13} />
                 {copy.delete}
               </button>
             )}
             {message && (
-              <span className={cn("ml-auto inline-flex items-center gap-1 text-xs", message.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-500")}>
+              <span className={cn("ml-auto inline-flex items-center gap-1 text-[11px]", message.type === "success" ? "text-tx-secondary" : "text-red-500")}>
                 {message.type === "success" ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
                 {message.text}
               </span>

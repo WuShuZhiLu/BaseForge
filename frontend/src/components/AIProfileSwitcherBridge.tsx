@@ -109,13 +109,13 @@ export default function AIProfileSwitcherBridge() {
   return createPortal(
     <label className="relative flex min-w-0 max-w-[220px] items-center">
       <span className="sr-only">{copy.label}</span>
-      <Bot size={12} className="pointer-events-none absolute left-2 text-violet-500" />
+      <Bot size={12} className="pointer-events-none absolute left-2.5 text-accent-primary" />
       <select
         value={activeProfileId}
         disabled={switching || profiles.length === 0}
         onChange={(event) => void handleChange(event.target.value)}
         title={copy.label}
-        className="h-8 w-[104px] min-w-0 appearance-none truncate rounded-lg border border-app-border bg-app-bg pl-6 pr-6 text-[10px] font-medium text-tx-secondary outline-none transition-colors hover:border-accent-primary/40 focus:border-accent-primary disabled:opacity-50 sm:w-[168px] sm:text-[11px]"
+        className="h-7 w-[104px] min-w-0 appearance-none truncate rounded-full border border-app-border bg-app-surface pl-7 pr-6 text-[11px] font-medium text-tx-secondary outline-none transition-colors hover:border-accent-primary/30 hover:bg-accent-primary/5 focus:border-accent-primary/50 focus:ring-2 focus:ring-accent-primary/30 disabled:opacity-50 sm:w-[168px]"
       >
         {profiles.length === 0 ? (
           <option value="">{copy.empty}</option>
