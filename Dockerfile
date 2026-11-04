@@ -33,6 +33,8 @@ RUN npm run build:web
 # ---------- Stage 2: 后端构建（包含 updater 专用入口） ----------
 FROM node:20-alpine AS backend-build
 WORKDIR /app/backend
+# 仅编译用，指向已存在文件让 ffmpeg-static 跳过下载（本阶段不需要真二进制）
+ENV FFMPEG_BIN=/bin/true
 RUN apk add --no-cache --virtual .build-deps python3 make g++ linux-headers
 COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -46,7 +48,10 @@ RUN apk del .build-deps
 # ---------- Stage 3: 运行时镜像 ----------
 FROM node:20-alpine
 WORKDIR /app
-RUN apk add --no-cache tini tzdata
+RUN apk add --no-cache tini tzdata ffmpeg
+# 运行时用系统 ffmpeg；同时让 npm ci 里 ffmpeg-static 跳过下载
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
+ENV FFMPEG_BIN=/usr/bin/ffmpeg
 
 COPY package.json ./package.json
 COPY backend/package.json backend/package-lock.json ./backend/
