@@ -11,7 +11,7 @@
  *   - 默认两个架构都打：amd64、arm64
  *   - 镜像优先从本机 docker daemon 中查找 nowen-note:<version> / nowen-note:v<version> / nowen-note:latest
  *     的 amd64 / arm64 manifest，docker save 出 tar；找不到则**跳过**该架构并提示
- *   - 调用项目根目录的 ugcli.exe 执行 pack
+ *   - 调用 tools/ugcli（或 UGCLI_BIN 指定）执行 pack
  *
  * 可选环境变量 / 参数：
  *   --version <x.y.z>   覆盖版本号（默认 package.json.version）
@@ -26,9 +26,8 @@
  *     UPK_BUILD_NO        构建号（同 --build）
  *     DOCKERHUB_REPO      DockerHub 仓库名（如 cropflre/nowen-note），
  *                          会拼成 ${DOCKERHUB_REPO}:v${VERSION} 加入候选镜像列表
- *     UGCLI_BIN           ugcli 可执行文件路径，默认根目录 ugcli.exe / ugcli
- *                         注意：ugcli 是绿联开发者工具提供的二进制，**不入库**（见 .gitignore），
- *                         使用前请自行放到仓库根目录或通过 UGCLI_BIN 指定路径。
+ *     UGCLI_BIN           ugcli 可执行文件路径，默认 tools/ugcli.exe / tools/ugcli
+ *                         （兼容旧位置：仓库根目录 ugcli.exe / ugcli）
  */
 import { execSync, spawnSync } from 'node:child_process';
 import {
@@ -258,6 +257,8 @@ function findUgcli() {
     const env = process.env.UGCLI_BIN;
     if (env && existsSync(env)) return env;
     const candidates = [
+        join(PROJECT_ROOT, 'tools', 'ugcli.exe'),
+        join(PROJECT_ROOT, 'tools', 'ugcli'),
         join(PROJECT_ROOT, 'ugcli.exe'),
         join(PROJECT_ROOT, 'ugcli'),
     ];
@@ -266,7 +267,7 @@ function findUgcli() {
 }
 const UGCLI = findUgcli();
 if (!UGCLI) {
-    console.error('[upk] 错误：找不到 ugcli 可执行文件，请放到项目根目录或设置 UGCLI_BIN');
+    console.error('[upk] 错误：找不到 ugcli 可执行文件，请放到 tools/ 目录（或项目根目录）或设置 UGCLI_BIN');
     process.exit(1);
 }
 console.log(`[upk] 使用 ugcli: ${UGCLI}`);
