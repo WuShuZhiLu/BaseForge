@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckSquare, ChevronDown, Lock, RotateCcw, Search, Trash2, RefreshCw, X } from "lucide-react";
+import { CheckSquare, ChevronDown, Lock, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { getCurrentWorkspace } from "@/lib/api";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
@@ -11,6 +11,7 @@ import type { ToolPageHeaderMode } from "@/lib/toolPage";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 import { toast } from "@/lib/toast";
 import { confirm } from "@/components/ui/confirm";
+import { Input } from "@/components/ui/input";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTrash } from "./useTrash";
@@ -37,7 +38,7 @@ import {
   type TrashTypeKey,
 } from "./trashUi";
 
-const buttonClass = "inline-flex items-center justify-center gap-1.5 rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-hover disabled:opacity-40 disabled:cursor-not-allowed";
+const buttonClass = "inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-app-border bg-transparent px-3 text-xs hover:bg-app-hover disabled:opacity-40 disabled:cursor-not-allowed";
 
 export default function TrashPage() {
   const { state } = useApp();
@@ -134,17 +135,36 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
     <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-app-border px-4">
       <div className="flex items-center gap-2"><Trash2 size={18} className="text-tx-secondary" /><h1 className="text-[15px] font-semibold">{t("sidebar.trash")}</h1><span className="text-xs tabular-nums text-tx-tertiary">{trash.items.length}</span></div>
       <div className="flex gap-2">
-        <button className={buttonClass} disabled={trash.busy || trash.loading} onClick={() => void trash.reload()} aria-label={t("trashCenter.refresh")}><RefreshCw size={16} /></button>
+        {/* 刷新按钮已移除：列表监听 nowen:storage-changed / nowen:trash-filter 自动刷新 */}
         {/* 选择模式开关：与文件管理右上角「选择 / 退出多选」同一交互 */}
-        <button className={`${buttonClass} ${selectionMode ? "border-accent-primary bg-accent-primary text-white hover:opacity-90" : ""}`} onClick={toggleSelectionMode} title={selectionMode ? t("trashCenter.exitSelection") : t("trashCenter.select")}>
-          {selectionMode ? <><X size={16} />{t("trashCenter.exitSelection")}</> : <><CheckSquare size={16} />{t("trashCenter.select")}</>}
+        <button className={`${buttonClass} ${selectionMode ? "border-accent-primary bg-accent-primary text-white hover:opacity-90" : "text-tx-primary"}`} onClick={toggleSelectionMode} title={selectionMode ? t("trashCenter.exitSelection") : t("trashCenter.select")}>
+          {selectionMode ? <><X size={14} />{t("trashCenter.exitSelection")}</> : <><CheckSquare size={14} />{t("trashCenter.select")}</>}
         </button>
-        <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])}><Trash2 size={16} />{t("trashCenter.cleanup")}</button>
+        <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])}><Trash2 size={14} />{t("trashCenter.cleanup")}</button>
       </div>
     </header>
-    {/* 工具行 h-10：只留搜索；批量在列表底部批量条 */}
-    <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border px-4">
-      <label className="flex h-7 w-56 items-center gap-1.5 rounded-lg bg-app-hover px-2.5 text-tx-tertiary"><Search size={13} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("trashCenter.search")} aria-label={t("trashCenter.search")} className="min-w-0 flex-1 border-none bg-transparent text-xs text-tx-primary outline-none no-focus-ring" /></label>
+    {/* 工具行 h-10：搜索框对齐分享中心/文件管理同款（w-[210px] h-8 Input）；批量在列表底部批量条 */}
+    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4">
+      <label className="relative block w-[210px] shrink-0">
+        <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={t("trashCenter.search")}
+          aria-label={t("trashCenter.search")}
+          className="h-7 pl-7 pr-7 text-[11.5px]"
+        />
+        {query && (
+          <button
+            type="button"
+            className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+            onClick={() => setQuery("")}
+            aria-label="清除搜索"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </label>
       <span className="flex-1" />
       {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」 */}
       <div ref={sortMenuRef} className="relative shrink-0">
@@ -153,7 +173,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
           aria-haspopup="listbox"
           aria-expanded={sortMenuOpen}
           onClick={() => setSortMenuOpen((value) => !value)}
-          className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
         >
           排序：<span className="font-medium text-tx-primary">{TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label}</span>
           <ChevronDown size={12} />

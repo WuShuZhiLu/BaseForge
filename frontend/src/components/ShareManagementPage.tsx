@@ -608,40 +608,35 @@ export default function ShareManagementPage() {
       {/* 工具行：搜索 + 快捷 chips + 排序，与原型同一行 */}
       <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4 text-xs text-tx-secondary">
         <label className="relative block w-[210px] shrink-0">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+          <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
           <Input
             aria-label="搜索分享"
             value={searchDraft}
             onChange={(event) => setSearchDraft(event.target.value)}
             placeholder="搜索标题 / 文件名 / 链接"
-            className="h-8 pl-8 text-xs"
+            className="h-7 pl-7 pr-7 text-[11.5px]"
           />
-        </label>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-          {SHARE_QUICK_CHIPS.map((chip) => (
+          {searchDraft && (
             <button
-              key={chip.key}
               type="button"
-              aria-pressed={quick === chip.key}
-              onClick={() => setShareCenterUi({ quick: chip.key === "all" || quick === chip.key ? "all" : chip.key })}
-              className={cn(
-                "rounded-full border px-2.5 py-[3px] text-[11px] transition-colors",
-                quick === chip.key
-                  ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary dark:border-accent-primary/40 dark:bg-accent-primary/15"
-                  : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover",
-              )}
+              aria-label="清除搜索"
+              className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+              onClick={() => setSearchDraft("")}
             >
-              {chip.label}
+              <X size={12} />
             </button>
-          ))}
-        </div>
+          )}
+        </label>
+        {/* 快捷筛选（仅查看/可评论/可编辑/有密码/7 天内到期）已上移侧栏「分享设置」，
+            主区工具行只保留搜索 + 排序，与文件管理/回收站一致。 */}
+        <span className="flex-1" />
         <div ref={sortMenuRef} className="relative shrink-0">
           <button
             type="button"
             aria-haspopup="listbox"
             aria-expanded={sortMenuOpen}
             onClick={() => setSortMenuOpen((value) => !value)}
-            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
           >
             排序：<span className="font-medium text-tx-primary">{SHARE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
             <ChevronDown size={12} />

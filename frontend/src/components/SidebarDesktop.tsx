@@ -31,6 +31,10 @@ import {
   Columns2,
   FilePlus2,
   FileText,
+  Image,
+  Film,
+  Music,
+  FileQuestion,
   Focus,
   Folder,
   Home,
@@ -89,12 +93,9 @@ import {
   getRetentionDays,
   getTrashSetting,
   getTrashTimeFilter,
-  getTrashSortFilter,
   getTrashTypeFilter,
   setTrashSetting,
-  setTrashSortFilter,
   setTrashTimeFilter,
-  TRASH_SORT_META,
   TRASH_TIME_META,
 
   retentionColor,
@@ -107,7 +108,6 @@ import {
   trashTypeKey,
   trashTypeLabel,
   type TrashTimeFilter,
-  type TrashSortFilter,
   type TrashTypeFilterKey,
   type TrashTypeKey,
 } from "@/features/trash/trashUi";
@@ -125,7 +125,7 @@ import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActi
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_SORT_OPTIONS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
+import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -165,11 +165,14 @@ import {
   getShareCenterUiVersion,
   getShareGroup,
   getShareObjectKind,
+  getShareQuick,
   getShareRisk,
+  SHARE_QUICK_CHIPS,
   setShareCenterUi,
   subscribeShareCenterUi,
 } from "@/features/shares/shareCenterUi";
 import { PublicOriginRiskControl } from "@/components/PublicOriginRiskControl";
+import { TypeFilterPopover } from "@/components/sidebar/TypeFilterPopover";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { useSortableDrag } from "@/hooks/useSortableDrag";
@@ -723,12 +726,9 @@ export default function SidebarDesktop() {
   const [trashFilter, setTrashFilterState] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
   const [retentionDays, setRetentionDaysState] = useState(() => getRetentionDays());
   const [timeFilter, setTimeFilterState] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
-  const [trashSort, setTrashSortState] = useState<TrashSortFilter>(() => getTrashSortFilter());
   const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
   const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
   const setTrashTypeFilter = useCallback((keys: TrashTypeFilterKey[]) => { setTrashFilterState(keys); persistTrashTypeFilter(keys); }, []);
-  const [trashTypesOpen, setTrashTypesOpen] = useState(false);
-  const [trashTypesQuery, setTrashTypesQuery] = useState("");
   // 回收站视图激活时，恢复/删除/清空等操作后即时刷新计数与类型分布
   useEffect(() => {
     if (sidebarView !== "trash") return;
@@ -3291,92 +3291,20 @@ export default function SidebarDesktop() {
               <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
               <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">回收站</span>
             </div>
-            {/* 类型多选：与主区共享同一份筛选（localStorage + nowen:trash-filter）。
-                收成一行触发器 + 覆盖式弹层（两列勾选），类型增多也不撑高侧栏。 */}
-            <div className="relative border-b border-app-border px-2 py-1.5">
-              <div className="flex items-center justify-between pl-1 pr-1 pb-1">
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-tx-tertiary" />
-                  <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">类型 · 可多选</span>
-                </span>
-                {trashFilter.length > 1 || (trashFilter.length === 1 && trashFilter[0] !== "all") ? (
-                  <button type="button" className="text-[11px] text-accent-primary" onClick={() => setTrashTypeFilter(["all"])}>清除</button>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-expanded={trashTypesOpen}
-                onClick={() => setTrashTypesOpen((value) => !value)}
-                className={`flex h-8 w-full items-center gap-2 rounded-md border px-2 text-[12px] transition-colors ${trashTypesOpen ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-              >
-                <span className="shrink-0 text-tx-tertiary">{trashTypeIcon("all")}</span>
-                <span className="min-w-0 flex-1 truncate text-left">
-                  {trashFilter.length === 1 && trashFilter[0] === "all"
-                    ? "全部"
-                    : trashFilter.length === 1
-                      ? TRASH_TYPE_META.find((meta) => meta.key === trashFilter[0])?.label || "已选 1 项"
-                      : `已选 ${trashFilter.length} 项`}
-                </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">{trashItems.length}</span>
-                <ChevronDown size={12} className={cn("shrink-0 text-tx-tertiary transition-transform", trashTypesOpen && "rotate-180")} />
-              </button>
-              {trashTypesOpen && (
-                <div className="absolute inset-x-2 top-full z-30 mt-1 overflow-hidden rounded-lg border border-app-border bg-app-elevated shadow-lg">
-                  <div className="flex items-center gap-1.5 border-b border-app-border bg-app-panel px-2 py-1.5">
-                    <input
-                      value={trashTypesQuery}
-                      onChange={(event) => setTrashTypesQuery(event.target.value)}
-                      placeholder="搜索类型"
-                      className="h-6 min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-1.5 text-[11.5px] outline-none focus:border-accent-primary/40"
-                    />
-                    <button
-                      type="button"
-                      className="shrink-0 text-[11px] text-accent-primary"
-                      onClick={() => setTrashTypeFilter(["all", ...TRASH_TYPE_META.map((meta) => meta.key)])}
-                    >
-                      全选
-                    </button>
-                  </div>
-                  <div className="grid max-h-40 grid-cols-2 gap-0.5 overflow-y-auto p-1.5">
-                    {(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[])
-                      .filter((key) => {
-                        const label = key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || "";
-                        return label.toLowerCase().includes(trashTypesQuery.trim().toLowerCase());
-                      })
-                      .map((key) => {
-                        const count = key === "all"
-                          ? trashItems.length
-                          : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length;
-                        const on = trashFilter.includes(key);
-                        const label = key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            role="option"
-                            aria-selected={on}
-                            onClick={() => {
-                              const next = key === "all" ? (on ? ["all" as TrashTypeKey] : ["all" as TrashTypeKey])
-                                : on ? trashFilter.filter((k) => k !== key) : [...trashFilter.filter((k) => k !== "all"), key];
-                              setTrashTypeFilter(next.length ? next : ["all"]);
-                            }}
-                            className={`flex h-7 min-w-0 items-center gap-1.5 rounded px-1.5 text-[11px] transition-colors ${on ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
-                          >
-                            <span className={cn("flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border text-[8px] leading-none", on ? "border-accent-primary bg-accent-primary text-white" : "border-app-border text-transparent")}>✓</span>
-                            <span className="shrink-0 text-tx-tertiary">{trashTypeIcon(key)}</span>
-                            <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-                            <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary">{count}</span>
-                          </button>
-                        );
-                      })}
-                  </div>
-                  <div className="flex items-center justify-between border-t border-app-border bg-app-panel px-2 py-1 text-[10.5px] text-tx-tertiary">
-                    <span>共 {TRASH_TYPE_META.length + 1} 种类型</span>
-                    <button type="button" className="text-[11px] text-accent-primary" onClick={() => { setTrashTypesOpen(false); setTrashTypesQuery(""); }}>关闭</button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* 类型多选：与回收站/文件管理共用 TypeFilterPopover（触发行 + 两列勾选弹层） */}
+            <TypeFilterPopover
+              label="类型 · 可多选"
+              items={(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => ({
+                key,
+                label: key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key,
+                count: key === "all" ? trashItems.length : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length,
+                icon: trashTypeIcon(key),
+              }))}
+              selected={trashFilter}
+              onChange={(keys) => setTrashTypeFilter(keys.length ? keys : ["all"])}
+              multi
+              totalCount={trashItems.length}
+            />
             <PanelSection
               label="删除时间"
             >
@@ -3388,23 +3316,6 @@ export default function SidebarDesktop() {
                     aria-pressed={timeFilter === meta.key}
                     onClick={() => { setTimeFilterState(meta.key); setTrashTimeFilter(meta.key); }}
                     className={`rounded-full border px-2 py-0.5 text-[11px] ${timeFilter === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >
-                    {meta.label}
-                  </button>
-                ))}
-              </div>
-            </PanelSection>
-            <PanelSection
-              label="排序"
-            >
-              <div className="flex flex-wrap gap-1 px-1">
-                {TRASH_SORT_META.map((meta) => (
-                  <button
-                    key={meta.key}
-                    type="button"
-                    aria-pressed={trashSort === meta.key}
-                    onClick={() => { setTrashSortState(meta.key); setTrashSortFilter(meta.key); }}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${trashSort === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >
                     {meta.label}
                   </button>
@@ -3533,6 +3444,30 @@ export default function SidebarDesktop() {
                 ))}
               </div>
             </PanelSection>
+            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），单选 */}
+            <TypeFilterPopover
+              label="类型"
+              items={FILE_TYPE_CHIPS.map((chip) => ({
+                key: chip.key,
+                label: chip.label,
+                count: !fileStats ? undefined
+                  : chip.key === "all" ? fileStats.total
+                  : chip.key === "image" ? fileStats.images.count
+                  : chip.key === "video" ? fileStats.videos?.count ?? 0
+                  : chip.key === "audio" ? fileStats.audios?.count ?? 0
+                  : chip.key === "doc" ? fileStats.documents?.count ?? 0
+                  : fileStats.others?.count ?? 0,
+                icon: chip.key === "all" ? <Layers size={12} />
+                  : chip.key === "image" ? <Image size={12} />
+                  : chip.key === "video" ? <Film size={12} />
+                  : chip.key === "audio" ? <Music size={12} />
+                  : chip.key === "doc" ? <FileText size={12} />
+                  : <FileQuestion size={12} />,
+              }))}
+              selected={[getFilesType()]}
+              onChange={(keys) => setFilesUi({ type: keys[0] })}
+              totalCount={fileStats?.total}
+            />
             {/* 分享状态：只看生效中（未关闭且未过期）的只读分享链接。 */}
             <PanelSection label="分享状态">
               <div className="flex flex-wrap gap-1 px-1">
@@ -3558,19 +3493,6 @@ export default function SidebarDesktop() {
                     onClick={() => setFilesUi({ time: key })}
                     className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                   >{label}</button>
-                ))}
-              </div>
-            </PanelSection>
-            <PanelSection label="排序">
-              <div className="flex flex-wrap gap-1 px-1">
-                {FILE_SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={getFilesSort() === opt.value}
-                    onClick={() => setFilesUi({ sort: opt.value })}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >{opt.label}</button>
                 ))}
               </div>
             </PanelSection>
@@ -4284,8 +4206,8 @@ function ShareCategoryRow({ active, icon, label, count, tone, onClick }: {
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`flex w-full items-center gap-1.5 rounded-[7px] px-2.5 py-1.5 text-xs transition-colors ${active
-        ? "bg-[#dbe6ff] font-medium text-accent-primary dark:bg-accent-primary/15"
+      className={`flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${active
+        ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
         : "text-tx-secondary hover:bg-app-hover"}`}
     >
       {/* 原型每一行都带图标：状态用彩点、对象类型与风险用图形图标 */}
@@ -4319,6 +4241,7 @@ function SharesSidePanel() {
   const group = useMemo(() => getShareGroup(), [uiVersion]);
   const objectKind = useMemo(() => getShareObjectKind(), [uiVersion]);
   const risk = useMemo(() => getShareRisk(), [uiVersion]);
+  const quick = useMemo(() => getShareQuick(), [uiVersion]);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -4358,6 +4281,22 @@ function SharesSidePanel() {
             tone={(counts?.groups.attention ?? 0) > 0 ? "text-amber-600 dark:text-amber-300" : undefined}
             onClick={() => pick({ group: "attention" })} />
           <ShareCategoryRow active={group === "disabled"} icon={shareDot("text-tx-tertiary")} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
+        </div>
+      </PanelSection>
+
+      <PanelSection label="分享设置">
+        <div className="space-y-0.5">
+          {SHARE_QUICK_CHIPS.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              aria-pressed={quick === chip.key}
+              onClick={() => setShareCenterUi({ quick: quick === chip.key && chip.key !== "all" ? "all" : chip.key })}
+              className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${quick === chip.key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+            >
+              <span className="min-w-0 flex-1 truncate text-left">{chip.label}</span>
+            </button>
+          ))}
         </div>
       </PanelSection>
 

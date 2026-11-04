@@ -1369,9 +1369,7 @@ export default function FileManager() {
           onClick={handleCleanupOrphans}
           disabled={cleaningUp}
           className={cn(
-            "shrink-0",
-            reclaimable && reclaimable.items > 0 &&
-              "text-amber-600 border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 hover:border-amber-500/60",
+            "shrink-0 text-accent-danger",
           )}
           title={
             reclaimable && reclaimable.items > 0
@@ -1423,16 +1421,16 @@ export default function FileManager() {
       <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
         {/* 搜索：与分享页同款 w-[210px] 输入框 */}
         <label className="relative block w-[210px] shrink-0">
-          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+          <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
           <Input
             placeholder="搜索文件名或类型（如 pdf）…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="h-8 pl-8 pr-7 text-xs"
+            className="h-7 pl-7 pr-7 text-[11.5px]"
           />
           {searchInput && (
             <button
-              className="absolute right-2 top-2 text-tx-tertiary hover:text-tx-primary"
+              className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
               onClick={() => setSearchInput("")}
             >
               <X size={12} />
@@ -1444,45 +1442,16 @@ export default function FileManager() {
           {statsLine || " "}
         </p>
         <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-        {/* 类型 chips：单选。统一文件池后，类型从"分隔容器"降级为"筛选维度"，
-            与"范围 / 时间 / 分享状态"正交叠加（例如"未引用的视频"）。 */}
-        <div className="flex shrink-0 items-center gap-1">
-          {FILE_TYPE_CHIPS.map((chip) => {
-            const active = typeFilter === chip.key;
-            const bucket = typeStatOf(chip.key);
-            return (
-              <button
-                key={chip.key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  setFilesUi({ type: chip.key });
-                  setPage(1);
-                }}
-                className={cn(
-                  "rounded-full border px-2 py-0.5 text-[11px] transition-colors",
-                  active
-                    ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary"
-                    : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover",
-                )}
-                title={`${chip.label} · ${bucket.count} 个${bucket.bytes ? ` · ${humanSize(bucket.bytes)}` : ""}`}
-              >
-                {chip.label}
-                {/* 内联个数：首屏就能按类型看到文件分布，不必逐个点 chip */}
-                <span className="ml-1 tabular-nums opacity-60">{bucket.count}</span>
-              </button>
-            );
-          })}
-        </div>
+        {/* 类型筛选已上移侧栏（主区只保留搜索 + 排序 + 操作按钮，与回收站/分享中心一致） */}
         {getFilesTime() !== "all" && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
             {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
             <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
           </span>
         )}
         {/* 已分享的附件：侧栏选中后在主区给一个可单独掉的标签，避免用户忘了自己在筛分享状态 */}
         {shareFilter !== "all" && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2 py-0.5 text-[10.5px] text-accent-primary">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
             {shareFilter === "shared" ? "已分享" : "未分享"}
             <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ share: "all" })}>✕</button>
           </span>
@@ -1506,7 +1475,7 @@ export default function FileManager() {
             aria-haspopup="listbox"
             aria-expanded={sortMenuOpen}
             onClick={() => setSortMenuOpen((value) => !value)}
-            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
           >
             排序：<span className="font-medium text-tx-primary">{FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
             <ChevronDown size={12} />
@@ -1521,7 +1490,7 @@ export default function FileManager() {
                   aria-selected={sort === option.value}
                   onClick={() => { setFilesUi({ sort: option.value }); setSortMenuOpen(false); }}
                   className={cn(
-                    "flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover",
+                    "flex w-full items-center px-2.5 py-1.5 text-left text-[11.5px] hover:bg-app-hover",
                     sort === option.value ? "text-accent-primary" : "text-tx-secondary",
                   )}
                 >
