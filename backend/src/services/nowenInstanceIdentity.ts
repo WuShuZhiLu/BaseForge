@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { getDb } from "../db/schema";
+import { brandEnv } from "../lib/envBrand.js";
 
 const INSTANCE_ID_KEY = "nowen_instance_id";
 const VALID_INSTANCE_ID = /^[A-Za-z0-9._:-]{8,160}$/;
@@ -16,7 +17,7 @@ function normalized(value: unknown): string | null {
  * system_settings, so application restarts and ordinary upgrades keep the same source identity.
  */
 export function getNowenInstanceId(): string {
-  const configured = normalized(process.env.NOWEN_INSTANCE_ID);
+  const configured = normalized(brandEnv("INSTANCE_ID"));
   if (configured) return configured;
 
   const db = getDb();
@@ -41,6 +42,6 @@ export function getNowenInstanceId(): string {
 /** The existing exporter reads NOWEN_INSTANCE_ID while building manifest.json. */
 export function ensureNowenInstanceEnvironment(): string {
   const id = getNowenInstanceId();
-  if (!normalized(process.env.NOWEN_INSTANCE_ID)) process.env.NOWEN_INSTANCE_ID = id;
+  if (!normalized(brandEnv("INSTANCE_ID"))) process.env.BASEFORGE_INSTANCE_ID = id;
   return id;
 }

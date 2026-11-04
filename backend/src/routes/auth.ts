@@ -348,7 +348,7 @@ auth.post("/desktop/reset-local", async (c) => {
     db.prepare(`
       INSERT INTO users (id, username, email, passwordHash, role, displayName)
       VALUES (?, ?, ?, ?, 'admin', ?)
-    `).run(userId, username, "desktop@nowen-note.local", passwordHash, "Local Desktop User");
+    `).run(userId, username, "desktop@baseforge.local", passwordHash, "Local Desktop User");
   }
 
   resetLoginFailure(db, userId);

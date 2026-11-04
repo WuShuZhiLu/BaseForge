@@ -8,7 +8,7 @@ import { getLanDiscovery, type DiscoveredService } from "@/lib/lanDiscovery";
 /**
  * 局域网 BaseForge 服务器发现面板
  *
- * 在以下环境可用（共享同一套 mDNS 协议 `_nowen-note._tcp.local.`）：
+ * 在以下环境可用（共享同一套 mDNS 协议 `_baseforge._tcp.local.`）：
  *   - Electron 桌面端 → 走 main 进程 bonjour-service
  *   - Android / iOS（Capacitor 原生）→ 走 @capacitor-community/zeroconf
  *   - 普通浏览器 / Web → 不支持，组件自动隐身（返回 null）

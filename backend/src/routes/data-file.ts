@@ -248,7 +248,7 @@ app.post("/import", async (c) => {
   const dir = path.dirname(dbPath);
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const tmpPath = path.join(dir, `.import-${ts}.tmp`);
-  const preBackupPath = path.join(dir, `nowen-note.pre-import-${ts}.bak`);
+  const preBackupPath = path.join(dir, `baseforge.pre-import-${ts}.bak`);
 
   try {
     // 4) 先把新数据写到临时文件，并用 better-sqlite3 打开校验（能 PRAGMA 读到 schema 才算合法）

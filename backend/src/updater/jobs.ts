@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { brandEnv } from "../lib/envBrand.js";
 import {
   buildReplacementCreatePayload,
   captureNetworkAttachments,
@@ -27,12 +28,12 @@ import {
   type SavedNetworkAttachment,
 } from "./docker";
 
-const STATE_DIR = path.resolve(process.env.NOWEN_UPDATER_STATE_DIR || "/var/lib/nowen-updater");
+const STATE_DIR = path.resolve(brandEnv("UPDATER_STATE_DIR") || "/var/lib/baseforge-updater");
 const JOBS_DIR = path.join(STATE_DIR, "jobs");
-const APP_BASE_URL = (process.env.NOWEN_UPDATER_TARGET_URL || "http://nowen-note:3001").replace(/\/+$/, "");
-const HEALTH_TIMEOUT_MS = Math.max(30_000, Number(process.env.NOWEN_UPDATER_HEALTH_TIMEOUT_MS) || 180_000);
-const STABILITY_WINDOW_MS = Math.max(5_000, Number(process.env.NOWEN_UPDATER_STABILITY_WINDOW_MS) || 15_000);
-const MIN_FREE_BYTES = Math.max(128 * 1024 * 1024, Number(process.env.NOWEN_UPDATER_MIN_FREE_BYTES) || 512 * 1024 * 1024);
+const APP_BASE_URL = (brandEnv("UPDATER_TARGET_URL") || "http://baseforge:3001").replace(/\/+$/, "");
+const HEALTH_TIMEOUT_MS = Math.max(30_000, Number(brandEnv("UPDATER_HEALTH_TIMEOUT_MS")) || 180_000);
+const STABILITY_WINDOW_MS = Math.max(5_000, Number(brandEnv("UPDATER_STABILITY_WINDOW_MS")) || 15_000);
+const MIN_FREE_BYTES = Math.max(128 * 1024 * 1024, Number(brandEnv("UPDATER_MIN_FREE_BYTES")) || 512 * 1024 * 1024);
 
 export type UpdateJobPhase =
   | "queued"
@@ -265,8 +266,8 @@ export async function getUpdaterStatus(): Promise<UpdaterStatus> {
     .map(publicJob);
   const active = activeJobId ? jobs.get(activeJobId) || null : null;
   return {
-    updaterVersion: process.env.NOWEN_APP_VERSION || "1",
-    instance: process.env.NOWEN_UPDATER_INSTANCE || "nowen-note",
+    updaterVersion: brandEnv("APP_VERSION") || "1",
+    instance: brandEnv("UPDATER_INSTANCE") || "baseforge",
     engine: {
       version: engine.ServerVersion || null,
       architecture: normalizeArchitecture(engine.Architecture),

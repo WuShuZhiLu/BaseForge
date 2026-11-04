@@ -179,12 +179,12 @@ function resolveAppVersion(): string {
   // 2) 优先读镜像 / 源码内 package.json。Dockerfile 会把根 package.json 复制到
   // /app/package.json；源码态 / Electron / backend/dist 也通过候选路径覆盖。
   const packageCandidates: Array<{ path: string; names: string[] }> = [
-    { path: path.resolve(process.cwd(), "package.json"), names: ["nowen-note"] },
-    { path: path.resolve(process.cwd(), "../package.json"), names: ["nowen-note"] },
-    { path: path.resolve(__dirname, "../../package.json"), names: ["nowen-note", "nowen-note-backend"] },
-    { path: path.resolve(__dirname, "../../../package.json"), names: ["nowen-note"] },
-    { path: path.resolve(process.cwd(), "backend/package.json"), names: ["nowen-note-backend"] },
-    { path: path.resolve(__dirname, "../package.json"), names: ["nowen-note-backend"] },
+    { path: path.resolve(process.cwd(), "package.json"), names: ["baseforge", "nowen-note"] },
+    { path: path.resolve(process.cwd(), "../package.json"), names: ["baseforge", "nowen-note"] },
+    { path: path.resolve(__dirname, "../../package.json"), names: ["baseforge", "nowen-note", "baseforge-backend", "nowen-note-backend"] },
+    { path: path.resolve(__dirname, "../../../package.json"), names: ["baseforge", "nowen-note"] },
+    { path: path.resolve(process.cwd(), "backend/package.json"), names: ["baseforge-backend", "nowen-note-backend"] },
+    { path: path.resolve(__dirname, "../package.json"), names: ["baseforge-backend", "nowen-note-backend"] },
   ];
   for (const candidate of packageCandidates) {
     const v = readPackageVersion(candidate.path, candidate.names);

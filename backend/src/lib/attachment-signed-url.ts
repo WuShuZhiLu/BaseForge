@@ -50,7 +50,7 @@ export interface AttachmentSignatureVerification {
 function getSigningSecret(): string {
   const explicit = process.env.ATTACHMENT_SIGNING_SECRET;
   if (explicit && explicit.length >= 16) return explicit;
-  const jwtSecret = process.env.JWT_SECRET || "nowen-note-secret-key-change-in-production";
+  const jwtSecret = process.env.JWT_SECRET || "baseforge-secret-key-change-in-production";
   return crypto.createHmac("sha256", jwtSecret).update("attachment-signing-v1").digest("hex");
 }
 

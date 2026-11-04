@@ -1,12 +1,12 @@
 services:
-  nowen-note:
+  baseforge:
     image: {{DOCKERHUB_REPO}}:{{IMAGE_TAG}}
-    container_name: nowen-note
+    container_name: baseforge
     restart: unless-stopped
     ports:
       - "3501:3001"
     volumes:
-      - "/var/apps/nowen-note/shares/nowen-note/data:/app/data"
+      - "/var/apps/baseforge/shares/baseforge/data:/app/data"
     environment:
       - NODE_ENV=production
       - DB_PATH=/app/data/baseforge.db

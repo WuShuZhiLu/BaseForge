@@ -5,7 +5,7 @@
  * 避免用户手动记忆/敲打 IP:PORT。
  *
  * 协议约定（对客户端是公开契约，改动需谨慎）：
- *   - service type:  _nowen-note._tcp.local.
+ *   - service type:  _baseforge._tcp.local.
  *   - port:          真实 HTTP 监听端口
  *   - txt:
  *       v    = 服务端版本（如 "1.0.2"）
@@ -27,7 +27,7 @@ let publishedService: any = null;
 export interface PublishOptions {
   port: number;
   version: string;
-  /** 实例名，默认 `nowen-note@${hostname}` */
+  /** 实例名，默认 `BaseForge@${hostname}` */
   name?: string;
 }
 
@@ -35,11 +35,11 @@ export interface PublishOptions {
  * 启动 mDNS 广播。返回是否成功。重复调用会先停掉旧的。
  *
  * 重名策略：
- *   - 默认 name = `nowen-note@${hostname}`。
+ *   - 默认 name = `BaseForge@${hostname}`。
  *   - 同机多实例（Electron 内嵌 backend + Node dev、或两个 dev）会因 name 完全相同
  *     而被 bonjour-service 的 probe 判定为冲突，抛 "Service name is already in use
  *     on the network"。
- *   - 这里把端口拼进 name —— `nowen-note@${hostname}:${port}`，同机同端口只可能有
+ *   - 这里把端口拼进 name —— `BaseForge@${hostname}:${port}`，同机同端口只可能有
  *     一份，冲突概率骤降；真还冲突则交给下面的 error 回调兜底（仅 warn，不影响主
  *     流程）。如果用户显式传了 name，则尊重用户选择，不自动追加端口。
  */
@@ -61,7 +61,7 @@ export function publishMdns(opts: PublishOptions): boolean {
     publishedService = bonjourInstance.publish({
       // 注意：bonjour-service 要求 type 不带下划线前缀和 ._tcp 后缀，它内部会拼
       name,
-      type: "nowen-note",
+      type: "baseforge",
       protocol: "tcp",
       port: opts.port,
       txt: {
@@ -98,7 +98,7 @@ export function publishMdns(opts: PublishOptions): boolean {
     });
 
     console.log(
-      `[discovery] mDNS published: _nowen-note._tcp.local. name="${name}" port=${opts.port}`,
+      `[discovery] mDNS published: _baseforge._tcp.local. name="${name}" port=${opts.port}`,
     );
     return true;
   } catch (err) {

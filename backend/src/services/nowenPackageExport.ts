@@ -2,6 +2,7 @@ import crypto from "crypto";
 import JSZip from "jszip";
 import path from "path";
 import { getDb, getDbSchemaVersion } from "../db/schema";
+import { brandEnv } from "../lib/envBrand.js";
 import { ensureKnowledgeTreePasswordTable } from "../db/knowledgeTreePasswordMigration";
 import { verifyFolderUnlockToken } from "../lib/knowledgeTreePasswordAccess";
 import { getUserWorkspaceRole, isSystemAdmin } from "../middleware/acl";
@@ -783,7 +784,7 @@ export async function createNowenPackageExport(params: ExportParams): Promise<{
     schemaVersion: getDbSchemaVersion(),
     exportedAt: now,
     exportBatchId,
-    sourceInstanceId: process.env.NOWEN_INSTANCE_ID || null,
+    sourceInstanceId: brandEnv("INSTANCE_ID") || null,
     scope: {
       type: notebookId ? "notebook" : noteIds ? "selection" : "all",
       workspaceId: workspaceId || null,

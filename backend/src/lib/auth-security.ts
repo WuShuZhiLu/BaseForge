@@ -20,7 +20,7 @@ import type { Context } from "hono";
 
 // ========== JWT Secret 初始化 ==========
 
-const DEV_FALLBACK_SECRET = "nowen-note-secret-key-change-in-production";
+const DEV_FALLBACK_SECRET = "baseforge-secret-key-change-in-production";
 
 function resolveJwtSecret(): string {
   const fromEnv = process.env.JWT_SECRET;

@@ -78,7 +78,7 @@ function env(name: string): string {
 }
 
 function deriveCipherKey(): Buffer {
-  const secret = process.env.JWT_SECRET || "nowen-note-default-secret";
+  const secret = process.env.JWT_SECRET || "baseforge-default-secret";
   return crypto.scryptSync(secret, "nowen-attachment-storage-v1", 32);
 }
 

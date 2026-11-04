@@ -95,7 +95,7 @@ function toIcsDate(dateStr: string): { value: string; isDateTime: boolean } {
 function buildVEvent(task: any, feed: any, reminders: any[]): string {
   const lines: string[] = [];
   lines.push("BEGIN:VEVENT");
-  lines.push(icsFold(`UID:task-${task.id}@nowen-note`));
+  lines.push(icsFold(`UID:task-${task.id}@baseforge`));
   lines.push(icsFold(`SUMMARY:${icsEscape(task.title)}`));
 
   if (feed.includeDescription && task.description) {

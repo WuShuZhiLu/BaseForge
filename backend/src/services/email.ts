@@ -80,7 +80,7 @@ export const EMAIL_ATTACHMENT_LIMIT = 25 * 1024 * 1024;
 function deriveCipherKey(): Buffer {
   // 不直接用 JWT_SECRET 原值，避免"解密邮件密码 === 伪造 JWT"的攻击面耦合；
   // 加固定盐 + scryptSync 派生 32 字节密钥。
-  const secret = process.env.JWT_SECRET || "nowen-note-default-secret";
+  const secret = process.env.JWT_SECRET || "baseforge-default-secret";
   return crypto.scryptSync(secret, "nowen-smtp-v1", 32);
 }
 
@@ -278,7 +278,7 @@ function buildMimeMessage(cfg: SmtpConfig, opt: SendMailOptions): string {
     ? `${encodeMimeWord(cfg.fromName)} <${cfg.fromEmail || cfg.username}>`
     : cfg.fromEmail || cfg.username;
   const date = new Date().toUTCString();
-  const messageId = `<${crypto.randomUUID()}@nowen-note>`;
+  const messageId = `<${crypto.randomUUID()}@baseforge>`;
 
   const headers: string[] = [
     `From: ${fromHeader}`,
@@ -394,7 +394,7 @@ export async function sendMail(opt: SendMailOptions): Promise<SendMailResult> {
     assertCode(await smtpCommand(socket, null, timeoutMs), [220], "greeting");
 
     // 2) EHLO
-    const hostname = "nowen-note.local";
+    const hostname = "baseforge.local";
     let ehlo = await smtpCommand(socket, `EHLO ${hostname}`, timeoutMs);
     assertCode(ehlo, [250], "EHLO");
 

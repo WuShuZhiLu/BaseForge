@@ -10,11 +10,12 @@ import { getBackupManager } from "../services/backup";
 import { logAudit } from "../services/audit";
 import { getLatestReleasePayload } from "./releases";
 import { resolveAppVersion } from "./version";
+import { brandEnv } from "../lib/envBrand.js";
 
 const router = new Hono();
-const UPDATER_URL = (process.env.NOWEN_UPDATER_URL || "http://nowen-note-updater:3002").replace(/\/+$/, "");
-const UPDATER_TOKEN = (process.env.NOWEN_UPDATER_TOKEN || "").trim();
-const PREFLIGHT_TTL_MS = Math.max(5 * 60_000, Number(process.env.NOWEN_UPDATE_PREFLIGHT_TTL_MS) || 30 * 60_000);
+const UPDATER_URL = (brandEnv("UPDATER_URL") || "http://baseforge-updater:3002").replace(/\/+$/, "");
+const UPDATER_TOKEN = (brandEnv("UPDATER_TOKEN") || "").trim();
+const PREFLIGHT_TTL_MS = Math.max(5 * 60_000, Number(brandEnv("UPDATE_PREFLIGHT_TTL_MS")) || 30 * 60_000);
 const INTERACTIVE_HEADER = "Nowen-System-Update";
 const PREFLIGHT_PREFIX = "system-update:preflight:";
 
@@ -63,9 +64,9 @@ const mutationRate = new Map<string, { count: number; resetAt: number }>();
 router.use("*", requireAdmin);
 
 function detectDeploymentType(): string {
-  const explicit = (process.env.NOWEN_DEPLOYMENT_TYPE || "").trim();
+  const explicit = (brandEnv("DEPLOYMENT_TYPE") || "").trim();
   if (explicit) return explicit;
-  const packageType = (process.env.NOWEN_NAS_PACKAGE_TYPE || process.env.NOWEN_PACKAGE_TYPE || "").toLowerCase();
+  const packageType = (brandEnv("NAS_PACKAGE_TYPE") || brandEnv("PACKAGE_TYPE") || "").toLowerCase();
   if (packageType === "fpk" || packageType === "upk") return packageType;
   if (fs.existsSync("/.dockerenv")) return "docker-unmanaged";
   if (process.env.ELECTRON_RUN_AS_NODE || process.env.ELECTRON_USER_DATA) return "desktop-local";
@@ -103,9 +104,9 @@ function manualGuidance(type: string, latestVersion: string | null): { title: st
     return {
       title: "手动 Docker 升级",
       steps: [
-        `NOWEN_IMAGE_TAG=${target} docker compose pull nowen-note`,
-        `NOWEN_IMAGE_TAG=${target} docker compose up -d --no-deps nowen-note`,
-        "docker compose logs -f --tail=100 nowen-note",
+        `BASEFORGE_IMAGE_TAG=${target} docker compose pull baseforge`,
+        `BASEFORGE_IMAGE_TAG=${target} docker compose up -d --no-deps baseforge`,
+        "docker compose logs -f --tail=100 baseforge",
       ],
     };
   }
