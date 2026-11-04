@@ -38,7 +38,7 @@ import { withEncryptedBlocksSupport } from "../lib/encryptedNotes.js";
  * 天然把这些修改一并上传。不需要"禁止用户编辑几分钟"。
  */
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { SYNC_PERSONAL_SCOPE_KEY, SYNC_SNAPSHOT_PAGE_SIZE } from "./constants";
 import { SyncError } from "./errors";
@@ -111,7 +111,7 @@ interface ProfileBootstrapRow {
   bootstrapError: string | null;
 }
 
-function readProfile(db: Database.Database, profileId: string): ProfileBootstrapRow {
+function readProfile(db: DatabaseSync, profileId: string): ProfileBootstrapRow {
   const row = db.prepare(`
     SELECT id, bootstrapStatus, bootstrapCursor, bootstrapSequence, bootstrapError
     FROM sync_profiles WHERE id = ?
@@ -121,7 +121,7 @@ function readProfile(db: Database.Database, profileId: string): ProfileBootstrap
 }
 
 function setStatus(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   status: BootstrapStatus,
   extra: { cursor?: string | null; sequence?: number | null; error?: string | null } = {},
@@ -149,7 +149,7 @@ function setStatus(
  * 用独立函数而非直接调 resetBootstrap：这里要处理"所有 Profile"，
  * 而且必须能在没有 sync 表的老库上安全降级（备份可能来自更早版本）。
  */
-export function markSyncNeedsReconcile(db: Database.Database = getDb()): number {
+export function markSyncNeedsReconcile(db: DatabaseSync = getDb()): number {
   // 表可能不存在（备份来自 v88 之前）：静默跳过而不是抛错，
   // 否则恢复流程会因为一个可选功能而失败。
   const hasTable = db.prepare(`
@@ -204,7 +204,7 @@ export function markSyncNeedsReconcile(db: Database.Database = getDb()): number 
  * 否则会跳过冲突检测。
  */
 export function markBootstrapReady(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   sequence: number,
 ): void {
@@ -227,7 +227,7 @@ export function markBootstrapReady(
  * 分实体类型返回，便于按依赖顺序上传。
  */
 export function readLocalState(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   entityType: SyncEntityType,
 ): RemoteEntityPayload[] {
@@ -364,7 +364,7 @@ export function readLocalState(
 }
 
 /** 本地个人空间是否为空 —— 决定走"下载"还是"合并"。 */
-export function isLocalEmpty(db: Database.Database, userId: string): boolean {
+export function isLocalEmpty(db: DatabaseSync, userId: string): boolean {
   for (const type of BOOTSTRAP_ENTITY_ORDER) {
     if (readLocalState(db, userId, type).length > 0) return false;
   }
@@ -461,7 +461,7 @@ export function reconcile(
 // ---------------------------------------------------------------------------
 
 export interface BootstrapOptions {
-  db: Database.Database;
+  db: DatabaseSync;
   profileId: string;
   deviceId: string;
   userId: string;
@@ -771,7 +771,7 @@ export async function runBootstrap(
 }
 
 function progressOf(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   counts: { pulled: number; pushed: number; conflicts: number },
 ): BootstrapProgress {
@@ -789,14 +789,14 @@ function progressOf(
 
 /** 读取 Bootstrap 进度，供设置页展示阶段与失败原因。 */
 export function getBootstrapProgress(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): BootstrapProgress {
   return progressOf(db, profileId, { pulled: 0, pushed: 0, conflicts: 0 });
 }
 
 /** 是否已完成基线建立 —— 增量引擎的启动前置条件。 */
-export function isBootstrapReady(db: Database.Database, profileId: string): boolean {
+export function isBootstrapReady(db: DatabaseSync, profileId: string): boolean {
   const row = db.prepare(
     "SELECT bootstrapStatus FROM sync_profiles WHERE id = ?",
   ).get(profileId) as { bootstrapStatus?: string } | undefined;
@@ -809,7 +809,7 @@ export function isBootstrapReady(db: Database.Database, profileId: string): bool
  * 用于恢复备份之后（旧 cursor 不再可信）或用户手动重试。
  * 只清 Bootstrap 进度，**不动任何本地业务数据、不动 Outbox、不动冲突台账**。
  */
-export function resetBootstrap(db: Database.Database, profileId: string): void {
+export function resetBootstrap(db: DatabaseSync, profileId: string): void {
   resetKnowledgeTreeSyncReadiness(db, profileId);
   db.prepare(`
     UPDATE sync_profiles

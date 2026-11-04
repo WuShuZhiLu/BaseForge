@@ -159,17 +159,17 @@ export function ReminderCenter({ open, onClose, onSelectTask }: ReminderCenterPr
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.97, opacity: 0, y: 10 }}
         transition={{ duration: 0.2 }}
-        className="relative w-[min(560px,calc(100vw-24px))] max-h-[85vh] sm:max-h-[80vh] bg-bg-primary rounded-xl shadow-2xl border border-app-border flex flex-col overflow-hidden"
+        className="relative flex max-h-[85vh] w-[min(560px,calc(100vw-24px))] flex-col overflow-hidden rounded-[10px] border border-app-border bg-app-surface shadow-xl sm:max-h-[80vh]"
       >
         {/* Header */}
-        <div className="min-h-12 flex items-center justify-between px-4 border-b border-app-border bg-bg-primary">
+        <div className="flex min-h-12 items-center justify-between border-b border-app-border bg-app-surface px-4">
           <div className="flex items-center gap-2">
-            <Bell size={18} className="text-accent-primary" />
-            <h2 className="text-sm font-medium text-tx-primary">
+            <Bell size={14} className="text-tx-secondary" />
+            <h2 className="text-[13px] font-semibold text-tx-primary">
               {t("tasks.reminderCenter.title")}
             </h2>
             {totalMissedToday > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 font-medium">
+              <span className="rounded-full bg-app-hover px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-tx-secondary">
                 {totalMissedToday}
               </span>
             )}

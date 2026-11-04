@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 /**
  * Change Feed 抑制开关（服务端侧）。
@@ -17,12 +17,12 @@ import type Database from "better-sqlite3";
 
 let depth = 0;
 
-function setSuppressed(db: Database.Database, value: boolean): void {
+function setSuppressed(db: DatabaseSync, value: boolean): void {
   db.prepare("UPDATE sync_v2_suppression SET suppressed = ? WHERE id = 1")
     .run(value ? 1 : 0);
 }
 
-export function isChangeFeedSuppressed(db: Database.Database): boolean {
+export function isChangeFeedSuppressed(db: DatabaseSync): boolean {
   const row = db.prepare("SELECT suppressed FROM sync_v2_suppression WHERE id = 1")
     .get() as { suppressed: number } | undefined;
   return Number(row?.suppressed || 0) === 1;
@@ -35,7 +35,7 @@ export function isChangeFeedSuppressed(db: Database.Database): boolean {
  * 这样抑制窗口不会泄漏到其他并发写入。
  */
 export function runChangeFeedSuppressed<T>(
-  db: Database.Database,
+  db: DatabaseSync,
   fn: () => T,
 ): T {
   depth += 1;
@@ -63,7 +63,7 @@ export function runChangeFeedSuppressed<T>(
  * 上一次运行若在抑制窗口内被强杀，开关会留在 1，
  * 导致此后所有写入都不进 feed。启动复位是唯一可靠的兜底。
  */
-export function resetChangeFeedSuppression(db: Database.Database): void {
+export function resetChangeFeedSuppression(db: DatabaseSync): void {
   depth = 0;
   try {
     setSuppressed(db, false);

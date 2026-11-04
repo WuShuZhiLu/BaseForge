@@ -723,6 +723,7 @@ app.put("/:id", async (c) => {
       UPDATE notebooks SET name = COALESCE(?, name), icon = COALESCE(?, icon),
       color = COALESCE(?, color), parentId = COALESCE(?, parentId),
       sortOrder = COALESCE(?, sortOrder), isExpanded = COALESCE(?, isExpanded),
+      description = COALESCE(?, description),
       updatedAt = datetime('now')
       WHERE id = ?
     `,
@@ -733,6 +734,7 @@ app.put("/:id", async (c) => {
       body.parentId,
       body.sortOrder,
       body.isExpanded,
+      body.description,
       id,
     );
     if (body.parentId !== undefined || body.sortOrder !== undefined || body.isExpanded !== undefined) {

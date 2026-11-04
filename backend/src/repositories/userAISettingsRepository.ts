@@ -51,7 +51,7 @@ export function createUserAISettingsRepository(
         FROM user_ai_settings
         WHERE userId = ? AND key IN (${placeholders})
         ORDER BY key
-      `).all(userId, ...keys) as UserAISetting[];
+      `).all(userId, ...keys) as unknown as UserAISetting[];
     },
 
     getByPrefix(userId: string, prefix: string): UserAISetting[] {
@@ -61,7 +61,7 @@ export function createUserAISettingsRepository(
         FROM user_ai_settings
         WHERE userId = ? AND key LIKE ?
         ORDER BY key
-      `).all(userId, `${prefix}%`) as UserAISetting[];
+      `).all(userId, `${prefix}%`) as unknown as UserAISetting[];
     },
 
     set(userId: string, key: string, value: string): void {

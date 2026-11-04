@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const MINDMAP_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MARKDOWN_EMBED_RE = /!\[\[mindmap:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]\]/gi;
@@ -78,7 +78,7 @@ function isSameResourceScope(mapWorkspaceId: string | null, noteWorkspaceId: str
 }
 
 function canOwnerReadMap(
-  db: Database.Database,
+  db: DatabaseSync,
   row: { userId: string; workspaceId: string | null },
   noteOwnerId: string,
 ): boolean {
@@ -95,7 +95,7 @@ function canOwnerReadMap(
  * and the same personal/workspace boundary. Payload size is bounded.
  */
 export function collectSharedMindMapSnapshots(
-  db: Database.Database,
+  db: DatabaseSync,
   options: {
     content: string;
     contentFormat?: string | null;

@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
 import { getDb } from "../db/schema";
 import { analyzeModernMedia, type MediaAnalysis } from "../lib/modern-media";
+import { getMediaFfmpegPath } from "../lib/ffmpeg-path";
 import { getAttachmentsDir, readAttachmentObject } from "./attachment-storage";
 
 interface SourceRow {
@@ -58,7 +58,7 @@ async function findLiveCompanion(row: SourceRow, identifier: string): Promise<So
   const candidates = getDb().prepare(`SELECT id, noteId, userId, workspaceId, mimeType, filename, path FROM attachments
     WHERE noteId = ? AND userId = ? AND workspaceId IS ? AND id != ?
     AND (mimeType LIKE 'video/%' OR lower(filename) LIKE '%.mov' OR lower(filename) LIKE '%.mp4')`)
-    .all(row.noteId, row.userId, row.workspaceId, row.id) as SourceRow[];
+    .all(row.noteId, row.userId, row.workspaceId, row.id) as unknown as SourceRow[];
   for (const candidate of candidates) {
     let analysis: MediaAnalysis;
     try { analysis = await loadAnalysis(candidate, () => readAttachmentObject(candidate.path)); }
@@ -88,11 +88,9 @@ export function recordHeifVariant(id: string): void {
     .run(id, `.thumbs/${id}_preview.webp`);
 }
 
-export function getMediaFfmpegPath(): string {
-  if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
-  const require = createRequire(__filename);
-  return require("ffmpeg-static") || "ffmpeg";
-}
+// ffmpeg 路径解析已抽到 lib/ffmpeg-path（视频海报共用同一份）；此处 re-export
+// 保持既有调用方（含测试）的 import 路径不变。
+export { getMediaFfmpegPath };
 
 function convertMotion(input: string, output: string): Promise<void> {
   return new Promise((resolve, reject) => {

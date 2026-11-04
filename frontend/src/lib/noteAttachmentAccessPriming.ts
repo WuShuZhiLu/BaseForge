@@ -166,7 +166,7 @@ async function requestNoteAttachmentAccess(
   );
 
   // navigator.onLine describes Internet reachability poorly on isolated Wi-Fi/LAN networks.
-  // A private Nowen server may still be perfectly reachable, so do not suppress its auth exchange.
+  // A private BaseForge server may still be perfectly reachable, so do not suppress its auth exchange.
   if (
     typeof navigator !== "undefined"
     && navigator.onLine === false

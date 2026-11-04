@@ -3457,7 +3457,7 @@ const moveToTrash = useCallback(async () => {
 
       {/* Desktop Editor Header（分屏时由宿主 portal 到全宽位置：顶栏 + 工具栏各一条，都在内容分栏之上） */}
       <EditorToolbarPortal target={chromeSlot}>
-      <div className="hidden md:flex min-w-0 items-center justify-between gap-3 px-4 py-1.5 border-b border-app-border bg-app-surface/30 transition-colors">
+      <div className="hidden md:flex h-12 shrink-0 min-w-0 items-center justify-between gap-3 px-4 border-b border-app-border bg-app-surface/30 transition-colors">
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {/* �ʼ��б����۵�ʱ���������ṩ��չ������ť��δ�۵�ʱ���ء�
               ����������м��࣬�����ڡ���˭���б���ס�ˡ������֪��һ�ۿ����� */}
@@ -4822,7 +4822,7 @@ function OutlinePanel({
   // 当前标题跟随：在编辑器表面容器上捕获滚动（滚动事件不冒泡，捕获阶段可从祖先接住），
   // 取视口顶部以上最近的标题为当前项。DOM h1-h6 顺序 == headings 文档顺序，
   // 数量对不上（特殊视图/异步渲染）时不高亮，仅影响跟随不影响跳转。
-  const surfaceRef = useRef<HTMLElement | null>(null);
+  const surfaceRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const host = surfaceRef.current;
     const surface = host?.parentElement;

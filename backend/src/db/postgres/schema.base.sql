@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     name TEXT NOT NULL,
     description TEXT DEFAULT '',
     icon TEXT DEFAULT '🏢',
+    "avatarUrl" TEXT,
     "ownerId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -211,6 +212,28 @@ CREATE TABLE IF NOT EXISTS notebook_share_links (
 
 CREATE INDEX IF NOT EXISTS idx_notebook_share_links_notebook ON notebook_share_links("notebookId");
 CREATE INDEX IF NOT EXISTS idx_notebook_share_links_token ON notebook_share_links(token);
+
+-- ============================================================
+-- Attachment shares（附件只读分享链接：密码/过期/次数上限）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS attachment_shares (
+    id TEXT PRIMARY KEY,
+    "attachmentId" TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+    "ownerId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    "shareToken" TEXT NOT NULL UNIQUE,
+    password TEXT,
+    "expiresAt" TIMESTAMPTZ,
+    "maxViews" INTEGER,
+    "viewCount" INTEGER NOT NULL DEFAULT 0,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "credentialVersion" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachment_shares_attachment ON attachment_shares("attachmentId");
+CREATE INDEX IF NOT EXISTS idx_attachment_shares_owner ON attachment_shares("ownerId");
 
 -- ============================================================
 -- Note ACL

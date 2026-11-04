@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { ensureNoteBlockTables } from "../lib/noteBlocks.js";
 import { blockAuthorityMigration } from "./blockAuthorityMigration.js";
 import { blockAuthorityStaleGuardMigration } from "./blockAuthorityStaleGuardMigration.js";
@@ -24,7 +24,7 @@ const LEGACY_BLOCK_SCHEMA_VERSION = 48;
  * migration implementations keeps the repair aligned with the canonical schema
  * instead of maintaining a second copy of the DDL.
  */
-export function ensureBlockSchemaRepair(db: Database.Database): void {
+export function ensureBlockSchemaRepair(db: DatabaseSync): void {
   const legacyBlockMigration = BASE_MIGRATIONS.find(
     (migration) => migration.version === LEGACY_BLOCK_SCHEMA_VERSION,
   );

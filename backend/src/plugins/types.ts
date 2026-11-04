@@ -1,5 +1,12 @@
 export const PLUGIN_API_VERSION = 2;
-export const NOWEN_VERSION = "1.5.0";
+/**
+ * 宿主对插件声明的兼容版本基线（对应上游 nowen note 的功能层级）。
+ * 本仓库基线是 v1.5.1（上游 tag bd6f4f73），此前误写 1.5.0，导致 examples 里
+ * 声明 `nowen >=1.5.1` 的插件装不上——宿主明明包含 1.5.1 的全部能力却自称 1.5.0。
+ * 注意：不要为了"让某个插件装上"随手抬高，这个值是对插件开发者的能力承诺。
+ */
+export const NOWEN_VERSION = "1.5.1";
+/** v2.1 扩展平台的目标版本：低于此版本的宿主不启用 extensionsV21 相关贡献点 */
 export const EXTENSION_V21_TARGET_NOWEN_VERSION = "1.6.0";
 
 export interface ExtensionPlatformFeatureFlags {
@@ -17,6 +24,9 @@ export const PLUGIN_PERMISSIONS = [
   "notebooks:read", "notebooks:write",
   "tags:read", "tags:write",
   "tasks:read", "tasks:write",
+  // attachments:write 目前没有对应的 Host 方法（host-api-contract 只有 attachments.get / list），
+  // 保留只是为了不破坏已发布的 v1 manifest；Plugin API V2 会直接拒绝声明它。
+  // 等真正开放附件写入再补方法，否则新插件不要请求这个权限。
   "attachments:read", "attachments:write",
   "diary:read", "diary:write",
   "mindmaps:read", "mindmaps:write",
@@ -199,6 +209,8 @@ export interface PluginContributionManifest {
   noteTemplates?: PluginNoteTemplateContribution[];
   promptPacks?: PluginPromptPackContribution[];
   uiComponents?: PluginUiActionContribution[];
+  /** 编辑器命令（V2.3，斜杠菜单 + 快捷键，仅可执行插件） */
+  editorCommands?: PluginEditorCommandContribution[];
   /** 侧栏/主区插件面板（V2.1，受 uiExtensions flag 门禁） */
   sidebarPanels?: PluginSidebarPanelContribution[];
   mainViewPanels?: PluginMainViewPanelContribution[];
@@ -242,6 +254,24 @@ export interface PluginInboundWebhookContribution {
   methods: Array<"GET" | "POST">;
   maxBodyBytes: number;
   backgroundAction?: string;
+}
+
+/** when 条件：编辑器获得焦点 / 有笔记处于打开状态 */
+export type PluginEditorCommandWhen = "editorFocused" | "noteOpen";
+
+/** 编辑器命令：出现在斜杠菜单，可绑定快捷键，执行时调用已声明的插件 Action */
+export interface PluginEditorCommandContribution {
+  /** 必须为 `${pluginId}.${localId}`（如 nowen.example.insert-timestamp） */
+  id: string;
+  title: string;
+  keywords?: string[];
+  /** 形如 Mod-Alt-K；修饰键仅支持 Mod/Alt/Shift */
+  keybinding?: string;
+  when?: PluginEditorCommandWhen;
+  /** 斜杠菜单分组名（1-20 字，缺省「插件」），与契约 editorCommand.maxCategoryLength 一致 */
+  category?: string;
+  /** 指向同一插件已声明的 Action id */
+  action: string;
 }
 
 export interface PluginDeclarativeContributionManifest {

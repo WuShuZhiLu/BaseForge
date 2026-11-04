@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { SYNC_TABLES } from "./constants";
 import type { SyncDeviceRow } from "./types";
 
@@ -43,7 +43,7 @@ export interface EnsureInstallationDeviceInput {
  * "从未开启过同步的全新安装" 上触发。
  */
 export function ensureInstallationDevice(
-  db: Database.Database,
+  db: DatabaseSync,
   input: EnsureInstallationDeviceInput = {},
 ): { deviceId: string; deviceName: string | null; platform: string | null } {
   const existing = db.prepare(`
@@ -87,7 +87,7 @@ export function ensureInstallationDevice(
 }
 
 /** 读取安装身份；尚未建立时返回 null（不产生副作用）。 */
-export function getInstallationDeviceId(db: Database.Database): string | null {
+export function getInstallationDeviceId(db: DatabaseSync): string | null {
   const row = db.prepare(
     "SELECT deviceId FROM sync_device_identity WHERE singletonKey = 1",
   ).get() as { deviceId?: string } | undefined;
@@ -107,7 +107,7 @@ export interface EnsureDeviceInput {
  * 关键区别：`id` 现在是**安装级** deviceId —— 换服务器时它不变。
  */
 export function ensureDevice(
-  db: Database.Database,
+  db: DatabaseSync,
   input: EnsureDeviceInput,
 ): SyncDeviceRow {
   const identity = ensureInstallationDevice(db, {
@@ -133,7 +133,7 @@ export function ensureDevice(
     SELECT deviceId AS id, profileId, deviceName, platform, createdAt, lastSeenAt
     FROM sync_profile_devices
     WHERE profileId = ? AND deviceId = ?
-  `).get(input.profileId, identity.deviceId) as SyncDeviceRow;
+  `).get(input.profileId, identity.deviceId) as unknown as SyncDeviceRow;
 
   return row;
 }
@@ -144,7 +144,7 @@ export function ensureDevice(
  * 更新全部 membership：deviceId 是安装级的，"本机刚刚通信过"
  * 这个事实对所有 Profile 都成立。
  */
-export function touchDevice(db: Database.Database, deviceId: string): void {
+export function touchDevice(db: DatabaseSync, deviceId: string): void {
   db.prepare(`
     UPDATE sync_profile_devices SET lastSeenAt = datetime('now')
     WHERE deviceId = ?
@@ -157,7 +157,7 @@ export function touchDevice(db: Database.Database, deviceId: string): void {
  * 主要供诊断与测试使用；业务判定应直接用 getInstallationDeviceId()。
  */
 export function getDevice(
-  db: Database.Database,
+  db: DatabaseSync,
   deviceId: string,
 ): SyncDeviceRow | null {
   const row = db.prepare(`
@@ -172,7 +172,7 @@ export function getDevice(
 
 /** 某个 Profile 的全部设备 membership，供设置页展示"已同步的设备"。 */
 export function listProfileDevices(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): SyncDeviceRow[] {
   return db.prepare(`
@@ -180,5 +180,5 @@ export function listProfileDevices(
     FROM sync_profile_devices
     WHERE profileId = ?
     ORDER BY createdAt ASC
-  `).all(profileId) as SyncDeviceRow[];
+  `).all(profileId) as unknown as SyncDeviceRow[];
 }

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema.js";
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
@@ -32,7 +32,7 @@ export function listKnowledgeTree(input: {
   userId: string;
   workspaceId: string | null;
   includeDeleted?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): KnowledgeTreeNode[] {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);
@@ -96,7 +96,74 @@ export function listKnowledgeTree(input: {
     visibleChildCounts.set(row.parentId, (visibleChildCounts.get(row.parentId) || 0) + 1);
   }
 
-  return visible.map((row) => ({
+  // 复制 = 连接：同一篇文档的其它路径从引用表读出，正文仍然只有一份。
+  const accessByNodeId = new Map(visible.map((row) => [row.id, row.access]));
+  const referenceRows = db.prepare(`
+    SELECT ref.id, ref.userId, ref.workspaceId, ref.scopeKey, ref.parentId,
+           ref.resourceId, COALESCE(note.title, ref.title) AS title, ref.sortOrder,
+           ref.createdAt, ref.updatedAt,
+           note.contentFormat AS contentFormat, note.colorMark AS colorMark,
+           note.note_type AS noteType,
+           CASE WHEN note.note_type = 'word' THEN 'word'
+                WHEN note.contentFormat = 'markdown' THEN 'markdown'
+                ELSE 'note' END AS nodeType,
+           COALESCE(note.isPinned, 0) AS isPinned,
+           COALESCE(note.isLocked, 0) AS isLocked,
+           CASE WHEN EXISTS(
+             SELECT 1 FROM favorites favorite
+             WHERE favorite.noteId = note.id AND favorite.userId = ?
+           ) THEN 1 ELSE 0 END AS isFavorite
+    FROM knowledge_tree_references ref
+    JOIN notes note ON note.id = ref.resourceId
+      AND COALESCE(note.isTrashed, 0) = 0
+      AND COALESCE(note.isUnlisted, 0) = 0
+    JOIN knowledge_tree_nodes parent ON parent.id = ref.parentId AND parent.isDeleted = 0
+    WHERE ref.scopeKey = ? AND ref.isDeleted = 0
+    ORDER BY ref.parentId, ref.sortOrder, lower(COALESCE(note.title, ref.title)), ref.id
+  `).all(input.userId, key) as Array<{
+    id: string; userId: string; workspaceId: string | null; scopeKey: string;
+    parentId: string; resourceId: string; title: string; sortOrder: number;
+    createdAt: string; updatedAt: string; contentFormat: string | null;
+    colorMark: string | null; noteType: string | null; nodeType: KnowledgeTreeNode["nodeType"];
+    isPinned: number; isLocked: number; isFavorite: number;
+  }>;
+
+  const references: KnowledgeTreeNode[] = [];
+  for (const row of referenceRows) {
+    const parentAccess = accessByNodeId.get(row.parentId);
+    if (!parentAccess?.capabilities.canView) continue;
+    visibleChildCounts.set(row.parentId, (visibleChildCounts.get(row.parentId) || 0) + 1);
+    references.push({
+      id: row.id,
+      userId: row.userId,
+      workspaceId: row.workspaceId,
+      scopeKey: row.scopeKey,
+      parentId: row.parentId,
+      nodeType: row.nodeType,
+      resourceType: "note",
+      resourceId: row.resourceId,
+      title: row.title,
+      icon: null,
+      isPinned: Number(row.isPinned),
+      isFavorite: Number(row.isFavorite),
+      isLocked: Number(row.isLocked),
+      isPasswordProtected: 0,
+      contentFormat: row.contentFormat,
+      colorMark: row.colorMark,
+      noteType: row.noteType,
+      sortOrder: Number(row.sortOrder),
+      isExpanded: 0,
+      isDeleted: 0,
+      deletedAt: null,
+      childCount: 0,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      access: parentAccess,
+      isReference: true,
+    });
+  }
+
+  const nodes = visible.map((row) => ({
     ...row,
     // A directly shared descendant must remain reachable even when its restricted
     // ancestor is hidden. Promote it to a visible root instead of leaking the
@@ -104,4 +171,5 @@ export function listKnowledgeTree(input: {
     parentId: row.parentId && visibleIds.has(row.parentId) ? row.parentId : null,
     childCount: visibleChildCounts.get(row.id) || 0,
   }));
+  return [...nodes, ...references];
 }

@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -250,7 +250,9 @@ export function getBaseUrl(): string {
 }
 
 export function isNativeCapacitor(): boolean {
-  return typeof window !== "undefined" && !!(window as any).Capacitor?.isNativePlatform?.();
+  if (typeof window === "undefined") return false;
+  const capacitor = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  return !!capacitor?.isNativePlatform?.();
 }
 
 export function isAndroidInvalidServerUrl(url: string): boolean {
@@ -480,7 +482,7 @@ function splitConcatenatedJson(input: string): string[] {
  */
 function extractContentChunks(
   data: string,
-  onArray?: (arr: any[]) => void,
+  onArray?: (arr: AiReferenceItem[]) => void,
 ): string[] {
   if (data === "[DONE]") return [];
   const isControlObject = (value: unknown) =>
@@ -679,7 +681,7 @@ function getToken(): string | null {
  */
 async function clearDesktopLocalAuthCache(): Promise<void> {
   if (typeof window === "undefined") return;
-  const desktopApi = (window as any).nowenDesktop;
+  const desktopApi = (window as { nowenDesktop?: { isDesktop?: boolean; clearLocalAuth?: () => Promise<{ ok: boolean }> } }).nowenDesktop;
   if (!desktopApi?.isDesktop || typeof desktopApi.clearLocalAuth !== "function") return;
   try {
     await desktopApi.clearLocalAuth();
@@ -724,7 +726,7 @@ export function broadcastLogout(reason?: string): Promise<void> {
     // 立即删除，这样下次登出也能再次触发（避免 value 相同被合并）
     localStorage.removeItem("nowen-logout-broadcast");
     // 通知同 tab 内的组件（如 SecuritySettings）token 已变化
-    try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { }
+    try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { /* ignore */ }
   } catch {
     /* 隐私模式下 localStorage 可能不可用，忽略 */
   }
@@ -764,6 +766,18 @@ export function broadcastAuthChanged(reason?: string) {
  * 失败时（403 SUDO_REQUIRED / SUDO_INVALID）抛出带 code 的错误，UI 层捕获后弹密码
  * 框重取 sudoToken 再重试即可。
  */
+/** fetch / HTTP 错误的最小形状（TypeError、DOMException、HttpRequestError 均满足） */
+type ErrLike = { name?: string; message?: string; code?: string; status?: number };
+
+/** AI 流式响应中夹带的参考条目（参考笔记 / 附件命中） */
+type AiReferenceItem = {
+  id: string;
+  title: string;
+  kind?: "note" | "attachment";
+  attachmentId?: string;
+  attachmentFilename?: string;
+};
+
 interface RequestOptions extends RequestInit {
   sudoToken?: string;
   /** 标记此请求不走离线队列拦截（内部使用） */
@@ -811,7 +825,7 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
   // 兜底入队，不影响其他正常请求。
   // 注意：调用方传入的 signal 仍然生效，二者用 "linked controller" 模式合并。
   const linkedController = new AbortController();
-  const userSignal = (restOptions as any)?.signal as AbortSignal | undefined;
+  const userSignal = restOptions.signal ?? undefined;
   if (userSignal) {
     if (userSignal.aborted) linkedController.abort();
     else userSignal.addEventListener("abort", () => linkedController.abort(), { once: true });
@@ -835,7 +849,7 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
     // selfUserId 守卫兜底。
     let connId: string | null = null;
     try {
-      const fn = (window as any)?.__nowenGetConnectionId;
+      const fn = (window as { __nowenGetConnectionId?: () => string | null })?.__nowenGetConnectionId;
       if (typeof fn === "function") connId = fn();
     } catch {
       /* SSR / window 不可用时静默 */
@@ -861,8 +875,8 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
         console.warn("[api] fetch failed; using CapacitorHttp fallback for Android native request.", {
           method,
           url,
-          errorName: (error as any)?.name,
-          errorMessage: (error as any)?.message,
+          errorName: (error as ErrLike)?.name,
+          errorMessage: (error as ErrLike)?.message,
         });
         return nativeRes;
       } catch (nativeErr) {
@@ -870,9 +884,9 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
         console.warn("[api] CapacitorHttp fallback failed.", {
           method,
           url,
-          fetchErrorName: (error as any)?.name,
-          nativeErrorName: (nativeErr as any)?.name,
-          nativeErrorMessage: (nativeErr as any)?.message,
+          fetchErrorName: (error as ErrLike)?.name,
+          nativeErrorName: (nativeErr as ErrLike)?.name,
+          nativeErrorMessage: (nativeErr as ErrLike)?.message,
         });
         return null;
       }
@@ -883,7 +897,7 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
         { ...restOptions, signal: linkedController.signal, headers: buildHeaders(true) },
         getBaseUrl(),
       );
-    } catch (firstErr: any) {
+    } catch (firstErr) {
       // 兜底：当后端 CORS allowHeaders 没把 X-Connection-Id 加进白名单时，
       //   带它的请求会在 OPTIONS 预检阶段直接被浏览器/WebView 拦下，抛
       //   TypeError: Failed to fetch。一旦发生，剥离这个自定义 header 重试一次：
@@ -903,16 +917,16 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
             "[api] retry without X-Connection-Id succeeded — backend CORS likely missing this header in allowHeaders. Disabling injection for this session.",
           );
           // 关闭后续注入。注意只关一个会话内的注入，不写 storage（升级后端后下次重启即恢复）。
-          try { (window as any).__nowenGetConnectionId = () => null; } catch { /* ignore */ }
-        } catch (retryErr: any) {
+          try { (window as { __nowenGetConnectionId?: () => string | null }).__nowenGetConnectionId = () => null; } catch { /* ignore */ }
+        } catch (retryErr) {
           // 用户主动 abort（非超时） → 原样抛
-          if (retryErr?.name === "AbortError" && userSignal?.aborted) throw retryErr;
+          if ((retryErr as ErrLike)?.name === "AbortError" && userSignal?.aborted) throw retryErr;
           const nativeRes = await tryNativeFallback(retryErr, false);
           if (nativeRes) {
             res = nativeRes;
           } else {
             // 超时（linkedController.abort 触发） → 当作网络错误入队
-            const isTimeout = retryErr?.name === "AbortError";
+            const isTimeout = (retryErr as ErrLike)?.name === "AbortError";
             if (!_skipOfflineQueue && (isTimeout || _shouldEnqueue(url, method, retryErr))) {
               if (_shouldEnqueue(url, method, isTimeout ? new TypeError("timeout") : retryErr)) {
                 return handleOfflineEnqueue<T>(url, method, restOptions?.body as string | undefined, requestScope);
@@ -923,13 +937,13 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
         }
       } else {
         // 用户主动 abort → 原样抛
-        if (firstErr?.name === "AbortError" && userSignal?.aborted) throw firstErr;
+        if ((firstErr as ErrLike)?.name === "AbortError" && userSignal?.aborted) throw firstErr;
         const nativeRes = await tryNativeFallback(firstErr, true);
         if (nativeRes) {
           res = nativeRes;
         } else {
           // 超时 → 视为网络错误
-          const isTimeout = firstErr?.name === "AbortError";
+          const isTimeout = (firstErr as ErrLike)?.name === "AbortError";
           if (!_skipOfflineQueue) {
             const enqueueErr = isTimeout ? new TypeError("timeout") : firstErr;
             if (_shouldEnqueue(url, method, enqueueErr)) {
@@ -940,11 +954,11 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
         }
       }
     }
-  } catch (fetchErr: any) {
+  } catch (fetchErr) {
     // fetch 抛出 = 网络不可达（TypeError: Failed to fetch 等）
     // 用户主动 abort → 原样抛
-    if (fetchErr?.name === "AbortError" && userSignal?.aborted) throw fetchErr;
-    const isTimeout = fetchErr?.name === "AbortError";
+    if ((fetchErr as ErrLike)?.name === "AbortError" && userSignal?.aborted) throw fetchErr;
+    const isTimeout = (fetchErr as ErrLike)?.name === "AbortError";
     if (!_skipOfflineQueue) {
       const enqueueErr = isTimeout ? new TypeError("timeout") : fetchErr;
       if (_shouldEnqueue(url, method, enqueueErr)) {
@@ -962,8 +976,8 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
   const isSharePage =
     typeof window !== "undefined" && /^\/(?:share|notebook-share)\//.test(window.location.pathname);
   if (res.status === 401 || res.status === 403) {
-    let errBody: any = {};
-    try { errBody = await res.clone().json(); } catch { }
+    let errBody: { code?: string } = {};
+    try { errBody = await res.clone().json(); } catch { /* 非 JSON 响应体，忽略 */ }
     const code: string | undefined = errBody?.code;
     const sessionRevoked =
       res.status === 401 ||
@@ -1113,7 +1127,7 @@ type ImportNotesResponse = {
   count: number;
   notebookId: string;
   notebookIds?: string[];
-  notes: any[];
+  notes: Array<{ id: string; version?: number }>;
   workspaceId?: string | null;
 };
 
@@ -1176,13 +1190,13 @@ function readSiyuanImportRecovery(): SiyuanImportRecovery | null {
 }
 
 function writeSiyuanImportRecovery(value: SiyuanImportRecovery): void {
-  try { localStorage.setItem(SIYUAN_IMPORT_RECOVERY_KEY, JSON.stringify(value)); } catch {}
+  try { localStorage.setItem(SIYUAN_IMPORT_RECOVERY_KEY, JSON.stringify(value)); } catch { /* ignore */ }
 }
 
 function clearSiyuanImportRecovery(requestId: string): void {
   const current = readSiyuanImportRecovery();
   if (!current || current.requestId !== requestId) return;
-  try { localStorage.removeItem(SIYUAN_IMPORT_RECOVERY_KEY); } catch {}
+  try { localStorage.removeItem(SIYUAN_IMPORT_RECOVERY_KEY); } catch { /* ignore */ }
 }
 
 const IMPORT_NOTES_MAX_BATCH_BODY_CHARS = 8 * 1024 * 1024;
@@ -1264,11 +1278,87 @@ function mergeImportNoteResponses(results: ImportNotesResponse[]): ImportNotesRe
   };
 }
 
+/** ICS 日历订阅配置（taskCalendarFeed 接口返回） */
+export interface TaskCalendarFeedData {
+  id: string;
+  token: string;
+  enabled: boolean;
+  includeCompleted: boolean;
+  includeDescription: boolean;
+  defaultAlarmMinutes: number;
+  lastAccessedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 日历 ICS 镜像导出目标（calendarExportTargets 接口返回） */
+export interface CalendarExportTargetData {
+  id: string;
+  userId: string;
+  feedId: string;
+  type: string;
+  enabled: boolean;
+  name: string;
+  endpoint: string;
+  region: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKeySet: boolean;
+  pathPrefix: string;
+  publicBaseUrl: string;
+  usePathStyle: boolean;
+  publicUrl: string | null;
+  lastExportAt: string | null;
+  lastStatus: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 附件健康报告（/attachments/_health 与 _repair 接口共用） */
+export interface AttachmentHealthReportData {
+  ok: boolean;
+  totalAttachments: number;
+  totalPhysicalFiles: number;
+  totalAttachmentBytes: number;
+  missingPhysicalFiles: Array<{
+    id: string;
+    noteId: string;
+    noteTitle?: string;
+    filename: string;
+    path: string;
+    mimeType?: string;
+    size: number;
+    createdAt: string;
+    referencedBy: number;
+  }>;
+  danglingReferences: Array<{
+    attachmentId: string;
+    noteId: string;
+    noteTitle?: string;
+    isTrashed?: boolean;
+  }>;
+  sharedPhysicalFiles: Array<{
+    path: string;
+    count: number;
+    bytes: number;
+    attachmentIds: string[];
+  }>;
+  orphans: {
+    dbOrphans: Array<{ filename: string; bytes: number }>;
+    contentOrphans: Array<{ id: string; filename: string; bytes: number; noteId: string; createdAt: string }>;
+    reclaimableBytes: number;
+    totalAttachmentBytes: number;
+    graceHours: number;
+  };
+  checkedAt: string;
+}
+
 export const api = {
   trash: {
     list: (workspaceId: string) => request<{ items: import("@/features/trash/trashTypes").TrashItem[] }>(`/trash?workspaceId=${encodeURIComponent(workspaceId)}`),
-    mutate: (workspaceId: string, action: "restore" | "permanent", ids: string[]) =>
-      request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash/batch?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ action, ids }) }),
+    mutate: (workspaceId: string, action: "restore" | "permanent", ids: string[], options?: { targetParentId?: string }) =>
+      request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash/batch?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ action, ids, ...(options?.targetParentId ? { targetParentId: options.targetParentId } : {}) }) }),
     empty: (workspaceId: string) => request<import("@/features/trash/trashTypes").TrashBatchResult>(`/trash?workspaceId=${encodeURIComponent(workspaceId)}`, { method: "DELETE" }),
   },
   plugins: {
@@ -1294,7 +1384,7 @@ export const api = {
     const res = await fetch(`${getBaseUrl()}/settings`, { cache: "no-store" });
     if (!res.ok)
       return {
-        site_title: "nowen-note",
+        site_title: "BaseForge",
         site_favicon: "",
         site_share_footer_text: "",
         site_icp_beian: "",
@@ -1530,7 +1620,7 @@ export const api = {
   createNotebook: (data: Partial<Notebook>) => {
     // 自动带上当前工作区（除非数据里显式带了 workspaceId 或为个人空间）
     const currentWs = getCurrentWorkspace();
-    const payload: any = { ...data };
+    const payload: Partial<Notebook> = { ...data };
     if (payload.workspaceId === undefined && currentWs && currentWs !== "personal") {
       payload.workspaceId = currentWs;
     }
@@ -1595,7 +1685,7 @@ export const api = {
     //   只覆盖三个高频场景：notebookId / isFavorite / isTrashed；
     //   其他复杂 query（全文搜索 / sort / page 等）离线不支持，让上层报错。
     const offlineWorkspace = finalParams.workspaceId ?? currentWorkspace;
-    const offlineFilter = (n: any): boolean => {
+    const offlineFilter = (n: Note & { treeParentId?: string | null }): boolean => {
       const wsMatch = offlineWorkspace === "personal"
         ? !n.workspaceId
         : n.workspaceId === offlineWorkspace;
@@ -1668,13 +1758,25 @@ export const api = {
       endOffset: number | null;
     }> }>(`/blocks/note/${id}?limit=${limit}`),
   getBlock: (noteId: string, blockId: string) =>
-    request<any>(`/blocks/${noteId}/${encodeURIComponent(blockId)}`),
+    request<{ startOffset?: number | null; endOffset?: number | null }>(`/blocks/${noteId}/${encodeURIComponent(blockId)}`),
   resolveNoteLink: (link: string) =>
-    request<any>(`/blocks/resolve?link=${encodeURIComponent(link)}`),
+    request<{
+      note: {
+        id: string;
+        title: string;
+        notebookId: string;
+        notebookName: string | null;
+        version: number;
+        updatedAt: string;
+        excerpt: string;
+        contentFormat: string;
+      };
+      block: null | { blockId: string; blockType: string; plainText: string };
+    }>(`/blocks/resolve?link=${encodeURIComponent(link)}`),
   getBlockBacklinks: (noteId: string, blockId: string) =>
-    request<{ backlinks: any[] }>(`/blocks/${noteId}/${encodeURIComponent(blockId)}/backlinks`),
+    request<{ backlinks: unknown[] }>(`/blocks/${noteId}/${encodeURIComponent(blockId)}/backlinks`),
   getKnowledgeGraph: (noteId?: string) =>
-    request<{ nodes: Array<{ id: string; title: string; notebookId: string }>; edges: any[] }>(
+    request<{ nodes: Array<{ id: string; title: string; notebookId: string }>; edges: unknown[] }>(
       `/blocks/graph${noteId ? `?noteId=${encodeURIComponent(noteId)}` : ""}`,
     ),
   createNote: (data: Partial<Note>) => {
@@ -1686,8 +1788,9 @@ export const api = {
       { operation: "createNote" },
     );
     if (!payload.id) {
-      payload.id = (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-        ? (crypto as any).randomUUID()
+      const cryptoUuid = typeof crypto !== "undefined" ? (crypto as Crypto & { randomUUID?: () => string }) : undefined;
+      payload.id = cryptoUuid?.randomUUID
+        ? cryptoUuid.randomUUID()
         : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-4${Math.random().toString(16).slice(2, 5)}-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 14)}`;
     }
     return request<Note>("/notes", { method: "POST", body: JSON.stringify(payload) });
@@ -1768,7 +1871,7 @@ export const api = {
     if (!query.trim()) return [];
     const params = new URLSearchParams();
     params.set("q", query.trim());
-    const data = await request<any>(`/search?${params.toString()}`);
+    const data = await request<Array<{ id: string; title: string; notebookId: string; updatedAt: string; resourceType?: string }> | { items?: Array<{ id: string; title: string; notebookId: string; updatedAt: string; resourceType?: string }> }>(`/search?${params.toString()}`);
     // 后端返回数组或 { items: [...] }，兼容处理
     const items = Array.isArray(data) ? data : (data?.items || []);
     return items
@@ -1814,7 +1917,7 @@ export const api = {
     return _readTags(() => request<Tag[]>(`/tags${qs}`));
   },
   createTag: (data: Partial<Tag> & { workspaceId?: string | null }) => {
-    const payload: any = { ...data };
+    const payload: Partial<Tag> & { workspaceId?: string | null } = { ...data };
     if (payload.workspaceId === undefined) {
       const currentWs = getCurrentWorkspace();
       // 'personal' 不显式传，让后端按缺省走 NULL（个人空间）
@@ -1941,7 +2044,7 @@ export const api = {
   deleteTaskTemplate: (id: string) =>
     request(`/task-templates/${id}`, { method: "DELETE" }),
   applyTaskTemplate: (id: string, options: { projectId?: string | null; parentId?: string | null; baseDate?: string | null }) =>
-    request<{ createdTasks: any[]; count: number }>(`/task-templates/${id}/apply`, { method: "POST", body: JSON.stringify(options) }),
+    request<{ createdTasks: unknown[]; count: number }>(`/task-templates/${id}/apply`, { method: "POST", body: JSON.stringify(options) }),
 
   // Task dependencies
   getTaskDependencies: (taskId?: string) => {
@@ -2060,16 +2163,16 @@ export const api = {
 
   // Task calendar subscription (ICS feed)
   taskCalendarFeed: {
-    get: () => request<{ feed: any }>(`/task-calendar/feed`),
-    create: () => request<{ feed: any }>(`/task-calendar/feed`, { method: "POST" }),
+    get: () => request<{ feed: TaskCalendarFeedData }>(`/task-calendar/feed`),
+    create: () => request<{ feed: TaskCalendarFeedData }>(`/task-calendar/feed`, { method: "POST" }),
     update: (data: { enabled?: boolean; includeCompleted?: boolean; includeDescription?: boolean; defaultAlarmMinutes?: number }) =>
-      request<{ feed: any }>(`/task-calendar/feed`, { method: "PATCH", body: JSON.stringify(data) }),
+      request<{ feed: TaskCalendarFeedData }>(`/task-calendar/feed`, { method: "PATCH", body: JSON.stringify(data) }),
     rotateToken: () => request<{ success: boolean }>(`/task-calendar/feed/rotate-token`, { method: "POST" }),
   },
 
   // Calendar ICS mirror export to S3
   calendarExportTargets: {
-    list: () => request<{ targets: any[] }>(`/task-calendar/export-targets`),
+    list: () => request<{ targets: CalendarExportTargetData[] }>(`/task-calendar/export-targets`),
     create: (data: {
       feedId: string;
       name?: string;
@@ -2082,7 +2185,7 @@ export const api = {
       pathPrefix?: string;
       publicBaseUrl: string;
       forcePathStyle?: boolean;
-    }) => request<{ target: any }>(`/task-calendar/export-targets`, { method: "POST", body: JSON.stringify(data) }),
+    }) => request<{ target: CalendarExportTargetData }>(`/task-calendar/export-targets`, { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: {
       name?: string;
       enabled?: boolean;
@@ -2094,7 +2197,7 @@ export const api = {
       pathPrefix?: string;
       publicBaseUrl?: string;
       forcePathStyle?: boolean;
-    }) => request<{ target: any }>(`/task-calendar/export-targets/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+    }) => request<{ target: CalendarExportTargetData }>(`/task-calendar/export-targets/${id}`, { method: "PUT", body: JSON.stringify(data) }),
     delete: (id: string) => request<{ success: boolean }>(`/task-calendar/export-targets/${id}`, { method: "DELETE" }),
     test: (id: string) => request<{ ok: boolean; error?: string }>(`/task-calendar/export-targets/${id}/test`, { method: "POST" }),
     exportNow: (id: string) => request<{ success: boolean; publicUrl?: string; error?: string }>(`/task-calendar/export-targets/${id}/export-now`, { method: "POST" }),
@@ -2147,11 +2250,11 @@ export const api = {
       });
       const data = await res.json() as {
         success: boolean; created: boolean; updated: boolean; skipped: boolean;
-        noteId: string; attachmentId?: string; sha256: string;
+        noteId: string; attachmentId?: string; sha256: string; error?: string;
         extracted?: boolean; extractedChars?: number; extractionTruncated?: boolean;
         extractionError?: string; noText?: boolean;
       };
-      if (!res.ok) throw new Error((data as any).error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       return data;
     },
 
@@ -2328,7 +2431,7 @@ export const api = {
   getExportNotes: (workspaceId?: string) => {
     const ws = workspaceId ?? getCurrentWorkspace();
     const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    return request<any[]>(`/export/notes${qs}`);
+    return request<unknown[]>(`/export/notes${qs}`);
   },
   createMarkdownExportJob: (
     notes: Array<{
@@ -2414,7 +2517,7 @@ export const api = {
     }
     return res.json() as Promise<{ downloadToken: string; filename: string; size: number }>;
   },
-  /** 导出 Nowen 数据包（.nowen.zip） */
+  /** 导出 BaseForge 数据包（.zip，兼容旧 .nowen.zip） */
   downloadNowenPackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
     const ws = opts?.workspaceId ?? getCurrentWorkspace();
     const params = new URLSearchParams();
@@ -2436,7 +2539,7 @@ export const api = {
     const blob = await res.blob();
     const contentDisp = res.headers.get("Content-Disposition") || "";
     const filenameMatch = /filename\*?=(?:UTF-8'')?([^;\n]*)/i.exec(contentDisp);
-    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"/g, "")) : "nowen-package.nowen.zip";
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"/g, "")) : "baseforge-package.zip";
     return { blob, filename };
   },
   resolveImportOrigins: (
@@ -2705,13 +2808,14 @@ export const api = {
       }
     }
   },
-  /** Nowen 数据包 dry-run 预检 */
-  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string }) => {
+  /** BaseForge 数据包 dry-run 预检 */
+  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
     const params = new URLSearchParams({ dryRun: "1" });
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
+    if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const res = await fetch(`${getBaseUrl()}/export/import/nowen-package?${params}`, {
       method: "POST",
       credentials: "include",
@@ -2722,8 +2826,8 @@ export const api = {
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
   },
-  /** Nowen 数据包正式导入 */
-  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string }) => {
+  /** BaseForge 数据包正式导入 */
+  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
@@ -2731,6 +2835,7 @@ export const api = {
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
     if (opts?.importMode) params.set("importMode", opts.importMode);
     if (opts?.targetNotebookId) params.set("targetNotebookId", opts.targetNotebookId);
+    if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const qs = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(`${getBaseUrl()}/export/import/nowen-package${qs}`, {
       method: "POST",
@@ -2986,7 +3091,7 @@ export const api = {
       body: JSON.stringify({ cookie }),
     }),
   miCloudNotes: (cookie: string) =>
-    request<{ notes: any[]; folders: Record<string, string> }>("/micloud/notes", {
+    request<{ notes: unknown[]; folders: Record<string, string> }>("/micloud/notes", {
       method: "POST",
       body: JSON.stringify({ cookie }),
     }),
@@ -2998,14 +3103,14 @@ export const api = {
 
   // OPPO Cloud
   oppoCloudImport: (notes: { id: string; title: string; content: string }[], notebookId?: string) =>
-    request<{ success: boolean; count: number; notebookId: string; notes: any[]; errors: string[] }>("/oppocloud/import", {
+    request<{ success: boolean; count: number; notebookId: string; notes: unknown[]; errors: string[] }>("/oppocloud/import", {
       method: "POST",
       body: JSON.stringify({ notes, notebookId }),
     }),
 
   // iCloud (iPhone 备忘录)
   icloudImport: (notes: { id: string; title: string; content: string; folder?: string; date?: string; createDate?: string; modifyDate?: string }[], notebookId?: string) =>
-    request<{ success: boolean; count: number; notebookId: string; notes: any[]; errors: string[] }>("/icloud/import", {
+    request<{ success: boolean; count: number; notebookId: string; notes: unknown[]; errors: string[] }>("/icloud/import", {
       method: "POST",
       body: JSON.stringify({ notes, notebookId }),
     }),
@@ -3057,18 +3162,18 @@ export const api = {
   getMindMapFolders: () => {
     const ws = getCurrentWorkspace();
     const qs = ws ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    return request<any[]>(`/mindmap-folders${qs}`);
+    return request<MindMapFolder[]>(`/mindmap-folders${qs}`);
   },
   createMindMapFolder: (data: { name?: string; parentId?: string }) => {
     const ws = getCurrentWorkspace();
     const qs = ws ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    return request<any>(`/mindmap-folders${qs}`, { method: "POST", body: JSON.stringify(data) });
+    return request<MindMapFolder>(`/mindmap-folders${qs}`, { method: "POST", body: JSON.stringify(data) });
   },
   updateMindMapFolder: (id: string, data: { name?: string; parentId?: string; sortOrder?: number }) =>
-    request<any>(`/mindmap-folders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    request<MindMapFolder>(`/mindmap-folders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteMindMapFolder: (id: string) => request(`/mindmap-folders/${id}`, { method: "DELETE" }),
   moveMindMap: (id: string, folderId: string | null) =>
-    request<any>(`/mindmaps/${id}/move`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
+    request<MindMap>(`/mindmaps/${id}/move`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
 
   // Diary (说说/动态)
   // Y2: 自动注入当前工作区。后端按 workspaceId 隔离数据：
@@ -3132,7 +3237,22 @@ export const api = {
   journals: {
     /** 获取或创建今日日记（POST 语义，避免 GET 副作用） */
     getOrCreateToday: async (localDate?: string) => {
-      const result = await request<{ id: string; title: string; existed: boolean;[key: string]: any }>("/journals/today", {
+      const result = await request<{
+        id: string;
+        title: string;
+        existed: boolean;
+        userId: string;
+        contentText?: string;
+        isPinned?: number;
+        isFavorite?: number;
+        isLocked?: number;
+        isArchived?: number;
+        isTrashed?: number;
+        version?: number;
+        createdAt: string;
+        updatedAt: string;
+        [key: string]: unknown;
+      }>("/journals/today", {
         method: "POST",
         body: JSON.stringify({ localDate }),
       });
@@ -3158,7 +3278,7 @@ export const api = {
         role: string;
         workspaceId: string;
         scope: "workspace";
-        [key: string]: any;
+        [key: string]: unknown;
       }>(`/journals/workspace/${encodeURIComponent(workspaceId)}/resolve`, {
         method: "POST",
         body: JSON.stringify({ localDate }),
@@ -3372,16 +3492,25 @@ export const api = {
 
     /** 分页列出文件。所有筛选字段可选；默认按 createdAt desc。
      *  Y4: 自动注入 workspaceId（调用方未显式指定时）。
-     *  filter=unreferenced：仅返回 scope 内"没有被任何笔记引用"的附件（含 24h 宽限期）。
-     *    与 category 正交——可同时传 category=image 得到"孤儿图片"。
+     *  filter=unreferenced / referenced：scope 内"没被任何笔记正文引用"
+     *    / "被至少一篇笔记正文引用"两个互补分类（相加就是全部，不看时间宽限期）；
+     *    与 mimeCategory 正交——可同时传 mimeCategory=image 得到"未引用的图片"。
      *  filter=myUploads：仅返回"用户从文件管理页直接上传"的附件（noteId 指向 holder note）；
      *    可叠加 myUploadsRef=referenced/unreferenced 进一步拆分"已被笔记引用 / 还没引用"。
+     *  shareStatus=shared / unshared：按是否存在生效中的只读分享链接筛选。
      */
     list: (params: {
+      /** 统一文件池的类型筛选（image/video/audio/doc/other）。 */
+      mimeCategory?: import("@/types").MimeCategory;
+      /** @deprecated 三来源时代的来源二分筛选，新代码用 mimeCategory。 */
       category?: FileCategory;
       filter?: FileFilter;
       myUploadsRef?: FileMyUploadsRef;
+      /** 分享状态（侧栏「分享状态」chips）：只算生效中且未过期的链接。 */
+      shareStatus?: import("@/types").FileShareStatus;
       mime?: string;
+      /** 上传时间：最近 N 天（侧栏时间 chips）。 */
+      uploadedWithin?: number;
       notebookId?: string;
       /** 仅返回"被该笔记引用过"的附件（走 attachment_references 倒排表）。 */
       noteId?: string;
@@ -3394,6 +3523,7 @@ export const api = {
       pageSize?: number;
     } = {}): Promise<FileListResponse> => {
       const qs = new URLSearchParams();
+      if (params.mimeCategory) qs.set("mimeCategory", params.mimeCategory);
       // 注意：FileCategory 已收窄为 "image" | "file"，不再含 "all"。
       // 调用方（FileManager）自己维护 "all" | FileCategory 的 UI 过滤，
       // 在传进来之前就会把 "all" 映射成 undefined，这里只需非空判断。
@@ -3403,6 +3533,10 @@ export const api = {
       // 但为了让 URL 干净，前端只在 filter 匹配时传。
       if (params.filter === "myUploads" && params.myUploadsRef) {
         qs.set("myUploadsRef", params.myUploadsRef);
+      }
+      if (params.shareStatus) qs.set("shareStatus", params.shareStatus);
+      if (typeof params.uploadedWithin === "number" && params.uploadedWithin > 0) {
+        qs.set("uploadedWithin", String(params.uploadedWithin));
       }
       if (params.mime) qs.set("mime", params.mime);
       if (params.notebookId) qs.set("notebookId", params.notebookId);
@@ -3446,6 +3580,21 @@ export const api = {
       }>(`/files/batch-delete`, {
         method: "POST",
         body: JSON.stringify({ ids }),
+      }),
+
+    /**
+     * 批量归档 / 移出附件文件夹（只改 attachments.folderId，不碰磁盘）。
+     * folderId 传 null = 移出到"未归档"；单次最多 200 个，
+     * 无权 / 不存在的 id 进 failed[]，不阻塞同批其它项。
+     */
+    batchMove: (ids: string[], folderId: string | null) =>
+      request<{
+        success: boolean;
+        moved: number;
+        failed: Array<{ id: string; reason: string }>;
+      }>(`/files/batch-move`, {
+        method: "POST",
+        body: JSON.stringify({ ids, folderId }),
       }),
 
     /**
@@ -3494,7 +3643,8 @@ export const api = {
   },
 
   // Shares (分享管理)
-  createShare: (data: { noteId: string; permission?: string; password?: string; expiresAt?: string; maxViews?: number }) =>
+  // expiresAt：undefined = 用后端缺省（7 天），显式 null = 永久，字符串 = 指定时刻。
+  createShare: (data: { noteId: string; permission?: string; password?: string; expiresAt?: string | null; maxViews?: number }) =>
     request<Share>("/shares", { method: "POST", body: JSON.stringify(data) }),
   getShares: () => request<Share[]>("/shares"),
   getShareManagement: (params: import("@/types").ShareManagementQuery = {}) => {
@@ -3878,7 +4028,7 @@ export const api = {
     }
 
     let result = "";
-    const handleArray = (arr: any[]) => {
+    const handleArray = (arr: AiReferenceItem[]) => {
       // 后端在内容流里夹一条数组 = 参考笔记列表 [{id,title},...]
       if (arr.length > 0 && arr[0]?.id && arr[0]?.title) {
         onReferences?.(arr);
@@ -4277,6 +4427,32 @@ export const api = {
   updateWorkspace: (id: string, data: { name?: string; description?: string; icon?: string }) =>
     request<Workspace>(`/workspaces/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteWorkspace: (id: string) => request(`/workspaces/${id}`, { method: "DELETE" }),
+  uploadWorkspaceAvatar: async (id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const token = getAccessToken();
+    const res = await fetch(`${getBaseUrl()}/workspaces/${id}/avatar`, {
+      method: "POST",
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: form,
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(String((payload as { error?: string }).error || "空间头像上传失败"));
+    }
+    return (await res.json()) as { success: boolean; avatarUrl: string };
+  },
+  removeWorkspaceAvatar: (id: string) =>
+    request<{ success: boolean; avatarUrl: string | null }>(`/workspaces/${id}/avatar`, { method: "DELETE" }),
+  /** 空间头像文件地址：<img> 无法带 Authorization 头，token 走查询参数 */
+  workspaceAvatarFileUrl: (id: string, version?: string | null): string => {
+    const token = getAccessToken();
+    const params = new URLSearchParams();
+    if (token) params.set("token", token);
+    if (version) params.set("v", version);
+    const query = params.toString();
+    return `${getBaseUrl()}/workspaces/${id}/avatar-file${query ? `?${query}` : ""}`;
+  },
   leaveWorkspace: (id: string) =>
     request<{ success: boolean }>(`/workspaces/${id}/leave`, { method: "POST" }),
 
@@ -4289,6 +4465,21 @@ export const api = {
     }),
   removeWorkspaceMember: (id: string, userId: string) =>
     request<{ success: boolean }>(`/workspaces/${id}/members/${userId}`, { method: "DELETE" }),
+  /**
+   * 站内搜索添加成员：userId 来自 GET /api/users/search（只能搜到已注册用户）。
+   * 已是成员时后端幂等返回 { success: true, alreadyMember: true }。
+   */
+  addWorkspaceMember: (id: string, userId: string, role: WorkspaceRole) =>
+    request<{ success: boolean; alreadyMember?: boolean }>(`/workspaces/${id}/members`, {
+      method: "POST",
+      body: JSON.stringify({ userId, role }),
+    }),
+  /** 转让 Owner：仅 owner 可调，转让后原 owner 降为 admin */
+  transferWorkspaceOwnership: (id: string, toUserId: string) =>
+    request<{ success: boolean }>(`/workspaces/${id}/transfer-ownership`, {
+      method: "POST",
+      body: JSON.stringify({ toUserId }),
+    }),
 
   // 邀请
   getWorkspaceInvites: (id: string) => request<WorkspaceInvite[]>(`/workspaces/${id}/invites`),
@@ -4296,6 +4487,9 @@ export const api = {
     request<WorkspaceInvite>(`/workspaces/${id}/invites`, { method: "POST", body: JSON.stringify(data) }),
   deleteWorkspaceInvite: (id: string, inviteId: string) =>
     request<{ success: boolean }>(`/workspaces/${id}/invites/${inviteId}`, { method: "DELETE" }),
+  /** 重置邀请码：生成新 code 并清零使用次数，旧码立即失效 */
+  resetWorkspaceInvite: (id: string, inviteId: string) =>
+    request<WorkspaceInvite>(`/workspaces/${id}/invites/${inviteId}/reset`, { method: "POST" }),
   joinWorkspace: (code: string) =>
     request<{ success: boolean; workspace?: Workspace; role?: WorkspaceRole; alreadyMember?: boolean; workspaceId?: string }>(
       "/workspaces/join",
@@ -4390,7 +4584,7 @@ export const api = {
         },
         body: form,
       });
-      const body = (await res.json().catch(() => ({}))) as any;
+      const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
       if (!res.ok) {
         const err = new Error(body?.error || `导入失败: ${res.status}`) as Error & { code?: string; status?: number };
         err.code = body?.code;
@@ -4944,43 +5138,8 @@ export const api = {
 
     /** GET /api/attachments/_health/report — 附件健康检查：裂图/悬空引用/共享物理文件 */
     scanHealth: (graceHours = 24) =>
-      request<{
-        ok: boolean;
-        totalAttachments: number;
-        totalPhysicalFiles: number;
-        totalAttachmentBytes: number;
-        missingPhysicalFiles: Array<{
-          id: string;
-          noteId: string;
-          noteTitle?: string;
-          filename: string;
-          path: string;
-          mimeType?: string;
-          size: number;
-          createdAt: string;
-          referencedBy: number;
-        }>;
-        danglingReferences: Array<{
-          attachmentId: string;
-          noteId: string;
-          noteTitle?: string;
-          isTrashed?: boolean;
-        }>;
-        sharedPhysicalFiles: Array<{
-          path: string;
-          count: number;
-          bytes: number;
-          attachmentIds: string[];
-        }>;
-        orphans: {
-          dbOrphans: Array<{ filename: string; bytes: number }>;
-          contentOrphans: Array<{ id: string; filename: string; bytes: number; noteId: string; createdAt: string }>;
-          reclaimableBytes: number;
-          totalAttachmentBytes: number;
-          graceHours: number;
-        };
-        checkedAt: string;
-      }>(`/attachments/_health/report?graceHours=${encodeURIComponent(graceHours)}`),
+      request<AttachmentHealthReportData>(
+        `/attachments/_health/report?graceHours=${encodeURIComponent(graceHours)}`),
 
     /** POST /api/attachments/_repair/missing/:id/upload — 上传替代文件修复缺失物理文件 */
     uploadMissingReplacement: async (id: string, file: File, sudoToken: string, opts?: { force?: boolean }) => {
@@ -4996,7 +5155,7 @@ export const api = {
         },
         body: form,
       });
-      const body = (await res.json().catch(() => ({}))) as any;
+      const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
       if (!res.ok) {
         const err = new Error(body?.error || `修复失败: ${res.status}`) as Error & { code?: string; status?: number };
         err.code = body?.code;
@@ -5009,7 +5168,7 @@ export const api = {
         path: string;
         size: number;
         hash: string;
-        health: any;
+        health: AttachmentHealthReportData;
       };
     },
 
@@ -5020,7 +5179,7 @@ export const api = {
         notesUpdated: number;
         referencesRemoved: number;
         changed: Array<{ noteId: string; removed: number }>;
-        health: any;
+        health: AttachmentHealthReportData;
       }>("/attachments/_repair/dangling/remove", {
         method: "POST",
         body: JSON.stringify(body),
@@ -5137,8 +5296,8 @@ export async function withSudo<T>(
     try {
       const result = await action(cachedToken);
       return { result, sudoToken: cachedToken };
-    } catch (e: any) {
-      if (e?.code !== "SUDO_REQUIRED" && e?.code !== "SUDO_INVALID") throw e;
+    } catch (e) {
+      if ((e as ErrLike)?.code !== "SUDO_REQUIRED" && (e as ErrLike)?.code !== "SUDO_INVALID") throw e;
       // 过期 / 无效，走下面的询问流程
     }
   }
@@ -5183,7 +5342,7 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
     const text = await res.text();
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     if (contentType.includes("text/html") || /^\s*</.test(text)) {
-      return { ok: false, htmlResponse: true, error: "返回了网页 HTML，而不是 Nowen Note API" };
+      return { ok: false, htmlResponse: true, error: "返回了网页 HTML，而不是 BaseForge API" };
     }
     let data: unknown;
     try { data = JSON.parse(text); } catch { return { ok: false, error: "返回内容不是有效 JSON" }; }
@@ -5193,7 +5352,7 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
       || payload.status !== "ok"
       || (payload.service !== "nowen-note" && typeof payload.version !== "string")
     ) {
-      return { ok: false, error: "JSON 响应不符合 Nowen Note 健康检查格式" };
+      return { ok: false, error: "JSON 响应不符合 BaseForge 健康检查格式" };
     }
     return {
       ok: true,
@@ -5271,7 +5430,7 @@ export async function testServerConnection(serverUrl: string): Promise<ServerPro
   if (!resolved) {
     const error = sawHtml
       ? "检测到可访问的网页，但标准及兼容 API 路径均不可用。请检查反向代理是否转发 API 请求。"
-      : `未检测到 Nowen Note API（${errors.join("；")}）`;
+      : `未检测到 BaseForge API（${errors.join("；")}）`;
     console.error("[api] server probe failed", { serverUrl: base, errors });
     return { ok: false, apiOk: false, websocketOk: false, error };
   }
@@ -5396,13 +5555,13 @@ export async function diagnoseConnection(serverUrl: string): Promise<DiagnosisRe
       } catch {
         results.push({ step: label, ok: false, detail: `HTTP ${res.status}，但返回内容不是有效 JSON` });
       }
-    } catch (e: any) {
-      if (e.name === "AbortError") {
+    } catch (e) {
+      if ((e as ErrLike)?.name === "AbortError") {
         results.push({ step: label, ok: false, detail: "请求超时（" + timeout / 1000 + "s）" });
       } else if (e instanceof TypeError) {
         results.push({ step: label, ok: false, detail: `网络错误：${e.message}（可能为 CORS / Mixed Content / 证书问题）` });
       } else {
-        results.push({ step: label, ok: false, detail: e.message || "未知错误" });
+        results.push({ step: label, ok: false, detail: (e as ErrLike)?.message || "未知错误" });
       }
     }
   }

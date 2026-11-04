@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { getDb } from "../db/schema";
+import { defaultShareExpiresAt } from "../lib/share-defaults";
 import { resolveEffectiveNoteCapabilities } from "./share-capabilities";
 
 export interface FileShareRecord {
@@ -162,7 +163,7 @@ export function ensureStableFileShare(
         WHERE id = ?
       `).run(nextExpiresAt, nextAllowDownload, active.id);
     }
-    return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(active.id) as FileShareRecord;
+    return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(active.id) as unknown as FileShareRecord;
   }
 
   const id = crypto.randomUUID();
@@ -178,11 +179,13 @@ export function ensureStableFileShare(
     normalizedAttachmentId,
     attachment.noteId,
     ownerId,
-    expiresAt ?? null,
+    // 未指定有效期就是 7 天后过期（与笔记/附件分享同一默认值）。
+    // 复制附件 URL 到剪贴板会静默走到这里，留空＝永久的话等于批量造永久外链。
+    expiresAt === undefined ? defaultShareExpiresAt() : expiresAt,
     allowDownload,
   );
 
-  return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(id) as FileShareRecord;
+  return db.prepare("SELECT * FROM file_shares WHERE id = ?").get(id) as unknown as FileShareRecord;
 }
 
 export function resolveStableFileShare(

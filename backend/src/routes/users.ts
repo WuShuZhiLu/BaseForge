@@ -536,7 +536,7 @@ users.get("/:id/data-summary", requireAdmin, (c) => {
  *       直接改写主键会 UNIQUE 冲突，需保留接收方那一行，删除原用户那一行。
  */
 function transferAndDeleteUser(
-  db: import("better-sqlite3").Database,
+  db: import("node:sqlite").DatabaseSync,
   fromId: string,
   toId: string,
 ): { moved: Record<string, number> } {

@@ -408,7 +408,7 @@ export async function handleDownloadAttachment(c: Context): Promise<Response> {
     ? rangeResponse
     : await handleFullAttachmentDownload(c);
 
-  if (response.status === 404) {
+  if (response.status === 404 && response.headers.get("X-Attachment-Note") !== "video-poster-unavailable") {
     console.warn(
       metadataExists ? "[attachment.file.missing]" : "[attachment.metadata.missing]",
       { id },

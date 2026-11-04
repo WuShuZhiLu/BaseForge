@@ -1,6 +1,6 @@
 # 安全设置
 
-> 保护你的 nowen-note 账号：修改密码、启用 2FA、管理登录。
+> 保护你的 BaseForge 账号：修改密码、启用 2FA、管理登录。
 
 ---
 
@@ -74,7 +74,7 @@
 
 ## API Token
 
-API Token 用于外部工具（如浏览器剪藏扩展、MCP Server、SDK）访问 nowen-note。
+API Token 用于外部工具（如浏览器剪藏扩展、MCP Server、SDK）访问 BaseForge。
 
 ### 创建 Token
 

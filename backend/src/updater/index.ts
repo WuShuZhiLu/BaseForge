@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { brandEnv } from "../lib/envBrand.js";
 import {
   createUpdateJob,
   getJob,
@@ -9,11 +10,11 @@ import {
   runUpdaterPreflight,
 } from "./jobs";
 
-const port = Math.max(1, Number(process.env.NOWEN_UPDATER_PORT) || 3002);
-const token = (process.env.NOWEN_UPDATER_TOKEN || "").trim();
+const port = Math.max(1, Number(brandEnv("UPDATER_PORT")) || 3002);
+const token = (brandEnv("UPDATER_TOKEN") || "").trim();
 
 if (token.length < 32) {
-  console.error("[updater] NOWEN_UPDATER_TOKEN must contain at least 32 characters");
+  console.error("[updater] BASEFORGE_UPDATER_TOKEN must contain at least 32 characters");
   process.exit(1);
 }
 

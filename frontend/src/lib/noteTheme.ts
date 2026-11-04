@@ -55,8 +55,8 @@ const defaultDark: NoteThemeTokens = {
 export const NOTE_THEMES: readonly NoteThemeDefinition[] = [
   {
     id: "default",
-    name: { zh: "Nowen 默认", en: "Nowen Default" },
-    description: { zh: "保持当前界面与编辑器视觉。", en: "Keep the current Nowen editor appearance." },
+    name: { zh: "BaseForge 默认", en: "BaseForge Default" },
+    description: { zh: "保持当前界面与编辑器视觉。", en: "Keep the current BaseForge editor appearance." },
     modes: { light: defaultLight, dark: defaultDark },
   },
   {

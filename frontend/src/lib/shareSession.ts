@@ -8,7 +8,7 @@ function randomSessionId(): string {
 }
 
 /**
- * A tab-scoped anonymous visit identifier. It is never sent outside Nowen's
+ * A tab-scoped anonymous visit identifier. It is never sent outside BaseForge's
  * `/api/shared/*` endpoints and contains no account or device information.
  */
 export function getShareSessionId(): string {

@@ -41,7 +41,7 @@ npm run dev:frontend
 
 浏览器访问 `http://localhost:5173` 即可使用。
 
-数据库文件位于 `backend/data/nowen-note.db`，备份此文件即可迁移数据。
+数据库文件位于 `backend/data/baseforge.db`，备份此文件即可迁移数据。
 
 ---
 
@@ -75,7 +75,7 @@ docker run -d \
   --restart unless-stopped \
   -p 3001:3001 \
   -v /opt/nowen-note/data:/app/data \
-  -e DB_PATH=/app/data/nowen-note.db \
+  -e DB_PATH=/app/data/baseforge.db \
   -e TZ=Asia/Shanghai \
   nowen-note
 ```
@@ -93,7 +93,7 @@ docker run -d \
 | 变量名 | 默认值 | 说明 |
 | ------ | ------ | ---- |
 | `PORT` | `3001` | 服务监听端口 |
-| `DB_PATH` | `/app/data/nowen-note.db` | 数据库文件路径 |
+| `DB_PATH` | `/app/data/baseforge.db` | 数据库文件路径 |
 | `NODE_ENV` | `production` | 运行环境 |
 | `TZ` | `Asia/Shanghai` | 容器时区，影响待办「今日 / 本周 / 逾期」等后端日期判断 |
 | `OLLAMA_URL` | （未设置） | Ollama 服务地址（如需本地 AI 请自行部署 Ollama） |
@@ -195,7 +195,7 @@ storeFile=你的keystore路径
 3. **访问使用**
    - 浏览器访问 `http://<群晖IP>:3001`
 
-> **提示：** 数据备份只需复制 `/docker/nowen-note/data/nowen-note.db` 文件。可使用群晖 Hyper Backup 定期备份该目录。也可通过 API `/api/backups` 进行在线备份管理。
+> **提示：** 数据备份只需复制 `/docker/nowen-note/data/baseforge.db` 文件。可使用群晖 Hyper Backup 定期备份该目录。也可通过 API `/api/backups` 进行在线备份管理。
 
 ---
 
@@ -226,9 +226,9 @@ storeFile=你的keystore路径
 >
 > 绿联 Docker 面板的"存储空间"配置中，**容器目录必须填 `/app/data`**（与 Dockerfile 中的 `WORKDIR /app` + `mkdir -p /app/data` 一致）。如果填成 `/data`，程序会把数据库、JWT 密钥写到容器内部的 `/app/data`（该路径没有挂载出去，容器删掉就没了），导致 NAS 侧挂载目录"空空如也"——这**不是权限问题**，是路径问题。
 >
-> **验证方法**：容器启动几秒后进入绿联 Docker → 容器 → 终端，执行 `ls -la /app/data`，应能看到 `.jwt_secret`、`nowen-note.db`、`nowen-note.db-shm`、`nowen-note.db-wal` 四个文件；同时 NAS 文件管理器里挂载目录也应看到同样的文件。
+> **验证方法**：容器启动几秒后进入绿联 Docker → 容器 → 终端，执行 `ls -la /app/data`，应能看到 `.jwt_secret`、`baseforge.db`、`baseforge.db-shm`、`baseforge.db-wal` 四个文件；同时 NAS 文件管理器里挂载目录也应看到同样的文件。
 >
-> **备选方案**：如果你因特殊原因必须把容器目录保留为 `/data`，请额外在"环境变量"里配置 `NOWEN_DATA_DIR=/data` 和 `DB_PATH=/data/nowen-note.db`，两者缺一不可。
+> **备选方案**：如果你因特殊原因必须把容器目录保留为 `/data`，请额外在"环境变量"里配置 `NOWEN_DATA_DIR=/data` 和 `DB_PATH=/data/baseforge.db`，两者缺一不可。
 
 ---
 
@@ -362,7 +362,7 @@ docker run -d \
 ## 通用注意事项
 
 - **数据持久化**：务必将容器内的 **`/app/data`** 目录映射到宿主机（⚠️ 注意是 `/app/data`，不是 `/data`，填错会导致 NAS 挂载目录看不到任何文件），否则容器删除后数据丢失。镜像已通过 `VOLUME ["/app/data"]` 声明数据卷，主流 NAS 面板（绿联 / 群晖 / 威联通 / 极空间 / 飞牛 等）创建容器时会**自动把 `/app/data` 填入容器目录**，避免手填出错
-- **数据备份**：支持两种方式 — 直接备份 `nowen-note.db` 文件，或通过 API `/api/backups` 在线创建/下载备份
+- **数据备份**：支持两种方式 — 直接备份 `baseforge.db` 文件，或通过 API `/api/backups` 在线创建/下载备份
 - **自动备份**：服务启动后自动开启每 24 小时数据库备份，保留最近 10 个自动备份
 - **端口冲突**：如 3001 端口被占用，可修改主机端口映射（如 `8080:3001`）
 - **安全建议**：首次登录后请立即修改默认密码；如需外网访问，建议搭配反向代理（Nginx / Caddy）并启用 HTTPS

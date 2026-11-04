@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { getDb } from "../db/schema.js";
@@ -126,7 +126,7 @@ function noteAttachmentUrl(id: string): string {
 }
 
 async function snapshotSourceAttachments(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   noteId: string,
   content: string,
@@ -167,7 +167,7 @@ async function copyTemplateAttachments(rows: TemplateAttachmentRow[]): Promise<C
   }
 }
 
-function readTemplate(db: Database.Database, templateId: string): NoteTemplateRow {
+function readTemplate(db: DatabaseSync, templateId: string): NoteTemplateRow {
   const row = db.prepare(`
     SELECT id, workspaceId, createdBy, name, content, contentText, contentFormat,
            sourceNoteId, createdAt, updatedAt
@@ -200,7 +200,7 @@ export function listNoteTemplates(input: {
         WHERE template.workspaceId IS NULL AND template.createdBy = ?
         GROUP BY template.id
         ORDER BY template.updatedAt DESC, template.id DESC
-      `).all(input.userId)) as Array<NoteTemplateRow & { attachmentCount: number }>;
+      `).all(input.userId)) as unknown as Array<NoteTemplateRow & { attachmentCount: number }>;
 
   return rows.map((row) => ({
     id: row.id,
@@ -376,7 +376,7 @@ export async function createNoteFromTemplate(input: {
   const templateAssets = db.prepare(`
     SELECT id, templateId, sourceAttachmentId, filename, mimeType, size, path, hash
     FROM note_template_attachments WHERE templateId = ? ORDER BY id
-  `).all(template.id) as TemplateAttachmentRow[];
+  `).all(template.id) as unknown as TemplateAttachmentRow[];
   const copied = await copyTemplateAttachments(templateAssets);
   let content = template.content || "";
   let contentText = template.contentText || "";

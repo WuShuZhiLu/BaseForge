@@ -64,7 +64,7 @@ export function PanelFooterButton({ icon, label, onClick }: { icon?: React.React
     <button
       type="button"
       onClick={onClick}
-      className="flex shrink-0 items-center justify-center gap-1.5 border-t border-app-border px-3 py-2 text-[11.5px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+      className="flex shrink-0 items-center justify-center gap-1.5 border-t border-app-border px-3 py-2 text-[12px] text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
     >
       {icon}
       {label}
@@ -97,9 +97,9 @@ export function PanelRow({
       onContextMenu={onContextMenu}
       title={title}
       className={
-        "flex h-[26px] w-full items-center gap-2 rounded-md px-2 text-left text-[12.5px] transition-colors " +
+        "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors " +
         (active
-          ? "bg-accent-primary/12 font-semibold text-accent-primary"
+          ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
           : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary")
       }
     >
@@ -111,12 +111,12 @@ export function PanelRow({
 }
 
 export function PanelEmpty({ text }: { text: string }) {
-  return <p className="px-2 py-6 text-center text-[11.5px] text-tx-tertiary">{text}</p>;
+  return <p className="px-2 py-6 text-center text-[12px] text-tx-tertiary">{text}</p>;
 }
 
 export function PanelLoading() {
   return (
-    <div className="flex items-center justify-center gap-2 py-6 text-[11.5px] text-tx-tertiary">
+    <div className="flex items-center justify-center gap-2 py-6 text-[12px] text-tx-tertiary">
       <Loader2 size={13} className="animate-spin" />…
     </div>
   );

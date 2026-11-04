@@ -1,13 +1,14 @@
 import http from "http";
 import fs from "fs";
 import path from "path";
+import { brandEnv } from "../lib/envBrand.js";
 
 export const OFFICIAL_IMAGE_REPOSITORY = (
-  process.env.NOWEN_UPDATER_ALLOWED_IMAGE || "cropflre/nowen-note"
+  brandEnv("UPDATER_ALLOWED_IMAGE") || "cropflre/nowen-note"
 ).trim();
-export const MANAGED_INSTANCE = (process.env.NOWEN_UPDATER_INSTANCE || "nowen-note").trim();
-export const MANAGED_CONTAINER_NAME = (process.env.NOWEN_UPDATER_CONTAINER_NAME || "nowen-note").trim();
-export const DOCKER_SOCKET = process.env.NOWEN_DOCKER_SOCKET || "/var/run/docker.sock";
+export const MANAGED_INSTANCE = (brandEnv("UPDATER_INSTANCE") || "baseforge").trim();
+export const MANAGED_CONTAINER_NAME = (brandEnv("UPDATER_CONTAINER_NAME") || "baseforge").trim();
+export const DOCKER_SOCKET = brandEnv("DOCKER_SOCKET") || "/var/run/docker.sock";
 
 export interface DockerContainerSummary {
   Id: string;
@@ -498,7 +499,7 @@ export async function reconnectContainerNetworks(id: string, networks: SavedNetw
 }
 
 export function getUpdaterDiskStatus(): { freeBytes: number | null; totalBytes: number | null; path: string } {
-  const stateDir = process.env.NOWEN_UPDATER_STATE_DIR || "/var/lib/nowen-updater";
+  const stateDir = brandEnv("UPDATER_STATE_DIR") || "/var/lib/baseforge-updater";
   try {
     fs.mkdirSync(stateDir, { recursive: true });
     const stat = fs.statfsSync(stateDir);

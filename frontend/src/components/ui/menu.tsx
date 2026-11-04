@@ -1,5 +1,5 @@
 import React from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -45,6 +45,8 @@ export function MenuSeparator() {
 }
 
 export interface MenuItemProps {
+  /** 行标识：只用于渲染二级菜单时的 key。 */
+  id?: string;
   icon?: React.ComponentType<{ size?: number | string; className?: string }>;
   label: React.ReactNode;
   /** 右侧提示（快捷键 / 计数）。 */
@@ -54,30 +56,63 @@ export interface MenuItemProps {
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
+  /** 二级菜单：给出即渲染为可展开的子菜单（如“导出”下的各格式）。 */
+  children?: MenuSubItem[];
 }
 
-export function MenuItem({ icon: Icon, label, hint, checked, danger, disabled, onClick, className }: MenuItemProps) {
+/** 二级菜单项：与一级行同样的视觉，只是挂在子菜单面板里。 */
+export type MenuSubItem = Omit<MenuItemProps, "children" | "hint" | "checked" | "className">;
+
+export function MenuItem({ icon: Icon, label, hint, checked, danger, disabled, onClick, className, children }: MenuItemProps) {
+  const rowClassName = cn(
+    "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors",
+    danger
+      ? "text-red-600 hover:bg-red-500/10 dark:text-red-400"
+      : "text-tx-primary hover:bg-app-hover",
+    disabled && "pointer-events-none opacity-40",
+    className,
+  );
+  const iconNode = Icon ? (
+    <Icon
+      size={14}
+      className={cn("shrink-0", danger ? "text-red-500 dark:text-red-400" : "text-tx-tertiary")}
+    />
+  ) : null;
+
+  if (children && children.length > 0) {
+    return (
+      <div className="group/sub relative">
+        <button
+          type="button"
+          role="menuitem"
+          aria-haspopup="menu"
+          disabled={disabled}
+          className={rowClassName}
+        >
+          {iconNode}
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <ChevronRight size={13} className="shrink-0 text-tx-tertiary" />
+        </button>
+        <div className="absolute left-full top-0 z-[1] hidden pl-1 group-hover/sub:block group-focus-within/sub:block">
+          <MenuSurface className="min-w-[176px]">
+            {children.map((child) => (
+              <MenuItem key={child.id ?? String(child.label)} {...child} />
+            ))}
+          </MenuSurface>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left transition-colors",
-        danger
-          ? "text-red-600 hover:bg-red-500/10 dark:text-red-400"
-          : "text-tx-primary hover:bg-app-hover",
-        disabled && "pointer-events-none opacity-40",
-        className,
-      )}
+      className={rowClassName}
     >
-      {Icon && (
-        <Icon
-          size={14}
-          className={cn("shrink-0", danger ? "text-red-500 dark:text-red-400" : "text-tx-tertiary")}
-        />
-      )}
+      {iconNode}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {hint != null && <span className="shrink-0 text-[10.5px] tabular-nums text-tx-tertiary">{hint}</span>}
       {checked && <Check size={13} className="shrink-0 text-accent-primary" />}

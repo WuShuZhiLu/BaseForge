@@ -82,12 +82,12 @@ export default function AIKnowledgeScopePicker({
         ref={menuRef}
         role="dialog"
         aria-label="知识库范围"
-        className="fixed z-[350] overflow-hidden rounded-2xl border border-app-border bg-app-elevated shadow-2xl shadow-black/15"
+        className="fixed z-[350] overflow-hidden rounded-[10px] border border-app-border bg-app-elevated shadow-lg shadow-black/10"
         style={{ left, top: Math.max(8, top), width }}
       >
         <div className="border-b border-app-border p-2.5">
           <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">选择知识库范围</div>
-          <div className="flex items-center gap-2 rounded-xl border border-app-border bg-app-bg px-2.5 py-2 text-tx-tertiary focus-within:border-accent-primary/50 focus-within:ring-2 focus-within:ring-accent-primary/10">
+          <div className="flex items-center gap-2 rounded-[8px] border border-app-border bg-app-bg px-2.5 py-2 text-tx-tertiary transition-colors focus-within:border-accent-primary/50 focus-within:ring-2 focus-within:ring-accent-primary/30">
             <Search size={13} className="shrink-0" />
             <input
               ref={searchRef}
@@ -95,14 +95,14 @@ export default function AIKnowledgeScopePicker({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜索笔记本"
               aria-label="搜索笔记本"
-              className="min-w-0 flex-1 bg-transparent text-xs text-tx-primary outline-none placeholder:text-tx-tertiary"
+              className="min-w-0 flex-1 bg-transparent text-[11.5px] text-tx-primary outline-none placeholder:text-tx-tertiary"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
                 title="清空搜索"
-                className="rounded-md p-0.5 hover:bg-app-hover hover:text-tx-primary"
+                className="rounded-[6px] p-0.5 hover:bg-app-hover hover:text-tx-primary"
               >
                 <X size={11} />
               </button>
@@ -117,18 +117,18 @@ export default function AIKnowledgeScopePicker({
               aria-pressed={!value}
               onClick={() => handleSelect("")}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors",
+                "flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[11.5px] transition-colors",
                 !value ? "bg-accent-primary/10 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
               )}
             >
               <span className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-                !value ? "bg-accent-primary text-white" : "bg-app-hover text-tx-tertiary",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]",
+                !value ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover text-tx-tertiary",
               )}>
                 <Database size={13} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">{allLabel}</span>
+                <span className="block truncate text-[11.5px] font-medium">{allLabel}</span>
                 <span className="mt-0.5 block text-[10px] text-tx-tertiary">检索当前空间内的全部笔记</span>
               </span>
               {!value && <Check size={14} className="shrink-0" />}
@@ -144,17 +144,17 @@ export default function AIKnowledgeScopePicker({
                 aria-pressed={selected}
                 onClick={() => handleSelect(notebook.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors",
+                  "flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-left text-[11.5px] transition-colors",
                   selected ? "bg-accent-primary/10 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
                 )}
               >
                 <span className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px]",
                   selected ? "bg-accent-primary/15 text-accent-primary" : "bg-app-hover text-tx-tertiary",
                 )}>
                   <Folder size={13} />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-xs font-medium">{notebook.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium">{notebook.name}</span>
                 {selected && <Check size={14} className="shrink-0" />}
               </button>
             );
@@ -181,10 +181,10 @@ export default function AIKnowledgeScopePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         className={cn(
-          "flex h-7 min-w-28 max-w-56 items-center gap-1.5 rounded-lg px-2 text-left text-[11px] font-medium transition-colors",
+          "flex h-7 min-w-24 max-w-56 items-center gap-1.5 rounded-full border px-2.5 text-left text-[11px] font-medium transition-colors",
           open
-            ? "bg-accent-primary/10 text-accent-primary ring-1 ring-accent-primary/30"
-            : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
+            ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+            : "border-app-border text-tx-secondary hover:border-accent-primary/30 hover:bg-accent-primary/5 hover:text-accent-primary",
         )}
       >
         {value ? <Folder size={12} className="shrink-0" /> : <Database size={12} className="shrink-0" />}

@@ -5,7 +5,7 @@ const LazyShareManagementPage = React.lazy(() => import("./ShareManagementPage")
 
 export default function LazyShareManagementPageRuntime() {
   return (
-    <Suspense fallback={<LazyWorkspaceFallback label="正在加载分享管理…" />}>
+    <Suspense fallback={<LazyWorkspaceFallback label="正在加载分享中心…" />}>
       <LazyShareManagementPage />
     </Suspense>
   );

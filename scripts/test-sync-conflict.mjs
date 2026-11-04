@@ -75,7 +75,7 @@ async function main() {
   }
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-sync-conflict-"));
-  const dbPath = path.join(root, "nowen-note.db");
+  const dbPath = path.join(root, "baseforge.db");
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = spawn(process.execPath, [dist], {

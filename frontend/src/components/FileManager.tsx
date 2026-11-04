@@ -23,7 +23,7 @@
  *   点 "跳转到笔记" → api.getNote(id) → setActiveNote + setViewMode("all")；
  *   复用 AppContext，与 SidebarMobile / NoteList 的跳转路径一致。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import RemoteFilesPanel from "@/components/RemoteFilesPanel";
 import type { RemoteSourcePublic } from "@/types";
@@ -43,37 +43,38 @@ import {
   FileCode,
   FileAudio,
   FileVideo,
+  Play,
   FileSpreadsheet,
   ExternalLink,
   Download,
   Loader2,
-  Filter,
   FolderOpen,
   ChevronRight,
   ChevronDown,
-  ArrowUpDown,
   Inbox,
   Copy,
   Check,
   CheckSquare,
   Square,
-  Sparkles,
+  Share2,
   Link2,
-  Globe,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
+import { isBuiltinPluginEnabled } from "@/plugins/builtin/registry";
 import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
 import { navigateToolPage } from "@/components/toolTabs";
 
 /** 页签契约：页面自带标题行（附件管理顶栏），宿主顶栏无需重复渲染。 */
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
-import { FileItem, FileStats, FileSortKey, FileCategory } from "@/types";
+import { FileItem, FileStats } from "@/types";
+import { FILE_SORT_OPTIONS, FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
+import type { FilesTypeFilter, FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useApp, useAppActions } from "@/store/AppContext";
+import { useAppActions } from "@/store/AppContext";
 import { toast } from "@/lib/toast";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
 import { copyText } from "@/lib/clipboard";
@@ -81,12 +82,17 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { buildPublicAttachmentUrl } from "@/lib/publicAttachmentUrl";
 import { downloadAttachment } from "@/lib/downloadFile";
 import {
-  formatImageHostSnippet,
-  imageHostFormatLabel,
-  type ImageHostFormat,
-} from "@/lib/imageHostFormats";
+  formatFileLinkSnippet,
+  fileLinkFormatLabel,
+  type FileLinkFormat,
+} from "@/lib/fileLinkFormats";
 import AttachmentDetailDrawer from "@/components/attachmentDetail/AttachmentDetailDrawer";
 import FileUploadDialog from "@/components/FileUploadDialog";
+import {
+  attachmentShareApi,
+  buildAttachmentShareUrl,
+} from "@/lib/attachmentShareApi";
+import { focusShareCenter } from "@/features/shares/shareCenterUi";
 
 // ---------------------------------------------------------------------------
 // 工具：文件大小可读化 / MIME → 图标 / 时间格式化
@@ -149,13 +155,14 @@ function formatLocalTime(s: string): string {
 // ---------------------------------------------------------------------------
 
 /**
- * UI 侧的分类 Tab 值。在 FileCategory（"image" | "file"）基础上额外加：
- *   - "all"          全部（不传 category / filter）
+ * UI 侧的范围筛选（与类型维度正交）：
+ *   - "all"          全部文件
  *   - "myUploads"    我的上传（用户从文件管理页直接上传的附件，
- *                    实现上 = attachments.noteId 指向 holder note）
- *   - "unreferenced" 孤儿视图（走 filter=unreferenced，category 不参与）
+ *                    实现上 = attachments.uploadSource = 'file_manager'）
+ *   - "referenced"   文档引用（正文里引用过的附件，走 filter=referenced）
+ *   - "unreferenced" 未引用视图（走 filter=unreferenced；与上一项严格互补，相加=全部）
  */
-type CategoryFilter = "all" | FileCategory | "myUploads" | "unreferenced";
+type CategoryFilter = "all" | "myUploads" | "referenced" | "unreferenced";
 
 /**
  * "我的上传"内部的二级子筛选。仅在 category="myUploads" 时生效。
@@ -164,15 +171,6 @@ type CategoryFilter = "all" | FileCategory | "myUploads" | "unreferenced";
  *   - "unreferenced" ：还没被任何笔记引用过的
  */
 type MyUploadsRefFilter = "all" | "referenced" | "unreferenced";
-
-const SORT_OPTIONS: Array<{ value: FileSortKey; label: string }> = [
-  { value: "created_desc", label: "最新上传" },
-  { value: "created_asc", label: "最早上传" },
-  { value: "size_desc", label: "大小 ↓" },
-  { value: "size_asc", label: "大小 ↑" },
-  { value: "name_asc", label: "名称 A→Z" },
-  { value: "name_desc", label: "名称 Z→A" },
-];
 
 // ---------------------------------------------------------------------------
 // 分页大小（每页条数）
@@ -211,7 +209,7 @@ function readStoredPageSize(): number {
 //
 // 策略：
 //   - 模块级 Map（FileManager 实例销毁后下次进来仍然命中，体感更好）；
-//   - cacheKey 是 list 的所有筛选参数 + workspace 作用域 + isImageHostMode；
+//   - cacheKey 是 list 的所有筛选参数（类型/范围/时间/排序/搜索/分页）+ workspace 作用域；
 //   - TTL 30s：足够覆盖典型"翻页 → 看图 → 切回上一页"的窗口；
 //   - 写动作（删除 / 上传 / 重命名）会调用 invalidateFileListCache() 清空，
 //     避免显示陈旧数据。
@@ -253,15 +251,13 @@ function invalidateFileListCache(): void {
 
 export default function FileManager() {
   const { t } = useTranslation();
-  const { state } = useApp();
   const actions = useAppActions();
 
   // 列表状态
-  // 远程文件管理（remote-files 内置插件）：文件管理内的并列视图（本地附件 / 远程文件 Tab）
-  const [sourceTab, setSourceTab] = useState<"local" | "remote">("local");
-  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab
+  // 远程文件管理（remote-files 内置插件）：经侧栏「来源」切换，主区不重复提供入口
+  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab（来源由侧栏 filesUi 驱动，无需本地状态）
   useEffect(() => {
-    const handler = () => setSourceTab("remote");
+    const handler = () => setFilesUi({ source: "remote" });
     window.addEventListener("nowen:files-remote-tab", handler);
     return () => window.removeEventListener("nowen:files-remote-tab", handler);
   }, []);
@@ -273,25 +269,24 @@ export default function FileManager() {
   // 每页条数：默认 10，从 localStorage 恢复上次选择，跨会话保留。
   const [pageSize, setPageSize] = useState<number>(() => readStoredPageSize());
 
-  // 筛选 / 搜索
-  const [category, setCategory] = useState<CategoryFilter>("all");
+  // 筛选 / 搜索：分类/排序/视图/分组由侧栏 filesUi 驱动（useSyncExternalStore 派生，见下方）
   // "我的上传"内部的二级子筛选；仅在 category === "myUploads" 时参与请求。
-  // 切到非 myUploads 主 tab 时不重置——下次回到"我的上传"还能保持上次的子筛选选择。
   const [myUploadsRef, setMyUploadsRef] = useState<MyUploadsRefFilter>("all");
-  const [sort, setSort] = useState<FileSortKey>("created_desc");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState(""); // debounced
+  // 工具行右端排序下拉（对齐分享页「排序：xxx ▾」，选项复用 FILE_SORT_OPTIONS）
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
 
-  // 视图模式：文件管理默认 list（信息密度高、文件名 / 时间 / 大小一目了然，
-  //          普通用户进文件管理多半是来"找一个具体文件"的，列表更高效）；
-  //          切到"图片"分类时会自动跳 grid（见 handleCategoryChange）；
-  //          图床模式下强制 grid（见 toggleImageHostMode）。
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
-
-  // 分组模式：扁平列表 vs 按笔记本分组 vs 按附件文件夹分组
-  const [groupMode, setGroupMode] = useState<"flat" | "notebook" | "folder">(() => {
-    try { return (localStorage.getItem("nowen-file-group") as "flat" | "notebook" | "folder") || "flat"; } catch { return "flat"; }
-  });
+  // 排序菜单的外部点击关闭
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) setSortMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [sortMenuOpen]);
 
   // 附件文件夹列表（groupMode === "folder" 时使用）
   const [attachmentFolders, setAttachmentFolders] = useState<Array<{ id: string; name: string; fileCount: number }>>([]);
@@ -305,25 +300,68 @@ export default function FileManager() {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      try { localStorage.setItem("nowen-file-collapsed-groups", JSON.stringify([...next])); } catch {}
+      try { localStorage.setItem("nowen-file-collapsed-groups", JSON.stringify([...next])); } catch { /* ignore */ }
       return next;
     });
   }, []);
 
-  // 图床模式（Image Host）：
-  //   特化的 UI 子模式，专门服务于"把笔记附件当外链图床用"的场景。
-  //   开启后：
-  //     - 强制 category=image（隐藏其他分类 tab）
-  //     - 强制 viewMode=grid（图床的核心交互是看图复制链接）
-  //     - GridCard hover 工具条上的"复制链接"按钮变成"分裂下拉"——
-  //       左半快速复制 URL，右半弹出 Markdown / HTML 选项
-  //     - 详情抽屉头部新增"外链分享"区块，醒目展示完整直链 + 三种格式按钮
-  //   不持久化到 localStorage：当前作为临时操作模式，避免下次进来发现"图片之外的文件不见了"。
-  const [isImageHostMode, setIsImageHostMode] = useState(false);
+  // 来源/分类/排序/视图/分组：全部由侧栏 filesUi 驱动，useSyncExternalStore 保证
+  // 任何一端修改必然触发本组件重渲染（版本号变化）。
+  const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
+  void filesUiVersion; // 仅为订阅；实际值在渲染期从 getter 读取
+  const source = getFilesSource();
+  // remote-files 是内置插件，关闭后「保存到远程」等联动入口也必须消失
+  const remoteFilesEnabled = isBuiltinPluginEnabled("remote-files");
+  const isRemoteSource = source === "remote" && remoteFilesEnabled;
+  const sourceTab = isRemoteSource ? "remote" : "local";
+  // 统一文件池：类型（图片/视频/音频/文档/其他）是筛选维度而非分隔容器；
+  // 范围（全部/我的上传/未引用）与它正交，两者可叠加。
+  const typeFilter = getFilesType();
+  const category = getFilesCategory() as CategoryFilter;
+  /** 分享状态（侧栏「分享状态」chips）：all = 不筛。 */
+  const shareFilter = getFilesShare();
+  const sort = getFilesSort();
+  const viewMode: FilesViewMode = getFilesViewMode();
+  const groupMode = getFilesGroupMode();
 
   // 详情抽屉
   // detailId 为 null 时抽屉关闭；非 null 由 AttachmentDetailDrawer 自己加载详情。
   const [detailId, setDetailId] = useState<string | null>(null);
+  // 已开启分享（isActive）的附件 id 集合：卡片"已分享"角标的数据源。
+  // 注：公开直链对所有附件都可用，这里的"已分享"指用户主动建过分享链接。
+  const [sharedIds, setSharedIds] = useState<Set<string>>(new Set());
+  // 已建过分享记录的附件 id（含已关闭的）：行内「分享」据此判断要不要先建一条。
+  const [shareRecordIds, setShareRecordIds] = useState<Set<string>>(new Set());
+  const loadShares = useCallback(async () => {
+    try {
+      const rows = await attachmentShareApi.list();
+      setSharedIds(new Set(rows.filter((row) => row.isActive).map((row) => row.attachmentId)));
+      setShareRecordIds(new Set(rows.map((row) => row.attachmentId)));
+    } catch {
+      // 角标不是关键路径，失败静默，不打扰用户
+    }
+  }, []);
+  useEffect(() => { void loadShares(); }, [loadShares]);
+
+  /**
+   * 行内「分享」入口：跳到分享中心并打开同一抽屉（原型落地顺序第 3 条），
+   * 不再另开一套对话框。没有分享记录时先用统一默认值（7 天）建一条，
+   * 等价于旧对话框里的「开启分享」；已存在记录则绝不能调 open()——
+   * 空 body 会把密码、有效期、次数上限全部覆盖。
+   */
+  const openShare = useCallback(async (attachmentId: string) => {
+    if (!shareRecordIds.has(attachmentId)) {
+      try {
+        await attachmentShareApi.open(attachmentId, {});
+        void loadShares();
+      } catch (error) {
+        toast.error(errMsg(error, "开启分享失败"));
+        return;
+      }
+    }
+    focusShareCenter({ channel: "attachment_share", objectId: attachmentId });
+    actions.setActiveToolTab("shares");
+  }, [actions, loadShares, shareRecordIds]);
 
   // 上传
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -338,6 +376,8 @@ export default function FileManager() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchMoving, setBatchMoving] = useState(false);
+  const [batchSharing, setBatchSharing] = useState(false);
 
   // 可回收空间（dryRun 扫出的"孤儿附件"汇总）：
   //   顶部清理按钮始终可见；有可回收项时附带展示数量与空间。
@@ -399,16 +439,18 @@ export default function FileManager() {
   // ---- 拉列表（受 category / sort / searchQuery / page 驱动）----
   const loadList = useCallback(async () => {
     // v12：客户端 30s TTL 缓存。命中即跳过 API 调用，秒开翻页。
-    // cacheKey 包含全部筛选维度 + workspace + 图床模式，保证不同场景互不串台。
+    // cacheKey 包含全部筛选维度 + workspace，保证不同场景互不串台。
     const cacheKey = JSON.stringify({
       c: category,
-      // 仅在 myUploads tab 下子筛选才有意义；其他 tab 固定写空串避免污染 key
+      // 仅在 myUploads 范围下子筛选才有意义；其他范围固定写空串避免污染 key
       mur: category === "myUploads" ? myUploadsRef : "",
+      t: typeFilter,
+      sh: shareFilter,
+      tf: getFilesTime(),
       s: sort,
       q: searchQuery,
       p: page,
       ps: pageSize,
-      ihm: isImageHostMode,
       // 工作区切换会重新 mount FileManager，理论上 cache 跟着销毁，
       // 但模块级 Map 跨实例存活——把当前 workspace 加进 key 防误命中。
       // 直接读取 store 在这里不方便，简单起见用 location 作为代理（已包含 workspace 路径）。
@@ -425,38 +467,27 @@ export default function FileManager() {
 
     setLoading(true);
     try {
-      // category="unreferenced" / "myUploads" 都是 UI 上的伪分类，实际走后端 filter=...，
-      // 真正的 category 维度不参与（孤儿视图保持包含全部 MIME；我的上传同理，
-      // 用户上传过的可能既有图也有文件）。
-      // v14：图床模式下不再强制 category=image——图床定位扩展为"任意文件的外链分享"，
-      //      用户可能要把 zip / pdf 也传上来发链接给别人下载。tab 切换由用户自主决定。
-      const isOrphan = category === "unreferenced";
-      const isMyUploads = category === "myUploads";
-      const apiFilter = isOrphan
-        ? ("unreferenced" as const)
-        : isMyUploads
-          ? ("myUploads" as const)
+      // 统一文件池：类型走 mimeCategory（"全部"时不传），范围走 filter=...，
+      // 分享状态走 shareStatus。三者正交可叠加（例如"未引用的视频"、
+      // "已分享的图片"），后端一个 WHERE 子句同时收口。
+      const apiFilter: "unreferenced" | "referenced" | "myUploads" | undefined =
+        category === "unreferenced" || category === "referenced" || category === "myUploads"
+          ? category
           : undefined;
-      const apiCategory =
-        isOrphan || isMyUploads
-          ? undefined
-          : category === "all"
-            ? undefined
-            : (category as FileCategory);
       const res = await api.files.list({
-        category: apiCategory,
+        mimeCategory: typeFilter === "all" ? undefined : typeFilter,
         filter: apiFilter,
+        shareStatus: shareFilter === "all" ? undefined : shareFilter,
+        uploadedWithin: getFilesTime() !== "all"
+          ? ({ today: 1, week: 7, month: 30 } as Record<string, number>)[getFilesTime()] || undefined
+          : undefined,
         myUploadsRef:
-          isMyUploads && myUploadsRef !== "all" ? myUploadsRef : undefined,
+          category === "myUploads" && myUploadsRef !== "all" ? myUploadsRef : undefined,
         q: searchQuery || undefined,
         sort,
         page,
         pageSize,
       });
-      // v13：图床模式下对"我的上传/未引用"也走 category=image，由后端直接收口，
-      //       前端不再做二次过滤——total 就是真实可分页数，分页器不会跳变。
-      //       早期版本（仅 unreferenced 时）做客户端过滤是因为后端 filter=unreferenced
-      //       不接受 category，今天后端两个维度可同时生效，这段 dead path 已去除。
       setItems(res.items);
       setTotal(res.total);
       writeFileListCache(cacheKey, {
@@ -464,13 +495,13 @@ export default function FileManager() {
         total: res.total,
         ts: Date.now(),
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] list failed:", err);
-      toast.error(err?.message || "加载文件列表失败");
+      toast.error(err instanceof Error ? err.message : "加载文件列表失败");
     } finally {
       setLoading(false);
     }
-  }, [category, myUploadsRef, sort, searchQuery, page, pageSize, isImageHostMode]);
+  }, [typeFilter, category, shareFilter, myUploadsRef, sort, searchQuery, page, pageSize, filesUiVersion]);
 
   useEffect(() => {
     loadList();
@@ -501,8 +532,8 @@ export default function FileManager() {
       }
 
       const ok = await confirmDialog({
-        title: "确定清理未引用附件？",
-        description: `本次将清理 ${preview.totalRemovedItems} 个没有被任何笔记引用的附件，预计释放约 ${humanSize(preview.totalFreedBytes)}。最近 24 小时上传的附件不会被清理。该操作不可撤销。`,
+        title: "确定清理未引用内容？",
+        description: `本次将删除所有未被引用的内容：共 ${preview.totalRemovedItems} 个，预计释放约 ${humanSize(preview.totalFreedBytes)}。最近 24 小时上传的内容不会被清理。该操作不可撤销。`,
         confirmText: "立即清理",
         danger: true,
       });
@@ -523,9 +554,9 @@ export default function FileManager() {
       try {
         window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "cleanup-orphans" } }));
       } catch { /* ignore */ }
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] cleanup failed:", err);
-      toast.error(err?.message || "清理失败");
+      toast.error(err instanceof Error ? err.message : "清理失败");
     } finally {
       setCleaningUp(false);
     }
@@ -546,6 +577,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       loadList();
     };
     window.addEventListener("nowen:workspace-changed", onWs);
@@ -557,20 +589,7 @@ export default function FileManager() {
   }, [loadStats, loadList, loadReclaimable]);
 
   // ---- 分类切换时重置到第 1 页 + 调整默认视图 ----
-  const handleCategoryChange = useCallback((c: CategoryFilter) => {
-    setCategory(c);
-    setPage(1);
-    // 切到"文件"分类时默认列表视图；"图片" / "全部" / "我的上传" / "孤儿"默认网格视图。
-    // 用户在同一分类里手动切换了视图就不再被覆盖（放在 effect 依赖外）。
-    // **图床例外**：图床整体锁 grid（顶栏视图切换按钮也是隐藏的），所以这里跳过自动切。
-    if (!isImageHostMode) {
-      if (c === "file") setViewMode("list");
-      else setViewMode("grid");
-    }
-    // 进入"我的上传"时，子筛选总是从"全部"开始；保留旧值会让"刚切过来就只看到一种"
-    // 与用户预期不符。离开 myUploads 时不需要重置，下次进来还是从全部开始。
-    if (c === "myUploads") setMyUploadsRef("all");
-  }, [isImageHostMode]);
+
 
   // ---- 详情抽屉控制 ----
   // 加载逻辑下沉到 AttachmentDetailDrawer 内部，这里只负责打开/关闭。
@@ -585,6 +604,11 @@ export default function FileManager() {
   // ---- 删除：列表层面同步（剔除 / 翻页 / 缓存 / 统计） ----
   // 抽屉删除走 onAfterDelete 路径；ListView 行内删除按钮先二次确认 → 调 api.files.remove
   // → 再走 afterDelete。两条路径共用同一份「列表后处理」。
+  // 附件数量/存储变化 → 通知侧栏文件面板刷新计数
+  const notifyStorageChanged = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "file-manager" } }));
+  }, []);
+
   const afterDelete = useCallback(
     (id: string) => {
       // 本地列表即时剔除（让 UI 立刻有反馈，不等接口往返）
@@ -594,6 +618,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       // 关键：删除后必须重新拉当前页，把"被删项后面的"那一项从第 N+1 项
       // 顶上来，否则用户会看到当前页只剩 PAGE_SIZE-1 项，要切页才能看到
       // 后面被顶上来的文件。当前页若被删空且不在第 1 页 → 回退一页
@@ -605,7 +630,7 @@ export default function FileManager() {
         loadList();
       }
     },
-    [loadStats, loadReclaimable, loadList, items.length, page],
+    [loadStats, loadReclaimable, loadList, items.length, page, notifyStorageChanged],
   );
 
   // ---- 附件另存到远程（remote-files 内置插件联动）----
@@ -637,8 +662,8 @@ export default function FileManager() {
       await api.saveAttachmentToRemote(remoteSaveSourceId, remoteSaveDlg.attachmentId, remoteSavePath);
       setRemoteSaveDlg(null);
       toast.success("已保存到远程源");
-    } catch (err: any) {
-      setRemoteSaveMsg(err?.message || "保存到远程失败");
+    } catch (err) {
+      setRemoteSaveMsg(err instanceof Error ? err.message : "保存到远程失败");
     } finally {
       setRemoteSaving(false);
     }
@@ -661,9 +686,9 @@ export default function FileManager() {
         // 如果当前打开的就是这个详情，顺手关掉
         setDetailId((cur) => (cur === id ? null : cur));
         afterDelete(id);
-      } catch (err: any) {
+      } catch (err) {
         console.error("[FileManager] delete failed:", err);
-        toast.error(err?.message || "删除失败");
+        toast.error(err instanceof Error ? err.message : "删除失败");
       }
     },
     [afterDelete],
@@ -761,6 +786,7 @@ export default function FileManager() {
       invalidateFileListCache();
       loadStats();
       loadReclaimable();
+      notifyStorageChanged();
       // 关键：与单删一致——删除后必须重新拉当前页，把后续页的项顶上来，
       // 否则当前页会剩不足 PAGE_SIZE 项，要切页才能看到完整的剩余文件。
       // 当前页全删空且不在第 1 页 → 回退一页（page 变化会触发 loadList）。
@@ -770,19 +796,89 @@ export default function FileManager() {
       } else {
         loadList();
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] batch delete failed:", err);
-      toast.error(err?.message || "批量删除失败");
+      toast.error(err instanceof Error ? err.message : "批量删除失败");
     } finally {
       setBatchDeleting(false);
     }
   }, [selectedIds, detailId, closeDetail, loadStats, loadReclaimable, loadList, items.length, page]);
 
+  // ---- 批量归档到文件夹 ----
+  // folderId = null 表示移出到"未归档"。后端只改 attachments.folderId，
+  // 所以改完直接刷列表（当前筛选如果是按文件夹分组，用户能立刻看到变化）。
+  const handleBatchMove = useCallback(
+    async (folderId: string | null) => {
+      if (selectedIds.size === 0 || batchMoving) return;
+      const ids = Array.from(selectedIds);
+      setBatchMoving(true);
+      try {
+        const res = await api.files.batchMove(ids, folderId);
+        const label = folderId
+          ? attachmentFolders.find((f) => f.id === folderId)?.name || "文件夹"
+          : "未归档";
+        if (res.failed.length === 0) {
+          toast.success(`已移动 ${res.moved} 个文件到“${label}”`);
+          setSelectionMode(false);
+        } else {
+          toast.error(
+            `已移动 ${res.moved} 个，${res.failed.length} 个失败：${res.failed[0]?.reason || ""}${res.failed.length > 1 ? " 等" : ""}`,
+          );
+        }
+        invalidateFileListCache();
+        loadStats();
+        loadList();
+      } catch (err) {
+        console.error("[FileManager] batch move failed:", err);
+        toast.error(err instanceof Error ? err.message : "批量移动失败");
+      } finally {
+        setBatchMoving(false);
+      }
+    },
+    [selectedIds, batchMoving, attachmentFolders, loadStats, loadList],
+  );
+
+  // ---- 批量生成公开链接 ----
+  // 一个附件一条分享记录（后端语义），因此逐个 POST；拿到链接后整体拷到
+  // 剪贴板（一行一个），与单文件“复制链接”同一个 copyText 通道。
+  const handleBatchShareLinks = useCallback(async () => {
+    if (selectedIds.size === 0 || batchSharing) return;
+    const ids = Array.from(selectedIds);
+    setBatchSharing(true);
+    try {
+      const links: string[] = [];
+      let failed = 0;
+      for (const id of ids) {
+        try {
+          const share = await attachmentShareApi.open(id, {});
+          links.push(buildAttachmentShareUrl(share.shareToken));
+        } catch {
+          failed += 1;
+        }
+      }
+      if (links.length === 0) {
+        toast.error("生成公开链接失败");
+        return;
+      }
+      const copied = await copyText(links.join("\n"));
+      toast.success(
+        copied
+          ? `已生成 ${links.length} 个公开链接并复制到剪贴板，默认 7 天后失效${failed ? `（${failed} 个失败）` : ""}`
+          : `已生成 ${links.length} 个公开链接，但复制失败：当前环境不允许访问剪贴板`,
+      );
+      // 刷新"已分享"角标 + 分享状态筛选徽标（stats.shared）
+      loadShares();
+      loadStats();
+    } finally {
+      setBatchSharing(false);
+    }
+  }, [selectedIds, batchSharing, loadShares, loadStats]);
+
   // 切换分类 / 搜索 / 排序 / 翻页时，已勾选的 id 可能不再在当前 items 里，
   // 体验上保留集合也容易让用户产生"幽灵勾选"。统一在这些维度变化时清空。
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [category, myUploadsRef, sort, searchQuery, page]);
+  }, [category, shareFilter, myUploadsRef, sort, searchQuery, page]);
 
   // ---- 上传 ----
   const handleUpload = useCallback(
@@ -796,10 +892,10 @@ export default function FileManager() {
         try {
           await api.files.upload(f);
           ok++;
-        } catch (err: any) {
+        } catch (err) {
           console.error("[FileManager] upload failed:", err);
           fail++;
-          toast.error(`${f.name}: ${err?.message || "上传失败"}`);
+          toast.error(`${f.name}: ${err instanceof Error ? err.message : "上传失败"}`);
         }
       }
       setUploading(false);
@@ -814,12 +910,21 @@ export default function FileManager() {
         loadReclaimable();
       }
     },
-    [loadList, loadStats, loadReclaimable],
+    [loadList, loadStats, loadReclaimable, notifyStorageChanged],
   );
 
   const onPickFiles = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  // 统一上传入口：文件池不再区分来源，任何类型都直接进池子（服务端不再做 MIME 分流）。
+  const routeUpload = useCallback(
+    (files: File[]) => {
+      if (files.length > 0) handleUpload(files);
+    },
+    [handleUpload],
+  );
+
 
   // ---- 粘贴板上传（图床高频用法：截图 → Ctrl+V）----
   //
@@ -849,43 +954,22 @@ export default function FileManager() {
       }
       if (files.length > 0) {
         e.preventDefault();
-        handleUpload(files);
+        routeUpload(files);
       }
     };
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
-  }, [handleUpload]);
-
-  // ---- 图床模式开关 ----
-  //
-  // 进入：默认看"全部"，强制 viewMode=grid（图床的核心交互是缩略图 + 复制直链），
-  //       回到第 1 页（避免在"文件"分页里残留页码）。
-  // 退出：保持当前 category 不变（用户可能本来在浏览"图片"），view 由用户上次手动状态决定。
-  // 两个方向都清空多选，避免状态混乱。
-  const toggleImageHostMode = useCallback(() => {
-    setIsImageHostMode((prev) => {
-      const next = !prev;
-      setSelectedIds(new Set());
-      setSelectionMode(false);
-      setPage(1);
-      if (next) {
-        // 进入图床：默认"全部"——图床承载图片+文件两类资源的外链分享
-        setCategory("all");
-        setViewMode("grid");
-      }
-      return next;
-    });
-  }, []);
+  }, [routeUpload]);
 
   const onFileInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
-        handleUpload(e.target.files);
+        routeUpload(Array.from(e.target.files));
       }
       // 清空 input value，允许再次选相同文件
       e.target.value = "";
     },
-    [handleUpload],
+    [routeUpload],
   );
 
   // ---- 拖拽上传整区 ----
@@ -914,10 +998,10 @@ export default function FileManager() {
       dragCounter.current = 0;
       setDragOver(false);
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        handleUpload(e.dataTransfer.files);
+        routeUpload(Array.from(e.dataTransfer.files));
       }
     },
-    [handleUpload],
+    [routeUpload],
   );
 
   // ---- 跳转到引用笔记 ----
@@ -934,9 +1018,9 @@ export default function FileManager() {
         // 宿主不处理侧栏选中态，这里保留（非视图切换动作）。
         actions.setSelectedNotebook(note.notebookId);
         navigateToolPage({ kind: "note", noteId });
-      } catch (err: any) {
+      } catch (err) {
         console.error("[FileManager] jumpToNote failed:", err);
-        toast.error(err?.message || "跳转失败");
+        toast.error(err instanceof Error ? err.message : "跳转失败");
       }
     },
     [actions],
@@ -957,13 +1041,14 @@ export default function FileManager() {
 
   /** 把附件信息按指定格式（URL / Markdown / HTML）复制到剪贴板。 */
   const copySnippet = useCallback(
-    async (item: { id: string; filename: string; url: string }, format: ImageHostFormat = "url") => {
+    async (item: { id: string; filename: string; url: string; mimeType?: string }, format: FileLinkFormat = "url") => {
       const full = buildPublicAttachmentUrl(resolveAttachmentUrl(item.url), publicAttachmentOptions);
-      const snippet = formatImageHostSnippet(format, full, item.filename);
+      // 片段形态由 MIME 决定：图片 <img>/![]()、视频 <video>、音频 <audio>、其他 <a>/[]()
+      const snippet = formatFileLinkSnippet(format, full, item.filename, item.mimeType);
       const ok = await copyText(snippet);
       if (ok) {
         setCopiedId(item.id);
-        toast.success(`已复制 ${imageHostFormatLabel(format)}`);
+        toast.success(`已复制 ${fileLinkFormatLabel(format)}`);
         setTimeout(() => setCopiedId((id) => (id === item.id ? null : id)), 1200);
       } else {
         toast.error("复制失败，请检查浏览器剪贴板权限");
@@ -998,9 +1083,9 @@ export default function FileManager() {
     setDownloadingId(item.id);
     try {
       await downloadAttachment(resolveAttachmentUrl(item.url), item.filename || `file-${item.id}`);
-    } catch (err: any) {
+    } catch (err) {
       console.error("[FileManager] download failed:", err);
-      toast.error(`下载失败: ${err?.message || "未知错误"}`);
+      toast.error(`下载失败: ${err instanceof Error ? err.message : "未知错误"}`);
     } finally {
       setDownloadingId((id) => (id === item.id ? null : id));
     }
@@ -1030,7 +1115,9 @@ export default function FileManager() {
 
   // 空态文案：区分"一张没有" vs "当前筛选无结果"
   const isFirstPageNoResults = !loading && items.length === 0 && page === 1;
-  const hasAnyFilter = searchQuery || category !== "all";
+  // 空态文案分叉依据：类型 / 范围 / 时间 / 搜索 任一非默认即视为"筛选中"
+  const hasAnyFilter =
+    Boolean(searchQuery) || category !== "all" || typeFilter !== "all" || shareFilter !== "all" || getFilesTime() !== "all";
 
   // 扁平视图也按 id 去重，防止重复渲染
   const displayItems = useMemo(() => {
@@ -1099,8 +1186,33 @@ export default function FileManager() {
   // 方便状态栏展示
   const statsLine = useMemo(() => {
     if (!stats) return "";
-    return `共 ${stats.total} 个文件 · ${humanSize(stats.totalBytes)}（图片 ${stats.images.count} · 其他 ${stats.files.count}）`;
+    // 统一文件池：统计口径 = 全类型文件（图片 / 视频 / 音频 / 文档 / 其他）
+    return `共 ${stats.total} 个文件 · ${humanSize(stats.totalBytes)}`;
   }, [stats]);
+
+  // 类型 chips 的统计（个数 + 占用）：来自 /api/files/stats 的大类分桶。
+  // 个数直接画在 chip 上（首屏就能看到"图片 128 / 视频 6"这类分布），
+  // 字节数放 title：避免工具条被五个数字挤满。
+  const typeStatOf = useCallback(
+    (key: FilesTypeFilter): { count: number; bytes: number } => {
+      if (!stats) return { count: 0, bytes: 0 };
+      switch (key) {
+        case "image":
+          return stats.images;
+        case "video":
+          return stats.videos ?? { count: 0, bytes: 0 };
+        case "audio":
+          return stats.audios ?? { count: 0, bytes: 0 };
+        case "doc":
+          return stats.documents ?? { count: 0, bytes: 0 };
+        case "other":
+          return stats.others ?? { count: 0, bytes: 0 };
+        default:
+          return { count: stats.total, bytes: stats.totalBytes };
+      }
+    },
+    [stats],
+  );
 
   const storageBadge = useMemo(() => {
     const storage = stats?.storage;
@@ -1190,56 +1302,20 @@ export default function FileManager() {
           </div>
         </div>
       )}
-      {/* 顶栏 */}
+      {sourceTab !== "remote" && (
+      <>
+      {/* 顶栏：h-12 与侧栏工作区头同一节奏 */}
       <div
-        className="flex flex-wrap items-center gap-2 md:gap-3 px-3 md:px-6 py-2.5 md:py-3 border-b border-app-border bg-app-surface/40"
-        style={{ paddingTop: "calc(var(--safe-area-top) + 4px)" }}
+        className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4"
       >
         {/* 左侧：标题区 */}
         <div className="flex items-center gap-2 min-w-0">
-          <div
-            className={cn(
-              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0",
-              isImageHostMode
-                ? "bg-indigo-500/15 text-indigo-500"
-                : "bg-accent-primary/10 text-accent-primary",
-            )}
-          >
-            {isImageHostMode ? <Globe size={18} /> : <Inbox size={18} />}
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 bg-accent-primary/10 text-accent-primary">
+            <FolderOpen size={18} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-semibold text-tx-primary whitespace-nowrap">
-                {isImageHostMode ? "图床" : "附件"}
-              </h2>
-              {!isImageHostMode && (
-                <div className="flex items-center rounded-lg border border-app-border bg-app-bg p-0.5" role="tablist">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sourceTab === "local"}
-                    onClick={() => setSourceTab("local")}
-                    className={cn(
-                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
-                      sourceTab === "local" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-                    )}
-                  >
-                    本地
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sourceTab === "remote"}
-                    onClick={() => setSourceTab("remote")}
-                    className={cn(
-                      "px-2 py-0.5 rounded-md text-[11px] transition-colors",
-                      sourceTab === "remote" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-                    )}
-                  >
-                    远程
-                  </button>
-                </div>
-              )}
+              <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">文件</h2>
               {storageBadge && (
                 <div
                   className={cn(
@@ -1258,96 +1334,14 @@ export default function FileManager() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-tx-tertiary leading-none mt-0.5">
-              {isImageHostMode
-                ? "上传图片 / 文件即得直链 · 支持复制 URL / Markdown / HTML"
-                : statsLine || " "}
-            </p>
           </div>
         </div>
 
         <div className="flex-1" />
 
-        {/* 图床模式开关：放在视图切换之前，让用户第一眼能找到。
-            图床本质是 FileManager 的"图片专区 + 直链复制"特化形态，
-            点亮后整页 UI 会切换为图床外观（标题 / 图标 / 卡片工具条）。 */}
-        <Button
-          size="sm"
-          variant={isImageHostMode ? "default" : "outline"}
-          onClick={toggleImageHostMode}
-          className={cn(
-            "shrink-0",
-            isImageHostMode &&
-              "bg-indigo-500 hover:bg-indigo-600 text-white border-indigo-500",
-          )}
-          title={isImageHostMode ? "退出图床" : "进入图床（外链分享 · 图片与文件直链）"}
-        >
-          <Globe size={14} className="mr-1" />
-          {isImageHostMode ? "退出图床" : "图床"}
-        </Button>
-
-        {/* 视图切换：图床模式锁定网格视图，所以隐藏切换组 */}
-        {!isImageHostMode && (
-          <div className="hidden md:flex items-center rounded-lg border border-app-border bg-app-bg p-0.5">
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                viewMode === "grid" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => setViewMode("grid")}
-              title="网格视图"
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                viewMode === "list" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => setViewMode("list")}
-              title="列表视图"
-            >
-              <List size={14} />
-            </button>
-          </div>
-        )}
-
-        {/* 分组切换：扁平 / 按笔记本 / 按文件夹 */}
-        {!isImageHostMode && (
-          <div className="hidden md:flex items-center rounded-lg border border-app-border bg-app-bg p-0.5">
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "flat" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("flat"); localStorage.setItem("nowen-file-group", "flat"); }}
-              title="不分组"
-            >
-              <List size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "notebook" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("notebook"); localStorage.setItem("nowen-file-group", "notebook"); }}
-              title="按笔记本分组"
-            >
-              <FolderOpen size={14} />
-            </button>
-            <button
-              className={cn(
-                "px-2 py-1 rounded-md text-xs flex items-center gap-1 transition-colors",
-                groupMode === "folder" ? "bg-accent-primary/15 text-accent-primary" : "text-tx-secondary hover:bg-app-hover",
-              )}
-              onClick={() => { setGroupMode("folder"); localStorage.setItem("nowen-file-group", "folder"); }}
-              title="按文件夹分组"
-            >
-              <FolderOpen size={14} />
-            </button>
-          </div>
-        )}
-
+{!isRemoteSource && (
+        <>
+        {/* 多选 / 清理 / 上传：附件与图床的操作；远程来源有面板自带操作 */}
         <Button
           size="sm"
           variant={selectionMode ? "default" : "outline"}
@@ -1375,9 +1369,7 @@ export default function FileManager() {
           onClick={handleCleanupOrphans}
           disabled={cleaningUp}
           className={cn(
-            "shrink-0",
-            reclaimable && reclaimable.items > 0 &&
-              "text-amber-600 border-amber-500/40 hover:bg-amber-500/10 hover:text-amber-700 hover:border-amber-500/60",
+            "shrink-0 text-accent-danger",
           )}
           title={
             reclaimable && reclaimable.items > 0
@@ -1390,7 +1382,7 @@ export default function FileManager() {
           ) : (
             <Trash2 size={14} className="mr-1" />
           )}
-          <span>清理附件</span>
+          <span>清理</span>
           {reclaimable && reclaimable.items > 0 && (
             <span className="hidden sm:inline ml-1 text-[10px] opacity-80">
               {humanSize(reclaimable.bytes)} · {reclaimable.items} 项
@@ -1402,16 +1394,20 @@ export default function FileManager() {
           {uploading ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
           {uploading ? "上传中" : "上传文件"}
         </Button>
+        {/* 统一文件池：不限制上传类型（图片 / 视频 / 音频 / 文档一律进池子） */}
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          // 图床支持任意类型——图片 / 压缩包 / PDF 等都能拿到公开直链分享给他人下载，
-          // 不再限制 accept。
           className="hidden"
           onChange={onFileInputChange}
         />
+        </>
+      )}
       </div>
+
+      </>
+      )}
 
       {/* 远程文件视图（remote-files 内置插件）：与本地附件并列的补充视图，经顶栏 Tab 切换 */}
       {sourceTab === "remote" ? (
@@ -1421,118 +1417,88 @@ export default function FileManager() {
       ) : (
         <>
 
-      {/* 工具条：分类 / 搜索 / 排序 */}
-      <div className="flex flex-wrap items-center gap-2 px-3 md:px-6 py-1.5 md:py-2 border-b border-app-border bg-app-surface/20">
-        {/* 分类 Tabs：移动端可横滚，桌面端正常排列 */}
-        <div className="flex items-center gap-1 text-xs overflow-x-auto no-scrollbar shrink-0 max-w-full">
-          {(isImageHostMode
-            ? ([
-                { key: "all", label: "全部", count: stats?.total ?? 0, icon: <Filter size={12} /> },
-                { key: "image", label: "图片", count: stats?.images.count ?? 0, icon: <ImageIcon size={12} /> },
-                { key: "file", label: "文件", count: stats?.files.count ?? 0, icon: <FileText size={12} /> },
-                {
-                  key: "myUploads",
-                  label: "我的上传",
-                  count: stats?.myUploads?.total ?? 0,
-                  icon: <UploadCloud size={12} />,
-                },
-                {
-                  key: "unreferenced",
-                  label: "未引用",
-                  count: stats?.unreferenced?.count ?? 0,
-                  icon: <Sparkles size={12} />,
-                },
-              ] as const)
-            : ([
-                { key: "all", label: "全部", count: stats?.total ?? 0, icon: <Filter size={12} /> },
-                { key: "image", label: "图片", count: stats?.images.count ?? 0, icon: <ImageIcon size={12} /> },
-                { key: "file", label: "文件", count: stats?.files.count ?? 0, icon: <FileText size={12} /> },
-                // 我的上传：用户从文件管理页直接上传的文件（≠ 编辑器粘贴的）。
-                // 选中后下面会显示二级子 tab（全部 / 已引用 / 未引用）。
-                {
-                  key: "myUploads",
-                  label: "我的上传",
-                  count: stats?.myUploads?.total ?? 0,
-                  icon: <UploadCloud size={12} />,
-                },
-                // 孤儿（unreferenced）tab：高亮琥珀色，与顶栏"可回收"徽标视觉呼应；
-                // count 为 0 时也显示，方便用户确认"当前没有孤儿"。
-                {
-                  key: "unreferenced",
-                  label: "孤儿",
-                  count: stats?.unreferenced?.count ?? 0,
-                  icon: <Sparkles size={12} />,
-                },
-              ] as const)
-          ).map((tab) => (
+      {/* 工具条：h-10 与侧栏面板头对齐；搜索最左，中间筛选，右端排序下拉（对齐分享页布局） */}
+      <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
+        {/* 搜索：与分享页同款 w-[210px] 输入框 */}
+        <label className="relative block w-[210px] shrink-0">
+          <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+          <Input
+            placeholder="搜索文件名或类型（如 pdf）…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="h-7 pl-7 pr-7 text-[11.5px]"
+          />
+          {searchInput && (
             <button
-              key={tab.key}
-              onClick={() => handleCategoryChange(tab.key as CategoryFilter)}
-              className={cn(
-                "px-2.5 py-1 rounded-md flex items-center gap-1.5 transition-colors",
-                category === tab.key
-                  ? tab.key === "unreferenced"
-                    ? "bg-amber-500/15 text-amber-600"
-                    : "bg-accent-primary/15 text-accent-primary"
-                  : tab.key === "unreferenced" && tab.count > 0
-                    ? "text-amber-600 hover:bg-amber-500/10"
-                    : "text-tx-secondary hover:bg-app-hover",
-              )}
-              title={
-                tab.key === "unreferenced"
-                  ? "没有被任何笔记引用的附件（刚上传 24 小时内的不算）"
-                  : tab.key === "myUploads"
-                    ? "你从附件页直接上传的文件（不含编辑器粘贴的）"
-                    : undefined
-              }
+              className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+              onClick={() => setSearchInput("")}
             >
-              {tab.icon}
-              <span>{tab.label}</span>
-              <span className="text-[10px] text-tx-tertiary">{tab.count}</span>
+              <X size={12} />
             </button>
-          ))}
-        </div>
-
+          )}
+        </label>
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
+        <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
+          {statsLine || " "}
+        </p>
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
+        {/* 类型筛选已上移侧栏（主区只保留搜索 + 排序 + 操作按钮，与回收站/分享中心一致） */}
+        {getFilesTime() !== "all" && (
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
+            {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
+            <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
+          </span>
+        )}
+        {/* 已分享的附件：侧栏选中后在主区给一个可单独掉的标签，避免用户忘了自己在筛分享状态 */}
+        {shareFilter !== "all" && (
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
+            {shareFilter === "shared" ? "已分享" : "未分享"}
+            <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ share: "all" })}>✕</button>
+          </span>
+        )}
+        {(typeFilter !== "all" || getFilesTime() !== "all" || shareFilter !== "all") && (
+          <button
+            type="button"
+            className="shrink-0 text-[10.5px] text-tx-tertiary hover:text-tx-secondary"
+            onClick={() => setFilesUi({ type: "all", time: "all", share: "all" })}
+          >
+            清除筛选
+          </button>
+        )}
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <div className="flex-1" />
 
-        {/* 搜索 + 排序 */}
-        <div className="flex items-center gap-2">
-          <div className="relative w-40 md:w-56">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-tertiary" />
-            <Input
-              placeholder="按文件名搜索…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-7 h-8 text-xs bg-app-bg"
-            />
-            {searchInput && (
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-tx-tertiary hover:text-tx-primary"
-                onClick={() => setSearchInput("")}
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
-          {/* 排序 */}
-          <div className="flex items-center gap-1 text-xs shrink-0">
-            <ArrowUpDown size={12} className="text-tx-tertiary hidden sm:block" />
-            <select
-              className="h-8 px-2 rounded-md border border-app-border bg-app-bg text-tx-primary text-xs outline-none"
-              value={sort}
-              onChange={(e) => {
-                setSort(e.target.value as FileSortKey);
-                setPage(1);
-              }}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
+        {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」，复用 FILE_SORT_OPTIONS */}
+        <div ref={sortMenuRef} className="relative shrink-0">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={sortMenuOpen}
+            onClick={() => setSortMenuOpen((value) => !value)}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
+          >
+            排序：<span className="font-medium text-tx-primary">{FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
+            <ChevronDown size={12} />
+          </button>
+          {sortMenuOpen && (
+            <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+              {FILE_SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={sort === option.value}
+                  onClick={() => { setFilesUi({ sort: option.value }); setSortMenuOpen(false); }}
+                  className={cn(
+                    "flex w-full items-center px-2.5 py-1.5 text-left text-[11.5px] hover:bg-app-hover",
+                    sort === option.value ? "text-accent-primary" : "text-tx-secondary",
+                  )}
+                >
+                  {option.label}
+                </button>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1623,6 +1589,38 @@ export default function FileManager() {
 
               <div className="flex-1" />
 
+              {/* 批量归档：同一个附件文件夹体系（上传对话框 / 分组视图共用） */}
+              <select
+                value=""
+                disabled={selectedIds.size === 0 || batchMoving}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return;
+                  void handleBatchMove(v === "__unarchived__" ? null : v);
+                }}
+                className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
+                title="把选中文件归档到附件文件夹"
+              >
+                <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
+                <option value="__unarchived__">未归档</option>
+                {attachmentFolders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleBatchShareLinks}
+                disabled={selectedIds.size === 0 || batchSharing}
+                title="为选中附件开启只读分享链接，并全部复制到剪贴板"
+              >
+                {batchSharing ? (
+                  <Loader2 size={14} className="mr-1 animate-spin" />
+                ) : (
+                  <Link2 size={14} className="mr-1" />
+                )}
+                生成公开链接
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -1693,7 +1691,7 @@ export default function FileManager() {
                             selectionMode={selectionMode}
                             selectedIds={selectedIds}
                             onToggleSelect={toggleSelect}
-                            isImageHostMode={isImageHostMode}
+                            sharedIds={sharedIds}
                           />
                         ) : (
                           <ListView
@@ -1703,12 +1701,14 @@ export default function FileManager() {
                             onJumpToNote={jumpToNote}
                             onDownload={downloadItem}
                             onDelete={afterDelete}
-                            onSaveRemote={openRemoteSave}
+                            onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
+                            onShare={(item) => void openShare(item.id)}
                             copiedId={copiedId}
                             downloadingId={downloadingId}
                             selectionMode={selectionMode}
                             selectedIds={selectedIds}
                             onToggleSelect={toggleSelect}
+                            sharedIds={sharedIds}
                           />
                         )
                       )}
@@ -1728,7 +1728,7 @@ export default function FileManager() {
                 selectionMode={selectionMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                isImageHostMode={isImageHostMode}
+                sharedIds={sharedIds}
               />
             ) : (
               <ListView
@@ -1738,12 +1738,14 @@ export default function FileManager() {
                  onJumpToNote={jumpToNote}
                  onDownload={downloadItem}
                  onDelete={handleDelete}
-                 onSaveRemote={openRemoteSave}
+                 onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
+                onShare={(item) => void openShare(item.id)}
                 copiedId={copiedId}
                 downloadingId={downloadingId}
                 selectionMode={selectionMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
+                sharedIds={sharedIds}
               />
             )}
 
@@ -1802,7 +1804,8 @@ export default function FileManager() {
 
       {/* 详情抽屉：复用型 AttachmentDetailDrawer（编辑器场景同款）。
           - 加载/下载/复制外链/重命名/删除 全部组件内部自管；
-          - 列表层只接 onAfterDelete / onAfterRename 做本地同步。 */}
+          - 列表层只接 onAfterDelete / onAfterRename 做本地同步。
+          - extraHeaderActions 注入"分享"入口（抽屉组件文件不在本模块改动范围）。 */}
       <AnimatePresence>
         {detailId && (
           <AttachmentDetailDrawer
@@ -1812,16 +1815,26 @@ export default function FileManager() {
             onAfterDelete={afterDelete}
             onAfterRename={afterRename}
             showDelete
-            isImageHostMode={isImageHostMode}
+            extraHeaderActions={(
+              <button
+                className="p-1.5 rounded-md text-tx-tertiary hover:text-tx-primary hover:bg-app-hover"
+                onClick={() => void openShare(detailId)}
+                title="分享"
+              >
+                <Share2 size={14} />
+              </button>
+            )}
           />
         )}
       </AnimatePresence>
+
+      {/* 附件分享：行内「分享」跳到分享中心并打开同一抽屉（不再另开对话框） */}
 
       {/* 上传弹窗 */}
       <FileUploadDialog
         open={uploadDialogOpen}
         onClose={() => setUploadDialogOpen(false)}
-        onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); }}
+        onUploaded={() => { invalidateFileListCache(); loadList(); loadStats(); loadReclaimable(); loadFolders(); notifyStorageChanged(); }}
         defaultFolderId={null}
       />
         </>
@@ -1847,7 +1860,7 @@ function EmptyState({ hasFilter, onUpload }: { hasFilter: boolean; onUpload: () 
     <div className="flex flex-col items-center justify-center py-16 text-tx-tertiary">
       <Inbox size={40} className="mb-3 opacity-40" />
       <p className="text-sm">还没有任何文件</p>
-      <p className="text-xs mt-1 mb-4">上传一张图片或任意文件开始使用</p>
+      <p className="text-xs mt-1 mb-4">上传文件开始使用 · 支持图片 / 视频 / 音频 / 文档等任意类型</p>
       <Button size="sm" onClick={onUpload}>
         <Upload size={14} className="mr-1" />
         上传文件
@@ -1870,19 +1883,20 @@ function GridView({
   selectionMode,
   selectedIds,
   onToggleSelect,
-  isImageHostMode,
+  sharedIds,
 }: {
   items: FileItem[];
   onOpen: (id: string) => void;
   onCopyUrl: (item: FileItem) => void;
-  onCopySnippet: (item: FileItem, format: ImageHostFormat) => void;
+  onCopySnippet: (item: FileItem, format: FileLinkFormat) => void;
   onDownload: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
-  isImageHostMode: boolean;
+  /** 已开启分享（isActive）的附件 id 集合——卡片"已分享"角标的数据源 */
+  sharedIds: Set<string>;
 }) {
   // 性能优化（v12）：
   //   GridCard 用 React.memo 浅比较 props。为了让 memo 真正生效，
@@ -1909,7 +1923,7 @@ function GridView({
           selectionMode={selectionMode}
           selected={selectedIds.has(it.id)}
           onToggleSelect={onToggleSelect}
-          isImageHostMode={isImageHostMode}
+          isShared={sharedIds.has(it.id)}
         />
       ))}
     </div>
@@ -1920,7 +1934,7 @@ interface GridCardProps {
   item: FileItem;
   onOpen: (id: string) => void;
   onCopyUrl: (item: FileItem) => void;
-  onCopySnippet: (item: FileItem, format: ImageHostFormat) => void;
+  onCopySnippet: (item: FileItem, format: FileLinkFormat) => void;
   onDownload: (item: FileItem) => void;
   /** 当前卡片是否处于"刚刚复制成功"高亮态（替代 copiedId === item.id 全局比较） */
   isCopied: boolean;
@@ -1929,7 +1943,8 @@ interface GridCardProps {
   selectionMode: boolean;
   selected: boolean;
   onToggleSelect: (id: string) => void;
-  isImageHostMode: boolean;
+  /** 是否已开启只读分享链接（角标数据来自 attachment_shares） */
+  isShared: boolean;
 }
 
 /**
@@ -1956,10 +1971,14 @@ const GridCard = React.memo(function GridCard({
   selectionMode,
   selected,
   onToggleSelect,
-  isImageHostMode,
+  isShared,
 }: GridCardProps) {
   const isImage = item.category === "image";
-  // 图床的"复制格式"下拉菜单是否展开。每张卡独立维护——同时只能展开一个比较自然，
+  // 视频卡片用后端 ffmpeg 首帧海报当缩略图；拿不到 thumbnailUrl（老服务端）
+  // 就仍然用类型图标占位。
+  const isVideo = resolveMimeCategory(item) === "video";
+  const hasThumbnail = isImage || (isVideo && Boolean(item.thumbnailUrl));
+  // "复制格式"下拉菜单是否展开。每张卡独立维护——同时只能展开一个比较自然，
   // 但实现上让外层点击就关掉即可，无需引入全局状态。
   const [formatMenuOpen, setFormatMenuOpen] = useState(false);
   // 点卡片其他位置时关掉菜单（避免菜单悬空残留）
@@ -1997,7 +2016,7 @@ const GridCard = React.memo(function GridCard({
       title={item.filename}
     >
       <div className="aspect-square w-full bg-app-bg flex items-center justify-center overflow-hidden">
-        {isImage ? (
+        {hasThumbnail ? (
           <img
             src={thumbSrc}
             alt={item.filename}
@@ -2010,13 +2029,15 @@ const GridCard = React.memo(function GridCard({
             fetchpriority="low"
             className="w-full h-full object-cover"
             onError={(e) => {
-              // 破图兜底：先尝试退回原图（缩略图生成失败时尤其有用），
-              // 仍失败再隐藏 + 展示占位。
+              // 破图兜底：图片先尝试退回原图（缩略图生成失败时尤其有用）；
+              // 视频不能回退——那会把整个视频文件当图片下回来，直接走占位。
               const el = e.currentTarget;
-              const fallbackUrl = resolveAttachmentUrl(item.url);
-              if (el.src !== fallbackUrl) {
-                el.src = fallbackUrl;
-                return;
+              if (!isVideo) {
+                const fallbackUrl = resolveAttachmentUrl(item.url);
+                if (el.src !== fallbackUrl) {
+                  el.src = fallbackUrl;
+                  return;
+                }
               }
               el.style.display = "none";
               const fallback = el.nextElementSibling as HTMLElement | null;
@@ -2024,30 +2045,37 @@ const GridCard = React.memo(function GridCard({
             }}
           />
         ) : null}
-        {!isImage && (
+        {!hasThumbnail && (
           <div className="w-full h-full flex flex-col items-center justify-center text-tx-tertiary">
             <div className="text-accent-primary/70 mb-1">{mimeIcon(item.mimeType)}</div>
-            <span className="text-[10px] uppercase tracking-wide">{(item.mimeType || "").split("/")[1] || "file"}</span>
+            <span className="text-[10px] uppercase tracking-wide">{MIME_CATEGORY_LABELS[resolveMimeCategory(item)]}</span>
           </div>
         )}
-        {isImage && (
+        {hasThumbnail && (
           <div className="w-full h-full hidden flex-col items-center justify-center text-tx-tertiary bg-app-bg">
             {mimeIcon(item.mimeType)}
             <span className="text-[10px] mt-1">无法加载</span>
           </div>
         )}
 
-        {/* 图床模式：左下角的"公开直链"角标。
-            语义提示：当前附件有一条无需登录就能访问的 URL，
-            点击右上的复制按钮可拿到 URL/Markdown/HTML 任一形式。
-            v14：扩展到所有附件（不止图片）——图床支持文件外链分享。 */}
-        {isImageHostMode && (
+        {/* 视频海报上的播放角标：区分“这是一段视频”与普通图片 */}
+        {isVideo && hasThumbnail && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-8 h-8 rounded-full bg-black/45 flex items-center justify-center">
+              <Play size={14} className="text-white" />
+            </div>
+          </div>
+        )}
+
+        {/* 已分享角标：存在生效中的只读分享链接（attachment_shares.isActive）。
+            注：公开直链对所有附件都可用，这里的"已分享"指用户主动建过分享。 */}
+        {isShared && (
           <div
             className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded bg-indigo-500/85 text-white text-[9px] flex items-center gap-1 pointer-events-none"
-            title="此附件有公开直链，可对外引用"
+            title="已开启只读分享链接"
           >
-            <Link2 size={9} />
-            <span>直链</span>
+            <Share2 size={9} />
+            <span>已分享</span>
           </div>
         )}
       </div>
@@ -2078,17 +2106,11 @@ const GridCard = React.memo(function GridCard({
       )}
 
       {/* hover 工具条（选择模式下隐藏，避免误操作）。
-          - 普通模式：下载 + 复制链接（单击直接复制 URL）
-          - 图床模式：下载 + 分裂式复制按钮（左半 URL，右半下拉 MD/HTML）
-          图床下让"复制链接"常驻可见而不是 hover 才出现——这是图床场景的核心交互，
-          手机端（无 hover）也得能点到。 */}
+          统一文件池：所有类型都有公开直链，工具栏统一为"下载 + 分裂式复制"
+          （左半 URL，右半下拉 Markdown / HTML）。
+          复制常驻可见而不是仅 hover 才出现——手机端（无 hover）也得能点到。 */}
       {!selectionMode && (
-        <div
-          className={cn(
-            "absolute top-1.5 right-1.5 flex gap-1 transition-opacity",
-            isImageHostMode ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-          )}
-        >
+        <div className="absolute top-1.5 right-1.5 flex gap-1 transition-opacity opacity-100">
           <button
             className="w-6 h-6 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center disabled:opacity-50"
             onClick={(e) => {
@@ -2101,63 +2123,50 @@ const GridCard = React.memo(function GridCard({
             {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
           </button>
 
-          {isImageHostMode ? (
-            // 分裂按钮：左半 URL，右半下拉 MD/HTML
-            <div className="relative flex items-stretch rounded-md overflow-hidden">
-              <button
-                className="px-1.5 bg-black/50 hover:bg-black/70 text-white flex items-center"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCopyUrl(item);
-                }}
-                title="复制 URL"
-              >
-                {isCopied ? <Check size={12} /> : <Copy size={12} />}
-              </button>
-              <button
-                className="px-0.5 bg-black/50 hover:bg-black/70 text-white flex items-center border-l border-white/15"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFormatMenuOpen((v) => !v);
-                }}
-                title="选择复制格式"
-              >
-                <ChevronDown size={11} />
-              </button>
-              {formatMenuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-app-border bg-app-surface shadow-md py-1 text-xs"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {(["url", "markdown", "html"] as ImageHostFormat[]).map((fmt) => (
-                    <button
-                      key={fmt}
-                      className="w-full px-2.5 py-1.5 text-left text-tx-primary hover:bg-app-hover flex items-center gap-2"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFormatMenuOpen(false);
-                        onCopySnippet(item, fmt);
-                      }}
-                    >
-                      <Copy size={11} className="text-tx-tertiary" />
-                      <span>{imageHostFormatLabel(fmt)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
+          {/* 分裂按钮：左半 URL，右半下拉 MD/HTML */}
+          <div className="relative flex items-stretch rounded-md overflow-hidden">
             <button
-              className="w-6 h-6 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center"
+              className="px-1.5 bg-black/50 hover:bg-black/70 text-white flex items-center"
               onClick={(e) => {
                 e.stopPropagation();
                 onCopyUrl(item);
               }}
-              title="复制链接"
+              title="复制 URL"
             >
               {isCopied ? <Check size={12} /> : <Copy size={12} />}
             </button>
-          )}
+            <button
+              className="px-0.5 bg-black/50 hover:bg-black/70 text-white flex items-center border-l border-white/15"
+              onClick={(e) => {
+                e.stopPropagation();
+                setFormatMenuOpen((v) => !v);
+              }}
+              title="选择复制格式"
+            >
+              <ChevronDown size={11} />
+            </button>
+            {formatMenuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 z-20 min-w-[120px] rounded-md border border-app-border bg-app-surface shadow-md py-1 text-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {(["url", "markdown", "html"] as FileLinkFormat[]).map((fmt) => (
+                  <button
+                    key={fmt}
+                    className="w-full px-2.5 py-1.5 text-left text-tx-primary hover:bg-app-hover flex items-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFormatMenuOpen(false);
+                      onCopySnippet(item, fmt);
+                    }}
+                  >
+                    <Copy size={11} className="text-tx-tertiary" />
+                    <span>{fileLinkFormatLabel(fmt)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -2175,11 +2184,13 @@ function ListView({
   onDownload,
   onDelete,
   onSaveRemote,
+  onShare,
   copiedId,
   downloadingId,
   selectionMode,
   selectedIds,
   onToggleSelect,
+  sharedIds,
 }: {
   items: FileItem[];
   onOpen: (id: string) => void;
@@ -2187,12 +2198,16 @@ function ListView({
   onJumpToNote: (noteId: string) => void;
   onDownload: (item: FileItem) => void;
   onDelete: (id: string) => void;
-  onSaveRemote: (item: FileItem) => void;
+  /** 未传（remote-files 插件关闭）时不渲染「保存到远程」按钮 */
+  onSaveRemote?: (item: FileItem) => void;
+  onShare: (item: FileItem) => void;
   copiedId: string | null;
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
+  /** 已开启分享（isActive）的附件 id 集合——“已分享”标记的数据源 */
+  sharedIds: Set<string>;
 }) {
   return (
     <div className="rounded-lg border border-app-border bg-app-surface overflow-hidden">
@@ -2263,7 +2278,18 @@ function ListView({
                   <div className="truncate" title={it.filename}>{it.filename}</div>
                 </td>
                 <td className="px-3 py-2 text-tx-tertiary hidden md:table-cell">
-                  <code className="text-[11px]">{it.mimeType || "-"}</code>
+                  <span className="inline-flex items-center gap-1">
+                    <span title={it.mimeType || undefined}>{MIME_CATEGORY_LABELS[resolveMimeCategory(it)]}</span>
+                    {sharedIds.has(it.id) && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded bg-accent-primary/10 px-1 text-[10px] text-accent-primary"
+                        title="已开启只读分享链接"
+                      >
+                        <Share2 size={9} />
+                        已分享
+                      </span>
+                    )}
+                  </span>
                 </td>
                 <td className="px-3 py-2 text-right text-tx-secondary tabular-nums">{humanSize(it.size)}</td>
                 <td className="px-3 py-2 hidden lg:table-cell text-tx-secondary">
@@ -2298,16 +2324,18 @@ function ListView({
                     >
                       {downloadingId === it.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                     </button>
-                    <button
-                      className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void onSaveRemote(it);
-                      }}
-                      title="保存到远程（WebDAV / 百度网盘）"
-                    >
-                      <Cloud size={12} />
-                    </button>
+                    {onSaveRemote && (
+                      <button
+                        className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onSaveRemote(it);
+                        }}
+                        title="保存到远程（WebDAV / 百度网盘）"
+                      >
+                        <Cloud size={12} />
+                      </button>
+                    )}
                     <button
                       className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
                       onClick={(e) => {
@@ -2317,6 +2345,16 @@ function ListView({
                       title="复制链接"
                     >
                       {copiedId === it.id ? <Check size={12} /> : <Copy size={12} />}
+                    </button>
+                    <button
+                      className="p-1 rounded hover:bg-app-hover text-tx-tertiary hover:text-tx-primary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onShare(it);
+                      }}
+                      title="分享"
+                    >
+                      <Share2 size={12} />
                     </button>
                     <button
                       className="p-1 rounded hover:bg-red-500/10 text-tx-tertiary hover:text-red-500 transition-colors"
@@ -2337,4 +2375,12 @@ function ListView({
       </table>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// 工具：提取异常文案（避免 any，风格与文件内 toast 用法一致）
+// ---------------------------------------------------------------------------
+/** 提取 unknown 异常的可读信息。 */
+function errMsg(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback;
 }

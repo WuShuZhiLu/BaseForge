@@ -480,10 +480,15 @@ export function TaskMetadataWorkspace({ children }: { children: React.ReactNode 
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-app-bg">
-      <div className="shrink-0 border-b border-app-border bg-app-surface">
-        <div className="flex min-h-10 items-center gap-2 px-3 md:px-4">
+      <div className="flex h-12 shrink-0 items-center border-b border-app-border bg-app-surface">
+        <div className="flex h-full w-full items-center gap-2 px-3 md:px-4">
           {snapshot.views.length > 0 && <Bookmark size={14} className="shrink-0 text-accent-primary" />}
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-1 [scrollbar-width:none]">
+            {snapshot.views.length === 0 && (
+              <span className="shrink-0 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-2.5 py-1 text-[11px] font-medium text-accent-primary">
+                全部任务
+              </span>
+            )}
             {snapshot.views.map((view) => (
               <div key={view.id} className="group flex shrink-0 items-center rounded-full border border-app-border bg-app-bg">
                 <button

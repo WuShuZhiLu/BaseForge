@@ -10,21 +10,27 @@
  *   DELETE /api/workspaces/:id            - 删除工作区（owner / 系统管理员）
  *
  *   GET    /api/workspaces/:id/members    - 成员列表（系统管理员旁路）
+ *   POST   /api/workspaces/:id/members    - 站内搜索添加成员（owner/admin / 系统管理员）
  *   PUT    /api/workspaces/:id/members/:userId  - 修改成员角色（owner/admin / 系统管理员）
  *   DELETE /api/workspaces/:id/members/:userId  - 移除成员（owner/admin / 系统管理员）
  *   POST   /api/workspaces/:id/leave      - 主动退出工作区
+ *   POST   /api/workspaces/:id/transfer-ownership - 转让 Owner（owner / 系统管理员）
  *
  *   POST   /api/workspaces/:id/invites    - 生成邀请码（owner/admin / 系统管理员）
  *   GET    /api/workspaces/:id/invites    - 查看邀请码列表（owner/admin / 系统管理员）
  *   DELETE /api/workspaces/:id/invites/:inviteId - 撤销邀请码
+ *   POST   /api/workspaces/:id/invites/:inviteId/reset - 重置邀请码（旧码立即失效）
  *   POST   /api/workspaces/join           - 使用邀请码加入
  *
  * 系统管理员（users.role='admin'）通过 requireWorkspaceRole 内的旁路逻辑，
  * 视同任意工作区的 owner，可执行所有写操作；这是"运维兜底"语义。
  */
+import fs from "node:fs";
+import path from "node:path";
 import { Hono } from "hono";
 import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
+import { verifyLoginToken } from "../lib/auth-security";
 import {
   getUserWorkspaceRole,
   isSystemAdmin,
@@ -35,7 +41,12 @@ import {
   type EnabledFeaturesConfig,
   type WorkspaceFeature,
 } from "../middleware/acl";
-import { workspaceInvitesRepository, noteAclRepository, workspaceMembersRepository } from "../repositories";
+import {
+  workspaceInvitesRepository,
+  noteAclRepository,
+  workspaceMembersRepository,
+  userSessionsRepository,
+} from "../repositories";
 import {
   normalizeWorkspaceIcon,
   workspaceIconForRead,
@@ -56,6 +67,55 @@ function generateInviteCode(): string {
 
 function normalizeWorkspaceRow<T extends Record<string, any>>(row: T): T {
   return { ...row, icon: workspaceIconForRead(row.icon) };
+}
+
+// ===================== 工作区头像 =====================
+//
+// 文件存 data/workspace-avatars/<workspaceId>.<ext>（每个工作区单文件，覆盖写）；
+// workspaces.avatarUrl 存带 cache-bust 版本号的相对 URL，由 avatar-file 路由鉴权后下发。
+
+const WORKSPACE_AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const WORKSPACE_AVATAR_MIME_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+
+function getWorkspaceAvatarDir(): string {
+  const dataDir = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
+  return path.join(dataDir, "workspace-avatars");
+}
+
+function removeWorkspaceAvatarFile(workspaceId: string): void {
+  try {
+    for (const ext of Object.values(WORKSPACE_AVATAR_MIME_EXT)) {
+      const file = path.join(getWorkspaceAvatarDir(), `${workspaceId}.${ext}`);
+      if (fs.existsSync(file)) fs.unlinkSync(file);
+    }
+  } catch {
+    // 清理失败不阻塞流程
+  }
+}
+
+// 头像文件由 <img> 直接请求，额外接受 ?token= 查询参数
+function resolveViewerIdFromToken(token: string): string | null {
+  if (!token) return null;
+  const payload = verifyLoginToken(token);
+  if (!payload) return null;
+
+  const db = getDb();
+  const user = db
+    .prepare("SELECT id, tokenVersion FROM users WHERE id = ?")
+    .get(payload.userId) as { id: string; tokenVersion: number } | undefined;
+  if (!user) return null;
+  if ((payload.tver ?? 0) !== user.tokenVersion) return null;
+  if (payload.jti) {
+    const session = userSessionsRepository.getByIdAndUser(payload.jti, payload.userId);
+    if (!session || session.revokedAt) return null;
+    if (session.expiresAt && Date.parse(session.expiresAt) <= Date.now()) return null;
+  }
+  return user.id;
 }
 
 function broadcastWorkspaceProfileUpdated(workspaceId: string, workspace: Record<string, any>): void {
@@ -217,6 +277,90 @@ app.put("/:id", requireWorkspaceRole("admin"), async (c) => {
   return c.json(ws);
 });
 
+// 上传工作区头像（仅 owner/admin）
+app.post("/:id/avatar", requireWorkspaceRole("admin"), async (c) => {
+  const db = getDb();
+  const id = c.req.param("id");
+  const ws = db.prepare("SELECT id FROM workspaces WHERE id = ?").get(id);
+  if (!ws) return c.json({ error: "工作区不存在" }, 404);
+
+  const body = await c.req.parseBody();
+  const file = body.file;
+  if (!(file instanceof File)) {
+    return c.json({ error: "缺少头像文件（字段名 file）" }, 400);
+  }
+  const ext = WORKSPACE_AVATAR_MIME_EXT[file.type.toLowerCase()];
+  if (!ext) {
+    return c.json({ error: "仅支持 PNG/JPEG/WebP/GIF 图片" }, 400);
+  }
+  if (file.size > WORKSPACE_AVATAR_MAX_BYTES) {
+    return c.json({ error: "头像文件不能超过 5MB" }, 400);
+  }
+
+  const dir = getWorkspaceAvatarDir();
+  fs.mkdirSync(dir, { recursive: true });
+  removeWorkspaceAvatarFile(id);
+  fs.writeFileSync(path.join(dir, `${id}.${ext}`), Buffer.from(await file.arrayBuffer()));
+
+  const avatarUrl = `/api/workspaces/${id}/avatar-file?v=${Date.now()}`;
+  db.prepare("UPDATE workspaces SET avatarUrl = ?, updatedAt = datetime('now') WHERE id = ?").run(avatarUrl, id);
+  const row = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as Record<string, any>;
+  broadcastWorkspaceProfileUpdated(id, normalizeWorkspaceRow(row));
+  return c.json({ success: true, avatarUrl });
+});
+
+// 移除工作区头像（仅 owner/admin）
+app.delete("/:id/avatar", requireWorkspaceRole("admin"), (c) => {
+  const db = getDb();
+  const id = c.req.param("id");
+  removeWorkspaceAvatarFile(id);
+  db.prepare("UPDATE workspaces SET avatarUrl = NULL, updatedAt = datetime('now') WHERE id = ?").run(id);
+  const row = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as Record<string, any>;
+  if (row) broadcastWorkspaceProfileUpdated(id, normalizeWorkspaceRow(row));
+  return c.json({ success: true, avatarUrl: null });
+});
+
+// 工作区头像文件（成员或系统管理员可读）
+app.get("/:id/avatar-file", (c) => {
+  const authHeader = c.req.header("Authorization");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : String(c.req.query("token") || "");
+  const viewerId = resolveViewerIdFromToken(token);
+  if (!viewerId) return c.json({ error: "未授权" }, 401);
+
+  const id = c.req.param("id");
+  // 防路径穿越：workspaceId 必须是 uuid 形态
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
+    return c.json({ error: "参数不合法" }, 400);
+  }
+  if (!isSystemAdmin(viewerId) && !getUserWorkspaceRole(id, viewerId)) {
+    return c.json({ error: "无权访问该工作区" }, 403);
+  }
+
+  const db = getDb();
+  const ws = db.prepare("SELECT avatarUrl FROM workspaces WHERE id = ?").get(id) as
+    | { avatarUrl: string | null }
+    | undefined;
+  if (!ws?.avatarUrl) return c.json({ error: "无头像" }, 404);
+
+  const dir = getWorkspaceAvatarDir();
+  for (const [mime, ext] of Object.entries(WORKSPACE_AVATAR_MIME_EXT)) {
+    const file = path.join(dir, `${id}.${ext}`);
+    if (fs.existsSync(file)) {
+      return new Response(new Uint8Array(fs.readFileSync(file)), {
+        headers: {
+          "Content-Type": mime,
+          "Cache-Control": "private, max-age=60",
+        },
+      });
+    }
+  }
+  // DB 有记录但文件丢失：清掉脏数据
+  db.prepare("UPDATE workspaces SET avatarUrl = NULL WHERE id = ?").run(id);
+  return c.json({ error: "无头像" }, 404);
+});
+
 // 删除工作区（仅 owner）
 app.delete("/:id", requireWorkspaceRole("owner"), (c) => {
   const db = getDb();
@@ -234,6 +378,7 @@ app.delete("/:id", requireWorkspaceRole("owner"), (c) => {
     db.prepare("DELETE FROM workspaces WHERE id = ?").run(id);
   });
   tx();
+  removeWorkspaceAvatarFile(id);
 
   return c.json({ success: true });
 });
@@ -252,6 +397,36 @@ app.get("/:id/members", (c) => {
   const members = workspaceMembersRepository.listByWorkspaceWithUser(id);
 
   return c.json(members);
+});
+
+// 站内搜索添加成员（owner/admin；目标用户只能来自 GET /api/users/search 的已注册用户）
+app.post("/:id/members", requireWorkspaceRole("admin"), async (c) => {
+  const db = getDb();
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { userId, role } = body as { userId: string; role: WorkspaceRole };
+
+  if (!userId || typeof userId !== "string") return c.json({ error: "缺少用户 ID" }, 400);
+
+  // owner 只能经转让产生，不能在这里直接授予
+  const validRoles: WorkspaceRole[] = ["admin", "editor", "commenter", "viewer"];
+  if (!validRoles.includes(role)) {
+    return c.json({ error: "无效的角色" }, 400);
+  }
+
+  const ws = db.prepare("SELECT id FROM workspaces WHERE id = ?").get(id);
+  if (!ws) return c.json({ error: "工作区不存在" }, 404);
+
+  // 与 GET /api/users/search 口径一致：目标用户必须存在且未被禁用
+  const user = db.prepare("SELECT id FROM users WHERE id = ? AND isDisabled = 0").get(userId);
+  if (!user) return c.json({ error: "用户不存在或已被禁用" }, 404);
+
+  // 幂等：已是成员时直接成功返回，不重复插入
+  const existing = workspaceMembersRepository.getRole(id, userId);
+  if (existing) return c.json({ success: true, alreadyMember: true });
+
+  workspaceMembersRepository.create(id, userId, role);
+  return c.json({ success: true }, 201);
 });
 
 // 修改成员角色（仅 owner/admin）
@@ -313,6 +488,48 @@ app.post("/:id/leave", (c) => {
   return c.json({ success: true });
 });
 
+// 转让 Owner（仅 owner；转让后原 owner 降为 admin，保证"至少保留一个 Owner"）
+app.post("/:id/transfer-ownership", requireWorkspaceRole("owner"), async (c) => {
+  const db = getDb();
+  const userId = c.req.header("X-User-Id") || "";
+  const id = c.req.param("id");
+  const body = await c.req.json();
+  const { toUserId } = body as { toUserId: string };
+
+  if (!toUserId || typeof toUserId !== "string") return c.json({ error: "缺少目标用户" }, 400);
+  if (toUserId === userId) return c.json({ error: "不能转让给自己" }, 400);
+
+  const ws = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as Record<string, any> | undefined;
+  if (!ws) return c.json({ error: "工作区不存在" }, 404);
+
+  // 目标必须是当前成员
+  const target = workspaceMembersRepository.getRole(id, toUserId);
+  if (!target) return c.json({ error: "目标用户不是该工作区成员" }, 404);
+  // 复用"不能修改 owner 角色"的语义：目标已是 owner 时拒绝，防止重复转让
+  if (target.role === "owner") {
+    return c.json({ error: "不能修改 owner 的角色" }, 400);
+  }
+
+  // 降级对象取当前持有 owner 角色的成员（正常路径即请求者本人；
+  // 系统管理员旁路时请求者不是成员，按实际 owner 降级才能维持"恰好一个 Owner"）
+  const currentOwner = db
+    .prepare("SELECT userId FROM workspace_members WHERE workspaceId = ? AND role = 'owner'")
+    .get(id) as { userId: string } | undefined;
+
+  const tx = db.transaction(() => {
+    workspaceMembersRepository.updateRole(id, toUserId, "owner");
+    if (currentOwner) workspaceMembersRepository.updateRole(id, currentOwner.userId, "admin");
+    // ownerId 是 canonical owner 判定（knowledgeTreeCore 权限预设、删除空间时的内容归属
+    // 均读 workspaces.ownerId），必须与 workspace_members.role 同步更新
+    db.prepare("UPDATE workspaces SET ownerId = ? WHERE id = ?").run(toUserId, id);
+  });
+  tx();
+  ws.ownerId = toUserId;
+
+  broadcastWorkspaceProfileUpdated(id, normalizeWorkspaceRow(ws));
+  return c.json({ success: true });
+});
+
 // ===================== 邀请码 =====================
 
 app.post("/:id/invites", requireWorkspaceRole("admin"), async (c) => {
@@ -357,6 +574,15 @@ app.delete("/:id/invites/:inviteId", requireWorkspaceRole("admin"), (c) => {
   const inviteId = c.req.param("inviteId");
   workspaceInvitesRepository.delete(inviteId, id);
   return c.json({ success: true });
+});
+
+// 重置邀请码：换新 code 并清零使用次数，旧码立即失效
+app.post("/:id/invites/:inviteId/reset", requireWorkspaceRole("admin"), (c) => {
+  const id = c.req.param("id");
+  const inviteId = c.req.param("inviteId");
+  const changes = workspaceInvitesRepository.reset(inviteId, id, generateInviteCode());
+  if (!changes) return c.json({ error: "邀请码不存在" }, 404);
+  return c.json(workspaceInvitesRepository.getById(inviteId));
 });
 
 // 使用邀请码加入（独立端点，不需要 workspaceId 参数）

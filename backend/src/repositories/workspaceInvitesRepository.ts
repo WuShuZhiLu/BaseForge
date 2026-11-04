@@ -51,7 +51,7 @@ export const workspaceInvitesRepository = {
     const db = getDb();
     return db
       .prepare("SELECT * FROM workspace_invites WHERE \"workspaceId\" = ? ORDER BY \"createdAt\" DESC")
-      .all(workspaceId) as WorkspaceInviteRecord[];
+      .all(workspaceId) as unknown as WorkspaceInviteRecord[];
   },
 
   /**
@@ -110,6 +110,22 @@ export const workspaceInvitesRepository = {
   },
 
   /**
+   * 重置邀请码：换新 code 并清零使用次数（旧码立即失效）。
+   *
+   * @param inviteId 邀请 ID
+   * @param workspaceId 工作区 ID
+   * @param newCode 新邀请码
+   * @returns 更新的行数
+   */
+  reset(inviteId: string, workspaceId: string, newCode: string): number {
+    const db = getDb();
+    const result = db
+      .prepare("UPDATE workspace_invites SET code = ?, \"useCount\" = 0 WHERE id = ? AND \"workspaceId\" = ?")
+      .run(newCode, inviteId, workspaceId);
+    return result.changes as number;
+  },
+
+  /**
    * 转移邀请创建者（用户迁移时使用）。
    *
    * @param fromUserId 源用户 ID
@@ -119,7 +135,7 @@ export const workspaceInvitesRepository = {
   transferOwnership(fromUserId: string, toUserId: string): number {
     const db = getDb();
     const result = db.prepare("UPDATE workspace_invites SET \"createdBy\" = ? WHERE \"createdBy\" = ?").run(toUserId, fromUserId);
-    return result.changes;
+    return result.changes as number;
   },
 
   async getByIdAsync(inviteId: string): Promise<WorkspaceInviteRecord | undefined> {

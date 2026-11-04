@@ -2783,7 +2783,7 @@ export default function MindMapCenter({
 
     const content = buildXmindContent(result.data, title);
     const contentJson = JSON.stringify(content);
-    const metadata = JSON.stringify({ creator: { name: "nowen-note", version: "1.0.0" } });
+    const metadata = JSON.stringify({ creator: { name: "BaseForge", version: "1.0.0" } });
     const manifest = JSON.stringify({ "file-entries": { "content.json": {}, "metadata.json": {} } });
 
     // 使用简易 ZIP 打包（无压缩），xmind 本质是 ZIP

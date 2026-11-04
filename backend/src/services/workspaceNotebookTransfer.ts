@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { v4 as uuid } from "uuid";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema";
 import { getUserWorkspaceRole, hasPermission, hasRole, resolveNotebookPermission } from "../middleware/acl";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
@@ -147,10 +147,10 @@ function cleanupCreatedFiles(files: string[]) {
   }
 }
 
-function collectNotebookTree(db: Database.Database, source: NotebookRow): NotebookRow[] {
+function collectNotebookTree(db: DatabaseSync, source: NotebookRow): NotebookRow[] {
   const all = db
     .prepare("SELECT * FROM notebooks WHERE userId = ? AND workspaceId IS NULL AND isDeleted = 0")
-    .all(source.userId) as NotebookRow[];
+    .all(source.userId) as unknown as NotebookRow[];
   const byParent = new Map<string | null, NotebookRow[]>();
   for (const nb of all) {
     const list = byParent.get(nb.parentId ?? null) || [];
@@ -289,7 +289,7 @@ export function copyPersonalNotebookToWorkspace(input: CopyPersonalNotebookInput
                   AND workspaceId IS NULL
                   AND isTrashed = 0`,
             )
-            .all(...oldNotebookIds, actorUserId) as NoteRow[]
+            .all(...oldNotebookIds, actorUserId) as unknown as NoteRow[]
         : [];
 
       for (const note of sourceNotes) {
@@ -302,7 +302,7 @@ export function copyPersonalNotebookToWorkspace(input: CopyPersonalNotebookInput
         const notePlaceholders = oldNoteIds.map(() => "?").join(",");
         const rows = db
           .prepare(`SELECT * FROM attachments WHERE noteId IN (${notePlaceholders})`)
-          .all(...oldNoteIds) as AttachmentRow[];
+          .all(...oldNoteIds) as unknown as AttachmentRow[];
         for (const row of rows) {
           const list = attachmentsByOldNote.get(row.noteId) || [];
           list.push(row);
@@ -419,7 +419,7 @@ export function copyPersonalNotebookToWorkspace(input: CopyPersonalNotebookInput
           const tagPlaceholders = oldTagIds.map(() => "?").join(",");
           const tags = db
             .prepare(`SELECT * FROM tags WHERE id IN (${tagPlaceholders})`)
-            .all(...oldTagIds) as TagRow[];
+            .all(...oldTagIds) as unknown as TagRow[];
           for (const tag of tags) {
             let targetTag = targetWorkspaceId
               ? (selectTargetTag.get(actorUserId, tag.name, targetWorkspaceId) as TagRow | undefined)

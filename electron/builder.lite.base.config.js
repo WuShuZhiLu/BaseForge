@@ -36,8 +36,8 @@ const SIGN_AND_EDIT_EXECUTABLE = !SKIP_RCEDIT;
 
 // Linux 元信息（与 full 同；仅 synopsis/description 变更以区分 lite）
 const LINUX_MAINTAINER =
-  process.env.NOWEN_LINUX_MAINTAINER || "Nowen <noreply@nowen.local>";
-const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "Nowen";
+  process.env.NOWEN_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
+const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "BaseForge";
 
 module.exports = {
   // appId 加 .lite 后缀 —— 关键：避免与 full 安装包互覆盖、autoUpdate 串 feed
@@ -152,7 +152,7 @@ module.exports = {
     signDlls: false,
     signingHashAlgorithms: ["sha256"],
     verifyUpdateCodeSignature: true,
-    publisherName: "Nowen",
+    publisherName: "BaseForge",
     // 产物名加 -lite 后缀，便于跟 full 分发包并排
     artifactName: "BaseForge-${version}-lite-setup.${ext}",
   },

@@ -40,10 +40,10 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { buildPublicAttachmentUrl } from "@/lib/publicAttachmentUrl";
 import { downloadAttachment } from "@/lib/downloadFile";
 import {
-  formatImageHostSnippet,
-  imageHostFormatLabel,
-  type ImageHostFormat,
-} from "@/lib/imageHostFormats";
+  formatFileLinkSnippet,
+  fileLinkFormatLabel,
+  type FileLinkFormat,
+} from "@/lib/fileLinkFormats";
 import AttachmentPreview from "@/components/attachmentPreview/AttachmentPreview";
 
 function humanSize(bytes: number): string {
@@ -96,7 +96,6 @@ export interface AttachmentDetailDrawerProps {
   onAfterDelete?: (id: string) => void;
   onAfterRename?: (id: string, newFilename: string) => void;
   showDelete?: boolean;
-  isImageHostMode?: boolean;
   extraHeaderActions?: React.ReactNode;
   renderPreview?: (detail: FileDetail, expanded: boolean) => React.ReactNode;
 }
@@ -108,7 +107,6 @@ export default function AttachmentDetailDrawer({
   onAfterDelete,
   onAfterRename,
   showDelete = false,
-  isImageHostMode = false,
   extraHeaderActions,
   renderPreview,
 }: AttachmentDetailDrawerProps) {
@@ -165,9 +163,9 @@ export default function AttachmentDetailDrawer({
     setRenameDraft("");
     setRenameSubmitting(false);
     setExpanded(false);
-    setMobileShareOpen(isImageHostMode);
+    setMobileShareOpen(false);
     setMobileInfoOpen(false);
-  }, [attachmentId, isImageHostMode]);
+  }, [attachmentId]);
 
   const startRename = useCallback(() => {
     if (!detail) return;
@@ -209,16 +207,17 @@ export default function AttachmentDetailDrawer({
   }, [detail, renameDraft, cancelRename, onAfterRename, t]);
 
   const copySnippet = useCallback(
-    async (format: ImageHostFormat) => {
+    async (format: FileLinkFormat) => {
       if (!detail) return;
       const full = buildPublicAttachmentUrl(resolveAttachmentUrl(detail.url), {
         filePublicOrigin: siteConfig.filePublicOrigin,
         publicWebOrigin: siteConfig.publicWebOrigin,
       });
-      const snippet = formatImageHostSnippet(format, full, detail.filename);
+      // 片段形态由 MIME 决定：图片 ![]()/<img>、视频 <video>、音频 <audio>、其他链接
+      const snippet = formatFileLinkSnippet(format, full, detail.filename, detail.mimeType);
       const ok = await copyText(snippet);
       if (ok) {
-        toast.success(t("attachmentDetail.copiedFormat", { format: imageHostFormatLabel(format) }));
+        toast.success(t("attachmentDetail.copiedFormat", { format: fileLinkFormatLabel(format) }));
       } else {
         toast.error(t("attachmentDetail.copyFailed"));
       }
@@ -282,19 +281,14 @@ export default function AttachmentDetailDrawer({
         className="w-full px-2 py-1.5 rounded-md border border-app-border bg-app-surface text-[11px] text-tx-primary font-mono outline-none focus:border-accent-primary overflow-x-auto"
       />
       <div className="flex flex-wrap gap-1.5">
-        {(["url", "markdown", "html"] as ImageHostFormat[]).map((fmt) => (
+        {(["url", "markdown", "html"] as FileLinkFormat[]).map((fmt) => (
           <button
             key={fmt}
             onClick={() => copySnippet(fmt)}
-            className={cn(
-              "px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 transition-colors",
-              isImageHostMode
-                ? "bg-indigo-500 hover:bg-indigo-600 text-white"
-                : "bg-app-surface border border-app-border hover:bg-app-hover text-tx-primary",
-            )}
+            className="px-2.5 py-1 rounded-md text-[11px] flex items-center gap-1 transition-colors bg-app-surface border border-app-border hover:bg-app-hover text-tx-primary"
           >
             <Copy size={11} />
-            {t("attachmentDetail.copyFormat", { format: imageHostFormatLabel(fmt) })}
+            {t("attachmentDetail.copyFormat", { format: fileLinkFormatLabel(fmt) })}
           </button>
         ))}
       </div>
@@ -490,12 +484,7 @@ export default function AttachmentDetailDrawer({
                 if (isMobile) {
                   return (
                     <div
-                      className={cn(
-                        "rounded-xl border overflow-hidden",
-                        isImageHostMode
-                          ? "border-indigo-500/30 bg-indigo-500/5"
-                          : "border-app-border bg-app-bg",
-                      )}
+                      className="rounded-xl border overflow-hidden border-app-border bg-app-bg"
                       data-mobile-attachment-section="share"
                     >
                       <button
@@ -506,13 +495,10 @@ export default function AttachmentDetailDrawer({
                       >
                         <Link2
                           size={15}
-                          className={cn("shrink-0", isImageHostMode ? "text-indigo-500" : "text-tx-tertiary")}
+                          className="shrink-0 text-tx-tertiary"
                         />
                         <div className="min-w-0 flex-1">
-                          <div className={cn(
-                            "text-xs font-semibold",
-                            isImageHostMode ? "text-indigo-500" : "text-tx-primary",
-                          )}>
+                          <div className="text-xs font-semibold text-tx-primary">
                             {t("attachmentDetail.shareLink")}
                           </div>
                           <div className="mt-0.5 text-[10px] text-tx-tertiary">
@@ -536,25 +522,10 @@ export default function AttachmentDetailDrawer({
                   );
                 }
                 return (
-                  <div
-                    className={cn(
-                      "rounded-lg border p-3 space-y-2",
-                      isImageHostMode
-                        ? "border-indigo-500/30 bg-indigo-500/5"
-                        : "border-app-border bg-app-bg",
-                    )}
-                  >
+                  <div className="rounded-lg border p-3 space-y-2 border-app-border bg-app-bg">
                     <div className="flex items-center gap-1.5 text-xs">
-                      <Link2
-                        size={13}
-                        className={isImageHostMode ? "text-indigo-500" : "text-tx-tertiary"}
-                      />
-                      <span
-                        className={cn(
-                          "font-semibold",
-                          isImageHostMode ? "text-indigo-500" : "text-tx-secondary",
-                        )}
-                      >
+                      <Link2 size={13} className="text-tx-tertiary" />
+                      <span className="font-semibold text-tx-secondary">
                         {t("attachmentDetail.shareLink")}
                       </span>
                       <span className="text-[10px] text-tx-tertiary ml-auto">

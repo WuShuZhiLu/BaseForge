@@ -286,9 +286,9 @@ api.attachments.upload = (async (noteId: string, file: File) => {
   return stableUrl ? { ...payload, url: stableUrl } : payload;
 }) as typeof baseApi.attachments.upload;
 
-const nativeMoveNotebook = baseApi.moveNotebook.bind(baseApi);
-const nativeReorderNotebooks = baseApi.reorderNotebooks.bind(baseApi);
-const nativeUpdateNotebook = baseApi.updateNotebook.bind(baseApi);
+const nativeMoveNotebook = baseApi.moveNotebook?.bind(baseApi);
+const nativeReorderNotebooks = baseApi.reorderNotebooks?.bind(baseApi);
+const nativeUpdateNotebook = baseApi.updateNotebook?.bind(baseApi);
 
 api.moveNotebook = (async (...args: Parameters<typeof baseApi.moveNotebook>) => {
   const moved = await nativeMoveNotebook(...args);
@@ -310,6 +310,21 @@ api.updateNotebook = (async (...args: Parameters<typeof baseApi.updateNotebook>)
   }
   return updated;
 }) as typeof baseApi.updateNotebook;
+
+// 文档收藏/锁定等状态变更广播：收藏区段与收藏面板据此即时刷新，不必等手动刷新。
+// 只在 isFavorite 变化时广播，避免普通编辑的高频保存刷屏。
+// 注意：模块顶层取原始实现，必须容忍 updateNote 缺失（测试会部分 mock apiImpl），
+// 否则整个测试套件会在收集阶段抛 "Cannot read properties of undefined (reading 'bind')"。
+const nativeUpdateNote = baseApi.updateNote?.bind(baseApi);
+api.updateNote = (async (...args: Parameters<typeof baseApi.updateNote>) => {
+  if (!nativeUpdateNote) return undefined as unknown as Awaited<ReturnType<typeof baseApi.updateNote>>;
+  const updated = await nativeUpdateNote(...args);
+  const patch = args[1] as Record<string, unknown> | undefined;
+  if (patch && Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
+    window.dispatchEvent(new CustomEvent("nowen:notes-changed", { detail: { noteId: args[0] } }));
+  }
+  return updated;
+}) as typeof baseApi.updateNote;
 
 api.getTaskActivityEvents = (params: TaskActivityQuery = {}) => {
   const search = new URLSearchParams();
@@ -365,7 +380,7 @@ api.updateNoteConfirmed = async (id: string, data: Partial<Note>) => {
   return updated;
 };
 
-const nativeCreateTask = baseApi.createTask.bind(baseApi);
+const nativeCreateTask = baseApi.createTask?.bind(baseApi);
 api.createTask = (async (data: Partial<Task>) => {
   const created = await nativeCreateTask(data);
   if (!created.isCompleted || !data.completedAt) return created;
@@ -383,7 +398,7 @@ api.createTask = (async (data: Partial<Task>) => {
   }
 }) as typeof baseApi.createTask;
 
-const nativeGetHabitCheckinLog = baseApi.getHabitCheckinLog.bind(baseApi);
+const nativeGetHabitCheckinLog = baseApi.getHabitCheckinLog?.bind(baseApi);
 api.getHabitCheckinLog = ((params?: {
   from?: string;
   to?: string;

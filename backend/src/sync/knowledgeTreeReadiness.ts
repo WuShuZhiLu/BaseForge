@@ -1,7 +1,7 @@
 import { SYNC_PERSONAL_SCOPE_KEY } from "./constants.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-function readinessTableExists(db: Database.Database): boolean {
+function readinessTableExists(db: DatabaseSync): boolean {
   return Boolean(db.prepare(`
     SELECT 1 FROM sqlite_master
     WHERE type = 'table' AND name = 'sync_v2_tree_scope_readiness'
@@ -9,7 +9,7 @@ function readinessTableExists(db: Database.Database): boolean {
 }
 
 export function isKnowledgeTreeSyncReady(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey = SYNC_PERSONAL_SCOPE_KEY,
 ): boolean {
@@ -26,7 +26,7 @@ export function isKnowledgeTreeSyncReady(
  * Business Bootstrap readiness alone is deliberately insufficient.
  */
 export function markKnowledgeTreeSyncReady(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey = SYNC_PERSONAL_SCOPE_KEY,
 ): void {
@@ -44,7 +44,7 @@ export function markKnowledgeTreeSyncReady(
 
 /** Re-lock one Profile whenever its baseline becomes untrustworthy. */
 export function resetKnowledgeTreeSyncReadiness(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey?: string,
 ): void {
@@ -70,7 +70,7 @@ export function resetKnowledgeTreeSyncReadiness(
 
 /** Backup restore invalidates every remote relationship, not only the active Profile. */
 export function resetAllKnowledgeTreeSyncReadiness(
-  db: Database.Database,
+  db: DatabaseSync,
 ): number {
   if (!readinessTableExists(db)) return 0;
   return db.prepare(`

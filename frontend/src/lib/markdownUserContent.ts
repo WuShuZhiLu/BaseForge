@@ -23,7 +23,7 @@ const PASTED_MARKER_RE = new RegExp(
 const FENCE_OPEN_RE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 
 /**
- * Locate Nowen's reserved Markdown block markers while respecting fenced code blocks.
+ * Locate BaseForge's reserved Markdown block markers while respecting fenced code blocks.
  * The returned offsets refer to the original internal Markdown string.
  */
 export function findInternalMarkdownMarkerRanges(markdown: string): InternalMarkdownMarkerRange[] {

@@ -1,5 +1,5 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 /**
  * Clipper 本地凭据（Phase 8）。
@@ -43,7 +43,7 @@ export interface ClipperCredentialRow {
  * 与用户笔记数据无关，且只在桌面端 Embedded Backend 里存在。
  * 放进正式迁移会让 Docker/NAS 部署也凭空多出一张永远为空的表。
  */
-export function ensureClipperCredentialTable(db: Database.Database): void {
+export function ensureClipperCredentialTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS clipper_credentials (
       id TEXT PRIMARY KEY,
@@ -72,7 +72,7 @@ export interface IssuedClipperCredential {
 }
 
 export function issueClipperCredential(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   label?: string,
 ): IssuedClipperCredential {
@@ -98,7 +98,7 @@ export function issueClipperCredential(
  * 注意这里比较的是摘要而非明文——摘要长度固定，天然满足等长要求。
  */
 export function verifyClipperCredential(
-  db: Database.Database,
+  db: DatabaseSync,
   token: string,
 ): { userId: string; scopes: ClipperScope[] } | null {
   if (!token || !token.startsWith("nwclip_")) return null;
@@ -107,7 +107,7 @@ export function verifyClipperCredential(
   const digest = hashToken(token);
   const rows = db.prepare(
     "SELECT * FROM clipper_credentials WHERE revokedAt IS NULL",
-  ).all() as ClipperCredentialRow[];
+  ).all() as unknown as ClipperCredentialRow[];
 
   for (const row of rows) {
     const a = Buffer.from(row.tokenHash, "hex");
@@ -133,14 +133,14 @@ export function verifyClipperCredential(
   return null;
 }
 
-export function revokeClipperCredential(db: Database.Database, id: string): void {
+export function revokeClipperCredential(db: DatabaseSync, id: string): void {
   ensureClipperCredentialTable(db);
   db.prepare("UPDATE clipper_credentials SET revokedAt = datetime('now') WHERE id = ?")
     .run(id);
 }
 
 export function listClipperCredentials(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
 ): Array<{ id: string; label: string | null; createdAt: string; lastUsedAt: string | null }> {
   ensureClipperCredentialTable(db);

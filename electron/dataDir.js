@@ -1,10 +1,17 @@
 const fs = require("fs");
 const path = require("path");
 
-const DATA_DIR_NAME = "nowen-data";
-const DATA_DIR_POINTER_FILE = "nowen-data-location.json";
+const DATA_DIR_NAME = "baseforge-data";
+const DATA_DIR_POINTER_FILE = "baseforge-data-location.json";
+/** 旧版本使用的目录与指针文件名，启动时原样搬到新名，避免看起来丢数据 */
+const LEGACY_DATA_DIR_NAME = "nowen-data";
+const LEGACY_DATA_DIR_POINTER_FILE = "nowen-data-location.json";
+const DB_FILE_NAME = "baseforge.db";
+const LEGACY_DB_FILE_NAME = "nowen-note.db";
+const SIDECAR_SUFFIXES = ["", "-wal", "-shm"];
 const FIRST_RUN_DATA_MARKERS = [
-  "nowen-note.db",
+  DB_FILE_NAME,
+  LEGACY_DB_FILE_NAME,
   "settings.json",
   ".jwt_secret",
   ".local_account_secret",
@@ -21,6 +28,58 @@ function getDataDirPointerPath(userDataRoot) {
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+/** 目标不存在而旧路径存在时改名（跨卷/占用时退化为复制），返回是否完成了搬迁 */
+function moveIfMissing(legacyPath, nextPath) {
+  if (!fs.existsSync(legacyPath) || fs.existsSync(nextPath)) return false;
+  try {
+    fs.renameSync(legacyPath, nextPath);
+    return true;
+  } catch {
+    try {
+      fs.cpSync(legacyPath, nextPath, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** appData 下的旧用户数据根目录（nowen-note）搬到新名（baseforge），返回应当使用的根目录 */
+function migrateLegacyUserDataRoot(appDataRoot) {
+  const nextRoot = path.join(appDataRoot, "baseforge");
+  moveIfMissing(path.join(appDataRoot, "nowen-note"), nextRoot);
+  return nextRoot;
+}
+
+/** 用户数据根目录内的旧数据目录与数据位置指针搬到新名 */
+function migrateLegacyDataDir(userDataRoot) {
+  moveIfMissing(
+    path.join(userDataRoot, LEGACY_DATA_DIR_POINTER_FILE),
+    path.join(userDataRoot, DATA_DIR_POINTER_FILE),
+  );
+  moveIfMissing(
+    path.join(userDataRoot, LEGACY_DATA_DIR_NAME),
+    path.join(userDataRoot, DATA_DIR_NAME),
+  );
+}
+
+/** 数据目录内的旧数据库文件名改成新名（含 -wal / -shm 旁路文件） */
+function migrateLegacyDatabase(dataDir) {
+  const nextPath = path.join(dataDir, DB_FILE_NAME);
+  const legacyPath = path.join(dataDir, LEGACY_DB_FILE_NAME);
+  if (fs.existsSync(nextPath) || !fs.existsSync(legacyPath)) return false;
+  for (const suffix of SIDECAR_SUFFIXES) {
+    const from = legacyPath + suffix;
+    if (!fs.existsSync(from)) continue;
+    try {
+      fs.renameSync(from, nextPath + suffix);
+    } catch {
+      // 数据库仍被占用时保持旧文件不动，由下次启动重试
+    }
+  }
+  return fs.existsSync(nextPath);
 }
 
 function normalizeAbsolutePath(value) {
@@ -138,7 +197,11 @@ function validateMigrationTarget(targetDir, {
     const stat = fs.statSync(resolved);
     if (!stat.isDirectory()) return { ok: false, error: "TARGET_NOT_DIRECTORY" };
     const entries = fs.readdirSync(resolved);
-    if (entries.length > 0 && !fs.existsSync(path.join(resolved, "nowen-note.db"))) {
+    if (
+      entries.length > 0
+      && !fs.existsSync(path.join(resolved, DB_FILE_NAME))
+      && !fs.existsSync(path.join(resolved, LEGACY_DB_FILE_NAME))
+    ) {
       return { ok: false, error: "TARGET_NOT_EMPTY" };
     }
   }
@@ -155,7 +218,7 @@ function copyDataDir(sourceDir, targetDir) {
 }
 
 function verifyCopiedDataDir(sourceDir, targetDir) {
-  for (const name of ["nowen-note.db", "attachments", "settings.json"]) {
+  for (const name of [DB_FILE_NAME, "attachments", "settings.json"]) {
     const source = path.join(sourceDir, name);
     if (fs.existsSync(source) && !fs.existsSync(path.join(targetDir, name))) {
       return { ok: false, error: `MISSING_${name.toUpperCase().replace(/[^A-Z0-9]/g, "_")}` };
@@ -167,11 +230,18 @@ function verifyCopiedDataDir(sourceDir, targetDir) {
 module.exports = {
   DATA_DIR_NAME,
   DATA_DIR_POINTER_FILE,
+  LEGACY_DATA_DIR_NAME,
+  LEGACY_DATA_DIR_POINTER_FILE,
+  DB_FILE_NAME,
+  LEGACY_DB_FILE_NAME,
   FIRST_RUN_DATA_MARKERS,
   getDefaultDataPath,
   getDataDirPointerPath,
   getUserDataPathFromRoot,
   hasExistingDefaultData,
+  migrateLegacyUserDataRoot,
+  migrateLegacyDataDir,
+  migrateLegacyDatabase,
   readCustomDataDir,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,

@@ -31,7 +31,6 @@ rmSync(outdir, { recursive: true, force: true });
 mkdirSync(outdir, { recursive: true });
 
 const external = [
-  "better-sqlite3",
   "sqlite-vec",
   "sqlite-vec-windows-x64",
   "sqlite-vec-darwin-x64",

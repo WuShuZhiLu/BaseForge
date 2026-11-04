@@ -242,7 +242,7 @@ async function loadBootstrap(
   workspaceId: string,
 ): Promise<MobileBootstrapPayload> {
   const url = bootstrapUrlFor(targetUrl, workspaceId);
-  if (!url) throw new Error("Invalid Nowen API URL");
+  if (!url) throw new Error("Invalid BaseForge API URL");
 
   const response = await originalFetch(url.toString(), {
     method: "GET",

@@ -1,5 +1,5 @@
 import { withEncryptedBlockWrite } from "../lib/encryptedBlockWrites.js";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { runWithOutboxSuppressed } from "./context";
 import { runChangeFeedSuppressed } from "./suppression";
 import type { SyncEntityType } from "./types";
@@ -47,7 +47,7 @@ export interface ApplyLocalResult {
 }
 
 /** Validate before conflict storage or cursor advancement, including brand-new devices. */
-export function validateEncryptedRemoteNotes(db: Database.Database, items: ReadonlyArray<RemoteEntityPayload>, options: ApplyLocalOptions): void {
+export function validateEncryptedRemoteNotes(db: DatabaseSync, items: ReadonlyArray<RemoteEntityPayload>, options: ApplyLocalOptions): void {
   for (const item of items) {
     if (item.entityType !== "note" || item.operation !== "upsert") continue;
     const workspaceId = options.workspaceId ?? null;
@@ -85,7 +85,7 @@ function bit(value: unknown): number {
  * 不能让远端内容静默覆盖本地未上传的编辑。
  */
 function hasPendingLocalChange(
-  db: Database.Database,
+  db: DatabaseSync,
   entityType: SyncEntityType,
   entityId: string,
   scopeKey: string,
@@ -99,7 +99,7 @@ function hasPendingLocalChange(
   return !!row;
 }
 
-function applyNotebookLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyNotebookLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare(`
@@ -147,7 +147,7 @@ function applyNotebookLocal(db: Database.Database, item: RemoteEntityPayload, op
   );
 }
 
-function applyTagLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyTagLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM tags WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -169,7 +169,7 @@ function applyTagLocal(db: Database.Database, item: RemoteEntityPayload, options
   );
 }
 
-function applyNoteLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyNoteLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM notes WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -228,7 +228,7 @@ function applyNoteLocal(db: Database.Database, item: RemoteEntityPayload, option
   ), p.encryptedBlocksVersion);
 }
 
-function applyNoteTagLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyNoteTagLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { workspaceId = null } = options;
   const separator = item.entityId.lastIndexOf(":");
   if (separator <= 0) return;
@@ -249,7 +249,7 @@ function applyNoteTagLocal(db: Database.Database, item: RemoteEntityPayload, opt
   db.prepare("INSERT OR IGNORE INTO note_tags (noteId, tagId) VALUES (?, ?)").run(noteId, tagId);
 }
 
-function applyFavoriteLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyFavoriteLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   const separator = item.entityId.lastIndexOf(":");
   if (separator <= 0) return;
@@ -272,7 +272,7 @@ function applyFavoriteLocal(db: Database.Database, item: RemoteEntityPayload, op
  * 二进制单独下载，因此这里只维护记录。path 使用占位值并标记为待下载——
  * 远端不会（也不应该）把服务器文件路径告诉客户端。
  */
-function applyAttachmentLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyAttachmentLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM attachments WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -314,7 +314,7 @@ function applyAttachmentLocal(db: Database.Database, item: RemoteEntityPayload, 
 // 但引擎在 applyRemoteChanges 之前会检查该实体是否还有未推送的本地修改，
 // 有则转入冲突而不覆盖（RULE 3）。
 
-function applyTaskLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyTaskLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM tasks WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -365,7 +365,7 @@ function applyTaskLocal(db: Database.Database, item: RemoteEntityPayload, option
 }
 
 function applyTaskReminderLocal(
-  db: Database.Database,
+  db: DatabaseSync,
   item: RemoteEntityPayload,
   options: ApplyLocalOptions,
 ): void {
@@ -400,7 +400,7 @@ function applyTaskReminderLocal(
   // 从别的设备同步过来会让本机漏掉提醒。
 }
 
-function applyDiaryLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyDiaryLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM diaries WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -439,7 +439,7 @@ function applyDiaryLocal(db: Database.Database, item: RemoteEntityPayload, optio
   );
 }
 
-function applyMindmapLocal(db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
+function applyMindmapLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
     db.prepare("DELETE FROM mindmaps WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
@@ -468,7 +468,7 @@ function applyMindmapLocal(db: Database.Database, item: RemoteEntityPayload, opt
 
 const LOCAL_APPLIERS: Record<
   SyncEntityType,
-  (db: Database.Database, item: RemoteEntityPayload, options: ApplyLocalOptions) => void
+  (db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions) => void
 > = {
   notebook: applyNotebookLocal,
   note: applyNoteLocal,
@@ -489,7 +489,7 @@ const LOCAL_APPLIERS: Record<
  * 事务保证崩溃时不留半写状态，抑制保证不产生回环。
  */
 export function applyRemoteChanges(
-  db: Database.Database,
+  db: DatabaseSync,
   items: RemoteEntityPayload[],
   options: ApplyLocalOptions,
 ): ApplyLocalResult {

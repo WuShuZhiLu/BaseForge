@@ -19,7 +19,7 @@ function ExportDialog({ request }: { request: RoundTripPermissionExportRequest }
           <div className="flex min-w-0 items-start gap-2.5">
             <ShieldCheck size={20} className="mt-0.5 shrink-0 text-violet-600" />
             <div>
-              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">导出 Nowen 无损包</h2>
+              <h2 className="font-semibold text-zinc-900 dark:text-zinc-100">导出 BaseForge 无损包</h2>
               <p className="mt-0.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
                 权限数据默认不导出。只有需要跨实例恢复团队成员时才应开启。
               </p>

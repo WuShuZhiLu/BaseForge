@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { pipeline } from "node:stream/promises";
 import {
   closeDb,
@@ -197,7 +197,7 @@ async function extractDirectoryStreaming(
   return count;
 }
 
-function listAllTables(db: Database.Database): string[] {
+function listAllTables(db: DatabaseSync): string[] {
   const rows = db
     .prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%'",
@@ -223,9 +223,11 @@ function cleanupWalShm(dbPath: string): void {
 }
 
 function checkSqliteIntegrity(dbPath: string, label: string): void {
-  let db: Database.Database | null = null;
+  let db: DatabaseSync | null = null;
   try {
-    db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    // 备份里可能存着 vec0 虚表；node:sqlite 默认禁止 loadExtension，
+    // 必须显式放开，否则含向量索引的备份会以 no such module: vec0 失败。
+    db = new DatabaseSync(dbPath, { readOnly: true, allowExtension: true });
     requireSqliteVecForStoredTables(db, label);
     const row = db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
     if (row.integrity_check !== "ok") {
@@ -356,10 +358,10 @@ async function buildDryRun(
       meta.files?.attachments,
     );
 
-    const backupDb = new Database(tmpDb, { readonly: true, fileMustExist: true });
+    const backupDb = new DatabaseSync(tmpDb, { readOnly: true, allowExtension: true });
     try {
       requireSqliteVecForStoredTables(backupDb, "备份预览");
-      const currentDb = getDb() as unknown as Database.Database;
+      const currentDb = getDb() as unknown as DatabaseSync;
       const tables = listAllTables(backupDb).map((name) => {
         let willClear = 0;
         try {

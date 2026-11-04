@@ -1,10 +1,10 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 import { installSyncOutboxCaptureTriggers } from "./syncOutboxCaptureMigration.js";
 import { installSyncPersonalEntitiesTriggers } from "./syncPersonalEntitiesMigration.js";
 import { installKnowledgeTreeFeedTriggers } from "./syncV2KnowledgeTreeFeedMigration.js";
 
-export function installKnowledgeTreeOutboxTriggers(db: Database.Database): void {
+export function installKnowledgeTreeOutboxTriggers(db: DatabaseSync): void {
   const readinessTable = db.prepare(`
     SELECT 1 FROM sqlite_master
     WHERE type = 'table' AND name = 'sync_v2_tree_scope_readiness'

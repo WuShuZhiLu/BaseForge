@@ -1,6 +1,6 @@
 import { secureExternalFetch } from "../plugins/secureExternalFetch.js";
 /**
- * Nowen Note Webhook 事件系统
+ * BaseForge Webhook 事件系统
  *
  * 支持注册 Webhook URL，当指定事件发生时自动推送通知。
  * 事件类型：
@@ -117,7 +117,7 @@ class WebhookDispatcher {
       const db = getDb();
       const webhooks = db.prepare(
         "SELECT * FROM webhooks WHERE userId = ? AND isActive = 1"
-      ).all(userId) as WebhookConfig[];
+      ).all(userId) as unknown as WebhookConfig[];
 
       for (const webhook of webhooks) {
         const events: string[] = JSON.parse(webhook.events as any);
@@ -169,7 +169,7 @@ class WebhookDispatcher {
             "X-Nowen-Event": event,
             "X-Nowen-Signature": signature ? `sha256=${signature}` : "",
             "X-Nowen-Delivery": deliveryId,
-            "User-Agent": "Nowen-Note-Webhook/1.0",
+            "User-Agent": "BaseForge-Webhook/1.0",
           },
           body: payload,
         }, {

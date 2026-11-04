@@ -13,6 +13,28 @@ export interface PermissionRow {
   grantedAt: string | null;
 }
 
+/** 授权查询接口返回的权限视图：external:fetch 附带解析后的域名白名单。 */
+export interface PermissionView extends PermissionRow {
+  hosts: string[];
+}
+
+/**
+ * 解析 external:fetch 的 configJson.hosts。
+ * 配置缺失、非对象或 hosts 不是字符串数组时按空白名单处理，不抛错。
+ */
+export function externalFetchHostsFromConfig(configJson: string | null | undefined): string[] {
+  if (!configJson) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(configJson);
+  } catch {
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+  const hosts = (parsed as { hosts?: unknown }).hosts;
+  return Array.isArray(hosts) ? hosts.filter((host): host is string => typeof host === "string") : [];
+}
+
 export class PluginPermissions {
   initialize(manifest: PluginManifest, options: { preserveExistingGrants?: boolean } = {}): void {
     if (manifest.apiVersion === 2 && manifest.permissions.some((permission) => !isV2SupportedPluginPermission(permission))) {
@@ -50,12 +72,13 @@ export class PluginPermissions {
     transaction();
   }
 
-  list(pluginId: string): PermissionRow[] {
-    return getDb().prepare("SELECT * FROM plugin_permissions WHERE pluginId=? ORDER BY permission")
-      .all(pluginId) as PermissionRow[];
+  list(pluginId: string): PermissionView[] {
+    const rows = getDb().prepare("SELECT * FROM plugin_permissions WHERE pluginId=? ORDER BY permission")
+      .all(pluginId) as unknown as PermissionRow[];
+    return rows.map((row) => ({ ...row, hosts: externalFetchHostsFromConfig(row.configJson) }));
   }
 
-  replaceGrants(pluginId: string, requested: string[], grantedBy: string): PermissionRow[] {
+  replaceGrants(pluginId: string, requested: string[], grantedBy: string): PermissionView[] {
     const record = getDb().prepare("SELECT apiVersion FROM plugin_registry WHERE id=?")
       .get(pluginId) as { apiVersion: number } | undefined;
     const permissionSupported = record?.apiVersion === 2

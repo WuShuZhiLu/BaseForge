@@ -510,10 +510,10 @@ async function importNowenPackageZip(
   target: MarkdownZipImportTarget,
 ): Promise<MarkdownBatchImportResult> {
   if (target.parentId && !target.targetNotebookId) {
-    throw new Error("Nowen 数据包只能导入到目录节点，不能导入到文档节点");
+    throw new Error("BaseForge 数据包只能导入到目录节点，不能导入到文档节点");
   }
 
-  let progressMessage = "Nowen 数据包导入失败";
+  let progressMessage = "BaseForge 数据包导入失败";
   const packageEntry = createRoundTripPackageImportFile(file, manifest);
   const result = await importNotes(
     [packageEntry],
@@ -528,9 +528,9 @@ async function importNowenPackageZip(
     if (progressMessage.startsWith("已取消导入")) {
       return { imported: [], failures: [], importedCount: 0, cancelled: true };
     }
-    throw new Error(progressMessage.replace(/^导入失败：/, "") || "Nowen 数据包导入失败");
+    throw new Error(progressMessage.replace(/^导入失败：/, "") || "BaseForge 数据包导入失败");
   }
-  if (result.count <= 0) throw new Error("Nowen 数据包未创建任何笔记");
+  if (result.count <= 0) throw new Error("BaseForge 数据包未创建任何笔记");
 
   window.dispatchEvent(new CustomEvent(TREE_CHANGED_EVENT, {
     detail: { reason: "roundtrip-markdown-package-imported", imported: result.count },

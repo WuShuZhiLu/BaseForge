@@ -132,7 +132,7 @@ function RoundTripImportReviewDialog({ request }: { request: RoundTripImportRevi
     confirm: strategy === "sync" ? "确认安全同步" : strategy === "merge" ? "确认合并导入" : "确认创建副本",
     currentSpace: "当前导入空间",
     packageKindMarkdown: "Markdown 往返包",
-    packageKindNowen: "Nowen 无损包",
+    packageKindNowen: "BaseForge 无损包",
     loadingPlan: "正在重新计算导入计划…",
     loadFailed: "无法生成该策略的预检结果",
   } : {
@@ -198,7 +198,7 @@ function RoundTripImportReviewDialog({ request }: { request: RoundTripImportRevi
     confirm: strategy === "sync" ? "Confirm safe sync" : strategy === "merge" ? "Confirm merge import" : "Confirm independent copy",
     currentSpace: "Current import space",
     packageKindMarkdown: "Markdown round-trip package",
-    packageKindNowen: "Nowen lossless package",
+    packageKindNowen: "BaseForge lossless package",
     loadingPlan: "Recalculating the import plan…",
     loadFailed: "Unable to build the selected preflight plan",
   };

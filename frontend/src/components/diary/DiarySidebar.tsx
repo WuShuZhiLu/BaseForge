@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Calendar, TrendingUp, Smile, BarChart3 } from "lucide-react";
+import { BarChart3, Calendar, ChevronRight, Smile, TrendingUp, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { Diary, DiaryStats } from "@/types";
@@ -24,6 +24,15 @@ function getMoodEmoji(mood: string): string {
   return MOODS.find((m) => m.value === mood)?.emoji || "";
 }
 
+function SectionHeading({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-tx-tertiary">
+      <Icon size={12} className="shrink-0" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
 interface DiarySidebarProps {
   stats: DiaryStats | null;
   moodFilter: string;
@@ -35,11 +44,11 @@ interface DiarySidebarProps {
 /**
  * 说说模块右侧面板（桌面端）
  *
- * 包含：
- * - 日历入口卡片
- * - 今日统计
+ * 分区小标题 + 紧凑块，不堆叠独立圆角大卡：
+ * - 日历入口
+ * - 统计
  * - 心情筛选
- * - 最近动态
+ * - 心情分布
  */
 export default function DiarySidebar({
   stats,
@@ -64,64 +73,55 @@ export default function DiarySidebar({
   }, [recentItems]);
 
   return (
-    <div className="space-y-4">
-      {/* 日历入口卡片 */}
+    <div className="space-y-5">
+      {/* 日历入口 */}
       <button
         onClick={onOpenCalendar}
-        className="w-full p-4 rounded-xl bg-gradient-to-br from-violet-500/5 to-pink-500/5 border border-violet-200/30 dark:border-violet-500/10 hover:from-violet-500/10 hover:to-pink-500/10 transition-all group"
+        className="flex w-full items-center gap-2 rounded-[8px] border border-app-border bg-app-surface px-2.5 py-2 text-left transition-colors hover:bg-app-hover"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center shadow-lg shadow-violet-500/20">
-            <Calendar size={20} className="text-white" />
-          </div>
-          <div className="text-left">
-            <div className="text-sm font-semibold text-tx-primary">
-              {t("diary.calendarTitle") || "日历视图"}
-            </div>
-            <div className="text-[11px] text-tx-tertiary">
-              {t("diary.calendarSubtitle", { defaultValue: "按日期浏览说说" })}
-            </div>
-          </div>
-        </div>
+        <Calendar size={14} className="shrink-0 text-tx-tertiary" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11.5px] font-medium text-tx-primary">
+            {t("diary.calendarTitle") || "日历视图"}
+          </span>
+          <span className="mt-0.5 block truncate text-[11px] text-tx-tertiary">
+            {t("diary.calendarSubtitle", { defaultValue: "按日期浏览说说" })}
+          </span>
+        </span>
+        <ChevronRight size={13} className="shrink-0 text-tx-tertiary" />
       </button>
 
-      {/* 今日统计卡片 */}
+      {/* 统计 */}
       {stats && (
-        <div className="p-4 rounded-xl bg-app-surface border border-app-border">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart3 size={14} className="text-accent-primary" />
-            <span className="text-xs font-semibold text-tx-secondary">
-              {t("diary.statsTitle", { defaultValue: "统计" })}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center p-2 rounded-lg bg-app-hover/50">
-              <div className="text-lg font-bold text-accent-primary">{stats.total}</div>
-              <div className="text-[10px] text-tx-tertiary">{t("diary.statsTotal", { defaultValue: "总计" })}</div>
+        <section>
+          <SectionHeading icon={BarChart3}>
+            {t("diary.statsTitle", { defaultValue: "统计" })}
+          </SectionHeading>
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border border-app-border bg-app-border">
+            <div className="bg-app-surface px-3 py-2">
+              <div className="text-[15px] font-semibold tabular-nums leading-5 text-tx-primary">{stats.total}</div>
+              <div className="mt-0.5 text-[11px] text-tx-tertiary">{t("diary.statsTotal", { defaultValue: "总计" })}</div>
             </div>
-            <div className="text-center p-2 rounded-lg bg-app-hover/50">
-              <div className="text-lg font-bold text-accent-primary">{stats.todayCount}</div>
-              <div className="text-[10px] text-tx-tertiary">{t("diary.statsToday", { defaultValue: "今日" })}</div>
+            <div className="bg-app-surface px-3 py-2">
+              <div className="text-[15px] font-semibold tabular-nums leading-5 text-tx-primary">{stats.todayCount}</div>
+              <div className="mt-0.5 text-[11px] text-tx-tertiary">{t("diary.statsToday", { defaultValue: "今日" })}</div>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
       {/* 心情筛选 */}
-      <div className="p-4 rounded-xl bg-app-surface border border-app-border">
-        <div className="flex items-center gap-2 mb-3">
-          <Smile size={14} className="text-accent-primary" />
-          <span className="text-xs font-semibold text-tx-secondary">
-            {t("diary.moodFilterTitle", { defaultValue: "心情" })}
-          </span>
-        </div>
-        <div className="grid grid-cols-4 gap-2">
+      <section>
+        <SectionHeading icon={Smile}>
+          {t("diary.moodFilterTitle", { defaultValue: "心情" })}
+        </SectionHeading>
+        <div className="grid grid-cols-4 gap-1">
           <button
             onClick={() => onMoodFilterChange("")}
             className={cn(
-              "p-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap",
+              "h-8 rounded-[6px] text-[11px] font-medium transition-colors",
               !moodFilter
-                ? "bg-accent-primary/15 text-accent-primary"
+                ? "bg-accent-primary/10 text-accent-primary"
                 : "text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary",
             )}
           >
@@ -132,10 +132,10 @@ export default function DiarySidebar({
               key={v}
               onClick={() => onMoodFilterChange(moodFilter === v ? "" : v)}
               className={cn(
-                "p-2 rounded-lg text-lg transition-all",
+                "grid h-8 place-items-center rounded-[6px] text-base transition-colors",
                 moodFilter === v
-                  ? "bg-accent-primary/15 scale-110 ring-1 ring-accent-primary/30"
-                  : "hover:bg-app-hover hover:scale-105",
+                  ? "bg-accent-primary/10"
+                  : "hover:bg-app-hover",
               )}
               title={t(`diary.mood${v.charAt(0).toUpperCase() + v.slice(1)}`)}
             >
@@ -143,32 +143,29 @@ export default function DiarySidebar({
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* 心情分布（最近说说） */}
       {moodDistribution.length > 0 && (
-        <div className="p-4 rounded-xl bg-app-surface border border-app-border">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={14} className="text-accent-primary" />
-            <span className="text-xs font-semibold text-tx-secondary">
-              {t("diary.moodDistribution", { defaultValue: "心情分布" })}
-            </span>
-          </div>
-          <div className="space-y-2">
+        <section>
+          <SectionHeading icon={TrendingUp}>
+            {t("diary.moodDistribution", { defaultValue: "心情分布" })}
+          </SectionHeading>
+          <div className="space-y-1.5">
             {moodDistribution.map(([mood, count]) => (
               <div key={mood} className="flex items-center gap-2">
-                <span className="text-sm w-6 text-center">{getMoodEmoji(mood)}</span>
-                <div className="flex-1 h-1.5 bg-app-hover rounded-full overflow-hidden">
+                <span className="w-5 shrink-0 text-center text-[13px] leading-4">{getMoodEmoji(mood)}</span>
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-app-hover">
                   <div
-                    className="h-full bg-accent-primary/60 rounded-full"
+                    className="h-full rounded-full bg-accent-primary/50"
                     style={{ width: `${Math.min(100, (count / recentItems.length) * 100)}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-tx-tertiary w-6 text-right">{count}</span>
+                <span className="w-5 shrink-0 text-right text-[10px] tabular-nums text-tx-tertiary">{count}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
     </div>
   );

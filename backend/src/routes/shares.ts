@@ -15,6 +15,7 @@ import { resolveEffectiveNoteCapabilities } from "../services/share-capabilities
 import { recordNoteSave, markVersionAsRelease, unmarkVersionRelease } from "../services/version-save";
 import { buildVersionDiff } from "../services/version-diff";
 import { parseShareManagementQuery, queryShareManagement } from "../services/share-management";
+import { defaultShareExpiresAt } from "../lib/share-defaults";
 import { consumeShareViewSession, findSingleShareByToken, installSingleShareGuard, resetShareViewSessions } from "../services/single-share-access";
 import { checkCredentialAttempt, getClientIp as getCredentialClientIp, hashClientIp, recordCredentialFailure, recordCredentialSuccess } from "../lib/share-credential-rate-limit";
 import { syncNoteBlocks } from "../lib/noteBlocks";
@@ -121,10 +122,16 @@ sharesRouter.post("/", async (c) => {
     passwordHash = await bcrypt.hash(password.trim(), 10);
   }
 
+  // 新建分享默认 7 天后过期；只有显式传 `expiresAt: null` 才表示永久。
+  // 历史上留空＝永久，批量分享会一次造出多条无限期公开链。
+  const resolvedExpiresAt = expiresAt === null
+    ? null
+    : (expiresAt ? String(expiresAt) : defaultShareExpiresAt());
+
   db.prepare(`
     INSERT INTO shares (id, noteId, ownerId, shareToken, shareType, permission, password, expiresAt, maxViews)
     VALUES (?, ?, ?, ?, 'link', ?, ?, ?, ?)
-  `).run(id, noteId, userId, shareToken, perm, passwordHash, expiresAt || null, maxViews || null);
+  `).run(id, noteId, userId, shareToken, perm, passwordHash, resolvedExpiresAt, maxViews || null);
 
   // SEC-AUDIT-01: 记录分享创建（不记录密码）
   logAudit(userId, "share", "create", {

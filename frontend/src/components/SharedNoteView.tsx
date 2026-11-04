@@ -65,7 +65,7 @@ export function normalizeExternalHref(href: string): string {
   return trimmed;
 }
 
-/** Remove Nowen's persisted Markdown block identity markers from public presentation only. */
+/** Remove BaseForge's persisted Markdown block identity markers from public presentation only. */
 export function prepareSharedMarkdownForDisplay(markdown: string): string {
   return projectMarkdownForUser(markdown);
 }

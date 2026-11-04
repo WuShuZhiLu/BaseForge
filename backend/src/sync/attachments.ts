@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { syncRetryDelayMs } from "./constants";
 import { logSyncInfo, logSyncWarn } from "./log";
 
@@ -46,7 +46,7 @@ export interface AttachmentSyncRow {
  * 统一转成 pending，这样关闭同步期间产生的附件不会丢。
  */
 export function registerLocalAttachment(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentId: string,
   profileId: string | null,
 ): void {
@@ -86,7 +86,7 @@ export function registerLocalAttachment(
  * "正在获取图片"而不是破图，也让下载队列知道该抓哪些文件。
  */
 export function registerRemoteAttachment(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentId: string,
   profileId: string | null,
 ): void {
@@ -101,7 +101,7 @@ export function registerRemoteAttachment(
 
 /** 二进制下载完成：不再是 remoteOnly。 */
 export function markAttachmentDownloaded(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentId: string,
 ): void {
   db.prepare(`
@@ -118,7 +118,7 @@ export function markAttachmentDownloaded(
  * 若不做这一步，这些附件永远不会上传，其他设备上全是破图。
  */
 export function promoteLocalAttachments(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): number {
   const result = db.prepare(`
@@ -129,10 +129,10 @@ export function promoteLocalAttachments(
   if (result.changes > 0) {
     logSyncInfo("attachment.promoted", {
       profileId,
-      pendingCount: result.changes,
+      pendingCount: result.changes as number,
     });
   }
-  return result.changes;
+  return result.changes as number;
 }
 
 /**
@@ -143,7 +143,7 @@ export function promoteLocalAttachments(
  * 一直占住队头把后面的小图片饿死。
  */
 export function listPendingUploads(
-  db: Database.Database,
+  db: DatabaseSync,
   limit: number,
   workspaceId?: string | null,
 ): AttachmentSyncRow[] {
@@ -151,19 +151,19 @@ export function listPendingUploads(
     return db.prepare(`SELECT s.* FROM attachment_sync_state s
       JOIN attachments a ON a.id=s.attachmentId JOIN notes n ON n.id=a.noteId
       WHERE s.status IN ('pending','failed') AND s.remoteOnly=0 AND n.workspaceId IS ?
-      ORDER BY s.retryCount ASC,s.updatedAt ASC LIMIT ?`).all(workspaceId,limit) as AttachmentSyncRow[];
+      ORDER BY s.retryCount ASC,s.updatedAt ASC LIMIT ?`).all(workspaceId,limit) as unknown as AttachmentSyncRow[];
   }
   return db.prepare(`
     SELECT * FROM attachment_sync_state
     WHERE status IN ('pending', 'failed') AND remoteOnly = 0
     ORDER BY retryCount ASC, updatedAt ASC
     LIMIT ?
-  `).all(limit) as AttachmentSyncRow[];
+  `).all(limit) as unknown as AttachmentSyncRow[];
 }
 
 /** 取出待下载附件（远端已有、本地缺二进制）。 */
 export function listPendingDownloads(
-  db: Database.Database,
+  db: DatabaseSync,
   limit: number,
   workspaceId?: string | null,
 ): AttachmentSyncRow[] {
@@ -171,17 +171,17 @@ export function listPendingDownloads(
     return db.prepare(`SELECT s.* FROM attachment_sync_state s
       JOIN attachments a ON a.id=s.attachmentId JOIN notes n ON n.id=a.noteId
       WHERE s.remoteOnly=1 AND n.workspaceId IS ?
-      ORDER BY s.retryCount ASC,s.updatedAt ASC LIMIT ?`).all(workspaceId,limit) as AttachmentSyncRow[];
+      ORDER BY s.retryCount ASC,s.updatedAt ASC LIMIT ?`).all(workspaceId,limit) as unknown as AttachmentSyncRow[];
   }
   return db.prepare(`
     SELECT * FROM attachment_sync_state
     WHERE remoteOnly = 1
     ORDER BY retryCount ASC, updatedAt ASC
     LIMIT ?
-  `).all(limit) as AttachmentSyncRow[];
+  `).all(limit) as unknown as AttachmentSyncRow[];
 }
 
-export function markUploading(db: Database.Database, attachmentId: string): void {
+export function markUploading(db: DatabaseSync, attachmentId: string): void {
   db.prepare(`
     UPDATE attachment_sync_state
     SET status = 'uploading', lastAttemptAt = datetime('now'), updatedAt = datetime('now')
@@ -189,7 +189,7 @@ export function markUploading(db: Database.Database, attachmentId: string): void
   `).run(attachmentId);
 }
 
-export function markUploaded(db: Database.Database, attachmentId: string): void {
+export function markUploaded(db: DatabaseSync, attachmentId: string): void {
   db.prepare(`
     UPDATE attachment_sync_state
     SET status = 'synced', lastError = NULL, updatedAt = datetime('now')
@@ -204,7 +204,7 @@ export function markUploaded(db: Database.Database, attachmentId: string): void 
  * 附件二进制只存在于本机时，删除记录等于永久丢失用户的图片。
  */
 export function markUploadFailed(
-  db: Database.Database,
+  db: DatabaseSync,
   attachmentId: string,
   errorCode: string,
 ): void {
@@ -225,16 +225,16 @@ export function markUploadFailed(
  * 进程被强杀时正在上传的附件会永久停留在 uploading，
  * 之后再也不会被 listPendingUploads 取出。启动时必须复位。
  */
-export function recoverStuckUploads(db: Database.Database): number {
+export function recoverStuckUploads(db: DatabaseSync): number {
   const result = db.prepare(`
     UPDATE attachment_sync_state
     SET status = 'pending', updatedAt = datetime('now')
     WHERE status = 'uploading'
   `).run();
   if (result.changes > 0) {
-    logSyncWarn("attachment.recovered-uploading", { pendingCount: result.changes });
+    logSyncWarn("attachment.recovered-uploading", { pendingCount: result.changes as number });
   }
-  return result.changes;
+  return result.changes as number;
 }
 
 /** 下次重试的建议等待时间，与 Outbox 共用同一套退避节奏。 */
@@ -252,7 +252,7 @@ export interface AttachmentSyncSummary {
 }
 
 /** 供设置页展示附件同步概况。 */
-export function summarizeAttachmentSync(db: Database.Database): AttachmentSyncSummary {
+export function summarizeAttachmentSync(db: DatabaseSync): AttachmentSyncSummary {
   const rows = db.prepare(`
     SELECT status, COUNT(*) AS count FROM attachment_sync_state GROUP BY status
   `).all() as Array<{ status: AttachmentSyncStatus; count: number }>;

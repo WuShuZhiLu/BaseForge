@@ -8,7 +8,7 @@ import { getBackupManager } from "./backup.js";
 
 const CONFIG_KEY = "backup:webdav";
 const STATUS_KEY = "backup:webdav:status";
-const DEFAULT_REMOTE_PATH = "nowen-note/backups";
+const DEFAULT_REMOTE_PATH = "baseforge/backups";
 const TEST_TIMEOUT_MS = 30_000;
 const UPLOAD_TIMEOUT_MS = 30 * 60_000;
 

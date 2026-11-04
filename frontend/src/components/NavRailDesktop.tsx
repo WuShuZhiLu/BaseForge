@@ -37,6 +37,7 @@ import { useRailMode, type RailMode } from "@/hooks/useRailMode";
 import { ViewMode, type User, type WorkspaceFeatures } from "@/types";
 import { cn } from "@/lib/utils";
 import SettingsModal from "@/components/SettingsModal";
+import { AccountLoginHistoryDialog } from "@/components/AccountLoginHistory";
 import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/appPathNavigation";
 
 type NavItemMode = Extract<
@@ -109,11 +110,11 @@ const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFe
   },
 ];
 
-/** 分享管理：固定导航项（非插件），跟随文件管理 */
+/** 分享中心：固定导航项（非插件），跟随文件管理 */
 const SHARES_NAV_ITEM: NavItem = {
   mode: "shares",
   titleKey: "sidebarNext.nav.shares",
-  titleDefault: "分享管理",
+  titleDefault: "分享中心",
   icon: (sz: number) => <Link2 size={sz} strokeWidth={2} />,
 };
 
@@ -132,7 +133,7 @@ const PLUGIN_ITEMS: NavItem[] = [
  * - pluginGroupCollapsed：插件组折叠（折叠时点「插件」徽章弹出插件菜单）；
  * - coreOrder / pluginOrder：分割线上下两组各自内部的显示顺序
  *   （拖拽排序持久化，仅限组内；缺失的 mode 按默认顺序追加在末尾）。
- *   分割线位置固定：核心徽章（知识库/收藏/回收站/文件管理/分享管理）在上，
+ *   分割线位置固定：核心徽章（知识库/收藏/回收站/文件管理/分享中心）在上，
  *   插件徽章（固定不可动）与各插件徽章在下，禁止跨组拖拽。
  */
 type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean; coreOrder?: string[]; pluginOrder?: string[] };
@@ -180,6 +181,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   const { theme, setTheme } = useTheme();
 
   const [popupOpen, setPopupOpen] = useState(false);
+  const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [railCustom, setRailCustomState] = useState<RailCustomization>(loadRailCustomization);
   const [badgeMenu, setBadgeMenu] = useState<{ x: number; y: number; item: NavItem | null } | null>(null);
   const [badgeManagerOpen, setBadgeManagerOpen] = useState(false);
@@ -333,12 +335,20 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     window.addEventListener("nowen:sidebar-view", onSwitch);
     return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
   }, []);
-  // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮
+  // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮。
+  // 刷新/深链恢复时不经 Rail 点击（没有 nowen:sidebar-view 事件），各模块视图
+  // 都要按 viewMode 补齐高亮——否则刷新 /plugins 后高亮停在知识库。
   useEffect(() => {
     if (state.viewMode === "favorites") setActiveView("star");
     else if (state.viewMode === "trash") setActiveView("trash");
     else if (state.viewMode === "files") setActiveView("files");
     else if (state.viewMode === "notebook") setActiveView("kb");
+    else if (state.viewMode === "plugins") setActiveView("plugins");
+    else if (state.viewMode === "shares") setActiveView("shares");
+    else if (state.viewMode === "projects") setActiveView("projects");
+    else if (state.viewMode === "tasks") setActiveView("tasks");
+    else if (state.viewMode === "diary") setActiveView("diary");
+    else if (state.viewMode === "ai-chat") setActiveView("ai-chat");
   }, [state.viewMode]);
 
   const activeMode: NavItemMode | null = useMemo(() => {
@@ -541,7 +551,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       </div>
 
       <div
-        className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex w-full min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-1 pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onContextMenu={(e) => {
           if ((e.target as HTMLElement).closest("button")) return;
           e.preventDefault();
@@ -843,7 +853,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             <button
               type="button"
               role="menuitem"
-              onClick={() => void handleLogout()}
+              onClick={() => { setPopupOpen(false); setSwitchAccountOpen(true); }}
               className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-tx-primary transition-colors hover:bg-app-hover"
             >
               <UserRound size={14} className="shrink-0 text-tx-tertiary" />
@@ -938,6 +948,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           onClose={closeSettings}
         />
       )}
+
+      <AccountLoginHistoryDialog open={switchAccountOpen} onClose={() => setSwitchAccountOpen(false)} />
     </nav>
   );
 }

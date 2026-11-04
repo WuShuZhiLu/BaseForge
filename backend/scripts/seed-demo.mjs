@@ -26,7 +26,7 @@ const DB_PATH =
   process.env.DB_PATH ||
   path.join(
     process.env.ELECTRON_USER_DATA || path.join(path.resolve(__dirname, ".."), "data"),
-    "nowen-note.db",
+    "baseforge.db",
   );
 
 const username = process.env.DEMO_USER || "demo";

@@ -2,7 +2,10 @@ import archiver from "archiver";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
+// 本模块直接 new DatabaseSync 打开备份副本，不经过 db/schema.ts，
+// 必须显式引入能力补齐（transaction/pragma/backup）才能使用 db.transaction。
+import "../db/sqlite-ext.js";
 
 export interface BackupDirectoryStats {
   count: number;
@@ -21,7 +24,7 @@ export interface FullBackupFileStats {
  * dangling projects whose files were intentionally excluded from the archive.
  */
 export function scrubPluginStudioProjectsFromBackup(dbPath: string): void {
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     const tables = new Set((db.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'plugin_studio_%'",

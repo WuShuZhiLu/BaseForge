@@ -314,7 +314,7 @@ taskMetadata.get("/", (c) => {
         FROM task_labels l
         WHERE l.userId = ? AND l.workspaceId IS NULL
         ORDER BY l.sortOrder ASC, l.createdAt ASC
-      `).all(userId)) as TaskLabelRow[];
+      `).all(userId)) as unknown as TaskLabelRow[];
 
   const links = (scope.workspaceId
     ? getDb().prepare(`
@@ -346,7 +346,7 @@ taskMetadata.get("/", (c) => {
         SELECT * FROM task_saved_views
         WHERE userId = ? AND workspaceId IS NULL
         ORDER BY sortOrder ASC, createdAt ASC
-      `).all(userId)) as TaskSavedViewRow[];
+      `).all(userId)) as unknown as TaskSavedViewRow[];
 
   return c.json({
     workspaceId: scope.workspaceId || "personal",
@@ -447,7 +447,7 @@ taskMetadata.put("/labels/:id", async (c) => {
     SELECT l.*,
       (SELECT COUNT(*) FROM task_label_links link WHERE link.labelId = l.id) AS taskCount
     FROM task_labels l WHERE l.id = ?
-  `).get(id) as TaskLabelRow;
+  `).get(id) as unknown as TaskLabelRow;
   return c.json({ label: publicLabel(updated) });
 });
 
@@ -598,7 +598,7 @@ taskMetadata.put("/views/:id", async (c) => {
     }
     throw error;
   }
-  const updated = getDb().prepare("SELECT * FROM task_saved_views WHERE id = ?").get(id) as TaskSavedViewRow;
+  const updated = getDb().prepare("SELECT * FROM task_saved_views WHERE id = ?").get(id) as unknown as TaskSavedViewRow;
   return c.json({ view: publicView(updated, userId, scope) });
 });
 

@@ -67,7 +67,7 @@ const STATIC_COPY: ReadonlyArray<readonly [string, string]> = [
   ["不能选择磁盘根目录", "The disk root cannot be used"],
   ["不能选择应用安装目录", "The application installation directory cannot be used"],
   ["目标路径不是文件夹", "The target path is not a directory"],
-  ["目标目录非空，请选择空目录或已有 nowen-note 数据目录", "The target directory is not empty. Choose an empty directory or an existing nowen-note data directory."],
+  ["目标目录非空，请选择空目录或已有 BaseForge 数据目录", "The target directory is not empty. Choose an empty directory or an existing BaseForge data directory."],
   ["轻量模式不使用本机完整数据库", "Lite mode does not use a full local database"],
   ["创建目标目录失败", "Failed to create the target directory"],
   ["迁移本地数据目录？", "Move the local data directory?"],
@@ -140,7 +140,7 @@ function replaceDynamic(text: string, english: boolean): string {
     if ((match = text.match(/^上次同步 (.+)$/))) return `Last synced ${match[1]}`;
     if ((match = text.match(/^最近错误：(.*)$/))) return `Recent error: ${match[1]}`;
     if ((match = text.match(/^同步失败：(.*)$/))) return `Sync failed: ${match[1]}`;
-    if ((match = text.match(/^数据库文件：nowen-note\.db · 日志目录：(.*)$/))) return `Database: nowen-note.db · Logs: ${match[1]}`;
+    if ((match = text.match(/^数据目录：(.*)（数据库与日志）$/))) return `Data directory: ${match[1]} (database and logs)`;
     if ((match = text.match(/^选择目录失败：(.*)$/))) return `Failed to choose directory: ${replaceStatic(match[1], true)}`;
     if ((match = text.match(/^恢复失败：(.*)$/))) return `Restore failed: ${match[1]}`;
     if ((match = text.match(/^迁移失败：(.*)$/))) return `Migration failed: ${replaceStatic(match[1], true)}`;
@@ -164,7 +164,7 @@ function replaceDynamic(text: string, english: boolean): string {
     if ((match = text.match(/^Last synced (.+)$/))) return `上次同步 ${match[1]}`;
     if ((match = text.match(/^Recent error: (.*)$/))) return `最近错误：${match[1]}`;
     if ((match = text.match(/^Sync failed: (.*)$/))) return `同步失败：${match[1]}`;
-    if ((match = text.match(/^Database: nowen-note\.db · Logs: (.*)$/))) return `数据库文件：nowen-note.db · 日志目录：${match[1]}`;
+    if ((match = text.match(/^Data directory: (.*) \(database and logs\)$/))) return `数据目录：${match[1]}（数据库与日志）`;
     if ((match = text.match(/^Failed to choose directory: (.*)$/))) return `选择目录失败：${replaceStatic(match[1], false)}`;
     if ((match = text.match(/^Restore failed: (.*)$/))) return `恢复失败：${match[1]}`;
     if ((match = text.match(/^Migration failed: (.*)$/))) return `迁移失败：${replaceStatic(match[1], false)}`;

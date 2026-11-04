@@ -248,7 +248,7 @@ app.post("/import-file", async (c) => {
   syncRow = resolved.syncRow;
   const conflict = hasManualConflict(note, syncRow);
   if (conflict && conflictPolicy === "protect") {
-    return c.json({ error: "Nowen 内的同步笔记已被手动修改，已阻止源文件静默覆盖", code: "SYNC_CONFLICT", noteId: note?.id }, 409);
+    return c.json({ error: "BaseForge 内的同步笔记已被手动修改，已阻止源文件静默覆盖", code: "SYNC_CONFLICT", noteId: note?.id }, 409);
   }
 
   const title = filenameToTitle(filename);
@@ -319,7 +319,7 @@ app.post("/import-attachment", async (c) => {
   syncRow = resolved.syncRow;
   const conflict = hasManualConflict(note, syncRow);
   if (conflict && conflictPolicy === "protect") {
-    return c.json({ error: "Nowen 内的同步笔记已被手动修改，已阻止源文件静默覆盖", code: "SYNC_CONFLICT", noteId: note?.id }, 409);
+    return c.json({ error: "BaseForge 内的同步笔记已被手动修改，已阻止源文件静默覆盖", code: "SYNC_CONFLICT", noteId: note?.id }, 409);
   }
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());

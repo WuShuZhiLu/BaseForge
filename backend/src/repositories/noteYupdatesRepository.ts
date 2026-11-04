@@ -86,7 +86,7 @@ export const noteYupdatesRepository = {
     const result = getDb()
       .prepare("DELETE FROM yjs_operation_receipts WHERE persistedAt < ?")
       .run(persistedBefore);
-    return result.changes;
+    return result.changes as number;
   },
 
   /** 获取笔记的最大 update ID。 */

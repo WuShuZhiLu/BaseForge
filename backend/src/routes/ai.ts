@@ -2265,7 +2265,7 @@ ai.post("/classify", async (c) => {
          )
        ORDER BY nb.sortOrder ASC, nb.name ASC
        LIMIT 100
-    `).all(userId) as NotebookRow[];
+    `).all(userId) as unknown as NotebookRow[];
   } else {
     notebookRows = db.prepare(`
       SELECT DISTINCT nb.id, nb.parentId, nb.name, nb.description, nb.sortOrder
@@ -2275,7 +2275,7 @@ ai.post("/classify", async (c) => {
          AND n.workspaceId = ?
        ORDER BY nb.sortOrder ASC, nb.name ASC
        LIMIT 100
-    `).all(userId, workspaceId) as NotebookRow[];
+    `).all(userId, workspaceId) as unknown as NotebookRow[];
   }
 
   if (notebookRows.length === 0) {

@@ -48,14 +48,14 @@ export function createSystemSettingsRepository(
         .prepare(
           `SELECT key, value, updatedAt FROM system_settings WHERE key IN (${placeholders})`,
         )
-        .all(...keys) as SystemSetting[];
+        .all(...keys) as unknown as SystemSetting[];
     },
 
     getAll(): SystemSetting[] {
       const db = getDb();
       return db
         .prepare("SELECT key, value, updatedAt FROM system_settings")
-        .all() as SystemSetting[];
+        .all() as unknown as SystemSetting[];
     },
 
     getByPrefix(prefix: string): SystemSetting[] {
@@ -64,7 +64,7 @@ export function createSystemSettingsRepository(
         .prepare(
           "SELECT key, value, updatedAt FROM system_settings WHERE key LIKE ?",
         )
-        .all(`${prefix}%`) as SystemSetting[];
+        .all(`${prefix}%`) as unknown as SystemSetting[];
     },
 
     getByPrefixes(prefixes: string[]): SystemSetting[] {
@@ -76,7 +76,7 @@ export function createSystemSettingsRepository(
         .prepare(
           `SELECT key, value, updatedAt FROM system_settings WHERE ${conditions}`,
         )
-        .all(...params) as SystemSetting[];
+        .all(...params) as unknown as SystemSetting[];
     },
 
     set(key: string, value: string): void {

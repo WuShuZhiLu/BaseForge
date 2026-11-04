@@ -180,7 +180,7 @@ A complete backup of BaseForge's attachment data requires three components:
 Back up the main database file:
 
 ```
-data/nowen-note.db
+data/baseforge.db
 ```
 
 For a consistent snapshot, either:

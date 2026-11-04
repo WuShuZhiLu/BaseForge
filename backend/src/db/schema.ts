@@ -1,4 +1,6 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
+// 副作用挂载：给 DatabaseSync 补上 transaction / pragma / backup（node:sqlite 未提供）
+import "./sqlite-ext.js";
 import path from "path";
 import fs from "fs";
 import { runMigrations, getCurrentSchemaVersion, CURRENT_SCHEMA_VERSION } from "./migrations.js";
@@ -7,16 +9,41 @@ import { assertSafeTestDatabasePath } from "./test-db-guard.js";
 import { ensureNormalizedSearchFts } from "../lib/searchIndex.js";
 import { requireSqliteVecForStoredTables } from "./sqlite-vec-extension.js";
 
-const DB_PATH = process.env.DB_PATH || path.join(process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data"), "nowen-note.db");
+const DB_FILE_NAME = "baseforge.db";
+/** 旧版本的主库文件名；首次以新名启动时原样改名，避免看起来丢数据 */
+const LEGACY_DB_FILE_NAME = "nowen-note.db";
+
+function resolveDefaultDbPath(): string {
+  const baseDir = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
+  return path.join(baseDir, DB_FILE_NAME);
+}
+
+function adoptLegacyDatabaseFile(dbPath: string): void {
+  if (fs.existsSync(dbPath)) return;
+  const legacy = path.join(path.dirname(dbPath), LEGACY_DB_FILE_NAME);
+  if (!fs.existsSync(legacy)) return;
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const from = legacy + suffix;
+    if (!fs.existsSync(from)) continue;
+    try {
+      fs.renameSync(from, dbPath + suffix);
+    } catch {
+      // 数据库仍被占用时保持旧文件，由下次启动重试
+    }
+  }
+}
+
+const DB_PATH = process.env.DB_PATH || resolveDefaultDbPath();
+adoptLegacyDatabaseFile(DB_PATH);
 assertSafeTestDatabasePath(DB_PATH);
 
 const DB_REGISTRY_KEY = Symbol.for("nowen-note.sqlite-database-registry");
 const globalState = globalThis as typeof globalThis & {
-  [DB_REGISTRY_KEY]?: Map<string, Database.Database>;
+  [DB_REGISTRY_KEY]?: Map<string, DatabaseSync>;
 };
-const dbRegistry = globalState[DB_REGISTRY_KEY] || new Map<string, Database.Database>();
+const dbRegistry = globalState[DB_REGISTRY_KEY] || new Map<string, DatabaseSync>();
 globalState[DB_REGISTRY_KEY] = dbRegistry;
-let db: Database.Database | undefined;
+let db: DatabaseSync | undefined;
 
 /**
  * 返回当前 SQLite 数据库文件的绝对路径。
@@ -53,7 +80,7 @@ export function closeDb(): void {
   }
 }
 
-export function getDb(): Database.Database {
+export function getDb(): DatabaseSync {
   if (!db) {
     db = dbRegistry.get(DB_PATH);
     if (db) return db;
@@ -62,7 +89,9 @@ export function getDb(): Database.Database {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    db = new Database(DB_PATH);
+    // allowExtension：node:sqlite 默认禁止加载扩展，而 sqlite-vec 依赖 loadExtension，
+    // 构建向量索引的库必须开启（此前 better-sqlite3 默认允许）。
+    db = new DatabaseSync(DB_PATH, { allowExtension: true });
     dbRegistry.set(DB_PATH, db);
     db.pragma("journal_mode = WAL");
     db.pragma("foreign_keys = ON");
@@ -151,7 +180,7 @@ export function getCodeSchemaVersion(): number {
   return CURRENT_SCHEMA_VERSION;
 }
 
-function initSchema(db: Database.Database) {
+function initSchema(db: DatabaseSync) {
   db.exec(`
     -- 用户表
     CREATE TABLE IF NOT EXISTS users (
@@ -389,6 +418,9 @@ function initSchema(db: Database.Database) {
       sessionHash TEXT NOT NULL,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       lastSeenAt TEXT NOT NULL DEFAULT (datetime('now')),
+      -- 访问明细用：UA 原样（截断）+ 脱敏 IP 前缀（1.2.3.* / 2001:db8:1:*）
+      userAgent TEXT,
+      ipPrefix TEXT,
       PRIMARY KEY (shareId, sessionHash),
       FOREIGN KEY (shareId) REFERENCES shares(id) ON DELETE CASCADE
     );
@@ -622,6 +654,7 @@ function initSchema(db: Database.Database) {
       name TEXT NOT NULL,
       description TEXT DEFAULT '',
       icon TEXT DEFAULT '🏢',
+      avatarUrl TEXT,
       ownerId TEXT NOT NULL,
       createdAt TEXT NOT NULL DEFAULT (datetime('now')),
       updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
@@ -713,6 +746,26 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_notebook_members_user ON notebook_members(userId);
     CREATE INDEX IF NOT EXISTS idx_notebook_share_links_notebook ON notebook_share_links(notebookId);
     CREATE INDEX IF NOT EXISTS idx_notebook_share_links_token ON notebook_share_links(token);
+
+    -- 附件分享链接（只读可控分享：密码/过期/次数上限；isActive=0 关闭但保留设置）
+    CREATE TABLE IF NOT EXISTS attachment_shares (
+      id TEXT PRIMARY KEY,
+      attachmentId TEXT NOT NULL,
+      ownerId TEXT NOT NULL,
+      shareToken TEXT NOT NULL UNIQUE,
+      password TEXT,
+      expiresAt TEXT,
+      maxViews INTEGER,
+      viewCount INTEGER NOT NULL DEFAULT 0,
+      isActive INTEGER NOT NULL DEFAULT 1,
+      credentialVersion INTEGER NOT NULL DEFAULT 1,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (attachmentId) REFERENCES attachments(id) ON DELETE CASCADE,
+      FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_attachment_shares_attachment ON attachment_shares(attachmentId);
+    CREATE INDEX IF NOT EXISTS idx_attachment_shares_owner ON attachment_shares(ownerId);
   `);
 
   // ==============================================================

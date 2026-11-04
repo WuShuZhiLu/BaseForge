@@ -109,7 +109,7 @@ const EXTRACT_SCRIPT = `(async () => {
     try {
       await navigator.clipboard.writeText(json);
       console.log("\\n✅ 完成! " + notes.length + " 条备忘录已复制到剪贴板");
-      console.log("请回到 nowen-note 的「iPhone 备忘录导入」区域粘贴数据。");
+      console.log("请回到 BaseForge 的「iPhone 备忘录导入」区域粘贴数据。");
     } catch (e) {
       window.__icloudNotes = json;
       console.log("\\n⚠️ 自动复制失败，请手动运行以下命令复制:");

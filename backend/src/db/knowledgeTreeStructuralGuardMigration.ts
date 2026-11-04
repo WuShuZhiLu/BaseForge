@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_STRUCTURAL_GUARD_SCHEMA_VERSION = 64;
@@ -8,7 +8,7 @@ export const KNOWLEDGE_TREE_STRUCTURAL_GUARD_SCHEMA_VERSION = 64;
  * Parent validation must run only when parentId or scopeKey actually changes; otherwise deleting or
  * restoring a subtree can reject a harmless state update because its parent is temporarily deleted.
  */
-export function ensureKnowledgeTreeStructuralGuard(db: Database.Database): void {
+export function ensureKnowledgeTreeStructuralGuard(db: DatabaseSync): void {
   db.exec(`
     DROP TRIGGER IF EXISTS knowledge_tree_parent_scope_guard_update;
     CREATE TRIGGER knowledge_tree_parent_scope_guard_update

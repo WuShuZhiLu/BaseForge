@@ -63,7 +63,7 @@ Useful options:
 ```bash
 npm run migrate:attachments:object -- --dry-run --limit 100 --verbose
 npm run migrate:attachments:object -- --apply --include-existing
-npm run migrate:attachments:object -- --db /path/to/nowen-note.db --attachments-dir /path/to/attachments
+npm run migrate:attachments:object -- --db /path/to/baseforge.db --attachments-dir /path/to/attachments
 ```
 
 The script only uploads missing objects. It does not delete local files, so rollback remains simple.

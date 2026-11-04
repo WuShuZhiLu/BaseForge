@@ -3,7 +3,7 @@
  * Restores open fresh readonly connections and replace the live connection;
  * both need the module before integrity checks and virtual-table queries.
  */
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import * as sqliteVec from "sqlite-vec";
 
 export interface SqliteVecLoadResult {
@@ -11,10 +11,10 @@ export interface SqliteVecLoadResult {
   error?: string;
 }
 
-const connectionStatus = new WeakMap<Database.Database, SqliteVecLoadResult>();
+const connectionStatus = new WeakMap<DatabaseSync, SqliteVecLoadResult>();
 
 /** Register sqlite-vec at most once per connection (including readonly snapshots). */
-export function loadSqliteVec(db: Database.Database): SqliteVecLoadResult {
+export function loadSqliteVec(db: DatabaseSync): SqliteVecLoadResult {
   const previous = connectionStatus.get(db);
   if (previous) return previous;
   let result: SqliteVecLoadResult;
@@ -31,7 +31,7 @@ export function loadSqliteVec(db: Database.Database): SqliteVecLoadResult {
 }
 
 /** Ordinary SQLite databases work without sqlite-vec, but ones with vec0 do not. */
-export function requireSqliteVecForStoredTables(db: Database.Database, context: string): void {
+export function requireSqliteVecForStoredTables(db: DatabaseSync, context: string): void {
   const candidates = db.prepare(
     "SELECT sql FROM sqlite_master WHERE type = 'table' AND sql LIKE '%vec0%'",
   ).all() as Array<{ sql: string | null }>;

@@ -154,7 +154,7 @@ function BackupWebDavPanel() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [remotePath, setRemotePath] = useState("nowen-note/backups");
+  const [remotePath, setRemotePath] = useState("baseforge/backups");
   const [enabled, setEnabled] = useState(false);
   const [uploadOnAutoBackup, setUploadOnAutoBackup] = useState(false);
   const [backups, setBackups] = useState<BackupRow[]>([]);
@@ -176,7 +176,7 @@ function BackupWebDavPanel() {
     setEndpoint(next.endpoint || "");
     setUsername(next.username || "");
     setPassword("");
-    setRemotePath(next.remotePath || "nowen-note/backups");
+    setRemotePath(next.remotePath || "baseforge/backups");
     setEnabled(next.enabled);
     setUploadOnAutoBackup(next.uploadOnAutoBackup);
     window.dispatchEvent(new Event("nowen-backup-webdav-config-changed"));
@@ -427,7 +427,7 @@ function BackupWebDavPanel() {
               <input
                 value={remotePath}
                 onChange={(event) => setRemotePath(event.target.value)}
-                placeholder="nowen-note/backups"
+                placeholder="baseforge/backups"
                 className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-xs text-zinc-800 outline-none focus:border-sky-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200"
               />
             </label>

@@ -172,7 +172,7 @@ async function prepareProfile(userId: string): Promise<Profile> {
       repository.setEnabled(workflowId, true);
       db.prepare("INSERT INTO wechat_assistant_profiles(userId,tokenVersion,notebookId,workflowId) VALUES (?,?,?,?) ON CONFLICT(userId) DO UPDATE SET tokenVersion=excluded.tokenVersion,notebookId=excluded.notebookId,workflowId=excluded.workflowId,openId=CASE WHEN wechat_assistant_profiles.tokenVersion=excluded.tokenVersion THEN openId ELSE NULL END").run(userId, user.tokenVersion, notebook.id, workflowId);
     })();
-    return db.prepare("SELECT * FROM wechat_assistant_profiles WHERE userId=?").get(userId) as Profile;
+    return db.prepare("SELECT * FROM wechat_assistant_profiles WHERE userId=?").get(userId) as unknown as Profile;
   })();
   creatingProfiles.set(userId, operation);
   try { return await operation; } finally { creatingProfiles.delete(userId); }
@@ -199,7 +199,7 @@ function items(userId: string, urlKey?: string): Item[] {
   return getDb().prepare(`SELECT i.*,r.status,r.errorMessage,s.outputPreview FROM wechat_assistant_items i
     LEFT JOIN automation_workflow_runs r ON r.id=i.runId
     LEFT JOIN automation_workflow_steps s ON s.runId=i.runId AND s.stepId='capture'
-    WHERE i.userId=? ${urlKey ? "AND i.urlKey=?" : ""} ORDER BY i.createdAt DESC,i.rowid DESC LIMIT 100`).all(...(urlKey ? [userId, urlKey] : [userId])) as Item[];
+    WHERE i.userId=? ${urlKey ? "AND i.urlKey=?" : ""} ORDER BY i.createdAt DESC,i.rowid DESC LIMIT 100`).all(...(urlKey ? [userId, urlKey] : [userId])) as unknown as Item[];
 }
 function noteResult(item: Item) {
   try {

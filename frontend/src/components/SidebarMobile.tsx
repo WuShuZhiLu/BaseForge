@@ -264,7 +264,7 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
             {mobileControlsCollapsed ? <PanelTopOpen size={16} /> : <PanelTopClose size={16} />}
           </button>
           <span className={cn("min-w-0 truncate font-semibold", classicText ? "text-[13px]" : "text-sm")}>
-            {siteConfig.title || "nowen-note"}
+            {siteConfig.title || "BaseForge"}
           </span>
           {mobileRailHidden && (
             <div className="flex shrink-0 items-center gap-1">

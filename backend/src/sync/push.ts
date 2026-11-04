@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { SYNC_TABLES } from "./constants";
 import type { SyncOutboxRow } from "./types";
 import type { PushMutationPayload } from "./remote";
@@ -85,7 +85,7 @@ export function coalesceMutations(rows: SyncOutboxRow[]): CoalescedMutation[] {
  * 后者在崩溃恢复后仍然有效。
  */
 export function markLocalMutationApplied(
-  db: Database.Database,
+  db: DatabaseSync,
   mutationId: string,
   deviceId: string,
 ): void {
@@ -96,7 +96,7 @@ export function markLocalMutationApplied(
 }
 
 export function isLocalMutationApplied(
-  db: Database.Database,
+  db: DatabaseSync,
   mutationId: string,
 ): boolean {
   const row = db.prepare(

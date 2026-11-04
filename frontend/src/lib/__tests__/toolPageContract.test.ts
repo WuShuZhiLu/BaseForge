@@ -72,7 +72,7 @@ describe("B2 工具页页签契约（toolPageContract）", () => {
     it("ShareManagementPage：无 actions.setViewMode，跳笔记走 navigateToolPage", () => {
       const src = source("../../components/ShareManagementPage.tsx");
       expect(src).not.toContain("actions.setViewMode(");
-      expect(src).toContain('navigateToolPage({ kind: "note", noteId: item.noteId })');
+      expect(src).toContain('navigateToolPage({ kind: "note", noteId: item.objectId })');
       expect(src).toContain('from "@/components/toolTabs"');
     });
 

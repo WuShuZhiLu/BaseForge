@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import {
   ensureNoteIndexed,
@@ -97,17 +97,17 @@ function describeSections(operation: SplitOperationRow): SectionDescriptor[] {
   return [];
 }
 
-function readableSplitItems(db: Database.Database, operationId: string): SplitItemRow[] {
+function readableSplitItems(db: DatabaseSync, operationId: string): SplitItemRow[] {
   return db.prepare(`
     SELECT i.noteId, i.sortOrder, i.title
     FROM note_split_items i
     JOIN notes n ON n.id = i.noteId AND n.isTrashed = 0
     WHERE i.operationId = ?
     ORDER BY i.sortOrder ASC
-  `).all(operationId) as SplitItemRow[];
+  `).all(operationId) as unknown as SplitItemRow[];
 }
 
-function targetBlockIds(db: Database.Database, noteId: string): Set<string> {
+function targetBlockIds(db: DatabaseSync, noteId: string): Set<string> {
   ensureNoteIndexed(db, noteId);
   return new Set(getNoteBlocks(db, noteId, 10000).map((row) => row.blockId));
 }
@@ -127,7 +127,7 @@ function overlapSize(left: Set<string>, right: Set<string>): number {
  * rather than redirecting an old link to the wrong chapter.
  */
 function assignSections(
-  db: Database.Database,
+  db: DatabaseSync,
   operation: SplitOperationRow,
 ): AssignedSection[] {
   const sections = describeSections(operation);
@@ -164,7 +164,7 @@ function assignSections(
   return assigned;
 }
 
-function listCompletedOperations(db: Database.Database, sourceNoteId: string): SplitOperationRow[] {
+function listCompletedOperations(db: DatabaseSync, sourceNoteId: string): SplitOperationRow[] {
   try {
     return db.prepare(`
       SELECT id, sourceNoteId, originalContent, originalContentFormat,
@@ -173,14 +173,14 @@ function listCompletedOperations(db: Database.Database, sourceNoteId: string): S
       WHERE sourceNoteId = ? AND status = 'completed'
       ORDER BY createdAt DESC, rowid DESC
       LIMIT 50
-    `).all(sourceNoteId) as SplitOperationRow[];
+    `).all(sourceNoteId) as unknown as SplitOperationRow[];
   } catch {
     return [];
   }
 }
 
 function resolveSingleHop(
-  db: Database.Database,
+  db: DatabaseSync,
   sourceNoteId: string,
   sourceBlockId: string,
 ): { noteId: string; blockId: string | null; operationId: string } | null {
@@ -211,7 +211,7 @@ function resolveSingleHop(
 
 /** Resolve an old noteId + blockId through one or more completed split operations. */
 export function resolveSplitBlockTarget(
-  db: Database.Database,
+  db: DatabaseSync,
   sourceNoteId: string,
   sourceBlockId: string,
 ): ResolvedSplitBlockTarget | null {
@@ -250,7 +250,7 @@ export function resolveSplitBlockTarget(
 }
 
 export function blockExists(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   blockId: string,
 ): NoteBlockIndexRow | null {

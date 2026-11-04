@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import jwt from "jsonwebtoken";
 
 import { JWT_SECRET } from "./auth-security.js";
@@ -68,7 +68,7 @@ export function parseFolderUnlockTokens(value: string | undefined): string[] {
  * 密码版本或目录绑定关系发生变化后，旧令牌会在这里立即失效。
  */
 export function resolveUnlockedFolderNodeIds(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   headerValue: string | undefined,
 ): Set<string> {
@@ -97,7 +97,7 @@ export function resolveUnlockedFolderNodeIds(
  * 没有统一知识树节点的旧数据继续按原权限规则处理，避免升级后误隐藏历史笔记。
  */
 export function canViewNoteThroughFolderPasswords(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   unlockedFolderNodeIds: Set<string>,
   options: { includeDeleted?: boolean } = {},

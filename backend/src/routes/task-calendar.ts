@@ -95,7 +95,7 @@ function toIcsDate(dateStr: string): { value: string; isDateTime: boolean } {
 function buildVEvent(task: any, feed: any, reminders: any[]): string {
   const lines: string[] = [];
   lines.push("BEGIN:VEVENT");
-  lines.push(icsFold(`UID:task-${task.id}@nowen-note`));
+  lines.push(icsFold(`UID:task-${task.id}@baseforge`));
   lines.push(icsFold(`SUMMARY:${icsEscape(task.title)}`));
 
   if (feed.includeDescription && task.description) {
@@ -319,7 +319,7 @@ taskCalendar.get("/feed/:token", (c) => {
     "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    icsFold("X-WR-CALNAME:Nowen Tasks"),
+    icsFold("X-WR-CALNAME:BaseForge Tasks"),
   ];
   for (const task of tasks) {
     calLines.push(buildVEvent(task, feed, remindersByTask.get(task.id) || []));
@@ -460,7 +460,7 @@ export function buildIcsForToken(token: string): { body: string; feedId: string 
   const calLines = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//BaseForge//Tasks//CN",
     "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-    icsFold("X-WR-CALNAME:Nowen Tasks"),
+    icsFold("X-WR-CALNAME:BaseForge Tasks"),
   ];
   for (const task of tasks) {
     calLines.push(buildVEvent(task, feed, remindersByTask.get(task.id) || []));

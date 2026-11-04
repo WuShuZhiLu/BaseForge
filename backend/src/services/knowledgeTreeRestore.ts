@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { v4 as uuid } from "uuid";
 
 import { getDb } from "../db/schema.js";
@@ -15,7 +15,7 @@ type RestorableNode = {
   resourceId: string;
 };
 
-function canRestoreRoot(db: Database.Database, node: RestorableNode, actorUserId: string): boolean {
+function canRestoreRoot(db: DatabaseSync, node: RestorableNode, actorUserId: string): boolean {
   // Restore is a tombstone lifecycle operation. Evaluate the deleted resource's
   // own effective ACL (including explicit deny/restricted boundaries) instead of
   // inferring permission from the nearest surviving parent.
@@ -27,7 +27,7 @@ function canRestoreRoot(db: Database.Database, node: RestorableNode, actorUserId
   ).capabilities.canDelete;
 }
 
-function readSubtree(db: Database.Database, nodeId: string, includeSubtree: boolean): RestorableNode[] {
+function readSubtree(db: DatabaseSync, nodeId: string, includeSubtree: boolean): RestorableNode[] {
   if (!includeSubtree) {
     const node = db.prepare(`
       SELECT id, userId, workspaceId, parentId, resourceType, resourceId
@@ -55,7 +55,7 @@ export function restoreKnowledgeNode(input: {
   actorUserId: string;
   nodeId: string;
   includeSubtree?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): { success: true; restoredNodeIds: string[] } {
   const db = input.db || getDb();
   ensureKnowledgeTreeTables(db);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { MessageSquareText, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, SERVER_URL_CHANGED_EVENT } from "@/lib/api";
 import { openCommentCenter } from "@/lib/noteCommentNavigation";
@@ -131,7 +131,10 @@ export default function NotificationCenter({ onUnreadChange, onOpenIssue, onOpen
         <button className={buttonClass} disabled={loading} aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)}>{t("notificationCenter.all")}</button>
         <button className={buttonClass} disabled={loading} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)}>{t("notificationCenter.unread")}</button>
         <button className={buttonClass} disabled={loading} onClick={() => setRevision((value) => value + 1)}>{t("issues.refresh")}</button>
-        <button className={buttonClass} onClick={() => { setOpen(false); openCommentCenter(); }}>{t("commentCenter.title")}</button>
+        <button className={`${buttonClass} inline-flex items-center gap-1.5`} onClick={() => { setOpen(false); openCommentCenter(); }}>
+          <MessageSquareText size={14} />
+          {t("commentCenter.title")}
+        </button>
         <button className={buttonClass} disabled={loading || data.unreadCount === 0} onClick={() => void run(() => api.notifications.readAll())}>{t("notificationCenter.readAll")}</button>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-3 pb-[calc(16px+env(safe-area-inset-bottom))]">

@@ -4,13 +4,14 @@
  * v2 定稿（proto-kb-single-tree-v2 / DESIGN-KB-SINGLE-TREE §2.3）：
  * - 侧栏单击库根行 = 展开子树 + 进入本页；本页不是 notes 记录、不计入文档数
  * - 统计 = 子树内文档数 / 字数（contentText 长度）/ 最近更新时间
- * - 目录带时间戳：点文件夹 = 目录内展开 + 侧栏树 reveal（不离开 Overview）；
+ * - 目录带时间戳与虚线引导线：点文件夹 = 目录内展开 + 侧栏树 reveal（不离开 Overview）；
  *   点文档 = 打开编辑器（kbNoteAppPath / sheet 深链）
+ * - 头部动作区 = 收藏 / 分享 / 新建文档 / 更多（定位、导出）
  * - 空库 = 空态引导新建第一篇文档
  */
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FaBook, FaFolder } from "react-icons/fa";
-import { FileCode, FileText, Plus, Table2 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FaStar, FaRegStar } from "react-icons/fa";
+import { Bold, ChevronRight, Code as CodeIcon, Italic, Link as LinkIcon, List, ListOrdered, MoreHorizontal, NotebookPen, Palette, Pencil, Plus, Strikethrough, Trash2 } from "lucide-react";
 
 import { getCurrentWorkspace } from "@/lib/api";
 import {
@@ -19,10 +20,16 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { api } from "@/lib/api";
-import { pushAppPathState } from "@/lib/appPathNavigation";
+import { pushAppPathState, resolveCurrentAppPathname } from "@/lib/appPathNavigation";
 import { kbNoteAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
 import { toast } from "@/lib/toast";
+import { knowledgeTreeEmojiFor, NOTEBOOK_EMOJIS } from "@/lib/knowledgeTreeIcons";
+import { defaultInlineCreateTitle, type KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import NotebookShareDialog from "@/components/NotebookShareDialog";
+import type { Notebook } from "@/types";
 
 const fmtTs = (ts: string) => {
   if (!ts) return "";
@@ -34,13 +41,52 @@ const fmtTs = (ts: string) => {
 
 const isFolderNode = (node: KnowledgeTreeNode) => node.nodeType === "folder";
 
+/** Overview「新建」可选的内容类型（与侧栏创建菜单同语义）。 */
+const CREATE_DOC_ITEMS: Array<{ kind: KnowledgeTreeInlineCreateKind; label: string }> = [
+  { kind: "folder", label: "文件夹" },
+  { kind: "note", label: "富文本文档" },
+  { kind: "markdown", label: "Markdown 文档" },
+  { kind: "mindmap", label: "思维导图" },
+  { kind: "sheet", label: "轻量表格" },
+  { kind: "board", label: "画板文档" },
+  { kind: "plain", label: "纯文本" },
+];
+
+/** 目录行内新建命名用的 emoji（与 knowledgeTreeIcons 同一套）。 */
+const CREATE_KIND_EMOJI: Record<KnowledgeTreeInlineCreateKind, string> = {
+  folder: "📁",
+  note: "📄",
+  markdown: "📝",
+  mindmap: "🧠",
+  sheet: "📊",
+  board: "🎨",
+  plain: "🗒️",
+};
+
 export default function KbDetailPage({ kbId }: { kbId: string }) {
   const [nodes, setNodes] = useState<KnowledgeTreeNode[] | null>(null);
-  const [notebooks, setNotebooks] = useState<Map<string, string> | null>(null);
+  const [notebooks, setNotebooks] = useState<Notebook[] | null>(null);
   // 统计走服务端聚合（文档数/字数/最近更新/贡献者）：不再全量拉 notes 本地累加。
   const [stats, setStats] = useState<KnowledgeNodeStats | null>(null);
   const [tocOpen, setTocOpen] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  // 新建文档类型选择菜单
+  const [createOpen, setCreateOpen] = useState(false);
+  const createRef = useRef<HTMLDivElement | null>(null);
+  // 目录行内命名（新建后的“先建后改名”）
+  const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+  const [renamingValue, setRenamingValue] = useState<string | null>(null);
+  // 重命名（标题行内 input）与总览编辑（简介弹窗）
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [descEditing, setDescEditing] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
+  const descTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [descOverflow, setDescOverflow] = useState(false);
+  const descDisplayRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(() => {
     let cancelled = false;
@@ -48,8 +94,8 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
       .then((res) => { if (!cancelled) setNodes(res.nodes); })
       .catch(() => { if (!cancelled) setNodes([]); });
     api.getNotebooks()
-      .then((items) => { if (!cancelled) setNotebooks(new Map(items.map((nb) => [nb.id, nb.description ?? ""]))); })
-      .catch(() => { if (!cancelled) setNotebooks(new Map()); });
+      .then((items) => { if (!cancelled) setNotebooks(items); })
+      .catch(() => { if (!cancelled) setNotebooks([]); });
     return () => { cancelled = true; };
   }, []);
 
@@ -66,6 +112,17 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     () => nodes?.find((n) => n.resourceId === kbId && n.resourceType === "notebook" && !n.isDeleted) ?? null,
     [nodes, kbId],
   );
+
+  const notebook = notebooks?.find((nb) => nb.id === kbId) ?? null;
+  const description = notebook?.description ?? "";
+
+  // 简介是否超 2 行（折叠态下 clientHeight 被裁剪，用 scrollHeight 比较）。
+  // 必须放在早退 return 之前：hooks 数量在所有分支下要一致。
+  useEffect(() => {
+    const element = descDisplayRef.current;
+    if (!element || descriptionExpanded) { setDescOverflow(false); return; }
+    setDescOverflow(element.scrollHeight > element.clientHeight + 1);
+  }, [description, descriptionExpanded]);
 
   const childrenMap = useMemo(() => {
     const map = new Map<string | null, KnowledgeTreeNode[]>();
@@ -158,6 +215,19 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     }
   }, [kbNode, creating, kbId]);
 
+  // 收藏/取消收藏知识库（树节点的 isFavorite，与侧栏收藏区共用一份数据）
+  const toggleFavorite = useCallback(async () => {
+    if (!kbNode) return;
+    const next = kbNode.isFavorite === 1 ? 0 : 1;
+    try {
+      await knowledgeTreeApi.update(kbNode.id, { isFavorite: next });
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+    } catch (err) {
+      console.error("[KbDetailPage] toggle favorite failed:", err);
+      toast.error(next === 1 ? "收藏失败" : "取消收藏失败");
+    }
+  }, [kbNode]);
+
   // 目录点文件夹：目录内展开 + 侧栏树 reveal（不离开 Overview）
   const toggleToc = useCallback((id: string) => {
     setTocOpen((current) => {
@@ -168,49 +238,236 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     });
   }, []);
 
+  // 按类型新建：先建后改名——创建后目录行进入行内命名态（Esc 保留默认名）
+  const createDocOfKind = useCallback(async (kind: KnowledgeTreeInlineCreateKind) => {
+    setCreateOpen(false);
+    if (!kbNode || creating) return;
+    setCreating(true);
+    try {
+      const created = await knowledgeTreeApi.create({
+        parentId: kbNode.id,
+        nodeType: kind,
+        title: defaultInlineCreateTitle(kind),
+      });
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      setTocOpen((current) => new Set(current).add(kbNode.id));
+      // 先建后改名：留在总览，目录行进入行内命名态（编辑器等改完自己点开）
+      setRenamingNodeId(created.id);
+      setRenamingValue(created.title);
+    } catch (err) {
+      console.error("[KbDetailPage] create doc failed:", err);
+      toast.error("新建失败");
+    } finally {
+      setCreating(false);
+    }
+  }, [kbNode, creating, openDoc]);
+
+  // 目录行内命名提交：Esc / 清空 = 保留默认名
+  const commitNodeRename = useCallback(async () => {
+    const nodeId = renamingNodeId;
+    const title = renamingValue?.trim();
+    setRenamingNodeId(null);
+    setRenamingValue(null);
+    if (!nodeId || !title) return;
+    try {
+      await knowledgeTreeApi.update(nodeId, { title });
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+    } catch (err) {
+      console.error("[KbDetailPage] rename node failed:", err);
+      toast.error("重命名失败");
+    }
+  }, [renamingNodeId, renamingValue]);
+
+  // 换封面：把"书"的封面色写进 notebooks.icon，侧栏与总览同步生效
+  const updateCover = useCallback(async (emoji: string) => {    try {
+      await api.updateNotebook(kbId, { icon: emoji });
+      setNotebooks((current) => (current ?? []).map((nb) => (nb.id === kbId ? { ...nb, icon: emoji } : nb)));
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+    } catch (err) {
+      console.error("[KbDetailPage] update cover failed:", err);
+      toast.error("更换封面失败");
+    }
+  }, [kbId]);
+
+  // 行内重命名：提交后由树变更事件刷新侧栏与本页标题
+  const commitRename = useCallback(async () => {
+    if (!kbNode || renaming === null) return;
+    const title = renaming.trim();
+    setRenaming(null);
+    if (!title || title === kbNode.title) return;
+    try {
+      await knowledgeTreeApi.update(kbNode.id, { title });
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+    } catch (err) {
+      console.error("[KbDetailPage] rename kb failed:", err);
+      toast.error("重命名失败");
+    }
+  }, [kbNode, renaming]);
+
+  // 删除知识库：删除后退出 Overview（去掉 ?tree= 进入态，与侧栏 exitKb 同语义）
+  const deleteKb = useCallback(async () => {
+    if (!kbNode) return;
+    try {
+      await knowledgeTreeApi.remove(kbNode.id, "subtree");
+      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      const params = new URLSearchParams(window.location.search);
+      params.delete("tree");
+      const qs = params.toString();
+      pushAppPathState(`${resolveCurrentAppPathname()}${qs ? `?${qs}` : ""}`);
+    } catch (err) {
+      console.error("[KbDetailPage] delete kb failed:", err);
+      toast.error("删除知识库失败");
+    }
+  }, [kbNode]);
+
+  // 编辑总览：保存知识库描述（notebooks.description）
+  const commitDescription = useCallback(async () => {
+    const trimmed = descDraft.trim();
+    setDescEditing(false);
+    setDescriptionExpanded(false);
+    try {
+      await api.updateNotebook(kbId, { description: trimmed });
+      setNotebooks((current) => (current ?? []).map((nb) => (nb.id === kbId ? { ...nb, description: trimmed } : nb)));
+    } catch (err) {
+      console.error("[KbDetailPage] update description failed:", err);
+      toast.error("保存简介失败");
+    }
+  }, [descDraft, kbId]);
+
+  // 简介编辑工具条：把选中文本包上 Markdown 标记（加粗/斜体/删除线/链接/代码）
+  const wrapDescSelection = useCallback((before: string, after = before, placeholder = "") => {
+    const textarea = descTextareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const value = descDraft;
+    const selected = value.slice(start, end) || placeholder;
+    const next = `${value.slice(0, start)}${before}${selected}${after}${value.slice(end)}`;
+    setDescDraft(next);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  }, [descDraft]);
+
+  // 列表：给选中的每一行加前缀（"- " / "1. "），再按一次去掉
+  const toggleDescListPrefix = useCallback((ordered: boolean) => {
+    const textarea = descTextareaRef.current;
+    if (!textarea) return;
+    const value = descDraft;
+    const start = value.lastIndexOf("\n", textarea.selectionStart - 1) + 1;
+    const end = value.indexOf("\n", textarea.selectionEnd);
+    const stop = end === -1 ? value.length : end;
+    const block = value.slice(start, stop);
+    const prefix = ordered ? "1. " : "- ";
+    const lines = block.split("\n");
+    const allListed = lines.every((line) => line.startsWith(prefix));
+    const nextBlock = lines
+      .map((line, index) => (allListed ? line.slice(prefix.length) : `${ordered ? `${index + 1}. ` : prefix}${line}`))
+      .join("\n");
+    setDescDraft(`${value.slice(0, start)}${nextBlock}${value.slice(stop)}`);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start, start + nextBlock.length);
+    });
+  }, [descDraft]);
+
+  // 点击「更多 / 新建」菜单外任意位置关闭
+  useEffect(() => {
+    if (!moreOpen && !createOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) setMoreOpen(false);
+      if (createRef.current && !createRef.current.contains(event.target as Node)) setCreateOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [moreOpen, createOpen]);
+
+  const revealNode = useCallback((nodeId: string) => {
+    window.dispatchEvent(new CustomEvent("nowen:kb-reveal-node", { detail: { nodeId } }));
+  }, []);
+
   const renderTocRows = (parentId: string, depth: number): React.ReactNode => {
     const children = childrenMap.get(parentId) ?? [];
     return children.map((node) => {
       const ts = fmtTs(subtreeUpdatedAt.get(node.id) ?? node.updatedAt);
-      const indent = { paddingLeft: 12 + depth * 20 };
+      const indent = { paddingLeft: depth * 24 };
       if (isFolderNode(node)) {
         const hasKids = (childrenMap.get(node.id) ?? []).length > 0;
         const open = tocOpen.has(node.id);
         return (
           <React.Fragment key={node.id}>
-            <button
-              type="button"
-              onClick={() => { toggleToc(node.id); if (!open) window.dispatchEvent(new CustomEvent("nowen:kb-reveal-node", { detail: { nodeId: node.id } })); }}
-              className="flex w-full items-center gap-2 rounded-md py-2 pr-2 text-left text-[13.5px] text-tx-primary hover:bg-app-hover"
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => { toggleToc(node.id); if (!open) revealNode(node.id); }}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { toggleToc(node.id); if (!open) revealNode(node.id); } }}
+              className="group flex h-9 w-full cursor-pointer select-none items-center gap-2 rounded-md pr-2 text-left text-[13.5px] text-tx-primary hover:bg-app-hover"
               style={indent}
             >
-              <span className={`w-3 shrink-0 text-tx-tertiary transition-transform ${hasKids ? (open ? "rotate-90" : "") : "opacity-0"}`}>▸</span>
-              <FaFolder size={13} className="shrink-0 text-amber-500" />
-              <span className="min-w-0 flex-1 truncate font-medium">{node.title}</span>
+              <span className={`flex w-4 shrink-0 items-center justify-center text-tx-tertiary ${hasKids ? "" : "opacity-0"}`}>
+                <ChevronRight size={12} className={`transition-transform ${open ? "rotate-90" : ""}`} />
+              </span>
+              <span className="shrink-0 text-[13px] leading-none">📁</span>
+              {renamingNodeId === node.id ? (
+                <input
+                  autoFocus
+                  value={renamingValue ?? ""}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => setRenamingValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void commitNodeRename();
+                    if (event.key === "Escape") { setRenamingNodeId(null); setRenamingValue(null); }
+                  }}
+                  onBlur={() => void commitNodeRename()}
+                  className="min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-1.5 py-0.5 text-[13.5px] text-tx-primary outline-none no-focus-ring focus:border-accent-primary"
+                />
+              ) : (
+                <span className="max-w-[70%] shrink-0 truncate whitespace-nowrap font-medium">{node.title}</span>
+              )}
+              {/* 虚线引导线：标题与时间之间的视线通道 */}
+              <span className="mx-2 h-0 min-w-4 flex-1 border-t border-dashed border-app-border" />
               <span className="shrink-0 text-[11.5px] tabular-nums text-tx-tertiary">{ts}</span>
-            </button>
+            </div>
             {open && hasKids && renderTocRows(node.id, depth + 1)}
           </React.Fragment>
         );
       }
-      const icon = node.noteType === "sheet"
-        ? <Table2 size={13} className="shrink-0 text-sky-500" />
-        : node.contentFormat === "markdown"
-          ? <FileCode size={13} className="shrink-0 text-emerald-500" />
-          : <FileText size={13} className="shrink-0 text-accent-primary" />;
+      const icon = <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node)}</span>;
       return (
-        <button
+        <div
           key={node.id}
-          type="button"
+          role="button"
+          tabIndex={0}
           onClick={() => openDoc(node)}
-          className="flex w-full items-center gap-2 rounded-md py-2 pr-2 text-left text-[13.5px] text-tx-primary hover:bg-app-hover"
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openDoc(node); }}
+          className="group flex h-9 w-full cursor-pointer select-none items-center gap-2 rounded-md pr-2 text-left text-[13.5px] text-tx-primary hover:bg-app-hover"
           style={indent}
         >
-          <span className="w-3 shrink-0" />
+          <span className="w-4 shrink-0" />
           {icon}
-          <span className="min-w-0 flex-1 truncate">{node.title}</span>
+          {renamingNodeId === node.id ? (
+            <input
+              autoFocus
+              value={renamingValue ?? ""}
+              onClick={(event) => event.stopPropagation()}
+              onChange={(event) => setRenamingValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void commitNodeRename();
+                if (event.key === "Escape") { setRenamingNodeId(null); setRenamingValue(null); }
+              }}
+              onBlur={() => void commitNodeRename()}
+              className="min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-1.5 py-0.5 text-[13.5px] text-tx-primary outline-none no-focus-ring focus:border-accent-primary"
+            />
+          ) : (
+            <span className="max-w-[70%] shrink-0 truncate whitespace-nowrap">
+              {node.title}
+              {node.isReference && <span className="ml-1 text-[10px] text-tx-tertiary" title="同一份内容的另一条路径">🔗</span>}
+            </span>
+          )}
+          <span className="mx-2 h-0 min-w-4 flex-1 border-t border-dashed border-app-border" />
           <span className="shrink-0 text-[11.5px] tabular-nums text-tx-tertiary">{ts}</span>
-        </button>
+        </div>
       );
     });
   };
@@ -222,13 +479,12 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   if (!kbNode) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-tx-tertiary">
-        <FaBook size={28} className="opacity-40" />
+        <span className="text-[28px] leading-none opacity-40">📗</span>
         <p className="text-[13px]">知识库不存在或已被删除</p>
       </div>
     );
   }
 
-  const description = notebooks?.get(kbId) ?? "";
   // 统计展示：服务端优先，本地树数据兜底（接口不可用时字数显示为 —）
   const docCount = stats?.docCount ?? localStats?.docCount ?? 0;
   const charCount = stats?.charCount ?? null;
@@ -236,21 +492,38 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   const contributors = stats?.contributors ?? [];
   const isEmpty = docCount === 0;
   const avatarColors = ["#2563eb", "#0891b2", "#7c3aed"];
+  const isFavorite = kbNode.isFavorite === 1;
+  // 当前生效封面（与侧栏同一规则：自选优先，默认蓝色）
+  const currentCover = knowledgeTreeEmojiFor(kbNode, true);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-app-bg dark:bg-app-surface">
       <div className="mx-auto max-w-3xl px-10 pb-24 pt-12">
-        {/* 头部：图标 / 标题 / 统计 / 新建 */}
+        {/* 头部：图标 / 标题 / 统计 / 动作区（收藏 / 分享 / 新建 / 更多） */}
         <div className="flex items-start gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-100">
-            <FaBook size={24} className="text-amber-600" />
+            <span className="text-[28px] leading-none">{knowledgeTreeEmojiFor(kbNode, true)}</span>
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[22px] font-semibold text-tx-primary">{kbNode.title}</h1>
+            {renaming !== null ? (
+              <input
+                autoFocus
+                value={renaming}
+                onChange={(event) => setRenaming(event.target.value)}
+                onBlur={() => void commitRename()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void commitRename();
+                  if (event.key === "Escape") setRenaming(null);
+                }}
+                className="w-full rounded-md border border-app-border bg-app-bg px-2 py-0.5 text-[20px] font-semibold text-tx-primary outline-none no-focus-ring focus:border-accent-primary"
+              />
+            ) : (
+              <h1 className="truncate text-[22px] font-semibold text-tx-primary">{kbNode.title}</h1>
+            )}
             <p className="mt-1.5 text-[12.5px] text-tx-tertiary">
               <b className="text-tx-secondary">{docCount}</b> 文档
-              {charCount !== null && <> · <b className="text-tx-secondary">{charCount}</b> 字</>}
-              · 更新于 {fmtTs(updatedAt) || "—"}
+              {charCount !== null && <> <span className="mx-1 text-app-border">·</span> <b className="text-tx-secondary">{charCount}</b> 字</>}
+              <span className="mx-1 text-app-border">·</span> 更新于 {fmtTs(updatedAt) || "—"}
             </p>
             {contributors.length > 0 && (
               <div className="mt-3 flex items-center gap-2 text-[12px] text-tx-tertiary">
@@ -269,34 +542,202 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
                     </span>
                   ))}
                 </div>
-                <span>
-                  @{contributors[0].displayName || contributors[0].username}
-                  {contributors.length > 1 ? ` 等 ${contributors.length} 人` : ""} 参与编写
-                </span>
+                <span>{contributors.length > 1 ? `等 ${contributors.length} 人` : ""} 参与编写</span>
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => void createDoc()}
-            disabled={creating}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-accent-primary px-4 py-2 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-60"
-          >
-            <Plus size={14} />
-            新建文档
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void toggleFavorite()}
+              className={`flex items-center gap-1.5 rounded-full border border-app-border bg-app-elevated px-3.5 py-1.5 text-[12.5px] hover:bg-app-hover ${isFavorite ? "text-amber-500" : "text-tx-secondary"}`}
+            >
+              {isFavorite ? <FaStar size={12} /> : <FaRegStar size={12} />}
+              {isFavorite ? "已收藏" : "收藏"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSharing(true)}
+              className="rounded-full border border-app-border bg-app-elevated px-3.5 py-1.5 text-[12.5px] text-tx-secondary hover:bg-app-hover"
+            >
+              分享
+            </button>
+            <div className="relative" ref={createRef}>
+              <button
+                type="button"
+                onClick={() => setCreateOpen((open) => !open)}
+                disabled={creating}
+                className="flex items-center gap-1.5 rounded-full bg-accent-primary px-4 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-60"
+              >
+                <Plus size={14} />
+                新建
+              </button>
+              {createOpen && (
+                <div className="absolute right-0 top-9 z-10 w-44 rounded-xl border border-app-border bg-app-bg p-1 shadow-lg">
+                  {CREATE_DOC_ITEMS.map((item) => (
+                    <button
+                      key={item.kind}
+                      type="button"
+                      onClick={() => void createDocOfKind(item.kind)}
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-tx-primary hover:bg-app-hover"
+                    >
+                      <span className="w-4 shrink-0 text-center text-[13px] leading-none">
+                        {item.kind === "note" ? "📄" : item.kind === "markdown" ? "📝" : item.kind === "mindmap" ? "🧠" : item.kind === "sheet" ? "📊" : item.kind === "board" ? "🎨" : "🗒️"}
+                      </span>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="relative" ref={moreRef}>
+              <button
+                type="button"
+                onClick={() => setMoreOpen((open) => !open)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-app-border bg-app-elevated text-tx-secondary hover:bg-app-hover"
+                aria-label="更多操作"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 top-9 z-10 w-52 rounded-xl border border-app-border bg-app-bg p-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpen(false); setRenaming(kbNode.title); }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-tx-primary hover:bg-app-hover"
+                  >
+                    <Pencil size={13} className="text-tx-tertiary" />
+                    重命名
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpen(false); setDescDraft(notebook?.description ?? ""); setDescEditing(true); }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-tx-primary hover:bg-app-hover"
+                  >
+                    <NotebookPen size={13} className="text-tx-tertiary" />
+                    编辑总览
+                  </button>
+                  <div className="group/sub relative">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-tx-primary hover:bg-app-hover"
+                    >
+                      <Palette size={13} className="text-tx-tertiary" />
+                      <span className="min-w-0 flex-1">封面颜色</span>
+                      <span className="shrink-0 text-[13px] leading-none">{currentCover}</span>
+                      <ChevronRight size={12} className="shrink-0 text-tx-tertiary" />
+                    </button>
+                    <div className="absolute left-full top-0 z-[1] hidden pl-1 group-hover/sub:block">
+                      <div className="flex w-max gap-1 rounded-xl border border-app-border bg-app-bg p-1.5 shadow-lg">
+                        {NOTEBOOK_EMOJIS.map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => void updateCover(emoji)}
+                            className={`flex h-7 w-7 items-center justify-center rounded-md text-[15px] hover:bg-app-hover ${currentCover === emoji ? "bg-app-hover ring-1 ring-accent-primary" : ""}`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setMoreOpen(false); void deleteKb(); }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-500/10 dark:text-red-400"
+                  >
+                    <Trash2 size={13} />
+                    删除知识库
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* 库简介（notebooks.description） */}
-        {description && (
-          <p className="mt-6 rounded-xl border border-app-border bg-app-panel px-4 py-3 text-[13px] leading-relaxed text-tx-secondary">
-            {description}
-          </p>
-        )}
+        {/* 库简介（notebooks.description，Markdown）：点击或经"更多 → 编辑总览"在原位编辑 */}
+        {descEditing ? (
+          <div className="mt-5">
+            {/* 语雀式总览编辑卡：工具条在卡内顶部，编辑区无边框，底部为动作区 */}
+            <div className="rounded-xl border border-app-border bg-app-elevated transition-colors focus-within:border-accent-primary/60">
+              <div className="flex items-center gap-0.5 px-2.5 pt-2">
+                <button type="button" title="加粗" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapDescSelection("**", "**", "加粗文字")}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><Bold size={14} /></button>
+                <button type="button" title="斜体" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapDescSelection("*", "*", "斜体文字")}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><Italic size={14} /></button>
+                <button type="button" title="删除线" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapDescSelection("~~", "~~", "删除文字")}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><Strikethrough size={14} /></button>
+                <span className="mx-1 h-4 w-px bg-app-border" />
+                <button type="button" title="有序列表" onMouseDown={(event) => event.preventDefault()} onClick={() => toggleDescListPrefix(true)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><ListOrdered size={14} /></button>
+                <button type="button" title="无序列表" onMouseDown={(event) => event.preventDefault()} onClick={() => toggleDescListPrefix(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><List size={14} /></button>
+                <span className="mx-1 h-4 w-px bg-app-border" />
+                <button type="button" title="链接" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapDescSelection("[", "](https://)", "链接文字")}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><LinkIcon size={14} /></button>
+                <button type="button" title="代码" onMouseDown={(event) => event.preventDefault()} onClick={() => wrapDescSelection("`", "`", "代码")}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-tx-secondary hover:bg-app-hover"><CodeIcon size={14} /></button>
+              </div>
+              <textarea
+                ref={descTextareaRef}
+                autoFocus
+                value={descDraft}
+                onChange={(event) => setDescDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void commitDescription();
+                  if (event.key === "Escape") setDescEditing(false);
+                }}
+                rows={4}
+                placeholder="写点什么介绍这个知识库…"
+                className="w-full resize-none border-0 bg-transparent px-4 pb-2 pt-1.5 text-[13.5px] leading-relaxed text-tx-primary outline-none no-focus-ring focus:ring-0"
+              />
+              <div className="flex items-center justify-end gap-3 border-t border-app-border/60 px-3 py-2">
+                <span className="mr-auto text-[11px] text-tx-tertiary">Ctrl + Enter 保存</span>
+                <button
+                  type="button"
+                  onClick={() => setDescEditing(false)}
+                  className="text-[12px] text-tx-tertiary hover:text-tx-secondary"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void commitDescription()}
+                  className="rounded-full bg-accent-primary px-3.5 py-1 text-[12px] font-medium text-white hover:opacity-90"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : description ? (
+          <div className="mt-5">
+            {/* 纯展示；编辑入口在“更多 → 编辑总览”。超 2 行折叠，按钮仅在真正溢出时出现 */}
+            <div
+              ref={descDisplayRef}
+              className={`text-[13px] leading-relaxed text-tx-secondary [&_a]:text-accent-primary [&_a]:underline [&_code]:rounded [&_code]:bg-app-hover [&_code]:px-1 [&_code]:text-[12px] ${descriptionExpanded ? "" : "line-clamp-2"}`}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {/* 单个换行预处理为 Markdown 硬换行（行尾两空格），保留编辑时的手动分行 */}
+                {description.replace(/(?<!\n)\n(?!\n)/gu, "  \n")}
+              </ReactMarkdown>
+            </div>
+            {(descOverflow || descriptionExpanded) && (
+              <button
+                type="button"
+                onClick={() => setDescriptionExpanded((expanded) => !expanded)}
+                className="mt-0.5 text-[12px] text-accent-primary hover:opacity-80"
+              >
+                {descriptionExpanded ? "收起" : "展开"}
+              </button>
+            )}
+          </div>
+        ) : null}
 
         {isEmpty ? (
-          <div className="mt-14 rounded-xl border-[1.5px] border-dashed border-app-border bg-app-panel px-6 py-12 text-center">
-            <FaBook size={30} className="mx-auto opacity-30" />
+          <div className="mt-14 rounded-xl border-[1.5px] border-dashed border-app-border bg-app-elevated px-6 py-12 text-center">
+            <span className="mx-auto block text-[30px] leading-none opacity-30">{knowledgeTreeEmojiFor(kbNode, true)}</span>
             <h3 className="mt-3 text-[15px] font-medium text-tx-primary">这个知识库还没有内容</h3>
             <p className="mt-1 text-[12.5px] text-tx-tertiary">创建第一篇文档，开始沉淀你的知识</p>
             <button
@@ -311,9 +752,10 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
           </div>
         ) : (
           <>
-            <div className="mt-8 mb-2 flex items-baseline">
-              <h3 className="text-[12px] font-medium uppercase tracking-[0.12em] text-tx-tertiary">目录</h3>
-              <span className="ml-3 text-[11.5px] text-tx-tertiary">点击直达 · 右侧为最近更新时间</span>
+            <div className="mb-2 mt-9 flex items-baseline gap-2.5">
+              <h3 className="text-[12px] font-semibold text-tx-secondary">目录</h3>
+              <span className="rounded-full bg-app-panel px-2 py-0.5 text-[11px] text-tx-tertiary">{docCount} 篇</span>
+              <span className="text-[11.5px] text-tx-tertiary">点击直达 · 右侧为最近更新时间</span>
             </div>
             <div className="pb-4">
               {renderTocRows(kbNode.id, 0)}
@@ -321,6 +763,10 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
           </>
         )}
       </div>
+
+      {sharing && notebook && (
+        <NotebookShareDialog notebook={notebook} onClose={() => setSharing(false)} />
+      )}
     </div>
   );
 }

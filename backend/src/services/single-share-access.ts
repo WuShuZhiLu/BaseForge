@@ -37,6 +37,29 @@ export function getShareSessionHash(c: Context, shareId: string): string | null 
   return crypto.createHash("sha256").update(`${shareId}:${raw}`).digest("hex");
 }
 
+/** 脱敏：只留 IPv4 前三段 / IPv6 前三组，访问明细里只需区分不同访客。 */
+function maskIpPrefix(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  if (value.includes(":")) {
+    const groups = value.split(":").filter(Boolean);
+    return groups.length >= 3 ? `${groups.slice(0, 3).join(":")}:*` : null;
+  }
+  const parts = value.split(".");
+  if (parts.length !== 4 || parts.some((part) => !part)) return null;
+  return `${parts.slice(0, 3).join(".")}.*`;
+}
+
+/** 访问明细的客户端信息：UA 截断 200 字，IP 只存前缀（不存完整地址）。 */
+function readClientMeta(c: Context): { userAgent: string | null; ipPrefix: string | null } {
+  const userAgent = (c.req.header("user-agent") || "").slice(0, 200) || null;
+  const forwarded = (c.req.header("x-forwarded-for") || "").split(",")[0]
+    || c.req.header("x-real-ip")
+    || c.req.header("cf-connecting-ip")
+    || "";
+  return { userAgent, ipPrefix: maskIpPrefix(forwarded) };
+}
+
 function isExpired(value: string | null): boolean {
   if (!value) return false;
   const timestamp = new Date(value).getTime();
@@ -86,14 +109,20 @@ export function consumeShareViewSession(
 ): { ok: true; counted: boolean; viewCount: number } | { ok: false } {
   const db = getDb();
   const sessionHash = getShareSessionHash(c, share.id);
+  const client = readClientMeta(c);
   return db.transaction(() => {
     if (sessionHash) {
       const existing = db.prepare(
         "SELECT 1 AS ok FROM share_view_sessions WHERE shareId = ? AND sessionHash = ?",
       ).get(share.id, sessionHash);
       if (existing) {
-        db.prepare("UPDATE share_view_sessions SET lastSeenAt = datetime('now') WHERE shareId = ? AND sessionHash = ?")
-          .run(share.id, sessionHash);
+        db.prepare(`
+          UPDATE share_view_sessions
+          SET lastSeenAt = datetime('now'),
+              userAgent = COALESCE(?, userAgent),
+              ipPrefix = COALESCE(?, ipPrefix)
+          WHERE shareId = ? AND sessionHash = ?
+        `).run(client.userAgent, client.ipPrefix, share.id, sessionHash);
         const current = db.prepare("SELECT viewCount FROM shares WHERE id = ?").get(share.id) as { viewCount: number };
         return { ok: true as const, counted: false, viewCount: current.viewCount };
       }
@@ -108,9 +137,10 @@ export function consumeShareViewSession(
 
     if (sessionHash) {
       db.prepare(`
-        INSERT OR IGNORE INTO share_view_sessions (shareId, sessionHash, createdAt, lastSeenAt)
-        VALUES (?, ?, datetime('now'), datetime('now'))
-      `).run(share.id, sessionHash);
+        INSERT OR IGNORE INTO share_view_sessions
+          (shareId, sessionHash, createdAt, lastSeenAt, userAgent, ipPrefix)
+        VALUES (?, ?, datetime('now'), datetime('now'), ?, ?)
+      `).run(share.id, sessionHash, client.userAgent, client.ipPrefix);
     }
     const current = db.prepare("SELECT viewCount FROM shares WHERE id = ?").get(share.id) as { viewCount: number };
     return { ok: true as const, counted: true, viewCount: current.viewCount };

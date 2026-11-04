@@ -159,7 +159,7 @@ export class EcosystemRegistry {
     this.advisories.assertInstallAllowed(extensionId, version.version);
     const platform = process.env.ELECTRON_USER_DATA ? "desktop-full" : "server";
     const runtimePlatforms = version.runtimePlatform || version.platforms;
-    if (!nowenVersionSatisfies(version.nowen) || runtimePlatforms?.length && !runtimePlatforms.includes(platform)) throw Object.assign(new Error("插件与当前 Nowen/Runtime 平台不兼容"), { code: "PLUGIN_INCOMPATIBLE" });
+    if (!nowenVersionSatisfies(version.nowen) || runtimePlatforms?.length && !runtimePlatforms.includes(platform)) throw Object.assign(new Error("插件与当前 BaseForge/Runtime 平台不兼容"), { code: "PLUGIN_INCOMPATIBLE" });
     const key = index.publishers.find((item) => item.publisher === extension.publisher && item.keyId === version.publisherKeyId);
     const time = Date.now();
     if (!key || key.state !== "active" || key.validFrom && Date.parse(key.validFrom) > time || key.validUntil && Date.parse(key.validUntil) < time) throw Object.assign(new Error("Publisher 签名密钥不可用或已撤销"), { code: "PUBLISHER_KEY_REVOKED" });

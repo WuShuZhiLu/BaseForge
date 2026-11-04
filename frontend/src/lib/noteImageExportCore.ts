@@ -740,12 +740,27 @@ async function saveFiles(
   return { displayPath: "浏览器下载目录（具体位置由浏览器设置决定）", files };
 }
 
-export async function exportNoteImageDetailed(
+export type NoteImageExportRenderOptions = Omit<NoteImageExportOptions, "format" | "destination"> & {
+  format?: NoteImageExportFormat;
+};
+
+export interface RenderedNoteImages {
+  files: NoteImageExportFile[];
+  warnings: string[];
+  failedResources: NoteImageExportResourceFailure[];
+  paginated: boolean;
+}
+
+/**
+ * 只渲染、不落盘：把一篇文档渲染成一组图片文件。
+ * 单篇导出（exportNoteImageDetailed）与目录批量导出（逐篇渲染后打进同一个 zip）共用——
+ * 后者不能走 saveFiles，否则每篇都会弹一次保存对话框。
+ */
+export async function renderNoteImageFiles(
   note: ExportableNoteImageSource,
-  options: NoteImageExportOptions,
-): Promise<NoteImageExportResult> {
+  options: NoteImageExportRenderOptions = {},
+): Promise<RenderedNoteImages> {
   const format = options.format || "png";
-  const destination = options.destination || (isAndroidNative() ? "gallery" : "download");
   const warnings: string[] = [];
   let prepared: PreparedHost | null = null;
 
@@ -800,25 +815,51 @@ export async function exportNoteImageDetailed(
       options.onProgress?.({ phase: "render", current: plan.slices.length, total: plan.slices.length, message: "图片渲染完成" });
     }
 
-    options.onProgress?.({ phase: "save", current: 0, total: files.length, message: "正在保存导出结果…" });
-    const saved = await saveFiles(files, destination, baseName, warnings);
+    if (prepared.failedResources.length) {
+      warnings.push(`有 ${prepared.failedResources.length} 张图片或资源加载失败，导出结果中已放置占位图。`);
+    }
+
+    return { files, warnings, failedResources: prepared.failedResources, paginated };
+  } finally {
+    prepared?.cleanup();
+  }
+}
+
+export async function exportNoteImageDetailed(
+  note: ExportableNoteImageSource,
+  options: NoteImageExportOptions,
+): Promise<NoteImageExportResult> {
+  const format = options.format || "png";
+  const destination = options.destination || (isAndroidNative() ? "gallery" : "download");
+  const warnings: string[] = [];
+
+  try {
+    const rendered = await renderNoteImageFiles(note, {
+      format: options.format,
+      quality: options.quality,
+      pixelRatio: options.pixelRatio,
+      layout: options.layout,
+      theme: options.theme,
+      onProgress: options.onProgress,
+    });
+    warnings.push(...rendered.warnings);
+
+    const baseName = sanitizeFilename(note.title || "note");
+    options.onProgress?.({ phase: "save", current: 0, total: rendered.files.length, message: "正在保存导出结果…" });
+    const saved = await saveFiles(rendered.files, destination, baseName, warnings);
     if (saved.canceled) {
       return {
         ok: false,
         canceled: true,
         format,
         destination,
-        files,
+        files: rendered.files,
         warnings,
-        failedResources: prepared.failedResources,
-        paginated,
+        failedResources: rendered.failedResources,
+        paginated: rendered.paginated,
       };
     }
-    options.onProgress?.({ phase: "save", current: files.length, total: files.length, message: "导出完成" });
-
-    if (prepared.failedResources.length) {
-      warnings.push(`有 ${prepared.failedResources.length} 张图片或资源加载失败，导出结果中已放置占位图。`);
-    }
+    options.onProgress?.({ phase: "save", current: rendered.files.length, total: rendered.files.length, message: "导出完成" });
 
     return {
       ok: true,
@@ -826,8 +867,8 @@ export async function exportNoteImageDetailed(
       destination,
       files: saved.files,
       warnings,
-      failedResources: prepared.failedResources,
-      paginated,
+      failedResources: rendered.failedResources,
+      paginated: rendered.paginated,
       displayPath: saved.displayPath,
       openUri: saved.openUri,
     };
@@ -838,11 +879,9 @@ export async function exportNoteImageDetailed(
       destination,
       files: [],
       warnings,
-      failedResources: prepared?.failedResources || [],
+      failedResources: [],
       paginated: false,
       error: error instanceof Error ? error.message : String(error),
     };
-  } finally {
-    prepared?.cleanup();
   }
 }

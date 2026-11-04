@@ -80,3 +80,6 @@ scratch-*.sh
 scratch-*.mjs
 .commitmsg-*.txt
 .trae-cn/
+
+# 临时脚本 / 一次性 codemod（不入库）
+.tmp/

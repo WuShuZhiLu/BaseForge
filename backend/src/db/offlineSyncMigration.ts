@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 /**
@@ -12,7 +12,7 @@ import type { Migration } from "./migrations.impl.js";
 export const offlineSyncMigration: Migration = {
   version: 66,
   name: "offline-workspace-sync-feed",
-  up: (db: Database.Database) => {
+  up: (db: DatabaseSync) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS offline_sync_changes (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,

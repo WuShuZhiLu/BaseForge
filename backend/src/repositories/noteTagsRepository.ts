@@ -81,7 +81,7 @@ export function createNoteTagsRepository(
           WHERE nt."noteId" = ?
           `,
         )
-        .all(noteId) as Tag[];
+        .all(noteId) as unknown as Tag[];
     },
 
     /**

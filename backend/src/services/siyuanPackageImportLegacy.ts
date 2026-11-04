@@ -104,7 +104,7 @@ function readImportedTagLinks(noteIds: string[], withWorkspaceId: boolean): Impo
             JOIN notes n ON n.id = nt.noteId
             JOIN tags t ON t.id = nt.tagId
             WHERE nt.noteId IN (${placeholders})
-        `).all(...batch) as ImportedTagLinkRow[]));
+        `).all(...batch) as unknown as ImportedTagLinkRow[]));
     }
     return rows;
 }
@@ -159,7 +159,7 @@ function enhanceImportedRichText(noteIds: string[]): string[] {
             SELECT id, content, COALESCE(contentText, '') AS contentText
             FROM notes
             WHERE id IN (${placeholders}) AND contentFormat = 'tiptap-json'
-        `).all(...batch) as ImportedRichTextRow[]));
+        `).all(...batch) as unknown as ImportedRichTextRow[]));
     }
     if (rows.length === 0) return [];
 

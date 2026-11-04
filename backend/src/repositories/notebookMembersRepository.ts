@@ -195,7 +195,7 @@ export const notebookMembersRepository = {
       `UPDATE notebook_members SET status = 'removed', "updatedAt" = datetime('now')
        WHERE source = ? AND "sourceId" = ? AND status = 'active'`,
     ).run(source, sourceId);
-    return result.changes;
+    return result.changes as number;
   },
 
   restrictBySource(
@@ -209,7 +209,7 @@ export const notebookMembersRepository = {
            "allowDownload" = ?, "allowReshare" = ?, "updatedAt" = datetime('now')
        WHERE source = ? AND "sourceId" = ? AND status = 'active'`,
     ).run(input.role, input.allowDownload ? 1 : 0, input.allowReshare ? 1 : 0, source, sourceId);
-    return result.changes;
+    return result.changes as number;
   },
 
   async getRoleAsync(notebookId: string, userId: string): Promise<{ role: string } | undefined> {

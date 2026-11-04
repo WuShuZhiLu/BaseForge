@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getYjsStats } from "./yjs.js";
 
 // Counts are possible source-related copies, never a claim of physical erasure.
@@ -23,7 +23,7 @@ const referenceColumns = ["noteId", "note_id", "sourceNoteId", "targetNoteId", "
 const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
 
 /** Read-only snapshot: no envelope creation, deletion, index rebuild, or maintenance. */
-export function inspectEncryptedNoteConversion(db: Database.Database, noteId: string) {
+export function inspectEncryptedNoteConversion(db: DatabaseSync, noteId: string) {
   return db.transaction(() => {
     const note = db.prepare("SELECT id, version, contentFormat, contentText, workspaceId, isTrashed, isLocked FROM notes WHERE id = ?").get(noteId) as
       { id: string; version: number; contentFormat: string; contentText: string; workspaceId: string | null; isTrashed: number; isLocked: number } | undefined;

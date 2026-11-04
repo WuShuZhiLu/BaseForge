@@ -524,7 +524,7 @@ export default function DataManager() {
     setIsExporting(false);
   };
 
-  // Nowen 数据包导出
+  // BaseForge 数据包导出
   const handleExportNowenPackage = async () => {
     setIsExportingNowen(true);
     try {
@@ -1352,7 +1352,7 @@ export default function DataManager() {
               )}
             </button>
 
-            {/* Nowen 数据包导出 */}
+            {/* BaseForge 数据包导出 */}
             <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
               <div className="flex items-center gap-2 mb-2">
                 <Package size={16} className="text-violet-500" />
@@ -1980,7 +1980,7 @@ export default function DataManager() {
                   </p>
                   <input
                     type="file"
-                    accept=".nowen.zip,.zip"
+                    accept=".zip,application/zip"
                     className="hidden"
                     id="nowen-package-import-input"
                     onChange={async (e) => {
@@ -1990,7 +1990,7 @@ export default function DataManager() {
 
                       try {
                         toast.info(t('note.nowenPackageImportDryRun'));
-                        const dryResult = await api.dryRunNowenPackage(file);
+                        const dryResult = await api.dryRunNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
 
                         if (!dryResult.success) {
                           toast.error(dryResult.errors?.[0] || t('note.nowenPackageImportFailed'));
@@ -2010,7 +2010,7 @@ export default function DataManager() {
                         if (!ok) return;
 
                         toast.info(t('note.nowenPackageImportDryRun'));
-                        const result = await api.importNowenPackage(file);
+                        const result = await api.importNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
 
                         if (result.success) {
                           const counts = result.counts;

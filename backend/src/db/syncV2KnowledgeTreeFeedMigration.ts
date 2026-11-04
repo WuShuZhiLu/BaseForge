@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 import { installSyncChangesV2Triggers } from "./syncChangesV2Migration.js";
 import { installSyncPersonalEntitiesTriggers } from "./syncPersonalEntitiesMigration.js";
 
-export function installKnowledgeTreeFeedTriggers(db: Database.Database): void {
+export function installKnowledgeTreeFeedTriggers(db: DatabaseSync): void {
   const changed = `
     OLD.parentId IS NOT NEW.parentId OR OLD.sortOrder IS NOT NEW.sortOrder
     OR OLD.isDeleted IS NOT NEW.isDeleted OR OLD.deletedAt IS NOT NEW.deletedAt

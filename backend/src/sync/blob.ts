@@ -14,7 +14,7 @@
 //   否则会产生一个无人引用的孤儿文件。因此上传器只处理 metadata 已 synced 的条目。
 
 import crypto from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { SYNC_V2_BLOB_PATH } from "./constants";
 import { parseSyncScopeKey } from "./scope";
@@ -215,7 +215,7 @@ interface AttachmentMetaRow {
   workspaceId: string | null;
 }
 
-function loadMeta(db: Database.Database, attachmentId: string): AttachmentMetaRow | undefined {
+function loadMeta(db: DatabaseSync, attachmentId: string): AttachmentMetaRow | undefined {
   return db.prepare(`
     SELECT a.id, a.path, a.mimeType, a.filename, a.hash, a.size, n.workspaceId
       FROM attachments a JOIN notes n ON n.id = a.noteId WHERE a.id = ?
@@ -229,7 +229,7 @@ function loadMeta(db: Database.Database, attachmentId: string): AttachmentMetaRo
  * 同步不成功和"用户不再需要这个文件"是两件完全不同的事。
  */
 export async function pushAttachmentBlobs(
-  db: Database.Database,
+  db: DatabaseSync,
   client: SyncBlobClient,
   options: { batchSize?: number; concurrency?: number; scopeKey?: string } = {},
 ): Promise<BlobTransferResult> {
@@ -299,7 +299,7 @@ export async function pushAttachmentBlobs(
  * 下载完成才置 remoteOnly=0 —— 在此之前 UI 应显示"正在获取"而不是破图。
  */
 export async function pullAttachmentBlobs(
-  db: Database.Database,
+  db: DatabaseSync,
   client: SyncBlobClient,
   options: { batchSize?: number; concurrency?: number; scopeKey?: string } = {},
 ): Promise<BlobTransferResult> {

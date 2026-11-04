@@ -613,7 +613,7 @@ export function markdownToPlainText(md: string): string {
   text = text.replace(/`([^`]+)`/g, "$1");
   // 图片
   text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
-  // Nowen 内部链接 / 块嵌入：别名保留，自动标题保留稳定 ID 的可读占位。
+  // BaseForge 内部链接 / 块嵌入：别名保留，自动标题保留稳定 ID 的可读占位。
   text = text.replace(/!?\[\[note:[0-9a-f-]{36}(?:#blk:[A-Za-z0-9_-]+)?(?:\|([^\]]+))?\]\]/gi, (_match, alias) => alias || "关联笔记");
   // 原生思维导图引用是结构元数据，不把 UUID 暴露到全文摘要。
   text = text.replace(/!\[\[mindmap:[0-9a-f-]{36}\]\]/gi, "思维导图");
@@ -1376,7 +1376,7 @@ function restoreMarkdownBlockIdPlaceholders(html: string, ids: string[]): string
 export function markdownToHtml(md: string): string {
   if (!md) return "";
   try {
-    // 第 -1 步：把 Nowen 内部链接/块嵌入转换成可由 Tiptap schema 识别的 HTML。
+    // 第 -1 步：把 BaseForge 内部链接/块嵌入转换成可由 Tiptap schema 识别的 HTML。
     const afterNoteLinks = preprocessInternalNoteLinks(md);
     // 第 0 步：把 ^blk_xxx 换成不会被 Markdown parser 吞掉的占位文本。
     const { text: afterBlockIds, ids: blockIds } = extractMarkdownBlockIdPlaceholders(afterNoteLinks);

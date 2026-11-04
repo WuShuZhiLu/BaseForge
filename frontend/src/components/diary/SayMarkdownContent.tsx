@@ -29,7 +29,7 @@ export default function SayMarkdownContent({ content, className }: SayMarkdownCo
         prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5
         prose-code:text-xs prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:bg-black/5 dark:prose-code:bg-white/10 prose-code:before:content-none prose-code:after:content-none
         prose-pre:my-1.5 prose-pre:rounded-lg prose-pre:bg-black/5 dark:prose-pre:bg-white/5 prose-pre:p-2 prose-pre:text-xs
-        prose-blockquote:my-1.5 prose-blockquote:border-violet-400 prose-blockquote:text-tx-secondary prose-blockquote:pl-3
+        prose-blockquote:my-1.5 prose-blockquote:border-app-border prose-blockquote:text-tx-secondary prose-blockquote:pl-3
         prose-hr:my-2
         prose-a:text-accent-primary prose-a:no-underline hover:prose-a:underline
         prose-strong:text-tx-primary`

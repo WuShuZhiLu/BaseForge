@@ -1,4 +1,4 @@
-import React, { forwardRef, lazy, Suspense, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { forwardRef, lazy, Suspense, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Keyboard } from "@capacitor/keyboard";
 import { sanitizeForPaste } from "@/lib/sanitizeHtml";
@@ -140,6 +140,7 @@ import type { NoteEditorHandle, NoteEditorHeading, NoteEditorProps } from "@/com
 import type { FormatMenuPayload } from "@/lib/desktopBridge";
 import { openDesktopAttachmentWithSystem, sendFormatState } from "@/lib/desktopBridge";
 import { SlashCommandsMenu, getDefaultSlashCommands, createSlashExtension, createSlashEventHandlers } from "@/components/SlashCommands";
+import { pluginEditorCommandsRevision, subscribePluginEditorCommands } from "@/lib/pluginEditorCommands";
 import { getSlashEditorId } from "@/components/extensions/SlashCommandExtension";
 import { NoteLinkMenu, type NoteSearchResult, type NoteLinkBlockItem, type NoteLinkSelectionOptions } from "@/components/NoteLinkExtension";
 import { NoteLinkHoverPreview } from "@/components/NoteLinkPreview";
@@ -1758,6 +1759,9 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   const wordStatsDisplayRef = useRef<WordStatsHandle>(null);
   const [activeListType, setActiveListType] = useState<ActiveListType>(null);
   const activeListTypeRef = useRef<ActiveListType>(null);
+  // 插件 editorCommands 注册表变化（插件启用/停用）时强制重渲染，
+  // 让斜杠菜单即时反映新增或已注销的插件命令。
+  useSyncExternalStore(subscribePluginEditorCommands, pluginEditorCommandsRevision);
   const [formatPainterArmed, setFormatPainterArmed] = useState(false);
   const formatPainterRef = useRef<CapturedTextFormat | null>(null);
   const formatPainterSourceRef = useRef<{ from: number; to: number; noteId: string } | null>(null);
@@ -7223,7 +7227,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       {/* 斜杠命令菜单 */}
       <SlashCommandsMenu
         editor={editor}
-        items={getDefaultSlashCommands(t, handleImageUpload, openAIAssistant, openAttachmentLibrary, editable && !isGuest && !note.isTrashed ? openVoiceRecorder : undefined)}
+        items={getDefaultSlashCommands(t, handleImageUpload, openAIAssistant, openAttachmentLibrary, editable && !isGuest && !note.isTrashed ? openVoiceRecorder : undefined, note.id)}
       />
 
       <AttachmentLibraryPicker

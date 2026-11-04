@@ -117,7 +117,7 @@ export function createFavoritesRepository(
     deleteByNoteId(noteId: string): number {
       const db = getDb();
       const result = db.prepare('DELETE FROM favorites WHERE "noteId" = ?').run(noteId);
-      return result.changes;
+      return result.changes as number;
     },
 
     /**
@@ -126,7 +126,7 @@ export function createFavoritesRepository(
     deleteByUserId(userId: string): number {
       const db = getDb();
       const result = db.prepare('DELETE FROM favorites WHERE "userId" = ?').run(userId);
-      return result.changes;
+      return result.changes as number;
     },
 
     // ---- Async 方法（支持 adapter 注入） ----

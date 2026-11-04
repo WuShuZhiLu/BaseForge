@@ -27,12 +27,18 @@ export function PluginRuntimePolicySettings({ onPolicyChange }: { onPolicyChange
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
-  return <div className="rounded-xl border p-3 dark:border-zinc-800">
-    <label className="flex items-center justify-between gap-3 text-sm font-medium">
+  return <div className="rounded-[10px] border border-app-border bg-app-bg p-3">
+    <label className="flex items-center justify-between gap-3 text-[11.5px] font-medium text-tx-primary">
       {t("plugins.runtimePolicy.title")}
-      <input type="checkbox" checked={allowed === true} disabled={allowed === null || busy} onChange={(event) => void change(event.target.checked)} />
+      <input
+        type="checkbox"
+        checked={allowed === true}
+        disabled={allowed === null || busy}
+        onChange={(event) => void change(event.target.checked)}
+        className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent-primary disabled:cursor-default disabled:opacity-50"
+      />
     </label>
-    <p className="mt-1 text-xs text-zinc-500">{t("plugins.runtimePolicy.description")}</p>
-    {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+    <p className="mt-1 text-[11px] leading-relaxed text-tx-tertiary">{t("plugins.runtimePolicy.description")}</p>
+    {error && <p role="alert" className="mt-2 text-[11px] text-red-600">{error}</p>}
   </div>;
 }

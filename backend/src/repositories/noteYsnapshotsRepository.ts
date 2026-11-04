@@ -14,6 +14,15 @@ function getAdapter() {
   return new SqliteAdapter(getDb());
 }
 
+/**
+ * better-sqlite3 把 BLOB 读成 Buffer，node:sqlite 读成 Uint8Array。
+ * 本仓库对外承诺 Buffer（调用方可能直接调 .toString("base64") 等 Buffer 方法），
+ * 因此在读取边界统一收敛，避免把驱动类型泄漏给上层。
+ */
+function toSnapshotBuffer(value: Uint8Array): Buffer {
+  return Buffer.isBuffer(value) ? value : Buffer.from(value);
+}
+
 export const noteYsnapshotsRepository = {
   /**
    * 获取笔记的 Y.js 快照。
@@ -23,9 +32,10 @@ export const noteYsnapshotsRepository = {
    */
   getByNoteId(noteId: string): { snapshot_blob: Buffer; updatesMergedTo: number } | undefined {
     const db = getDb();
-    return db
+    const row = db
       .prepare("SELECT snapshot_blob, updatesMergedTo FROM note_ysnapshots WHERE noteId = ?")
-      .get(noteId) as { snapshot_blob: Buffer; updatesMergedTo: number } | undefined;
+      .get(noteId) as { snapshot_blob: Uint8Array; updatesMergedTo: number } | undefined;
+    return row ? { ...row, snapshot_blob: toSnapshotBuffer(row.snapshot_blob) } : undefined;
   },
 
   /**
@@ -71,10 +81,11 @@ export const noteYsnapshotsRepository = {
   },
 
   async getByNoteIdAsync(noteId: string): Promise<{ snapshot_blob: Buffer; updatesMergedTo: number } | undefined> {
-    return getAdapter().queryOne<{ snapshot_blob: Buffer; updatesMergedTo: number }>(
+    const row = await getAdapter().queryOne<{ snapshot_blob: Uint8Array; updatesMergedTo: number }>(
       "SELECT snapshot_blob, updatesMergedTo FROM note_ysnapshots WHERE noteId = ?",
       [noteId],
     );
+    return row ? { ...row, snapshot_blob: toSnapshotBuffer(row.snapshot_blob) } : undefined;
   },
 
   async getUpdatesMergedToAsync(noteId: string): Promise<{ updatesMergedTo: number } | undefined> {

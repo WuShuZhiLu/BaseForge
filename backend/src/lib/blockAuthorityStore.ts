@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { v4 as uuid } from "uuid";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { syncNoteBlocks } from "./noteBlocks.js";
 
 interface IndexedBlockRow {
@@ -97,9 +97,9 @@ export function hashBlockAuthorityContent(content: string): string {
  * GET /api/notes/:id 都会白付一次。用 WeakSet 按连接记忆，连接被回收时自动
  * 释放；换新连接（重连、测试重建库）会重新建表，不影响正确性。
  */
-const schemaReadyConnections = new WeakSet<Database.Database>();
+const schemaReadyConnections = new WeakSet<DatabaseSync>();
 
-export function ensureBlockAuthorityTables(db: Database.Database): void {
+export function ensureBlockAuthorityTables(db: DatabaseSync): void {
   if (schemaReadyConnections.has(db)) return;
   db.exec(`
     CREATE TABLE IF NOT EXISTS note_block_documents (
@@ -176,12 +176,12 @@ export function ensureBlockAuthorityTables(db: Database.Database): void {
   schemaReadyConnections.add(db);
 }
 
-function readIndexedBlocks(db: Database.Database, noteId: string): IndexedBlockRow[] {
+function readIndexedBlocks(db: DatabaseSync, noteId: string): IndexedBlockRow[] {
   return db.prepare(`
     SELECT blockId, blockType, parentBlockId, blockOrder, plainText, contentHash,
            path, startOffset, endOffset
     FROM note_blocks_index WHERE noteId = ? ORDER BY blockOrder
-  `).all(noteId) as IndexedBlockRow[];
+  `).all(noteId) as unknown as IndexedBlockRow[];
 }
 
 /**
@@ -317,7 +317,7 @@ function structureSignature(rows: IndexedBlockRow[]): string {
   }))));
 }
 
-function readPreviousStructureSignature(db: Database.Database, noteId: string): string | null {
+function readPreviousStructureSignature(db: DatabaseSync, noteId: string): string | null {
   const rows = db.prepare(`
     SELECT blockId, parentBlockId, blockOrder, path
     FROM note_block_records WHERE noteId = ? ORDER BY blockOrder
@@ -333,11 +333,11 @@ function attachmentIdsFromPayload(payload: string): string[] {
   return [...ids];
 }
 
-function readStoredBlockRecords(db: Database.Database, noteId: string): StoredBlockRecord[] {
+function readStoredBlockRecords(db: DatabaseSync, noteId: string): StoredBlockRecord[] {
   return db.prepare(`
     SELECT blockId, parentBlockId, blockType, blockOrder, path, payload, payloadHash
     FROM note_block_records WHERE noteId = ? ORDER BY blockOrder
-  `).all(noteId) as StoredBlockRecord[];
+  `).all(noteId) as unknown as StoredBlockRecord[];
 }
 
 function parseRootOrder(rootOrderJson: string): string[] {
@@ -466,7 +466,7 @@ function materializeStoredRecords(
   return materializeTiptapRecords(records, rootOrder, byId);
 }
 
-export function materializeBlockAuthorityContent(db: Database.Database, noteId: string): string {
+export function materializeBlockAuthorityContent(db: DatabaseSync, noteId: string): string {
   ensureBlockAuthorityTables(db);
   const document = db.prepare(`
     SELECT contentFormat, rootOrderJson FROM note_block_documents WHERE noteId = ?
@@ -476,7 +476,7 @@ export function materializeBlockAuthorityContent(db: Database.Database, noteId: 
 }
 
 export function rebuildBlockAuthorityStore(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   content: string,
   contentFormat: string,
@@ -489,7 +489,7 @@ export function rebuildBlockAuthorityStore(
   `).get(noteId) as { blockVersion: number; structureVersion: number } | undefined;
   const previousRecords = new Map((db.prepare(`
     SELECT blockId, version, payloadHash FROM note_block_records WHERE noteId = ?
-  `).all(noteId) as PreviousRecord[]).map((row) => [row.blockId, row]));
+  `).all(noteId) as unknown as PreviousRecord[]).map((row) => [row.blockId, row]));
   const previousStructure = readPreviousStructureSignature(db, noteId);
   const nextStructure = structureSignature(rows);
   const materialized = buildIndexedPayloads(content, contentFormat, rows);
@@ -572,7 +572,7 @@ export function rebuildBlockAuthorityStore(
 
 /** 按新到旧读取 Block 写入历史；任一损坏 JSON 都拒绝返回部分历史。 */
 export function readBlockAuthorityHistory(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   options: { limit?: number; offset?: number } = {},
 ): BlockAuthorityHistoryPage {
@@ -637,7 +637,7 @@ export function readBlockAuthorityHistory(
  * 缓存命中期内无法发现（换连接或键变化后仍会被立刻检出）。正常写入都经由
  * rebuildBlockAuthorityStore，因此不影响真实场景。
  */
-const healthyVerdictCache = new WeakMap<Database.Database, Map<string, string>>();
+const healthyVerdictCache = new WeakMap<DatabaseSync, Map<string, string>>();
 const MAX_HEALTHY_VERDICT_ENTRIES = 256;
 
 function healthyVerdictKey(row: StoredBlockDocument, notesContentHash: string): string {
@@ -645,14 +645,14 @@ function healthyVerdictKey(row: StoredBlockDocument, notesContentHash: string): 
 }
 
 function readCachedHealthyVerdict(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   key: string,
 ): boolean {
   return healthyVerdictCache.get(db)?.get(noteId) === key;
 }
 
-function rememberHealthyVerdict(db: Database.Database, noteId: string, key: string): void {
+function rememberHealthyVerdict(db: DatabaseSync, noteId: string, key: string): void {
   let perConnection = healthyVerdictCache.get(db);
   if (!perConnection) {
     perConnection = new Map();
@@ -668,7 +668,7 @@ function rememberHealthyVerdict(db: Database.Database, noteId: string, key: stri
 }
 
 export function readAuthoritativeNoteContent(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   notesContent: string,
 ): { content: string; source: "blocks" | "notes"; status: "healthy" | "missing" | "mismatch" } {
@@ -735,7 +735,7 @@ export function readAuthoritativeNoteContent(
 }
 
 export function assertBlockAuthorityVersions(
-  db: Database.Database,
+  db: DatabaseSync,
   noteId: string,
   expected: ExpectedBlockAuthorityVersions,
 ): BlockAuthorityDocumentState | null {
@@ -772,7 +772,7 @@ export function assertBlockAuthorityVersions(
 }
 
 export function backfillBlockAuthorityStore(
-  db: Database.Database,
+  db: DatabaseSync,
   options: { limit?: number; afterId?: string } = {},
 ): { scanned: number; rebuilt: number; failed: Array<{ noteId: string; error: string }>; nextCursor: string | null } {
   ensureBlockAuthorityTables(db);
@@ -817,7 +817,7 @@ export function backfillBlockAuthorityStore(
   };
 }
 
-export function markBlockAuthorityMismatch(db: Database.Database, noteId: string, reason: string): void {
+export function markBlockAuthorityMismatch(db: DatabaseSync, noteId: string, reason: string): void {
   ensureBlockAuthorityTables(db);
   db.prepare(`
     UPDATE note_block_documents SET status = 'mismatch', mismatchReason = ?, updatedAt = datetime('now')

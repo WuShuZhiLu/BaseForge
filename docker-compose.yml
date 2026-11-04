@@ -1,34 +1,35 @@
 services:
-  nowen-note:
-    image: cropflre/nowen-note:${NOWEN_IMAGE_TAG:-latest}
-    container_name: nowen-note
+  baseforge:
+    # 镜像仓库仍沿用上游发布地址（承认来源）；部署名/容器名/卷/网络/环境变量已全部 BaseForge 化
+    image: cropflre/nowen-note:${BASEFORGE_IMAGE_TAG:-latest}
+    container_name: baseforge
     restart: unless-stopped
     ports:
-      - "${NOWEN_PORT:-3001}:3001"
+      - "${BASEFORGE_PORT:-3001}:3001"
     volumes:
-      - nowen-note-data:/app/data
+      - baseforge-data:/app/data
       # 推荐把备份放到独立物理卷，并同时设置 BACKUP_DIR=/app/backups
-      # - /path/on/another-disk/nowen-backups:/app/backups
+      # - /path/on/another-disk/baseforge-backups:/app/backups
     env_file:
       - path: .env
         required: false
     environment:
       - NODE_ENV=production
-      - DB_PATH=/app/data/nowen-note.db
+      - DB_PATH=/app/data/baseforge.db
       - PORT=3001
       - TZ=${TZ:-Asia/Shanghai}
       - PUBLIC_WEB_ORIGIN=${PUBLIC_WEB_ORIGIN:-}
-      - NOWEN_DEPLOYMENT_TYPE=docker-compose-managed
-      - NOWEN_IMAGE_TAG=${NOWEN_IMAGE_TAG:-latest}
-      - NOWEN_UPDATER_URL=http://nowen-note-updater:3002
-      - NOWEN_UPDATER_TOKEN=${NOWEN_UPDATER_TOKEN:-}
-      - NOWEN_UPDATER_INSTANCE=${NOWEN_INSTANCE_ID:-nowen-note}
+      - BASEFORGE_DEPLOYMENT_TYPE=docker-compose-managed
+      - BASEFORGE_IMAGE_TAG=${BASEFORGE_IMAGE_TAG:-latest}
+      - BASEFORGE_UPDATER_URL=http://baseforge-updater:3002
+      - BASEFORGE_UPDATER_TOKEN=${BASEFORGE_UPDATER_TOKEN:-}
+      - BASEFORGE_UPDATER_INSTANCE=${BASEFORGE_INSTANCE_ID:-baseforge}
     labels:
-      com.nowen-note.managed: "true"
-      com.nowen-note.role: "app"
-      com.nowen-note.project: "nowen-note"
-      com.nowen-note.instance: "${NOWEN_INSTANCE_ID:-nowen-note}"
-      com.nowen-note.image-repository: "cropflre/nowen-note"
+      com.baseforge.managed: "true"
+      com.baseforge.role: "app"
+      com.baseforge.project: "baseforge"
+      com.baseforge.instance: "${BASEFORGE_INSTANCE_ID:-baseforge}"
+      com.baseforge.image-repository: "cropflre/nowen-note"
     healthcheck:
       test:
         - CMD
@@ -40,33 +41,33 @@ services:
       retries: 12
       start_period: 30s
     networks:
-      - nowen-network
-      - nowen-update-internal
+      - baseforge-network
+      - baseforge-update-internal
 
   # 默认关闭：只有显式传入 --profile updater 才会启动。
   # 该容器是唯一挂载 Docker Socket 的进程；主应用永远不挂载 Socket。
-  nowen-note-updater:
-    image: cropflre/nowen-note:${NOWEN_IMAGE_TAG:-latest}
-    container_name: nowen-note-updater
+  baseforge-updater:
+    image: cropflre/nowen-note:${BASEFORGE_IMAGE_TAG:-latest}
+    container_name: baseforge-updater
     profiles: ["updater"]
     restart: unless-stopped
     depends_on:
-      nowen-note:
+      baseforge:
         condition: service_healthy
     entrypoint: ["/sbin/tini", "--"]
     command: ["node", "backend/dist/updater/index.js"]
     environment:
       - NODE_ENV=production
-      - NOWEN_UPDATER_PORT=3002
-      - NOWEN_UPDATER_TOKEN=${NOWEN_UPDATER_TOKEN:-}
-      - NOWEN_UPDATER_INSTANCE=${NOWEN_INSTANCE_ID:-nowen-note}
-      - NOWEN_UPDATER_CONTAINER_NAME=nowen-note
-      - NOWEN_UPDATER_ALLOWED_IMAGE=cropflre/nowen-note
-      - NOWEN_UPDATER_TARGET_URL=http://nowen-note:3001
-      - NOWEN_UPDATER_STATE_DIR=/var/lib/nowen-updater
+      - BASEFORGE_UPDATER_PORT=3002
+      - BASEFORGE_UPDATER_TOKEN=${BASEFORGE_UPDATER_TOKEN:-}
+      - BASEFORGE_UPDATER_INSTANCE=${BASEFORGE_INSTANCE_ID:-baseforge}
+      - BASEFORGE_UPDATER_CONTAINER_NAME=baseforge
+      - BASEFORGE_UPDATER_ALLOWED_IMAGE=cropflre/nowen-note
+      - BASEFORGE_UPDATER_TARGET_URL=http://baseforge:3001
+      - BASEFORGE_UPDATER_STATE_DIR=/var/lib/baseforge-updater
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - nowen-updater-state:/var/lib/nowen-updater
+      - baseforge-updater-state:/var/lib/baseforge-updater
     read_only: true
     tmpfs:
       - /tmp:size=64m,noexec,nosuid,nodev
@@ -85,15 +86,15 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - nowen-update-internal
+      - baseforge-update-internal
 
 volumes:
-  nowen-note-data:
+  baseforge-data:
     driver: local
-  nowen-updater-state:
+  baseforge-updater-state:
     driver: local
 
 networks:
-  nowen-network:
-  nowen-update-internal:
+  baseforge-network:
+  baseforge-update-internal:
     internal: true

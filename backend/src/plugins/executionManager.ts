@@ -12,7 +12,7 @@ import type { HostApiBroker } from "./hostApiBroker.js";
 import { pluginManifestActions, type PluginExecutionContext, type PluginExecutionResult, type PluginManifest, type PluginRegistryRecord } from "./types.js";
 
 const EXPECTED_HOST_FAILURE_CODES = new Set([
-  "RESOURCE_FORBIDDEN", "PLUGIN_PERMISSION_DENIED",
+  "RESOURCE_FORBIDDEN", "PLUGIN_PERMISSION_DENIED", "PLUGIN_RATE_LIMITED",
   "CAPTURE_URL_DENIED", "CAPTURE_FETCH_FAILED", "CAPTURE_TOO_LARGE", "CAPTURE_EXTRACTION_FAILED",
 ]);
 const executionSlots = {
@@ -58,10 +58,10 @@ export class PluginExecutionManager {
   private recoverInterruptedExecutions(): void {
     const finishedAt = new Date().toISOString();
     getDb().prepare(`UPDATE plugin_executions
-      SET status='failed',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='Nowen 重启，排队任务未执行'
+      SET status='failed',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='BaseForge 重启，排队任务未执行'
       WHERE status='queued'`).run(finishedAt);
     getDb().prepare(`UPDATE plugin_executions
-      SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='Nowen 重启，运行中的任务已中断'
+      SET status='interrupted',finishedAt=?,errorCode='HOST_RESTARTED',errorMessage='BaseForge 重启，运行中的任务已中断'
       WHERE status='running'`).run(finishedAt);
   }
 

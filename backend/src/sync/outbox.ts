@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { SYNC_PERSONAL_SCOPE_KEY, SYNC_TABLES } from "./constants";
 import { isOutboxSuppressed } from "./context";
 import type {
@@ -53,7 +53,7 @@ export interface EnqueueMutationInput {
  * 不应回流到 Outbox（否则形成 Pull → Apply → Push 无限循环）。
  */
 export function enqueueMutation(
-  db: Database.Database,
+  db: DatabaseSync,
   input: EnqueueMutationInput,
 ): string | null {
   // 防回环：远端变更不产生新的本地 mutation。
@@ -105,7 +105,7 @@ export function enqueueMutation(
  * better-sqlite3 的 transaction 在回调抛出时自动回滚。
  */
 export function withMutation<T>(
-  db: Database.Database,
+  db: DatabaseSync,
   input: EnqueueMutationInput,
   write: () => T,
 ): T {
@@ -128,7 +128,7 @@ export function withMutation<T>(
  * 历史操作在开启同步后全部 replay —— 那不是正确模型（见 v88 迁移说明）。
  */
 export function listPendingMutations(
-  db: Database.Database,
+  db: DatabaseSync,
   limit: number,
   profileId?: string | null,
   scopeKey?: string,
@@ -143,7 +143,7 @@ export function listPendingMutations(
         ${treeFilter}
       ORDER BY createdAt ASC, rowid ASC
       LIMIT ?
-    `).all(limit) as SyncOutboxRow[];
+    `).all(limit) as unknown as SyncOutboxRow[];
   }
 
   if (scopeKey) {
@@ -154,7 +154,7 @@ export function listPendingMutations(
         ${treeFilter}
       ORDER BY createdAt ASC, rowid ASC
       LIMIT ?
-    `).all(profileId, scopeKey, limit) as SyncOutboxRow[];
+    `).all(profileId, scopeKey, limit) as unknown as SyncOutboxRow[];
   }
 
   return db.prepare(`
@@ -164,12 +164,12 @@ export function listPendingMutations(
       ${treeFilter}
     ORDER BY createdAt ASC, rowid ASC
     LIMIT ?
-  `).all(profileId, limit) as SyncOutboxRow[];
+  `).all(profileId, limit) as unknown as SyncOutboxRow[];
 }
 
 /** 统计待同步条目，供设置页诊断信息展示。 */
 export function countPendingMutations(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId?: string,
   scopeKey?: string,
 ): number {
@@ -186,7 +186,7 @@ export function countPendingMutations(
 }
 
 /** 推送成功后移除条目。这是**唯一**允许删除 Outbox 条目的路径。 */
-export function markMutationSynced(db: Database.Database, mutationId: string): void {
+export function markMutationSynced(db: DatabaseSync, mutationId: string): void {
   db.prepare(`DELETE FROM ${SYNC_TABLES.outbox} WHERE mutationId = ?`).run(mutationId);
 }
 
@@ -198,7 +198,7 @@ export function markMutationSynced(db: Database.Database, mutationId: string): v
  * 超过档位后固定在最大间隔，相当于"降频但不放弃"。
  */
 export function markMutationFailed(
-  db: Database.Database,
+  db: DatabaseSync,
   mutationId: string,
   errorCode: string,
 ): void {
@@ -219,17 +219,17 @@ export function markMutationFailed(
  * 之后再也不会被取出。启动时必须无条件复位。
  * 重复推送是安全的——服务端按 mutationId 幂等。
  */
-export function recoverInflightMutations(db: Database.Database): number {
+export function recoverInflightMutations(db: DatabaseSync): number {
   const result = db.prepare(`
     UPDATE ${SYNC_TABLES.outbox}
     SET status = 'pending'
     WHERE status = 'inflight'
   `).run();
-  return result.changes;
+  return result.changes as number;
 }
 
 /** 标记为正在推送，避免并发 Push 重复取到同一条目。 */
-export function markMutationInflight(db: Database.Database, mutationId: string): void {
+export function markMutationInflight(db: DatabaseSync, mutationId: string): void {
   db.prepare(`
     UPDATE ${SYNC_TABLES.outbox}
     SET status = 'inflight', lastAttemptAt = datetime('now')

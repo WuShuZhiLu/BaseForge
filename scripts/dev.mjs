@@ -1,6 +1,6 @@
 import path from "node:path"
 import process from "node:process"
-import { spawn } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { forceReleasePorts } from "./dev-port-manager.mjs"
@@ -49,17 +49,65 @@ try {
   process.exit(1)
 }
 
-const electronCli = path.join(rootDir, "node_modules", "electron", "cli.js")
+// 开发环境只用系统 node 22 跑前后端，不依赖 Electron（迁移/测试也走同一运行时）。
 const tsxCli = path.join(backendDir, "node_modules", "tsx", "dist", "cli.mjs")
 const backendEntry = path.join(backendDir, "src", "index.hardened.ts")
 const viteCli = path.join(frontendDir, "node_modules", "vite", "bin", "vite.js")
 const viteDevConfig = path.join(frontendDir, "vite.dev.config.ts")
 
-assertFile(electronCli, "npm install")
 assertFile(tsxCli, "npm run install:all")
 assertFile(viteCli, "npm run install:all")
 assertFile(backendEntry, "确认 backend/src/index.hardened.ts 是否存在")
 assertFile(viteDevConfig, "确认 frontend/vite.dev.config.ts 是否存在")
+
+// node 版本下限：22.5 起才有内置 node:sqlite（后续数据库层要从 better-sqlite3 迁过去）。
+// 低于这个版本直接叫停，避免后端跑到一半才因为缺 API 崩掉。
+const MIN_NODE = [22, 5, 0]
+{
+  const current = process.versions.node.split(".").map((part) => Number.parseInt(part, 10))
+  const tooOld =
+    current[0] < MIN_NODE[0] ||
+    (current[0] === MIN_NODE[0] && current[1] < MIN_NODE[1])
+  if (tooOld) {
+    console.error(
+      [
+        "",
+        `[dev] 当前 node ${process.version} 过低，本项目要求 >= v${MIN_NODE.join(".")}。`,
+        "      v22.5 起才有内置 node:sqlite（数据库层正在从 better-sqlite3 迁向它）。",
+        "      请切换到 node 22.5+ 后重跑：nvm use 22（或把 node 22 放到 PATH 前面）。",
+        "",
+      ].join("\n"),
+    )
+    process.exit(1)
+  }
+}
+
+// 原生模块 ABI 必须与运行时一致：better-sqlite3 是按 node 22（ABI 127）编译的，
+// 若用 node 24（ABI 137）启动会在后端启动瞬间 ERR_DLOPEN_FAILED，且报错埋在日志里很难辨认。
+// 这里先探一次，失败即给出可直接执行的修复命令。
+console.log("[dev] 检查原生模块与当前 node 的 ABI 是否匹配…")
+{
+  const probe = spawnSync(
+    process.execPath,
+    ["-e", "require('better-sqlite3')"],
+    { cwd: backendDir, encoding: "utf8" },
+  )
+  if (probe.status !== 0) {
+    console.error(
+      [
+        "",
+        `[dev] better-sqlite3 无法在当前 node 下加载（当前 ${process.version}，ABI ${process.versions.modules}）。`,
+        "      常见原因：PATH 里的 node 不是 22（比如系统装了 node 24），ABI 与已编译的原生模块不一致。",
+        "      任选其一修复：",
+        "        1) 用 node 22 启动：nvm use 22（或把 node 22 放到 PATH 前面）后重跑 npm run dev",
+        "        2) 固化到当前 node：",
+        `           cd backend/node_modules/better-sqlite3 && npx prebuild-install --runtime node --target ${process.versions.node} --arch ${process.arch} --platform ${process.platform}`,
+        "",
+      ].join("\n"),
+    )
+    process.exit(1)
+  }
+}
 
 console.log("\n[dev] 正在检查开发端口...")
 try {
@@ -149,12 +197,13 @@ process.once("SIGTERM", () => void shutdown(0))
 startProcess(
   "后端",
   process.execPath,
-  [electronCli, tsxCli, "watch", backendEntry],
+  // 直接用系统 node22 跑后端：sharp 在 Electron 内置 node（20.18）下会原生崩溃，
+  // node22 下正常；better-sqlite3 需处于 node ABI（npm run rebuild:node）。
+  [tsxCli, "watch", backendEntry],
   {
-    cwd: rootDir,
+    cwd: backendDir,
     env: {
       ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
       PORT: String(backendPort),
     },
   },

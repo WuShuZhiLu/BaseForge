@@ -249,7 +249,7 @@ function BatchCenterModal({
             {loadingList && !items.length ? (
               <div className="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500"><Loader2 size={17} className="animate-spin" />加载记录…</div>
             ) : items.length === 0 ? (
-              <div className="px-3 py-8 text-center text-sm text-zinc-500">暂无 Nowen 数据包导入记录</div>
+              <div className="px-3 py-8 text-center text-sm text-zinc-500">暂无 BaseForge 数据包导入记录</div>
             ) : items.map((item) => (
               <button
                 key={item.id}
@@ -281,7 +281,7 @@ function BatchCenterModal({
                     <span className="text-xs text-zinc-500">{formatDate(detail.completedAt || detail.createdAt)}</span>
                   </div>
                   <div className="mt-2 grid gap-1 text-xs text-zinc-500 sm:grid-cols-2">
-                    <p>数据包：{detail.packageKind === "markdown" ? "Markdown 往返包" : "Nowen 无损包"}</p>
+                    <p>数据包：{detail.packageKind === "markdown" ? "Markdown 往返包" : "BaseForge 无损包"}</p>
                     <p className="truncate" title={detail.sourceInstanceId || ""}>来源实例：{detail.sourceInstanceId || "未记录"}</p>
                     <p>目标空间：{detail.workspaceId || "个人空间"}</p>
                     <p>导出批次：{detail.sourceExportBatchId || "未记录"}</p>

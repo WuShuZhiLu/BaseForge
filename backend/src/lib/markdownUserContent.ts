@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 export interface MarkdownNoteForProjection {
   id: string;
@@ -124,7 +124,7 @@ export function stripLegacyInternalMarkdownMarkers(markdown: string): string {
 }
 
 export function projectMarkdownNoteForUser<T extends MarkdownNoteForProjection>(
-  db: Database.Database,
+  db: DatabaseSync,
   note: T,
 ): T {
   if (!note || note.contentFormat !== "markdown" || typeof note.content !== "string") return note;

@@ -1015,7 +1015,7 @@ function SessionsSection() {
   const formatUa = (ua: string) => {
     if (!ua) return t("securitySettings.sessions.unknownUa", { defaultValue: "来源未知" });
     // 桌面客户端特殊处理
-    if (/Nowen.*Desktop/i.test(ua)) {
+    if (/(BaseForge|Nowen).*Desktop/i.test(ua)) {
       const os = /Windows/.test(ua) ? "Windows"
         : /Mac OS/.test(ua) ? "macOS"
         : /Linux/.test(ua) ? "Linux"
@@ -1035,7 +1035,7 @@ function SessionsSection() {
       : /Firefox\//.test(ua) ? "Firefox"
       : /Safari\//.test(ua) ? "Safari"
       : "";
-    return [br, os].filter(Boolean).join(" · ") || ua.slice(0, 60);
+    return ([br, os].filter(Boolean).join(" · ") || ua.slice(0, 60)).replace(/nowen[-_ ]?note/gi, "BaseForge");
   };
 
   const others = sessions.filter((s) => !s.current);

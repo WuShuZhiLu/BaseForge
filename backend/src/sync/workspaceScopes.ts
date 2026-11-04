@@ -1,19 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { SYNC_PERSONAL_SCOPE_KEY } from "./constants";
 import type { SyncScopeDescriptor } from "./scope";
 import type { SyncWorkspaceScopeRow } from "./types";
 
-function tableExists(db: Database.Database, table: string): boolean {
+function tableExists(db: DatabaseSync, table: string): boolean {
   return Boolean(db.prepare(
     "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
   ).get(table));
 }
 
 export function listWorkspaceScopeStates(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): SyncWorkspaceScopeRow[] {
   if (!tableExists(db, "sync_workspace_scopes")) return [];
@@ -23,7 +23,7 @@ export function listWorkspaceScopeStates(
     FROM sync_workspace_scopes
     WHERE profileId = ?
     ORDER BY CASE WHEN scopeKey = 'personal' THEN 0 ELSE 1 END, workspaceName, scopeKey
-  `).all(profileId) as SyncWorkspaceScopeRow[];
+  `).all(profileId) as unknown as SyncWorkspaceScopeRow[];
 }
 
 /**
@@ -32,7 +32,7 @@ export function listWorkspaceScopeStates(
  * 本地业务数据、Outbox、Conflict 均保留。
  */
 export function refreshWorkspaceScopeStates(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   descriptors: SyncScopeDescriptor[],
   localUserId?: string,
@@ -115,7 +115,7 @@ export function refreshWorkspaceScopeStates(
 }
 
 export function markWorkspaceScopeRevoked(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string,
   localUserId?: string,
@@ -144,7 +144,7 @@ export function markWorkspaceScopeRevoked(
 }
 
 export function markWorkspaceScopeActive(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string,
   accessFingerprint: string,
@@ -162,7 +162,7 @@ export function markWorkspaceScopeActive(
 }
 
 export function buildWorkspaceScopeExport(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
 ): Record<string, unknown> {
   const rows = (table: string, sql: string, ...params: unknown[]) =>
@@ -194,7 +194,7 @@ export function buildWorkspaceScopeExport(
 }
 
 function insertDynamic(
-  db: Database.Database,
+  db: DatabaseSync,
   table: string,
   row: Record<string, unknown>,
   overrides: Record<string, unknown>,
@@ -213,7 +213,7 @@ function insertDynamic(
  * 新增行由现有 Outbox 触发器作为 Personal mutation 捕获。
  */
 export function copyWorkspaceScopeToPersonal(
-  db: Database.Database,
+  db: DatabaseSync,
   workspaceId: string,
   userId: string,
 ): { notebooks: number; notes: number; attachments: number; tasks: number } {

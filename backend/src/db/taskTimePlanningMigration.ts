@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
-export function ensureTaskTimePlanningSchema(db: Database.Database): void {
+export function ensureTaskTimePlanningSchema(db: DatabaseSync): void {
   const taskColumns = db.prepare("PRAGMA table_info(tasks)").all() as Array<{ name: string }>;
   if (!taskColumns.some((column) => column.name === "estimatedMinutes")) {
     db.prepare("ALTER TABLE tasks ADD COLUMN estimatedMinutes INTEGER").run();

@@ -266,7 +266,7 @@ function ConfigCard({
         <div className="space-y-4 border-t border-app-border bg-app-bg/40 p-4">
           <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs leading-5 text-amber-700 dark:text-amber-300">
             <div className="mb-1 flex items-center gap-2 font-medium"><ShieldAlert size={14} />单向同步与冲突保护</div>
-            本地文件夹是数据源。Nowen 不会反向修改本地文件；检测到同步笔记在 Nowen 内被编辑时，默认停止覆盖并在报告中标记冲突。
+            本地文件夹是数据源。BaseForge 不会反向修改本地文件；检测到同步笔记在 BaseForge 内被编辑时，默认停止覆盖并在报告中标记冲突。
           </div>
 
           <label className="block space-y-1.5">
@@ -285,19 +285,19 @@ function ConfigCard({
               </select>
             </label>
             <label className="block space-y-1.5">
-              <span className="text-xs font-medium text-tx-secondary">Nowen 编辑冲突</span>
+              <span className="text-xs font-medium text-tx-secondary">BaseForge 编辑冲突</span>
               <select value={preferences.conflictPolicy} onChange={(event) => setPreferences((current) => ({ ...current, conflictPolicy: event.target.value as FolderSyncPreferences["conflictPolicy"] }))} className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-tx-primary">
                 <option value="protect">停止覆盖并提示（推荐）</option>
-                <option value="copy">先保留 Nowen 副本，再用源文件更新</option>
+                <option value="copy">先保留 BaseForge 副本，再用源文件更新</option>
                 <option value="overwrite">始终由源文件覆盖</option>
-                <option value="detach">保留 Nowen 编辑，并停止跟踪该文件</option>
+                <option value="detach">保留 BaseForge 编辑，并停止跟踪该文件</option>
               </select>
             </label>
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-tx-secondary">源文件删除后</span>
               <select value={preferences.deletionPolicy} onChange={(event) => setPreferences((current) => ({ ...current, deletionPolicy: event.target.value as FolderSyncPreferences["deletionPolicy"] }))} className="w-full rounded-xl border border-app-border bg-app-surface px-3 py-2 text-sm text-tx-primary">
-                <option value="keep">保留 Nowen 笔记</option>
-                <option value="trash">移入 Nowen 回收站</option>
+                <option value="keep">保留 BaseForge 笔记</option>
+                <option value="trash">移入 BaseForge 回收站</option>
                 <option value="detach">保留内容并停止跟踪</option>
               </select>
             </label>
@@ -326,7 +326,7 @@ function ConfigCard({
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-tx-secondary">排除规则</span>
             <textarea value={excludeText} onChange={(event) => setExcludeText(event.target.value)} rows={4} placeholder={"每行一条，例如：\n**/draft/**\n*.tmp\nprivate-*"} className="w-full resize-y rounded-xl border border-app-border bg-app-surface px-3 py-2 font-mono text-xs text-tx-primary outline-none focus:ring-2 focus:ring-accent-primary/30" />
-            <span className="text-[10px] text-tx-tertiary">支持 *、**、?；也可在同步根目录创建 .nowenignore。最多 10 条自定义规则。选择“停止跟踪”后，发生冲突的精确路径会自动加入此列表。</span>
+            <span className="text-[10px] text-tx-tertiary">支持 *、**、?；也可在同步根目录创建 .baseforgeignore。最多 10 条自定义规则。选择“停止跟踪”后，发生冲突的精确路径会自动加入此列表。</span>
           </label>
 
           <button type="button" onClick={save} disabled={busy || !fileTypes.length} className="flex items-center gap-2 rounded-xl bg-accent-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -511,7 +511,7 @@ export default function FolderSyncSettings() {
   };
 
   const remove = async (folderId: string) => {
-    if (!await confirm({ title: "移除该同步文件夹？", description: "只删除本机同步配置和索引，不会删除本地文件，也不会自动删除已导入的 Nowen 笔记。", danger: true })) return;
+    if (!await confirm({ title: "移除该同步文件夹？", description: "只删除本机同步配置和索引，不会删除本地文件，也不会自动删除已导入的 BaseForge 笔记。", danger: true })) return;
     const bridge = getFolderSync();
     if (!bridge) return;
     setBusyKey(`remove:${folderId}`);

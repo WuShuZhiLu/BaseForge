@@ -25,7 +25,7 @@ import {
  *
  * 产品层只呈现两个选项：
  *   ● 不同步，仅此设备
- *   ○ 我的 Nowen Server
+ *   ○ 我的 BaseForge Server
  *
  * 刻意**不**暴露 Full / Lite / SQLite / Server Mode。这些是实现细节，
  * 让用户理解它们除了增加困惑没有任何好处——底层数据模式永远是 Local，
@@ -230,7 +230,7 @@ export function SyncSettingsPanel() {
           <span className="flex-1">
             <span className="flex items-center gap-2 text-sm font-medium">
               <Server className="h-4 w-4" />
-              我的 Nowen Server
+              我的 BaseForge Server
             </span>
             <span className="mt-1 block text-xs text-muted-foreground">
               依然优先保存到本机，随后在后台同步到你的服务器。断网时可继续编辑，恢复后自动补传。

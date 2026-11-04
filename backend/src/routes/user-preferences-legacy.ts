@@ -275,8 +275,8 @@ function profileConnectionFailure(error: unknown, profile: AIProfile): { code: s
   return {
     code: "AI_UPSTREAM_UNREACHABLE",
     error: isLMStudio
-      ? `Nowen Note 服务端无法连接 LM Studio（${host}）。请在 LM Studio 开启 Serve on Local Network，并放行防火墙 1234 端口；如果 Nowen Note 部署在另一台设备，不能填写 localhost。`
-      : `Nowen Note 服务端无法连接 AI 服务（${host}），请检查服务地址、监听网卡和防火墙。`,
+      ? `BaseForge 服务端无法连接 LM Studio（${host}）。请在 LM Studio 开启 Serve on Local Network，并放行防火墙 1234 端口；如果 BaseForge 部署在另一台设备，不能填写 localhost。`
+      : `BaseForge 服务端无法连接 AI 服务（${host}），请检查服务地址、监听网卡和防火墙。`,
   };
 }
 

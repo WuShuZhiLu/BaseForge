@@ -47,7 +47,7 @@ export const aiCustomPromptsRepository = {
          ORDER BY usageCount DESC, updatedAt DESC, createdAt DESC
          LIMIT 200`,
       )
-      .all(userId) as AiCustomPromptRecord[];
+      .all(userId) as unknown as AiCustomPromptRecord[];
   },
 
   /**

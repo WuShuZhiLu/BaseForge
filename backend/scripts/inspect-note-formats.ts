@@ -1,6 +1,6 @@
 /**
  * Read-only audit. From backend/:
- * npm run inspect:note-formats -- --db="D:\\path\\nowen-note.db" --limit=30
+ * npm run inspect:note-formats -- --db="D:\\path\\baseforge.db" --limit=30
  * No writes, no migrations, never prints note contents.
  */
 import fs from "node:fs";
@@ -15,7 +15,7 @@ const limit = limitArg === undefined ? 30 : Number(limitArg);
 if (!Number.isInteger(limit) || limit < 0 || limit > 500) {
   throw new Error("--limit must be an integer between 0 and 500");
 }
-const dbPath = path.resolve(dbArg || process.env.DB_PATH || path.join(process.cwd(), "data", "nowen-note.db"));
+const dbPath = path.resolve(dbArg || process.env.DB_PATH || path.join(process.cwd(), "data", "baseforge.db"));
 if (!fs.existsSync(dbPath)) throw new Error("Database file not found. Pass --db=<path>.");
 const db = new Database(dbPath, { readonly: true, fileMustExist: true });
 type Row = { id: string; content: string | null; version: number };

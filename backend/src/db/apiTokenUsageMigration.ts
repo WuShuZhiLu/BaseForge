@@ -1,9 +1,9 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const API_TOKEN_USAGE_SCHEMA_VERSION = 86;
 
-export function ensureApiTokenUsageSchema(db: Database.Database): void {
+export function ensureApiTokenUsageSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS api_tokens (
       id TEXT PRIMARY KEY,

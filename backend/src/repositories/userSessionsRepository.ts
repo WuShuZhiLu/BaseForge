@@ -192,7 +192,7 @@ export const userSessionsRepository = {
        SET "revokedAt" = datetime('now'), "revokedReason" = 'user_bulk_revoked'
        WHERE "userId" = ? AND "revokedAt" IS NULL AND id != ?`
     ).run(userId, currentSessionId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -208,7 +208,7 @@ export const userSessionsRepository = {
        SET "revokedAt" = datetime('now'), "revokedReason" = 'user_bulk_revoked'
        WHERE "userId" = ? AND "revokedAt" IS NULL`
     ).run(userId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -226,7 +226,7 @@ export const userSessionsRepository = {
          OR ("expiresAt" IS NOT NULL AND datetime("expiresAt") <= datetime('now'))
        )`
     ).run(userId);
-    return result.changes;
+    return result.changes as number;
   },
 
   /**
@@ -245,7 +245,7 @@ export const userSessionsRepository = {
            AND ("expiresAt" IS NULL OR datetime("expiresAt") > datetime('now'))
          ORDER BY "lastSeenAt" DESC`
       )
-      .all(userId) as SessionListItem[];
+      .all(userId) as unknown as SessionListItem[];
   },
 
   // ============================================================

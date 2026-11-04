@@ -30,6 +30,37 @@ const connectionSchema = z.object({
   description: z.string().max(500).optional(),
 }).strict();
 
+const EXTERNAL_HOST_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
+const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".localdomain", ".localhost", ".lan", ".home.arpa"];
+
+/**
+ * 外网白名单的静态校验：只接受精确域名（不含通配符、不含端口），拒绝 IP 字面量与内网域名。
+ * 运行时的 CIDR 拦截只能挡住"解析后落在内网"的情况，挡不住 manifest 里直接写
+ * 127.0.0.1 / localhost / *.internal 这类意图明显的声明，所以在安装校验阶段就拒掉。
+ * 运行期白名单是精确匹配（secureExternalFetch 会把含 * 的条目录视为非法配置并拒绝），
+ * 因此这里必须同步拒绝，避免"装得上、跑不通"。
+ */
+function validateExternalHost(value: string): string | null {
+  const host = value.trim().toLowerCase();
+  if (!host) return "域名不能为空";
+  if (host.includes("*")) return "不支持通配符，请逐个填写精确域名";
+  if (/^[\d.]+$/.test(host) || host.includes(":")) return "不能使用 IP 字面量，请填写域名";
+  if (host === "localhost" || BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return "不能使用内网/本机域名";
+  }
+  if (!EXTERNAL_HOST_PATTERN.test(host)) return "域名格式不合法（请填写类似 api.example.com 的精确域名）";
+  return null;
+}
+
+const permissionConfigSchema = z.object({
+  externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional(),
+}).strict().superRefine((config, ctx) => {
+  for (const [index, host] of (config.externalFetchHosts ?? []).entries()) {
+    const problem = validateExternalHost(host);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["externalFetchHosts", index], message: problem });
+  }
+});
+
 export const pluginManifestV1Schema = z.object({
   id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(150),
   name: z.string().min(1).max(100),
@@ -50,7 +81,7 @@ export const pluginManifestV1Schema = z.object({
   connections: z.array(connectionSchema).max(20).optional(),
   output: z.record(z.unknown()).optional(),
   permissions: z.array(z.enum(PLUGIN_PERMISSIONS)).max(32).default([]),
-  permissionConfig: z.object({ externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional() }).strict().optional(),
+  permissionConfig: permissionConfigSchema.optional(),
   actions: z.array(actionSchema).min(1).max(50),
   events: z.array(z.string().min(1).max(100)).max(50).optional(),
   eventHandlers: z.array(z.object({ event: z.string().min(1).max(100), action: z.string().min(1).max(64) }).strict()).max(50).optional(),
@@ -205,6 +236,40 @@ const sidebarPanelSchema = z.object({
   }
 });
 
+/**
+ * Editor Command 快捷键的静态校验：只接受 `修饰键-...-主按键` 的写法，
+ * 例如 Mod-Alt-K。要求至少含 Mod 或 Alt，避免占用普通输入/IME；
+ * 同时拒绝平台基础快捷键（复制粘贴等），因为宿主的捕获监听会先吃掉按键。
+ */
+export function validateKeybinding(value: string): string | null {
+  const tokens = value.split("-");
+  if (tokens.length < 2 || tokens.length > 4) return "快捷键必须包含 1-3 个修饰键与 1 个主按键，如 Mod-Alt-K";
+  const primary = tokens[tokens.length - 1];
+  if (!/^[A-Za-z0-9]$/.test(primary)) return "快捷键主按键只能是单个字母或数字";
+  const modifiers = tokens.slice(0, -1);
+  if (modifiers.some((modifier) => !["Mod", "Alt", "Shift"].includes(modifier))) return "快捷键修饰键只支持 Mod / Alt / Shift";
+  if (new Set(modifiers).size !== modifiers.length) return "快捷键修饰键不能重复";
+  if (!modifiers.includes("Mod") && !modifiers.includes("Alt")) return "快捷键必须包含 Mod 或 Alt";
+  if (modifiers.includes("Mod") && /^[acvxz]$/i.test(primary)) return "快捷键不能占用平台基础快捷键（复制/粘贴/剪切/全选/撤销）";
+  if (modifiers.includes("Mod") && /^[rwq]$/i.test(primary)) return "快捷键不能占用浏览器或系统保留快捷键";
+  return null;
+}
+
+const editorCommandSchema = z.object({
+  id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(200),
+  title: z.string().min(1).max(100),
+  keywords: z.array(z.string().min(1).max(50)).max(10).optional(),
+  keybinding: z.string().min(1).max(50).optional(),
+  when: z.enum(["editorFocused", "noteOpen"]).optional(),
+  /** 斜杠菜单分组名（缺省「插件」）；长度上限与契约 editorCommand.maxCategoryLength 一致 */
+  category: z.string().min(1).max(20).optional(),
+  action: z.string().min(1).max(64),
+}).strict().superRefine((command, ctx) => {
+  if (command.keybinding === undefined) return;
+  const problem = validateKeybinding(command.keybinding);
+  if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["keybinding"], message: problem });
+});
+
 const mainViewPanelSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
   title: z.string().min(1).max(100),
@@ -228,7 +293,7 @@ const v2BaseShape = {
   runtimePlatform: z.array(z.enum(["server", "desktop-full"])).min(1).max(2).optional(),
   uiPlatform: z.array(z.enum(["web", "desktop", "android", "ios"])).max(4).optional(),
   output: z.record(z.unknown()).optional(),
-  permissionConfig: z.object({ externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional() }).strict().optional(),
+  permissionConfig: permissionConfigSchema.optional(),
   extensionDependencies: z.record(z.string().min(1).max(100)).optional(),
 };
 
@@ -247,6 +312,7 @@ const executableContributesSchema = z.object({
   noteTemplates: z.array(noteTemplateSchema).max(100).optional(),
   promptPacks: z.array(promptPackSchema).max(100).optional(),
   uiComponents: z.array(uiComponentSchema).max(50).optional(),
+  editorCommands: z.array(editorCommandSchema).max(50).optional(),
   sidebarPanels: sidebarPanelsField,
   mainViewPanels: mainViewPanelsField,
 }).strict().optional();
@@ -316,6 +382,22 @@ export const pluginManifestV2Schema = z.union([executableV2Schema, declarativeV2
     if (new Set(hook.methods).size !== hook.methods.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "inboundWebhooks"], message: "Inbound Webhook methods 不能重复" });
   }
   for (const command of manifest.contributes?.commands || []) if (!actionIds.has(command.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "commands"], message: `Command Action 不存在: ${command.action}` });
+  const editorCommands = manifest.contributes?.editorCommands || [];
+  const editorCommandIds = new Set<string>();
+  const editorCommandKeybindings = new Set<string>();
+  for (const command of editorCommands) {
+    if (editorCommandIds.has(command.id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command id 不能重复: ${command.id}` });
+    editorCommandIds.add(command.id);
+    if (!command.id.startsWith(`${manifest.id}.`) || !/^[a-z][a-z0-9-]{0,63}$/.test(command.id.slice(manifest.id.length + 1))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command id 必须形如 ${manifest.id}.<动作>（插件 id 前缀 + 小写动作名）` });
+    }
+    if (!actionIds.has(command.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command Action 不存在: ${command.action}` });
+    if (command.keybinding) {
+      const normalized = command.keybinding.toLowerCase();
+      if (editorCommandKeybindings.has(normalized)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "editorCommands"], message: `Editor Command 快捷键不能重复: ${command.keybinding}` });
+      editorCommandKeybindings.add(normalized);
+    }
+  }
   const commandIds = new Set((manifest.contributes?.commands || []).map((command) => command.id));
   for (const menu of manifest.contributes?.menus || []) if (!commandIds.has(menu.command)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contributes", "menus"], message: `Menu Command 不存在: ${menu.command}` });
   for (const handler of manifest.eventHandlers || []) if (!actionIds.has(handler.action)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["eventHandlers"], message: `Event Handler Action 不存在: ${handler.action}` });
@@ -390,7 +472,7 @@ export function parsePluginManifest(value: unknown, options: ParsePluginManifest
     }
   }
   const currentVersion = options.currentVersion || NOWEN_VERSION;
-  if (!nowenVersionSatisfies(manifest.engines.nowen, currentVersion)) throw new Error(`插件要求 Nowen ${manifest.engines.nowen}，当前版本为 ${currentVersion}`);
+  if (!nowenVersionSatisfies(manifest.engines.nowen, currentVersion)) throw new Error(`插件要求 BaseForge ${manifest.engines.nowen}，当前版本为 ${currentVersion}`);
   return manifest;
 }
 

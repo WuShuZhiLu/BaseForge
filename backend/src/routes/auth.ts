@@ -348,7 +348,7 @@ auth.post("/desktop/reset-local", async (c) => {
     db.prepare(`
       INSERT INTO users (id, username, email, passwordHash, role, displayName)
       VALUES (?, ?, ?, ?, 'admin', ?)
-    `).run(userId, username, "desktop@nowen-note.local", passwordHash, "Local Desktop User");
+    `).run(userId, username, "desktop@baseforge.local", passwordHash, "Local Desktop User");
   }
 
   resetLoginFailure(db, userId);
@@ -365,7 +365,7 @@ auth.post("/desktop/reset-local", async (c) => {
   const sessionId = createSession({
     userId,
     ip: extractClientIp(c),
-    userAgent: c.req.header("user-agent") || "Nowen Desktop",
+    userAgent: c.req.header("user-agent") || "BaseForge Desktop",
   });
   const tokens = issueLoginTokens({
     userId,

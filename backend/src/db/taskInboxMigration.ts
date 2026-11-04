@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const TASK_INBOX_SOURCE_TYPES = [
@@ -11,7 +11,7 @@ export const TASK_INBOX_SOURCE_TYPES = [
   "other",
 ] as const;
 
-export function ensureTaskInboxSchema(db: Database.Database): void {
+export function ensureTaskInboxSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_inbox_items (
       taskId TEXT NOT NULL,

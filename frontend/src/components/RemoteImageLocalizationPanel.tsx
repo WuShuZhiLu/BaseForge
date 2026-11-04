@@ -271,8 +271,8 @@ export default function RemoteImageLocalizationPanel() {
               <p className="text-xs text-tx-tertiary">
                 {tr(
                   "remoteImageLocalization.subtitle",
-                  "将历史笔记中的网络图片保存为 Nowen 附件，失败时保留原链接",
-                  "Save remote images as Nowen attachments while preserving failed URLs",
+                  "将历史笔记中的网络图片保存为 BaseForge 附件，失败时保留原链接",
+                  "Save remote images as BaseForge attachments while preserving failed URLs",
                 )}
               </p>
             </div>

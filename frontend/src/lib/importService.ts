@@ -17,6 +17,7 @@ import {
 } from "./roundTripImportReview";
 import { requestRoundTripPermissionReview } from "./roundTripPermissionReview";
 import { normalizeImportedHtmlContent } from "./singleFileHtmlImport";
+import i18n from "i18next";
 
 export {
   tiptapExtensions,
@@ -68,7 +69,7 @@ export function parseRoundTripPackageManifest(source: string): PackageManifestPr
   }
   if (manifest?.format !== "nowen-package") return null;
   if (![1, 2].includes(Number(manifest.formatVersion))) {
-    throw new Error(`不支持的 Nowen 数据包版本：${String(manifest.formatVersion ?? "未知")}`);
+    throw new Error(`不支持的 BaseForge 数据包版本：${String(manifest.formatVersion ?? "未知")}`);
   }
   return manifest;
 }
@@ -91,7 +92,7 @@ export function createRoundTripPackageImportFile(
   file: File,
   manifest: PackageManifestPreview,
 ): ImportFileInfo {
-  const title = file.name.replace(/(?:\.nowen)?\.zip$/i, "") || "Nowen 数据包";
+  const title = file.name.replace(/(?:\.nowen)?\.zip$/i, "") || "BaseForge 数据包";
   return {
     name: file.name,
     title,
@@ -122,7 +123,7 @@ export async function readMarkdownFiles(files: FileList | File[]): Promise<Impor
 }
 
 /**
- * Nowen 自己导出的 Markdown ZIP 和 .nowen.zip 都携带 round-trip manifest。
+ * BaseForge 自己导出的 Markdown ZIP 和旧版数据包都携带 round-trip manifest。
  * 这类包不能再走“逐个 Markdown 文件推断目录”的旧链路，否则空目录、普通附件、
  * 排序和稳定 ID 映射都会丢失。这里只返回一个包级占位项，正式导入交给服务端事务。
  */
@@ -166,7 +167,7 @@ export async function importNotes(
   const packageItems = selected.filter((item) => item.__nowenRoundTripPackage instanceof File);
   if (!packageItems.length) return importNotesBase(fileInfos, notebookId, onProgress, options);
   if (packageItems.length !== 1 || selected.length !== 1) {
-    onProgress?.({ phase: "error", current: 0, total: selected.length, message: "Nowen 数据包必须单独导入" });
+    onProgress?.({ phase: "error", current: 0, total: selected.length, message: "BaseForge 数据包必须单独导入" });
     return { success: false, count: 0 };
   }
 
@@ -174,6 +175,7 @@ export async function importNotes(
   const submitOptionsFor = (strategy: RoundTripImportStrategy) => ({
     workspaceId: options?.workspaceId,
     targetNotebookId: strategy === "sync" ? undefined : notebookId || undefined,
+    fallbackNotebookName: strategy === "sync" ? undefined : i18n.t("note.nowenFallbackNotebookName"),
   });
   try {
     onProgress?.({ phase: "reading", current: 0, total: 1, message: "正在校验目录、附件和来源映射…" });

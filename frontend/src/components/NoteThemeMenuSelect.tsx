@@ -15,7 +15,7 @@ import {
  * 选项语义（2026-10-13 收敛）：
  *   - 「默认（跟随应用外观）」= 不设 per-note 覆盖（存 null）。账号级主题设置在上游已废弃
  *     （settings/NoteThemePicker 是空壳），所以默认就等于跟随应用外观。
- *   - 原先列表里另有「Nowen 默认」（显式 default），与本项视觉完全一致（都落 default tokens），
+ *   - 原先列表里另有「BaseForge 默认」（显式 default），与本项视觉完全一致（都落 default tokens），
  *     两个看着一样的选项已合并成这一项。
  *   - 其余主题才真正换配色/版心/行距；深色由应用的深浅色模式自动选 dark tokens。
  */

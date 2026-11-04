@@ -63,8 +63,15 @@ import {
   requireWorkspaceFeature,
 } from "../middleware/acl";
 import { createUserAttachmentAccessUrls } from "../lib/attachment-signed-url";
+import { scanAttachmentReferences } from "../lib/attachment-reference-scan";
 import { isHeifMime, resolveHeifUploadMime } from "../lib/heif-mime";
 import { analyzeModernMedia } from "../lib/modern-media";
+import {
+  buildMimeCategoryWhere,
+  getMimeCategory,
+  isMimeCategory,
+  type MimeCategory,
+} from "../lib/mime-category";
 import { recordMediaAnalysis } from "../services/modern-media";
 import {
   isManualFileManagerUpload,
@@ -162,6 +169,8 @@ interface FileRow {
   hash: string | null;
   folderId: string | null;
   folderName: string | null;
+  /** 仅 GET /api/files 的子查询会带；其它复用 FileRow 的查询为 undefined。 */
+  refCount?: number;
 }
 
 interface FileOut {
@@ -171,16 +180,25 @@ interface FileOut {
   size: number;
   createdAt: string;
   category: "image" | "file";
+  /**
+   * 统一文件池的类型大类（image / video / audio / doc / other）。
+   * 前端类型 chips 过滤、卡片类型标签、复制片段（视频/音频用 <video>/<audio> 标签）
+   * 都直接用它，避免前端再维护一份 MIME 白名单。
+   */
+  mimeCategory: MimeCategory;
   url: string;
   /**
-   * v12：图片缩略图 URL（可选）。
-   * - 仅当 category === "image" 且 MIME 在 raster 白名单内（png/jpeg/webp/bmp/gif）时下发；
-   * - 指向 `/api/attachments/<id>?w=240`，后端自动按需生成 webp 并落盘缓存；
+   * v12：缩略图 / 首帧海报 URL（可选）。
+   * - 图片：MIME 在 raster 白名单（png/jpeg/webp/bmp/gif）或 HEIF 时下发；
+   * - 视频：指向同一入口，后端用 ffmpeg 抽首帧编码 webp 海报；
+   * - 都落在 `/api/attachments/<id>?w=240`，按需生成 + 落盘缓存；
    * - 前端 GridCard 列表用此 URL，避免拉原图（手机截图常 3-5MB × 60 张 = 几百 MB）；
-   * - 详情大图、Markdown 复制时仍用 `url`（原图）。
+   * - 详情大图、Markdown 复制时仍用 `url`（原件）。
    * - svg / ico 等不下发 thumbnailUrl，前端回退到原图（通常本身就小）。
    */
   thumbnailUrl?: string;
+  /** 引用该附件的笔记数（attachment_references 倒排表）。仅列表查询附带。 */
+  referenceCount?: number;
   /** SHA-256 hex；v11 之前的老附件可能为 null（懒迁移）。 */
   hash: string | null;
   /** 附件文件夹（attachment_folders）。未归档时为 null。 */
@@ -222,6 +240,7 @@ function toFileOut(row: FileRow): FileOut {
     size: row.size,
     createdAt: row.createdAt,
     category: isImg ? "image" : "file",
+    mimeCategory: getMimeCategory(row.mimeType),
     url: `/api/attachments/${row.id}`,
     hash: row.hash ?? null,
     folderId: row.folderId ?? null,
@@ -237,8 +256,14 @@ function toFileOut(row: FileRow): FileOut {
         }
       : null,
   };
-  if (isImg && (THUMBNAILABLE_MIMES.has(mimeLower) || isHeifMime(mimeLower))) {
+  if ((isImg && (THUMBNAILABLE_MIMES.has(mimeLower) || isHeifMime(mimeLower)))
+    || mimeLower.startsWith("video/")) {
+    // 图片走 sharp 缩放；视频走 ffmpeg 首帧海报。
+    // 服务端没有可用 ffmpeg 时该 URL 返回 404，前端据此回退类型图标。
     out.thumbnailUrl = `/api/attachments/${row.id}?w=${DEFAULT_THUMBNAIL_WIDTH}`;
+  }
+  if (typeof row.refCount === "number") {
+    out.referenceCount = row.refCount;
   }
   return out;
 }
@@ -259,6 +284,22 @@ function resolveOrderBy(sort: string | undefined): string {
       return "a.size DESC";
     case "created_asc":
       return "a.createdAt ASC";
+    case "referenced_desc":
+      // “最近引用”：取引用该附件的最新一条 attachment_references.createdAt。
+      // 子查询写两遍是为了先按“有无引用”分组（IS NULL 为 0/1），让从未被引用的
+      // 附件沉到末尾——SQLite 的 NULLS LAST 语法要 3.30+，用 IS NULL 更兼容。
+      // 语义注意：倒排表记录的是“引用关系建立时间”，笔记反复编辑不会刷新它。
+      //
+      // 末尾的 a.createdAt DESC, a.id ASC 是必要的决胜位：倒排表是写时维护的
+      // （历史库没有 backfill），大批附件的 MAX(createdAt) 会同时为 NULL；没有
+      // 决胜位时这些行的顺序不确定，翻页会出现重复/漏项。加上之后老库的
+      // “最近引用”自然退化为“最新上传”，语义仍然合理。
+      return `(
+        SELECT MAX(ar0.createdAt) FROM attachment_references ar0 WHERE ar0.attachmentId = a.id
+      ) IS NULL,
+      (
+        SELECT MAX(ar1.createdAt) FROM attachment_references ar1 WHERE ar1.attachmentId = a.id
+      ) DESC, a.createdAt DESC, a.id ASC`;
     case "created_desc":
     default:
       return "a.createdAt DESC";
@@ -281,77 +322,6 @@ function resolveFilesScope(
   const role = getUserWorkspaceRole(workspaceId, userId);
   if (!role) return { scope: "workspace", workspaceId, error: "无权访问该工作区" };
   return { scope: "workspace", workspaceId };
-}
-
-/**
- * 计算"无引用"（unreferenced / 孤儿）附件 id 集合。
- *
- * 定义：attachments 行存在、noteId 对应的 note 也存在，但 `/api/attachments/<id>`
- * 这个 URL 在 scope 内**所有 notes.content** 里都扫不到。
- *
- * 与 `/api/data-file/cleanup-orphans` 的"内容孤儿"定义保持一致（包含 24h 宽限期），
- * 这样用户在"文件管理 → 孤儿"tab 里看到的集合 ≈ "清理孤儿"按钮会回收的那批。
- *
- * 性能：一次性把 scope 内的 notes.content 拼成单个 haystack 字符串，再对每个
- * 附件 id 做 `indexOf`。attachments id 是 uuid 不会误匹配。O(M + N*L) 但 L 是
- * 常数级（uuid 长度），大库仍可接受；比每个 id 单独跑一次 LIKE '%..%' 快数百倍。
- */
-function buildUnreferencedSet(
-  db: ReturnType<typeof getDb>,
-  scope: { scope: "personal" | "workspace"; workspaceId: string | null },
-  userId: string,
-): Set<string> {
-  // 宽限期：createdAt 距今不足 24h 的附件不算孤儿（刚上传还没 save content 也会先进 holder note）
-  const GRACE_MS = 24 * 3600 * 1000;
-  const cutoffMs = Date.now() - GRACE_MS;
-
-  // 1) 拉 scope 内的 haystack（仅 content 非空的 note，减少 join 字符串开销）
-  const contentRows = (scope.scope === "workspace"
-    ? db
-        .prepare(
-          `SELECT content FROM notes
-            WHERE workspaceId = ? AND content IS NOT NULL AND content <> ''`,
-        )
-        .all(scope.workspaceId!)
-    : db
-        .prepare(
-          `SELECT content FROM notes
-            WHERE userId = ? AND workspaceId IS NULL
-              AND content IS NOT NULL AND content <> ''`,
-        )
-        .all(userId)) as { content: string }[];
-  const haystack = contentRows.map((r) => r.content).join("\n");
-
-  // 2) 拉 scope 内的候选附件（只要 noteId 对应 note 还在）
-  const candidates = (scope.scope === "workspace"
-    ? db
-        .prepare(
-          `SELECT a.id, a.createdAt FROM attachments a
-            INNER JOIN notes n ON n.id = a.noteId
-            WHERE a.workspaceId = ?`,
-        )
-        .all(scope.workspaceId!)
-    : db
-        .prepare(
-          `SELECT a.id, a.createdAt FROM attachments a
-            INNER JOIN notes n ON n.id = a.noteId
-            WHERE a.userId = ? AND a.workspaceId IS NULL`,
-        )
-        .all(userId)) as { id: string; createdAt: string }[];
-
-  // 3) 扫描
-  const orphanIds = new Set<string>();
-  for (const r of candidates) {
-    const created = new Date(
-      r.createdAt && r.createdAt.includes("T")
-        ? r.createdAt
-        : (r.createdAt || "").replace(" ", "T") + "Z",
-    ).getTime();
-    if (Number.isFinite(created) && created > cutoffMs) continue;
-    if (haystack.indexOf(`/api/attachments/${r.id}`) >= 0) continue;
-    orphanIds.add(r.id);
-  }
-  return orphanIds;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,21 +348,27 @@ function buildUnreferencedSet(
 // 列表 + 搜索 + 筛选 + 分页
 //
 // Query 参数：
-//   category   "all" | "image" | "file"                    —— 大类筛选
-//   filter     "unreferenced" | "myUploads"                —— 视图筛选
+//   mimeCategory "image" | "video" | "audio" | "doc" | "other"  —— 统一文件池的类型筛选（正式参数）
+//   category   "all" | "image" | "file"                    —— 旧来源二分筛选（deprecated，
+//                                                             未传 mimeCategory 时才生效）
+//   filter     "unreferenced" | "referenced" | "myUploads"   —— 视图筛选
+//                                                            （unreferenced / referenced 严格互补）
+//   shareStatus "shared" | "unshared"                       —— 按生效中的只读分享链接筛
 //   myUploadsRef "referenced" | "unreferenced"             —— 仅 filter=myUploads 时生效，
 //                                                            子筛选"已被任意笔记引用 / 还没被引用"
 //   mime       精确 MIME（如 image/png）                    —— 细分筛选
 //   notebookId 所属笔记本 id                                —— 按笔记本筛
-//   q          文件名关键字（ILIKE）                         —— 搜索
-//   sort       name_asc | name_desc | size_asc | size_desc | created_asc | created_desc
+//   q          关键字（文件名 或 MIME 类型，包含匹配）        —— 搜索
+//   sort       created_desc | created_asc | name_asc | name_desc
+//            | size_asc | size_desc | referenced_desc（最近引用）
 //   page       1 起，默认 1
 //   pageSize   默认 50，最大 200
 //
-// filter=unreferenced 语义：
-//   返回 scope 内所有"没有任何 notes.content 引用"的附件（含 24h 宽限期）。
-//   与 category 正交——可以同时 filter=unreferenced + category=image 得到"孤儿图片"。
-//   实现：一次性构建 scope 内 haystack，计算 orphan id 集合，再用 `a.id IN (...)`
+// filter=unreferenced / referenced 语义：
+//   两者基于同一次内容扫描，严格互补（见 scanAttachmentReferences）。
+//   与 mimeCategory / shareStatus 正交——可以同时 filter=unreferenced +
+//   mimeCategory=image 得到"孤儿图片"。
+//   实现：一次性构建 scope 内 haystack，算出 id 集合，再用 `a.id IN (...)`
 //   注入 WHERE。大库场景请配合 page/pageSize 分页，避免 IN 列表过长。
 //
 // 响应：
@@ -407,7 +383,13 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   if (scope.error) return c.json({ error: scope.error, code: "FORBIDDEN" }, 403);
 
   const category = (c.req.query("category") || "all").toLowerCase();
+  // 统一文件池的类型筛选（image / video / audio / doc / other）。非法值视为不筛选。
+  const mimeCategoryRaw = (c.req.query("mimeCategory") || "").toLowerCase();
+  const mimeCategory = isMimeCategory(mimeCategoryRaw) ? mimeCategoryRaw : null;
   const filter = (c.req.query("filter") || "").toLowerCase();
+  // shareStatus：按“是否存在生效中的只读分享链接”筛。与 attachmentShareApi.list()
+  // 的 isActive 口径一致（前端卡片“已分享”角标用的就是它）。
+  const shareStatus = (c.req.query("shareStatus") || "").toLowerCase();
   const mime = c.req.query("mime") || "";
   const notebookId = c.req.query("notebookId") || "";
   // ?noteId=xxx —— 仅返回"被该笔记引用过"的附件。
@@ -440,7 +422,15 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
     params.push(userId);
   }
 
-  if (category === "image") {
+  // 类型维度：mimeCategory 是统一文件池的正式筛选参数；category 保留为旧参数
+  // （image / file 二分，前端三来源时代的产物），仅在未传 mimeCategory 时生效。
+  // 两者同时出现时不叠加——例如 mimeCategory=image + category=file 应该按
+  // 新参数理解为"只看图片"，而不是交集为空。
+  if (mimeCategory) {
+    const cond = buildMimeCategoryWhere(mimeCategory);
+    whereParts.push(cond.sql);
+    params.push(...cond.params);
+  } else if (category === "image") {
     whereParts.push("a.mimeType LIKE 'image/%'");
   } else if (category === "file") {
     // 与 "image" 互斥；NULL mimeType 理论上不出现，仍兜底归为非图片
@@ -448,8 +438,32 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   }
 
   if (mime) {
-    whereParts.push("a.mimeType = ?");
-    params.push(mime.toLowerCase());
+    // 逗号分隔多选（侧栏类型 chips）：image/png,image/jpeg → IN 查询
+    const mimeList = mime.split(",").map((entry) => entry.trim().toLowerCase()).filter(Boolean);
+    if (mimeList.length === 1) {
+      whereParts.push("a.mimeType = ?");
+      params.push(mimeList[0]);
+    } else {
+      // 支持 "audio/" 这类前缀项：带 / 结尾的用 LIKE，精确的用 IN
+      const clauses: string[] = [];
+      for (const entry of mimeList) {
+        if (entry.endsWith("/")) {
+          clauses.push("a.mimeType LIKE ?");
+          params.push(`${entry}%`);
+        } else {
+          clauses.push("a.mimeType = ?");
+          params.push(entry);
+        }
+      }
+      whereParts.push(`(${clauses.join(" OR ")})`);
+    }
+  }
+
+  // 上传时间：uploadedWithin=N 天（侧栏时间 chips）
+  const uploadedWithin = Number(c.req.query("uploadedWithin") || 0);
+  if (Number.isFinite(uploadedWithin) && uploadedWithin > 0) {
+    whereParts.push("a.createdAt >= datetime('now', ?)");
+    params.push(`-${Math.floor(uploadedWithin)} days`);
   }
 
   if (notebookId) {
@@ -458,8 +472,11 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   }
 
   if (q) {
-    whereParts.push("a.filename LIKE ? COLLATE NOCASE");
-    params.push(`%${q}%`);
+    // 统一搜索框：同时匹配文件名和 MIME 类型——输 "pdf" / "video/" 也能命中，
+    // 避免用户为了按类型找文件还得先去学侧栏的精确 MIME 筛选。
+    const like = `%${q}%`;
+    whereParts.push("(a.filename LIKE ? COLLATE NOCASE OR a.mimeType LIKE ? COLLATE NOCASE)");
+    params.push(like, like);
   }
 
   // noteId：本笔记引用过的附件（含自己上传 + 引用别处的）
@@ -482,17 +499,29 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
     }
   }
 
-  // filter=unreferenced：把 orphan id 集合注入 WHERE
-  // 空集也要落成 `1=0` 而不是省略条件，避免返回全部附件
-  if (filter === "unreferenced") {
-    const orphanIds = Array.from(buildUnreferencedSet(db, scope, userId));
-    if (orphanIds.length === 0) {
+  // filter=unreferenced / referenced：把内容扫描得到的 id 集合注入 WHERE。
+  // 空集也要落成 `1=0` 而不是省略条件，避免返回全部附件。
+  if (filter === "unreferenced" || filter === "referenced") {
+    const scan = scanAttachmentReferences(db, scope, userId);
+    const ids = Array.from(
+      filter === "unreferenced" ? scan.orphanIds : scan.referencedIds,
+    );
+    if (ids.length === 0) {
       whereParts.push("1 = 0");
     } else {
-      const placeholders = orphanIds.map(() => "?").join(",");
+      const placeholders = ids.map(() => "?").join(",");
       whereParts.push(`a.id IN (${placeholders})`);
-      for (const id of orphanIds) params.push(id);
+      for (const id of ids) params.push(id);
     }
+  }
+
+  // shareStatus：EXISTS 子查询走 idx_attachment_shares_attachment，不扫全表。
+  // 过期分享不算：isActive=1 且未过 expiresAt 才计作“已分享”。
+  if (shareStatus === "shared" || shareStatus === "unshared") {
+    const existsSql = `EXISTS(SELECT 1 FROM attachment_shares s
+      WHERE s.attachmentId = a.id AND s.isActive = 1
+        AND (s.expiresAt IS NULL OR s.expiresAt > datetime('now')))`;
+    whereParts.push(shareStatus === "shared" ? existsSql : `NOT ${existsSql}`);
   }
 
   // filter=myUploads：仅返回"用户在文件管理页主动上传"的附件——
@@ -550,7 +579,7 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
         filter: c.req.query("filter") ?? null,
         myUploadsRef: c.req.query("myUploadsRef") ?? null,
       },
-      parsed: { category, filter, mime, notebookId, sort, page, pageSize },
+      parsed: { category, mimeCategory, filter, shareStatus, mime, notebookId, sort, page, pageSize },
       whereSql,
       paramCount: params.length,
     });
@@ -574,7 +603,9 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
               a.noteId, a.folderId,
               n.title AS noteTitle, n.notebookId, n.isTrashed,
               nb.name AS notebookName, nb.icon AS notebookIcon,
-              af.name AS folderName
+              af.name AS folderName,
+              (SELECT COUNT(*) FROM attachment_references ar
+                WHERE ar.attachmentId = a.id) AS refCount
          FROM attachments a
          LEFT JOIN notes n ON n.id = a.noteId
          LEFT JOIN notebooks nb ON nb.id = n.notebookId
@@ -583,7 +614,7 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
         ORDER BY ${orderSql}
         LIMIT ? OFFSET ?`,
     )
-    .all(...params, pageSize, (page - 1) * pageSize) as FileRow[];
+    .all(...params, pageSize, (page - 1) * pageSize) as unknown as FileRow[];
 
   return c.json({
     items: rows.map(toFileOut),
@@ -596,11 +627,14 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/files/stats
-// 按分类汇总（首屏 + 分类筛选器徽标用）：
+// 按分类汇总（首屏 + 类型筛选器徽标用）：
 //   { total, totalBytes,
-//     images: { count, bytes },
-//     files:  { count, bytes },
-//     unreferenced: { count, bytes },   —— 孤儿视图徽标（含 24h 宽限期）
+//     images / videos / audios / documents / others: { count, bytes },
+//     files:  { count, bytes },         —— 兼容字段：非图片总和
+//     unreferenced: { count, bytes },   —— 「未引用」分类徽标（与列表同源的内容扫描口径）
+//     referenced:  { count, bytes },    —— “文档引用”分类（与上一行严格互补）
+//     shared:      { count, bytes },    —— 生效中只读分享链接的附件
+//     myUploads: { total, referenced, unreferenced },
 //     storage: { mode, driver, source, bucket?, endpoint?, prefix? },
 //     byMime: [{ mime, count, bytes }] }
 // ---------------------------------------------------------------------------
@@ -640,52 +674,58 @@ app.get("/stats", requireWorkspaceFeature("files"), (c) => {
 
   let total = 0;
   let totalBytes = 0;
-  let imageCount = 0;
-  let imageBytes = 0;
+  // 兼容字段 files 的口径：非图片总和
   let fileCount = 0;
   let fileBytes = 0;
+  // 按 MIME 大类分桶（统一文件池的类型 chips 徽标）。
+  const byCategory: Record<MimeCategory, { count: number; bytes: number }> = {
+    image: { count: 0, bytes: 0 },
+    video: { count: 0, bytes: 0 },
+    audio: { count: 0, bytes: 0 },
+    doc: { count: 0, bytes: 0 },
+    other: { count: 0, bytes: 0 },
+  };
   for (const r of rows) {
     total += r.count;
     totalBytes += r.bytes;
-    if (isImage(r.mime)) {
-      imageCount += r.count;
-      imageBytes += r.bytes;
-    } else {
-      fileCount += r.count;
-      fileBytes += r.bytes;
-    }
+    const bucket = byCategory[getMimeCategory(r.mime)];
+    bucket.count += r.count;
+    bucket.bytes += r.bytes;
+    if (bucket === byCategory.image) continue;
+    fileCount += r.count;
+    fileBytes += r.bytes;
   }
 
-  // 无引用（孤儿）视图徽标：与 filter=unreferenced 用同一份判定
+  // “未引用 / 文档引用”徽标：与 list 的 filter=unreferenced|referenced 用同一次
+  // 内容扫描口径（两者严格互补），字节数扫描时已顺带累加。
   // 大库上这会额外扫一遍 notes.content；如果性能成为瓶颈可按需做短 TTL 缓存。
-  const orphanIds = buildUnreferencedSet(db, scope, userId);
-  let unreferencedCount = 0;
-  let unreferencedBytes = 0;
-  if (orphanIds.size > 0) {
-    const ids = Array.from(orphanIds);
-    const placeholders = ids.map(() => "?").join(",");
-    const sumRow = db
-      .prepare(
-        `SELECT COUNT(*) AS c, COALESCE(SUM(size), 0) AS b
-           FROM attachments WHERE id IN (${placeholders})`,
-      )
-      .get(...ids) as { c: number; b: number } | undefined;
-    unreferencedCount = sumRow?.c ?? 0;
-    unreferencedBytes = sumRow?.b ?? 0;
-  }
+  const refScan = scanAttachmentReferences(db, scope, userId);
+
+  // “已分享”徽标：生效中且未过期的只读分享链接。与 list 的 shareStatus 同口径。
+  const sharedScope = scope.scope === "workspace"
+    ? { sql: "a.workspaceId = ?", param: scope.workspaceId! as string | number }
+    : { sql: "a.userId = ? AND a.workspaceId IS NULL", param: userId as string | number };
+  const sharedAgg = db
+    .prepare(
+      `SELECT COUNT(*) AS c, COALESCE(SUM(a.size), 0) AS b
+         FROM attachments a
+        WHERE ${sharedScope.sql}
+          AND EXISTS(SELECT 1 FROM attachment_shares s
+            WHERE s.attachmentId = a.id AND s.isActive = 1
+              AND (s.expiresAt IS NULL OR s.expiresAt > datetime('now')))`,
+    )
+    .get(sharedScope.param) as { c: number; b: number } | undefined;
 
   // "我的上传" 徽标（v12 起）：scope 内 uploadSource='file_manager' 的附件，
   // 按是否被任意笔记引用拆两档。走 attachment_references 倒排表——索引覆盖
   // attachmentId 列，不会扫全表。
   // 老附件 uploadSource=NULL 不计入；用户从未走过文件管理上传时三个值都为 0。
+  // 统一文件池下不再按"图片/非图片"拆口径，total 就是 scope 内全部手动上传数。
   const uploadsSummary = attachmentQueryService.getMyUploadsSummary(
     scope.scope === "workspace" ? "workspace" : "personal",
     userId,
     scope.scope === "workspace" ? scope.workspaceId! : undefined,
   );
-  const myUploadsTotal = uploadsSummary.total;
-  const myUploadsReferenced = uploadsSummary.referenced;
-  const myUploadsUnreferenced = uploadsSummary.unreferenced;
 
   const storageInfo = getAttachmentStorageInfo();
   const storageConfig = readObjectStorageConfigPublic();
@@ -714,13 +754,20 @@ app.get("/stats", requireWorkspaceFeature("files"), (c) => {
   return c.json({
     total,
     totalBytes,
-    images: { count: imageCount, bytes: imageBytes },
+    images: byCategory.image,
+    videos: byCategory.video,
+    audios: byCategory.audio,
+    documents: byCategory.doc,
+    others: byCategory.other,
+    // 兼容字段：非图片总和（旧前端 / 旧调用方仍可能读它）
     files: { count: fileCount, bytes: fileBytes },
-    unreferenced: { count: unreferencedCount, bytes: unreferencedBytes },
+    unreferenced: { count: refScan.orphanIds.size, bytes: refScan.orphanBytes },
+    referenced: { count: refScan.referencedIds.size, bytes: refScan.referencedBytes },
+    shared: { count: sharedAgg?.c ?? 0, bytes: sharedAgg?.b ?? 0 },
     myUploads: {
-      total: myUploadsTotal,
-      referenced: myUploadsReferenced,
-      unreferenced: myUploadsUnreferenced,
+      total: uploadsSummary.total,
+      referenced: uploadsSummary.referenced,
+      unreferenced: uploadsSummary.unreferenced,
     },
     storage,
     byMime: rows,
@@ -1000,7 +1047,7 @@ app.post("/batch-delete", async (c) => {
       `SELECT id, noteId, userId, workspaceId, uploadSource, path
          FROM attachments WHERE id IN (${placeholders})`,
     )
-    .all(...ids) as Array<FileAttachmentAccessRow & {
+    .all(...ids) as unknown as Array<FileAttachmentAccessRow & {
       id: string;
       path: string;
     }>;
@@ -1066,6 +1113,112 @@ app.post("/batch-delete", async (c) => {
     deleted: deletedCount,
     failed,
   });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/files/batch-move
+// 批量归档 / 移出文件夹（只改 attachments.folderId，不碰磁盘）。
+//
+// 请求体：{ ids: string[], folderId: string | null }
+//   - folderId 为字符串：归档到该文件夹（必须是当前用户自己的 attachment_folders）；
+//   - folderId 为 null / 未传：归入"未归档"（与 DELETE /api/attachment-folders/:id
+//     的清空格子语义一致）。
+//
+// 响应：{ success: true, moved: number, failed: [{ id, reason }] }
+//
+// 权限：与 DELETE /:id、PATCH /:id 完全同款（本人 + 笔记 write / 手动上传 scope），
+// 单个 id 不通过只进 failed[]，不阻塞其它 id。
+// ---------------------------------------------------------------------------
+app.post("/batch-move", async (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!userId) return c.json({ error: "未授权" }, 401);
+
+  let body: { ids?: unknown; folderId?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "invalid json body" }, 400);
+  }
+  const ids = Array.from(
+    new Set(
+      (Array.isArray(body.ids) ? body.ids : []).filter(
+        (x): x is string => typeof x === "string" && x.length > 0,
+      ),
+    ),
+  );
+  if (ids.length === 0) {
+    return c.json({ error: "ids 不能为空" }, 400);
+  }
+  if (ids.length > 200) {
+    return c.json({ error: "单次最多移动 200 个文件" }, 400);
+  }
+  // folderId 只接受"字符串"或"null/未传"两种形态，其余类型（数字、对象）视为非法
+  const rawFolder = body.folderId;
+  const targetFolderId: string | null =
+    typeof rawFolder === "string" && rawFolder.trim() ? rawFolder.trim() : null;
+  if (
+    rawFolder !== undefined &&
+    rawFolder !== null &&
+    typeof rawFolder !== "string"
+  ) {
+    return c.json({ error: "folderId 必须是字符串或 null" }, 400);
+  }
+
+  const db = getDb();
+
+  if (targetFolderId) {
+    const folder = db
+      .prepare("SELECT id FROM attachment_folders WHERE id = ? AND userId = ?")
+      .get(targetFolderId, userId) as { id: string } | undefined;
+    if (!folder) return c.json({ error: "目标文件夹不存在", code: "FOLDER_NOT_FOUND" }, 404);
+  }
+
+  const failed: Array<{ id: string; reason: string }> = [];
+  const placeholders = ids.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT id, noteId, userId, workspaceId, uploadSource, folderId
+         FROM attachments WHERE id IN (${placeholders})`,
+    )
+    .all(...ids) as unknown as Array<
+      FileAttachmentAccessRow & { id: string; folderId: string | null }
+    >;
+
+  const foundIds = new Set(rows.map((r) => r.id));
+  for (const id of ids) {
+    if (!foundIds.has(id)) failed.push({ id, reason: "文件不存在" });
+  }
+
+  const movableIds: string[] = [];
+  for (const row of rows) {
+    if (row.userId !== userId) {
+      failed.push({ id: row.id, reason: "无权移动他人文件" });
+      continue;
+    }
+    if (!canWriteManagedFile(row, userId)) {
+      failed.push({ id: row.id, reason: "无权移动该文件" });
+      continue;
+    }
+    // 已在目标文件夹：跳过写，避免无谓 UPDATE 抬高变更量
+    if (row.folderId === targetFolderId) continue;
+    movableIds.push(row.id);
+  }
+
+  let moved = 0;
+  if (movableIds.length > 0) {
+    const movePlaceholders = movableIds.map(() => "?").join(",");
+    const tx = db.transaction((arr: string[]) => {
+      const info = db
+        .prepare(
+          `UPDATE attachments SET folderId = ? WHERE id IN (${movePlaceholders})`,
+        )
+        .run(targetFolderId, ...arr);
+      return Number(info.changes || 0);
+    });
+    moved = tx(movableIds);
+  }
+
+  return c.json({ success: true, moved, failed });
 });
 
 // ---------------------------------------------------------------------------
@@ -1308,6 +1461,7 @@ app.post("/upload", requireWorkspaceFeature("files"), async (c) => {
         size: dedupRow.size,
         filename: dedupRow.filename,
         category: isImage(dedupRow.mimeType) ? "image" : "file",
+        mimeCategory: getMimeCategory(dedupRow.mimeType),
         createdAt: new Date().toISOString(),
         deduplicated: true,
         ...(repaired ? { repaired: true } : {}),
@@ -1361,6 +1515,7 @@ app.post("/upload", requireWorkspaceFeature("files"), async (c) => {
       size: file.size,
       filename: file.name || `${id}.${ext}`,
       category: isImage(mime) ? "image" : "file",
+      mimeCategory: getMimeCategory(mime),
       createdAt: new Date().toISOString(),
       accessUrls: createUserAttachmentAccessUrls(userId, [{ id, noteId }]),
     },
@@ -1438,6 +1593,7 @@ app.post("/upload-from-remote", requireWorkspaceFeature("files"), async (c) => {
         size: dedupRow.size,
         filename: dedupRow.filename,
         category: isImage(dedupRow.mimeType) ? "image" : "file",
+        mimeCategory: getMimeCategory(dedupRow.mimeType),
         createdAt: new Date().toISOString(),
         deduplicated: true,
         accessUrls: createUserAttachmentAccessUrls(userId, [{ id: dedupRow.id, noteId: dedupRow.noteId }]),
@@ -1470,6 +1626,7 @@ app.post("/upload-from-remote", requireWorkspaceFeature("files"), async (c) => {
       size: buffer.length,
       filename,
       category: isImage(mime) ? "image" : "file",
+      mimeCategory: getMimeCategory(mime),
       createdAt: new Date().toISOString(),
       accessUrls: createUserAttachmentAccessUrls(userId, [{ id, noteId }]),
     },

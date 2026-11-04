@@ -1,6 +1,5 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
-// 【2026-10-16 手工同步注明】生成器脚本已不在仓库内（文件头引用缺失）；按 .cmp/COLLAB-BOARD.md 6.8 B-7，
-// 由 B 线按既有生成格式手工追加 sidebarPanels / activityBadges（contractVersion 4 → 5）。
+// 此文件由 scripts/generate-plugin-contracts.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
+// 重新生成：node scripts/generate-plugin-contracts.mjs
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const nested of Object.values(value)) deepFreeze(nested);
@@ -10,7 +9,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 export type PluginContributionRuntime = "declarative" | "sandbox-js" | "node-action";
-export type PluginContributionType = "activityBadges" | "automationTemplates" | "commands" | "inboundWebhooks" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
+export type PluginContributionType = "automationTemplates" | "commands" | "editorCommands" | "inboundWebhooks" | "mainViewPanels" | "menus" | "noteTemplates" | "noteThemes" | "promptPacks" | "settings" | "sidebarPanels" | "uiComponents";
 
 export interface PluginContributionContractEntry {
   id: PluginContributionType;
@@ -20,18 +19,9 @@ export interface PluginContributionContractEntry {
   description: string;
 }
 
-export const CONTRIBUTION_CONTRACT_VERSION = 5 as const;
+export const CONTRIBUTION_CONTRACT_VERSION = 6 as const;
 export const CONTRIBUTION_NAMESPACE_TEMPLATE = "<pluginId>/<contributionId>" as const;
 export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] = deepFreeze([
-  {
-    "id": "activityBadges",
-    "since": "2.2",
-    "runtimes": [
-      "declarative"
-    ],
-    "declarative": true,
-    "description": "Declarative activity-bar badges that open a sidebar panel or a tool tab"
-  },
   {
     "id": "automationTemplates",
     "since": "2.0",
@@ -54,6 +44,16 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     "description": "Command palette and host command registrations"
   },
   {
+    "id": "editorCommands",
+    "since": "2.3",
+    "runtimes": [
+      "sandbox-js",
+      "node-action"
+    ],
+    "declarative": false,
+    "description": "Editor slash-menu entries and keybindings that dispatch declared plugin actions"
+  },
+  {
     "id": "inboundWebhooks",
     "since": "2.0",
     "runtimes": [
@@ -62,6 +62,17 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     ],
     "declarative": false,
     "description": "Host-owned capability-token HTTP callbacks with bounded requests and responses"
+  },
+  {
+    "id": "mainViewPanels",
+    "since": "2.2",
+    "runtimes": [
+      "declarative",
+      "sandbox-js",
+      "node-action"
+    ],
+    "declarative": true,
+    "description": "Host-rendered main-area panels that occupy the workspace view"
   },
   {
     "id": "menus",
@@ -121,10 +132,12 @@ export const CONTRIBUTION_CONTRACT: readonly PluginContributionContractEntry[] =
     "id": "sidebarPanels",
     "since": "2.2",
     "runtimes": [
-      "declarative"
+      "declarative",
+      "sandbox-js",
+      "node-action"
     ],
     "declarative": true,
-    "description": "Declarative sidebar panels rendered by the host inside the sidebar panel container"
+    "description": "Host-rendered sidebar panels; any runtime may declare them, the host renders the content declaratively"
   },
   {
     "id": "uiComponents",
@@ -176,14 +189,6 @@ export const PROMPT_PACK_CONTRIBUTION_LIMITS = deepFreeze({
   "maxPromptsPerPlugin": 100,
   "maxPromptBytes": 65536
 } as const);
-export const ACTIVITY_BADGE_CONTRIBUTION_LIMITS = deepFreeze({
-  "schemaVersion": 1,
-  "maxBadgesPerPlugin": 10,
-  "targets": [
-    "panel",
-    "tool"
-  ]
-} as const);
 export const SIDEBAR_PANEL_CONTRIBUTION_LIMITS = deepFreeze({
   "schemaVersion": 1,
   "maxPanelsPerPlugin": 10
@@ -200,4 +205,13 @@ export const UI_COMPONENT_CONTRIBUTION_LIMITS = deepFreeze({
     "navigation.open"
   ],
   "maxComponentsPerPlugin": 50
+} as const);
+export const EDITOR_COMMAND_CONTRIBUTION_LIMITS = deepFreeze({
+  "schemaVersion": 1,
+  "maxCommandsPerPlugin": 50,
+  "when": [
+    "editorFocused",
+    "noteOpen"
+  ],
+  "maxCategoryLength": 20
 } as const);

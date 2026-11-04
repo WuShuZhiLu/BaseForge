@@ -7,7 +7,7 @@ function deepFreeze<T>(value: T): T {
   return value;
 }
 
-export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "9f71e9450fefc6a07f1f33cd1a24c0d556e51b70de2c24da45268b74c4865850" as const;
+export const EXTENSION_CAPABILITY_CATALOG_DIGEST = "70439f1ebc136f239b072edb3fd01b915b6d240bd608d64eb4ea74c40887202c" as const;
 export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
   "catalogVersion": 1,
   "hostApi": {
@@ -1041,7 +1041,7 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
     ]
   },
   "contributions": {
-    "contractVersion": 4,
+    "contractVersion": 6,
     "namespaceTemplate": "<pluginId>/<contributionId>",
     "runtimes": [
       "declarative",
@@ -1071,6 +1071,16 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "description": "Command palette and host command registrations"
       },
       {
+        "id": "editorCommands",
+        "since": "2.3",
+        "runtimes": [
+          "sandbox-js",
+          "node-action"
+        ],
+        "declarative": false,
+        "description": "Editor slash-menu entries and keybindings that dispatch declared plugin actions"
+      },
+      {
         "id": "inboundWebhooks",
         "since": "2.0",
         "runtimes": [
@@ -1079,6 +1089,17 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         ],
         "declarative": false,
         "description": "Host-owned capability-token HTTP callbacks with bounded requests and responses"
+      },
+      {
+        "id": "mainViewPanels",
+        "since": "2.2",
+        "runtimes": [
+          "declarative",
+          "sandbox-js",
+          "node-action"
+        ],
+        "declarative": true,
+        "description": "Host-rendered main-area panels that occupy the workspace view"
       },
       {
         "id": "menus",
@@ -1135,6 +1156,17 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "description": "Host-rendered extension settings"
       },
       {
+        "id": "sidebarPanels",
+        "since": "2.2",
+        "runtimes": [
+          "declarative",
+          "sandbox-js",
+          "node-action"
+        ],
+        "declarative": true,
+        "description": "Host-rendered sidebar panels; any runtime may declare them, the host renders the content declaratively"
+      },
+      {
         "id": "uiComponents",
         "since": "2.1",
         "runtimes": [
@@ -1145,58 +1177,7 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "declarative": true,
         "description": "Host-rendered UI actions placed in user-controlled extension slots"
       }
-    ],
-    "noteTheme": {
-      "schemaVersion": 1,
-      "bases": [
-        "nowen.default"
-      ],
-      "editableTokens": [
-        "surface",
-        "text",
-        "heading",
-        "muted",
-        "border",
-        "accent",
-        "accentHover",
-        "inlineCodeBackground",
-        "inlineCodeText",
-        "preBackground",
-        "preText",
-        "quoteBorder",
-        "quoteText",
-        "softBackground",
-        "tableStripe",
-        "markBackground",
-        "selection",
-        "contentMaxWidth",
-        "lineHeight"
-      ],
-      "maxThemesPerPlugin": 20
-    },
-    "noteTemplate": {
-      "schemaVersion": 1,
-      "maxTemplatesPerPlugin": 100,
-      "maxBodyBytes": 262144
-    },
-    "promptPack": {
-      "schemaVersion": 1,
-      "maxPromptsPerPlugin": 100,
-      "maxPromptBytes": 65536
-    },
-    "uiComponent": {
-      "schemaVersion": 1,
-      "kinds": [
-        "action"
-      ],
-      "slots": [
-        "floating-layer"
-      ],
-      "actions": [
-        "navigation.open"
-      ],
-      "maxComponentsPerPlugin": 50
-    }
+    ]
   },
   "errors": {
     "contractVersion": 2,

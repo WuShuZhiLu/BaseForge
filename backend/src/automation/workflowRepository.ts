@@ -24,7 +24,7 @@ export class WorkflowRepository {
       : getDb().prepare(`SELECT w.* FROM automation_workflows w
           WHERE w.userId=? OR (w.workspaceId IS NOT NULL AND EXISTS (
             SELECT 1 FROM workspace_members wm WHERE wm.workspaceId=w.workspaceId AND wm.userId=?
-          )) ORDER BY w.updatedAt DESC`).all(userId, userId)) as WorkflowRecord[];
+          )) ORDER BY w.updatedAt DESC`).all(userId, userId)) as unknown as WorkflowRecord[];
   }
 
   get(id: string): WorkflowRecord | undefined {
@@ -102,7 +102,7 @@ export class WorkflowRepository {
     const row = eventId
       ? getDb().prepare("SELECT * FROM automation_workflow_runs WHERE workflowId=? AND eventId=?").get(workflow.id, eventId)
       : getDb().prepare("SELECT * FROM automation_workflow_runs WHERE id=?").get(id);
-    return row as WorkflowRunRecord;
+    return row as unknown as WorkflowRunRecord;
   }
 
   getRun(id: string): WorkflowRunRecord | undefined {
@@ -110,7 +110,7 @@ export class WorkflowRepository {
   }
 
   listRuns(workflowId: string, limit = 100): WorkflowRunRecord[] {
-    return getDb().prepare("SELECT * FROM automation_workflow_runs WHERE workflowId=? ORDER BY createdAt DESC LIMIT ?").all(workflowId, Math.min(500, limit)) as WorkflowRunRecord[];
+    return getDb().prepare("SELECT * FROM automation_workflow_runs WHERE workflowId=? ORDER BY createdAt DESC LIMIT ?").all(workflowId, Math.min(500, limit)) as unknown as WorkflowRunRecord[];
   }
 
   listSteps(runId: string): Record<string, unknown>[] {

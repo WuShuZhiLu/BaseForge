@@ -9,7 +9,7 @@
  *      + 知识树嵌套/折叠/搜索/筛选 + 专注模式 + 行级菜单
  *      + 拖拽 + 面板沉底 + 区段拖拽排序。
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowUpDown,
   Check,
@@ -18,12 +18,23 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Circle,
+  Copy,
+  Download,
+  FileArchive,
+  FileType2,
+  FolderInput,
+  Image as ImageIcon,
+  Printer,
+  Share2,
   Ellipsis,
   ExternalLink,
-  FileCode,
   Columns2,
   FilePlus2,
   FileText,
+  Image,
+  Film,
+  Music,
+  FileQuestion,
   Focus,
   Folder,
   Home,
@@ -33,21 +44,36 @@ import {
   Pencil,
   Play,
   BookOpen,
-  PenTool,
   Pin,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
-  Table2,
   Sparkles,
   Star,
   Trash2,
   Upload,
+  KanbanSquare,
+  Inbox,
   Users,
-  Waypoints,
   X,
   XCircle,
+  Puzzle,
+  EyeOff,
+  Ghost,
+  Layers,
+  LayoutGrid,
+  Magnet,
+  Paperclip,
+  Store,
+  SlidersHorizontal,
+  Unlock,
+  FolderOpen,
+  Cloud,
+  FileCode,
+  Network,
+  PenTool,
+  Table,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -61,12 +87,50 @@ import {
   knowledgeTreeApi,
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
-import type { FileItem, NoteListItem, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
+import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
+import { knowledgeTreeEmojiFor, docEmojiForFormat } from "@/lib/knowledgeTreeIcons";
+import {
+  getRetentionDays,
+  getTrashSetting,
+  getTrashTimeFilter,
+  getTrashTypeFilter,
+  setTrashSetting,
+  setTrashTimeFilter,
+  TRASH_TIME_META,
+
+  retentionColor,
+  retentionDaysLeft,
+  setRetentionDays,
+  setTrashTypeFilter as persistTrashTypeFilter,
+  TRASH_RETENTION_OPTIONS,
+  TRASH_TYPE_META,
+  trashTypeEmoji,
+  trashTypeKey,
+  trashTypeLabel,
+  type TrashTimeFilter,
+  type TrashTypeFilterKey,
+  type TrashTypeKey,
+} from "@/features/trash/trashUi";
+import {
+  exportNoteAsImage,
+  exportSingleNote,
+  exportSingleNoteAsPDF,
+} from "@/lib/exportService";
+import {
+  NOTEBOOK_EXPORT_FORMAT_ITEMS,
+  exportNotebookAsFormat,
+  type NotebookExportFormat,
+} from "@/lib/notebookFormatExport";
+import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActions";
+import NotebookShareDialog from "@/components/NotebookShareDialog";
+import ShareModal from "@/components/ShareModal";
+import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
+import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
+import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
+import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
-import { FaFolder, FaBook } from "react-icons/fa";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import {
   importMarkdownIntoKnowledgeTree,
@@ -87,8 +151,28 @@ import {
 } from "@/lib/knowledgeTreeSort";
 import FileUploadDialog from "@/components/FileUploadDialog";
 import { pushAppPathState, replaceAppPathState, resolveCurrentAppPathname, hasInAppForwardNavigationOccurred } from "@/lib/appPathNavigation";
-import { kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
+import { getCurrentAppRoute, kbNoteAppPath, KB_ROOT_APP_PATH, moduleAppPath } from "@/lib/appRoute";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import {
+  shareCenterApi,
+  shareRiskLabel,
+  type ShareCenterCounts,
+  type ShareCenterObjectKind,
+  type ShareCenterRisk,
+} from "@/lib/shareCenter";
+import { loadPluginCounts, peekPluginCounts, PLUGIN_COUNTS_EVENT, type PluginCounts } from "@/lib/pluginCounts";
+import {
+  getShareCenterUiVersion,
+  getShareGroup,
+  getShareObjectKind,
+  getShareQuick,
+  getShareRisk,
+  SHARE_QUICK_CHIPS,
+  setShareCenterUi,
+  subscribeShareCenterUi,
+} from "@/features/shares/shareCenterUi";
+import { PublicOriginRiskControl } from "@/components/PublicOriginRiskControl";
+import { TypeFilterPopover } from "@/components/sidebar/TypeFilterPopover";
 import { getNextTabAfterClose, useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { useSortableDrag } from "@/hooks/useSortableDrag";
@@ -292,31 +376,8 @@ function subtreeHasMatch(
 }
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
-  if (node.nodeType === "folder") {
-    // 根层知识库（笔记本）用实心书本与普通实心文件夹区分
-    if (isRoot && node.resourceType === "notebook") {
-      return <FaBook size={14} className="shrink-0 text-accent-primary" />;
-    }
-    return <FaFolder size={14} className="shrink-0 text-amber-400" />;
-  }
-  // 轻量表格 / 思维导图节点（对齐 KnowledgeTreePanel 的语义图标）
-  if (node.noteType === "sheet") {
-    return <Table2 size={15} className="shrink-0 text-emerald-500" />;
-  }
-  if (node.contentFormat === "board") {
-    return <PenTool size={15} className="shrink-0 text-teal-500" />;
-  }
-  // 导图归一后是 contentFormat="mindmap" 的笔记节点；nodeType/resourceType 判断保留给遗留数据。
-  if (node.nodeType === "mindmap" || node.resourceType === "mindmap" || node.contentFormat === "mindmap") {
-    return <Waypoints size={15} className="shrink-0 text-violet-500" />;
-  }
-  if (node.contentFormat === "pdf") {
-    return <FileText size={15} className="shrink-0 text-red-500" />;
-  }
-  if (node.contentFormat === "markdown" || node.nodeType === "markdown") {
-    return <FileCode size={15} className="shrink-0 text-emerald-500" />;
-  }
-  return <FileText size={15} className="shrink-0 text-[var(--color-accent-primary)]" />;
+  // 与总览页共用一套 emoji 图标（见 knowledgeTreeIcons.ts），两处类型视觉一致
+  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, isRoot)}</span>;
 }
 
 const TAG_DOT_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#06b6d4"];
@@ -334,6 +395,154 @@ interface RowMenuState {
   docId?: string;
   x: number;
   y: number;
+}
+
+/** 面板内分区标题：统一的小圆点装饰 + 12px/600 标签（所有分区同一个符号，不做区分）。 */
+/** 回收站侧栏类型行的线性图标（与文件管理/插件行同一套 14px 线性图标语言）。 */
+function trashTypeIcon(key: string) {
+  switch (key) {
+    case "all": return <Layers size={14} className="shrink-0" />;
+    case "markdown": return <FileCode size={14} className="shrink-0" />;
+    case "mindmap": return <Network size={14} className="shrink-0" />;
+    case "board": return <PenTool size={14} className="shrink-0" />;
+    case "sheet": return <Table size={14} className="shrink-0" />;
+    case "attach": return <Paperclip size={14} className="shrink-0" />;
+    default: return <FileText size={14} className="shrink-0" />;
+  }
+}
+
+function PanelSection({ label, extra, children }: {
+  label: string;
+  extra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-app-border px-2 py-1.5">
+      <div className="flex items-center justify-between pl-1 pr-1 pb-1">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Circle size={6} aria-hidden className="shrink-0 fill-current text-tx-tertiary" />
+          <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">{label}</span>
+        </span>
+        {extra}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface AiConversationRow {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+function formatAiConversationRelativeTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} 天前`;
+  return date.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
+}
+
+/** AI 会话列表面板（方案 A）：会话列表上移到侧栏，主区 AIChatPanel 对话占全宽。
+ *  行点击 → nowen:ai-open-conversation 通知主区加载；列表变化 → nowen:ai-conversations-changed 刷新。 */
+function AiConversationsMiniPanel() {
+  const [conversations, setConversations] = useState<AiConversationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const reload = () => {
+      api.aiConversations.list()
+        .then((result) => { if (!cancelled) setConversations(result.conversations); })
+        .catch(() => { if (!cancelled) setConversations([]); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+    reload();
+    const handleConversationsChanged = () => reload();
+    const handleConversationSelected = (event: Event) => {
+      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (conversationId) setSelectedId(conversationId);
+    };
+    window.addEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
+    window.addEventListener("nowen:ai-conversation-selected", handleConversationSelected);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
+      window.removeEventListener("nowen:ai-conversation-selected", handleConversationSelected);
+    };
+  }, []);
+
+  const openConversation = useCallback((conversationId: string) => {
+    setSelectedId(conversationId);
+    window.dispatchEvent(new CustomEvent("nowen:ai-open-conversation", { detail: { conversationId } }));
+  }, []);
+
+  const handleCreateConversation = useCallback(() => {
+    void api.aiConversations.create()
+      .then((result) => {
+        setConversations((previous) => [result.conversation, ...previous]);
+        window.dispatchEvent(new CustomEvent("nowen:ai-conversations-changed"));
+        openConversation(result.conversation.id);
+      })
+      .catch(() => {});
+  }, [openConversation]);
+
+  return (
+    <div className="sbx-view">
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="flex items-center justify-between pl-1 pr-1 pb-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-tx-tertiary" />
+            <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">会话</span>
+          </span>
+          <button
+            type="button"
+            onClick={handleCreateConversation}
+            title="新建会话"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+        <div className="max-h-72 space-y-0.5 overflow-y-auto">
+          {loading && (
+            <div className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</div>
+          )}
+          {!loading && !conversations.length && (
+            <div className="px-2 py-2 text-[11px] text-tx-tertiary">暂无会话，点右上角新建</div>
+          )}
+          {!loading && conversations.map((conversation) => {
+            const active = conversation.id === selectedId;
+            const displayTitle = conversation.title || "未命名会话";
+            return (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => openConversation(conversation.id)}
+                title={displayTitle}
+                className={cn(
+                  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors",
+                  active
+                    ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                    : "text-tx-secondary hover:bg-app-hover",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{displayTitle}</span>
+                <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary">{formatAiConversationRelativeTime(conversation.updatedAt)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function SidebarDesktop() {
@@ -399,6 +608,10 @@ export default function SidebarDesktop() {
 
   // 行级菜单
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null);
+  // 行菜单里的“移动 / 分享”入口状态（侧栏内置面板/弹窗，无需离开当前页）。
+  const [moveNodeId, setMoveNodeId] = useState<string | null>(null);
+  const [shareNote, setShareNote] = useState<{ id: string; title: string } | null>(null);
+  const [shareNotebook, setShareNotebook] = useState<Notebook | null>(null);
 
   // 重命名（行内 input）。isNew = 刚新建、正处于"先建后改名"流程：
   // 这种情况下取消/清空名字要真正把节点删掉，否则"取消"只是个装饰按钮。
@@ -418,6 +631,9 @@ export default function SidebarDesktop() {
   }, [collapsedSections]);
   // 模块侧栏面板折叠状态（projects/files/shares 等单块面板，同样持久化）
   const SIDEBAR_PANEL_COLLAPSED_KEY = "nowen-next-sidebar-panel-collapsed";
+  // 文件管理面板的来源/筛选状态（filesUi）：订阅保证侧栏 chips 即时反映选择
+  const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
+  void filesUiVersion;
   const [panelCollapsed, setPanelCollapsed] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(SIDEBAR_PANEL_COLLAPSED_KEY);
@@ -458,17 +674,111 @@ export default function SidebarDesktop() {
   // ===== 侧栏活动栏视图（FR-IA-02）：kb / star / trash / files / plugins =====
   // Rail 点击经 nowen:sidebar-view 事件切换；主区视图不变（语雀式）
   type SidebarView = "kb" | "trash" | "files" | "plugins" | "projects" | "shares";
-  const [sidebarView, setSidebarView] = useState<SidebarView>("kb");
+  const [sidebarView, setSidebarView] = useState<SidebarView>(() => {
+    // 刷新/深链首次挂载：与 App 从 URL 恢复的主区 viewMode 对齐一次（如 /plugins → 插件侧栏）。
+    // 只在初始化时对齐，之后用户可自由切换侧栏，不在 viewMode 变化时强改。
+    const route = getCurrentAppRoute();
+    if (route.kind === "module") {
+      const map: Partial<Record<string, SidebarView>> = {
+        trash: "trash",
+        files: "files",
+        plugins: "plugins",
+        projects: "projects",
+        shares: "shares",
+        favorites: "kb",
+      };
+      const v = map[route.viewMode];
+      if (v) return v;
+    }
+    return "kb";
+  });
+  // 挂载早于路由恢复的兜底：若挂载时 URL 还不是模块路径（如经登录重定向后才落到
+  // /plugins），等第一次 viewMode 变化（路由恢复驱动）时重读 URL 对齐一次。
+  // 只消费一次，且只对齐到 URL 当前的模块视图——不会随之后每次 viewMode 变化强改侧栏。
+  const pendingSidebarRouteAlignRef = useRef(getCurrentAppRoute().kind !== "module");
+  const alignPrevViewModeRef = useRef(state.viewMode);
+  useEffect(() => {
+    if (alignPrevViewModeRef.current === state.viewMode) return;
+    alignPrevViewModeRef.current = state.viewMode;
+    if (!pendingSidebarRouteAlignRef.current) return;
+    pendingSidebarRouteAlignRef.current = false;
+    const route = getCurrentAppRoute();
+    if (route.kind !== "module") return;
+    const map: Partial<Record<string, SidebarView>> = {
+      trash: "trash",
+      files: "files",
+      plugins: "plugins",
+      projects: "projects",
+      shares: "shares",
+      favorites: "kb",
+      notebook: "kb",
+    };
+    const v = map[route.viewMode];
+    if (v && sidebarView !== v) applySidebarView(v);
+    // applySidebarView 是稳定引用；sidebarView 只用于避免重复设置
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.viewMode]);
 
   // 收藏 / 回收站 / 文件管理数据
   const [starDocs, setStarDocs] = useState<NoteListItem[]>([]);
   const [trashItems, setTrashItems] = useState<import("@/features/trash/trashTypes").TrashItem[]>([]);
+  // 侧栏回收站类型筛选（与主区 TrashPage 同语义：按 resourceType）
+  const [trashFilter, setTrashFilterState] = useState<TrashTypeFilterKey[]>(() => getTrashTypeFilter());
+  const [retentionDays, setRetentionDaysState] = useState(() => getRetentionDays());
+  const [timeFilter, setTimeFilterState] = useState<TrashTimeFilter>(() => getTrashTimeFilter());
+  const [notifyExpiry, setNotifyExpiryState] = useState(() => getTrashSetting("notifyExpiry"));
+  const [weeklySummary, setWeeklySummaryState] = useState(() => getTrashSetting("weeklySummary"));
+  const setTrashTypeFilter = useCallback((keys: TrashTypeFilterKey[]) => { setTrashFilterState(keys); persistTrashTypeFilter(keys); }, []);
+  // 回收站视图激活时，恢复/删除/清空等操作后即时刷新计数与类型分布
+  useEffect(() => {
+    if (sidebarView !== "trash") return;
+    const reload = () => { api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined); };
+    window.addEventListener("nowen:storage-changed", reload);
+    window.addEventListener("nowen:knowledge-tree-changed", reload);
+    window.addEventListener("nowen:notes-changed", reload);
+    return () => {
+      window.removeEventListener("nowen:storage-changed", reload);
+      window.removeEventListener("nowen:knowledge-tree-changed", reload);
+      window.removeEventListener("nowen:notes-changed", reload);
+    };
+  }, [sidebarView]);
+  // 文件管理视图激活时：上传/删除/清理后即时刷新计数（stats + 文件列表）
+  useEffect(() => {
+    if (sidebarView !== "files") return;
+    const reload = () => {
+      api.files.stats().then((s) => setFileStats(s)).catch(() => undefined);
+      api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
+    };
+    window.addEventListener("nowen:storage-changed", reload);
+    window.addEventListener("nowen:knowledge-tree-changed", reload);
+    window.addEventListener("nowen:notes-changed", reload);
+    return () => {
+      window.removeEventListener("nowen:storage-changed", reload);
+      window.removeEventListener("nowen:knowledge-tree-changed", reload);
+      window.removeEventListener("nowen:notes-changed", reload);
+    };
+  }, [sidebarView]);
+  useEffect(() => {
+    const onFilter = () => { setTrashFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); }
+    const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };
+    window.addEventListener("nowen:trash-filter", onFilter);
+    window.addEventListener("nowen:trash-settings", onSettings);
+    return () => {
+      window.removeEventListener("nowen:trash-filter", onFilter);
+      window.removeEventListener("nowen:trash-settings", onSettings);
+    };
+  }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
-  const [fileCat, setFileCat] = useState<"all" | "image" | "other">("all");
+  const [fileStats, setFileStats] = useState<FileStats | null>(null);
+  const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
   // 插件列表（后端 GET /plugins）
-  const [plugCat, setPlugCat] = useState<"installed" | "market" | "disabled">("installed");
+  const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "config">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
+  // 插件面板入口上的计数（市场条目数 / 可用更新数），带 5 分钟缓存的轻量请求
+  const [pluginCounts, setPluginCounts] = useState<PluginCounts | null>(() => peekPluginCounts());
   const [joinOpen, setJoinOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   // 知识库面板：+ 新建菜单（复用旧版 KnowledgeTreeCreateDropdown）与 ⋮ 更多菜单（排序/折叠/刷新）
   const [createMenuState, setCreateMenuState] = useState<KnowledgeTreeCreateMenuState | null>(null);
   // Yuque 导入模态：null = 关闭；非 null = 目标笔记本 id（fallback 由 YuqueImport 处理）
@@ -479,6 +789,8 @@ export default function SidebarDesktop() {
   const [uploadOpen, setUploadOpen] = useState(false);
   // 侧栏内嵌打开的插件面板（runtimeId），null = 未打开（返回条隐藏）
   const [openPluginPanel, setOpenPluginPanel] = useState<string | null>(null);
+  // 独立插件模块（待办/日记/AI）：界面与知识库无关，侧栏只显示插件自己的顶块与内容
+  const standalonePluginPanel = openPluginPanel === "tasks" || openPluginPanel === "diary" || openPluginPanel === "ai";
   // 知识树统一选中系统：单选/ctrl 多选/shift 范围选；点空白清空
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(() => {
     try {
@@ -509,6 +821,8 @@ export default function SidebarDesktop() {
     }
     if (view === "files") {
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => setFileItems([]));
+      api.files.stats().then((s) => setFileStats(s)).catch(() => setFileStats(null));
+      api.getRemoteFileSources().then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })))).catch(() => setRemoteSources([]));
     }
     if (view === "plugins") {
       api.plugins.list().then((list) => setPlugins(list)).catch(() => setPlugins([]));
@@ -536,6 +850,22 @@ export default function SidebarDesktop() {
     window.addEventListener("nowen:open-plugin-panel", onOpenPanel);
     return () => window.removeEventListener("nowen:open-plugin-panel", onOpenPanel);
   }, []);
+
+  // 插件面板入口的计数：进入插件视图时取一次（带 5 分钟缓存），并跟随刷新事件更新
+  useEffect(() => {
+    if (sidebarView !== "plugins") return;
+    let alive = true;
+    const onCounts = (event: Event) => {
+      const detail = (event as CustomEvent<PluginCounts>).detail;
+      if (alive && detail) setPluginCounts(detail);
+    };
+    window.addEventListener(PLUGIN_COUNTS_EVENT, onCounts);
+    void loadPluginCounts().then((counts) => { if (alive) setPluginCounts(counts); }).catch(() => undefined);
+    return () => {
+      alive = false;
+      window.removeEventListener(PLUGIN_COUNTS_EVENT, onCounts);
+    };
+  }, [sidebarView]);
 
   // PM 主区激活时，侧栏跟随切到项目面板（URL 直达/刷新恢复不走 Rail 点击，需主动跟随）
   useEffect(() => {
@@ -566,8 +896,14 @@ export default function SidebarDesktop() {
   useEffect(() => {
     reloadStar();
     const onKbChanged = () => reloadStar();
+    // nowen:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
+    const onNotesChanged = () => reloadStar();
     window.addEventListener("nowen:knowledge-tree-changed", onKbChanged);
-    return () => window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
+    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    return () => {
+      window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
+      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+    };
   }, [reloadStar]);
 
   useEffect(() => {
@@ -576,9 +912,16 @@ export default function SidebarDesktop() {
     return () => window.removeEventListener("nowen:builtin-plugins-changed", onChanged);
   }, []);
 
-  const reloadTrash = useCallback(() => {
-    api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined);
+  // 主区工作区切分组（如安装后跳「已安装」）时，侧栏分类跟着高亮，两边只有一套分组
+  useEffect(() => {
+    const onGroup = (event: Event) => {
+      const next = (event as CustomEvent<{ group?: typeof plugCat }>).detail?.group;
+      if (next) setPlugCat(next);
+    };
+    window.addEventListener("nowen:plugin-group", onGroup);
+    return () => window.removeEventListener("nowen:plugin-group", onGroup);
   }, []);
+
   const reloadFiles = useCallback(() => {
     api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
   }, []);
@@ -675,7 +1018,7 @@ export default function SidebarDesktop() {
     try {
       const response = await knowledgeTreeApi.list();
       if (seq !== reloadSeqRef.current) return;
-      setNodes(response.nodes);
+      setNodes(Array.isArray(response?.nodes) ? response.nodes : []);
     } catch (error) {
       console.error("[SidebarDesktop] knowledge tree load failed:", error);
     } finally {
@@ -1042,14 +1385,13 @@ export default function SidebarDesktop() {
     return starDocs.filter((doc) => docRootMap.docRoot.get(doc.id) === focusRootResourceId);
   }, [starDocs, focusRootResourceId, docRootMap]);
 
-  // 收藏区段的根层知识库：树节点 isFavorite=1 的知识库（notebook 收藏落 notebooks 表），
-  // 同样跟随聚焦范围——聚焦某库时只显示该库自身的收藏项
+  // 收藏区段的知识库条目：只在全空间（未聚焦）时显示；聚焦某库时该库自身就在眼前，
+  // 再列一条"知识库"收藏是冗余，直接隐藏（文档收藏仍按聚焦范围过滤）
   const visibleStarKbs = useMemo(() => {
-    const kbs = nodes.filter(
+    if (focusRootResourceId) return [];
+    return nodes.filter(
       (n) => !n.isDeleted && n.parentId === null && n.resourceType === "notebook" && n.isFavorite === 1,
     );
-    if (!focusRootResourceId) return kbs;
-    return kbs.filter((kb) => kb.resourceId === focusRootResourceId);
   }, [nodes, focusRootResourceId]);
 
   // 收藏模块：当前笔记不在（可见）收藏中时，自动落到第一条收藏（避免编辑器停留在无关笔记）。
@@ -1593,6 +1935,112 @@ export default function SidebarDesktop() {
     }
   }, [focusRootId]);
 
+  /** 复制文档 = 连接：正文、附件、标签都不复制，只多一条指向同一份内容的路径。 */
+  const duplicateNoteNode = useCallback(async (node: KnowledgeTreeNode) => {
+    if (node.resourceType !== "note") return;
+    try {
+      const reference = await knowledgeTreeApi.createReference(node.resourceId, node.parentId || undefined);
+      if (reference.parentId) setExpanded((cur) => new Set(cur).add(reference.parentId!));
+      await reload();
+      actions.refreshNotes();
+      toast.success("已复制，副本与原文档共用同一份内容");
+    } catch (error) {
+      console.error("[SidebarDesktop] copy note reference failed:", error);
+      toast.error(error instanceof Error ? error.message : "复制失败");
+    }
+  }, [actions, reload]);
+
+  /** 复制文件夹/知识库：整棵子树（子目录、文档、附件）深拷贝到同级。 */
+  const duplicateFolderNode = useCallback(async (node: KnowledgeTreeNode) => {
+    if (node.resourceType !== "notebook") return;
+    const toastId = toast.info(`正在复制“${node.title}”…`, 0);
+    try {
+      const result = await knowledgeTreeApi.duplicateFolder(node.id);
+      toast.dismiss(toastId);
+      const skipped = result.skippedNoteCount + result.skippedFileCount;
+      toast.success(skipped > 0
+        ? `已复制为“${result.title}”，跳过 ${skipped} 项无法复制的内容`
+        : `已复制为“${result.title}”`);
+      if (node.parentId) setExpanded((cur) => new Set(cur).add(node.parentId!));
+      await reload();
+      actions.refreshNotes();
+      actions.refreshNotebooks();
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] duplicate folder failed:", error);
+      toast.error(error instanceof Error ? error.message : "复制文件夹失败");
+    }
+  }, [actions, reload]);
+
+  /** 导出单篇文档：与知识库面板同一套格式。 */
+  const exportNoteNode = useCallback(async (node: KnowledgeTreeNode, actionId: string) => {
+    if (node.resourceType !== "note") return;
+    const toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    try {
+      if (actionId === "export_note_md" || actionId === "export_note_md_zip") {
+        const ok = await exportSingleNote(node.resourceId, { forceZip: actionId === "export_note_md_zip" });
+        if (!ok) throw new Error("导出失败");
+      } else if (actionId === "export_note_pdf") {
+        const result = await exportSingleNoteAsPDF(node.resourceId);
+        if (!result.ok && result.mode !== "canceled") {
+          throw new Error((result as { error?: string }).error || "导出失败");
+        }
+      } else if (actionId === "export_note_png" || actionId === "export_note_jpg") {
+        const fresh = await api.getNote(node.resourceId);
+        const ok = await exportNoteAsImage({
+          id: fresh.id,
+          title: fresh.title,
+          content: fresh.content,
+          contentText: fresh.contentText,
+          contentFormat: fresh.contentFormat,
+          updatedAt: fresh.updatedAt,
+        }, { format: actionId.endsWith("png") ? "png" : "jpg" });
+        if (!ok) throw new Error("导出失败");
+      } else if (actionId === "export_note_word") {
+        const fresh = await api.getNote(node.resourceId);
+        const { exportNoteAsDocx, downloadDocxBlob } = await import("@/lib/wordNoteService");
+        const blob = await exportNoteAsDocx(fresh.content || "", fresh.title || "未命名笔记");
+        await downloadDocxBlob(blob, fresh.title || "未命名笔记");
+      }
+      toast.dismiss(toastId);
+      toast.success("导出完成");
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] export note failed:", error);
+      toast.error(error instanceof Error ? error.message : "导出失败");
+    }
+  }, []);
+
+  /** 导出目录（含子目录）：与文档一致，可选 Markdown / PDF / PNG / JPG / Word。 */
+  const exportFolderNode = useCallback(async (node: KnowledgeTreeNode, format: NotebookExportFormat) => {
+    if (node.resourceType !== "notebook") return;
+    const { ids, names } = descendantNotebookResources(node, nodes);
+    let toastId = toast.info(`正在导出“${node.title}”…`, 0);
+    try {
+      const ok = await exportNotebookAsFormat({
+        notebookId: node.resourceId,
+        notebookName: node.title,
+        descendantNotebookIds: ids,
+        descendantNotebookNames: names,
+      }, format, (progress) => {
+        // 逐篇渲染/打包时把粘性提示换成当前进度，避免长目录导出“毫无反应”。
+        if (progress.phase !== "converting" && progress.phase !== "packing") return;
+        toast.dismiss(toastId);
+        toastId = toast.info(progress.message, 0);
+      });
+      toast.dismiss(toastId);
+      if (ok) {
+        toast.success("导出完成");
+      } else {
+        toast.error("导出失败");
+      }
+    } catch (error) {
+      toast.dismiss(toastId);
+      console.error("[SidebarDesktop] export folder failed:", error);
+      toast.error(error instanceof Error ? error.message : "导出失败");
+    }
+  }, [nodes]);
+
   // 选中节点的键盘快捷键：F2 重命名 / Delete 删除（与行菜单右侧提示一致）。
   // 必须放在 deleteNode 声明之后——依赖数组在渲染期求值，提前引用即 TDZ。
   useEffect(() => {
@@ -1668,6 +2116,43 @@ export default function SidebarDesktop() {
     setRowMenu(null);
   }, [nodes, focusRootId, childrenMap]);
 
+  /**
+   * 打开的文档 → 侧栏选中同步（VS Code 式定位）：页签切换 / 命令面板 / 列表打开文档时，
+   * 自动退出专注、展开祖先、选中对应节点并滚动到位，避免"编辑器显示 b、侧栏还选着 a"。
+   */
+  const revealNoteById = useCallback((noteId: string) => {
+    const hit = nodes.find((n) => !n.isDeleted && n.nodeType !== "folder" && n.resourceId === noteId);
+    if (!hit) return;
+    if (focusRootId && hit.id !== focusRootId && !isDescendant(hit.id, focusRootId, childrenMap)) {
+      setFocusRootId(null);
+    }
+    setExpanded((current) => {
+      const next = new Set(current);
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      let cursor: KnowledgeTreeNode | undefined = hit;
+      while (cursor?.parentId) {
+        next.add(cursor.parentId);
+        cursor = byId.get(cursor.parentId);
+      }
+      return next;
+    });
+    setSelectedNodeIds(new Set([hit.id]));
+    requestAnimationFrame(() => {
+      const el = treeRootRef.current?.querySelector(`[data-next-row="${hit.id}"]`);
+      el?.scrollIntoView({ block: "center" });
+    });
+  }, [nodes, focusRootId, childrenMap]);
+
+  // activeNote 变化（页签切换 / 命令面板 / 侧栏打开）时把选中与滚动定位同步过去；
+  // lastRevealedIdRef 防止同一文档重复触发（避免与用户手动多选打架）。
+  const lastRevealedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = state.activeNote?.id ?? null;
+    if (!id || lastRevealedIdRef.current === id) return;
+    lastRevealedIdRef.current = id;
+    revealNoteById(id);
+  }, [state.activeNote?.id, revealNoteById]);
+
   // ---- 菜单渲染位置修正（底部越界上翻） ----
   const menuStyle = useMemo(() => {
     if (!rowMenu) return {};
@@ -1718,7 +2203,7 @@ export default function SidebarDesktop() {
               reorderActive === "kb" && "opacity-40",
             )}
           >
-            <FaBook size={13} className="shrink-0 text-accent-primary" />
+            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(focusRoot, true)}</span>
             <button
               type="button"
               onClick={() => openKbOverview(focusRoot.resourceId)}
@@ -1926,6 +2411,12 @@ export default function SidebarDesktop() {
                         >
                           {fileIconFor(node, !focusRootId && depth === 0)}
                           <span className="min-w-0 flex-1 truncate">{node.title}</span>
+                          {/* 复制 = 连接：同一篇文档的额外路径带一个链标，提示正文只有一份 */}
+                          {node.isReference && (
+                            <span className="shrink-0 text-tx-tertiary" title="同一份内容的另一条路径">
+                              <Link2 size={10} />
+                            </span>
+                          )}
                           {isFolder && (
                             <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">
                               {docCountMap.get(node.id) ?? 0}
@@ -2116,11 +2607,7 @@ export default function SidebarDesktop() {
                           onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          {doc.contentFormat === "markdown" ? (
-                            <FileCode size={15} className="shrink-0 text-emerald-500" />
-                          ) : (
-                            <FileText size={15} className="shrink-0 text-[var(--color-accent-primary)]" />
-                          )}
+                          <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                           <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                         </button>
                         <button
@@ -2192,13 +2679,7 @@ export default function SidebarDesktop() {
                       isActive ? "bg-app-active text-tx-primary" : "text-tx-primary hover:bg-app-hover",
                     )}
                   >
-                    {tab.contentFormat === "markdown" ? (
-                      <FileCode size={14} className="shrink-0 text-emerald-500" />
-                    ) : tab.contentFormat === "board" ? (
-                      <PenTool size={14} className="shrink-0 text-teal-500" />
-                    ) : (
-                      <FileText size={14} className="shrink-0 text-[var(--color-accent-primary)]" />
-                    )}
+                    <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(tab.contentFormat)}</span>
                     <button
                       type="button"
                       onClick={() => void openNoteFromTab(tab.id)}
@@ -2298,7 +2779,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <span className="sbx-ico"><FaBook size={14} className="text-accent-primary" /></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(kb, true)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{kb.title}</div>
                       <div className="sbx-sub">知识库</div>
@@ -2326,7 +2807,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => { void openNoteFromTab(doc.id); }}
                   >
-                    <span className="sbx-ico">{doc.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{doc.title}</div>
                       <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
@@ -2351,14 +2832,22 @@ export default function SidebarDesktop() {
     ),
   };
 
+  const activeWorkspace = workspaces.find((w) => w.id === currentWs);
+  const canManageActiveWorkspace = Boolean(
+    activeWorkspace && (activeWorkspace.role === "owner" || activeWorkspace.role === "admin"),
+  );
+
   return (
     <aside
       className="relative flex h-full min-w-0 flex-col overflow-hidden border-r border-app-border bg-app-surface text-tx-primary"
       style={{ width: sidebarWidth }}
       data-next-sidebar=""
     >
-      {/* ===== 头部：位置 + 搜索（筛选内置在搜索结果面板内）（48px，三区通栏线对齐） ===== */}
-      <header className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2.5">
+      {/* ===== 头部：位置 + 搜索 —— 仅知识库视图显示；模块视图有自己的面板头 ===== */}
+      <header
+        className="relative flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border px-2"
+        style={sidebarView === "kb" && !standalonePluginPanel ? undefined : { display: "none" }}
+      >
         <div ref={spaceRef} className="relative shrink-0">
           <button
             type="button"
@@ -2367,7 +2856,16 @@ export default function SidebarDesktop() {
             title={t("sidebarNext.switchSpace", { defaultValue: "切换空间" })}
             className="flex h-8 max-w-[104px] items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-tx-primary transition-colors hover:bg-app-hover"
           >
-            <Home size={14} className="shrink-0 text-tx-tertiary" />
+            {activeWorkspace?.avatarUrl ? (
+              <img
+                key={activeWorkspace.avatarUrl}
+                src={api.workspaceAvatarFileUrl(activeWorkspace.id, activeWorkspace.updatedAt)}
+                alt=""
+                className="h-5 w-5 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <Home size={14} className="shrink-0 text-tx-tertiary" />
+            )}
             <span className="min-w-0 truncate">
               {currentWs && currentWs !== "personal"
                 ? workspaces.find((w) => w.id === currentWs)?.name ?? "团队空间"
@@ -2397,11 +2895,38 @@ export default function SidebarDesktop() {
                   onClick={() => { switchSpace(w.id); setSpaceOpen(false); }}
                   className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
                 >
-                  <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  {w.avatarUrl ? (
+                    <img
+                      key={w.avatarUrl}
+                      src={api.workspaceAvatarFileUrl(w.id, w.updatedAt)}
+                      alt=""
+                      className="h-4 w-4 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  )}
                   <span className="flex-1">{w.name}</span>
                   {currentWs === w.id && <Check size={12} className="text-accent-primary" />}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => { setSpaceOpen(false); setCreateOpen(true); }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
+              >
+                <Plus size={13} className="shrink-0 text-tx-tertiary" />
+                <span className="flex-1">创建空间</span>
+              </button>
+              {canManageActiveWorkspace && (
+                <button
+                  type="button"
+                  onClick={() => { setSpaceOpen(false); setManageOpen(true); }}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-app-hover"
+                >
+                  <Users size={13} className="shrink-0 text-tx-tertiary" />
+                  <span className="flex-1">空间管理</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setSpaceOpen(false); setJoinOpen(true); }}
@@ -2562,11 +3087,7 @@ export default function SidebarDesktop() {
                             onClick={() => void openSearchDoc(doc.id)}
                             className="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                           >
-                            {doc.contentFormat === "markdown" ? (
-                              <FileCode size={13} className="shrink-0 text-emerald-500" />
-                            ) : (
-                              <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                            )}
+                            <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                             <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                           </button>
                         ))}
@@ -2587,11 +3108,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {doc.contentFormat === "markdown" ? (
-                        <FileCode size={13} className="shrink-0 text-emerald-500" />
-                      ) : (
-                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
                       <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
                     </button>
@@ -2620,11 +3137,7 @@ export default function SidebarDesktop() {
                       }}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {node.nodeType === "folder" ? (
-                        <FaFolder size={13} className="shrink-0 text-amber-500" />
-                      ) : (
-                        <FaBook size={13} className="shrink-0 text-accent-primary" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, node.parentId === null)}</span>
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
                     </button>
                   ))}
@@ -2644,11 +3157,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      {doc.contentFormat === "markdown" ? (
-                        <FileCode size={13} className="shrink-0 text-emerald-500" />
-                      ) : (
-                        <FileText size={13} className="shrink-0 text-[var(--color-accent-primary)]" />
-                      )}
+                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                     </button>
                   ))}
@@ -2713,41 +3222,31 @@ export default function SidebarDesktop() {
         </div>
       )}
 
-      {/* 内置官方插件的侧栏迷你面板（打开时遮盖知识库，带返回条） */}
+      {/* 内置插件的侧栏面板：模块切换归导航栏（Rail）管，侧栏不放"返回知识库"这类跨模块入口。
+          待办/日记/AI 界面独立：顶块 = 插件模块顶块（与文件管理/回收站同规格），KB 树不渲染。 */}
         {openPluginPanel && (
           <div className="shrink-0">
             {(() => {
               const def = BUILTIN_PLUGINS.find((p) => p.id === openPluginPanel);
               if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
+              const standalone = def.id === "tasks" || def.id === "diary" || def.id === "ai";
+              const PanelIcon = def.id === "tasks" ? ListTodo : def.id === "diary" ? BookOpen : Sparkles;
               return (
                 <>
-                  <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-1 py-1">
-                    <button
-                      type="button"
-                      onClick={() => setOpenPluginPanel(null)}
-                      title="返回知识库"
-                      className="flex h-5 w-5 items-center justify-center rounded text-accent-primary hover:bg-app-hover"
-                    >
-                      <ChevronDown size={13} className="rotate-90" />
-                    </button>
-                    <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{def.sidebarPanel.title}</span>
-                  </div>
-                  {def.id === "tasks" && <TasksMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
-                  {def.id === "diary" && <DiaryMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
-                  {def.id === "pm" && <PmMiniPanel onOpenMain={(view) => { actions.setViewMode(view); }} />}
-                  {def.id === "ai" && (
-                    <div className="sbx-view">
-                      <div className="px-2 pb-2">
-                        <p className="sbx-view-empty">AI 基于知识库回答问题，支持检索引用与上下文来源。</p>
-                        <div className="sbx-foot-row">
-                          <span className="sbx-foot-tip" />
-                          <button type="button" className="sbx-foot-link" onClick={() => actions.setViewMode("ai-chat")}>
-                            在主区打开
-                          </button>
-                        </div>
-                      </div>
+                  {standalone ? (
+                    <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><PanelIcon size={13} /></span>
+                      <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">{def.sidebarPanel.title}</span>
+                    </div>
+                  ) : (
+                    <div className="mx-2 mb-1 mt-2 flex items-center gap-1 rounded-md bg-accent-primary/10 px-2 py-1">
+                      <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-accent-primary">{def.sidebarPanel.title}</span>
                     </div>
                   )}
+                  {def.id === "tasks" && <TasksMiniPanel />}
+                  {def.id === "diary" && <DiaryMiniPanel />}
+                  {def.id === "pm" && <PmMiniPanel />}
+                  {def.id === "ai" && <AiConversationsMiniPanel />}
                 </>
               );
             })()}
@@ -2783,213 +3282,339 @@ export default function SidebarDesktop() {
           />
         )}
 
-        {/* ===== 回收站视图 ===== */}
+        {/* ===== 回收站视图 =====
+             面板头 h-10：与主区回收站页的筛选行（40px）同一节奏，横线贯通对齐。
+             职责 = 浏览 + 单条恢复/删除；清空、批量、筛选只在主区完整工作区。 */}
         {sidebarView === "trash" && (
           <div className="sbx-view">
-            <div className="sbx-view-head"><span>回收站</span><span className="flex-1" /><span className="sbx-badge">{trashItems.length}</span></div>
-            <div
-              className="mx-2 mb-1 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-accent-danger hover:bg-app-hover"
-              onClick={() => {
-                if (trashItems.length === 0) return;
-                api.trash.empty(getCurrentWorkspace()).then(() => reloadTrash()).catch(() => undefined);
-              }}
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Trash2 size={13} /></span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">回收站</span>
+            </div>
+            {/* 类型多选：与回收站/文件管理共用 TypeFilterPopover（触发行 + 两列勾选弹层） */}
+            <TypeFilterPopover
+              label="类型 · 可多选"
+              items={(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => ({
+                key,
+                label: key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key,
+                count: key === "all" ? trashItems.length : trashItems.filter((item) => trashTypeKey(item.resourceType, item.contentFormat) === key).length,
+                icon: trashTypeIcon(key),
+              }))}
+              selected={trashFilter}
+              onChange={(keys) => setTrashTypeFilter(keys.length ? keys : ["all"])}
+              multi
+              totalCount={trashItems.length}
+            />
+            <PanelSection
+              label="删除时间"
             >
-              <Trash2 size={13} />
-              清空回收站
-            </div>
-            <div className="px-1 pb-2">
-              {trashItems.length === 0 ? (
-                <p className="sbx-view-empty">回收站是空的</p>
-              ) : trashItems.map((item) => (
-                <div key={item.id} className="sbx-row group">
-                  <span className="sbx-ico">{item.resourceType === "notebook" ? <Folder size={14} className="text-amber-500" /> : item.contentFormat === "markdown" ? <FileCode size={14} className="text-emerald-500" /> : <FileText size={14} className="text-accent-primary" />}</span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{item.title}</div>
-                    <div className="sbx-sub">{item.resourceType === "notebook" ? "文件夹" : "文档"} · {item.deletedAt ? item.deletedAt.slice(5, 10) : ""} 删除</div>
-                  </span>
-                  <span className="sbx-acts">
+              <div className="flex flex-wrap gap-1 px-1">
+                {TRASH_TIME_META.filter((meta) => meta.key !== "older" || retentionDays > 30).map((meta) => (
+                  <button
+                    key={meta.key}
+                    type="button"
+                    aria-pressed={timeFilter === meta.key}
+                    onClick={() => { setTimeFilterState(meta.key); setTrashTimeFilter(meta.key); }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${timeFilter === meta.key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+            </PanelSection>
+            <PanelSection
+              label="自动清理"
+            >
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
+                <span>保留期限</span>
+                <span className="flex gap-1">
+                  {TRASH_RETENTION_OPTIONS.map((days) => (
                     <button
+                      key={days}
                       type="button"
-                      title="恢复"
-                      onClick={() => { api.trash.mutate(getCurrentWorkspace(), "restore", [item.id]).then(() => { reloadTrash(); window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")); }).catch(() => undefined); }}
-                      className="sbx-btn"
+                      aria-pressed={retentionDays === days}
+                      onClick={() => { setRetentionDaysState(days); setRetentionDays(days); }}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] ${retentionDays === days ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
                     >
-                      <RotateCcw size={12} />
+                      {days} 天
                     </button>
-                    <button
-                      type="button"
-                      title="彻底删除"
-                      onClick={() => { api.trash.mutate(getCurrentWorkspace(), "permanent", [item.id]).then(() => reloadTrash()).catch(() => undefined); }}
-                      className="sbx-btn hover:text-accent-danger"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
+                  ))}
+                </span>
+              </div>
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
+                <span>到期前提醒我</span>
+                <button
+                  type="button"
+                  aria-pressed={notifyExpiry}
+                  aria-label="到期前提醒我"
+                  onClick={() => { const next = !notifyExpiry; setNotifyExpiryState(next); setTrashSetting("notifyExpiry", next); }}
+                  className={`relative h-[17px] w-[30px] rounded-full transition-colors ${notifyExpiry ? "bg-accent-primary" : "bg-app-border"}`}
+                >
+                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${notifyExpiry ? "left-[15px]" : "left-0.5"}`} />
+                </button>
+              </div>
+              <div className="flex h-8 items-center justify-between px-2 text-[12px] text-tx-secondary">
+                <span>每周清理摘要</span>
+                <button
+                  type="button"
+                  aria-pressed={weeklySummary}
+                  aria-label="每周清理摘要"
+                  onClick={() => { const next = !weeklySummary; setWeeklySummaryState(next); setTrashSetting("weeklySummary", next); }}
+                  className={`relative h-[17px] w-[30px] rounded-full transition-colors ${weeklySummary ? "bg-accent-primary" : "bg-app-border"}`}
+                >
+                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${weeklySummary ? "left-[15px]" : "left-0.5"}`} />
+                </button>
+              </div>
+              <div className="px-1 pb-1 pt-0.5 text-[10px] leading-relaxed text-tx-tertiary">到期条目自动彻底删除；提醒走应用内通知与图标徽标</div>
+            </PanelSection>
           </div>
         )}
 
         {/* ===== 项目管理视图 ===== */}
         {sidebarView === "projects" && (
           <div>
-            <div className="sbx-view-head cursor-pointer select-none" onClick={() => togglePanelCollapsed("projects")} title={panelCollapsed.projects ? "展开" : "折叠"}>
-              <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.projects && "-rotate-90")} />
-              <span>项目管理</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><KanbanSquare size={13} /></span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">项目管理</span>
             </div>
-            {!panelCollapsed.projects && <ProjectsSidePanel onOpenMain={() => actions.setViewMode("projects")} />}
+            {!panelCollapsed.projects && <ProjectsSidePanel />}
           </div>
         )}
 
-        {/* ===== 分享管理视图 ===== */}
+        {/* ===== 分享中心视图 ===== */}
         {sidebarView === "shares" && (
           <div>
-            <div className="sbx-view-head cursor-pointer select-none" onClick={() => togglePanelCollapsed("shares")} title={panelCollapsed.shares ? "展开" : "折叠"}>
-              <ChevronDown size={12} className={cn("shrink-0 transition-transform", panelCollapsed.shares && "-rotate-90")} />
-              <span>分享管理</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Link2 size={13} /></span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">分享中心</span>
             </div>
-            {!panelCollapsed.shares && <SharesSidePanel onOpenMain={() => actions.setViewMode("shares")} />}
+            {!panelCollapsed.shares && <SharesSidePanel />}
           </div>
         )}
 
-        {/* ===== 文件管理视图 ===== */}
+        {/* ===== 文件管理视图 =====
+             侧栏 = 来源选择 + 该来源的筛选/设置；列表与批量在主区。 */}
         {sidebarView === "files" && (
           <div className="sbx-view">
-            <div className="sbx-view-head">
-              <button
-                type="button"
-                aria-expanded={!panelCollapsed.files}
-                title={panelCollapsed.files ? "展开" : "折叠"}
-                className="flex items-center gap-1 text-xs text-tx-secondary hover:text-tx-primary"
-                onClick={() => togglePanelCollapsed("files")}
-              >
-                <ChevronDown size={12} className={cn("transition-transform", panelCollapsed.files && "-rotate-90")} />
-                <span>文件管理</span>
-              </button>
-              <span className="flex-1" />
-              <button type="button" title="上传文件" onClick={() => setUploadOpen(true)} className="sbx-btn">
-                <Upload size={13} />
-              </button>
-              <span className="sbx-badge">{fileItems.length}</span>
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-[13px] pr-2 text-xs">
+              <Inbox size={14} className="mx-[1px] shrink-0 text-tx-tertiary" />
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">文件管理</span>
             </div>
-            {!panelCollapsed.files && (
-            <>
-            <div className="sbx-chips">
-              {([["all", "全部"], ["image", "图片"], ["other", "其他"]] as Array<[typeof fileCat, string]>).map(([cat, label]) => (
-                <span key={cat} className={cn("sbx-chip", fileCat === cat && "on")} onClick={() => setFileCat(cat)}>{label}</span>
-              ))}
-              <span
-                className="sbx-chip"
-                title="远程文件（WebDAV / 百度网盘）：在文件管理中打开"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent("nowen:files-remote-tab"));
-                  actions.setViewMode("files");
-                }}
-              >
-                ☁ 远程
-              </span>
+            {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
+            <PanelSection label="来源">
+              <div className="space-y-0.5">
+                {([["all", FolderOpen, "文件"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", Cloud, "远程文件"]] : [])] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesSource() === key}
+                    onClick={() => setFilesUi({ source: key })}
+                    className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${getFilesSource() === key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+                  >
+                    <Icon size={14} className="shrink-0 opacity-80" />
+                    <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                    {/* 角标：统一文件总数（远程文件的条目数由面板自管，不在此统计） */}
+                    {key === "all" && fileStats && (
+                      <span className="tabular-nums text-tx-tertiary">{fileStats.total}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </PanelSection>
+            {getFilesSource() !== "remote" && (<>
+            <PanelSection label="分类">
+              <div className="space-y-0.5">
+                {([[ "all", Layers, "全部"], ["myUploads", Upload, "我的上传"], ["referenced", FileText, "文档引用"], ["unreferenced", Sparkles, "未引用"]] as Array<[string, typeof Layers, string]>).map(([key, Icon, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesCategory() === key}
+                    onClick={() => setFilesUi({ category: key })}
+                    className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${getFilesCategory() === key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+                    title={key === "referenced" ? "被至少一篇笔记正文引用着的附件" : key === "unreferenced" ? "没被任何笔记正文引用的附件（手动上传的会显示盾牌，不会被自动清理）" : undefined}
+                  >
+                    <Icon size={14} className="shrink-0 opacity-80" />
+                    <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+                    {fileStats && <span className="ml-auto tabular-nums text-tx-tertiary">{
+                      key === "all" ? fileStats.total
+                      : key === "myUploads" ? fileStats.myUploads?.total ?? 0
+                      : key === "referenced" ? fileStats.referenced?.count ?? 0
+                      : fileStats.unreferenced?.count ?? 0}</span>}
+                  </button>
+                ))}
+              </div>
+            </PanelSection>
+            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），单选 */}
+            <TypeFilterPopover
+              label="类型"
+              items={FILE_TYPE_CHIPS.map((chip) => ({
+                key: chip.key,
+                label: chip.label,
+                count: !fileStats ? undefined
+                  : chip.key === "all" ? fileStats.total
+                  : chip.key === "image" ? fileStats.images.count
+                  : chip.key === "video" ? fileStats.videos?.count ?? 0
+                  : chip.key === "audio" ? fileStats.audios?.count ?? 0
+                  : chip.key === "doc" ? fileStats.documents?.count ?? 0
+                  : fileStats.others?.count ?? 0,
+                icon: chip.key === "all" ? <Layers size={12} />
+                  : chip.key === "image" ? <Image size={12} />
+                  : chip.key === "video" ? <Film size={12} />
+                  : chip.key === "audio" ? <Music size={12} />
+                  : chip.key === "doc" ? <FileText size={12} />
+                  : <FileQuestion size={12} />,
+              }))}
+              selected={[getFilesType()]}
+              onChange={(keys) => setFilesUi({ type: keys[0] })}
+              totalCount={fileStats?.total}
+            />
+            {/* 分享状态：只看生效中（未关闭且未过期）的只读分享链接。 */}
+            <PanelSection label="分享状态">
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_SHARE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={getFilesShare() === opt.value}
+                    onClick={() => setFilesUi({ share: opt.value })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesShare() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                    title={opt.value === "shared" ? fileStats ? `已分享 · ${fileStats.shared?.count ?? 0} 个` : undefined : undefined}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            <PanelSection label="上传时间">
+              <div className="flex flex-wrap gap-1 px-1">
+                {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesTime() === key}
+                    onClick={() => setFilesUi({ time: key })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            <PanelSection label="展示">
+              <div className="grid grid-cols-2 gap-1 px-1">
+                {([[ "list", "列表"], ["grid", "网格"]] as Array<[FilesViewMode, string]>).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={getFilesViewMode() === mode}
+                    onClick={() => setFilesUi({ view: mode })}
+                    className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${getFilesViewMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-3 gap-1 px-1">
+                {([[ "flat", "扁平"], ["notebook", "按库"], ["folder", "按文件夹"]] as Array<[FilesGroupMode, string]>).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={getFilesGroupMode() === mode}
+                    onClick={() => setFilesUi({ group: mode })}
+                    className={`rounded-md border px-1 py-1 text-[11px] transition-colors ${getFilesGroupMode() === mode ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            </>)}
+            {getFilesSource() === "remote" && (<>
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_REMOTE_TYPE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    aria-pressed={getFilesRemoteTypes().includes(chip.key)}
+                    onClick={() => {
+                      const current = getFilesRemoteTypes();
+                      setFilesUi({ remoteTypes: current.includes(chip.key) ? current.filter((t) => t !== chip.key) : [...current, chip.key] });
+                    }}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTypes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{chip.label}</button>
+                ))}
+              </div>
             </div>
-            <div className="px-1 pb-2">
-              {fileItems.filter((f) => fileCat === "all" || f.category === fileCat).length === 0 ? (
-                <p className="sbx-view-empty">该类型暂无文件</p>
-              ) : fileItems.filter((f) => fileCat === "all" || f.category === fileCat).map((f) => (
-                <div key={f.id} className="sbx-row group" onClick={() => window.open(f.url, "_blank")}>
-                  <span className="sbx-ico">{f.category === "image" ? <FileText size={14} className="text-accent-primary" /> : <FileText size={14} className="text-tx-tertiary" />}</span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{f.filename}</div>
-                    <div className="sbx-sub">{f.createdAt.slice(0, 10)}</div>
-                  </span>
-                  <span className="sbx-meta">{f.size > 1024 * 1024 ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(f.size / 1024)} KB`}</span>
-                </div>
-              ))}
+            <div className="border-b border-app-border px-2 py-1.5">
+              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">排序</div>
+              <div className="flex flex-wrap gap-1 px-1">
+                {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={getFilesRemoteSort() === opt.value}
+                    onClick={() => setFilesUi({ remoteSort: opt.value as FilesRemoteSortKey })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{opt.label}</button>
+                ))}
+              </div>
             </div>
-            </>
-            )}
+            <PanelSection label="修改时间">
+              <div className="flex flex-wrap gap-1 px-1">
+                {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"], ["older", "更早"]] as Array<[string, string]>).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={getFilesRemoteTime() === key}
+                    onClick={() => setFilesUi({ remoteTime: key })}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTime() === key ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </PanelSection>
+            </>)}
           </div>
         )}
 
-        {/* ===== 插件视图 ===== */}
+        {/* ===== 插件视图（方案 B：侧栏只做入口，不列插件） ===== */}
         {sidebarView === "plugins" && (
           <div className="sbx-view">
-            <div className="sbx-view-head"><span>插件</span><span className="flex-1" /><span className="sbx-badge">{BUILTIN_PLUGINS.length}</span></div>
-            <div className="sbx-chips">
-              {([["installed", "已安装"], ["market", "市场"], ["disabled", "已停用"]] as Array<[typeof plugCat, string]>).map(([cat, label]) => (
-                <span key={cat} className={cn("sbx-chip", plugCat === cat && "on")} onClick={() => setPlugCat(cat)}>{label}</span>
-              ))}
+            <div className="flex h-12 shrink-0 items-center gap-1.5 border-b border-app-border pl-3 pr-2 text-xs">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center text-tx-tertiary"><Puzzle size={13} /></span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-tx-primary">插件</span>
             </div>
-            <div className="px-1 pb-2">
-              {plugCat === "installed" && BUILTIN_PLUGINS.map((plug) => {
-                const enabled = isBuiltinPluginEnabled(plug.id) && !builtinDisabled.has(plug.id);
-                return (
-                  <div
-                    key={plug.id}
-                    className="sbx-row group cursor-pointer items-start"
-                    title="查看插件详情"
-                    onClick={() => {
-                      // VSCode 式：点击插件 → 工作区显示详情页
-                      try { localStorage.setItem("nowen-plugins-workspace-selected", plug.id); } catch { /* ignore */ }
-                      window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: plug.id } }));
-                      if (state.viewMode !== "plugins") actions.setViewMode("plugins");
-                    }}
-                  >
-                    <span className="sbx-ico mt-0.5">{plug.icon === "tasks" ? <ListTodo size={14} className="text-violet-500" /> : plug.icon === "diary" ? <RefreshCw size={14} className="text-amber-500" /> : plug.icon === "ai" ? <Sparkles size={14} className="text-accent-primary" /> : <Link2 size={14} className="text-tx-tertiary" />}</span>
-                    <span className="min-w-0 flex-1">
-                      <div className="truncate text-xs text-tx-primary">{plug.name}</div>
-                      <div className="sbx-sub">{plug.description}</div>
-                    </span>
-                    <span className="sbx-acts">
-                      {enabled && (
-                        <button
-                          type="button"
-                          title="打开面板"
-                          onClick={(e) => { e.stopPropagation(); setOpenPluginPanel(plug.id); setSidebarView("kb"); }}
-                          className="sbx-btn"
-                        >
-                          <ChevronDown size={12} className="-rotate-90" />
-                        </button>
+            {/* 侧栏只做入口：插件启用后在导航栏徽章里直接打开，这里只负责"去哪找"。
+                结构与文件管理/回收站同源：PanelSection（12px/600 标签 + 底边线）+ 每行独立描边条。 */}
+            {([
+              { group: "浏览", key: "catalog" as const, icon: Store, label: "市场", hint: pluginCounts?.catalog ? String(pluginCounts.catalog) : "" },
+              { group: "已安装", key: "installed" as const, icon: LayoutGrid, label: "管理", hint: String(BUILTIN_PLUGINS.length + plugins.length) },
+              { group: "设置", key: "config" as const, icon: SlidersHorizontal, label: "配置", hint: "" },
+            ]).map((entry) => {
+              const Icon = entry.icon;
+              const active = plugCat === entry.key;
+              return (
+                <PanelSection key={entry.key} label={entry.group}>
+                  <div className="space-y-0.5">
+                    <div
+                      className={cn(
+                        "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
+                        active
+                          ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+                          : "text-tx-secondary hover:bg-app-hover",
                       )}
-                    </span>
-                    <span
-                      className={cn("sbx-switch", enabled && "on")}
-                      title={enabled ? "停用插件" : "启用插件"}
-                      onClick={() => setBuiltinPluginDisabled(plug.id, enabled)}
-                    />
+                      title={entry.label}
+                      onClick={() => {
+                        setPlugCat(entry.key);
+                        window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
+                        if (state.viewMode !== "plugins") actions.setViewMode("plugins");
+                      }}
+                    >
+                      <Icon size={14} className={active ? "shrink-0 text-accent-primary" : "shrink-0 text-tx-tertiary"} />
+                      <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                      {entry.hint && (
+                        <span className={cn("shrink-0 text-[10px] tabular-nums", active ? "text-accent-primary/80" : "text-tx-tertiary")}>
+                          {entry.hint}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                );
-              })}
-              {(plugCat === "market"
-                ? []
-                : plugins.filter((p) => plugCat === "installed" ? p.status === "enabled" : p.status !== "enabled")
-              ).map((plug) => (
-                <div key={plug.id} className="sbx-row group items-start">
-                  <span className="sbx-ico mt-0.5"><ListTodo size={14} className="text-violet-500" /></span>
-                  <span className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tx-primary">{plug.name}</div>
-                    <div className="sbx-sub">v{plug.version} · {plug.status === "enabled" ? "已启用" : "已停用"}{plug.source ? ` · ${plug.source}` : ""}</div>
-                    {plug.description && <div className="sbx-sub">{plug.description}</div>}
-                  </span>
-                  <span
-                    className={cn("sbx-switch", plug.status === "enabled" && "on")}
-                    title={plug.status === "enabled" ? "停用插件" : "启用插件"}
-                    onClick={() => {
-                      const action = plug.status === "enabled" ? api.plugins.disable(plug.id) : api.plugins.enable(plug.id);
-                      action
-                        .then(() => api.plugins.list().then((list) => setPlugins(list)).catch(() => undefined))
-                        .catch(() => undefined);
-                    }}
-                  />
-                </div>
-              ))}
-
-              {plugCat === "disabled" && plugins.filter((p) => p.status !== "enabled").length === 0 && (
-                <p className="sbx-view-empty">没有已停用的插件</p>
-              )}
-              {plugCat === "market" && (
-                <p className="sbx-view-empty">插件市场（后续批次）</p>
-              )}
-            </div>
-            <p className="sbx-view-tip">插件面板不由宿主写死入口：启用后经 contributes.sidebarPanels 注册到侧栏，卸载即移除；数据始终保留。</p>
+                </PanelSection>
+              );
+            })}
           </div>
         )}
       </div>
@@ -3113,12 +3738,35 @@ export default function SidebarDesktop() {
         </>
       )}
 
+      {/* ===== 创建空间对话框 ===== */}
+      {createOpen && (
+        <CreateWorkspaceDialog
+          onClose={() => setCreateOpen(false)}
+          onCreated={(workspace) => {
+            setCreateOpen(false);
+            api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
+            switchSpace(workspace.id);
+          }}
+        />
+      )}
+
       {/* ===== 加入空间对话框 ===== */}
       {joinOpen && (
         <JoinWorkspaceDialog
           onClose={() => setJoinOpen(false)}
           onJoined={() => {
             setJoinOpen(false);
+            api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
+          }}
+        />
+      )}
+
+      {/* ===== 当前空间管理（成员/邀请/功能） ===== */}
+      {manageOpen && activeWorkspace && (
+        <MembersPanel
+          workspaceId={activeWorkspace.id}
+          onClose={() => {
+            setManageOpen(false);
             api.getWorkspaces().then((list) => setWorkspaces(list)).catch(() => undefined);
           }}
         />
@@ -3164,6 +3812,29 @@ export default function SidebarDesktop() {
                   }}
                 />
                 <MenuSeparator />
+                {/* 与文档菜单对齐：复制 / 移动 / 导出 / 分享 都是目录的一级动作 */}
+                <MenuItem icon={Copy} label="复制" onClick={() => { setRowMenu(null); void duplicateFolderNode(node); }} />
+                <MenuItem icon={FolderInput} label="移动到…" onClick={() => { setRowMenu(null); setMoveNodeId(node.id); }} />
+                <MenuItem
+                  icon={Download}
+                  label="导出"
+                  children={NOTEBOOK_EXPORT_FORMAT_ITEMS.map((item) => ({
+                    id: `export_folder_${item.id}`,
+                    label: item.label,
+                    onClick: () => { setRowMenu(null); void exportFolderNode(node, item.id); },
+                  }))}
+                />
+                {(() => {
+                  const notebook = (state.notebooks ?? []).find((nb) => nb.id === node.resourceId);
+                  return notebook ? (
+                    <MenuItem
+                      icon={Share2}
+                      label="分享与发布"
+                      onClick={() => { setRowMenu(null); setShareNotebook(notebook); }}
+                    />
+                  ) : null;
+                })()}
+                <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
               </>
@@ -3184,9 +3855,39 @@ export default function SidebarDesktop() {
                   }}
                 />
                 <MenuSeparator />
+                {/* 语雀式文档菜单：复制 / 移动 / 导出 / 分享 都在一级，不再埋进“更多”。
+                    文件节点（resourceType=file）不参与这三类文档动作。 */}
+                {node.resourceType === "note" && !node.isReference && (
+                  <MenuItem icon={Copy} label="复制" onClick={() => { setRowMenu(null); void duplicateNoteNode(node); }} />
+                )}
+                <MenuItem icon={FolderInput} label="移动到…" onClick={() => { setRowMenu(null); setMoveNodeId(node.id); }} />
+                {node.resourceType === "note" && (
+                  <>
+                    <MenuItem
+                      icon={Download}
+                      label="导出"
+                      children={[
+                        { id: "export_note_md", label: "Markdown", icon: FileText, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_md"); } },
+                        { id: "export_note_md_zip", label: "Markdown + 附件 ZIP", icon: FileArchive, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_md_zip"); } },
+                        { id: "export_note_pdf", label: "PDF", icon: Printer, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_pdf"); } },
+                        { id: "export_note_png", label: "PNG", icon: ImageIcon, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_png"); } },
+                        { id: "export_note_jpg", label: "JPG", icon: ImageIcon, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_jpg"); } },
+                        { id: "export_note_word", label: "Word", icon: FileType2, onClick: () => { setRowMenu(null); void exportNoteNode(node, "export_note_word"); } },
+                      ]}
+                    />
+                    <MenuItem icon={Share2} label="分享" onClick={() => { setRowMenu(null); setShareNote({ id: node.resourceId, title: node.title }); }} />
+                  </>
+                )}
+                <MenuSeparator />
                 <MenuItem icon={Pencil} label="重命名" hint="F2" onClick={() => { setRowMenu(null); setRenaming({ kind: "kb", id: node.id, value: node.title }); }} />
                 <MenuSeparator />
-                <MenuItem icon={Trash2} label="删除" hint="Del" danger onClick={() => { setRowMenu(null); void deleteNode(node.id); }} />
+                <MenuItem
+                  icon={Trash2}
+                  label={node.isReference ? "删除这条路径" : "删除"}
+                  hint="Del"
+                  danger
+                  onClick={() => { setRowMenu(null); void deleteNode(node.id); }}
+                />
               </>
             );
           })()}
@@ -3214,6 +3915,33 @@ export default function SidebarDesktop() {
             );
           })()}
         </MenuSurface>
+      )}
+
+      {/* ===== 行菜单触发的移动面板（侧栏内直接选目标目录，支持文档与文件夹） ===== */}
+      {moveNodeId && (() => {
+        const target = nodes.find((node) => node.id === moveNodeId && !node.isDeleted);
+        if (!target) return null;
+        return (
+          <KnowledgeTreeBatchMovePanel
+            selectedNodes={[target]}
+            nodes={nodes}
+            targetNodes={nodes}
+            onMoved={() => { setMoveNodeId(null); void reload(); }}
+            onClose={() => setMoveNodeId(null)}
+          />
+        );
+      })()}
+
+      {/* ===== 行菜单触发的分享弹窗 ===== */}
+      {shareNote && (
+        <ShareModal
+          noteId={shareNote.id}
+          noteTitle={shareNote.title}
+          onClose={() => setShareNote(null)}
+        />
+      )}
+      {shareNotebook && (
+        <NotebookShareDialog notebook={shareNotebook} onClose={() => setShareNotebook(null)} />
       )}
     </aside>
   );
@@ -3254,8 +3982,7 @@ export function isNextSidebarEnabled(): boolean {
 
 
 /** 项目管理侧栏面板（官方插件 pm · 视觉重设计）：项目选择 + 状态分组导航 + 工单速览快改 */
-function ProjectsSidePanel(props: { onOpenMain: () => void }) {
-  const { onOpenMain } = props;
+function ProjectsSidePanel() {
   const [projects, setProjects] = useState<PmProject[]>([]);
   const [activeId, setActiveId] = useState("");
   const [items, setItems] = useState<PmWorkItem[]>([]);
@@ -3345,7 +4072,6 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         <span>项目管理</span>
         <span className="flex-1" />
         <button type="button" title="刷新" className="sbx-btn" onClick={() => void reload()}>↻</button>
-        <button type="button" title="在主区打开" className="sbx-btn" onClick={onOpenMain}>↗</button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -3427,14 +4153,6 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
                                       <Check size={11} />
                                     </button>
                                   ) : null}
-                                  <button
-                                    type="button"
-                                    title="在主区打开"
-                                    className="rounded p-0.5 text-zinc-400 hover:bg-app-hover"
-                                    onClick={onOpenMain}
-                                  >
-                                    <ExternalLink size={11} />
-                                  </button>
                                 </span>
                               </div>
                             ))
@@ -3449,13 +4167,12 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         )}
       </div>
 
-      {/* 底部动作：新建走主区表单（事件通知），打开看板切换主区 */}
+      {/* 底部动作：新建走事件通知主区表单（模块内动作，不跨模块切换） */}
       <div className="border-t border-app-border px-2 py-1.5">
         <button
           type="button"
           className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] font-medium text-accent-primary hover:bg-app-hover"
           onClick={() => {
-            onOpenMain();
             window.dispatchEvent(new CustomEvent("nowen:pm-new-item"));
           }}
         >
@@ -3464,15 +4181,7 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
         <button
           type="button"
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
-          onClick={onOpenMain}
-        >
-          <ListTodo size={12} /> 在主区打开看板
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
           onClick={() => {
-            onOpenMain();
             window.dispatchEvent(new CustomEvent("nowen:pm-new-project"));
           }}
         >
@@ -3483,90 +4192,177 @@ function ProjectsSidePanel(props: { onOpenMain: () => void }) {
   );
 }
 
-/** 分享管理侧栏面板（核心模块 shares）：统计速览 + 最近分享链接，点击进主区管理 */
-function SharesSidePanel({ onOpenMain }: { onOpenMain: () => void }) {
-  const [stats, setStats] = useState<{ total: number; active: number; paused: number } | null>(null);
-  const [recent, setRecent] = useState<Array<{ id: string; title: string; isActive: boolean }>>([]);
+/** 分享中心侧栏面板（核心模块 shares）：五通道统计速览 + 最近分享链接，点击进主区管理 */
+function ShareCategoryRow({ active, icon, label, count, tone, onClick }: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  tone?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${active
+        ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+        : "text-tx-secondary hover:bg-app-hover"}`}
+    >
+      {/* 原型每一行都带图标：状态用彩点、对象类型与风险用图形图标 */}
+      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center opacity-90">{icon}</span>
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+      <span className={`shrink-0 tabular-nums text-[10.5px] ${tone || "text-tx-tertiary"}`}>{count}</span>
+    </button>
+  );
+}
+
+/** 状态用彩点（原型 🟢 / ⏳ / ⛔ 的语义），其余分组用图形图标。 */
+function shareDot(className: string) {
+  return <Circle size={7} className={`fill-current ${className}`} />;
+}
+
+/**
+ * 分享中心侧栏（原型 share-redesign-v1 ① 的左栏）
+ * ---------------------------------------------------------------------------
+ * 三组分类是「导航」不是「叠加筛选」：点一项会把其它两维复位（见 pick），
+ * 所以永远不会出现三行同时高亮、列表却空掉的自相矛盾状态。
+ * 每行徽标 = 点它之后看到的条数（后端按同一集合统计），因此「条数 = 徽标数」。
+ * 主区不重复渲染分类，两侧共用 features/shares/shareCenterUi 里的筛选状态。
+ */
+function SharesSidePanel() {
+  const actions = useAppActions();
+  const [counts, setCounts] = useState<ShareCenterCounts | null>(null);
+  const [bareCount, setBareCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const uiVersion = useSyncExternalStore(subscribeShareCenterUi, getShareCenterUiVersion, getShareCenterUiVersion);
+  const group = useMemo(() => getShareGroup(), [uiVersion]);
+  const objectKind = useMemo(() => getShareObjectKind(), [uiVersion]);
+  const risk = useMemo(() => getShareRisk(), [uiVersion]);
+  const quick = useMemo(() => getShareQuick(), [uiVersion]);
 
   const reload = useCallback(() => {
     setLoading(true);
-    api
-      .getShareManagement({ sort: "updatedAt", order: "desc" })
-      .then((r) => {
-        setStats({ total: r.stats.total, active: r.stats.active, paused: Math.max(0, r.stats.total - r.stats.active) });
-        setRecent(
-          (r.items ?? []).slice(0, 8).map((item) => ({
-            id: item.id,
-            title: item.noteTitle || "未命名笔记",
-            isActive: !!item.isActive,
-          })),
-        );
+    // 计数与主区同源：不在这里按 status 自己统计
+    shareCenterApi
+      .list({ pageSize: 1 })
+      .then((response) => {
+        setCounts(response.counts);
+        setBareCount(response.bareAttachmentUrls.count);
       })
-      .catch(() => {
-        setStats(null);
-        setRecent([]);
-      })
+      .catch(() => setCounts(null))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    const onChange = () => reload();
+    window.addEventListener("nowen:workspace-changed", onChange);
+    return () => window.removeEventListener("nowen:workspace-changed", onChange);
+  }, [reload]);
+
+  /**
+   * 分类是导航，不是叠加筛选：点一项就把其它两维复位。
+   * 否则「目录/知识库 + 无密码且永久」会叠出空列表，而左栏还有三个高亮。
+   */
+  const pick = (patch: Parameters<typeof setShareCenterUi>[0]) => {
+    setShareCenterUi({ group: "all", objectKind: "all", risk: "all", ...patch });
+  };
 
   return (
     <div className="sbx-view">
-      <div className="sbx-view-head">
-        <span>分享管理</span><span className="flex-1" />
-        <button type="button" title="刷新" onClick={reload} className="sbx-btn">
-          <RefreshCw size={13} />
-        </button>
-        <span className="sbx-badge">{stats?.total ?? 0}</span>
-      </div>
-      <div className="px-2 pb-1 grid grid-cols-3 gap-1">
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-tx-primary">{stats?.total ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">全部</p>
+      <PanelSection label="状态">
+        <div className="space-y-0.5">
+          <ShareCategoryRow active={group === "all"} icon={<Layers size={12} />} label="全部" count={counts?.total ?? 0} onClick={() => pick({ group: "all" })} />
+          <ShareCategoryRow active={group === "active"} icon={shareDot("text-emerald-500")} label="生效中" count={counts?.groups.active ?? 0} onClick={() => pick({ group: "active" })} />
+          <ShareCategoryRow active={group === "attention"} icon={shareDot("text-amber-500")} label="需要处理" count={counts?.groups.attention ?? 0}
+            tone={(counts?.groups.attention ?? 0) > 0 ? "text-amber-600 dark:text-amber-300" : undefined}
+            onClick={() => pick({ group: "attention" })} />
+          <ShareCategoryRow active={group === "disabled"} icon={shareDot("text-tx-tertiary")} label="已停用" count={counts?.groups.disabled ?? 0} onClick={() => pick({ group: "disabled" })} />
         </div>
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-emerald-500">{stats?.active ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">启用</p>
-        </div>
-        <div className="rounded-md border border-app-border bg-app-surface px-1.5 py-1 text-center">
-          <p className="text-sm font-semibold text-amber-500">{stats?.paused ?? "—"}</p>
-          <p className="text-[10px] text-tx-tertiary">停用</p>
-        </div>
-      </div>
-      <div className="px-1 pb-2">
-        {loading ? (
-          <p className="sbx-view-empty">加载中…</p>
-        ) : recent.length === 0 ? (
-          <p className="sbx-view-empty">还没有分享链接，在笔记里点击「分享」创建</p>
-        ) : (
-          recent.map((item) => (
+      </PanelSection>
+
+      <PanelSection label="分享设置">
+        <div className="space-y-0.5">
+          {SHARE_QUICK_CHIPS.map((chip) => (
             <button
-              key={item.id}
+              key={chip.key}
               type="button"
-              onClick={onOpenMain}
-              className="sbx-row w-full text-left flex items-center gap-2"
-              title="在主区打开分享管理"
+              aria-pressed={quick === chip.key}
+              onClick={() => setShareCenterUi({ quick: quick === chip.key && chip.key !== "all" ? "all" : chip.key })}
+              className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${quick === chip.key ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
             >
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 shrink-0 rounded-full",
-                  item.isActive ? "bg-emerald-500" : "bg-amber-500",
-                )}
-              />
-              <span className="min-w-0 flex-1 truncate text-[11px]">{item.title}</span>
-              <ExternalLink size={11} className="shrink-0 text-tx-tertiary" />
+              <span className="min-w-0 flex-1 truncate text-left">{chip.label}</span>
             </button>
-          ))
-        )}
+          ))}
+        </div>
+      </PanelSection>
+
+      <PanelSection label="对象类型">
+        <div className="space-y-1">
+          {([["note", "笔记链接", <FileText key="note" size={12} />], ["file", "文件链接", <Paperclip key="file" size={12} />], ["notebook", "目录 / 知识库", <BookOpen key="notebook" size={12} />]] as Array<[ShareCenterObjectKind, string, React.ReactNode]>).map(([kind, label, icon]) => (
+            <ShareCategoryRow
+              key={kind}
+              active={objectKind === kind}
+              icon={icon}
+              label={label}
+              count={counts?.objects[kind] ?? 0}
+              onClick={() => pick({ objectKind: objectKind === kind ? "all" : kind })}
+            />
+          ))}
+        </div>
+      </PanelSection>
+
+      <PanelSection label="风险">
+        <div className="space-y-0.5">
+          {(["open_ended", "orphan", "unused"] as ShareCenterRisk[]).map((value) => (
+            <ShareCategoryRow
+              key={value}
+              active={risk === value}
+              icon={value === "open_ended" ? <Unlock size={12} /> : value === "orphan" ? <Ghost size={12} /> : <EyeOff size={12} />}
+              label={shareRiskLabel(value)}
+              count={counts?.risks[value] ?? 0}
+              tone={value === "unused" ? undefined : (counts?.risks[value] ?? 0) > 0 ? "text-rose-600 dark:text-rose-300" : undefined}
+              onClick={() => pick({ risk: risk === value ? "all" : value })}
+            />
+          ))}
+          {/* 裸直链也在同一个列表里：点它只是把风险维度切到 bare（其它维度由 pick 复位） */}
+          <ShareCategoryRow
+            active={risk === "bare"}
+            icon={<Magnet size={12} />}
+            label={shareRiskLabel("bare")}
+            count={counts?.risks.bare ?? bareCount}
+            tone="text-rose-600 dark:text-rose-300"
+            onClick={() => pick({ risk: risk === "bare" ? "all" : "bare" })}
+          />
+        </div>
+      </PanelSection>
+
+      <div className="border-b border-app-border px-2 py-1.5">
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.08] p-2.5 text-[11px] leading-5 text-amber-800 dark:text-amber-200">
+          <p className="flex items-center gap-1.5 font-medium"><Magnet size={12} className="shrink-0" />附件裸直链不是「私有地址」</p>
+          <p className="mt-1">
+            笔记里插入的图片/文件本身就有 <code>/api/attachments/&lt;id&gt;</code> 免登录直链：
+            知道地址即可永久访问，既不计数也无法撤销（设计上要保留，否则笔记里的图会裂）。
+          </p>
+          <button type="button" onClick={() => actions.openToolTab("files")} className="mt-1 text-accent-primary underline-offset-4 hover:underline">
+            {/* 数字与上方徽标同一个表达式，两处永远一致 */}
+            查看这 {counts?.risks.bare ?? bareCount} 个文件 →
+          </button>
+        </div>
       </div>
-      <div className="sbx-foot-row">
-        <span className="sbx-foot-tip" />
-        <button type="button" onClick={onOpenMain} className="sbx-foot-link">
-          在主区打开
-        </button>
+
+      <div className="px-2 py-1.5">
+        <PublicOriginRiskControl variant="box" />
       </div>
+
+      {loading && (
+        <div className="sbx-foot-row">
+          <span className="sbx-foot-tip">加载中…</span>
+        </div>
+      )}
     </div>
   );
 }

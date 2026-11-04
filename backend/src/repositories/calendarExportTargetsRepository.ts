@@ -40,7 +40,7 @@ export const calendarExportTargetsRepository = {
       .prepare(
         'SELECT * FROM calendar_export_targets WHERE "userId" = ? ORDER BY "createdAt" DESC',
       )
-      .all(userId) as CalendarExportTargetRecord[];
+      .all(userId) as unknown as CalendarExportTargetRecord[];
     return rows.map(toBoolean);
   },
 
@@ -62,7 +62,7 @@ export const calendarExportTargetsRepository = {
     const db = getDb();
     const rows = db
       .prepare("SELECT * FROM calendar_export_targets WHERE enabled = 1")
-      .all() as CalendarExportTargetRecord[];
+      .all() as unknown as CalendarExportTargetRecord[];
     return rows.map(toBoolean);
   },
 

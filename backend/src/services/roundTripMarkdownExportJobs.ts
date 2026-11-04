@@ -200,7 +200,7 @@ export function handleRoundTripMarkdownDownload(c: Context): Response | null {
       "Content-Type": "application/zip",
       "Content-Length": String(stat.size),
       "Content-Encoding": "identity",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "nowen-note.zip")}`,
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "baseforge.zip")}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "X-Nowen-Round-Trip-Package": "2",

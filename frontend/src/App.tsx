@@ -31,6 +31,7 @@ import { openWorkspaceIssue } from "@/lib/workspaceIssueNavigation";
 import WechatClipboardBridge from "@/components/WechatClipboardBridge";
 import SharedNoteView from "@/components/SharedNoteView";
 import NotebookShareJoinView from "@/components/NotebookShareJoinView";
+import AttachmentShareView from "@/components/AttachmentShareView";
 import LoginPage from "@/components/LoginPage";
 import QuickLoginGate from "@/components/QuickLoginGate";
 import QuickLoginEnrollDialog from "@/components/QuickLoginEnrollDialog";
@@ -64,6 +65,7 @@ import {
 } from "@/lib/shortcutRegistry";
 import CommandPalette from "@/components/common/CommandPalette";
 import FloatingLayerHost from "@/components/FloatingLayerHost";
+import PluginEditorCommandBridge from "@/components/PluginEditorCommandBridge";
 import AppRouteSync from "@/components/AppRouteSync";
 import OfflineSyncRuntime from "@/components/OfflineSyncRuntime";
 import UpdateNotifier from "@/components/common/UpdateNotifier";
@@ -617,7 +619,7 @@ function AppLayout() {
   // useSiteSettings 是分享页/登录页等更外层场景也会用到的更基础 Provider。
   const { siteConfig } = useSiteSettings();
   useEffect(() => {
-    const baseTitle = siteConfig.title || "nowen-note";
+    const baseTitle = siteConfig.title || "BaseForge";
     if (userPrefs.noteTitleAsAppTitle) {
       const noteTitle = (state.activeNote?.title || "").trim();
       document.title = noteTitle ? `${noteTitle} - ${baseTitle}` : baseTitle;
@@ -1001,6 +1003,9 @@ function AppLayout() {
 
       {/* 插件 UI 贡献的浮动层宿主：把插件注册的悬浮入口/面板渲染到全局层 */}
       <FloatingLayerHost />
+
+      {/* 插件编辑器命令宿主：斜杠菜单/快捷键注册与注销（执行走插件 Action 通道） */}
+      <PluginEditorCommandBridge />
 
       {/* 统一路由所有者：URL ⇄ 状态单向流 + 自回声抑制（取代旧笔记深链桥与墓碑） */}
       <AppRouteSync />
@@ -1593,6 +1598,17 @@ function App() {
     return (
       <ThemeProvider>
         <NotebookShareJoinView token={notebookShareMatch[1]} />
+        <Toaster />
+      </ThemeProvider>
+    );
+  }
+
+  // 附件分享访客页 /fs/:token（分享中心里 attachment_share 的 urlPath）
+  const attachmentShareMatch = path.match(/^\/fs\/([A-Za-z0-9_-]+)$/);
+  if (attachmentShareMatch) {
+    return (
+      <ThemeProvider>
+        <AttachmentShareView shareToken={attachmentShareMatch[1]} />
         <Toaster />
       </ThemeProvider>
     );

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 /**
  * Resolve the notebook IDs used by the note-list query.
@@ -9,7 +9,7 @@ import type Database from "better-sqlite3";
  * filtering them locally.
  */
 export function resolveNotebookNoteScopeIds(
-  db: Database.Database,
+  db: DatabaseSync,
   notebookId: string,
   includeDescendants: boolean,
 ): string[] {

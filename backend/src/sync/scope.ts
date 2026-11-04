@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import type { WorkspaceRole } from "../middleware/acl";
 import {
@@ -91,7 +91,7 @@ function isWorkspaceRole(role: unknown): role is WorkspaceRole {
     || role === "viewer";
 }
 
-function tableExists(db: Database.Database, tableName: string): boolean {
+function tableExists(db: DatabaseSync, tableName: string): boolean {
   return Boolean(db.prepare(`
     SELECT 1
     FROM sqlite_master
@@ -99,7 +99,7 @@ function tableExists(db: Database.Database, tableName: string): boolean {
   `).get(tableName));
 }
 
-function workspaceAccessFingerprint(db: Database.Database, workspaceId: string): string {
+function workspaceAccessFingerprint(db: DatabaseSync, workspaceId: string): string {
   const workspace = db.prepare(`
     SELECT id, name, updatedAt
     FROM workspaces
@@ -184,7 +184,7 @@ function workspaceAccessFingerprint(db: Database.Database, workspaceId: string):
 }
 
 function descriptorForWorkspace(
-  db: Database.Database,
+  db: DatabaseSync,
   workspace: WorkspaceRow,
   role: WorkspaceRole,
 ): SyncScopeDescriptor {
@@ -199,7 +199,7 @@ function descriptorForWorkspace(
 }
 
 export function listAuthorizedScopes(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
 ): SyncScopeDescriptor[] {
   const personal: SyncScopeDescriptor = {
@@ -216,7 +216,7 @@ export function listAuthorizedScopes(
     JOIN workspaces w ON w.id = wm.workspaceId
     WHERE wm.userId = ?
     ORDER BY w.id
-  `).all(userId) as Array<WorkspaceRow & { role: unknown }>;
+  `).all(userId) as unknown as Array<WorkspaceRow & { role: unknown }>;
   return [
     personal,
     ...rows
@@ -226,7 +226,7 @@ export function listAuthorizedScopes(
 }
 
 export function resolveAuthorizedScope(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   scopeKey: string | null | undefined,
   access: SyncScopeAccessStatus = "read",
@@ -268,7 +268,7 @@ export function resolveAuthorizedScope(
 
 /** 对 Workspace Push 做逐实体 ACL 校验；Scope 角色只是一层粗粒度 gate。 */
 export function assertSyncMutationAccess(
-  db: Database.Database,
+  db: DatabaseSync,
   userId: string,
   descriptor: SyncScopeDescriptor,
   input: {

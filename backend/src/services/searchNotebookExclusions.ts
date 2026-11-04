@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { getDb } from "../db/schema";
 
@@ -16,14 +16,14 @@ export interface SearchNotebookExclusionListItem extends SearchNotebookExclusion
   parentId: string | null;
 }
 
-const initializedDatabases = new WeakSet<Database.Database>();
+const initializedDatabases = new WeakSet<DatabaseSync>();
 
 /**
  * Keep a runtime guard in addition to the formal migration. Search is a startup-critical path and
  * tests/older local databases can enter this module before the migration bootstrap has completed.
  */
 export function ensureSearchNotebookExclusionsTable(
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): void {
   if (initializedDatabases.has(db)) return;
   db.exec(`
@@ -48,7 +48,7 @@ export function ensureSearchNotebookExclusionsTable(
 
 export function listDirectSearchNotebookExclusions(
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): SearchNotebookExclusionListItem[] {
   ensureSearchNotebookExclusionsTable(db);
   return db.prepare(`
@@ -58,7 +58,7 @@ export function listDirectSearchNotebookExclusions(
     JOIN notebooks nb ON nb.id = e.notebookId
     WHERE e.userId = ? AND nb.isDeleted = 0
     ORDER BY lower(nb.name), e.createdAt, e.notebookId
-  `).all(userId) as SearchNotebookExclusionListItem[];
+  `).all(userId) as unknown as SearchNotebookExclusionListItem[];
 }
 
 /**
@@ -68,7 +68,7 @@ export function listDirectSearchNotebookExclusions(
  */
 export function getEffectiveExcludedNotebookIds(
   userId: string,
-  db: Database.Database = getDb(),
+  db: DatabaseSync = getDb(),
 ): Set<string> {
   ensureSearchNotebookExclusionsTable(db);
   const rows = db.prepare(`
@@ -94,7 +94,7 @@ export function setSearchNotebookExcluded(input: {
   userId: string;
   notebookId: string;
   includeDescendants?: boolean;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): SearchNotebookExclusionRow {
   const db = input.db || getDb();
   ensureSearchNotebookExclusionsTable(db);
@@ -112,13 +112,13 @@ export function setSearchNotebookExcluded(input: {
     SELECT userId, notebookId, includeDescendants, createdAt, updatedAt
     FROM user_search_notebook_exclusions
     WHERE userId = ? AND notebookId = ?
-  `).get(input.userId, input.notebookId) as SearchNotebookExclusionRow;
+  `).get(input.userId, input.notebookId) as unknown as SearchNotebookExclusionRow;
 }
 
 export function clearSearchNotebookExcluded(input: {
   userId: string;
   notebookId: string;
-  db?: Database.Database;
+  db?: DatabaseSync;
 }): boolean {
   const db = input.db || getDb();
   ensureSearchNotebookExclusionsTable(db);

@@ -23,7 +23,7 @@
  *   Phase 2 接入 sqlite-vec 时新建虚表 vec_note_chunks 并把现有 vectorJson 灌进去。
  */
 import { getDb } from "../db/schema";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import {
   isVecAvailable,
   upsertVectors,
@@ -140,7 +140,7 @@ async function callEmbeddings(
 // 单条任务处理
 // ============================================================
 async function processOne(
-  db: Database.Database,
+  db: DatabaseSync,
   cfg: EmbeddingConfig,
   task: { noteId: string; userId: string; retries: number },
 ): Promise<void> {
@@ -259,7 +259,7 @@ async function processOne(
 //     不算失败（重试也救不了），等下次重建或 MIME 变了手动再试；
 //   - 解析器抛错 / embedding HTTP 失败：计入 retries，超过 MAX_RETRIES 标 failed。
 async function processAttachmentOne(
-  db: Database.Database,
+  db: DatabaseSync,
   cfg: EmbeddingConfig,
   task: { attachmentId: string; retries: number },
 ): Promise<void> {
@@ -706,7 +706,7 @@ export function rebuildAllEmbeddings(opts: {
  * 加 scope=... 的 opts，worker 会自动处理两类队列。
  */
 function rebuildAttachmentEmbeddingsInternal(
-  db: Database.Database,
+  db: DatabaseSync,
   conds: string[],
   attachmentConds: string[],
   params: any[],

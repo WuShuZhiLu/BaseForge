@@ -40,7 +40,7 @@
 docker-compose exec backend npx tsx -e "
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
-const db = new Database('data/nowen-note.db');
+const db = new Database('data/baseforge.db');
 const hash = bcrypt.hashSync('新密码', 10);
 db.prepare('UPDATE users SET passwordHash = ? WHERE username = ?').run(hash, 'admin');
 console.log('密码已重置');

@@ -81,7 +81,7 @@ LABEL org.opencontainers.image.title="Base Notes" \
       com.nowen-note.schema-metadata="runtime-api"
 
 ENV NODE_ENV=production
-ENV DB_PATH=/app/data/nowen-note.db
+ENV DB_PATH=/app/data/baseforge.db
 ENV PORT=3001
 
 EXPOSE 3001

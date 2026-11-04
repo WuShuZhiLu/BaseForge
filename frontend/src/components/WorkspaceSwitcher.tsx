@@ -29,6 +29,7 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { realtime } from "@/lib/realtime";
 import MembersPanel from "@/components/MembersPanel";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import WorkspaceIconField, { DEFAULT_WORKSPACE_ICON } from "@/components/WorkspaceIconField";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
 import { useContextMenu } from "@/hooks/useContextMenu";
@@ -68,7 +69,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
         ...workspace,
         icon: workspace.icon || DEFAULT_WORKSPACE_ICON,
       })));
-    } catch (e: any) {
+    } catch (e) {
       console.error("[WorkspaceSwitcher] load failed", e);
     }
   }, []);
@@ -89,7 +90,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
     api
       .getMe()
       .then((u) => {
-        if (!cancelled) setIsAdmin((u as any)?.role === "admin");
+        if (!cancelled) setIsAdmin(u?.role === "admin");
       })
       .catch(() => {
         if (!cancelled) setIsAdmin(false);
@@ -148,7 +149,16 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
           onClick={() => setOpen(true)}
           onContextMenu={handleEntryContextMenu}
         >
-          <span className="text-xl">{displayIcon}</span>
+          {currentWs?.avatarUrl ? (
+            <img
+              key={currentWs.avatarUrl}
+              src={api.workspaceAvatarFileUrl(currentWs.id, currentWs.updatedAt)}
+              alt=""
+              className="h-7 w-7 rounded-md object-cover"
+            />
+          ) : (
+            <span className="text-xl">{displayIcon}</span>
+          )}
         </button>
         {/* 收起态下右键菜单及其衍生弹窗复用展开态分支同一份渲染逻辑，避免代码冗余 */}
         {renderContextMenuAndDialogs()}
@@ -272,7 +282,16 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
             "bg-background hover:bg-accent transition-colors text-sm",
           )}
         >
-          <span className="shrink-0 text-lg">{displayIcon}</span>
+          {currentWs?.avatarUrl ? (
+            <img
+              key={currentWs.avatarUrl}
+              src={api.workspaceAvatarFileUrl(currentWs.id, currentWs.updatedAt)}
+              alt=""
+              className="h-7 w-7 shrink-0 rounded-md object-cover"
+            />
+          ) : (
+            <span className="shrink-0 text-lg">{displayIcon}</span>
+          )}
           <div className="flex-1 text-left truncate">
             <div className="font-medium truncate">{displayName}</div>
             {currentWs && (
@@ -309,6 +328,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
                   <WorkspaceItem
                     key={w.id}
                     icon={w.icon || DEFAULT_WORKSPACE_ICON}
+                    avatarSrc={w.avatarUrl ? api.workspaceAvatarFileUrl(w.id, w.updatedAt) : undefined}
                     name={w.name}
                     subtitle={`${w.role} · ${w.memberCount} 位成员`}
                     active={current === w.id}
@@ -392,6 +412,7 @@ export default function WorkspaceSwitcher({ onWorkspaceChange, collapsed }: Work
 /* ========== 下拉项 ========== */
 function WorkspaceItem({
   icon,
+  avatarSrc,
   name,
   subtitle,
   active,
@@ -400,6 +421,7 @@ function WorkspaceItem({
   onContextMenu,
 }: {
   icon: string;
+  avatarSrc?: string;
   name: string;
   subtitle: string;
   active: boolean;
@@ -416,7 +438,11 @@ function WorkspaceItem({
       onClick={onClick}
       onContextMenu={onContextMenu}
     >
-      <span className="shrink-0 text-lg">{icon}</span>
+      {avatarSrc ? (
+        <img src={avatarSrc} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+      ) : (
+        <span className="shrink-0 text-lg">{icon}</span>
+      )}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{name}</div>
         <div className="text-xs text-muted-foreground truncate">{subtitle}</div>
@@ -438,20 +464,47 @@ function WorkspaceItem({
 }
 
 /* ========== 创建工作区对话框 ========== */
-function CreateWorkspaceDialog({
+export function CreateWorkspaceDialog({
   onClose,
   onCreated,
 }: {
   onClose: () => void;
   onCreated: (ws: Workspace) => void;
 }) {
-  const { i18n, t } = useTranslation();
+  const { i18n } = useTranslation();
   const zh = i18n.language.toLowerCase().startsWith("zh");
   const copy = (cnText: string, enText: string) => zh ? cnText : enText;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [icon, setIcon] = useState(DEFAULT_WORKSPACE_ICON);
   const [loading, setLoading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarImageSrc, setAvatarImageSrc] = useState<string | null>(null);
+
+  const handleAvatarFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+      toast.error(copy("仅支持 PNG/JPEG/WebP/GIF 图片", "PNG/JPEG/WebP/GIF only"));
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(copy("图片文件不能超过 20MB", "Image must be under 20MB"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setAvatarImageSrc(String(reader.result));
+    reader.readAsDataURL(file);
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
+  };
+
+  const handleAvatarCropped = (file: File) => {
+    setAvatarImageSrc(null);
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setAvatarPreview(String(reader.result));
+    reader.readAsDataURL(file);
+  };
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -460,11 +513,18 @@ function CreateWorkspaceDialog({
     }
     setLoading(true);
     try {
-      const ws = await api.createWorkspace({ name: name.trim(), description, icon });
+      const ws = await api.createWorkspace({ name: name.trim(), description });
+      if (avatarFile) {
+        try {
+          await api.uploadWorkspaceAvatar(ws.id, avatarFile);
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : copy("空间头像上传失败", "Avatar upload failed"));
+        }
+      }
       toast.success(copy("团队空间创建成功", "Team workspace created"));
       onCreated(ws);
-    } catch (e: any) {
-      toast.error(e.message || copy("创建失败", "Create failed"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : copy("创建失败", "Create failed"));
     } finally {
       setLoading(false);
     }
@@ -473,12 +533,56 @@ function CreateWorkspaceDialog({
   return (
     <Modal title={copy("创建团队空间", "Create team workspace")} onClose={onClose}>
       <div className="space-y-4">
-        <WorkspaceIconField
-          icon={icon}
-          onChange={setIcon}
-          disabled={loading}
-          label={t("workspaceManagement.fieldIcon", copy("图标", "Icon"))}
-        />
+        <div className="flex items-center gap-3">
+          {avatarPreview ? (
+            <img src={avatarPreview} alt="" className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+          ) : (
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-accent-primary/12 text-lg font-semibold text-accent-primary">
+              {name.trim().slice(0, 1).toUpperCase() || "W"}
+            </span>
+          )}
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => avatarInputRef.current?.click()}
+                className="rounded-md border border-app-border px-3 py-1.5 text-sm text-tx-secondary transition-colors hover:bg-app-hover disabled:opacity-50"
+              >
+                {avatarPreview
+                  ? copy("更换头像", "Change avatar")
+                  : copy("上传头像", "Upload avatar")}
+              </button>
+              {avatarPreview && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => { setAvatarFile(null); setAvatarPreview(null); }}
+                  className="rounded-md px-2 py-1.5 text-sm text-accent-danger transition-colors hover:bg-app-hover disabled:opacity-50"
+                >
+                  {copy("移除", "Remove")}
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-tx-tertiary">
+              {copy("支持 PNG/JPEG/WebP/GIF，上传时可裁切", "PNG/JPEG/WebP/GIF, crop after upload")}
+            </p>
+          </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+          />
+        </div>
+        {avatarImageSrc && (
+          <AvatarCropDialog
+            imageSrc={avatarImageSrc}
+            onConfirm={handleAvatarCropped}
+            onCancel={() => setAvatarImageSrc(null)}
+          />
+        )}
         <div>
           <label className="text-sm mb-1 block">
             {copy("名称", "Name")} <span className="text-destructive">*</span>
@@ -537,8 +641,8 @@ export function JoinWorkspaceDialog({
         toast.success(`已加入团队空间：${res.workspace?.name}`);
         onJoined(res.workspace!.id);
       }
-    } catch (e: any) {
-      toast.error(e.message || "加入失败");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "加入失败");
     } finally {
       setLoading(false);
     }
@@ -606,8 +710,8 @@ function EditWorkspaceDialog({
       const saved = await api.updateWorkspace(workspace.id, payload);
       toast.success(t("workspaceManagement.saveSuccess", "已保存"));
       onSaved(saved);
-    } catch (e: any) {
-      toast.error(e?.message || t("workspaceManagement.saveFailed", "保存失败"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceManagement.saveFailed", "保存失败"));
     } finally {
       setLoading(false);
     }
@@ -674,8 +778,8 @@ function DeleteWorkspaceDialog({
       await api.deleteWorkspace(workspace.id);
       toast.success(t("workspaceManagement.deleteSuccess", "已删除"));
       onDeleted();
-    } catch (e: any) {
-      toast.error(e?.message || t("workspaceManagement.deleteFailed", "删除失败"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("workspaceManagement.deleteFailed", "删除失败"));
       setLoading(false);
     }
   };

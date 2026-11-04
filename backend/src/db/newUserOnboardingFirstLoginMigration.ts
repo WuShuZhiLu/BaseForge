@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 const ONBOARDING_VERSION = 1;
@@ -30,7 +30,7 @@ function extractTriggerBody(sql: string): string {
 export const newUserOnboardingFirstLoginMigration: Migration = {
   version: 68,
   name: "new-user-onboarding-first-login-gate",
-  up: (db: Database.Database) => {
+  up: (db: DatabaseSync) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS user_onboarding_state (
         userId TEXT NOT NULL,

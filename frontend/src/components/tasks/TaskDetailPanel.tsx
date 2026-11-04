@@ -481,17 +481,17 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-app-border" style={{ paddingTop: "calc(var(--safe-area-top) + 4px)" }}>
-        <span className="text-sm font-semibold text-tx-primary">{t("tasks.taskDetail")}</span>
-        <button onClick={onClose} className="p-1 rounded-md hover:bg-app-hover transition-colors">
-          <X size={16} className="text-tx-secondary" />
+        <span className="text-[13px] font-semibold text-tx-primary">{t("tasks.taskDetail")}</span>
+        <button onClick={onClose} className="rounded-[6px] p-1 text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary">
+          <X size={14} />
         </button>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 space-y-3.5 overflow-auto p-3.5">
         {/* Title */}
         <div>
-          <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.taskTitle")}</label>
+          <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.taskTitle")}</label>
           <div className="relative">
             <textarea
               ref={titleRef}
@@ -517,7 +517,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         <div>
           <div className="mb-1.5 flex min-w-0 items-center justify-between gap-2">
             <div className="min-w-0">
-              <label className="block text-xs text-tx-tertiary uppercase tracking-wider">{t("tasks.fields.description")}</label>
+              <label className="block text-[11px] text-tx-tertiary">{t("tasks.fields.description")}</label>
               <span className="text-[10px] text-tx-tertiary">{t("tasks.descriptionMarkdownHint")}</span>
             </div>
             <div className="flex shrink-0 overflow-hidden rounded-md border border-app-border bg-app-bg">
@@ -559,7 +559,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
 
         {/* Priority */}
         <div>
-          <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.priority")}</label>
+          <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.priority")}</label>
           <div className="flex gap-2">
             {([3, 2, 1] as TaskPriority[]).map((p) => {
               const cfg = PRIORITY_CONFIG[p];
@@ -568,10 +568,10 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
                   key={p}
                   onClick={() => { setPriority(p); onUpdate(task.id, { priority: p }); }}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-all",
+                    "flex items-center gap-1.5 rounded-[6px] border px-2.5 py-1 text-[11px] transition-colors",
                     priority === p
-                      ? `${cfg.color} border-current bg-current/10`
-                      : "text-tx-tertiary border-app-border hover:border-tx-tertiary"
+                      ? "border-accent-primary/30 bg-accent-primary/10 font-medium text-accent-primary"
+                      : "border-app-border text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
                   )}
                 >
                   <Flag size={12} />
@@ -611,7 +611,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
 
         {/* Start Date */}
         <div>
-          <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.startDate")}</label>
+          <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.startDate")}</label>
           <input
             type="date"
             value={startDate}
@@ -634,7 +634,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         {/* Start At (time) */}
         {!allDay && (
           <div>
-            <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.startAt")}</label>
+            <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.startAt")}</label>
             <input
               type="time"
               value={startAt}
@@ -658,7 +658,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
 
         {/* Due Date */}
         <div>
-          <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.dueDate")}</label>
+          <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.dueDate")}</label>
           <input
             type="date"
             value={dueDate}
@@ -699,7 +699,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         {/* Due At (time) */}
         {!allDay && (
           <div>
-            <label className="text-xs text-tx-tertiary uppercase tracking-wider mb-1.5 block">{t("tasks.dueAt")}</label>
+            <label className="mb-1.5 block text-[11px] text-tx-tertiary">{t("tasks.dueAt")}</label>
             <input
               type="time"
               value={dueAt}
@@ -727,10 +727,10 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         </div>
 
         {/* Progress Section */}
-        <div className="rounded-lg border border-app-border bg-app-elevated/50 p-4 space-y-2">
+        <div className="rounded-[10px] border border-app-border bg-app-surface p-3.5 space-y-2">
           <div className="flex items-center gap-2 mb-1">
             <Clock size={14} className="text-tx-tertiary" />
-            <span className="text-xs text-tx-tertiary uppercase tracking-wider font-medium">
+            <span className="text-[11px] font-medium text-tx-tertiary">
               {t("tasks.progress.title")}
             </span>
           </div>
@@ -772,9 +772,9 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
 
         {/* Subtask list */}
         {children.length > 0 && (
-          <div className="rounded-lg border border-app-border bg-app-elevated/50 p-4 space-y-2">
+          <div className="rounded-[10px] border border-app-border bg-app-surface p-3.5 space-y-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-tx-tertiary uppercase tracking-wider font-medium">
+              <span className="text-[11px] font-medium text-tx-tertiary">
                 {t("tasks.subtasks")}
               </span>
               <span className="text-[10px] text-tx-tertiary">
@@ -821,10 +821,10 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         <TaskTemplateEditor task={task} allTasks={allTasks} onSaved={() => {}} />
 
         {/* Repeat Settings */}
-        <div className="rounded-lg border border-app-border bg-app-elevated/50 p-4 space-y-2">
+        <div className="rounded-[10px] border border-app-border bg-app-surface p-3.5 space-y-2">
           <div className="flex items-center gap-2 mb-1">
             <Repeat size={14} className="text-tx-tertiary" />
-            <span className="text-xs text-tx-tertiary uppercase tracking-wider font-medium">
+            <span className="text-[11px] font-medium text-tx-tertiary">
               {t("tasks.repeat.title")}
             </span>
           </div>
@@ -1149,7 +1149,7 @@ export const TaskDetailPanel = React.forwardRef<HTMLDivElement, {
         <div className="rounded-lg border border-app-border bg-app-elevated/50 p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Bell size={14} className="text-tx-tertiary" />
-            <span className="text-xs text-tx-tertiary uppercase tracking-wider font-medium">
+            <span className="text-[11px] font-medium text-tx-tertiary">
               {t("tasks.reminder.title")}
             </span>
             {/* test notification button */}

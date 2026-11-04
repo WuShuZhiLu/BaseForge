@@ -6,9 +6,9 @@ import { parseServerUrl, type ServerAddressParts } from "@/lib/serverUrl";
 import { getLanDiscovery, type DiscoveredService } from "@/lib/lanDiscovery";
 
 /**
- * 局域网 nowen-note 服务器发现面板
+ * 局域网 BaseForge 服务器发现面板
  *
- * 在以下环境可用（共享同一套 mDNS 协议 `_nowen-note._tcp.local.`）：
+ * 在以下环境可用（共享同一套 mDNS 协议 `_baseforge._tcp.local.`）：
  *   - Electron 桌面端 → 走 main 进程 bonjour-service
  *   - Android / iOS（Capacitor 原生）→ 走 @capacitor-community/zeroconf
  *   - 普通浏览器 / Web → 不支持，组件自动隐身（返回 null）
@@ -221,7 +221,7 @@ export default function LanDiscoveryPanel({
               {services.map((svc) => {
                 const host = preferredHost(svc);
                 const label = host ? `${host}:${svc.port}` : `:${svc.port}`;
-                const friendly = svc.name || svc.txt?.name || host;
+                const friendly = (svc.name || svc.txt?.name || host).replace(/nowen-note/gi, "BaseForge");
                 return (
                   <button
                     key={svc.name || `${host}:${svc.port}`}

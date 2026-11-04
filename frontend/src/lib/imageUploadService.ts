@@ -24,11 +24,11 @@ export interface ImageUploadOptions {
 
 export interface ImageUploadResult {
   success: boolean;
-  /** 最终可访问的 Nowen 附件 URL */
+  /** 最终可访问的 BaseForge 附件 URL */
   url?: string;
   /** 文件名 */
   filename?: string;
-  /** 上传目标固定为 Nowen 附件系统 */
+  /** 上传目标固定为 BaseForge 附件系统 */
   target?: "local";
   /** 附件 ID */
   attachmentId?: string;
@@ -70,7 +70,7 @@ function failedResult(prefix: string, error: unknown): ImageUploadResult {
 /**
  * 统一图片上传。
  *
- * 所有图片都会先成为 Nowen 附件，再由服务端的附件存储驱动决定二进制实际写入
+ * 所有图片都会先成为 BaseForge 附件，再由服务端的附件存储驱动决定二进制实际写入
  * 本地磁盘、S3、R2 或 MinIO。图片始终拥有附件记录、权限、哈希、备份和迁移关系。
  */
 export async function uploadImage(options: ImageUploadOptions): Promise<ImageUploadResult> {

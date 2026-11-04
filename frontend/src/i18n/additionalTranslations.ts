@@ -167,7 +167,7 @@ export const zhCNAdditionalTranslations = {
     desktopData: {
       openFailed: "打开数据目录失败",
       location: "本地数据位置",
-      databaseAndLogs: "数据库文件：nowen-note.db · 日志目录：{{logDir}}",
+      databaseAndLogs: "数据目录：{{logDir}}（数据库与日志）",
       liteMode: "轻量模式数据存储在远端服务器，本机不保存完整数据库。",
       customDir: "自定义目录",
       openDir: "打开数据目录",
@@ -349,7 +349,7 @@ export const enAdditionalTranslations = {
     desktopData: {
       openFailed: "Failed to open the data directory",
       location: "Local data location",
-      databaseAndLogs: "Database: nowen-note.db · Logs: {{logDir}}",
+      databaseAndLogs: "Data directory: {{logDir}} (database and logs)",
       liteMode: "Lite mode stores full data on the remote server, not on this device.",
       customDir: "Custom directory",
       openDir: "Open data directory",

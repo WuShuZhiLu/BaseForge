@@ -14,6 +14,9 @@ import { mindmapDocsMigration } from "./mindmapDocsMigration.js";
 import { notebookIsFavoriteMigration } from "./notebookIsFavoriteMigration.js";
 import { markdownDefaultPreviewMigration } from "./markdownDefaultPreviewMigration.js";
 import { versionSourceMigration } from "./versionSourceMigration.js";
+// 本分支（space-and-plugins）的两条迁移：与 main 的 130/131 撞号，重新编号为 135/136
+import { attachmentShareMigration } from "./attachmentShareMigration.js";
+import { workspaceAvatarMigration } from "./workspaceAvatarMigration.js";
 /**
  * Compatibility wrapper around the historical migration list.
  *
@@ -22,7 +25,7 @@ import { versionSourceMigration } from "./versionSourceMigration.js";
  * column and clears impossible stale values. v45 introduces an append-only task
  * activity ledger used by records, trends and heatmaps.
  */
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { encryptedBlocksMigration } from "./encryptedBlocksMigration.js";
 import { encryptedNotesMigration } from "./encryptedNotesMigration.js";
 import { markSearchIndexRebuilt, rebuildNormalizedSearchFts, repairSearchContentText } from "../lib/searchIndex.js";
@@ -38,6 +41,7 @@ import { blockAuthorityStaleGuardMigration } from "./blockAuthorityStaleGuardMig
 import { yjsSubdocumentGenerationMigration } from "./yjsSubdocumentGenerationMigration.js";
 import { tagScopeUniquenessMigration } from "./tagScopeUniquenessMigration.js";
 import { knowledgeTreeMigration } from "./knowledgeTreeMigration.js";
+import { knowledgeTreeReferenceMigration } from "./knowledgeTreeReferenceMigration.js";
 import { knowledgeTreeResourceMigration } from "./knowledgeTreeResourceMigration.js";
 import { knowledgeTreeMindmapMigration } from "./knowledgeTreeMindmapMigration.js";
 import { knowledgeTreeMindmapFolderMigration } from "./knowledgeTreeMindmapFolderMigration.js";
@@ -95,7 +99,7 @@ import { noteCommentNotificationsMigration } from "./noteCommentNotificationsMig
 
 export type { Migration } from "./migrations.impl.js";
 
-function ensureTaskActivitySchema(db: Database.Database): void {
+function ensureTaskActivitySchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_activity_events (
       id TEXT PRIMARY KEY,
@@ -351,6 +355,21 @@ const taskInboxCanonicalMigration: Migration = {
   name: "personal-task-inbox-and-capture-source-canonical",
 };
 
+// v138: 分享访问会话补记 UA 与脱敏 IP 前缀——分享中心「访问记录」明细要按会话列出客户端。
+const shareViewSessionClientMetaMigration: Migration = {
+  version: 138,
+  name: "share-view-session-client-meta",
+  up: (db) => {
+    const columns = db.prepare("PRAGMA table_info(share_view_sessions)").all() as { name: string }[];
+    if (!columns.some((column) => column.name === "userAgent")) {
+      db.prepare("ALTER TABLE share_view_sessions ADD COLUMN userAgent TEXT").run();
+    }
+    if (!columns.some((column) => column.name === "ipPrefix")) {
+      db.prepare("ALTER TABLE share_view_sessions ADD COLUMN ipPrefix TEXT").run();
+    }
+  },
+};
+
 export const MIGRATIONS: Migration[] = [
   ...BASE_MIGRATIONS.filter((migration) => migration.version !== 44),
   patchedV44,
@@ -439,6 +458,10 @@ export const MIGRATIONS: Migration[] = [
   notebookIsFavoriteMigration,
   markdownDefaultPreviewMigration,
   versionSourceMigration,
+  attachmentShareMigration,
+  workspaceAvatarMigration,
+  knowledgeTreeReferenceMigration,
+  shareViewSessionClientMetaMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
@@ -446,7 +469,7 @@ export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
   0,
 );
 
-function ensureMigrationsTable(db: Database.Database): void {
+function ensureMigrationsTable(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY,
@@ -469,13 +492,13 @@ function validateMigrationRegistry(): void {
   }
 }
 
-function getAppliedMigrationVersions(db: Database.Database): Set<number> {
+function getAppliedMigrationVersions(db: DatabaseSync): Set<number> {
   ensureMigrationsTable(db);
   const rows = db.prepare("SELECT version FROM schema_migrations").all() as Array<{ version: number }>;
   return new Set(rows.map((row) => row.version));
 }
 
-export function getPendingMigrations(db: Database.Database): Migration[] {
+export function getPendingMigrations(db: DatabaseSync): Migration[] {
   validateMigrationRegistry();
   const applied = getAppliedMigrationVersions(db);
   return MIGRATIONS
@@ -483,7 +506,7 @@ export function getPendingMigrations(db: Database.Database): Migration[] {
     .sort((a, b) => a.version - b.version);
 }
 
-export function getCurrentSchemaVersion(db: Database.Database): number {
+export function getCurrentSchemaVersion(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   const row = db
     .prepare("SELECT MAX(version) AS version FROM schema_migrations")
@@ -491,7 +514,7 @@ export function getCurrentSchemaVersion(db: Database.Database): number {
   return row?.version ?? 0;
 }
 
-export function runMigrations(db: Database.Database): number {
+export function runMigrations(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   validateMigrationRegistry();
 

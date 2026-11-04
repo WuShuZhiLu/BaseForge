@@ -32,7 +32,7 @@ function isMobileBrowserUserAgent(): boolean {
 }
 
 /**
- * Decide whether Nowen should replace input[capture] with its managed camera UI.
+ * Decide whether BaseForge should replace input[capture] with its managed camera UI.
  *
  * Native Capacitor and mobile browsers keep their mature platform capture flow.
  * Desktop/Electron/Windows-tablet style environments use getUserMedia instead,
@@ -149,7 +149,7 @@ export function describeCameraError(error: unknown): CameraCaptureErrorInfo {
       return {
         code: "permission-denied",
         title: "无法使用摄像头",
-        message: "摄像头权限被拒绝。请在系统或浏览器权限设置中允许 Nowen Note 使用摄像头，然后重试。",
+        message: "摄像头权限被拒绝。请在系统或浏览器权限设置中允许 BaseForge 使用摄像头，然后重试。",
       };
     case "NotFoundError":
     case "DevicesNotFoundError":

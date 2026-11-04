@@ -12,10 +12,15 @@ import {
   Bold, Italic, Highlighter, Table2, ChevronDown,
   Strikethrough, Code, Link as LinkIcon, Workflow, Sigma, BookOpen, Film, FolderSearch,
   Columns2, Info, Type, Trash2, Copy, ClipboardPaste, Scissors, Plus, Repeat, ChevronRight, ArrowLeft,
-  BrainCircuit, Network, PenTool
+  BrainCircuit, Network, PenTool, Puzzle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
+import {
+  executePluginEditorCommand,
+  formatKeybinding,
+  listPluginEditorCommands,
+} from "@/lib/pluginEditorCommands";
 import { useTranslation } from "react-i18next";
 import {
   convertBlock, deleteBlock, cutBlock, copyBlock, pasteBlock, addBelowBlock,
@@ -544,10 +549,12 @@ export function getDefaultSlashCommands(
   onAIAssistant?: () => void,
   onAttachmentLibrary?: () => void,
   onVoiceRecord?: () => void,
+  noteId?: string | null,
 ): SlashCommandItem[] {
   return [
     ...(onVoiceRecord ? [{ id: "voice", label: t("voice.record"), description: t("voice.description"), icon: <span>🎙</span>, category: t("slash.catInsert"), keywords: ["voice", "audio", "录音", "语音"], action: onVoiceRecord }] : []),
     ...getDailyRecordSlashCommands(),
+    ...getPluginSlashCommands(noteId),
     // 标题
     {
       id: "heading1",
@@ -1064,6 +1071,42 @@ export function getDefaultSlashCommands(
       action: () => onAIAssistant?.(),
     },
   ];
+}
+
+/**
+ * 已启用插件声明的编辑器命令（`contributes.editorCommands`）：与内置项同形，
+ * 执行时走插件 Action 通道，因此斜杠菜单无需感知插件细节。
+ * 分组按声明的 category 归类（同一 category 的命令排在一起，组名即 category；
+ * 未声明时归入「插件」缺省组）。
+ */
+export function getPluginSlashCommands(noteId?: string | null): SlashCommandItem[] {
+  const registered = listPluginEditorCommands();
+  // 同一 category 的命令排在一起（菜单按相邻 category 渲染分组头）；
+  // 缺省组固定在最后，其余按组名稳定排序（同组保持声明顺序）。
+  const ordered = registered
+    .map((command, index) => ({ command, index, group: command.category || "" }))
+    .sort((a, b) => {
+      if (a.group === b.group) return a.index - b.index;
+      if (a.group === "") return 1;
+      if (b.group === "") return -1;
+      return a.group.localeCompare(b.group);
+    });
+  return ordered.map(({ command }) => {
+    const shortcut = command.chord ? formatKeybinding(command.chord) : "";
+    return {
+      id: `plugin:${command.id}`,
+      label: command.title,
+      description: shortcut ? `插件 · ${command.pluginId} · ${shortcut}` : `插件 · ${command.pluginId}`,
+      icon: <Puzzle size={16} />,
+      category: command.category || "插件",
+      keywords: [...command.keywords, "plugin", "插件", command.pluginId, command.localId],
+      action: () => {
+        void executePluginEditorCommand(command, { noteId }).catch((error: unknown) => {
+          toast.error(`插件命令执行失败：${error instanceof Error ? error.message : String(error)}`);
+        });
+      },
+    };
+  });
 }
 
 export interface SlashCommandsRef {

@@ -56,6 +56,8 @@ export interface KnowledgeTreeNode {
   access: EffectiveKnowledgeAccess;
   sharedRootId?: string;
   sharedDepth?: number;
+  /** 复制 = 连接：这条行是同一篇文档的额外路径，不是正文的物理位置。 */
+  isReference?: boolean;
 }
 
 export interface KnowledgePermissionRow {
@@ -140,7 +142,9 @@ function workspaceQuery(includeDeleted = false, workspaceIdOverride?: string): s
 }
 
 function withDisplaySort(result: KnowledgeTreeResponse): KnowledgeTreeResponse {
-  return { ...result, nodes: applyKnowledgeTreeSort(result.nodes) };
+  // 空库/接口异常时 nodes 可能缺失，兜底成空数组，避免下游 for...of 抛 "nodes is not iterable"
+  const nodes = Array.isArray(result?.nodes) ? result.nodes : [];
+  return { ...result, nodes: applyKnowledgeTreeSort(nodes) };
 }
 
 export const knowledgeTreeApi = {
@@ -203,6 +207,26 @@ export const knowledgeTreeApi = {
       method: "PUT",
       body: JSON.stringify(input),
     });
+  },
+
+  /** 复制 = 连接：同一条路径不加复制正文，只是多一条指向它的路径。 */
+  createReference(nodeId: string, parentId?: string) {
+    return request<KnowledgeTreeNode>(`/nodes/${encodeURIComponent(nodeId)}/reference`, {
+      method: "POST",
+      body: JSON.stringify(parentId ? { parentId } : {}),
+    });
+  },
+
+  /** 目录深拷贝：整棵子树（子目录/文档/附件）复制到源目录同级。 */
+  duplicateFolder(nodeId: string) {
+    return request<{
+      nodeId: string;
+      title: string;
+      notebookCount: number;
+      noteCount: number;
+      skippedNoteCount: number;
+      skippedFileCount: number;
+    }>(`/nodes/${encodeURIComponent(nodeId)}/duplicate`, { method: "POST" });
   },
 
   batchMove(nodeIds: string[], input: { parentId: string | null }) {

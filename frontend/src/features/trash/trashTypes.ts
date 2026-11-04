@@ -5,6 +5,8 @@ export interface TrashItem {
   resourceType: TrashResourceType;
   title: string;
   contentFormat: string | null;
+  /** 结构化内容预览：文本/markdown/导图大纲/迷你表格/画板统计。 */
+  preview: import("./trashServiceTypes").TrashPreview | null;
   deletedAt: string | null;
   originalParentId: string | null;
   originalPath: string[];
@@ -13,6 +15,8 @@ export interface TrashItem {
   canDeletePermanently: boolean;
   isLocked: boolean;
   restoreIncludesAncestors: boolean;
+  /** 内容字符数（后端计算），排序用；取不到为 null。 */
+  size: number | null;
 }
 export interface TrashBatchResult {
   succeededIds: string[];

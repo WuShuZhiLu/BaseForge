@@ -174,7 +174,7 @@ export async function exportSingleNote(
       // 用户明确选择 ZIP 时不能悄悄降级成 .md；让菜单显示真实失败。
       if (options?.forceZip) return false;
 
-      // Core 会把服务器打包错误收敛为 false。只对“正文里确实有 Nowen 图片”的场景
+      // Core 会把服务器打包错误收敛为 false。只对“正文里确实有 BaseForge 图片”的场景
       // 做兜底，避免把无关的格式/权限错误伪装成成功。
       const markdown = normalizeToMarkdown(note.content, note.contentText);
       const safeTitle = sanitizeSingleNoteExportFilename(note.title);

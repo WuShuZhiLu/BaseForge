@@ -91,7 +91,7 @@ export default function TagsPanelContent({
                   trailing={
                     <span className="relative flex h-4 w-5 shrink-0 items-center justify-center">
                       {tag.noteCount !== undefined && tag.noteCount > 0 && (
-                        <span className="absolute inset-0 flex items-center justify-center text-[10px] tabular-nums text-tx-tertiary">
+                        <span className="absolute inset-0 flex items-center justify-center text-[9px] tabular-nums text-tx-tertiary">
                           {tag.noteCount}
                         </span>
                       )}

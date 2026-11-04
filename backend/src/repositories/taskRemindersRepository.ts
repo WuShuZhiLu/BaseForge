@@ -40,7 +40,7 @@ export const taskRemindersRepository = {
     const db = getDb();
     return db
       .prepare("SELECT * FROM task_reminders WHERE taskId = ? AND userId = ? ORDER BY offsetMinutes ASC")
-      .all(taskId, userId) as TaskReminderRecord[];
+      .all(taskId, userId) as unknown as TaskReminderRecord[];
   },
 
   /**
@@ -178,7 +178,7 @@ export const taskRemindersRepository = {
     const db = getDb();
     return db
       .prepare("SELECT * FROM task_reminders WHERE taskId = ?")
-      .all(taskId) as TaskReminderRecord[];
+      .all(taskId) as unknown as TaskReminderRecord[];
   },
 
   /**

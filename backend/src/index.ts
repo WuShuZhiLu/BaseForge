@@ -25,6 +25,7 @@ import dataFileRouter from "./routes/data-file";
 import settingsRouter from "./routes/settings";
 import fontsRouter from "./routes/fonts";
 import attachmentsRouter, { handleDownloadAttachment } from "./routes/attachments";
+import { attachmentSharePublicRouter, attachmentSharesRouter } from "./routes/attachment-shares";
 import taskAttachmentsRouter, { handleDownloadTaskAttachment } from "./routes/task-attachments";
 import taskRemindersRouter from "./routes/task-reminders";
 import taskProjectsRouter from "./routes/task-projects";
@@ -70,6 +71,7 @@ import auditRouter from "./routes/audit";
 import backupsRouter, { handleFullBackupJobDownload } from "./routes/backups";
 import emailRouter from "./routes/email";
 import { sharesRouter, sharedRouter } from "./routes/shares";
+import { shareCenterRouter } from "./routes/share-center";
 import workspacesRouter from "./routes/workspaces";
 import authRouter from "./routes/auth";
 import usersRouter from "./routes/users";
@@ -359,6 +361,10 @@ app.get("/api/fonts/file/:id", (c) => {
 //   - 授权靠附件 id 不可枚举（uuid）保护；详细权衡见 routes/attachments.ts 顶部注释。
 app.get("/api/attachments/:id", handleDownloadAttachment);
 
+// 附件分享链接公开访问（无需 JWT）：匿名凭高熵 token 下载/验密，自身完成
+// isActive/过期/次数校验（关闭/过期/超次统一 404）。必须在 JWT 中间件之前注册。
+app.route("/api/attachment-shares", attachmentSharePublicRouter);
+
 // 导出任务生成的 ZIP 使用随机 256-bit capability token 下载。
 // 浏览器原生下载请求无法携带 localStorage 中的 Authorization header，因此必须在
 // JWT 中间件之前注册；token 不可枚举、30 分钟过期，且响应禁止缓存。
@@ -445,7 +451,16 @@ function touchSessionLastSeen(sessionId: string) {
 app.route("/api/pm", clientLogRouter);
 
 app.use("/api/*", async (c, next) => {
-  const authHeader = c.req.header("Authorization");
+  let authHeader = c.req.header("Authorization");
+
+  // 空间头像文件由 <img> 直接请求，无法携带 Authorization 头 → 允许该路径用 ?token=
+  if (
+    (!authHeader || !authHeader.startsWith("Bearer ")) &&
+    c.req.query("token") &&
+    /^\/api\/workspaces\/[^/]+\/avatar-file$/.test(c.req.path)
+  ) {
+    authHeader = `Bearer ${c.req.query("token")}`;
+  }
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return c.json({ error: "未授权，请先登录", code: "UNAUTHENTICATED" }, 401);
@@ -600,6 +615,10 @@ app.route("/api/user-preferences", userPreferencesRouter);
 app.route("/api/settings", settingsRouter);
 app.route("/api/fonts", fontsRouter);
 app.route("/api/attachments", attachmentsRouter);
+// 附件分享管理端点（JWT 保护）：开启/列表/改设置/删除
+app.route("/api/attachment-shares", attachmentSharesRouter);
+// 分享中心：五路分享数据收口的统一列表 + 批量处置（JWT 保护）
+app.route("/api/share-center", shareCenterRouter);
 app.route("/api/task-attachments", taskAttachmentsRouter);
 // 必须先于 /api/task-reminders 的 /:taskId 路由注册，否则 recent 会被当成任务 ID。
 app.get("/api/task-reminders/recent", (c) => {

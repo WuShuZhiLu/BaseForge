@@ -52,7 +52,7 @@ export const taskProjectsRepository = {
         'ROUND(100.0 * (SELECT COUNT(*) FROM tasks t WHERE t."projectId" = p.id AND t."isCompleted" = 1) / ' +
         '(SELECT COUNT(*) FROM tasks t WHERE t."projectId" = p.id)) ELSE 0 END AS progress ' +
         'FROM task_projects p WHERE p."workspaceId" = ? ORDER BY p."sortOrder" ASC, p."createdAt" ASC'
-      ).all(workspaceId) as TaskProjectWithStats[];
+      ).all(workspaceId) as unknown as TaskProjectWithStats[];
     } else {
       return db.prepare(
         'SELECT p.*, (SELECT COUNT(*) FROM tasks t WHERE t."projectId" = p.id) AS taskCount, ' +
@@ -61,7 +61,7 @@ export const taskProjectsRepository = {
         'ROUND(100.0 * (SELECT COUNT(*) FROM tasks t WHERE t."projectId" = p.id AND t."isCompleted" = 1) / ' +
         '(SELECT COUNT(*) FROM tasks t WHERE t."projectId" = p.id)) ELSE 0 END AS progress ' +
         'FROM task_projects p WHERE p."userId" = ? AND p."workspaceId" IS NULL ORDER BY p."sortOrder" ASC, p."createdAt" ASC'
-      ).all(userId) as TaskProjectWithStats[];
+      ).all(userId) as unknown as TaskProjectWithStats[];
     }
   },
 

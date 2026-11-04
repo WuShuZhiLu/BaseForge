@@ -136,7 +136,7 @@ BaseForge 支持 MCP Server，可让 Claude Code、Cursor、VS Code 等 AI 客�
 - 账号：`demo`
 - 密码：`demo123456`
 
-> `nowen.cn` 仍在维护中。当前请以 <https://cropflre.github.io/> 作为 Nowen 官方帮助与使用文档入口。
+> `nowen.cn` 仍在维护中。当前请以 <https://cropflre.github.io/> 作为上游官方帮助与使用文档入口。
 
 > 演示账号仅用于体验，数据可能被定期重置。请勿存放敏感或重要内容。
 
@@ -233,14 +233,15 @@ docker run -d \
 
 ```text
 /app/data/
-├── nowen-note.db
+├── baseforge.db
 ├── attachments/
 ├── backups/
 ├── fonts/
 └── .jwt_secret
 ```
 
-- 默认生产数据库为 SQLite，主文件是 `/app/data/nowen-note.db`。
+- 默认生产数据库为 SQLite，主文件是 `/app/data/baseforge.db`。
+- 从旧版本升级时，旧库文件会在首次启动时自动改名为 `baseforge.db`，无需手工处理。
 - 附件默认存储在 `/app/data/attachments`，新文件按 `YYYY/MM` 分目录。
 - 自动备份默认位于 `/app/data/backups`。
 - 生产环境建议把 `BACKUP_DIR` 映射到独立物理磁盘，并遵循 3-2-1 备份原则。

@@ -53,11 +53,11 @@ export const taskDependenciesRepository = {
     if (workspaceId) {
       return db
         .prepare("SELECT * FROM task_dependencies WHERE (predecessorTaskId = ? OR successorTaskId = ?) AND workspaceId = ?")
-        .all(taskId, taskId, workspaceId) as TaskDependencyRecord[];
+        .all(taskId, taskId, workspaceId) as unknown as TaskDependencyRecord[];
     } else {
       return db
         .prepare("SELECT * FROM task_dependencies WHERE (predecessorTaskId = ? OR successorTaskId = ?) AND userId = ? AND workspaceId IS NULL")
-        .all(taskId, taskId, userId) as TaskDependencyRecord[];
+        .all(taskId, taskId, userId) as unknown as TaskDependencyRecord[];
     }
   },
 
@@ -73,11 +73,11 @@ export const taskDependenciesRepository = {
     if (workspaceId) {
       return db
         .prepare("SELECT * FROM task_dependencies WHERE workspaceId = ?")
-        .all(workspaceId) as TaskDependencyRecord[];
+        .all(workspaceId) as unknown as TaskDependencyRecord[];
     } else {
       return db
         .prepare("SELECT * FROM task_dependencies WHERE userId = ? AND workspaceId IS NULL")
-        .all(userId) as TaskDependencyRecord[];
+        .all(userId) as unknown as TaskDependencyRecord[];
     }
   },
 

@@ -15,7 +15,7 @@
  * 用户只能启用一个 SyncProfile。
  */
 
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { SyncEngine } from "./engine";
 import type { SyncEngineStatus } from "./engine";
@@ -96,7 +96,7 @@ export function stopSyncEngine(): void {
  * 4. userId 未知（Desktop 本地账号尚未就绪）。
  */
 export function reconcileSyncEngine(
-  db: Database.Database,
+  db: DatabaseSync,
   options: { userId?: string | null; intervalMs?: number } = {},
 ): SyncEngine | null {
   if (!isLocalFirstSyncV2Enabled()) {
@@ -229,7 +229,7 @@ export function reconcileSyncEngine(
  * Desktop 是单用户场景：Embedded Backend 里只有 ensureLocalAccount 建的那个账号。
  * 取最早创建的用户即可，避免调用方到处传 userId。
  */
-function resolveLocalUserId(db: Database.Database): string | null {
+function resolveLocalUserId(db: DatabaseSync): string | null {
   try {
     const row = db.prepare(
       "SELECT id FROM users ORDER BY createdAt ASC LIMIT 1",

@@ -182,11 +182,14 @@ export function wrapKnowledgeRoute(path: string, subApp: Hono<any>): Hono<any> {
   if (!middleware) return subApp;
 
   const wrapper = new Hono<any>();
-  wrapper.use("*", middleware);
   if (normalized === "/api/files") {
-    // Keep the release branch orphan/source-note visibility correction after access filtering.
+    // 孤儿/来源笔记修正必须在收口层**外层**（Hono 按注册顺序由外到内执行）：
+    // 收口层会整体重建响应，挂在它内层的注解会被丢掉——实测
+    // isAutoCleanupProtected 不下发（绿色盾牌消失）、primaryNote 仍是 holder
+    // 笔记而不是真实引用笔记。
     wrapper.use("*", fileOrphanVisibilityMiddleware);
   }
+  wrapper.use("*", middleware);
   wrapper.route("/", subApp);
   guardedPaths(wrapper as RouterLike).add(normalized);
   return wrapper;

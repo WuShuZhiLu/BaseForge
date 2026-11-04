@@ -30,7 +30,7 @@ export class PluginLoader {
   }
 
   async loadPlugin(): Promise<never> {
-    throw new Error("旧式目录插件已停用，请打包为 .nowen-plugin 后由管理员安装");
+    throw new Error("旧式目录插件已停用，请打包为插件包后由管理员安装");
   }
 
   async unloadPlugin(name: string): Promise<boolean> {

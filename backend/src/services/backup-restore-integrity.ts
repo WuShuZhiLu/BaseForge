@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 export interface BackupFileMetaStats {
   count?: number;
@@ -312,7 +312,7 @@ function environmentObjectStorageEnabled(): boolean {
   return driver === "s3" || driver === "r2" || driver === "minio";
 }
 
-function readObjectStorageEnabled(db: Database.Database): boolean {
+function readObjectStorageEnabled(db: DatabaseSync): boolean {
   try {
     const row = db
       .prepare("SELECT value FROM system_settings WHERE key = ?")
@@ -325,7 +325,7 @@ function readObjectStorageEnabled(db: Database.Database): boolean {
   }
 }
 
-function readAttachmentRows(db: Database.Database): { rows: number; paths: string[] } {
+function readAttachmentRows(db: DatabaseSync): { rows: number; paths: string[] } {
   try {
     const rows = (db.prepare(
       "SELECT COUNT(*) AS count FROM attachments WHERE path IS NOT NULL AND path <> ''",
@@ -362,7 +362,7 @@ export function auditAttachmentBackup(
     );
   }
 
-  const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
     const attachmentRows = readAttachmentRows(db);
     const objectStorageEnabled = readObjectStorageEnabled(db) || environmentObjectStorageEnabled();

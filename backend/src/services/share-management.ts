@@ -94,7 +94,7 @@ export function resolveShareEffectiveStatus(
   return "active";
 }
 
-function canManageShare(
+export function canManageShare(
   row: ShareManagementRawRow,
   userId: string,
   access: ShareManagementAccessContext,
@@ -181,12 +181,15 @@ export function buildShareManagementResult(
   return { items, total, page, pageSize, stats };
 }
 
-export function queryShareManagement(
+/**
+ * 读取分享管理需要的原始数据：全库 shares 行 + 当前用户的三级角色表。
+ * 拆出来是为了让「分享中心」能复用同一套可见性判定，不再抄一份口径——
+ * 上一轮「未引用分类恒为空」的根因就是同一个集合被两处用不同口径覆写。
+ */
+export function loadShareManagementRows(
   db: any,
   userId: string,
-  query: ShareManagementQuery,
-  nowMs = Date.now(),
-) {
+): { rows: ShareManagementRawRow[]; access: ShareManagementAccessContext } {
   ensureNotebookAclOverridesTable();
 
   const rows = db.prepare(`
@@ -242,15 +245,22 @@ export function queryShareManagement(
     "SELECT workspaceId, role FROM workspace_members WHERE userId = ?",
   ).all(userId) as Array<{ workspaceId: string; role: string }>;
 
-  return buildShareManagementResult(
+  return {
     rows,
-    userId,
-    {
+    access: {
       notebookRoleById: new Map(notebookRoles.map((row) => [row.targetNotebookId, row.role])),
       notePermissionById: new Map(notePermissions.map((row) => [row.noteId, row.permission])),
       workspaceRoleById: new Map(workspaceRoles.map((row) => [row.workspaceId, row.role])),
     },
-    query,
-    nowMs,
-  );
+  };
+}
+
+export function queryShareManagement(
+  db: any,
+  userId: string,
+  query: ShareManagementQuery,
+  nowMs = Date.now(),
+) {
+  const { rows, access } = loadShareManagementRows(db, userId);
+  return buildShareManagementResult(rows, userId, access, query, nowMs);
 }

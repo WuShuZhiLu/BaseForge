@@ -40,7 +40,7 @@ export const attachmentFoldersRepository = {
          WHERE userId = ?
          ORDER BY name COLLATE NOCASE`
       )
-      .all(userId) as AttachmentFolderRecord[];
+      .all(userId) as unknown as AttachmentFolderRecord[];
   },
 
   /**

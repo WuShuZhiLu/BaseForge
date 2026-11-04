@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 const ONBOARDING_VERSION = 1;
@@ -442,7 +442,7 @@ function noteInsert(note: GuideNote, sortOrder: number): string {
 export const newUserOnboardingMigration: Migration = {
   version: 67,
   name: "new-user-bilingual-onboarding",
-  up: (db: Database.Database) => {
+  up: (db: DatabaseSync) => {
     const noteStatements = GUIDE_NOTES.map((note, index) => (
       noteInsert(note, index % (GUIDE_NOTES.length / 2))
     )).join("\n");

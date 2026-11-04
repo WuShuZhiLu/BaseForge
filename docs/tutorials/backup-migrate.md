@@ -6,7 +6,7 @@
 
 ## 数据位置
 
-所有数据在 SQLite 数据库文件中：`data/nowen-note.db`
+所有数据在 SQLite 数据库文件中：`data/baseforge.db`
 
 附件图片在：`data/attachments/`
 
@@ -21,7 +21,7 @@
 ### 手动备份
 
 ```bash
-cp data/nowen-note.db "data/nowen-note.db.bak.$(date +%Y%m%d)"
+cp data/baseforge.db "data/baseforge.db.bak.$(date +%Y%m%d)"
 ```
 
 ### Docker 卷备份
@@ -44,7 +44,7 @@ docker-compose start
 
 ```bash
 docker-compose stop
-cp data/nowen-note.db.bak data/nowen-note.db
+cp data/baseforge.db.bak data/baseforge.db
 docker-compose start
 ```
 

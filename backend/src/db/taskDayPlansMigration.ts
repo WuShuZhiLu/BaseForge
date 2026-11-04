@@ -1,7 +1,7 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
-export function ensureTaskDayPlansSchema(db: Database.Database): void {
+export function ensureTaskDayPlansSchema(db: DatabaseSync): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS task_day_plans (
       id TEXT PRIMARY KEY,

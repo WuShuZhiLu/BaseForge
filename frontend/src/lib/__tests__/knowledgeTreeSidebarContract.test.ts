@@ -72,6 +72,18 @@ describe("knowledge tree sidebar contract", () => {
     expect(panel).toContain("node.isFavorite === 1");
   });
 
+  // 用户实际点开的是侧栏的树；文档的复制/移动/导出/分享必须写在这里。
+  it("exposes copy-as-link and move on the desktop sidebar row menu", () => {
+    const sidebar = source("../../components/SidebarDesktop.tsx");
+    expect(sidebar).toContain('label="复制"');
+    expect(sidebar).toContain("knowledgeTreeApi.createReference");
+    expect(sidebar).not.toContain("api.duplicateNote");
+    expect(sidebar).toContain('label="移动到…"');
+    expect(sidebar).toContain("KnowledgeTreeBatchMovePanel");
+    expect(sidebar).toContain('label="导出"');
+    expect(sidebar).toContain('label="分享"');
+  });
+
   it("updates tree note status immediately after a successful menu action", () => {
     const panel = source("../../components/KnowledgeTreePanel.tsx");
     const menu = source("../../components/KnowledgeTreeNodeMenu.tsx");

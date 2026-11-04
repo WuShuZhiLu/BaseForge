@@ -42,7 +42,7 @@ app.get("/", (c) => {
   const db = getDb();
   const where = "workspaceId = ?" + (status === "all" ? "" : " AND status = ?");
   const params = status === "all" ? [workspaceId] : [workspaceId, status];
-  const rows = db.prepare(`SELECT * FROM workspace_issues WHERE ${where} ORDER BY updatedAt DESC, id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as WorkspaceIssue[];
+  const rows = db.prepare(`SELECT * FROM workspace_issues WHERE ${where} ORDER BY updatedAt DESC, id DESC LIMIT ? OFFSET ?`).all(...params, limit, offset) as unknown as WorkspaceIssue[];
   const total = (db.prepare(`SELECT COUNT(*) AS total FROM workspace_issues WHERE ${where}`).get(...params) as { total: number }).total;
   return c.json({ items: rows.map((row) => issueForRead(row, userId)), total, canCreate: access.canComment, role: access.role });
 });

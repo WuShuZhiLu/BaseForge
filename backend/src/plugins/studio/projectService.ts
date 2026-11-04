@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { getDb } from "../../db/schema.js";
 import {
@@ -56,7 +56,7 @@ function decodeContent(input: PluginStudioWriteFileInput, requiredEncoding: "utf
 
 export class PluginStudioProjectService {
   constructor(
-    private readonly db: Database.Database = getDb(),
+    private readonly db: DatabaseSync = getDb(),
     private readonly paths = new PluginStudioProjectPaths(),
   ) {}
 
@@ -104,12 +104,12 @@ export class PluginStudioProjectService {
       return this.db.prepare(`
         SELECT id, ownerUserId, name, slug, status, revision, createdAt, updatedAt
         FROM plugin_studio_projects ORDER BY updatedAt DESC
-      `).all() as ProjectRow[];
+      `).all() as unknown as ProjectRow[];
     }
     return this.db.prepare(`
       SELECT id, ownerUserId, name, slug, status, revision, createdAt, updatedAt
       FROM plugin_studio_projects WHERE ownerUserId = ? ORDER BY updatedAt DESC
-    `).all(actor.userId) as ProjectRow[];
+    `).all(actor.userId) as unknown as ProjectRow[];
   }
 
   getProject(actor: PluginStudioActor, projectId: string): PluginStudioProject {

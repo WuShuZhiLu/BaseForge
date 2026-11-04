@@ -31,6 +31,35 @@ const actionSchema = z.object({
   input: z.record(inputFieldSchema).default({}),
 }).strict();
 
+/**
+ * 外网白名单的发布侧校验：与用户端 backend/src/plugins/manifest.ts 的 validateExternalHost 同规则
+ * （精确域名、禁通配符、禁 IP 字面量、禁内网后缀）。两边必须一致，否则会出现
+ * "注册表收下了、用户端装不上"的发布事故。
+ */
+const EXTERNAL_HOST_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i
+const BLOCKED_HOST_SUFFIXES = [".local", ".internal", ".localdomain", ".localhost", ".lan", ".home.arpa"]
+
+function externalHostProblem(value: string): string | null {
+  const host = value.trim().toLowerCase()
+  if (!host) return "域名不能为空"
+  if (host.includes("*")) return "不支持通配符，请逐个填写精确域名"
+  if (/^[\d.]+$/.test(host) || host.includes(":")) return "不能使用 IP 字面量或端口，请填写域名"
+  if (host === "localhost" || BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+    return "不能使用内网/本机域名"
+  }
+  if (!EXTERNAL_HOST_PATTERN.test(host)) return "域名格式不合法（请填写类似 api.example.com 的精确域名）"
+  return null
+}
+
+const permissionConfigSchema = z.object({
+  externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional(),
+}).strict().superRefine((config, context) => {
+  for (const [index, host] of (config.externalFetchHosts ?? []).entries()) {
+    const problem = externalHostProblem(host)
+    if (problem) context.addIssue({ code: z.ZodIssueCode.custom, path: ["externalFetchHosts", index], message: problem })
+  }
+})
+
 const connectionSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
   name: z.string().min(1).max(100),
@@ -91,7 +120,7 @@ export const registryManifestV2Schema = z.object({
   connections: z.array(connectionSchema).max(20).optional(),
   output: z.record(z.unknown()).optional(),
   permissions: z.array(z.enum(PLUGIN_PERMISSIONS)).max(32).default([]),
-  permissionConfig: z.object({ externalFetchHosts: z.array(z.string().min(1).max(253)).max(50).optional() }).strict().optional(),
+  permissionConfig: permissionConfigSchema.optional(),
   actions: z.array(actionSchema).min(1).max(50),
   events: z.array(z.string().min(1).max(100)).max(50).optional(),
   eventHandlers: z.array(z.object({ event: z.string().min(1).max(100), action: z.string().min(1).max(64) }).strict()).max(50).optional(),

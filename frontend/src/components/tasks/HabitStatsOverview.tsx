@@ -13,11 +13,11 @@ export function HabitStatsOverview({ stats }: { stats: HabitStats | null }) {
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-2.5 px-4 md:px-5 pt-3 pb-1">
+    <div className="grid grid-cols-3 gap-2 px-4 pb-1 pt-2.5 md:px-5">
       {cards.map((card) => (
-        <div key={card.label} className="rounded-lg border border-app-border bg-app-surface px-3 py-3 shadow-sm">
-          <div className="text-[10px] text-tx-tertiary leading-tight">{card.label}</div>
-          <div className="mt-1 text-lg font-bold text-tx-primary">{card.value}</div>
+        <div key={card.label} className="rounded-[10px] border border-app-border bg-app-surface px-3 py-2.5">
+          <div className="text-[11px] leading-tight text-tx-tertiary">{card.label}</div>
+          <div className="mt-1 text-[17px] font-semibold tabular-nums text-tx-primary">{card.value}</div>
         </div>
       ))}
     </div>

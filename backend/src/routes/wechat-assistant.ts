@@ -75,21 +75,21 @@ export function createWechatAssistantCallbackRouter() {
       let result = await execute("verify-message", { method: c.req.method, query, body: await readBody(c.req.raw, 131072), headers: {} });
       if (result.message) {
         const { sender, event, scene, type, text, id, encrypted } = result.message;
-        let reply = "请发送公众号文章链接，可一次发送多篇。采集结果和失败重试可在 Nowen 的微信收件箱查看。";
+        let reply = "请发送公众号文章链接，可一次发送多篇。采集结果和失败重试可在 BaseForge 的微信收件箱查看。";
         if (type === "event" && ["SCAN", "subscribe"].includes(event) && scene) {
-          reply = bindConnection(scene, sender) ? "连接成功！发送公众号文章链接即可自动保存到微信收件箱。" : "二维码已失效或此微信已连接其他账号，请回到 Nowen 重新连接。";
+          reply = bindConnection(scene, sender) ? "连接成功！发送公众号文章链接即可自动保存到微信收件箱。" : "二维码已失效或此微信已连接其他账号，请回到 BaseForge 重新连接。";
         } else if (type === "event" && event === "unsubscribe") {
           const profile = getDb().prepare("SELECT userId FROM wechat_assistant_profiles WHERE openId=?").get(sender) as { userId: string } | undefined;
           if (profile) disconnectAssistant(profile.userId);
           return c.text("success");
         } else if (text) {
           const profile = getDb().prepare("SELECT userId FROM wechat_assistant_profiles WHERE openId=?").get(sender) as { userId: string } | undefined;
-          if (!profile) reply = "请先打开 Nowen 的微信收件箱，点击连接微信并扫码。";
+          if (!profile) reply = "请先打开 BaseForge 的微信收件箱，点击连接微信并扫码。";
           else if (!/^\d{1,30}$/.test(id)) return c.text("Missing MsgId", 400);
           else {
             try {
               const accepted = await collectArticles(profile.userId, text, sender, id);
-              reply = `已接收 ${accepted.accepted} 篇文章，${accepted.duplicates} 篇已在收件箱。请在 Nowen 微信收件箱查看进度。`;
+              reply = `已接收 ${accepted.accepted} 篇文章，${accepted.duplicates} 篇已在收件箱。请在 BaseForge 微信收件箱查看进度。`;
             } catch (error) { reply = (error as Error).message; }
           }
         } else return c.text("success");

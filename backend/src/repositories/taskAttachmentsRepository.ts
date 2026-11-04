@@ -51,7 +51,7 @@ export const taskAttachmentsRepository = {
          WHERE taskId = ?
          ORDER BY createdAt ASC, id ASC`,
       )
-      .all(taskId) as TaskAttachmentRecord[];
+      .all(taskId) as unknown as TaskAttachmentRecord[];
   },
 
   /**

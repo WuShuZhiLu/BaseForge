@@ -254,17 +254,23 @@ function matchesExcludePattern(relativePath, pattern) {
   return false;
 }
 
-function readNowenIgnore(folderPath) {
-  const ignorePath = path.join(folderPath, ".nowenignore");
-  try {
-    const boundary = checkPathBoundary(folderPath, ignorePath);
-    if (!boundary.ok) return [];
-    const stat = fs.statSync(ignorePath);
-    if (stat.size > 32 * 1024) return [];
-    return sanitizeExcludePatterns(fs.readFileSync(ignorePath, "utf8").split(/\r?\n/));
-  } catch {
-    return [];
+/** 同步根目录下的排除规则文件；旧文件名继续兼容 */
+const IGNORE_FILE_NAMES = [".baseforgeignore", ".nowenignore"];
+
+function readIgnoreFile(folderPath) {
+  for (const name of IGNORE_FILE_NAMES) {
+    const ignorePath = path.join(folderPath, name);
+    try {
+      const boundary = checkPathBoundary(folderPath, ignorePath);
+      if (!boundary.ok) continue;
+      const stat = fs.statSync(ignorePath);
+      if (stat.size > 32 * 1024) continue;
+      return sanitizeExcludePatterns(fs.readFileSync(ignorePath, "utf8").split(/\r?\n/));
+    } catch {
+      // 当前文件名不存在时继续尝试下一个
+    }
   }
+  return [];
 }
 
 function shouldIgnoreFile(name) {
@@ -299,7 +305,7 @@ function scanFolder(config, oldIndex) {
   const typeSet = new Set(normalizeFileTypes(config.fileTypes));
   const patterns = sanitizeExcludePatterns([
     ...(config.excludePatterns || []),
-    ...readNowenIgnore(config.folderPath),
+    ...readIgnoreFile(config.folderPath),
   ]);
   const budget = { files: 0, readBytes: 0, maxFiles: MAX_SCAN_FILES, maxReadBytes: MAX_TOTAL_READ_BYTES };
   let complete = true;

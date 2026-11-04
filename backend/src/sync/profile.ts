@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { SYNC_PERSONAL_SCOPE_KEY, SYNC_TABLES } from "./constants";
 import type { SyncProfileRow, SyncStateRow } from "./types";
 
@@ -23,7 +23,7 @@ function normalizeServerUrl(raw: string): string {
 }
 
 export function createProfile(
-  db: Database.Database,
+  db: DatabaseSync,
   input: CreateProfileInput,
 ): SyncProfileRow {
   const serverUrl = normalizeServerUrl(input.serverUrl);
@@ -42,7 +42,7 @@ export function createProfile(
 }
 
 export function getProfile(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): SyncProfileRow | null {
   const row = db.prepare(`SELECT * FROM ${SYNC_TABLES.profiles} WHERE id = ?`)
@@ -50,10 +50,10 @@ export function getProfile(
   return row || null;
 }
 
-export function listProfiles(db: Database.Database): SyncProfileRow[] {
+export function listProfiles(db: DatabaseSync): SyncProfileRow[] {
   return db.prepare(`
     SELECT * FROM ${SYNC_TABLES.profiles} ORDER BY createdAt ASC
-  `).all() as SyncProfileRow[];
+  `).all() as unknown as SyncProfileRow[];
 }
 
 /**
@@ -63,7 +63,7 @@ export function listProfiles(db: Database.Database): SyncProfileRow[] {
  * 而不是新建一份从零全量拉取。
  */
 export function findProfileByServer(
-  db: Database.Database,
+  db: DatabaseSync,
   serverUrl: string,
   remoteUserId: string | null,
 ): SyncProfileRow | null {
@@ -92,7 +92,7 @@ export function findProfileByServer(
  * @internal
  */
 export function setProfileEnabled(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   enabled: boolean,
 ): void {
@@ -117,7 +117,7 @@ export function setProfileEnabled(
  * 只改同步开关 —— 本地笔记、附件、未推送的 Outbox、冲突记录一个字都不删。
  */
 export function switchActiveProfile(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
 ): SyncProfileRow {
   const run = db.transaction(() => {
@@ -143,7 +143,7 @@ export function switchActiveProfile(
  *
  * 返回被停用的 Profile ID，供调用方清理对应的远端凭据。
  */
-export function disableAllProfiles(db: Database.Database): string[] {
+export function disableAllProfiles(db: DatabaseSync): string[] {
   const run = db.transaction(() => {
     const active = db.prepare(
       `SELECT id FROM ${SYNC_TABLES.profiles} WHERE enabled = 1`,
@@ -159,7 +159,7 @@ export function disableAllProfiles(db: Database.Database): string[] {
 }
 
 /** 当前唯一的 Active Profile；"仅此设备"时为 null。 */
-export function getActiveProfile(db: Database.Database): SyncProfileRow | null {
+export function getActiveProfile(db: DatabaseSync): SyncProfileRow | null {
   const row = db.prepare(`
     SELECT * FROM ${SYNC_TABLES.profiles}
     WHERE enabled = 1
@@ -171,7 +171,7 @@ export function getActiveProfile(db: Database.Database): SyncProfileRow | null {
 
 /** 首次授权成功后回填远端用户身份。 */
 export function setProfileRemoteUser(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   remoteUserId: string,
 ): void {
@@ -189,7 +189,7 @@ export function setProfileRemoteUser(
  * 笔记、附件、未同步的 Outbox、冲突记录全部原样保留。
  * 这正是 "关闭同步 / 切换服务器不得删除本地数据" 的落地点。
  */
-export function disableProfile(db: Database.Database, profileId: string): void {
+export function disableProfile(db: DatabaseSync, profileId: string): void {
   setProfileEnabled(db, profileId, false);
 }
 
@@ -198,7 +198,7 @@ export function disableProfile(db: Database.Database, profileId: string): void {
 // ---------------------------------------------------------------------------
 
 export function getSyncState(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string = SYNC_PERSONAL_SCOPE_KEY,
 ): SyncStateRow | null {
@@ -216,7 +216,7 @@ export function getSyncState(
  * 会导致已应用的变更被重复拉取。真正需要回退时走 resetSyncState。
  */
 export function advanceSyncState(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   sequence: number,
   scopeKey: string = SYNC_PERSONAL_SCOPE_KEY,
@@ -232,7 +232,7 @@ export function advanceSyncState(
 }
 
 export function recordSyncError(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   errorCode: string,
   scopeKey: string = SYNC_PERSONAL_SCOPE_KEY,
@@ -251,7 +251,7 @@ export function recordSyncError(
  * 而不是"丢弃本地修改"。
  */
 export function resetSyncState(
-  db: Database.Database,
+  db: DatabaseSync,
   profileId: string,
   scopeKey: string = SYNC_PERSONAL_SCOPE_KEY,
 ): void {

@@ -1,4 +1,4 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 import { ensureKnowledgeTreeTables } from "../db/knowledgeTreeMigration.js";
 
@@ -118,7 +118,7 @@ function updatedAtOf(row: ResourceRow): string {
   return row.noteUpdatedAt || row.mindmapUpdatedAt || row.notebookUpdatedAt || row.nodeUpdatedAt;
 }
 
-function listRows(db: Database.Database, rootNotebookId: string): ResourceRow[] {
+function listRows(db: DatabaseSync, rootNotebookId: string): ResourceRow[] {
   ensureKnowledgeTreeTables(db);
   return db.prepare(`
     WITH RECURSIVE subtree(nodeId, depth) AS (
@@ -174,7 +174,7 @@ function listRows(db: Database.Database, rootNotebookId: string): ResourceRow[] 
 }
 
 export function listPublishedKnowledgeResources(
-  db: Database.Database,
+  db: DatabaseSync,
   rootNotebookId: string,
 ): PublicKnowledgeResourceSummary[] {
   const rows = listRows(db, rootNotebookId);
@@ -220,7 +220,7 @@ export function listPublishedKnowledgeResources(
 }
 
 export function getPublishedKnowledgeResource(
-  db: Database.Database,
+  db: DatabaseSync,
   rootNotebookId: string,
   nodeId: string,
 ): PublicKnowledgeResourceContent | null {

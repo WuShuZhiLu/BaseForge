@@ -59,12 +59,33 @@ export default function DailyRecordsHub() {
   const setView = (next: DailyRecordsView) => {
     setViewState(next);
     saveDailyRecordsView(next);
+    // 同步侧栏高亮（侧栏「视图」分区监听）
+    window.dispatchEvent(new CustomEvent("nowen:diary-view-changed", { detail: { view: next } }));
   };
 
   const selectJournalDate = (dateKey: string) => {
     setSelectedDate(dateKey);
     setView("journal");
   };
+
+  // 侧栏是唯一导航层：模式与日期筛选由侧栏驱动（主区头部不再重复这两组控件）
+  useEffect(() => {
+    const onView = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: string }>).detail;
+      if (detail?.view && VIEW_OPTIONS.some((option) => option.key === detail.view)) setView(detail.view as DailyRecordsView);
+    };
+    const onDate = (event: Event) => {
+      const detail = (event as CustomEvent<{ date?: string }>).detail;
+      if (detail?.date) selectJournalDate(detail.date);
+    };
+    window.addEventListener("nowen:diary-set-view", onView);
+    window.addEventListener("nowen:diary-open-date", onDate);
+    return () => {
+      window.removeEventListener("nowen:diary-set-view", onView);
+      window.removeEventListener("nowen:diary-open-date", onDate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const copyCurrentTime = async () => {
     const value = formatCurrentTimestamp();
@@ -84,86 +105,24 @@ export default function DailyRecordsHub() {
       data-daily-records-hub=""
     >
       <header
-        className="shrink-0 border-b border-app-border bg-app-surface/80 px-0 pt-3 backdrop-blur sm:px-4 sm:pt-4 lg:px-6"
+        className="shrink-0 border-b border-app-border bg-app-surface/80 px-0 backdrop-blur sm:px-4 lg:px-6"
         data-daily-records-header=""
       >
-        <div className="mx-auto w-full max-w-[1320px] px-4 sm:px-0">
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold tracking-tight text-tx-primary">每日记录</h1>
-              <p className="mt-0.5 text-xs text-tx-tertiary">瞬间负责捕获，日记负责整理</p>
-            </div>
-            <nav
-              className="grid w-full grid-cols-3 items-center gap-1 rounded-xl bg-app-hover/60 p-1 sm:flex sm:w-auto"
-              aria-label="每日记录视图"
-              data-daily-records-views=""
-            >
-              {VIEW_OPTIONS.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setView(key)}
-                  className={cn(
-                    "flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-medium transition-all sm:min-h-0 sm:px-3 sm:py-1.5",
-                    view === key
-                      ? "bg-app-surface text-accent-primary shadow-sm"
-                      : "text-tx-tertiary hover:text-tx-primary",
-                  )}
-                  aria-current={view === key ? "page" : undefined}
-                >
-                  <Icon size={14} className="shrink-0" />
-                  <span className="truncate">{label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          <div
-            className="-mx-4 mt-3 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:mt-4 sm:px-0"
-            data-daily-records-shortcuts=""
-          >
-            <button
-              type="button"
-              onClick={() => selectJournalDate(relativeLocalDateKey(0))}
-              className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs font-medium text-tx-primary hover:border-accent-primary/40 hover:bg-app-hover"
-            >
-              <BookOpen size={14} className="text-accent-primary" />
-              今天日记
-            </button>
+        {/* 标题行：与文件管理/分享中心/插件页同为 h-12 一条线。
+            模式切换与日期筛选已上移侧栏（唯一导航层）；顶栏放高频动作「复制当前时间」。 */}
+        <div className="flex h-12 items-center gap-3 px-3 sm:px-4">
+          <h1 className="shrink-0 text-[15px] font-semibold tracking-tight text-tx-primary">每日记录</h1>
+          <span className="hidden min-w-0 truncate text-[11px] text-tx-tertiary sm:inline">瞬间负责捕获，日记负责整理</span>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => void copyCurrentTime()}
-              className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover"
+              title="复制当前时间"
+              className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-app-border px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
             >
-              <Clock3 size={14} className="text-accent-primary" />
-              现在
+              <Clock3 size={13} />
+              复制当前时间
             </button>
-            {[
-              { label: "昨天", offset: -1 },
-              { label: "今天", offset: 0 },
-              { label: "明天", offset: 1 },
-              { label: "后天", offset: 2 },
-            ].map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => selectJournalDate(relativeLocalDateKey(item.offset))}
-                className="flex min-h-10 shrink-0 snap-start items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover"
-              >
-                <CalendarDays size={14} className="text-accent-primary" />
-                {item.label}
-              </button>
-            ))}
-            <label className="flex min-h-10 shrink-0 snap-start cursor-pointer items-center gap-1.5 rounded-lg border border-app-border bg-app-surface px-3 py-2 text-xs text-tx-secondary hover:border-accent-primary/40 hover:bg-app-hover">
-              <CalendarDays size={14} className="text-accent-primary" />
-              选择日期
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(event) => event.target.value && selectJournalDate(event.target.value)}
-                className="sr-only"
-              />
-            </label>
           </div>
         </div>
       </header>

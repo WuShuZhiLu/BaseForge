@@ -5,7 +5,7 @@
  * 所有远程操作走后端 /api/remote-files 代理：凭据只在服务端加密存储，前端永不见明文。
  * 支持源：WebDAV（完整）、百度网盘（实验性，access_token 手动配置）；SMB 后续版本。
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { alert, confirm } from "@/components/ui/confirm";
 import {
   ChevronRight,
@@ -20,6 +20,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   Settings2,
   Trash2,
   X,
@@ -27,6 +28,7 @@ import {
 
 import { api } from "@/lib/api";
 import { markdownToTiptapJSON, normalizeToMarkdown } from "@/lib/contentFormat";
+import { filterSortRemoteEntries, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesUiVersion, subscribeFilesUi } from "@/features/files/filesUi";
 import type { RemoteFileEntry, RemoteNoteLink, RemoteSourcePublic } from "@/types";
 
 type SourceType = "webdav" | "baidu" | "smb";
@@ -267,14 +269,14 @@ function SourceManager(props: {
 
   return (
     <Overlay onClose={onClose}>
-      <div className="flex max-h-[80vh] w-[560px] flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
-        <div className="flex items-center gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-700">
+      <div className="flex max-h-[80vh] w-[560px] flex-col overflow-hidden rounded-xl border border-app-border bg-white shadow-2xl  ">
+        <div className="flex items-center gap-2 border-b border-app-border px-4 py-3 ">
           <Settings2 size={15} className="text-accent-primary" />
           <span className="text-sm font-semibold">管理远程源</span>
           <span className="flex-1" />
           <button
             type="button"
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+            className="rounded p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
             onClick={onClose}
           >
             <X size={15} />
@@ -283,19 +285,19 @@ function SourceManager(props: {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {sources.length === 0 && !draft ? (
-            <p className="py-6 text-center text-xs text-zinc-400">尚未配置远程源，点击下方按钮新增。</p>
+            <p className="py-6 text-center text-xs text-tx-tertiary">尚未配置远程源，点击下方按钮新增。</p>
           ) : null}
           {sources.map((source) => (
             <div
               key={source.id}
-              className="mb-2 flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 dark:border-zinc-700"
+              className="mb-2 flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 "
             >
-              <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800">
+              <span className="rounded bg-app-hover px-1.5 py-0.5 text-[10px] font-medium text-tx-tertiary">
                 {source.type}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium">{source.name}</p>
-                <p className="truncate text-[10px] text-zinc-400">
+                <p className="truncate text-[10px] text-tx-tertiary">
                   {source.type === "baidu" ? "百度网盘" : source.baseUrl}
                   {source.rootPath ? ` · 根: ${source.rootPath}` : ""}
                 </p>
@@ -306,7 +308,7 @@ function SourceManager(props: {
               <button
                 type="button"
                 title="测试连接"
-                className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                className="rounded p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
                 onClick={() => void testSource(source)}
               >
                 <Settings2 size={13} />
@@ -314,7 +316,7 @@ function SourceManager(props: {
               <button
                 type="button"
                 title="编辑"
-                className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800"
+                className="rounded p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
                 onClick={() => editSource(source)}
               >
                 <Pencil size={13} />
@@ -322,7 +324,7 @@ function SourceManager(props: {
               <button
                 type="button"
                 title="删除"
-                className="rounded p-1 text-zinc-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
+                className="rounded p-1 text-tx-tertiary hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/30"
                 onClick={() => void removeSource(source)}
               >
                 <Trash2 size={13} />
@@ -331,10 +333,10 @@ function SourceManager(props: {
           ))}
 
           {draft ? (
-            <div className="mt-3 space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            <div className="mt-3 space-y-2 rounded-lg border border-app-border p-3 ">
               <div className="flex gap-2">
                 <select
-                  className="h-7 rounded border border-zinc-200 bg-transparent px-1.5 text-xs dark:border-zinc-700"
+                  className="h-7 rounded border border-app-border bg-transparent px-1.5 text-xs "
                   value={draft.type}
                   onChange={(e) => setDraft({ ...draft, type: e.target.value as SourceType })}
                 >
@@ -343,7 +345,7 @@ function SourceManager(props: {
                   <option value="smb">SMB</option>
                 </select>
                 <input
-                  className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                  className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                   placeholder="源名称，如：群晖 NAS"
                   value={draft.name}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -352,67 +354,67 @@ function SourceManager(props: {
               {draft.type === "smb" ? (
                 <>
                   <input
-                    className="h-7 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
                     placeholder="服务器地址，如 \\192.168.1.10\docs 或 smb://nas:445/docs"
                     value={draft.baseUrl}
                     onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
                   />
                   <div className="flex gap-2">
                     <input
-                      className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                       placeholder="域/工作组（可选）"
                       value={draft.domain}
                       onChange={(e) => setDraft({ ...draft, domain: e.target.value })}
                     />
                     <input
-                      className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                       placeholder="用户名（可留空）"
                       value={draft.username}
                       onChange={(e) => setDraft({ ...draft, username: e.target.value })}
                     />
                     <input
                       type="password"
-                      className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                       placeholder={draft.id ? "密码（留空保持不变）" : "密码"}
                       value={draft.password}
                       onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     />
                   </div>
                   <input
-                    className="h-7 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
                     placeholder="共享内根路径（可选，如 /项目文档）"
                     value={draft.rootPath}
                     onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
                   />
-                  <p className="text-[10px] leading-4 text-zinc-400">
+                  <p className="text-[10px] leading-4 text-tx-tertiary">
                     需 NAS/服务器可直连该 SMB 主机（445 端口）。不支持强制 SMB3 加密的主机；桌面端也可改用资源管理器打开共享后由系统凭据访问。
                   </p>
                 </>
               ) : draft.type === "webdav" ? (
                 <>
                   <input
-                    className="h-7 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
                     placeholder="服务器地址，如 https://nas.local:5006"
                     value={draft.baseUrl}
                     onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
                   />
                   <div className="flex gap-2">
                     <input
-                      className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                       placeholder="用户名（可留空）"
                       value={draft.username}
                       onChange={(e) => setDraft({ ...draft, username: e.target.value })}
                     />
                     <input
                       type="password"
-                      className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                       placeholder={draft.id ? "密码（留空保持不变）" : "密码"}
                       value={draft.password}
                       onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     />
                   </div>
                   <input
-                    className="h-7 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
                     placeholder="根路径（可选，如 /docs）"
                     value={draft.rootPath}
                     onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
@@ -422,27 +424,27 @@ function SourceManager(props: {
                 <>
                   <input
                     type="password"
-                    className="h-7 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
                     placeholder={draft.id ? "access_token（留空保持不变）" : "百度网盘 access_token"}
                     value={draft.accessToken}
                     onChange={(e) => setDraft({ ...draft, accessToken: e.target.value })}
                   />
-                  <p className="text-[10px] leading-4 text-zinc-400">
+                  <p className="text-[10px] leading-4 text-tx-tertiary">
                     手动路径：在百度网盘开放平台创建应用并完成授权后，把 access_token 粘贴到这里。支持分片上传大文件（超过 4MB 自动分片）。
                   </p>
-                  <details className="rounded border border-zinc-200 px-2 py-1 text-[11px] dark:border-zinc-700">
-                    <summary className="cursor-pointer select-none text-zinc-500">应用凭据（可选：授权码换令牌 + 30 天自动续期）</summary>
+                  <details className="rounded border border-app-border px-2 py-1 text-[11px] ">
+                    <summary className="cursor-pointer select-none text-tx-tertiary">应用凭据（可选：授权码换令牌 + 30 天自动续期）</summary>
                     <div className="mt-1.5 space-y-1.5">
                       <div className="flex gap-2">
                         <input
-                          className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                           placeholder="API Key（client_id）"
                           value={draft.clientId}
                           onChange={(e) => setDraft({ ...draft, clientId: e.target.value })}
                         />
                         <input
                           type="password"
-                          className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                           placeholder="Secret Key（留空保持不变）"
                           value={draft.clientSecret}
                           onChange={(e) => setDraft({ ...draft, clientSecret: e.target.value })}
@@ -451,28 +453,28 @@ function SourceManager(props: {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          className="shrink-0 rounded border border-zinc-200 px-2 py-1 text-[11px] text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          className="shrink-0 rounded border border-app-border px-2 py-1 text-[11px] text-tx-tertiary hover:bg-app-hover"
                           disabled={busy || !draft.clientId}
                           onClick={() => void openBaiduAuthorize()}
                         >
                           打开授权页
                         </button>
                         <input
-                          className="h-7 min-w-0 flex-1 rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
                           placeholder="粘贴授权码（oob 页面显示）"
                           value={draft.oauthCode}
                           onChange={(e) => setDraft({ ...draft, oauthCode: e.target.value })}
                         />
                         <button
                           type="button"
-                          className="shrink-0 rounded border border-zinc-200 px-2 py-1 text-[11px] text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                          className="shrink-0 rounded border border-app-border px-2 py-1 text-[11px] text-tx-tertiary hover:bg-app-hover"
                           disabled={busy}
                           onClick={() => void exchangeBaiduCode()}
                         >
                           换令牌
                         </button>
                       </div>
-                      <p className="text-[10px] leading-4 text-zinc-400">授权页登录后复制显示的授权码，点「换令牌」自动填入上方 access_token；配置凭据后令牌临近过期会自动续期。</p>
+                      <p className="text-[10px] leading-4 text-tx-tertiary">授权页登录后复制显示的授权码，点「换令牌」自动填入上方 access_token；配置凭据后令牌临近过期会自动续期。</p>
                     </div>
                   </details>
                 </>
@@ -489,17 +491,17 @@ function SourceManager(props: {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-zinc-200 px-3 py-1 text-xs dark:border-zinc-700"
+                  className="rounded-md border border-app-border px-3 py-1 text-xs "
                   disabled={busy}
                   onClick={() => void testConnection()}
                 >
                   测试连接
                 </button>
-                {testResult ? <span className="text-[11px] text-zinc-400">{testResult}</span> : null}
+                {testResult ? <span className="text-[11px] text-tx-tertiary">{testResult}</span> : null}
                 <span className="flex-1" />
                 <button
                   type="button"
-                  className="text-xs text-zinc-400 hover:text-zinc-600"
+                  className="text-xs text-tx-tertiary hover:text-tx-secondary"
                   onClick={() => { setDraft(null); setError(""); }}
                 >
                   取消
@@ -509,7 +511,7 @@ function SourceManager(props: {
           ) : (
             <button
               type="button"
-              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-zinc-300 py-2 text-xs text-zinc-500 hover:border-accent-primary hover:text-accent-primary dark:border-zinc-600"
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-app-border py-2 text-xs text-tx-tertiary hover:border-accent-primary hover:text-accent-primary"
               onClick={() => { setDraft(emptyDraft()); setTestResult(""); }}
             >
               <Plus size={13} /> 新增远程源
@@ -528,6 +530,7 @@ export default function RemoteFilesPanel() {
   const [managerOpen, setManagerOpen] = useState(false);
 
   const [cwd, setCwd] = useState("");
+  const [remoteQuery, setRemoteQuery] = useState("");
   const [entries, setEntries] = useState<RemoteFileEntry[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
@@ -609,6 +612,14 @@ export default function RemoteFilesPanel() {
 
   const activeSource = sources.find((s) => s.id === activeId) || null;
 
+  // 侧栏类型 chips + 排序（filesUi 共享 store，事件驱动刷新）
+  const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
+  void filesUiVersion;
+  const remoteTypes = getFilesRemoteTypes();
+  const remoteSort = getFilesRemoteSort();
+  // 文件夹始终置顶且不受类型过滤影响；类型/搜索/排序只作用于文件条目。
+  const displayedEntries = filterSortRemoteEntries(entries, remoteQuery, remoteTypes, remoteSort, getFilesRemoteTime());
+
   const reloadSources = useCallback(async () => {
     try {
       const res = await api.getRemoteFileSources();
@@ -620,6 +631,18 @@ export default function RemoteFilesPanel() {
   }, []);
 
   useEffect(() => { void reloadSources(); }, [reloadSources]);
+  // 侧栏「存储」选择：外部指定激活源（nowen:files-remote-source）
+  useEffect(() => {
+    const onSource = (event: Event) => {
+      const sourceId = (event as CustomEvent<{ sourceId?: string }>).detail?.sourceId;
+      if (!sourceId) return;
+      setActiveId(sourceId);
+      setCwd("");
+      setOpenPath("");
+    };
+    window.addEventListener("nowen:files-remote-source", onSource);
+    return () => window.removeEventListener("nowen:files-remote-source", onSource);
+  }, []);
 
   useEffect(() => { loadLinks(); }, [loadLinks, activeId]);
 
@@ -817,42 +840,49 @@ export default function RemoteFilesPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 顶栏 */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-zinc-200 px-3 dark:border-zinc-700">
-        <Cloud size={15} className="text-accent-primary" />
-        <span className="text-sm font-semibold">远程文件</span>
-        <span className="sbx-mini-tag">官方插件</span>
+      {/* 顶栏：h-12 与模块面板头同一节奏；存储切换在侧栏 */}
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
+        <Cloud size={18} className="shrink-0 text-tx-secondary" />
+        <span className="text-[15px] font-semibold">远程文件</span>
+        <span className="rounded-lg bg-app-hover px-1.5 py-px text-[10.5px] tabular-nums text-tx-tertiary">
+          {entries.length} 个文件
+        </span>
         <span className="flex-1" />
-        <select
-          className="h-7 max-w-48 rounded border border-zinc-200 bg-transparent px-1.5 text-xs dark:border-zinc-700"
-          value={activeId}
-          onChange={(e) => { setActiveId(e.target.value); setCwd(""); setOpenPath(""); setEditorText(""); setDirty(false); }}
-        >
-          {sources.length === 0 ? <option value="">（无源）</option> : null}
-          {sources.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <button
-          type="button"
-          title="管理源"
-          className="rounded p-1.5 text-zinc-400 hover:bg-app-hover hover:text-zinc-600"
-          onClick={() => setManagerOpen(true)}
-        >
-          <Settings2 size={14} />
-        </button>
         <button
           type="button"
           title="刷新"
-          className="rounded p-1.5 text-zinc-400 hover:bg-app-hover hover:text-zinc-600"
+          className="inline-flex items-center gap-1 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs text-tx-secondary hover:bg-app-hover"
           onClick={() => activeId && void loadList(activeId, cwd)}
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={13} /> 刷新
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs text-tx-secondary hover:bg-app-hover"
+          onClick={() => setManagerOpen(true)}
+        >
+          ＋ 配置存储
         </button>
       </div>
 
+            {/* 搜索 + 当前存储 */}
+            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4 text-xs">
+              <span className="flex items-center gap-1.5 rounded-lg bg-app-hover px-2.5 py-1 text-tx-tertiary">
+                <Search size={13} />
+                <input
+                  value={remoteQuery}
+                  onChange={(e) => setRemoteQuery(e.target.value)}
+                  placeholder="搜索远程文件…"
+                  className="w-48 border-none bg-transparent text-tx-primary outline-none no-focus-ring placeholder:text-tx-tertiary"
+                />
+              </span>
+              <span className="ml-auto text-tx-tertiary">
+                {activeSource ? `当前存储：${activeSource.name}${cwd ? ` · /${cwd}` : ""}` : ""}
+              </span>
+            </div>
+
       {sources.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-zinc-400">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-tx-tertiary">
           <Cloud size={32} className="opacity-40" />
           <p>尚未配置远程源（WebDAV / 百度网盘）</p>
           <button
@@ -868,16 +898,16 @@ export default function RemoteFilesPanel() {
           {/* 文件浏览器 */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {/* 面包屑 + 工具行 */}
-            <div className="flex h-9 shrink-0 items-center gap-1 border-b border-zinc-200 px-3 text-xs dark:border-zinc-700">
-              <button type="button" className="text-zinc-500 hover:text-accent-primary" onClick={() => setCwd("")}>
+            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-app-border px-4 text-xs">
+              <button type="button" className="text-tx-tertiary hover:text-accent-primary" onClick={() => setCwd("")}>
                 {activeSource?.name || "根目录"}
               </button>
               {crumbs.map((part, index) => (
                 <React.Fragment key={`${index}-${part}`}>
-                  <ChevronRight size={11} className="text-zinc-300" />
+                  <ChevronRight size={11} className="text-app-border" />
                   <button
                     type="button"
-                    className="text-zinc-500 hover:text-accent-primary"
+                    className="text-tx-tertiary hover:text-accent-primary"
                     onClick={() => setCwd(crumbs.slice(0, index + 1).join("/"))}
                   >
                     {part}
@@ -890,20 +920,20 @@ export default function RemoteFilesPanel() {
                 <span className="flex items-center gap-1">
                   <input
                     autoFocus
-                    className="h-6 w-36 rounded border border-zinc-200 bg-transparent px-1.5 text-xs dark:border-zinc-700"
+                    className="h-6 w-36 rounded border border-app-border bg-transparent px-1.5 text-xs "
                     placeholder="新文件夹名"
                     value={newFolderName}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
                   />
                   <button type="button" className="text-accent-primary" onClick={() => void createFolder()}>确定</button>
-                  <button type="button" className="text-zinc-400" onClick={() => setNewFolderOpen(false)}>取消</button>
+                  <button type="button" className="text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
                 </span>
               ) : (
                 <button
                   type="button"
                   title="新建文件夹"
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-zinc-400 hover:bg-app-hover hover:text-zinc-600"
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
                   onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
                 >
                   <FolderPlus size={13} /> 新建文件夹
@@ -911,16 +941,19 @@ export default function RemoteFilesPanel() {
               )}
             </div>
 
+
             {/* 条目列表 */}
             <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
               {listLoading ? (
-                <p className="py-8 text-center text-xs text-zinc-400">加载中…</p>
+                <p className="py-8 text-center text-xs text-tx-tertiary">加载中…</p>
               ) : listError ? (
                 <p className="py-8 text-center text-xs text-red-400">{listError}</p>
               ) : entries.length === 0 ? (
-                <p className="py-8 text-center text-xs text-zinc-400">空目录</p>
+                <p className="py-8 text-center text-xs text-tx-tertiary">空目录</p>
+              ) : displayedEntries.length === 0 ? (
+                <p className="py-8 text-center text-xs text-tx-tertiary">没有匹配的远程文件</p>
               ) : (
-                entries.map((entry) => (
+                displayedEntries.map((entry) => (
                   <div
                     key={entry.path}
                     className={`group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-app-hover ${openPath === entry.path ? "bg-app-hover" : ""}`}
@@ -938,10 +971,10 @@ export default function RemoteFilesPanel() {
                       {entry.name}
                       {linkForEntry(entry) ? <span className="ml-1 text-[10px] text-sky-400">已链接</span> : null}
                     </button>
-                    <span className="w-16 shrink-0 text-right text-[10px] text-zinc-400">
+                    <span className="w-16 shrink-0 text-right text-[10px] text-tx-tertiary">
                       {entry.isFolder ? "—" : formatSize(entry.size)}
                     </span>
-                    <span className="hidden w-36 shrink-0 truncate text-right text-[10px] text-zinc-400 md:block">
+                    <span className="hidden w-36 shrink-0 truncate text-right text-[10px] text-tx-tertiary md:block">
                       {formatTime(entry.modifiedAt)}
                     </span>
                     <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
@@ -959,7 +992,7 @@ export default function RemoteFilesPanel() {
                         <button
                           type="button"
                           title={isTextFileName(entry.name) ? "导入为笔记" : "仅文本类文件可导入为笔记"}
-                          className="rounded p-1 text-zinc-400 hover:text-accent-primary disabled:opacity-40"
+                          className="rounded p-1 text-tx-tertiary hover:text-accent-primary disabled:opacity-40"
                           disabled={!isTextFileName(entry.name)}
                           onClick={() => void importToNote(entry)}
                         >
@@ -970,7 +1003,7 @@ export default function RemoteFilesPanel() {
                         <button
                           type="button"
                           title="存到文件管理"
-                          className="rounded p-1 text-zinc-400 hover:text-accent-primary"
+                          className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
                           onClick={() => void saveToLocal(entry)}
                         >
                           <Download size={12} />
@@ -979,7 +1012,7 @@ export default function RemoteFilesPanel() {
                       <button
                         type="button"
                         title="重命名"
-                        className="rounded p-1 text-zinc-400 hover:text-accent-primary"
+                        className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
                         onClick={() => { setRenameTarget(entry); setRenameValue(entry.name); }}
                       >
                         <Pencil size={12} />
@@ -987,7 +1020,7 @@ export default function RemoteFilesPanel() {
                       <button
                         type="button"
                         title="删除"
-                        className="rounded p-1 text-zinc-400 hover:text-red-500"
+                        className="rounded p-1 text-tx-tertiary hover:text-red-500"
                         onClick={() => void removeEntry(entry)}
                       >
                         <Trash2 size={12} />
@@ -1000,10 +1033,10 @@ export default function RemoteFilesPanel() {
           </div>
 
           {/* 编辑器 */}
-          <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-zinc-200 dark:border-zinc-700">
-            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-zinc-200 px-3 text-xs dark:border-zinc-700">
+          <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-app-border ">
+            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-app-border px-3 text-xs ">
               <FileText size={13} className="shrink-0 text-sky-500" />
-              <span className="min-w-0 flex-1 truncate text-zinc-500">{openPath || "未打开文件"}</span>
+              <span className="min-w-0 flex-1 truncate text-tx-tertiary">{openPath || "未打开文件"}</span>
               {openPath ? (
                 <>
                   {dirty ? <span className="text-[10px] text-amber-500">未保存</span> : null}
@@ -1018,7 +1051,7 @@ export default function RemoteFilesPanel() {
                   <button
                     type="button"
                     title="关闭"
-                    className="rounded p-1 text-zinc-400 hover:text-zinc-600"
+                    className="rounded p-1 text-tx-tertiary hover:text-tx-secondary"
                     onClick={() => { setOpenPath(""); setEditorText(""); setDirty(false); }}
                   >
                     <X size={13} />
@@ -1027,7 +1060,7 @@ export default function RemoteFilesPanel() {
               ) : null}
             </div>
             {editorLoading ? (
-              <p className="flex-1 py-8 text-center text-xs text-zinc-400">读取中…</p>
+              <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">读取中…</p>
             ) : openPath ? (
               <textarea
                 className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none"
@@ -1036,7 +1069,7 @@ export default function RemoteFilesPanel() {
                 onChange={(e) => { setEditorText(e.target.value); setDirty(true); }}
               />
             ) : (
-              <p className="flex-1 py-8 text-center text-xs text-zinc-400">
+              <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">
                 点击左侧文本文件（md / txt / json 等）进行读取与编辑
               </p>
             )}
@@ -1046,11 +1079,11 @@ export default function RemoteFilesPanel() {
 
       {diffDlg ? (
         <Overlay onClose={() => setDiffDlg(null)}>
-          <div className="w-[430px] rounded-xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="w-[430px] rounded-xl border border-app-border bg-white p-4 shadow-2xl  ">
             <p className="text-xs font-semibold text-tx-primary">
               同步：{diffDlg.entry.name} ↔ 笔记
             </p>
-            <div className="mt-2 space-y-1 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+            <div className="mt-2 space-y-1 text-[11px] leading-5 text-tx-tertiary dark:text-tx-tertiary">
               <p>远程：{diffDlg.remoteChanged ? "已修改" : "未变化"}</p>
               <p>笔记：{diffDlg.noteChanged ? "已修改" : "未变化"}</p>
               <p>
@@ -1080,7 +1113,7 @@ export default function RemoteFilesPanel() {
                 <button
                   type="button"
                   disabled={diffDlg.busy}
-                  className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  className="rounded-md border border-app-border px-3 py-1 text-xs text-tx-secondary hover:bg-app-hover"
                   onClick={() => void syncFromNote()}
                 >
                   笔记 → 远程
@@ -1089,7 +1122,7 @@ export default function RemoteFilesPanel() {
               <button
                 type="button"
                 disabled={diffDlg.busy}
-                className="text-[11px] text-zinc-400 hover:text-red-500"
+                className="text-[11px] text-tx-tertiary hover:text-red-500"
                 onClick={() => { void unlinkNote(diffDlg.entry, diffDlg.link); setDiffDlg(null); }}
               >
                 解除链接
@@ -1097,7 +1130,7 @@ export default function RemoteFilesPanel() {
               <button
                 type="button"
                 disabled={diffDlg.busy}
-                className="rounded-md border border-zinc-200 px-3 py-1 text-xs text-tx-secondary dark:border-zinc-700"
+                className="rounded-md border border-app-border px-3 py-1 text-xs text-tx-secondary "
                 onClick={() => setDiffDlg(null)}
               >
                 关闭
@@ -1109,17 +1142,17 @@ export default function RemoteFilesPanel() {
 
       {renameTarget ? (
         <Overlay onClose={() => setRenameTarget(null)}>
-          <div className="w-80 rounded-xl border border-zinc-200 bg-white p-4 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+          <div className="w-80 rounded-xl border border-app-border bg-white p-4 shadow-2xl  ">
             <p className="mb-2 text-xs font-semibold">重命名</p>
             <input
               autoFocus
-              className="h-8 w-full rounded border border-zinc-200 bg-transparent px-2 text-xs dark:border-zinc-700"
+              className="h-8 w-full rounded border border-app-border bg-transparent px-2 text-xs "
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void submitRename(); if (e.key === "Escape") setRenameTarget(null); }}
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" className="rounded-md border border-zinc-200 px-3 py-1 text-xs dark:border-zinc-700" onClick={() => setRenameTarget(null)}>
+              <button type="button" className="rounded-md border border-app-border px-3 py-1 text-xs " onClick={() => setRenameTarget(null)}>
                 取消
               </button>
               <button type="button" className="rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white" onClick={() => void submitRename()}>

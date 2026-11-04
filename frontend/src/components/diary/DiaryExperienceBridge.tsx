@@ -201,7 +201,7 @@ function markDiaryResponsiveRegions(container: HTMLElement): void {
   container
     .querySelectorAll<HTMLTextAreaElement>('textarea[data-nowen-diary-enhanced="true"]')
     .forEach((textarea) => {
-      const shell = textarea.closest<HTMLElement>(".rounded-2xl");
+      const shell = textarea.closest<HTMLElement>('[data-nowen-media-owner="diary"]');
       if (!shell) return;
       shell.dataset.diaryEditorShell = "true";
       shell.dataset.diaryEditorKind = textarea.autofocus ? "edit" : "compose";
@@ -348,9 +348,9 @@ export default function DiaryExperienceBridge({
         <button
           type="button"
           onClick={() => setReportOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-600 transition-all hover:bg-violet-500/20 dark:text-violet-300"
+          className="inline-flex h-7 items-center gap-1.5 rounded-[6px] border border-app-border bg-app-surface px-2.5 text-[11.5px] font-medium text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
         >
-          <Sparkles size={14} />
+          <Sparkles size={13} className="text-tx-tertiary" />
           <span className="hidden sm:inline">
             {t("diary.aiReportAction", { defaultValue: "AI 总结" })}
           </span>

@@ -122,7 +122,7 @@ function initLogger(opts = {}) {
   initialized = true;
 
   const userData =
-    app.getPath("userData") || path.join(require("os").tmpdir(), "nowen-note");
+    app.getPath("userData") || path.join(require("os").tmpdir(), "baseforge");
   logDir = path.join(userData, "logs");
   crashDir = path.join(logDir, "crash");
 
@@ -131,7 +131,7 @@ function initLogger(opts = {}) {
     fs.mkdirSync(crashDir, { recursive: true });
   } catch (e) {
     // 目录创建失败时，降级到临时目录
-    logDir = path.join(require("os").tmpdir(), "nowen-note-logs");
+    logDir = path.join(require("os").tmpdir(), "baseforge-logs");
     crashDir = path.join(logDir, "crash");
     try {
       fs.mkdirSync(logDir, { recursive: true });
@@ -146,7 +146,7 @@ function initLogger(opts = {}) {
   try {
     crashReporter.start({
       productName: "BaseForge",
-      companyName: "Nowen",
+      companyName: "BaseForge",
       submitURL: opts.crashSubmitURL || "https://example.invalid/submit",
       uploadToServer: !!opts.uploadCrashes && !!opts.crashSubmitURL,
       ignoreSystemCrashHandler: false,

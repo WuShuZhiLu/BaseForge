@@ -23,7 +23,7 @@
  *   BM25 检索路径，用户体验仍然能用，只是没有"语义"召回。
  */
 import * as sqliteVec from "sqlite-vec";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { getDb } from "../db/schema";
 import { systemSettingsRepository } from "../repositories";
 
@@ -97,7 +97,7 @@ export function getVecDim(): number | null {
 // 内部：建表
 // ============================================================
 
-function ensureVecTable(db: Database.Database, dim: number): void {
+function ensureVecTable(db: DatabaseSync, dim: number): void {
   // vec0 虚表语法：CREATE VIRTUAL TABLE name USING vec0(embedding float[D])
   // 不带 IF NOT EXISTS：vec0 模块会自己处理"已存在"，但保险起见 try/catch
   try {
@@ -193,7 +193,9 @@ export function upsertVectors(
         continue;
       }
       const buf = Buffer.from(new Float32Array(r.vector).buffer);
-      stmt.run(r.rowid, buf);
+      // vec0 的 rowid 是 INTEGER PRIMARY KEY：node:sqlite 把 JS number 按 REAL 绑定，
+      // 传 number 会报 "Only integers are allows for primary key values"，必须转 BigInt。
+      stmt.run(BigInt(r.rowid), buf);
       written++;
     }
   });
@@ -211,8 +213,9 @@ export function deleteVectorsByRowids(rowids: number[]): number {
   const placeholders = rowids.map(() => "?").join(",");
   const info = db.prepare(
     `DELETE FROM vec_note_chunks WHERE rowid IN (${placeholders})`,
-  ).run(...rowids);
-  return info.changes;
+    // rowid 比对同样要求整数类型，统一转 BigInt（见上方 insert 的注释）
+  ).run(...rowids.map((id) => BigInt(id)));
+  return info.changes as number;
 }
 
 /** 清空 vec0 表（不删表本身）。用于 /embeddings/rebuild?clearExisting=true */
