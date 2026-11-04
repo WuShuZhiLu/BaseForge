@@ -1,433 +1,159 @@
 <div align="center">
-  <img src="./electron/icon.png" alt="BaseForge" width="104" />
+  <img src="./electron/icon.png" alt="BaseForge" width="96" />
   <h1>BaseForge</h1>
-  <p><strong>An open-source, self-hosted knowledge base, collaborative note app, and task workspace</strong></p>
-  <p>
-    Unified knowledge tree · Rich text / Markdown editors · AI knowledge Q&A · Real-time collaboration · Tasks and mind maps · Cross-platform clients
-  </p>
+  <p>A self-hosted document platform built around knowledge bases</p>
   <p>
     <a href="./README.md">简体中文</a> ·
-    <a href="https://cropflre.github.io/">Official Website / Help Center</a> ·
-    <a href="http://nowen.cn/">nowen.cn (Under Maintenance)</a> ·
-    <a href="http://note.nowen.cn/">Live Demo</a> ·
-    <a href="https://github.com/cropflre/nowen-note/releases">Downloads</a> ·
+    <a href="./docs/README.md">Documentation</a> ·
     <a href="./docs/tutorials/README.md">Tutorials</a> ·
-    <a href="./docs/tutorials/mcp.en.md">MCP Installation</a> ·
-    <a href="./CHANGELOG.md">Changelog</a>
+    <a href="./CHANGELOG.en.md">Changelog</a>
   </p>
 </div>
 
 <div align="center">
 
-[![GitHub Release](https://img.shields.io/github/v/release/cropflre/nowen-note?display_name=tag&sort=semver)](https://github.com/cropflre/nowen-note/releases)
-[![Docker Pulls](https://img.shields.io/docker/pulls/cropflre/nowen-note?logo=docker&logoColor=white)](https://hub.docker.com/r/cropflre/nowen-note)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE)
-[![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Compose%20v2-2496ED?logo=docker&logoColor=white)](./docker-compose.yml)
 
 </div>
 
-> BaseForge is more than an editor. It is designed as user-controlled knowledge infrastructure that can run long-term on a NAS or server and remain accessible from the web, desktop, and mobile clients.
+## Overview
 
-> **Remote NAS connection and sign-in:** BaseForge supports deployment on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. After deployment, connect and sign in from the web, desktop, or Android client using a LAN IP address, an IPv6 address, or a public domain secured with HTTPS.
+BaseForge is a self-hosted document platform that organizes content around knowledge bases and extends through a plugin system.
 
-## Development preview
+A knowledge base groups related documents into a single subject unit; the editor and block-based document engine form the foundation of the platform. Documents support Markdown, rich text, plain text, whiteboards, mind maps and lightweight spreadsheets. Rich text is organized as blocks, and whiteboards, mind maps and spreadsheets can be embedded into a document as reference blocks. Files on remote devices can be read and written directly over WebDAV or SMB.
 
-BaseForge is currently in **development preview** (current version `1.0.0-preview.1`). Its version line evolves independently from **1.0.0** onward and no longer follows the upstream nowen-note version numbers. The code base tracks nowen-note **v1.4.16** (fd17d980) and has absorbed the functional and framework updates from upstream **v1.5.1**, while the interface, interactions, and branding remain BaseForge's own design.
+AI agents can use BaseForge through the MCP Server, with knowledge bases as their retrieval source. The plugin system extends the platform with additional functionality.
 
-> See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
+BaseForge was forked from nowen note v1.4.16, merged the features of v1.5.1, and has since developed independently.
 
-## Connect AI clients to BaseForge
+## Features
 
-BaseForge includes a supported MCP Server. Claude Code, Cursor, VS Code, and other compatible AI clients can search, read, create, and update notes within the permissions granted by your account and token.
+### Knowledge bases
 
-- [MCP Server installation guide](./docs/tutorials/mcp.en.md)
-- [中文安装教程](./docs/tutorials/mcp.md)
-- [Standalone nowen-mcp package README](./packages/nowen-mcp/README.md)
+Documents are organized in a mixed tree of knowledge bases and folders, with drag-and-drop ordering, favorites, tags, full-text search and bidirectional links. Permissions and sharing can apply to a whole knowledge base, or be set individually on a folder or document.
 
-The currently supported distribution is a source build: install Node.js 20+, build `packages/nowen-mcp`, create a restricted Personal API Token in BaseForge, and configure the absolute path to `packages/nowen-mcp/bin/nowen-mcp.mjs` in your client. `dist/scoped-entry.js` is an internal build entry used by the launcher and should not be configured directly. The guide covers Windows, macOS, Linux/WSL, NAS addresses, Claude Code, Cursor, VS Code, verification, updates, and troubleshooting.
+### Document formats
 
-## Why BaseForge
+Six formats can be created, edited and read: Markdown, rich text, plain text, whiteboards, mind maps and lightweight spreadsheets. Rich text is organized as blocks, and whiteboards, mind maps and spreadsheets can be embedded into the body as reference blocks. Markdown and rich text can be converted into each other.
 
-| | |
+### Remote documents
+
+Remote devices are mounted over WebDAV or SMB, and their files can be read, modified and written back in place. Read-only formats such as PDF and unsupported formats cannot be edited.
+
+### Collaboration and data
+
+- Real-time collaborative editing, directory-level permissions, share passwords and expiry, guest comments and block-level comments, version history.
+- Import from Markdown, Word / DOCX, web pages, SiYuan and Obsidian; export a directory in multiple formats.
+- Attachments stored on local disk, S3, Cloudflare R2 or MinIO, with automatic backups and ZIP archiving.
+- Offline workspaces that sync incrementally when the connection is restored.
+
+## Extensions
+
+### Plugin system
+
+Plugins are the platform's extension mechanism. Modules such as project management and a knowledge-base plaza are delivered as plugins. The contract is defined in [`contribution-contract.json`](./packages/nowen-plugin-sdk/contribution-contract.json) (`contractVersion: 6`), with the namespace `<pluginId>/<contributionId>` and 12 contribution types:
+
+| Group | Contribution types |
 | --- | --- |
-| **You own the data** | Self-host with Docker or deploy on NAS platforms such as UGREEN UGOS and Feiniu fnOS. Databases, attachments, and backups stay under your control. Attachments can use S3, Cloudflare R2, or MinIO, while backups can be sent through email or WebDAV. |
-| **One tree for every document** | Mix folders, rich-text notes, and Markdown notes in one hierarchy. Create documents at the root, drag and sort nodes, import files, expand or collapse the tree, inherit permissions, protect folders with passwords, and publish shared content. |
-| **Switch editing formats per note** | Convert notes between rich text and Markdown while preserving major structure, code blocks, and links. Use either format for quick notes, technical documentation, or long-form writing. |
-| **Built for individuals and teams** | Tags, tasks, AI, workspaces, notebook permissions, real-time collaboration, public sharing, and guest comments live in one system. |
+| Commands and UI | `commands`, `menus`, `uiComponents`, `sidebarPanels`, `mainViewPanels`, `settings` |
+| Editor | `editorCommands`, `noteThemes`, `noteTemplates` |
+| Automation | `automationTemplates`, `promptPacks` |
+| Integration | `inboundWebhooks` |
 
-## Core capabilities
+Plugins run in one of three runtimes: `declarative` renders its UI through the host, `sandbox-js` runs inside a restricted sandbox, and `node-action` runs as a separate child process. The host exposes `/api/plugins*` for installation, enablement and contribution lookup, `/api/plugin-executions` for execution records, and `/api/plugin-inbound` for inbound callbacks.
 
-| Module | Current capabilities |
+Development tools live in `packages/`: `nowen-plugin-sdk`, `nowen-plugin-cli`, the `create-nowen-plugin` scaffolder, and the `nowen-extension-registry` registry.
+
+### MCP Server
+
+`packages/nowen-mcp` provides the MCP Server. AI agents such as Claude Code, Cursor and VS Code use BaseForge through MCP, with knowledge bases as their retrieval source; the accessible scope is determined by a Personal API Token. Available tools are grouped by purpose:
+
+| Group | Tools |
 | --- | --- |
-| **Unified knowledge tree** | Mixed folders, rich-text notes, and Markdown notes; root-level documents, unlimited nesting, drag sorting, drag-to-change hierarchy, a unified create menu, expand/collapse all, Markdown drag-and-drop or file import, filtering, search, note counts, trash, shared tree views, and three-column browsing with child-folder scope. |
-| **Folder security and access control** | Folder passwords, short-lived unlock tokens, directory ACLs, Restricted mode, explicit allow/deny rules, inherited policy evaluation, and protected import/export flows. |
-| **Rich text and Markdown** | Tiptap 3, CodeMirror 6, per-note format conversion, live preview, split view, outline navigation, format painter, slash commands, tables, code blocks, KaTeX, Mermaid, footnotes, Callouts, media embeds, cross-note format-preserving paste, duplicate-title prefix warnings, comments, and version history. |
-| **Long documents and editor stability** | Complexity detection, Worker analysis, viewport rendering, windowed editing, incremental saves, large-document safe modes, outline navigation, and recovery logic for hidden Markdown markers and cursor state. |
-| **Performance and delivery** | Lazy-loaded workspace, editor, task, journal, file, AI, and sharing surfaces; cache validators, Gzip/Brotli precompression, and bundle-budget checks reduce startup and repeated transfer cost. |
-| **Image editing** | Crop images and add text, freehand drawing, arrows, shapes, and mosaic effects. Existing remote images can be migrated into local attachments or object storage. |
-| **Knowledge organization and search** | Colored tags, favorites, pinning, full-text search, current-directory note search, improved in-document find and replace, backlinks, block references, reverse links, and a knowledge graph. Permission-aware search hides restricted resources before result limits are applied. |
-| **AI** | OpenAI-compatible APIs, Qwen, Gemini, DeepSeek, Doubao, and Ollama. Features include continuation, rewriting, translation, title and tag generation, summaries, embeddings, and RAG knowledge Q&A. |
-| **Tasks and visualization** | Hierarchical tasks, lists, Kanban, calendar, Gantt/timeline, dependencies, recurrence, reminders, templates, AI task breakdown, My Day, Inbox, time planning, offline tasks/habits, native Android reminder scheduling with creator-timezone/date-only deadline consistency, and mind maps. |
-| **Collaboration, permissions, and sharing** | Yjs + WebSocket collaboration, workspaces and roles, directory ACLs, Restricted access, explicit allow/deny policies, ownership transfer, centralized share management, passwords and expiration, guest comments, public knowledge spaces, and rich-text/Markdown inline comments. |
-| **Sync and edit protection** | Incremental sync, persistence acknowledgements, draft recovery, and version checks. Offline attachment validation, quarantine, and recovery signaling keep broken cached blobs away from online rendering while serial saves and Yjs state protection guard Markdown/rich-text transitions. |
-| **Import, export, and migration** | Import Markdown, Word/DOCX, web URLs, WeChat articles, SingleFile HTML, SiYuan ZIP archives, Obsidian, Xiaomi Notes, and other supported sources. Export Markdown, PDF, Word, images, or full ZIP packages with permission mapping, conflict preview, reports, controlled rollback, image access preparation, and footnote handling. Team single-note ZIP export resolves the note's real workspace scope. |
-| **Attachments and storage** | Local attachments organized under `YYYY/MM`; reusable attachment-library insertion, thumbnails, note ownership, reference checks, orphan rescans and cleanup, protected manual uploads, local disk or S3/R2/MinIO storage, plus hardened mobile image/video file identity and multipart uploads. |
-| **Accounts and security** | Multiple-account history, remembered accounts, auto-login, remote server connections, session validation and revocation, 2FA, scoped Personal API Tokens, audit logs, protected attachment access, and concealment of restricted-resource existence. |
-| **Backups, automation, and developer APIs** | Local backups, background full-ZIP jobs, streamed archive/hash processing, native browser downloads, email backup, encrypted WebDAV backup credentials, managed Docker updates and rollback checks, webhooks, plugins, OpenAPI, TypeScript SDK, CLI, [MCP Server](./docs/tutorials/mcp.en.md), and a browser clipper. |
-| **Cross-platform access** | Web, Electron for Windows/macOS/Linux, Android, iOS project, HarmonyOS project, and Docker/NAS deployment. UGREEN UGOS and Feiniu fnOS are supported, and clients can connect through IPv4, IPv6, or a domain name. Android includes in-app gesture image preview and native task notifications. |
+| Knowledge bases and notes | `list_notebooks`, `create_notebook`, `list_notes`, `read_note`, `create_note`, `update_note`, `delete_note`, `search`, `knowledge_stats` |
+| Block-level access | `get_block`, `search_blocks`, `create_block`, `update_block`, `delete_block`, `move_block` |
+| References and links | `resolve_link`, `get_backlinks`, `get_block_backlinks` |
+| Attachments and tags | `upload_attachment`, `list_attachments`, `attach_to_note`, `list_tags`, `manage_tags` |
+| Operations | `list_plugins`, `execute_plugin`, `list_webhooks`, `create_webhook`, `audit_stats`, `list_backups`, `create_backup` |
 
-## Recent highlights
+Block-level writes must carry the note version and an operation ID for concurrency checks and deduplication on retry. Installation steps are in the [MCP guide](./docs/tutorials/mcp.en.md) ([中文](./docs/tutorials/mcp.md)); package documentation is in [`packages/nowen-mcp`](./packages/nowen-mcp/README.md).
 
-### 1.0.0-preview.1 · 2026-10-10
+### HTTP API and tools
 
-#### Note switching and editor stability
+- After startup, the OpenAPI 3.0 description is available at `/api/openapi.json`.
+- `packages/nowen-sdk` provides a TypeScript SDK, `nowen-cli` a command-line tool, and `nowen-clipper` a browser clipping extension.
+- Webhooks and automation templates can be configured in the app and used together with the `inboundWebhooks` contribution type.
 
-- Late rich-text save acknowledgements no longer reactivate the previous note after a rapid switch.
-- Regression coverage now locks down the late-acknowledgement path after a committed switch.
-- Code-block select-all shortcut behavior is refined to reduce conflicts between block-level and document-level selection.
-- Historical Markdown block markers are cleaned again so legacy markers are less likely to affect current editing or rendering.
+## Deployment
 
-#### Video, Android, and LAN access
+### Docker Compose
 
-- Attachment signatures are prepared before opening notes containing video, reducing first-open playback failures caused by authorization not being ready yet.
-- Android/LAN attachment authorization now uses the native HTTP path for more reliable NAS and LAN media access.
-- Regression tests cover authorization preparation before first open and Android LAN attachment authorization.
-
-#### Desktop release and distribution
-
-- Windows release signing is hardened around SignPath test/production signing, configuration validation, and strict Authenticode verification.
-- Post-sign Windows update metadata is rebuilt/refreshed so signed artifacts and update metadata stay consistent.
-- macOS release integrity gates now cover complete and dual-architecture downloadable artifacts.
-- Release notes more clearly document the desktop platform matrix.
-
-#### Sharing compatibility
-
-- Edge share-link copying compatibility is fixed with clipboard regression coverage.
-
-See [CHANGELOG.md](./CHANGELOG.md) for complete details.
-
-## Screenshots
-
-### Desktop
-
-| AI writing assistant | AI provider settings |
-| :---: | :---: |
-| ![Desktop AI writing](./docs/screenshots/desktop-ai-writing.png) | ![AI settings](./docs/screenshots/settings-ai.png) |
-
-### Mobile
-
-| Sidebar | Note list | Editor |
-| :---: | :---: | :---: |
-| ![Mobile sidebar](./docs/screenshots/mobile-sidebar.png) | ![Mobile note list](./docs/screenshots/mobile-list.png) | ![Mobile editor](./docs/screenshots/mobile-editor.png) |
-
-## Website and demo
-
-- Current website / help center: <https://cropflre.github.io/>
-- Future website: <http://nowen.cn/> (under maintenance)
-- Demo: <http://note.nowen.cn/>
-- Username: `demo`
-- Password: `demo123456`
-
-> `nowen.cn` is still under maintenance. For now, use <https://cropflre.github.io/> as the official Nowen help and documentation entry.
-
-> The demo is reset periodically. Do not store private or important data in it.
-
-## Quick deployment
-
-### Docker Compose (recommended)
-
-Docker Engine and Docker Compose v2 are required.
+Docker Engine and Compose v2 are required. Images are hosted in the internal registry `registry.betheone.cc.cd` and are not yet publicly available, so sign in before pulling:
 
 ```bash
-git clone https://github.com/cropflre/nowen-note.git
-cd nowen-note
+docker login registry.betheone.cc.cd
+
+git clone https://git.betheone.cc.cd/wushuzhilu/BaseForge.git
+cd BaseForge
 docker compose up -d
 ```
 
-Open `http://<server-ip>:3001`.
-
-Default administrator account:
-
-```text
-Username: admin
-Password: admin123
-```
-
-> Change the default password immediately. Public deployments should also use HTTPS, backups, a correct public origin, and restricted CORS settings.
-
-### UGREEN NAS / Feiniu NAS remote connection and sign-in
-
-BaseForge can be deployed on **UGREEN NAS (UGOS / UGOS Pro)** and **Feiniu NAS (fnOS)**. Use the corresponding `.upk` or `.fpk` package from Releases, or deploy with Docker Compose.
-
-After the service starts:
-
-- **LAN access:** Open `http://<nas-lan-ip>:3001` in a browser.
-- **Remote access:** Enter the NAS public domain, IPv4 address, or IPv6 service address in the web, desktop, or Android client, then sign in.
-- **Public deployment:** Configure an HTTPS reverse proxy. Do not expose an unencrypted HTTP service directly to the internet.
-
-See available packages in [GitHub Releases](https://github.com/cropflre/nowen-note/releases).
-
-Check status and logs:
+Then open `http://<server-ip>:3001`. The default administrator is `admin` with the password `admin123`; change it immediately after the first sign-in.
 
 ```bash
 docker compose ps
-docker compose logs -f --tail=200 nowen-note
+docker compose logs -f --tail=200 baseforge
+docker compose pull && docker compose up -d   # upgrade the image
 ```
 
-### Upgrade from an earlier release
+### Data and configuration
 
-Create a full backup first and confirm that both the database and attachment directory are persisted.
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-To pin the current stable release:
-
-```bash
-NOWEN_IMAGE_TAG=v1.4.16 docker compose up -d
-```
-
-> v1.4.16 focuses on note-switch stability, first-open video authorization, Android/LAN attachment access, Markdown/code-block editing details, and desktop signing/release integrity. After upgrading, verify rapid note switching, first video playback, Android video access to NAS/LAN services, code-block select-all behavior, and share-link copying. Rolling back an image does not roll back the database.
-
-### Managed Docker updates (optional)
-
-Managed updates only support the official [`docker-compose.yml`](./docker-compose.yml) and are disabled by default. The main application container does not mount the Docker socket; a separate restricted updater container performs the update.
-
-```bash
-cp .env.example .env
-printf '\nNOWEN_UPDATER_TOKEN=%s\n' "$(openssl rand -hex 32)" >> .env
-NOWEN_IMAGE_TAG=v1.4.16 docker compose --profile updater up -d
-```
-
-Administrators can then run preflight checks, create a full backup, update, verify health, and roll back the image from Settings → About → Version.
-
-> Rolling back an image does not roll back the database. Keep independent production backups.
-
-See [Docker online update and recovery](./docs/docker-online-update.md).
-
-### Run only the main container
-
-```bash
-docker run -d \
-  --name nowen-note \
-  --restart unless-stopped \
-  -p 3001:3001 \
-  -e TZ=Asia/Shanghai \
-  -v /opt/nowen-note/data:/app/data \
-  cropflre/nowen-note:v1.4.16
-```
-
-## Data, backups, and configuration
-
-### Persistent directory
-
-The persistent directory inside the container is **`/app/data`**, not `/data`. The default Compose file uses the `nowen-note-data` Docker volume.
+Persistent data lives in `/app/data` inside the container, mounted from the `baseforge-data` volume by default:
 
 ```text
 /app/data/
 ├── baseforge.db
 ├── attachments/
 ├── backups/
-├── fonts/
 └── .jwt_secret
 ```
 
-- SQLite is the default production database at `/app/data/baseforge.db`.
-- On upgrade the legacy database file is renamed to `baseforge.db` automatically at first start; no manual step is needed.
-- Attachments are stored under `/app/data/attachments` and organized by `YYYY/MM`.
-- Automatic backups are stored under `/app/data/backups` by default.
-- Map `BACKUP_DIR` to an independent physical disk and follow a 3-2-1 backup strategy for production.
-- Third-party image-host uploads are retired. New images use the attachment system; historical remote images can be migrated.
-- PostgreSQL adaptation and migration are still under validation. Production deployment and recovery remain based on SQLite.
+The image repository, tag and port come from `.env` and are interpolated by `docker-compose.yml`: `BASEFORGE_IMAGE_REPOSITORY` (default `registry.betheone.cc.cd/baseforge`), `BASEFORGE_IMAGE_TAG` (default `latest`), and `BASEFORGE_PORT` (default `3001`).
 
-### Common environment variables
-
-See [`.env.example`](./.env.example) for the complete template.
+Common environment variables read by the application; see [`.env.example`](./.env.example) for the full template:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `NOWEN_PORT` | `3001` | Exposed Compose port |
-| `TZ` | `Asia/Shanghai` | Container timezone |
-| `PUBLIC_WEB_ORIGIN` | empty | Public or reverse-proxy origin used to generate share links |
-| `JWT_SECRET` | generated and persisted | Session signing and fallback encryption; must match across instances |
-| `BACKUP_DIR` | `/app/data/backups` | Automatic backup directory |
-| `BACKUP_WEBDAV_ENCRYPTION_KEY` | falls back to `JWT_SECRET` | Encrypts stored WebDAV credentials; use a dedicated production key |
-| `CORS_ORIGINS` | native client origins | Additional comma-separated web origins |
-| `MAX_ATTACHMENT_SIZE_MB` | `100` | Maximum attachment size |
-| `ATTACHMENT_STORAGE` | `local` | Set to `s3` for S3/R2/MinIO |
-| `CALENDAR_EXPORT_ENCRYPTION_KEY` | empty | Encrypts calendar S3 export credentials |
-| `NOWEN_UPDATER_TOKEN` | empty | Enables the managed Docker updater |
+| `TZ` | `Asia/Shanghai` | Container time zone |
+| `PUBLIC_WEB_ORIGIN` | empty | Reverse-proxy origin used when generating share links |
+| `JWT_SECRET` | generated and persisted | Session signing |
+| `CORS_ORIGINS` | built-in client origins | Additional allowed web origins |
+| `ATTACHMENT_STORAGE` | `local` | Set to `s3` to use S3 / R2 / MinIO |
+| `MAX_ATTACHMENT_SIZE_MB` | `100` | Maximum size of a single attachment |
 
-- [Object storage](./docs/object-storage.md)
-- [WebDAV backup](./docs/webdav-backup.md)
-- [Email backup](./docs/backup-email-smtp.md)
-
-## Client and platform status
-
-| Platform | Distribution / build | Status |
-| --- | --- | --- |
-| **Web / Docker** | Docker Hub or source build | Recommended deployment; supports `amd64`, `arm64`, or multi-architecture images |
-| **Windows / macOS / Linux** | [GitHub Releases](https://github.com/cropflre/nowen-note/releases) or `npm run electron:build` | Electron client can connect to a remote service or use the local backend |
-| **Android** | Release APK or Capacitor build under `frontend/` | Actively maintained; system share import, Markdown file import, immersive editing, mobile knowledge tree, gesture image preview, native task reminders, and remote NAS service sign-in |
-| **iOS** | Capacitor project and GitHub Actions/TestFlight flow | Requires Apple signing and a developer account; see [iOS release guide](./docs/iOS-Release.md) |
-| **HarmonyOS** | Open [`nowen-harmony/`](./nowen-harmony/) in DevEco Studio | ArkTS + ArkWeb MVP; some native capabilities are still being completed |
-| **fnOS** | `.fpk` in Releases | Supports Feiniu NAS installation. The current package primarily targets x86_64; after deployment, connect and sign in using a LAN or public service address. |
-| **UGREEN UGOS** | `.upk` in Releases or build scripts | Supports UGREEN NAS installation, depending on device architecture and app installation support; after deployment, connect and sign in using a LAN or public service address. |
-| **Other NAS** | Docker Compose | Synology, QNAP, ZSpace, and similar devices can use the Docker deployment |
-
-> Available packages vary by release. Check [GitHub Releases](https://github.com/cropflre/nowen-note/releases).
-
-## Local development
-
-Requires Node.js 20+, npm, and Git. Electron and native builds also require platform toolchains.
+### Running from source
 
 ```bash
-git clone https://github.com/cropflre/nowen-note.git
-cd nowen-note
 npm install
 npm run install:all
+npm run dev
 ```
 
-Start two terminals:
-
-```bash
-npm run dev:backend
-```
-
-```bash
-npm run dev:frontend
-```
-
-Open `http://localhost:5173`.
-
-Common commands:
+The frontend is served at `http://localhost:5173`. Build and frontend tests:
 
 ```bash
 npm run build:all
-npm run electron:dev
-npm run electron:build
-(cd backend && npm test)
 (cd frontend && npm run test:run)
 ```
 
-Android:
+Technology stack: React 18, TypeScript 5, Vite 5, Tiptap 3, CodeMirror and Yjs on the frontend; Node.js 22+, Hono 4, SQLite (built-in `node:sqlite` with FTS5) and WebSocket on the backend; Electron 33 and Capacitor 8 for the client projects.
 
-```bash
-cd frontend
-npm run cap:build
-npx cap open android
-```
+## Documentation and license
 
-> Capacitor 8 requires Node.js 22+ for Android release tooling. Regular web and Electron development can continue to use the project's Node.js 20+ baseline.
+- [Documentation index](./docs/README.md) · [Tutorials](./docs/tutorials/README.md) · [Deployment guide](./docs/deployment.md)
+- [MCP installation and usage](./docs/tutorials/mcp.en.md) · [Object storage for attachments](./docs/object-storage.md) · [Privacy policy](./docs/PRIVACY.md)
+- [Issues](https://git.betheone.cc.cd/wushuzhilu/BaseForge/issues) · [Changelog](./CHANGELOG.en.md)
 
-iOS:
-
-```bash
-npm run cap:sync:ios
-npm run cap:open:ios
-```
-
-## Technology stack
-
-| Layer | Main technologies |
-| --- | --- |
-| **Frontend** | React 18, TypeScript, Vite 5, Tailwind CSS, Tiptap 3, CodeMirror 6, Yjs, IndexedDB |
-| **Backend** | Node.js 20, Hono 4, WebSocket, better-sqlite3, FTS5, sqlite-vec, sharp |
-| **Desktop** | Electron 33, electron-builder, electron-updater |
-| **Mobile** | Capacitor 8 for Android/iOS, ArkTS + ArkWeb for HarmonyOS |
-| **Storage and backup** | SQLite, local attachments, S3/Cloudflare R2/MinIO, email and WebDAV backups; PostgreSQL is under validation |
-| **Developer APIs** | OpenAPI 3.0, TypeScript SDK, CLI, MCP Server, Webhook |
-
-## Repository layout
-
-```text
-nowen-note/
-├── frontend/       # React web app and Capacitor clients
-├── backend/        # Hono APIs, database, sync, and background tasks
-├── electron/       # Electron main process and packaging
-├── packages/       # SDK, CLI, MCP, and developer packages
-├── nowen-harmony/  # HarmonyOS ArkTS / ArkWeb client
-├── docs/           # Deployment, tutorials, and design documents
-└── scripts/        # Build, migration, packaging, and release scripts
-```
-
-## Documentation
-
-- [Nowen official help center](https://cropflre.github.io/#/note)
-- [MCP Server installation and usage](./docs/tutorials/mcp.en.md)
-- [MCP Server 中文安装教程](./docs/tutorials/mcp.md)
-- [Tutorial center](./docs/tutorials/README.md)
-- [Feature overview](https://cropflre.github.io/#/note)
-- [Installation and troubleshooting](https://cropflre.github.io/#/note/faq)
-- [API documentation](https://cropflre.github.io/#/note/api)
-- [Deployment guide](./docs/deployment.md)
-- [Docker update and recovery](./docs/docker-online-update.md)
-- [WebDAV backup](./docs/webdav-backup.md)
-- [Object storage](./docs/object-storage.md)
-- [Email backup](./docs/backup-email-smtp.md)
-- [ARM64 deployment](./docs/deploy-arm64.md)
-- [iOS release guide](./docs/iOS-Release.md)
-- [Privacy policy](./docs/PRIVACY.md)
-- [Browser clipper](https://chromewebstore.google.com/detail/nowen-note-web-clipper/nglkodhfdbnfielchjpkjhenfaecafpg)
-- OpenAPI is available at `/api/openapi.json` after startup.
-
-## Current boundaries
-
-- **Database:** SQLite is the fully supported production default. PostgreSQL adapters, schemas, and partial dual-database tests exist, but production switching is not yet enabled.
-- **Format conversion:** Rich-text/Markdown conversion preserves major structures where possible. Highly customized HTML, complex extension nodes, or third-party syntax may still require manual review.
-- **WebDAV:** Used for completed backup files, not real-time sync, live database storage, or attachment hosting. Remote retention must be managed separately.
-- **Managed Docker updates:** Only support the official managed Compose deployment.
-- **Third-party image hosting:** Upload integration is retired; only historical configuration cleanup and image migration remain.
-- **macOS:** Unsigned or unnotarized packages may require removing quarantine attributes; see the desktop tutorial.
-- **Mobile:** Android has the most complete maintenance coverage. iOS and HarmonyOS distribution, signing, and some native bridges remain platform-dependent.
-
-## Releases
-
-The README documents stable capabilities, recent highlights, and deployment. Complete commit-level history remains in the changelog.
-
-- [Latest release](https://github.com/cropflre/nowen-note/releases)
-- [Full changelog](./CHANGELOG.md)
-- [Issues and roadmap](https://github.com/cropflre/nowen-note/issues)
-
-## Contributing
-
-Issues, feature suggestions, and pull requests are welcome. Before submitting code, run at least:
-
-```bash
-npm run build:all
-(cd backend && npm test)
-(cd frontend && npm run test:run)
-```
-
-Feedback channels:
-
-- [GitHub Issues](https://github.com/cropflre/nowen-note/issues)
-- QQ group: `1093473044`
-
-## Support the project
-
-If BaseForge helps you, sponsorship supports continued maintenance and development.
-
-<table align="center">
-  <tr>
-    <th>WeChat</th>
-    <th>Alipay</th>
-  </tr>
-  <tr>
-    <td align="center"><img src="./frontend/src/assets/sponsor/weixin.jpg" alt="WeChat sponsorship QR code" width="260" /></td>
-    <td align="center"><img src="./frontend/src/assets/sponsor/zhifubao.png" alt="Alipay sponsorship QR code" width="260" /></td>
-  </tr>
-</table>
-
-## License
-
-This project is a downstream fork of the upstream open-source project [nowen-note](https://github.com/cropflre/nowen-note) and is released under the [GNU General Public License v3.0](./LICENSE).
-
-**Origin and attribution**: BaseForge is a fork of upstream nowen-note, rebranded and further developed here. Copyright for upstream code remains with its original author; the upstream [CHANGELOG.md](./CHANGELOG.md) is preserved to record history.
-
-<!-- CHANGELOG:BEGIN -->
-<!-- Detailed release history lives in CHANGELOG.md. Keep the README focused on stable capabilities and recent highlights. -->
-<!-- CHANGELOG:END -->
+BaseForge is developed from [nowen note](https://github.com/cropflre/nowen-note) (GPL-3.0) and released under the [GNU General Public License v3.0](./LICENSE). Copyright of the upstream code remains with its original authors.
