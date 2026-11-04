@@ -4,7 +4,7 @@ import path from "path";
 import { brandEnv } from "../lib/envBrand.js";
 
 export const OFFICIAL_IMAGE_REPOSITORY = (
-  brandEnv("UPDATER_ALLOWED_IMAGE") || "registry.betheone.cc.cd/baseforge"
+  brandEnv("UPDATER_ALLOWED_IMAGE") || "docker.betheone.cc.cd/baseforge"
 ).trim();
 export const MANAGED_INSTANCE = (brandEnv("UPDATER_INSTANCE") || "baseforge").trim();
 export const MANAGED_CONTAINER_NAME = (brandEnv("UPDATER_CONTAINER_NAME") || "baseforge").trim();

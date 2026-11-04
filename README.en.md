@@ -90,11 +90,9 @@ Block-level writes must carry the note version and an operation ID for concurren
 
 ### Docker Compose
 
-Docker Engine and Compose v2 are required. Images are hosted in the internal registry `registry.betheone.cc.cd` and are not yet publicly available, so sign in before pulling:
+Docker Engine and Compose v2 are required. Images live in the internal registry `docker.betheone.cc.cd` and are not published publicly; pull them directly from the intranet, and run `docker login docker.betheone.cc.cd` first if the registry requires authentication.
 
 ```bash
-docker login registry.betheone.cc.cd
-
 git clone https://git.betheone.cc.cd/wushuzhilu/BaseForge.git
 cd BaseForge
 docker compose up -d
@@ -120,7 +118,7 @@ Persistent data lives in `/app/data` inside the container, mounted from the `bas
 └── .jwt_secret
 ```
 
-The image repository, tag and port come from `.env` and are interpolated by `docker-compose.yml`: `BASEFORGE_IMAGE_REPOSITORY` (default `registry.betheone.cc.cd/baseforge`), `BASEFORGE_IMAGE_TAG` (default `latest`), and `BASEFORGE_PORT` (default `3001`).
+The image repository, tag and port come from `.env` and are interpolated by `docker-compose.yml`: `BASEFORGE_IMAGE_REPOSITORY` (default `docker.betheone.cc.cd/baseforge`), `BASEFORGE_IMAGE_TAG` (default `latest`), and `BASEFORGE_PORT` (default `3001`).
 
 Common environment variables read by the application; see [`.env.example`](./.env.example) for the full template:
 

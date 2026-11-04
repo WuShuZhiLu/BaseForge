@@ -1,5 +1,5 @@
 # =============================================================================
-# nowen-note 多架构 Dockerfile（Alpine 精简版）
+# BaseForge 多架构 Dockerfile（Alpine 精简版）
 # =============================================================================
 ARG TARGETARCH=amd64
 
@@ -60,8 +60,8 @@ COPY --from=backend-build /app/backend/dist ./backend/dist
 COPY backend/templates ./backend/templates
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-RUN mkdir -p /app/data /var/lib/nowen-updater \
-    && chmod 700 /var/lib/nowen-updater
+RUN mkdir -p /app/data /var/lib/baseforge-updater \
+    && chmod 700 /var/lib/baseforge-updater
 VOLUME ["/app/data"]
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -72,13 +72,13 @@ ARG APP_VERSION=""
 ARG VCS_REF=""
 ENV NOWEN_BUILD_TIME=${BUILD_DATE}
 ENV NOWEN_APP_VERSION=${APP_VERSION}
-LABEL org.opencontainers.image.title="Base Notes" \
+LABEL org.opencontainers.image.title="BaseForge" \
       org.opencontainers.image.description="Self-hosted note and knowledge management" \
-      org.opencontainers.image.source="https://github.com/cropflre/nowen-note" \
+      org.opencontainers.image.source="https://git.betheone.cc.cd/wushuzhilu/BaseForge" \
       org.opencontainers.image.version=${APP_VERSION} \
       org.opencontainers.image.created=${BUILD_DATE} \
       org.opencontainers.image.revision=${VCS_REF} \
-      com.nowen-note.schema-metadata="runtime-api"
+      com.baseforge.schema-metadata="runtime-api"
 
 ENV NODE_ENV=production
 ENV DB_PATH=/app/data/baseforge.db
