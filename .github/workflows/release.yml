@@ -19,7 +19,32 @@ permissions:
   actions: read
 
 jobs:
+  # 发版前置校验：tag（去掉 v）必须与根 package.json 的 version 完全一致，
+  # 避免"打了 v0.1.0 但包里还是旧版本号"这类产物版本错乱。
+  version-guard:
+    name: tag ↔ package.json 版本一致性
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify tag matches package.json version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "push" ]; then
+            echo "非 tag 触发（${GITHUB_EVENT_NAME}），跳过版本校验"
+            exit 0
+          fi
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=${TAG} package.json=${PKG}"
+          if [ "${TAG}" != "${PKG}" ]; then
+            echo "::error::tag (${TAG}) 与 package.json (${PKG}) 不一致，拒绝构建"
+            exit 1
+          fi
+
   build:
+    needs: version-guard
     strategy:
       fail-fast: false
       matrix:
@@ -324,7 +349,7 @@ jobs:
       - name: Upload platform artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-${{ matrix.name }}
+          name: baseforge-${{ matrix.name }}
           path: |
             dist-electron/*.exe
             dist-electron/*.dmg
@@ -335,3 +360,31 @@ jobs:
             dist-electron/latest*.yml
           if-no-files-found: ignore
           retention-days: 14
+
+  # 把 build 各平台的产物汇总成 GitHub Release。
+  # 发布链路（方案 B）：GitHub 只负责构建 win/mac 并发到自己的 Release；
+  # 随后由 Gitea 侧的 sync-release.yml 调用 scripts/sync-release-assets.mjs
+  # 把资产搬到 Gitea（主仓）与 Gitee（镜像）。见 docs/release-pipeline.md。
+  publish:
+    needs: [version-guard, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: baseforge-*
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: BaseForge ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: false
+          files: release-assets/*
+          fail_on_unmatched_files: false
+          generate_release_notes: true

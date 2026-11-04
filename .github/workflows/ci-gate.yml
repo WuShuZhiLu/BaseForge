@@ -1,0 +1,58 @@
+# BaseForge 主干门禁（CI Gate）
+#
+# 目的：用**一条**流水线覆盖「类型检查 + 全量测试」，替代历史上按 issue/功能拆分的
+# 数十条细分 workflow。功能细分 workflow 只跑测试的一个子集，与全量门禁重复，
+# 白白消耗 runner 队列。
+#
+# runner 说明：Gitea act_runner 的 job 容器默认镜像可能不含 node（会报
+# "Cannot find: node in PATH"）。这里显式指定 node:22-bookworm 作为 job 容器，
+# 让 act_runner 无需改配置也能跑；换成自建带 node 的 runner 后可直接删掉 container:。
+
+name: CI Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  backend:
+    name: backend (typecheck + tests)
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: backend
+        run: npx tsc -p tsconfig.json --noEmit
+      - name: Tests
+        working-directory: backend
+        run: npm test
+
+  frontend:
+    name: frontend (typecheck + tests)
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck
+        working-directory: frontend
+        run: node node_modules/typescript/bin/tsc -p tsconfig.app.json --noEmit
+      - name: Tests
+        working-directory: frontend
+        run: node node_modules/vitest/vitest.mjs run

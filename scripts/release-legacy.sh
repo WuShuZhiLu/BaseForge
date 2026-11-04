@@ -1343,42 +1343,10 @@ if [ "$BUILD_ONLY" != "1" ]; then
     sync_backend_pkg_version "$VERSION"
 fi
 
-# -------------------- 生成 CHANGELOG / README 区块 / public/changelog.json --------------------
-# 解析自上一个 v* tag 至 HEAD 之间的 conventional commits（feat/fix/docs/...），
-# 按分组写入：
-#   1) CHANGELOG.md       —— 单一真相源
-#   2) README.md / README.en.md 内的 <!-- CHANGELOG:BEGIN/END --> 区块
-#   3) frontend/public/changelog.json  —— 应用内「更新日志」Modal 的数据源
-# 仅在非 build-only 流程里跑；不影响 docker build 单跑场景。
-GEN_CHANGELOG_SCRIPT="${REPO_ROOT}/scripts/generate-changelog.mjs"
-if [ "$BUILD_ONLY" != "1" ] && [ -f "$GEN_CHANGELOG_SCRIPT" ]; then
-    info "生成 CHANGELOG / README 区块 / public/changelog.json"
-    # 显式传 --since <上一个 v* tag>，避免 generate-changelog.mjs 在 HEAD 已等同于某个
-    # v* tag（重跑发布 / 版本号回写后的 tag 点上）时，误把更早版本的 commits 再重新
-    # 归入本版 —— 这会导致 README/CHANGELOG 出现巨大的重复分组块（同一个 "✨ 新增"
-    # 连续出现两次）。取"除本版外最大的 v* tag"作为起点最稳妥。
-    LAST_RELEASE_TAG="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null \
-        | grep -v -x "v${VERSION}" \
-        | head -n1 || true)"
-    GEN_ARGS=(
-        "$GEN_CHANGELOG_SCRIPT"
-        --version "$VERSION"
-        --write
-        --sync-readme
-        --emit-json
-    )
-    if [ -n "$LAST_RELEASE_TAG" ]; then
-        GEN_ARGS+=( --since "$LAST_RELEASE_TAG" )
-        info "  since tag: ${LAST_RELEASE_TAG}"
-    else
-        info "  since tag: (无历史 tag，回退到全历史)"
-    fi
-    if [ "$DRY_RUN" = "1" ]; then
-        echo "  (dry-run) node ${GEN_ARGS[*]}"
-    else
-        run_argv node "${GEN_ARGS[@]}"
-    fi
-fi
+# -------------------- CHANGELOG --------------------
+# CHANGELOG.md 由维护者主动编写（规则见该文件顶部），发版流程不再生成或改写它；
+# README 的 <!-- CHANGELOG:BEGIN/END --> 区块与 frontend/public/changelog.json 也已停止生成。
+# 发布说明改为直接引用 CHANGELOG.md 中对应版本的段落（见下方 RELEASE NOTES）。
 
 # -------------------- Android versionCode / versionName 同步 --------------------
 # frontend/android/app/build.gradle 里有硬编码的 `versionCode N` / `versionName "X"`，
@@ -2626,8 +2594,8 @@ if [ "$DO_GIT_TAG" = "1" ]; then
     if [ -n "$(git status --porcelain -- frontend/android/app/build.gradle 2>/dev/null)" ]; then
         CHANGED_FILES+=( "frontend/android/app/build.gradle" )
     fi
-    # 由 generate-changelog.mjs 产生的 4 个文件，存在变更就一起进 commit
-    for f in CHANGELOG.md README.md README.en.md frontend/public/changelog.json; do
+    # CHANGELOG.md 由维护者手写，若有改动一并进 commit（不再有自动生成的文件）
+    for f in CHANGELOG.md; do
         if [ -n "$(git status --porcelain -- "$f" 2>/dev/null)" ]; then
             CHANGED_FILES+=( "$f" )
         fi
@@ -2747,22 +2715,25 @@ if [ "$DO_GITHUB_RELEASE" = "1" ]; then
     elif [ -n "$RELEASE_NOTES" ]; then
         NOTES_ARGS=( --notes "$RELEASE_NOTES" )
     else
-        # 自动生成一份默认说明
-        # 优先取 generate-changelog.mjs --section 的输出（本版分组好的 markdown），
-        # 失败则退回到原始的 metadata 摘要。
-        # 这里走到时 HEAD 上很可能已经打了 v${VERSION} tag（tag step 在本步前完成），
-        # 所以必须显式传 --since 来绕开 HEAD^ 陷阱，避免把上个版本的 commits 再重复收一遍。
+        # 默认说明：直接引用 CHANGELOG.md 中本版本的段落，不再从 commit 自动生成。
+        CHANGELOG_SECTION="$(awk -v ver="v${VERSION}" '
+            /^## / {
+                if (found) exit
+                if ($0 ~ "^## " ver "([[:space:]]|-|$)") { found = 1 }
+                next
+            }
+            found { print }
+        ' "${REPO_ROOT}/CHANGELOG.md" 2>/dev/null || true)"
+        # 若维护者还没把 Unreleased 改成本版标题，则回退引用 Unreleased 段。
+        if [ -z "$CHANGELOG_SECTION" ]; then
+            CHANGELOG_SECTION="$(awk '
+                /^## / { if (found) exit; if ($0 ~ /^## Unreleased/) { found = 1 }; next }
+                found { print }
+            ' "${REPO_ROOT}/CHANGELOG.md" 2>/dev/null || true)"
+        fi
         AUTO_NOTES=""
-        if [ -f "$GEN_CHANGELOG_SCRIPT" ]; then
-            NOTES_SINCE_TAG="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname 2>/dev/null \
-                | grep -v -x "v${VERSION}" \
-                | head -n1 || true)"
-            SECTION_ARGS=( --version "$VERSION" --section )
-            [ -n "$NOTES_SINCE_TAG" ] && SECTION_ARGS+=( --since "$NOTES_SINCE_TAG" )
-            CHANGELOG_SECTION="$(node "$GEN_CHANGELOG_SCRIPT" "${SECTION_ARGS[@]}" 2>/dev/null || true)"
-            if [ -n "$CHANGELOG_SECTION" ]; then
-                AUTO_NOTES="$CHANGELOG_SECTION"$'\n\n---\n'
-            fi
+        if [ -n "$CHANGELOG_SECTION" ]; then
+            AUTO_NOTES="$CHANGELOG_SECTION"$'\n\n---\n'
         fi
         AUTO_NOTES+="Release ${VERSION_TAG}"$'\n\n'"Targets: ${TARGETS}"
         if [ "$HAS_DOCKER" = "1" ]; then

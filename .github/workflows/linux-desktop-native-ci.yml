@@ -1,36 +1,11 @@
 name: Linux Desktop Native CI
 
+# 触发策略（收尾统一）：只在打 tag 发版或手动时跑；日常改动由 ci-gate 覆盖。
 on:
   push:
-    branches:
-      - release/v1.4.6
-    paths:
-      - ".github/workflows/linux-desktop-native-ci.yml"
-      - ".github/workflows/release.yml"
-      - "electron/**"
-      - "scripts/rebuild-native.mjs"
-      - "scripts/check-linux-native-compat.cjs"
-      - "scripts/smoke-better-sqlite3.cjs"
-      - "scripts/lib/linux-native-compat.cjs"
-      - "scripts/tests/linux-native-compat.test.cjs"
-      - "backend/package.json"
-      - "backend/package-lock.json"
-      - "package.json"
-      - "package-lock.json"
-  pull_request:
-    paths:
-      - ".github/workflows/linux-desktop-native-ci.yml"
-      - ".github/workflows/release.yml"
-      - "electron/**"
-      - "scripts/rebuild-native.mjs"
-      - "scripts/check-linux-native-compat.cjs"
-      - "scripts/smoke-better-sqlite3.cjs"
-      - "scripts/lib/linux-native-compat.cjs"
-      - "scripts/tests/linux-native-compat.test.cjs"
-      - "backend/package.json"
-      - "backend/package-lock.json"
-      - "package.json"
-      - "package-lock.json"
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: read
