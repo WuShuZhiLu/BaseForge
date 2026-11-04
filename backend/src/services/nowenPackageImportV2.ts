@@ -21,6 +21,8 @@ export interface ImportParams {
   targetNotebookId?: string;
   importMode?: RoundTripImportMode;
   dryRun?: boolean;
+  /** 根路径文档兜底笔记本名称，缺省用「导入的内容」 */
+  fallbackNotebookName?: string;
 }
 
 interface ImportWarning {
@@ -624,7 +626,7 @@ export async function importNowenPackageV2(zipBuffer: Buffer, params: ImportPara
     || targetParentId
     || null;
   let fallbackRootNeedsCreate = false;
-  let fallbackRootName = "导入的内容";
+  let fallbackRootName = params.fallbackNotebookName?.trim() || "导入的内容";
   if (!fallbackRootId && noteContents.size) {
     if (strategy === "merge") {
       const existing = findExistingNotebook(db, userId, resolvedWorkspaceId, null, fallbackRootName);

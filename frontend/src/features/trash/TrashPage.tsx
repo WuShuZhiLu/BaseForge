@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Lock, RotateCcw, Search, Trash2, RefreshCw, X } from "lucide-react";
+import { CheckSquare, ChevronDown, Lock, RotateCcw, Search, Trash2, RefreshCw, X } from "lucide-react";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { getCurrentWorkspace } from "@/lib/api";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
@@ -55,11 +55,31 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   const [sortFilter, setSortFilter] = useState<TrashSortFilter>(() => getTrashSortFilter());
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  // 选择模式：进入后显示行首勾选框，退出时清空选择（对齐文件管理右上角「选择」控件）
+  const [selectionMode, setSelectionMode] = useState(false);
+  const toggleSelectionMode = () => setSelectionMode((mode) => {
+    const next = !mode;
+    if (!next) setSelected([]);
+    return next;
+  });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [retentionDays, setRetention] = useState(() => getRetentionDays());
   const [expanded, setExpanded] = useState(false);
   // 「恢复到…」：目标目录选择器
   const [restoreToItem, setRestoreToItem] = useState<TrashItem | null>(null);
+  // 工具行排序下拉（对齐分享页「排序：xxx ▾」）
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // 排序菜单的外部点击关闭
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) setSortMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [sortMenuOpen]);
 
   // 侧栏的类型筛选与保留期设置跨组件同步
   useEffect(() => {
@@ -115,14 +135,46 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
       <div className="flex items-center gap-2"><Trash2 size={18} className="text-tx-secondary" /><h1 className="text-[15px] font-semibold">{t("sidebar.trash")}</h1><span className="text-xs tabular-nums text-tx-tertiary">{trash.items.length}</span></div>
       <div className="flex gap-2">
         <button className={buttonClass} disabled={trash.busy || trash.loading} onClick={() => void trash.reload()} aria-label={t("trashCenter.refresh")}><RefreshCw size={16} /></button>
-        <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])}><Trash2 size={16} />{t("trashCenter.empty")}</button>
+        {/* 选择模式开关：与文件管理右上角「选择 / 退出多选」同一交互 */}
+        <button className={`${buttonClass} ${selectionMode ? "border-accent-primary bg-accent-primary text-white hover:opacity-90" : ""}`} onClick={toggleSelectionMode} title={selectionMode ? t("trashCenter.exitSelection") : t("trashCenter.select")}>
+          {selectionMode ? <><X size={16} />{t("trashCenter.exitSelection")}</> : <><CheckSquare size={16} />{t("trashCenter.select")}</>}
+        </button>
+        <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])}><Trash2 size={16} />{t("trashCenter.cleanup")}</button>
       </div>
     </header>
     {/* 工具行 h-10：只留搜索；批量在列表底部批量条 */}
     <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-app-border px-4">
       <label className="flex h-7 w-56 items-center gap-1.5 rounded-lg bg-app-hover px-2.5 text-tx-tertiary"><Search size={13} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("trashCenter.search")} aria-label={t("trashCenter.search")} className="min-w-0 flex-1 border-none bg-transparent text-xs text-tx-primary outline-none no-focus-ring" /></label>
       <span className="flex-1" />
-      <span className="text-xs text-tx-tertiary">排序：{TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label}</span>
+      {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」 */}
+      <div ref={sortMenuRef} className="relative shrink-0">
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={sortMenuOpen}
+          onClick={() => setSortMenuOpen((value) => !value)}
+          className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+        >
+          排序：<span className="font-medium text-tx-primary">{TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label}</span>
+          <ChevronDown size={12} />
+        </button>
+        {sortMenuOpen && (
+          <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+            {TRASH_SORT_META.map((meta) => (
+              <button
+                key={meta.key}
+                type="button"
+                role="option"
+                aria-selected={sortFilter === meta.key}
+                onClick={() => { setTrashSortFilter(meta.key); setSortFilter(meta.key); setSortMenuOpen(false); }}
+                className={`flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover ${sortFilter === meta.key ? "text-accent-primary" : "text-tx-secondary"}`}
+              >
+                {meta.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
     <div className="flex min-h-0 flex-1">
       {/* 列表 */}
@@ -132,7 +184,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
           : !visible.length ? <div className="py-16 text-center text-tx-tertiary"><Trash2 size={36} className="mx-auto mb-3 opacity-50" /><p>{t(trash.items.length ? "trashCenter.noMatches" : "trashCenter.emptyState")}</p>
               {trash.items.length > 0 && <p className="mt-1 text-xs">{t("trashCenter.filterHint", { defaultValue: "当前筛选条件下没有匹配项，试试调整类型或删除时间" })}</p>}</div>
           : <ul className="space-y-0.5">{visible.map((item) => <TrashRow key={item.id} item={item} disabled={disabled} selected={selected.includes(item.id)} active={activeId === item.id}
-              retentionDays={retentionDays}
+              retentionDays={retentionDays} showCheckbox={selectionMode}
               onSelect={() => setActiveId(activeId === item.id ? null : item.id)}
               onToggle={(checked) => setSelected(checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
               onRestore={() => void operate("restore", [item.id])}
@@ -175,8 +227,8 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   </main>;
 }
 
-function TrashRow({ item, disabled, selected, active, retentionDays, onSelect, onToggle, onRestore, onPurge }: {
-  item: TrashItem; disabled: boolean; selected: boolean; active: boolean; retentionDays: number;
+function TrashRow({ item, disabled, selected, active, retentionDays, showCheckbox, onSelect, onToggle, onRestore, onPurge }: {
+  item: TrashItem; disabled: boolean; selected: boolean; active: boolean; retentionDays: number; showCheckbox: boolean;
   onSelect: () => void; onToggle: (checked: boolean) => void; onRestore: () => void; onPurge: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -188,7 +240,7 @@ function TrashRow({ item, disabled, selected, active, retentionDays, onSelect, o
     onClick={onSelect}
     className={`group flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 ${active ? "bg-[#eef4ff]" : "hover:bg-app-hover"}`}
   >
-    <input type="checkbox" disabled={disabled} aria-label={t("trashCenter.selectItem", { title: item.title })} checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onToggle(event.target.checked)} className="shrink-0 accent-[var(--color-accent-primary)]" />
+    {showCheckbox && <input type="checkbox" disabled={disabled} aria-label={t("trashCenter.selectItem", { title: item.title })} checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onToggle(event.target.checked)} className="shrink-0 accent-[var(--color-accent-primary)]" />}
     <span className="shrink-0 text-[14px] leading-none">{trashTypeEmoji(typeKey)}</span>
     <div className="min-w-0 flex-1">
       <p className="flex min-w-0 items-center gap-1.5 text-[13px]"><span className="truncate font-medium" title={item.title}>{item.title}</span>{item.isLocked && <Lock size={12} className="shrink-0 text-tx-tertiary" />}</p>

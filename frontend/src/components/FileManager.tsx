@@ -68,7 +68,7 @@ import { navigateToolPage } from "@/components/toolTabs";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 import { FileItem, FileStats } from "@/types";
-import { FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
+import { FILE_SORT_OPTIONS, FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
 import type { FilesTypeFilter, FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -274,6 +274,19 @@ export default function FileManager() {
   const [myUploadsRef, setMyUploadsRef] = useState<MyUploadsRefFilter>("all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState(""); // debounced
+  // 工具行右端排序下拉（对齐分享页「排序：xxx ▾」，选项复用 FILE_SORT_OPTIONS）
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // 排序菜单的外部点击关闭
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) setSortMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [sortMenuOpen]);
 
   // 附件文件夹列表（groupMode === "folder" 时使用）
   const [attachmentFolders, setAttachmentFolders] = useState<Array<{ id: string; name: string; fileCount: number }>>([]);
@@ -1406,8 +1419,27 @@ export default function FileManager() {
       ) : (
         <>
 
-      {/* 工具条：h-10 与侧栏面板头对齐；统计行并入左侧 */}
+      {/* 工具条：h-10 与侧栏面板头对齐；搜索最左，中间筛选，右端排序下拉（对齐分享页布局） */}
       <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
+        {/* 搜索：与分享页同款 w-[210px] 输入框 */}
+        <label className="relative block w-[210px] shrink-0">
+          <Search size={14} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+          <Input
+            placeholder="搜索文件名或类型（如 pdf）…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="h-8 pl-8 pr-7 text-xs"
+          />
+          {searchInput && (
+            <button
+              className="absolute right-2 top-2 text-tx-tertiary hover:text-tx-primary"
+              onClick={() => setSearchInput("")}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </label>
+        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
           {statsLine || " "}
         </p>
@@ -1467,26 +1499,37 @@ export default function FileManager() {
         <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <div className="flex-1" />
 
-        {/* 搜索 */}
-        <div className="flex items-center gap-2">
-          <div className="relative w-40 md:w-56">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-tx-tertiary" />
-            <Input
-              placeholder="搜索文件名或类型（如 pdf）…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-8 border-none bg-app-hover pl-7 text-xs no-focus-ring"
-            />
-            {searchInput && (
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-tx-tertiary hover:text-tx-primary"
-                onClick={() => setSearchInput("")}
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
-
+        {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」，复用 FILE_SORT_OPTIONS */}
+        <div ref={sortMenuRef} className="relative shrink-0">
+          <button
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={sortMenuOpen}
+            onClick={() => setSortMenuOpen((value) => !value)}
+            className="inline-flex items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11px] text-tx-secondary transition-colors hover:bg-app-hover"
+          >
+            排序：<span className="font-medium text-tx-primary">{FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
+            <ChevronDown size={12} />
+          </button>
+          {sortMenuOpen && (
+            <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+              {FILE_SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={sort === option.value}
+                  onClick={() => { setFilesUi({ sort: option.value }); setSortMenuOpen(false); }}
+                  className={cn(
+                    "flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover",
+                    sort === option.value ? "text-accent-primary" : "text-tx-secondary",
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

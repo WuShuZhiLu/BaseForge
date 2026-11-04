@@ -88,6 +88,7 @@ app.post("/package", async (c) => {
   const dryRun = c.req.query("dryRun") === "1" || c.req.query("dryRun") === "true";
   const importMode = (c.req.query("importMode") as "new-root" | "into-target" | "merge" | "sync") || "new-root";
   const targetNotebookId = c.req.query("targetNotebookId") || undefined;
+  const fallbackNotebookName = c.req.query("fallbackNotebookName") || undefined;
   if (personalFeatureDisabled(userId, workspaceId, "personalImportEnabled")) {
     return c.json({ error: "管理员已禁用你的个人空间导入功能", code: "FEATURE_DISABLED" }, 403);
   }
@@ -124,6 +125,7 @@ app.post("/package", async (c) => {
       targetNotebookId,
       importMode,
       dryRun,
+      fallbackNotebookName,
       applyPermissions,
       permissionMappings,
     });

@@ -147,6 +147,7 @@ export interface SubmitRoundTripPackageOptions {
   targetNotebookId?: string;
   applyPermissions?: boolean;
   permissionMappings?: Record<string, string>;
+  fallbackNotebookName?: string;
 }
 
 interface RememberedImportDecision {
@@ -154,6 +155,7 @@ interface RememberedImportDecision {
   workspaceId?: string;
   applyPermissions: boolean;
   permissionMappings: Record<string, string>;
+  fallbackNotebookName?: string;
 }
 
 type Listener = (requests: RoundTripImportReviewRequest[]) => void;
@@ -192,6 +194,7 @@ export async function submitRoundTripPackage(
     params.set("workspaceId", options.workspaceId);
   }
   if (options.targetNotebookId) params.set("targetNotebookId", options.targetNotebookId);
+  if (options.fallbackNotebookName) params.set("fallbackNotebookName", options.fallbackNotebookName);
   params.set(
     "importMode",
     options.strategy === "sync"
@@ -306,12 +309,13 @@ export function installRoundTripImportReviewBridge(): void {
 
   const nativeImport = api.importNowenPackage.bind(api);
 
-  api.dryRunNowenPackage = (async (file: File) => {
+  api.dryRunNowenPackage = (async (file: File, opts?: { fallbackNotebookName?: string }) => {
     const workspaceId = currentWorkspaceId();
     const preview = await submitRoundTripPackage(file, {
       dryRun: true,
       strategy: "copy",
       workspaceId,
+      fallbackNotebookName: opts?.fallbackNotebookName,
     });
     if (!preview?.success) return preview;
     const decision = await requestRoundTripImportReview(preview, {
@@ -323,6 +327,7 @@ export function installRoundTripImportReviewBridge(): void {
         dryRun: true,
         strategy,
         workspaceId,
+        fallbackNotebookName: opts?.fallbackNotebookName,
       }),
     });
     if (decision.accepted) {
@@ -332,6 +337,7 @@ export function installRoundTripImportReviewBridge(): void {
         workspaceId,
         applyPermissions: permissionDecision.applyPermissions,
         permissionMappings: permissionDecision.permissionMappings,
+        fallbackNotebookName: opts?.fallbackNotebookName,
       });
     } else {
       selectedDecisionByFile.delete(file);
@@ -355,6 +361,7 @@ export function installRoundTripImportReviewBridge(): void {
       targetNotebookId: opts?.targetNotebookId,
       applyPermissions: remembered.applyPermissions,
       permissionMappings: remembered.permissionMappings,
+      fallbackNotebookName: opts?.fallbackNotebookName ?? remembered.fallbackNotebookName,
     });
   }) as typeof api.importNowenPackage;
 }

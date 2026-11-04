@@ -2809,12 +2809,13 @@ export const api = {
     }
   },
   /** BaseForge 数据包 dry-run 预检 */
-  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string }) => {
+  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
     const params = new URLSearchParams({ dryRun: "1" });
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
+    if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const res = await fetch(`${getBaseUrl()}/export/import/nowen-package?${params}`, {
       method: "POST",
       credentials: "include",
@@ -2826,7 +2827,7 @@ export const api = {
     return data;
   },
   /** BaseForge 数据包正式导入 */
-  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string }) => {
+  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
@@ -2834,6 +2835,7 @@ export const api = {
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
     if (opts?.importMode) params.set("importMode", opts.importMode);
     if (opts?.targetNotebookId) params.set("targetNotebookId", opts.targetNotebookId);
+    if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const qs = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(`${getBaseUrl()}/export/import/nowen-package${qs}`, {
       method: "POST",

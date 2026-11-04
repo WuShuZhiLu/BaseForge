@@ -506,7 +506,7 @@ export function createReliableMarkdownExportJob(params: {
     message: "等待生成 ZIP",
     filename: params.filenameBase
       ? `${sanitizeFilename(params.filenameBase)}.zip`
-      : `nowen-note_backup_${date}.zip`,
+      : `baseforge_backup_${date}.zip`,
     warnings: 0,
     tmpDir,
     tmpPath: path.join(tmpDir, "export.zip"),
@@ -629,7 +629,7 @@ export function handleReliableExportDownload(c: Context): Response {
       "Content-Type": job.contentType,
       "Content-Length": String(stat.size),
       "Content-Encoding": "identity",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "nowen-note-export.bin")}`,
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "baseforge-export.bin")}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
       "X-Nowen-Reliable-Export": "1",

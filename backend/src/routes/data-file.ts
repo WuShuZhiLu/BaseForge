@@ -180,7 +180,7 @@ app.get("/export", async (c) => {
     await db.backup(tmpPath);
     const content = fs.readFileSync(tmpPath);
     const checksum = crypto.createHash("sha256").update(content).digest("hex").slice(0, 16);
-    const filename = `nowen-note-${ts}.data`;
+    const filename = `baseforge-${ts}.data`;
 
     return new Response(content, {
       headers: {

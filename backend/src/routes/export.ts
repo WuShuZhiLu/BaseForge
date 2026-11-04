@@ -928,6 +928,7 @@ app.post("/import/nowen-package", async (c) => {
   const dryRun = c.req.query("dryRun") === "1" || c.req.query("dryRun") === "true";
   const importMode = (c.req.query("importMode") as "new-root" | "into-target" | "merge" | "sync") || "new-root";
   const targetNotebookId = c.req.query("targetNotebookId") || undefined;
+  const fallbackNotebookName = c.req.query("fallbackNotebookName") || undefined;
 
   // 解析 workspaceId
   const wsRaw = c.req.query("workspaceId") ?? undefined;
@@ -959,6 +960,7 @@ app.post("/import/nowen-package", async (c) => {
       targetNotebookId,
       importMode,
       dryRun,
+      fallbackNotebookName,
     });
 
     if (!result.success) {

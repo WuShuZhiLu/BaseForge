@@ -3099,6 +3099,7 @@
     "nowenPackageImportConfirmDesc": "This will import {{notes}} notes and {{attachments}} attachments. Existing data will not be overwritten.",
     "nowenPackageImportSuccess": "BaseForge package imported successfully",
     "nowenPackageImportFailed": "Failed to import BaseForge package",
+    "nowenFallbackNotebookName": "Unsorted",
     "colorMark": {
       "action": "Color mark",
       "none": "No mark",
@@ -3314,6 +3315,9 @@
     "sheet": "Sheets",
     "types": "Resource types",
     "empty": "Empty trash",
+    "cleanup": "Cleanup",
+    "select": "Select",
+    "exitSelection": "Exit selection",
     "permanent": "Delete permanently",
     "restore": "Restore",
     "refresh": "Refresh trash",

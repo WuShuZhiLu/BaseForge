@@ -3114,6 +3114,7 @@
     "nowenPackageImportConfirmDesc": "将导入 {{notes}} 篇笔记、{{attachments}} 个附件。不会覆盖现有数据。",
     "nowenPackageImportSuccess": "BaseForge 数据包导入成功",
     "nowenPackageImportFailed": "BaseForge 数据包导入失败",
+    "nowenFallbackNotebookName": "待整理",
     "colorMark": {
       "action": "颜色标记",
       "none": "无标记",
@@ -3329,6 +3330,9 @@
     "sheet": "轻量表格",
     "types": "资源类型",
     "empty": "清空回收站",
+    "cleanup": "清理",
+    "select": "选择",
+    "exitSelection": "退出多选",
     "permanent": "永久删除",
     "restore": "恢复",
     "refresh": "刷新回收站",

@@ -1990,7 +1990,7 @@ export default function DataManager() {
 
                       try {
                         toast.info(t('note.nowenPackageImportDryRun'));
-                        const dryResult = await api.dryRunNowenPackage(file);
+                        const dryResult = await api.dryRunNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
 
                         if (!dryResult.success) {
                           toast.error(dryResult.errors?.[0] || t('note.nowenPackageImportFailed'));
@@ -2010,7 +2010,7 @@ export default function DataManager() {
                         if (!ok) return;
 
                         toast.info(t('note.nowenPackageImportDryRun'));
-                        const result = await api.importNowenPackage(file);
+                        const result = await api.importNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
 
                         if (result.success) {
                           const counts = result.counts;

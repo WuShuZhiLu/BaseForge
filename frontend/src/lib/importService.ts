@@ -17,6 +17,7 @@ import {
 } from "./roundTripImportReview";
 import { requestRoundTripPermissionReview } from "./roundTripPermissionReview";
 import { normalizeImportedHtmlContent } from "./singleFileHtmlImport";
+import i18n from "i18next";
 
 export {
   tiptapExtensions,
@@ -174,6 +175,7 @@ export async function importNotes(
   const submitOptionsFor = (strategy: RoundTripImportStrategy) => ({
     workspaceId: options?.workspaceId,
     targetNotebookId: strategy === "sync" ? undefined : notebookId || undefined,
+    fallbackNotebookName: strategy === "sync" ? undefined : i18n.t("note.nowenFallbackNotebookName"),
   });
   try {
     onProgress?.({ phase: "reading", current: 0, total: 1, message: "正在校验目录、附件和来源映射…" });
