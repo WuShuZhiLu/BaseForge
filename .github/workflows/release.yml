@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   # 发版前置校验：tag（去掉 v）必须与根 package.json 的 version 完全一致，
-  # 避免"打了 v1.0.0-pre1 但包里还是 1.0.0-preview.1"这类产物版本错乱。
+  # 避免"打了 v0.1.0 但包里还是旧版本号"这类产物版本错乱。
   version-guard:
     name: tag ↔ package.json 版本一致性
     runs-on: ubuntu-latest
