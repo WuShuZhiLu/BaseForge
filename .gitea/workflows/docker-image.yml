@@ -1,17 +1,5 @@
-# 只打包 Docker 镜像：不构建桌面端 / 移动端，不发 Release，不生成 CHANGELOG。
-# 镜像地址、tag 与凭据全部来自仓库变量 / Secrets，不写死。
-# runner 需具备 docker CLI 与 daemon。
-#
-# 目标仓库配置（都在 Gitea 仓库的 Variables / Secrets 里，代码不写死）：
-#   0.1 内部仓库：vars.IMAGE_REGISTRY = registry.betheone.cc.cd，
-#                 vars.IMAGE_NAME = baseforge（vars.IMAGE_NAMESPACE 留空），
-#                 secrets.REGISTRY_USER / REGISTRY_TOKEN = 内部仓库凭据。
-#                 产物形如 registry.betheone.cc.cd/baseforge:0.1.0，与 docker-compose.yml 的
-#                 BASEFORGE_IMAGE_REPOSITORY 保持一致。
-#   Docker Hub：vars.IMAGE_REGISTRY 留空，vars.IMAGE_NAMESPACE = Docker Hub 账号名，
-#               secrets.REGISTRY_TOKEN = Docker Hub Access Token（不是登录密码）。
-#   其他自建仓库：vars.IMAGE_REGISTRY = 域名，vars.IMAGE_NAMESPACE = 命名空间。
-# registry 与 namespace 都不配时只构建、不推送。
+# tag：push tag 取名字去掉 v，手动触发取 package.json 的 version；推送时同步 :latest。
+# registry 与 namespace 都没配时只构建、不推送。
 
 name: Build Docker Image
 
@@ -21,10 +9,6 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: '镜像 tag；留空 = 取 tag 名（去掉 v），再回退到 package.json 的 version'
-        required: false
-        default: ''
       push_image:
         description: '是否推送到镜像仓库（false = 只构建）'
         required: false
@@ -48,21 +32,22 @@ jobs:
       IMAGE_NAME: ${{ vars.IMAGE_NAME }}
       REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
-      INPUT_TAG: ${{ github.event.inputs.image_tag }}
       INPUT_PUSH: ${{ github.event.inputs.push_image }}
     steps:
-      # 不引用 actions/*：那些是 JS action，需要 node；本 workflow 只用纯 shell + docker。
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Build image
         run: |
           set -eu
 
           if [ ! -f package.json ] || [ ! -f Dockerfile ]; then
-            echo "::error::工作区没有仓库文件，请确认 runner 会 checkout 仓库"
+            echo "::error::工作区里没有 package.json / Dockerfile，checkout 未生效"
             exit 1
           fi
 
-          TAG="${INPUT_TAG:-}"
-          if [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+          TAG=""
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
             TAG="${GITHUB_REF_NAME:-}"
             TAG="${TAG#v}"
           fi
@@ -70,7 +55,7 @@ jobs:
             TAG="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
           fi
           if [ -z "$TAG" ]; then
-            echo "::error::无法推导镜像 tag，请填 image_tag 或检查 package.json"
+            echo "::error::推导不出版本号（tag 名与 package.json 都拿不到）"
             exit 1
           fi
 
@@ -84,8 +69,12 @@ jobs:
             REF="${NAME}:${TAG}"
           fi
 
+          LATEST_REF="${REF%:*}:latest"
           echo "构建镜像：${REF}"
-          docker build -f Dockerfile -t "$REF" .
+          docker build -f Dockerfile -t "$REF" \
+            --build-arg APP_VERSION="$TAG" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg VCS_REF="${GITHUB_SHA:-}" .
 
           if [ "${INPUT_PUSH:-true}" != "true" ]; then
             echo "push_image=false，只构建不推送"
@@ -95,16 +84,17 @@ jobs:
             echo "未配置 vars.IMAGE_REGISTRY / vars.IMAGE_NAMESPACE，只构建不推送"
             exit 0
           fi
-          if [ -z "${REGISTRY_USER:-}" ] || [ -z "${REGISTRY_TOKEN:-}" ]; then
-            echo "::error::缺少 secrets.REGISTRY_USER / secrets.REGISTRY_TOKEN"
-            exit 1
+
+          if [ -n "${REGISTRY_USER:-}" ] && [ -n "${REGISTRY_TOKEN:-}" ]; then
+            if [ -n "${IMAGE_REGISTRY:-}" ]; then
+              echo "$REGISTRY_TOKEN" | docker login "$IMAGE_REGISTRY" -u "$REGISTRY_USER" --password-stdin
+            else
+              echo "$REGISTRY_TOKEN" | docker login -u "$REGISTRY_USER" --password-stdin
+            fi
           fi
 
-          # 不开 set -x，凭据不进日志
-          if [ -n "${IMAGE_REGISTRY:-}" ]; then
-            echo "$REGISTRY_TOKEN" | docker login "$IMAGE_REGISTRY" -u "$REGISTRY_USER" --password-stdin
-          else
-            # registry 留空 = Docker Hub 默认源
-            echo "$REGISTRY_TOKEN" | docker login -u "$REGISTRY_USER" --password-stdin
-          fi
           docker push "$REF"
+          if [ "$REF" != "$LATEST_REF" ]; then
+            docker tag "$REF" "$LATEST_REF"
+            docker push "$LATEST_REF"
+          fi
