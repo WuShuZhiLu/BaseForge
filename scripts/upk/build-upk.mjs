@@ -27,6 +27,8 @@
  *     DOCKERHUB_REPO      DockerHub 仓库名（如 cropflre/nowen-note），
  *                          会拼成 ${DOCKERHUB_REPO}:v${VERSION} 加入候选镜像列表
  *     UGCLI_BIN           ugcli 可执行文件路径，默认根目录 ugcli.exe / ugcli
+ *                         注意：ugcli 是绿联开发者工具提供的二进制，**不入库**（见 .gitignore），
+ *                         使用前请自行放到仓库根目录或通过 UGCLI_BIN 指定路径。
  */
 import { execSync, spawnSync } from 'node:child_process';
 import {

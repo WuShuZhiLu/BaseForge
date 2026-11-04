@@ -83,3 +83,19 @@ scratch-*.mjs
 
 # 临时脚本 / 一次性 codemod（不入库）
 .tmp/
+
+# 本地协作/设计草稿（.cmp 曾入库，现只留本地，不入仓库）
+.cmp/
+
+# 编辑器与工具缓存（截图、页面快照、计划文件），一律不入库
+.playwright-mcp/
+.trae-html-share-packages/
+.zcode/
+.trae-*/
+
+# 生成的性能测试 fixture（scripts/generate-*fixtures.mjs 输出目录，可重新生成）
+tmp/fixtures/
+
+# 单文件二进制/临时补丁，禁止入库
+ugcli
+*.patch
