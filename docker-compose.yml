@@ -1,7 +1,8 @@
+# 0.1 不含 Docker 在线升级（updater）；后端代码与 docs/docker-online-update.md 保留，后续版本再启用。
 services:
   baseforge:
-    # 镜像仓库仍沿用上游发布地址（承认来源）；部署名/容器名/卷/网络/环境变量已全部 BaseForge 化
-    image: cropflre/nowen-note:${BASEFORGE_IMAGE_TAG:-latest}
+    # 镜像来自内部镜像仓库；上游来源在 README 与 Dockerfile 的归属说明中保留
+    image: ${BASEFORGE_IMAGE_REPOSITORY:-registry.betheone.cc.cd/baseforge}:${BASEFORGE_IMAGE_TAG:-latest}
     container_name: baseforge
     restart: unless-stopped
     ports:
@@ -21,15 +22,13 @@ services:
       - PUBLIC_WEB_ORIGIN=${PUBLIC_WEB_ORIGIN:-}
       - BASEFORGE_DEPLOYMENT_TYPE=docker-compose-managed
       - BASEFORGE_IMAGE_TAG=${BASEFORGE_IMAGE_TAG:-latest}
-      - BASEFORGE_UPDATER_URL=http://baseforge-updater:3002
-      - BASEFORGE_UPDATER_TOKEN=${BASEFORGE_UPDATER_TOKEN:-}
-      - BASEFORGE_UPDATER_INSTANCE=${BASEFORGE_INSTANCE_ID:-baseforge}
+      - BASEFORGE_IMAGE_REPOSITORY=${BASEFORGE_IMAGE_REPOSITORY:-registry.betheone.cc.cd/baseforge}
     labels:
       com.baseforge.managed: "true"
       com.baseforge.role: "app"
       com.baseforge.project: "baseforge"
       com.baseforge.instance: "${BASEFORGE_INSTANCE_ID:-baseforge}"
-      com.baseforge.image-repository: "cropflre/nowen-note"
+      com.baseforge.image-repository: "${BASEFORGE_IMAGE_REPOSITORY:-registry.betheone.cc.cd/baseforge}"
     healthcheck:
       test:
         - CMD
@@ -42,59 +41,10 @@ services:
       start_period: 30s
     networks:
       - baseforge-network
-      - baseforge-update-internal
-
-  # 默认关闭：只有显式传入 --profile updater 才会启动。
-  # 该容器是唯一挂载 Docker Socket 的进程；主应用永远不挂载 Socket。
-  baseforge-updater:
-    image: cropflre/nowen-note:${BASEFORGE_IMAGE_TAG:-latest}
-    container_name: baseforge-updater
-    profiles: ["updater"]
-    restart: unless-stopped
-    depends_on:
-      baseforge:
-        condition: service_healthy
-    entrypoint: ["/sbin/tini", "--"]
-    command: ["node", "backend/dist/updater/index.js"]
-    environment:
-      - NODE_ENV=production
-      - BASEFORGE_UPDATER_PORT=3002
-      - BASEFORGE_UPDATER_TOKEN=${BASEFORGE_UPDATER_TOKEN:-}
-      - BASEFORGE_UPDATER_INSTANCE=${BASEFORGE_INSTANCE_ID:-baseforge}
-      - BASEFORGE_UPDATER_CONTAINER_NAME=baseforge
-      - BASEFORGE_UPDATER_ALLOWED_IMAGE=cropflre/nowen-note
-      - BASEFORGE_UPDATER_TARGET_URL=http://baseforge:3001
-      - BASEFORGE_UPDATER_STATE_DIR=/var/lib/baseforge-updater
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - baseforge-updater-state:/var/lib/baseforge-updater
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m,noexec,nosuid,nodev
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:3002/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - baseforge-update-internal
 
 volumes:
   baseforge-data:
     driver: local
-  baseforge-updater-state:
-    driver: local
 
 networks:
   baseforge-network:
-  baseforge-update-internal:
-    internal: true

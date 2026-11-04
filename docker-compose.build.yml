@@ -1,5 +1,4 @@
 # 源码开发/本地构建覆盖文件。
-# 在线升级只支持 docker-compose.yml 中的官方发布镜像部署；本地构建实例请重新 build。
 services:
   baseforge:
     build:
@@ -8,4 +7,3 @@ services:
     image: baseforge:local
     environment:
       - BASEFORGE_DEPLOYMENT_TYPE=docker-compose-build
-      - BASEFORGE_UPDATER_TOKEN=
