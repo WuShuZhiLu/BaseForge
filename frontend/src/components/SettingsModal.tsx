@@ -26,7 +26,6 @@ import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode
 import UserManagement from "@/components/UserManagement";
 import WorkspaceManagement from "@/components/WorkspaceManagement";
 import WhatsNewModal from "@/components/WhatsNewModal";
-import AuthorStoryModal from "@/components/AuthorStoryModal";
 import DownloadPanel from "@/components/DownloadPanel";
 import { useSiteSettings, BUILTIN_FONTS, getBuiltinFontName } from "@/hooks/useSiteSettings";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -411,7 +410,6 @@ function AboutPanel() {
   const [showSponsor, setShowSponsor] = useState(false);
   const [sponsorMethod, setSponsorMethod] = useState<"wechat" | "alipay">("wechat");
   const [showWhatsNew, setShowWhatsNew] = useState(false);
-  const [showAuthorStory, setShowAuthorStory] = useState(false);
   // 赞赏码大图预览：点击赞赏码缩略图时弹起 Lightbox
   const [sponsorPreviewOpen, setSponsorPreviewOpen] = useState(false);
   const [feedbackQqPreviewOpen, setFeedbackQqPreviewOpen] = useState(false);
@@ -496,30 +494,6 @@ function AboutPanel() {
         </div>
         <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
           {t('about.viewChangelog')}
-        </span>
-      </button>
-
-      {/* 作者感言 —— 项目背后的故事 */}
-      <button
-        type="button"
-        onClick={() => setShowAuthorStory(true)}
-        className="w-full flex items-center justify-between p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500">
-            <BookOpen size={16} />
-          </span>
-          <div>
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {t('about.authorStory')}
-            </div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              {t('about.authorStoryDesc')}
-            </div>
-          </div>
-        </div>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
-          {t('about.authorStoryAction')}
         </span>
       </button>
 
@@ -699,12 +673,6 @@ function AboutPanel() {
       <WhatsNewModal
         open={showWhatsNew}
         onClose={() => setShowWhatsNew(false)}
-      />
-
-      {/* 作者感言 Modal —— 项目背后的故事 */}
-      <AuthorStoryModal
-        open={showAuthorStory}
-        onClose={() => setShowAuthorStory(false)}
       />
 
       {feedbackQqPreviewOpen && (

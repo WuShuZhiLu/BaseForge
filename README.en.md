@@ -422,13 +422,11 @@ If BaseForge helps you, sponsorship supports continued maintenance and developme
   </tr>
 </table>
 
-Read the [author's note](./AUTHOR_STORY.md).
-
 ## License
 
 This project is a downstream fork of the upstream open-source project [nowen-note](https://github.com/cropflre/nowen-note) and is released under the [GNU General Public License v3.0](./LICENSE).
 
-**Origin and attribution**: BaseForge is a fork of upstream nowen-note. Copyright for the code and documentation remains primarily with the upstream author; this project only applies rebranding and further development on top of it. Upstream historical records ([CHANGELOG.md](./CHANGELOG.md), [author's note](./AUTHOR_STORY.md), `docs/superpowers/`) are preserved as-is.
+**Origin and attribution**: BaseForge is a fork of upstream nowen-note, rebranded and further developed here. Copyright for upstream code remains with its original author; the upstream [CHANGELOG.md](./CHANGELOG.md) is preserved to record history.
 
 <!-- CHANGELOG:BEGIN -->
 <!-- Detailed release history lives in CHANGELOG.md. Keep the README focused on stable capabilities and recent highlights. -->

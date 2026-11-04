@@ -419,13 +419,11 @@ npm run build:all
   </tr>
 </table>
 
-也可以阅读 [作者感言](./AUTHOR_STORY.md)。
-
 ## License
 
 本项目基于上游开源项目 [nowen-note](https://github.com/cropflre/nowen-note)（GNU General Public License v3.0）二次开发，遵循 [GNU General Public License v3.0](./LICENSE) 开源。
 
-**来源与归属**：BaseForge 是上游 nowen-note 的下游分支（fork）。代码与文档的主要版权归上游原作者所有，本项目仅在此基础上进行品牌替换与后续开发；上游历史记录（[CHANGELOG.md](./CHANGELOG.md)、[作者感言](./AUTHOR_STORY.md)、`docs/superpowers/`）均原样保留。
+**来源与归属**：BaseForge 是上游 nowen-note 的下游分支（fork），在此基础上完成品牌替换与后续开发。上游代码的版权归原作者所有，上游 [CHANGELOG.md](./CHANGELOG.md) 原样保留以记录历史。
 
 <!-- CHANGELOG:BEGIN -->
 <!-- 详细版本记录请查看 CHANGELOG.md；README 仅维护稳定能力与近期重点增强。 -->
