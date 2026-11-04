@@ -142,8 +142,10 @@ export function isBuiltinPluginEnabled(id: BuiltinPluginId): boolean {
   return !getDisabledBuiltinPlugins().has(id);
 }
 
-/** 首次加载时把 defaultEnabled=false 的插件写入停用集合（只做一次，之后完全尊重用户选择） */
-const DEFAULTS_SEEDED_KEY = "nowen-builtin-plugins-defaults-seeded-v1";
+/** 首次加载时把 defaultEnabled=false 的插件写入停用集合（只做一次，之后完全尊重用户选择）。
+ *  v2：从 nowen 继承的内置插件（待办/日记/AI/远程文件/项目管理）一律默认关闭——
+ *  用户明确表示暂时不需要，重新播种一次把老 profile 里残留的启用状态也关掉。 */
+const DEFAULTS_SEEDED_KEY = "nowen-builtin-plugins-defaults-seeded-v2";
 
 export function seedBuiltinPluginDefaults(): void {
   try {
