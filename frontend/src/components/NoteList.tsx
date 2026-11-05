@@ -1996,18 +1996,16 @@ export default function NoteList() {
       if (state.noteLoadingState.pendingNoteId && state.noteLoadingState.pendingNoteId !== noteId) {
         cancelNoteLoad();
       }
-      if (userPrefs.prefs.enableNoteTabs) {
-        actions.openNoteTab({
-          id: state.activeNote.id,
-          title: state.activeNote.title,
-          notebookId: state.activeNote.notebookId,
-          workspaceId: state.activeNote.workspaceId,
-          contentFormat: state.activeNote.contentFormat,
-          isLocked: state.activeNote.isLocked,
-          isTrashed: state.activeNote.isTrashed,
-          updatedAt: state.activeNote.updatedAt,
-        });
-      }
+      actions.openNoteTab({
+        id: state.activeNote.id,
+        title: state.activeNote.title,
+        notebookId: state.activeNote.notebookId,
+        workspaceId: state.activeNote.workspaceId,
+        contentFormat: state.activeNote.contentFormat,
+        isLocked: state.activeNote.isLocked,
+        isTrashed: state.activeNote.isTrashed,
+        updatedAt: state.activeNote.updatedAt,
+      });
       actions.setMobileView("editor");
       return;
     }
@@ -2030,18 +2028,16 @@ export default function NoteList() {
       request: () => api.getNote(noteId),
       onSuccess: (note) => {
         actions.setActiveNote(note);
-        if (userPrefs.prefs.enableNoteTabs) {
-          actions.openNoteTab({
-            id: note.id,
-            title: note.title,
-            notebookId: note.notebookId,
-            workspaceId: note.workspaceId,
-            contentFormat: note.contentFormat,
-            isLocked: note.isLocked,
-            isTrashed: note.isTrashed,
-            updatedAt: note.updatedAt,
-          });
-        }
+        actions.openNoteTab({
+          id: note.id,
+          title: note.title,
+          notebookId: note.notebookId,
+          workspaceId: note.workspaceId,
+          contentFormat: note.contentFormat,
+          isLocked: note.isLocked,
+          isTrashed: note.isTrashed,
+          updatedAt: note.updatedAt,
+        });
       },
     });
   };
@@ -2798,18 +2794,16 @@ export default function NoteList() {
             contentFormat: duplicated.contentFormat,
             colorMark: duplicated.colorMark ?? null,
           } as NoteListItem);
-          if (userPrefs.prefs.enableNoteTabs) {
-            actions.openNoteTab({
-              id: duplicated.id,
-              title: duplicated.title,
-              notebookId: duplicated.notebookId,
-              workspaceId: duplicated.workspaceId,
-              contentFormat: duplicated.contentFormat,
-              isLocked: duplicated.isLocked,
-              isTrashed: duplicated.isTrashed,
-              updatedAt: duplicated.updatedAt,
-            });
-          }
+          actions.openNoteTab({
+            id: duplicated.id,
+            title: duplicated.title,
+            notebookId: duplicated.notebookId,
+            workspaceId: duplicated.workspaceId,
+            contentFormat: duplicated.contentFormat,
+            isLocked: duplicated.isLocked,
+            isTrashed: duplicated.isTrashed,
+            updatedAt: duplicated.updatedAt,
+          });
           actions.setMobileView("editor");
           window.requestAnimationFrame(() => revealCreatedKnowledgeTreeNote(duplicated.treeParentId));
           emitKnowledgeTreeRefresh("note-duplicated-from-note-list");

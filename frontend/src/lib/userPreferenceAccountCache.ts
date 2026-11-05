@@ -38,6 +38,11 @@ export interface UserPreferences {
   readingDensity: ReadingDensity;
   editorFontSize: EditorFontSize;
   showNoteListUpdatedTime: boolean;
+  /**
+   * 已废弃：顶部页签栏已移除（与侧栏「打开的编辑器」面板重复）。
+   * 字段保留只是为了让既有服务端数据与三端 schema 继续解析通过，
+   * 前端不再读取也不再有开关入口；打开列表恒记录，不再受本字段门控。
+   */
   enableNoteTabs: boolean;
   markdownDefaultViewMode: MarkdownViewMode;
   remoteImagePasteMode: RemoteImagePasteMode;

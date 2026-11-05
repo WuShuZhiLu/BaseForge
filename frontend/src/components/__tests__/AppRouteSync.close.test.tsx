@@ -33,10 +33,6 @@ vi.mock("@/store/AppContext", () => ({
   useAppActions: () => mocks.actions,
 }));
 
-vi.mock("@/hooks/useUserPreferences", () => ({
-  useUserPreferences: () => ({ prefs: { enableNoteTabs: true } }),
-}));
-
 vi.mock("@/hooks/useNoteLoader", () => ({
   useNoteLoader: () => ({ loadNote: mocks.loadNote, cancelNoteLoad: mocks.cancelNoteLoad }),
 }));

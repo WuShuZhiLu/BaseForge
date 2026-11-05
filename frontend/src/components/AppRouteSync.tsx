@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useApp, useAppActions } from "@/store/AppContext";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { api, getCurrentWorkspace, setCurrentWorkspace } from "@/lib/api";
 import {
@@ -54,7 +53,6 @@ const RESOURCE_ROUTE_KINDS = new Set<AppRoute["kind"]>(["sheet", "mindmap", "iss
 export default function AppRouteSync() {
   const { state } = useApp();
   const actions = useAppActions();
-  const { prefs } = useUserPreferences();
   const { loadNote, cancelNoteLoad } = useNoteLoader();
   const { t } = useTranslation();
 
@@ -117,7 +115,9 @@ export default function AppRouteSync() {
             actions.setMobileView("editor");
             // 打开笔记 = 离开工具页（主区让位给编辑器），否则工具页会盖住新笔记
             actions.setActiveToolTab(null);
-            if (prefs.enableNoteTabs) actions.openNoteTab(tabFromNote(note));
+            // 打开笔记时始终记入打开列表：侧栏「打开的编辑器」是这条列表的唯一
+            // 呈现入口，曾由「启用顶部笔记标签页」开关门控，导致面板默认永远为空。
+            actions.openNoteTab(tabFromNote(note));
           },
           onError: (error) => {
             if (disposed || sequence !== routeLoadSequenceRef.current) return;
@@ -249,7 +249,7 @@ export default function AppRouteSync() {
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener(APP_PATH_CHANGED_EVENT, onAppPathChanged);
     };
-  }, [actions, cancelNoteLoad, loadNote, prefs.enableNoteTabs, t]);
+  }, [actions, cancelNoteLoad, loadNote, t]);
 
   // ============ 写侧：状态 → URL（唯一 reconcile，first-writer-wins） ============
   useEffect(() => {

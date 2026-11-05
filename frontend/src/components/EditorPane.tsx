@@ -2367,7 +2367,7 @@ const moveToTrash = useCallback(async () => {
     haptic.heavy();
     const noteId = activeNote.id;
     const currentTabIndex = state.openNoteTabs.findIndex((tab) => tab.id === noteId);
-    const nextTab = userPrefs.enableNoteTabs && currentTabIndex >= 0
+    const nextTab = currentTabIndex >= 0
       ? state.openNoteTabs[currentTabIndex + 1] || state.openNoteTabs[currentTabIndex - 1] || null
       : null;
     actions.setActiveNote(null);
@@ -2405,7 +2405,7 @@ const moveToTrash = useCallback(async () => {
         actions.refreshNotes();
       })
       .catch(console.error);
-  }, [activeNote, actions, loadNote, state.openNoteTabs, t, userPrefs.enableNoteTabs]);
+  }, [activeNote, actions, loadNote, state.openNoteTabs, t]);
 
   // BLOCK-LINKS-JUMP-01: 打开笔记回调（用于笔记引用跳转）
   const handleOpenNote = useCallback(async (noteId: string) => {
@@ -3826,7 +3826,7 @@ const moveToTrash = useCallback(async () => {
                       <span>拆分文档</span>
                     </button>
                   )}
-                  {/* 分屏入口只在页签右键菜单（NoteTabsBar「在右侧分屏打开」）：
+                  {/* 「在右侧分屏打开」只在知识树节点 / 笔记列表的右键菜单里：
                       文档自己的 ⋯ 里做「给自己分屏」没有语义，已移除 */}
 
                   {/* 布局模式切换（原悬浮按钮已删除，入口移到此处） */}

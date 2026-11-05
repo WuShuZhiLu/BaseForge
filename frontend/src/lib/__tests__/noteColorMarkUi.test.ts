@@ -18,21 +18,20 @@ describe("note color marks (#749)", () => {
   /**
    * 与上游的刻意分歧（2026-10-13 用户裁定）：色标从"小圆点"改为"竖线"。
    * 圆点在密集树/列表里不够显眼，且与列表卡片既有的左侧指示条重复。
-   * 现在统一成色条：树行左侧绝对定位色条、列表卡片左侧指示条取色标色、标签栏行内小竖线。
+   * 现在统一成色条：树行左侧绝对定位色条、列表卡片左侧指示条取色标色。
+   * （顶部页签行已随「启用顶部笔记标签页」开关一并移除，它那一处不再计入口径。）
    */
-  it("renders marks as bars in list, both knowledge-tree surfaces, and tabs", () => {
+  it("renders marks as bars in list and both knowledge-tree surfaces", () => {
     expect(source("../../components/NoteList.tsx")).toContain("getNoteColorMarkHex(note.colorMark)");
     expect(source("../../components/KnowledgeTreePanel.tsx")).toContain("<NoteColorMarkBar value={node.colorMark}");
     expect(source("../../components/MobileKnowledgeTreePanel.tsx")).toContain("<NoteColorMarkBar value={node.colorMark}");
-    expect(source("../../components/NoteTabsBar.tsx")).toContain("<NoteColorMarkBar value={colorMark}");
     expect(source("../../components/EditorPane.tsx")).toContain("<NoteColorMarkPicker");
 
-    // 圆点已从这四个渲染面撤下（组件本体保留，供将来需要圆点的位置使用）。
+    // 圆点已从这三个渲染面撤下（组件本体保留，供将来需要圆点的位置使用）。
     for (const file of [
       "../../components/NoteList.tsx",
       "../../components/KnowledgeTreePanel.tsx",
       "../../components/MobileKnowledgeTreePanel.tsx",
-      "../../components/NoteTabsBar.tsx",
     ]) {
       expect(source(file)).not.toContain("<NoteColorMarkDot");
     }
