@@ -146,6 +146,11 @@ function bindModeButtons(group: HTMLElement, state: EditorBridgeState): void {
       setLivePreview(state, false);
       localStorage.removeItem(LIVE_MODE_KEY);
       setButtonActive(liveButton!, false);
+      // 实时预览曾经通过 sourceButton.click() 把 React 的 viewMode 强制设成了 source，
+      // 于是之后用户真的点「源码」时 React 的 state 没有变化、不会重渲染，
+      // 高亮就没人补上（表现为「点了源码不高亮」）。四个按钮的高亮统一在这里落定，
+      // 不依赖 React 是否重渲染。
+      for (const native of nativeButtons) setButtonActive(native, native === button);
     });
   }
 
