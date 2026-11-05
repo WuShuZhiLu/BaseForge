@@ -32,6 +32,17 @@ BaseForge 的 Docker 在线升级只面向官方 `docker-compose.yml` 部署。�
 
 更新代理不发布宿主机端口，只加入 `nowen-update-internal` 内部网络。不要给 updater 配置反向代理或公网入口。
 
+### 版本来源
+
+「设置 → 关于 → 版本信息」和下面的升级预检都要读取「最新稳定版本」，来源是 GitHub Release。发布仓库没有内置默认值，必须由部署方显式指定：
+
+```bash
+NOWEN_RELEASE_OWNER=你的 GitHub 组织或用户名
+NOWEN_RELEASE_REPO=你的发布仓库名
+```
+
+未配置时，关于页「最新发布」显示为「不可用」，升级预检返回 `LATEST_RELEASE_UNAVAILABLE` 并注明未配置发布仓库——不会拿其他仓库的版本号来比较，也不会把用户引到无关的下载页。
+
 ## 升级流程
 
 1. 管理员密码二次验证，获取 5 分钟 sudo 授权。
