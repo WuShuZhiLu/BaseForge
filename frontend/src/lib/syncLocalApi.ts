@@ -23,7 +23,6 @@ export const SYNC_CONFLICT_ENTITY_TYPES = [
   "attachment",
   "task",
   "task_reminder",
-  "diary",
   "mindmap",
 ] as const;
 

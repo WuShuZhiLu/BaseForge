@@ -169,7 +169,7 @@ const stmtProto = StatementSync.prototype as unknown as {
  * 错误码还原：node:sqlite 统一抛 `Error { code: "ERR_SQLITE_ERROR", errcode }`，
  * 而 better-sqlite3 把扩展错误码命名成 `SQLITE_CONSTRAINT_UNIQUE` / `SQLITE_CONSTRAINT_TRIGGER`
  * 等。业务侧有 7 处按 `code.startsWith("SQLITE_CONSTRAINT")` 分支
- * （routes/auth、routes/users、routes/notes、routes/journals、services/workspaceJournals 等），
+ * （routes/auth、routes/users、routes/notes 等），
  * 迁移后这些分支会静默失效——例如重复用户名注册从 409 退化成 500。
  * 这里只在抛出边界把 errcode 映射回旧命名，SQL 与结果集行为保持不变。
  * 未列入表的扩展码回退到主码（errcode & 0xff）对应的名字。

@@ -22,7 +22,7 @@ function createStorage(initial: Record<string, string> = {}): StorageLike & { va
 
 describe("unifiedTreeOnlyLayout", () => {
   it("identifies ordinary tree navigation and functional result lists", () => {
-    for (const mode of ["all", "notebook", "tasks", "files", "diary", "mindmaps", "ai-chat", "shares", "trash"]) {
+    for (const mode of ["all", "notebook", "tasks", "files", "mindmaps", "ai-chat", "shares", "trash"]) {
       expect(usesFunctionalNoteList(mode)).toBe(false);
       expect(shouldCollapseLegacyNoteList(mode)).toBe(true);
     }

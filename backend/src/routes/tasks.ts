@@ -64,7 +64,7 @@ const tasks = new Hono();
 //   - 工作区：   `?workspaceId=<uuid>`            → tasks.workspaceId = <uuid>
 //                                                  （需要成员身份 + tasks 功能开关未关闭）
 //
-// 与 diary.ts 同款语义：
+// 集合接口语义（与 mindmaps 同款）：
 //   - 列表/创建/统计等"集合"接口由 requireWorkspaceFeature("tasks") 中间件
 //     校验功能开关；
 //   - 按 id 的读/写/删走资源行自带的 workspaceId 做 ACL（canManageResource）

@@ -16,7 +16,7 @@ import type {
   Tag, CreateTagParams,
   Task, TaskStats, ListTasksParams, CreateTaskParams, UpdateTaskParams,
   MindMap, CreateMindMapParams, UpdateMindMapParams,
-  AIChatParams, AIAskResult, AISettings, KnowledgeStats,
+  AIChatParams, AISettings, KnowledgeStats,
   SearchResult, SystemSettings, ExportFormat,
 } from "./types.js";
 
@@ -333,13 +333,6 @@ export class NowenClient {
     return this.request(`/api/mindmaps/${id}`, { method: "DELETE" });
   }
 
-  // ==================== 日记 ====================
-
-  /** 获取日记列表 */
-  async listDiaries(params?: { month?: string }): Promise<DiaryEntry[]> {
-    return this.request("/api/diary", { query: params });
-  }
-
   // ==================== 搜索 ====================
 
   /** 全文搜索笔记 */
@@ -353,15 +346,6 @@ export class NowenClient {
   async aiChat(params: AIChatParams): Promise<string> {
     const { text } = await this.readSSEStream("/api/ai/chat", params);
     return text;
-  }
-
-  /** 知识库问答（收集完整结果） */
-  async aiAsk(question: string): Promise<AIAskResult> {
-    const { text, metadata } = await this.readSSEStream("/api/ai/ask", { question });
-    return {
-      answer: text,
-      references: metadata || [],
-    };
   }
 
   /** 获取 AI 设置 */
@@ -499,6 +483,3 @@ export class NowenClient {
     return this.request("/api/backups/auto", { method: "POST", body: { enabled, intervalHours } });
   }
 }
-
-// 导入 DiaryEntry 类型
-import type { DiaryEntry } from "./types.js";

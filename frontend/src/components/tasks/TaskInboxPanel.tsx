@@ -9,7 +9,6 @@ import {
   FileText,
   Inbox,
   Loader2,
-  MessageSquareText,
   RefreshCw,
   Sparkles,
 } from "lucide-react";
@@ -53,7 +52,6 @@ function capturedText(value: string, chinese: boolean): string {
 
 function SourceIcon({ type }: { type: TaskCaptureSourceType }) {
   if (type === "note") return <FileText size={11} />;
-  if (type === "diary") return <MessageSquareText size={11} />;
   if (type === "selection") return <ClipboardPlus size={11} />;
   if (type === "global") return <Sparkles size={11} />;
   return <Inbox size={11} />;
@@ -253,9 +251,8 @@ export function TaskInboxPanel({ onTaskMutated, initiallyExpanded = false, stand
                 const due = dateText(item, chinese);
                 const sourceTitle = item.captureSourceTitle
                   || (item.captureSourceType === "note" ? (chinese ? "笔记" : "Note")
-                    : item.captureSourceType === "diary" ? (chinese ? "说说" : "Diary")
-                      : item.captureSourceType === "selection" ? (chinese ? "选中文本" : "Selection")
-                        : (chinese ? "快速捕获" : "Quick capture"));
+                    : item.captureSourceType === "selection" ? (chinese ? "选中文本" : "Selection")
+                      : (chinese ? "快速捕获" : "Quick capture"));
                 return (
                   <article key={item.id} className="group rounded-xl border border-app-border bg-app-bg p-3">
                     <div className="flex items-start gap-3">

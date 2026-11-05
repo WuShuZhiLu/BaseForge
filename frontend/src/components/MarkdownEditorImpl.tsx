@@ -148,7 +148,6 @@ import type { FormatMenuPayload } from "@/lib/desktopBridge";
 import { NoteLinkMenu, type NoteSearchResult, type NoteLinkBlockItem, type NoteLinkSelectionOptions } from "@/components/NoteLinkExtension";
 import { createMarkdownFindPanel, openMarkdownFindWithReplace } from "@/components/MarkdownDocFindPanel";
 import { buildWikiNoteLink, detectActiveWikiNoteQuery } from "@/lib/noteLinkSyntax";
-import { getMarkdownDailyRecordSlashCommands } from "@/components/daily-records/markdownDailyRecordSlashCommands";
 import { consumeBlockNavigation, subscribeBlockNavigation } from "@/lib/blockNavigation";
 import { requestVoiceMemo, voiceMemoHtml } from "@/lib/voiceMemo";
 import {
@@ -790,7 +789,6 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         onVoiceRecord: editable && !isGuest && !note.isTrashed ? openVoiceRecorder : undefined,
         onAIAssistant: isGuest ? undefined : openAIAssistant,
       }),
-      ...getMarkdownDailyRecordSlashCommands(),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tr, isGuest, editable, note.isTrashed, openAIAssistant, openAttachmentLibrary, openVoiceRecorder],

@@ -27,7 +27,6 @@ const nowen = {
   tags: namespace("tags", ["list", "create", "addToNote", "removeFromNote"]),
   tasks: namespace("tasks", ["get", "list", "create", "update"]),
   attachments: namespace("attachments", ["get", "list"]),
-  diary: namespace("diary", ["get", "list", "create"]),
   mindmaps: namespace("mindmaps", ["get", "list", "create", "update"]),
   storage: namespace("storage", ["get", "set", "delete"]),
   external: namespace("external", ["fetch"]),

@@ -13,8 +13,6 @@ import ToolPageHost from "@/components/ToolPageHost";
 import EditorSplitView from "@/components/EditorSplitView";
 import TaskWorkspace from "@/components/TaskWorkspace";
 import MindMapCenter from "@/components/MindMapEditor";
-import AIChatPanel from "@/components/AIChatPanel";
-import DiaryWorkspace from "@/components/DiaryWorkspace";
 import SheetEditor from "@/components/SheetEditor";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
@@ -449,8 +447,6 @@ function AppLayout() {
     !state.activeNote;
   const isTaskView = state.viewMode === "tasks";
   const isMindMapView = state.viewMode === "mindmaps";
-  const isAIChatView = state.viewMode === "ai-chat";
-  const isDiaryView = state.viewMode === "diary";
   const isFilesView = state.viewMode === "files";
   const isSharesView = state.viewMode === "shares";
   const isPmView = state.viewMode === "projects";
@@ -698,7 +694,7 @@ function AppLayout() {
   // ── 工作区切换：清空当前会话态，回到空态页 ──────────────────────────
   //
   // WorkspaceSwitcher 切换后会广播 "nowen:workspace-changed"。之前只有 SidebarMobile /
-  // TaskWorkspace / FileManager / DiaryWorkspace / MindMap 自己监听并各自重拉，但
+  // TaskWorkspace / FileManager / MindMap 自己监听并各自重拉，但
   // App 顶层并没有清理"正在编辑的笔记 + 笔记列表 + 选择/筛选状态"——于是会
   // 出现两类问题：
   //   1) 切到 A 空间后，右侧仍显示着 B 空间的 activeNote，且该笔记被 B 空间
@@ -879,31 +875,6 @@ function AppLayout() {
             routeMindMapId={route.kind === "mindmap" && route.mindMapId !== null ? route.mindMapId : undefined}
             onRequestClose={() => actions.setViewMode("all")}
           />
-        </div>
-      ) : isAIChatView ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <MobileTopBar />
-          <AIChatPanel
-            onClose={() => actions.setViewMode("all")}
-            onNavigateToNote={async (noteId) => {
-              try {
-                const { api } = await import("@/lib/api");
-                const note = await api.getNote(noteId);
-                if (note) {
-                  actions.setActiveNote(note);
-                  actions.setViewMode("all");
-                  actions.setMobileView("editor");
-                }
-              } catch (err) {
-                console.error("Navigate to note failed:", err);
-              }
-            }}
-          />
-        </div>
-      ) : isDiaryView ? (
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
-          <MobileTopBar />
-          <DiaryWorkspace />
         </div>
       ) : isFilesView ? (
         <div className="flex-1 flex flex-col">

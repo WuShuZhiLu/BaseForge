@@ -13,7 +13,6 @@ import {
   PanelLeft,
   PanelLeftClose,
   Settings,
-  Sparkles,
   Star,
   Trash2,
   UsersRound,
@@ -69,9 +68,7 @@ const NAV_CONFIG: NavConfigItem[] = [
   { icon: <Star size={RAIL_ICON_SIZE} />, labelKey: "sidebar.favorites", mode: "favorites", feature: "favorites", group: "workspace" },
   { icon: <FolderOpen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.fileManager", mode: "files", feature: "files", group: "workspace" },
   { icon: <Trash2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.trash", mode: "trash", group: "workspace" },
-  { icon: <NotebookPen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.diary", mode: "diary", feature: "diaries", group: "modules" },
   { icon: <ListTodo size={RAIL_ICON_SIZE} />, labelKey: "sidebar.tasks", mode: "tasks", feature: "tasks", group: "modules" },
-  { icon: <Sparkles size={RAIL_ICON_SIZE} />, labelKey: "sidebar.aiChat", mode: "ai-chat", group: "tools" },
   { icon: <Link2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.shareManagement", mode: "shares", group: "tools" },
 ];
 
@@ -214,9 +211,7 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
 
   const renderItem = (item: NavConfigItem) => {
     const active = state.viewMode === item.mode;
-    const label = item.mode === "diary"
-      ? t("sidebar.dailyRecords", { defaultValue: "每日记录" })
-      : t(item.labelKey);
+    const label = t(item.labelKey);
     return (
       <button
         key={item.mode}

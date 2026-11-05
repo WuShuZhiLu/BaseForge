@@ -41,7 +41,6 @@ const ICONS: Record<PluginUiIcon, LucideIcon> = {
   home: Home,
   star: Star,
   files: Files,
-  diary: CalendarDays,
   tasks: ListTodo,
   mindmap: Network,
   ai: Sparkles,
@@ -53,10 +52,8 @@ const VIEW_TARGETS: Partial<Record<PluginNavigationTarget, ViewMode>> = {
   all: "all",
   favorites: "favorites",
   files: "files",
-  diary: "diary",
   tasks: "tasks",
   mindmaps: "mindmaps",
-  "ai-chat": "ai-chat",
   shares: "shares",
 };
 

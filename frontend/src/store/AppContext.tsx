@@ -65,10 +65,10 @@ export interface EditorSplitState {
 /** 左侧栏面板 id（方案 B）：唯一定义在 lib/sidebarPanels.ts（面板框架），此处 re-export 兼容旧引用。 */
 export type { SidebarPanelId };
 
-/** 工具页签（方案 B · B2）：待办 / 小记 / AI / 分享 / 附件管理 / 回收站。
+/** 工具页签（方案 B · B2）：待办 / 分享 / 附件管理 / 回收站。
  *  工具页签占用主区编辑器列；笔记「打开的」列表在侧栏面板（OpenEditorsPanel / SidebarDesktop）。 */
-export type ToolTabKey = "tasks" | "diary" | "ai-chat" | "shares" | "files" | "trash";
-export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "diary", "ai-chat", "shares", "files", "trash"];
+export type ToolTabKey = "tasks" | "shares" | "files" | "trash";
+export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "shares", "files", "trash"];
 
 interface AppState {
   notebooks: Notebook[];

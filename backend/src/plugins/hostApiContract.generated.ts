@@ -53,39 +53,6 @@ export const HOST_API_CONTRACT = deepFreeze([
     "maxResultBytes": 1048576
   },
   {
-    "method": "diary.create",
-    "sinceApiVersion": 1,
-    "permission": "diary:write",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.get",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.list",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
     "method": "external.fetch",
     "sinceApiVersion": 1,
     "permission": "external:fetch",
@@ -391,8 +358,6 @@ export const V2_COMBINATION_PLUGIN_PERMISSIONS = deepFreeze([
 export const V2_SUPPORTED_PLUGIN_PERMISSIONS = deepFreeze([
   "attachments:read",
   "capture:write",
-  "diary:read",
-  "diary:write",
   "external:fetch",
   "mindmaps:read",
   "mindmaps:write",

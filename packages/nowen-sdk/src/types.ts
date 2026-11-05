@@ -209,18 +209,6 @@ export interface UpdateMindMapParams {
   data?: string;
 }
 
-// ===== 日记 =====
-export interface DiaryEntry {
-  id: string;
-  userId: string;
-  date: string;
-  content: string;
-  mood: string;
-  weather: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 // ===== AI =====
 export interface AISettings {
   ai_api_url: string;
@@ -239,11 +227,6 @@ export interface AIChatParams {
   text: string;
   context?: string;
   customPrompt?: string;
-}
-
-export interface AIAskResult {
-  answer: string;
-  references: { id: string; title: string }[];
 }
 
 export interface KnowledgeStats {

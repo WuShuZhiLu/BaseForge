@@ -28,7 +28,7 @@ const CARDS_MAX = 20;
 let registry: RegisteredPluginSidebarPanel[] = [];
 
 function isValidIcon(icon: unknown): icon is PluginUiIcon {
-  return typeof icon === "string" && ["home", "star", "files", "diary", "tasks", "mindmap", "ai", "shares", "settings"].includes(icon);
+  return typeof icon === "string" && ["home", "star", "files", "tasks", "mindmap", "ai", "shares", "settings"].includes(icon);
 }
 
 function validPanel(raw: unknown, pluginId: string): RegisteredPluginSidebarPanel | null {

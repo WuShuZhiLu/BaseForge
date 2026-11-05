@@ -51,7 +51,7 @@ let installed = false;
 
 /**
  * Prevent the mobile note-editor media bridge from hijacking similarly named buttons in
- * independent business modules such as Diary, Tasks, avatars, and attachment managers.
+ * independent business modules such as Tasks, avatars, and attachment managers.
  *
  * MediaExperienceBridge deliberately ignores controls under `[data-nowen-media-sheet]`.
  * The guard runs one capture level earlier (window -> document), applies that marker only

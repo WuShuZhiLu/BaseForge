@@ -20,7 +20,6 @@ import SidebarDisplaySettings from "@/components/settings/SidebarDisplaySettings
 import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
 import AutomationCenter from "@/components/automation/AutomationCenter";
 import TaskDigestSettings from "@/components/automation/TaskDigestSettings";
-import JournalPrivacySettingsCard from "@/components/settings/JournalPrivacySettingsCard";
 import MobileAccountSettings from "@/components/settings/MobileAccountSettings";
 import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
 import UserManagement from "@/components/UserManagement";
@@ -1008,8 +1007,6 @@ function SwitchesPanel() {
           </label>
         )}
       </div>
-
-      <JournalPrivacySettingsCard />
     </div>
   );
 }

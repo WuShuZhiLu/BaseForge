@@ -28,7 +28,6 @@ export const PLUGIN_PERMISSIONS = [
   // 保留只是为了不破坏已发布的 v1 manifest；Plugin API V2 会直接拒绝声明它。
   // 等真正开放附件写入再补方法，否则新插件不要请求这个权限。
   "attachments:read", "attachments:write",
-  "diary:read", "diary:write",
   "mindmaps:read", "mindmaps:write",
   "plugin-storage:read", "plugin-storage:write",
   "external:fetch", "secrets:use",
@@ -185,8 +184,8 @@ export interface PluginPromptPackContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 export type PluginUiSlot = "floating-layer";
-export type PluginUiIcon = "home" | "star" | "files" | "diary" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
-export type PluginNavigationTarget = "all" | "favorites" | "files" | "diary" | "tasks" | "mindmaps" | "ai-chat" | "shares" | "settings";
+export type PluginUiIcon = "home" | "star" | "files" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
+export type PluginNavigationTarget = "all" | "favorites" | "files" | "tasks" | "mindmaps" | "shares" | "settings";
 export interface PluginUiActionContribution {
   id: string;
   kind: "action";
@@ -223,7 +222,7 @@ export interface PluginSidebarPanelContribution {
   icon: PluginUiIcon;
   /** 面板形态：内置宿主渲染的迷你列表（内置插件）或静态信息卡（第三方声明式） */
   kind: "builtin" | "static-card";
-  /** builtin 面板指向宿主内置实现 id（如 "tasks" / "diary"） */
+  /** builtin 面板指向宿主内置实现 id（如 "tasks"） */
   builtinId?: string;
   /** static-card 的静态内容块（声明式渲染，无代码执行） */
   cards?: Array<{
@@ -237,12 +236,12 @@ export interface PluginSidebarPanelContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 
-/** 插件贡献的主区全屏面板（官方内置插件形态：tasks/diary 中心） */
+/** 插件贡献的主区全屏面板（官方内置插件形态：tasks 中心） */
 export interface PluginMainViewPanelContribution {
   id: string;
   title: string;
   icon: PluginUiIcon;
-  /** 宿主内置主区实现 id（如 "tasks" / "diary"）；第三方暂不开放自定义主区 */
+  /** 宿主内置主区实现 id（如 "tasks"）；第三方暂不开放自定义主区 */
   builtinId: string;
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }

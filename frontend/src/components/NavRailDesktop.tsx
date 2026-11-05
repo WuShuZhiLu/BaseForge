@@ -21,7 +21,6 @@ import {
   ListTodo,
   PenLine,
   LogIn,
-  Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -42,7 +41,7 @@ import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/ap
 
 type NavItemMode = Extract<
   ViewMode,
-  "notebook" | "favorites" | "trash" | "files" | "tasks" | "diary" | "ai-chat" | "shares" | "projects"
+  "notebook" | "favorites" | "trash" | "files" | "tasks" | "shares" | "projects"
 > | "plugins";
 
 interface NavItem {
@@ -75,7 +74,7 @@ const CORE_ITEMS: NavItem[] = [
 ];
 
 /** 官方插件贡献的导航项：受内置插件启停 + WorkspaceFeatures 叠加判定 */
-const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFeature: "tasks" | "diaries" | "notes" }> = [
+const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFeature: "tasks" | "notes" }> = [
   {
     mode: "tasks",
     titleKey: "sidebarNext.nav.tasks",
@@ -83,22 +82,6 @@ const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFe
     icon: (sz: number) => <ListTodo size={sz} strokeWidth={2} />,
     pluginId: "tasks",
     workspaceFeature: "tasks",
-  },
-  {
-    mode: "diary",
-    titleKey: "sidebarNext.nav.diary",
-    titleDefault: "每日记录",
-    icon: (sz: number) => <PenLine size={sz} strokeWidth={2} />,
-    pluginId: "diary",
-    workspaceFeature: "diaries",
-  },
-  {
-    mode: "ai-chat",
-    titleKey: "sidebarNext.nav.ai",
-    titleDefault: "AI 问答",
-    icon: (sz: number) => <Sparkles size={sz} strokeWidth={2} />,
-    pluginId: "ai",
-    workspaceFeature: "notes",
   },
   {
     mode: "projects",
@@ -347,14 +330,12 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     else if (state.viewMode === "shares") setActiveView("shares");
     else if (state.viewMode === "projects") setActiveView("projects");
     else if (state.viewMode === "tasks") setActiveView("tasks");
-    else if (state.viewMode === "diary") setActiveView("diary");
-    else if (state.viewMode === "ai-chat") setActiveView("ai-chat");
   }, [state.viewMode]);
 
   const activeMode: NavItemMode | null = useMemo(() => {
     // activeView 是侧栏视图 id（kb），item.mode 是 ViewMode 语义（notebook）
     const mapped = activeView === "kb" ? "notebook" : activeView;
-    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "diary" || mapped === "ai-chat" || mapped === "shares" || mapped === "projects" || mapped === "plugins") {
+    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "shares" || mapped === "projects" || mapped === "plugins") {
       return mapped as NavItemMode;
     }
     return null;
@@ -382,7 +363,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     };
   }, []);
 
-  const isPluginNavVisible = useCallback((pluginId: BuiltinPluginId, feature: "tasks" | "diaries" | "notes") => {
+  const isPluginNavVisible = useCallback((pluginId: BuiltinPluginId, feature: "tasks" | "notes") => {
     if (!isBuiltinPluginEnabled(pluginId)) return false;
     if (feature && features && features[feature] === false) return false;
     return true;
@@ -416,8 +397,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
         window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
         return;
       }
-      // 插件贡献的导航项（tasks/diary）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
-      if (mode === "tasks" || mode === "diary" || mode === "ai-chat" || mode === "shares" || mode === "projects") {
+      // 插件贡献的导航项（tasks）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
+      if (mode === "tasks" || mode === "shares" || mode === "projects") {
         if (mode === "projects") {
           window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: "projects" } }));
         }
@@ -575,7 +556,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           const rows: NavItem[] = [];
           for (const item of orderedPlugins) {
             if (isBadgeHidden(item.mode)) continue;
-            const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+            const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "notes" };
             if (
               typed.pluginId && typed.workspaceFeature &&
               !(isPluginNavVisible(typed.pluginId, typed.workspaceFeature) || activeMode === item.mode)
@@ -617,7 +598,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
                       : t("railCustom.collapseGroup", { defaultValue: "折叠插件组" })}
                   </button>
                 ) : null}
-                {badgeMenu.item.mode === "tasks" || badgeMenu.item.mode === "diary" || badgeMenu.item.mode === "ai-chat" ? (
+                {badgeMenu.item.mode === "tasks" ? (
                   <button
                     type="button"
                     className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
@@ -669,7 +650,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             </p>
             <div className="max-h-72 overflow-y-auto">
               {[...CORE_ITEMS, SHARES_NAV_ITEM, ...PLUGIN_ITEMS, ...PLUGIN_NAV_ITEMS].map((item) => {
-                const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+                const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "notes" };
                 const gate = typed.pluginId && typed.workspaceFeature
                   ? !isPluginNavVisible(typed.pluginId, typed.workspaceFeature)
                   : false;

@@ -78,11 +78,6 @@ export const SYNC_ENTITY_CAPABILITIES: EntityCapability[] = [
     pull: true, apply: true, conflictStrategy: true,
   },
   {
-    entityType: "diary",
-    localCrud: true, outbox: true, push: true, changeFeed: true,
-    pull: true, apply: true, conflictStrategy: true,
-  },
-  {
     entityType: "mindmap",
     localCrud: true, outbox: true, push: true, changeFeed: true,
     pull: true, apply: true, conflictStrategy: true,

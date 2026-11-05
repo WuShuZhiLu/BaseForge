@@ -400,45 +400,6 @@ function applyTaskReminderLocal(
   // 从别的设备同步过来会让本机漏掉提醒。
 }
 
-function applyDiaryLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
-  const { userId, workspaceId = null } = options;
-  if (item.operation === "delete") {
-    db.prepare("DELETE FROM diaries WHERE id = ? AND workspaceId IS ? AND (? IS NOT NULL OR userId = ?)")
-      .run(item.entityId,workspaceId,workspaceId,userId);
-    return;
-  }
-  const p = item.payload || {};
-  const asJsonArray = (value: unknown): string => {
-    if (typeof value === "string") {
-      try {
-        return Array.isArray(JSON.parse(value)) ? value : "[]";
-      } catch {
-        return "[]";
-      }
-    }
-    return Array.isArray(value) ? JSON.stringify(value) : "[]";
-  };
-
-  db.prepare(`
-    INSERT INTO diaries (id, userId, contentText, mood, images, media, createdAt, workspaceId)
-    VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?)
-    ON CONFLICT(id) DO UPDATE SET
-      contentText = excluded.contentText,
-      mood = excluded.mood,
-      images = excluded.images,
-      media = excluded.media
-  `).run(
-    item.entityId,
-    userId,
-    str(p.contentText, ""),
-    str(p.mood, ""),
-    asJsonArray(p.images),
-    asJsonArray(p.media),
-    p.createdAt ?? null,
-    workspaceId,
-  );
-}
-
 function applyMindmapLocal(db: DatabaseSync, item: RemoteEntityPayload, options: ApplyLocalOptions): void {
   const { userId, workspaceId = null } = options;
   if (item.operation === "delete") {
@@ -478,7 +439,6 @@ const LOCAL_APPLIERS: Record<
   attachment: applyAttachmentLocal,
   task: applyTaskLocal,
   task_reminder: applyTaskReminderLocal,
-  diary: applyDiaryLocal,
   mindmap: applyMindmapLocal,
 };
 

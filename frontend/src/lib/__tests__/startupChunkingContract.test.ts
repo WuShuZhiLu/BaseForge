@@ -10,7 +10,6 @@ describe("startup chunking contract", () => {
     const config = source("../../../vite.config.ts");
 
     for (const runtime of [
-      "LazyAIChatPanelRuntime.tsx",
       "LazySharedNoteViewRuntime.tsx",
       "LazyCommandPaletteRuntime.tsx",
       "LazySidebarRuntime.tsx",
@@ -19,7 +18,6 @@ describe("startup chunking contract", () => {
       "LazyEditorSplitViewRuntime.tsx",
       "LazyTaskCenterRuntime.tsx",
       "LazyMindMapEditorRuntime.tsx",
-      "LazyDiaryCenterRuntime.tsx",
       "LazyFileManagerRuntime.tsx",
       "LazyShareManagementPageRuntime.tsx",
       "LazyNotebookShareJoinViewRuntime.tsx",
@@ -45,11 +43,9 @@ describe("startup chunking contract", () => {
     expect(runtime).not.toContain('import FormatAwareEditorPane from "./FormatAwareEditorPane"');
   });
 
-  it("keeps AI and public sharing implementations outside the login chunk", () => {
-    const aiRuntime = source("../../components/LazyAIChatPanelRuntime.tsx");
+  it("keeps public sharing implementations outside the login chunk", () => {
     const sharedRuntime = source("../../components/LazySharedNoteViewRuntime.tsx");
 
-    expect(aiRuntime).toContain('React.lazy(() => import("./AIChatReliabilityShell"))');
     expect(sharedRuntime).toContain('React.lazy(() => import("./SharedNoteCommentDisplayRuntime"))');
   });
 
@@ -69,7 +65,6 @@ describe("startup chunking contract", () => {
     expect(main).toContain('React.lazy(() => import("./App"))');
     expect(main).toContain('React.lazy(() => import("./components/PublicNotebookView"))');
     for (const staticImport of [
-      'import AIProfileSwitcherBridge from "./components/AIProfileSwitcherBridge"',
       'import EmbeddingIndexTaskCopyBridge from "./components/EmbeddingIndexTaskCopyBridge"',
       'import MarkdownExperienceBridge from "./components/MarkdownExperienceBridge"',
       'import MindMapAppearanceBridge from "./components/MindMapAppearanceBridge"',
@@ -81,7 +76,6 @@ describe("startup chunking contract", () => {
     expect(deferredMount).toContain('import("./DeferredGlobalFeatureCenters")');
     expect(deferredMount).toContain("nowen:token-changed");
     for (const deferredImport of [
-      'import AIProfileSwitcherBridge from "./AIProfileSwitcherBridge"',
       'import MarkdownExperienceBridge from "./MarkdownExperienceBridge"',
       'import MindMapAppearanceBridge from "./MindMapAppearanceBridge"',
       'import NoteImageExportCenter from "./NoteImageExportCenter"',

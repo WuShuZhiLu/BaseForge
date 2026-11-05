@@ -81,10 +81,6 @@ export class ApplicationCommandGateway {
     return invokeCanonicalRoute((await import("../routes/tasks.js")).default, "tasks", `/${encodeURIComponent(taskId)}`, "PUT", userId, input, metadata);
   }
 
-  async createDiary(userId: string, workspaceId: string | null, input: Record<string, unknown>, metadata?: CommandMetadata): Promise<any> {
-    return invokeCanonicalRoute((await import("../routes/diary.js")).default, "diary", `/${workspaceQuery(workspaceId)}`, "POST", userId, { ...input, workspaceId }, metadata);
-  }
-
   async createMindmap(userId: string, workspaceId: string | null, input: Record<string, unknown>, metadata?: CommandMetadata): Promise<any> {
     return invokeCanonicalRoute((await import("../routes/mindmaps.js")).default, "mindmaps", `/${workspaceQuery(workspaceId)}`, "POST", userId, { ...input, workspaceId }, metadata);
   }

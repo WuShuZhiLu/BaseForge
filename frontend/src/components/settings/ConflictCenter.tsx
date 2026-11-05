@@ -34,7 +34,6 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
   attachment: "附件",
   task: "任务",
   task_reminder: "任务提醒",
-  diary: "日记",
   mindmap: "思维导图",
 };
 

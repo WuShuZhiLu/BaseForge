@@ -132,7 +132,6 @@ export interface WorkspaceInvite {
  */
 export interface WorkspaceFeatures {
   notes: boolean;
-  diaries: boolean;
   tasks: boolean;
   mindmaps: boolean;
   files: boolean;
@@ -146,7 +145,6 @@ export const WORKSPACE_FEATURE_META: Array<{
   description: string;
 }> = [
   { key: "notes", label: "笔记", description: "笔记本、正文、标签等核心功能" },
-  { key: "diaries", label: "说说", description: "时间线式短内容" },
   { key: "tasks", label: "待办", description: "任务清单与看板" },
   { key: "mindmaps", label: "思维导图", description: "节点式思维导图" },
   { key: "files", label: "文件", description: "独立文件管理" },
@@ -264,7 +262,7 @@ export interface SearchResult {
   matchedField?: string;
 }
 
-export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues" | "projects" | "plugins";
+export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "files" | "shares" | "issues" | "projects" | "plugins";
 
 // ========== 远程文件管理插件（remote-files） ==========
 /** 已配置的远程源（凭据掩码，密码/token 不下发） */
@@ -903,40 +901,6 @@ export interface MindMapFolder {
   mindmapCount?: number;
   createdAt: string;
   updatedAt: string;
-}
-export interface DiaryMediaItem {
-  id: string;
-  type: "image" | "video";
-  url?: string;
-  mimeType?: string;
-  size?: number;
-}
-
-export interface Diary {
-  id: string;
-  userId: string;
-  /** Y2: 说说归属的工作区 id；null = 个人空间。 */
-  workspaceId: string | null;
-  contentText: string;
-  mood: string;
-  /** 已绑定的说说图片 id 数组（顺序即展示顺序）。需要 URL 时拼 /api/diary/attachments/<id>。 */
-  images: string[];
-  /** 已绑定的说说媒体。旧数据可能为空，此时前端用 images 兜底。 */
-  media: DiaryMediaItem[];
-  createdAt: string;
-  /** 创建者用户名；后端 LEFT JOIN users 返回，工作区视图下用于展示"谁发的"。 */
-  creatorName?: string | null;
-}
-
-export interface DiaryTimeline {
-  items: Diary[];
-  hasMore: boolean;
-  nextCursor: string | null;
-}
-
-export interface DiaryStats {
-  total: number;
-  todayCount: number;
 }
 
 // 分享

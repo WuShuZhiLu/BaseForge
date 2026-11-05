@@ -28,12 +28,6 @@ export default defineConfig({
         find: /^@\/components\/KnowledgeTreePanel$/,
         replacement: path.resolve(__dirname, "./src/components/KnowledgeTreeCreateMenuRuntime.tsx"),
       },
-      // Issue #218：AI 可靠性壳与原聊天面板整体延迟到用户真正打开 AI 侧栏时加载。
-      // Lazy 壳和可靠性壳都使用相对路径进入下一层，避免精确别名递归。
-      {
-        find: /^@\/components\/AIChatPanel$/,
-        replacement: path.resolve(__dirname, "./src/components/LazyAIChatPanelRuntime.tsx"),
-      },
       {
         find: /^@\/components\/AISettingsPanel$/,
         replacement: path.resolve(__dirname, "./src/components/AISettingsReliabilityShell.tsx"),

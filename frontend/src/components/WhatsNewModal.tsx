@@ -216,7 +216,7 @@ export default function WhatsNewModal({ open, onClose, highlightVersion }: Whats
                       {/*
                         用 prose + react-markdown 渲染。body 里会有 h3（### 分组标题）+ ul+li，
                         这里用 Tailwind typography 做统一排版。不想引入新依赖 —— react-markdown
-                        和 remark-gfm 在 AIChatPanel / SharedNoteView 已在用。
+                        和 remark-gfm 在 SharedNoteView 已在用。
                       */}
                       <div
                         className="prose prose-sm dark:prose-invert max-w-none

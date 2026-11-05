@@ -1,7 +1,4 @@
 import type {
-  Diary,
-  DiaryStats,
-  DiaryTimeline,
   FileDetail,
   FileItem,
   FileListResponse,
@@ -20,7 +17,7 @@ import { ensureMobileLocalMindMapTree } from "./mobileLocalMindMapTree";
 import type { NativeDatabase } from "./nativeDatabase";
 import type { NativeLocalRepository } from "./nativeLocalRepository";
 
-type SyncEntityType = "task" | "task_reminder" | "diary" | "mindmap" | "attachment";
+type SyncEntityType = "task" | "task_reminder" | "mindmap" | "attachment";
 
 function now(): string {
   return new Date().toISOString();
@@ -88,11 +85,6 @@ export function installMobileLocalModuleBridge(
     updateMindMapFolder: target.updateMindMapFolder,
     deleteMindMapFolder: target.deleteMindMapFolder,
     moveMindMap: target.moveMindMap,
-    postDiary: target.postDiary,
-    getDiaryTimeline: target.getDiaryTimeline,
-    getDiaryStats: target.getDiaryStats,
-    updateDiary: target.updateDiary,
-    deleteDiary: target.deleteDiary,
     files: { ...target.files },
     attachmentFolders: { ...target.attachmentFolders },
     dataFileCleanupOrphans: target.dataFile.cleanupOrphans,
@@ -244,37 +236,6 @@ export function installMobileLocalModuleBridge(
   target.deleteTaskReminder = async (id: string) => {
     await db.run("DELETE FROM task_reminders WHERE id=?",[id]);await enqueue("task_reminder",id,"delete");return {success:true};
   };
-
-  target.getDiaryTimeline = async (_cursor?: string, limit = 20, range?: Record<string, string>): Promise<DiaryTimeline> => {
-    let rows = await db.query<Record<string, unknown>>("SELECT * FROM diaries WHERE scopeKey='personal' ORDER BY createdAt DESC");
-    if (range?.from) rows = rows.filter((row) => String(row.createdAt) >= range.from!);
-    if (range?.to) rows = rows.filter((row) => String(row.createdAt) <= `${range.to}T23:59:59.999Z`);
-    if (range?.mood) rows = rows.filter((row) => row.mood === range.mood);
-    if (range?.q) rows = rows.filter((row) => String(row.contentText).toLowerCase().includes(range.q!.toLowerCase()));
-    const items = rows.slice(0,limit).map((row) => ({ ...row,images:parseArray<string>(row.images),media:parseArray(row.media) })) as unknown as Diary[];
-    return { items,hasMore:rows.length > items.length,nextCursor:null };
-  };
-  target.getDiaryStats = async (): Promise<DiaryStats> => {
-    const rows = await db.query<{ createdAt: string }>("SELECT createdAt FROM diaries WHERE scopeKey='personal'");
-    const today = dateKey(now());return {total:rows.length,todayCount:rows.filter((row) => dateKey(row.createdAt) === today).length};
-  };
-  target.postDiary = async (data: Partial<Diary>): Promise<Diary> => {
-    const diary: Diary = { id:newLocalId(),userId,workspaceId:null,contentText:data.contentText || "",mood:data.mood || "",images:data.images || [],media:data.media || [],createdAt:data.createdAt || now() };
-    await db.run("INSERT INTO diaries (id,scopeKey,workspaceId,userId,contentText,mood,images,media,createdAt) VALUES (?,'personal',NULL,?,?,?,?,?,?)",[
-      diary.id,userId,diary.contentText,diary.mood,JSON.stringify(diary.images),JSON.stringify(diary.media),diary.createdAt,
-    ]);
-    await enqueue("diary",diary.id,"upsert",diary as unknown as Record<string, unknown>);return diary;
-  };
-  target.updateDiary = async (id: string, patch: Partial<Diary>): Promise<Diary> => {
-    const row = (await db.query<Record<string, unknown>>("SELECT * FROM diaries WHERE id=?",[id]))[0];
-    if (!row) throw new Error("记录不存在");
-    const diary = { ...row,...patch,id,userId,workspaceId:null,images:patch.images || parseArray(row.images),media:patch.media || parseArray(row.media) } as unknown as Diary;
-    await db.run("UPDATE diaries SET contentText=?,mood=?,images=?,media=?,createdAt=? WHERE id=?",[
-      diary.contentText,diary.mood,JSON.stringify(diary.images),JSON.stringify(diary.media),diary.createdAt,id,
-    ]);
-    await enqueue("diary",id,"upsert",diary as unknown as Record<string, unknown>);return diary;
-  };
-  target.deleteDiary = async (id: string) => { await db.run("DELETE FROM diaries WHERE id=?",[id]);await enqueue("diary",id,"delete");return {success:true}; };
 
   const readMindMap = async (id: string): Promise<MindMap> => {
     const deviceOnly = isMobileLocalMode();

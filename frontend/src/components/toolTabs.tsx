@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { BookOpen, BrainCircuit, CheckSquare, Link2, Paperclip, Trash2, Sparkles, FileText } from "lucide-react";
+import { BookOpen, BrainCircuit, CheckSquare, Link2, Paperclip, Trash2, FileText } from "lucide-react";
 import { useAppActions, type ToolTabKey } from "@/store/AppContext";
 
 /**
@@ -17,8 +17,6 @@ export interface ToolTabMeta {
 
 export const TOOL_TAB_META: ToolTabMeta[] = [
   { key: "tasks", labelKey: "sidebar.tasks", defaultLabel: "待办", icon: <CheckSquare size={13} /> },
-  { key: "diary", labelKey: "sidebar.dailyRecords", defaultLabel: "小记", icon: <BookOpen size={13} /> },
-  { key: "ai-chat", labelKey: "sidebar.aiChat", defaultLabel: "AI 对话", icon: <Sparkles size={13} /> },
   { key: "shares", labelKey: "sidebar.shareManagement", defaultLabel: "分享中心", icon: <Link2 size={13} /> },
   { key: "files", labelKey: "sidebar.fileManager", defaultLabel: "附件", icon: <Paperclip size={13} /> },
   { key: "trash", labelKey: "sidebar.trash", defaultLabel: "回收站", icon: <Trash2 size={13} /> },

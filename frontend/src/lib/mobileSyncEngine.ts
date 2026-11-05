@@ -9,7 +9,7 @@ import { validateEncryptedNoteWrite } from "./encryptedNotes/noteDocument";
 
 type ScopeStatus = "active" | "replan_required" | "access_revoked";
 type EntityType = "notebook" | "note" | "tag" | "note_tag" | "favorite" | "attachment"
-  | "task" | "task_reminder" | "diary" | "mindmap";
+  | "task" | "task_reminder" | "mindmap";
 type RemoteEntityType = EntityType;
 
 interface ScopeDescriptor {
@@ -61,7 +61,7 @@ function stable(value: unknown): string {
 function isCoreEntityType(value:unknown):value is EntityType {
   return value === "notebook" || value === "note" || value === "tag"
     || value === "note_tag" || value === "favorite" || value === "attachment"
-    || value === "task" || value === "task_reminder" || value === "diary" || value === "mindmap";
+    || value === "task" || value === "task_reminder" || value === "mindmap";
 }
 
 function syncFailure(code:string,message:string):Error&{code:string}{
@@ -405,7 +405,6 @@ export class MobileSyncEngine {
         [scope.scopeKey,...ids,this.options.profileId,scope.scopeKey,type]);
       };
       await remove("attachments","attachment");
-      await remove("diaries","diary");
       await remove("mindmaps","mindmap");
       const reminderIds=[...(seen.get("task_reminder")||[])];
       await tx.run(`DELETE FROM task_reminders WHERE taskId IN (SELECT id FROM tasks WHERE scopeKey=?)
@@ -572,7 +571,7 @@ export class MobileSyncEngine {
 
   private async readEntity(db:NativeDatabase,scopeKey:string,type:EntityType,id:string):Promise<Record<string,unknown>|null>{
     const table=type==="notebook"?"notebooks":type==="note"?"notes":type==="tag"?"tags":type==="attachment"?"attachments"
-      :type==="task"?"tasks":type==="task_reminder"?"task_reminders":type==="diary"?"diaries":type==="mindmap"?"mindmaps":null;
+      :type==="task"?"tasks":type==="task_reminder"?"task_reminders":type==="mindmap"?"mindmaps":null;
     if(!table)return null;
     if(type==="task_reminder")return (await db.query<Record<string,unknown>>("SELECT * FROM task_reminders WHERE id=?",[id]))[0]||null;
     return (await db.query<Record<string,unknown>>(`SELECT * FROM ${table} WHERE scopeKey=? AND id=?`,[scopeKey,id]))[0]||null;
@@ -615,15 +614,6 @@ export class MobileSyncEngine {
         entry.entityId,key,ws,p.userId||this.options.userId,p.title||"新任务",p.description||"",p.isCompleted?1:0,p.completedAt||null,
         p.priority||2,p.dueDate||null,p.dueAt||null,p.startDate||null,p.noteId||null,p.parentId||null,p.sortOrder||0,p.projectId||null,
         p.status||(p.isCompleted?"done":"todo"),p.createdAt||now(),p.updatedAt||now(),
-      ]);return;
-    }
-    if(entry.entityType==="diary"){
-      if(deleting){await db.run("DELETE FROM diaries WHERE scopeKey=? AND id=?",[key,entry.entityId]);return;}
-      const jsonArray=(value:unknown)=>typeof value==="string"?value:JSON.stringify(Array.isArray(value)?value:[]);
-      await db.run(`INSERT INTO diaries (id,scopeKey,workspaceId,userId,contentText,mood,images,media,createdAt)
-        VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-        contentText=excluded.contentText,mood=excluded.mood,images=excluded.images,media=excluded.media`,[
-        entry.entityId,key,ws,p.userId||this.options.userId,p.contentText||"",p.mood||"",jsonArray(p.images),jsonArray(p.media),p.createdAt||now(),
       ]);return;
     }
     if(entry.entityType==="mindmap"){

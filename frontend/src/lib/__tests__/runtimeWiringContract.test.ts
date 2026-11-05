@@ -167,7 +167,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).not.toContain('data-sidebar-toolbar');
     const badges = read("../../components/sidebar/ActivityBarBadges.tsx");
-    for (const mode of ["tasks", "diary", "ai-chat", "shares"]) {
+    for (const mode of ["tasks", "shares"]) {
       expect(badges).toContain(`id: "${mode}"`);
     }
   });
@@ -320,8 +320,6 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(host).toContain("TOOL_PAGE_NAVIGATE_EVENT");
     for (const component of [
       "<TaskWorkspace />",
-      "<DiaryWorkspace />",
-      "<AIChatPanel",
       "<ShareManagementPage />",
       "<FileManager />",
       "<TrashPage />",

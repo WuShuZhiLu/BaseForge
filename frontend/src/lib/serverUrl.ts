@@ -244,8 +244,8 @@ export function inferBrowserServerBaseUrl(
     || pathname.match(/\/(?:notes|mindmaps|sheets)(?:\/[^/]+)?$/i)?.[0]
     || pathname.match(/\/public(?:\/[^/]+)?$/)?.[0]
     // 模块路径（Rail 徽章三区联动写入的 SPA 路由）：否则会被误判为反代前缀，
-    // 下次导航被叠加成 /diary/tasks/ai/... 
-    || pathname.match(/\/(?:login|dashboard|kb|favorites|trash|files|shares|projects|tasks|diary|ai|plugins)$/)?.[0]
+    // 下次导航被叠加成 /tasks/plugins/...
+    || pathname.match(/\/(?:login|dashboard|kb|favorites|trash|files|shares|projects|tasks|plugins)$/)?.[0]
     || "";
   if (routeSuffix) pathname = pathname.slice(0, -routeSuffix.length);
   if (!pathname || pathname === "/") return "";

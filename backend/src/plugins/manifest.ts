@@ -185,12 +185,12 @@ const uiComponentSchema = z.object({
   kind: z.literal("action"),
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  icon: z.enum(["home", "star", "files", "diary", "tasks", "mindmap", "ai", "shares", "settings"]),
+  icon: z.enum(["home", "star", "files", "tasks", "mindmap", "ai", "shares", "settings"]),
   allowedSlots: z.array(uiSlotSchema).min(1).max(1),
   defaultPlacement: z.object({ slot: uiSlotSchema, order: z.number().int().min(0).max(999).optional() }).strict().optional(),
   action: z.object({
     type: z.literal("navigation.open"),
-    target: z.enum(["all", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares", "settings"]),
+    target: z.enum(["all", "favorites", "files", "tasks", "mindmaps", "shares", "settings"]),
   }).strict(),
   uiPlatform: z.array(z.enum(["web", "desktop", "android", "ios"])).min(1).max(4).optional(),
 }).strict().superRefine((component, ctx) => {
@@ -202,7 +202,7 @@ const uiComponentSchema = z.object({
   }
 });
 
-const uiIconEnum = z.enum(["home", "star", "files", "diary", "tasks", "mindmap", "ai", "shares", "settings"]);
+const uiIconEnum = z.enum(["home", "star", "files", "tasks", "mindmap", "ai", "shares", "settings"]);
 const uiPlatformEnum = z.enum(["web", "desktop", "android", "ios"]);
 
 const sidebarPanelCardSchema = z.object({
@@ -211,7 +211,7 @@ const sidebarPanelCardSchema = z.object({
   description: z.string().max(500).optional(),
   link: z.object({
     label: z.string().min(1).max(50),
-    target: z.enum(["all", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares", "settings"]),
+    target: z.enum(["all", "favorites", "files", "tasks", "mindmaps", "shares", "settings"]),
   }).strict().optional(),
 }).strict();
 
@@ -274,7 +274,7 @@ const mainViewPanelSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/),
   title: z.string().min(1).max(100),
   icon: uiIconEnum,
-  builtinId: z.enum(["tasks", "diary"]),
+  builtinId: z.enum(["tasks"]),
   uiPlatform: z.array(uiPlatformEnum).min(1).max(4).optional(),
 }).strict();
 

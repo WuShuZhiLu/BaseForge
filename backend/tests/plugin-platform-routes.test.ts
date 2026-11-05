@@ -18,10 +18,9 @@ async function createPackage(version = "1.0.0"): Promise<File> {
   zip.file("manifest.json", JSON.stringify({
     id: "com.example.route-test", name: "Route Test", description: "route e2e", version,
     apiVersion: 1, engines: { nowen: ">=1.5.0 <2.0.0" }, runtime: "node-action", main: "dist/index.mjs",
-    permissions: ["notes:write", "diary:write", "mindmaps:write"], actions: [
+    permissions: ["notes:write", "mindmaps:write"], actions: [
       { id: "hello", name: "Hello", input: { name: { type: "string", required: true } } },
       { id: "create-note", name: "Create Note", input: { notebookId: { type: "string", required: true }, title: { type: "string", required: true } } },
-      { id: "create-diary", name: "Create Diary", input: { workspaceId: { type: "string", required: true }, contentText: { type: "string", required: true } } },
       { id: "create-mindmap", name: "Create Mindmap", input: { workspaceId: { type: "string", required: true }, title: { type: "string", required: true } } },
       { id: "progress", name: "Progress", execution: "background", input: {} },
     ],
@@ -29,7 +28,6 @@ async function createPackage(version = "1.0.0"): Promise<File> {
   zip.file("dist/index.mjs", `export default {actions:{
     hello:async({input})=>({text:\`Hello \${input.name}\`}),
     'create-note':async({input,nowen})=>nowen.notes.create(input),
-    'create-diary':async({input,nowen})=>nowen.diary.create(input),
     'create-mindmap':async({input,nowen})=>nowen.mindmaps.create(input),
     progress:async({nowen})=>{nowen.progress({current:73,total:100,message:'Working'});return {text:'done'}},
   }}`);
@@ -68,14 +66,14 @@ test("admin lifecycle and ordinary-user boundaries work end to end", async () =>
   const installed = await installedResponse.json() as any;
   assert.equal(installed.plugin.status, "quarantined");
 
-  const declaredPermissions = ["notes:write", "diary:write", "mindmaps:write"];
+  const declaredPermissions = ["notes:write", "mindmaps:write"];
   const grant = await app.request("/plugins/com.example.route-test/permissions", { method: "PUT", headers: { "X-User-Id": ADMIN, "Content-Type": "application/json" }, body: JSON.stringify({ granted: declaredPermissions }) });
   assert.equal(grant.status, 200);
   const enable = await app.request("/plugins/com.example.route-test/enable", { method: "POST", headers: { "X-User-Id": ADMIN } });
   if (enable.status !== 200) assert.fail(await enable.text());
 
   const actions = await app.request("/plugins/actions", { headers: { "X-User-Id": USER } });
-  assert.equal((await actions.json() as any[]).length, 5);
+  assert.equal((await actions.json() as any[]).length, 4);
   const execute = await app.request("/plugins/com.example.route-test/actions/hello/execute", { method: "POST", headers: { "X-User-Id": USER, "Content-Type": "application/json" }, body: JSON.stringify({ input: { name: "Nowen" } }) });
   if (execute.status !== 200) assert.fail(await execute.text());
   const result = await execute.json() as any;
@@ -88,7 +86,6 @@ test("admin lifecycle and ordinary-user boundaries work end to end", async () =>
   assert.equal((db.prepare("SELECT COUNT(*) AS count FROM notes WHERE title='Denied'").get() as { count: number }).count, 0);
 
   for (const [actionId, input] of [
-    ["create-diary", { workspaceId: "plugin-ws", contentText: "Denied" }],
     ["create-mindmap", { workspaceId: "plugin-ws", title: "Denied" }],
   ] as const) {
     const denied = await app.request(`/plugins/com.example.route-test/actions/${actionId}/execute`, { method: "POST", headers: { "X-User-Id": USER, "Content-Type": "application/json" }, body: JSON.stringify({ input }) });

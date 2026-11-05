@@ -1,6 +1,5 @@
 import React from "react";
 
-import AIProfileSwitcherBridge from "./AIProfileSwitcherBridge";
 import EmbeddingIndexTaskCopyBridge from "./EmbeddingIndexTaskCopyBridge";
 import MarkdownExperienceBridge from "./MarkdownExperienceBridge";
 import MindMapAppearanceBridge from "./MindMapAppearanceBridge";
@@ -20,14 +19,13 @@ import SiyuanImportProgressBridge from "./SiyuanImportProgressBridge";
  * Low-frequency authenticated feature centers.
  *
  * These components mostly subscribe to explicit import/export/transfer events or reconcile editor
- * DOM after it mounts. Keeping them in one asynchronous boundary prevents AI profile management,
- * CodeMirror integration, JSZip, image export, migration, mind-map and backup UI dependencies from
- * joining the login chunk.
+ * DOM after it mounts. Keeping them in one asynchronous boundary prevents embedding profile
+ * management, CodeMirror integration, JSZip, image export, migration, mind-map and backup UI
+ * dependencies from joining the login chunk.
  */
 export default function DeferredGlobalFeatureCenters() {
   return (
     <>
-      <AIProfileSwitcherBridge />
       <EmbeddingIndexTaskCopyBridge />
       <MarkdownExperienceBridge />
       <MindMapAppearanceBridge />

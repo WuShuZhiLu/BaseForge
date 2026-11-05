@@ -4,7 +4,7 @@ import { automationApi, type AutomationRun, type AutomationStep, type Automation
 import { pluginApi, type PluginAction } from "@/lib/pluginApi";
 import TaskDigestSettings from "./TaskDigestSettings";
 
-const eventOptions = ["note.created", "note.updated", "task.created", "task.completed", "attachment.created", "diary.created", "mindmap.created"];
+const eventOptions = ["note.created", "note.updated", "task.created", "task.completed", "attachment.created", "mindmap.created"];
 type ActionOption = PluginAction & { pluginId: string; actionId: string };
 
 function RunHistory({ workflow }: { workflow: AutomationWorkflow }) {

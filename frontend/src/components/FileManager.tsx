@@ -5,7 +5,7 @@
  *   跨笔记的"相册 + 文件柜"。本页面**不新增存储**——直接消费后端
  *   /api/files 聚合视图，复用已有的 attachments 表 + ATTACHMENTS_DIR。
  *
- * 布局（与 DiaryWorkspace / TaskWorkspace 同构，沿用 flex 高度 + ScrollArea）：
+ * 布局（与 TaskWorkspace 同构，沿用 flex 高度 + ScrollArea）：
  *   ┌── 顶栏：标题 / 统计徽标 / 上传按钮 / 视图切换 ──────────┐
  *   ├── 工具条：分类 Tabs / 搜索 / 排序 ─────────────────────┤
  *   ├── 主区：

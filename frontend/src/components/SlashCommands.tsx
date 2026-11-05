@@ -30,7 +30,6 @@ import {
 import { toast } from "@/lib/toast";
 import { nextFootnoteIdentifier } from "@/components/FootnoteExtensions";
 import { prompt as promptDialog } from "@/components/ui/confirm";
-import { getDailyRecordSlashCommands } from "@/components/daily-records/dailyRecordSlashCommands";
 import type { AddBelowType } from "@/components/blockMenuActions";
 
 export interface SlashCommandItem {
@@ -553,7 +552,6 @@ export function getDefaultSlashCommands(
 ): SlashCommandItem[] {
   return [
     ...(onVoiceRecord ? [{ id: "voice", label: t("voice.record"), description: t("voice.description"), icon: <span>🎙</span>, category: t("slash.catInsert"), keywords: ["voice", "audio", "录音", "语音"], action: onVoiceRecord }] : []),
-    ...getDailyRecordSlashCommands(),
     ...getPluginSlashCommands(noteId),
     // 标题
     {

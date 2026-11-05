@@ -43,7 +43,7 @@ export const DEFAULT_SIDEBAR_LAYOUT: SidebarLayoutState = {
     trash: { visible: false, collapsed: false, order: 4 },
     files: { visible: false, collapsed: false, order: 5 },
   },
-  badges: { extra: ["tasks", "diary"], extraCollapsed: true },
+  badges: { extra: ["tasks"], extraCollapsed: true },
 };
 
 export const SIDEBAR_LAYOUT_EVENT = "nowen:sidebar-layout-changed";

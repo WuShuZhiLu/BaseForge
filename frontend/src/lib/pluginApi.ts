@@ -58,8 +58,8 @@ export interface PluginPromptPackContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 export type PluginUiSlot = "floating-layer";
-export type PluginUiIcon = "home" | "star" | "files" | "diary" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
-export type PluginNavigationTarget = "all" | "favorites" | "files" | "diary" | "tasks" | "mindmaps" | "ai-chat" | "shares" | "settings";
+export type PluginUiIcon = "home" | "star" | "files" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
+export type PluginNavigationTarget = "all" | "favorites" | "files" | "tasks" | "mindmaps" | "shares" | "settings";
 export interface PluginUiActionContribution {
   id: string;
   kind: "action";

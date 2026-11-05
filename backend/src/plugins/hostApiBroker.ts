@@ -118,7 +118,6 @@ export class HostApiBroker {
       case "tags": result = await this.tags(context, operation, args); break;
       case "tasks": result = await this.tasks(context, operation, args); break;
       case "attachments": result = this.attachments(context, operation, args); break;
-      case "diary": result = await this.diary(context, operation, args); break;
       case "mindmaps": result = await this.mindmaps(context, operation, args); break;
       case "storage": result = this.storage(context, operation, args); break;
       case "external": result = await this.external(context, operation, args, methodPermission); break;
@@ -318,33 +317,6 @@ export class HostApiBroker {
       return rows.filter((row) => hasPermission(resolveNotePermission(row.noteId, context.userId).permission, "read")).slice(0, Math.max(1, Math.min(100, Number(args.limit) || 50)));
     }
     throw createHostMethodNotFound(`attachments.${operation}`);
-  }
-
-  private async diary(context: PluginExecutionContext, operation: string, args: JsonObject): Promise<unknown> {
-    const db = getDb();
-    if (operation === "get") {
-      const row = db.prepare("SELECT id,userId,workspaceId,contentText,mood,images,media,createdAt FROM diaries WHERE id=?")
-        .get(requireString(args.id ?? args.diaryId, "diaryId")) as JsonObject | undefined;
-      if (!row || (row.userId !== context.userId && !allowedWorkspace(row.workspaceId, context.userId))) forbidden("无权读取该日记");
-      return row;
-    }
-    if (operation === "list") {
-      const rows = db.prepare("SELECT id,userId,workspaceId,contentText,mood,images,media,createdAt FROM diaries ORDER BY createdAt DESC LIMIT 500").all() as JsonObject[];
-      return rows.filter((row) => row.userId === context.userId || allowedWorkspace(row.workspaceId, context.userId)).slice(0, Math.max(1, Math.min(100, Number(args.limit) || 50)));
-    }
-    if (operation === "create") {
-      const workspaceId = typeof args.workspaceId === "string" && args.workspaceId ? args.workspaceId : null;
-      if (!allowedWorkspace(workspaceId, context.userId, true)) forbidden("无权在该工作区创建日记");
-      const created = await this.commands.createDiary(context.userId, workspaceId, {
-        contentText: String(args.contentText || ""),
-        mood: String(args.mood || ""),
-        media: Array.isArray(args.media) ? args.media : [],
-        images: Array.isArray(args.images) ? args.images : [],
-        ...(args.createdAt ? { createdAt: args.createdAt } : {}),
-      }, context);
-      return { id: created.id };
-    }
-    throw createHostMethodNotFound(`diary.${operation}`);
   }
 
   private async mindmaps(context: PluginExecutionContext, operation: string, args: JsonObject): Promise<unknown> {

@@ -6,7 +6,6 @@ export type TaskCaptureSourceType =
   | "global"
   | "selection"
   | "note"
-  | "diary"
   | "share"
   | "other";
 

@@ -45,7 +45,6 @@ function eventType(input: MutationCapture): string | null {
     if (method === "PUT" || method === "PATCH") return body.completed === true || body.completed === 1 ? "task.completed" : body.completed === false || body.completed === 0 ? "task.reopened" : "task.updated";
   }
   if (area === "attachments") return method === "POST" ? "attachment.created" : method === "DELETE" ? "attachment.deleted" : null;
-  if (area === "diary") return method === "POST" ? "diary.created" : method === "PUT" || method === "PATCH" ? "diary.updated" : null;
   if (area === "mindmaps") return method === "POST" ? "mindmap.created" : method === "PUT" || method === "PATCH" ? "mindmap.updated" : null;
   if (area === "tags") {
     if (method === "POST" && /\/note\/.+\/tag\//.test(input.path)) return "tag.added_to_note";
@@ -80,7 +79,7 @@ export const automationEventCaptureMiddleware: MiddlewareHandler = async (c, nex
   const method = c.req.method.toUpperCase();
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return next();
   const pathname = new URL(c.req.url).pathname;
-  const match = pathname.match(/^\/api\/(notes|notebooks|tags|tasks|attachments|diary|mindmaps)(\/.*)?$/);
+  const match = pathname.match(/^\/api\/(notes|notebooks|tags|tasks|attachments|mindmaps)(\/.*)?$/);
   if (!match) return next();
   let body: Record<string, unknown> = {};
   if (method !== "DELETE") body = await c.req.raw.clone().json().catch(() => ({})) as Record<string, unknown>;

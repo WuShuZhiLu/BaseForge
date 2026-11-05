@@ -1,6 +1,4 @@
 import React, { useEffect } from "react";
-import AIChatPanel from "@/components/AIChatPanel";
-import DiaryWorkspace from "@/components/DiaryWorkspace";
 import FileManager from "@/components/FileManager";
 import ShareManagementPage from "@/components/ShareManagementPage";
 import TaskWorkspace from "@/components/TaskWorkspace";
@@ -93,26 +91,6 @@ function renderToolPage(key: ToolTabKey, actions: ReturnType<typeof useAppAction
   switch (key) {
     case "tasks":
       return <TaskWorkspace />;
-    case "diary":
-      return <DiaryWorkspace />;
-    case "ai-chat":
-      return (
-        <AIChatPanel
-          onClose={() => actions.closeToolTab("ai-chat")}
-          onNavigateToNote={async (noteId: string) => {
-            try {
-              const { api } = await import("@/lib/api");
-              const note = await api.getNote(noteId);
-              if (!note) return;
-              actions.setActiveNote(note);
-              actions.setActiveToolTab(null);
-              actions.setMobileView("editor");
-            } catch (err) {
-              console.error("Navigate to note failed:", err);
-            }
-          }}
-        />
-      );
     case "shares":
       return <ShareManagementPage />;
     case "files":

@@ -311,7 +311,7 @@ function resolveOrderBy(sort: string | undefined): string {
  *   - 没传 workspaceId ⇒ 个人空间：仅当前用户自己上传的附件
  *     （attachments.userId = ? AND attachments.workspaceId IS NULL）
  *   - 传了 workspaceId ⇒ 工作区：必须是成员；按 attachments.workspaceId 过滤，
- *     所有成员可见全部附件（与 diary/tasks 的集合接口语义一致）
+ *     所有成员可见全部附件（与 tasks 的集合接口语义一致）
  */
 function resolveFilesScope(
   workspaceIdRaw: string,

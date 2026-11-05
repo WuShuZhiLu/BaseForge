@@ -7,7 +7,7 @@ const EVENT_TYPES = new Set([
   "notebook.created", "notebook.updated", "notebook.deleted",
   "tag.created", "tag.added_to_note", "tag.removed_from_note",
   "task.created", "task.updated", "task.completed", "task.reopened", "task.deleted",
-  "attachment.created", "attachment.deleted", "diary.created", "diary.updated",
+  "attachment.created", "attachment.deleted",
   "mindmap.created", "mindmap.updated", "app.started", "plugin.enabled", "plugin.disabled",
 ]);
 

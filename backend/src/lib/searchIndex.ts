@@ -168,15 +168,27 @@ export function repairLegacyMarkdownBlockMetadata(db: DatabaseSync): number {
   return repairedCount;
 }
 
+/**
+ * 把 `nowen_search_normalize` 注册到这条连接上（幂等）。
+ *
+ * 它被 notes 上的 FTS 同步触发器引用，而触发器一旦存在，任何触碰 notes 的语句
+ * 都会在 **prepare 阶段**解析它 —— 哪怕 WHEN 条件最后不成立。迁移跑在
+ * ensureNormalizedSearchFts() 之前，所以迁移里只要 UPDATE/DELETE notes，
+ * 就必须先注册，否则老库升级会以 `no such function: nowen_search_normalize`
+ * 直接打断启动（新库没有触发器，所以只有存量库会炸，测试若只建新库会漏掉）。
+ */
+export function registerSearchNormalizeFunction(db: DatabaseSync): void {
+  if (normalizedSearchFunctionDatabases.has(db as object)) return;
+  db.function(
+    "nowen_search_normalize",
+    { deterministic: true },
+    (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
+  );
+  normalizedSearchFunctionDatabases.add(db as object);
+}
+
 function createNormalizedSearchFts(db: DatabaseSync): void {
-  if (!normalizedSearchFunctionDatabases.has(db as object)) {
-    db.function(
-      "nowen_search_normalize",
-      { deterministic: true },
-      (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
-    );
-    normalizedSearchFunctionDatabases.add(db as object);
-  }
+  registerSearchNormalizeFunction(db);
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS notes_search_fts USING fts5(
       title,

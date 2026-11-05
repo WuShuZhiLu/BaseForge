@@ -36,7 +36,7 @@ const DATABASE_PREFIX = "nowen_local_";
 
 const ENTITY_TYPE_CHECK = `
   'notebook', 'note', 'tag', 'note_tag', 'favorite', 'attachment',
-  'task', 'task_reminder', 'diary', 'mindmap'
+  'task', 'task_reminder', 'mindmap'
 `;
 
 const SCOPE_CHECK = `
@@ -87,20 +87,6 @@ const MOBILE_MODULE_SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_native_task_reminders_task
     ON task_reminders(taskId, enabled)`,
-  `CREATE TABLE IF NOT EXISTS diaries (
-    id TEXT PRIMARY KEY,
-    scopeKey TEXT NOT NULL DEFAULT 'personal',
-    workspaceId TEXT,
-    userId TEXT NOT NULL,
-    contentText TEXT NOT NULL DEFAULT '',
-    mood TEXT NOT NULL DEFAULT '',
-    images TEXT NOT NULL DEFAULT '[]',
-    media TEXT NOT NULL DEFAULT '[]',
-    createdAt TEXT NOT NULL,
-    CHECK (${SCOPE_CHECK})
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_native_diaries_scope_created
-    ON diaries(scopeKey, createdAt DESC)`,
   `CREATE TABLE IF NOT EXISTS mindmaps (
     id TEXT PRIMARY KEY,
     scopeKey TEXT NOT NULL DEFAULT 'personal',
@@ -313,21 +299,6 @@ const SCHEMA_V1_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_native_task_reminders_task
     ON task_reminders(taskId, enabled)`,
-
-  `CREATE TABLE IF NOT EXISTS diaries (
-    id TEXT PRIMARY KEY,
-    scopeKey TEXT NOT NULL DEFAULT 'personal',
-    workspaceId TEXT,
-    userId TEXT NOT NULL,
-    contentText TEXT NOT NULL DEFAULT '',
-    mood TEXT NOT NULL DEFAULT '',
-    images TEXT NOT NULL DEFAULT '[]',
-    media TEXT NOT NULL DEFAULT '[]',
-    createdAt TEXT NOT NULL,
-    CHECK (${SCOPE_CHECK})
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_native_diaries_scope_created
-    ON diaries(scopeKey, createdAt DESC)`,
 
   `CREATE TABLE IF NOT EXISTS mindmaps (
     id TEXT PRIMARY KEY,

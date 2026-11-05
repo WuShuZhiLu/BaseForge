@@ -8,7 +8,7 @@ type EditorFontSize = 0 | 14 | 16 | 18 | 20 | 22 | 24;
 type EditorMode = "md" | "tiptap";
 type CodeBlockCollapseMode = "expanded" | "long" | "collapsed";
 type FolderAutoLockMinutes = 0 | 5 | 15 | 30 | 60;
-type NavigationModuleId = "notifications" | "favorites" | "files" | "diary" | "tasks" | "mindmaps" | "ai-chat" | "shares";
+type NavigationModuleId = "notifications" | "favorites" | "files" | "tasks" | "mindmaps" | "shares";
 type TaskCenterOptionalModuleId = "inbox" | "my-day" | "planner" | "habits" | "stats";
 type NoteTheme = "default" | "paper" | "minimal" | "eye-care";
 type CodeBlockTheme =
@@ -43,7 +43,6 @@ export interface SyncedUserPreferences {
   hiddenNavigationModules: NavigationModuleId[];
   navigationModuleOrder: NavigationModuleId[];
   hiddenTaskCenterModules: TaskCenterOptionalModuleId[];
-  journalLockOnEntry: boolean;
   showNoteListDividers: boolean;
 }
 
@@ -90,9 +89,8 @@ export const DEFAULT_SYNCED_USER_PREFERENCES: SyncedUserPreferences = {
   noteTheme: "default",
   noteListTitleOnly: false,
   hiddenNavigationModules: [],
-  navigationModuleOrder: ["notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares"],
+  navigationModuleOrder: ["notifications", "favorites", "files", "tasks", "mindmaps", "shares"],
   hiddenTaskCenterModules: [],
-  journalLockOnEntry: false,
   showNoteListDividers: false,
 };
 
@@ -100,7 +98,7 @@ const PREFERENCE_KEYS = Object.keys(DEFAULT_SYNCED_USER_PREFERENCES) as Preferen
 /** 默认值版本：v2 = 大纲默认不钉住；v3 = 代码块默认跟随昼夜（auto） */
 const PREFERENCE_DEFAULTS_REVISION = 3;
 const PREFERENCE_KEY_SET = new Set<string>(PREFERENCE_KEYS);
-const NAVIGATION_MODULE_ORDER: NavigationModuleId[] = ["notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares"];
+const NAVIGATION_MODULE_ORDER: NavigationModuleId[] = ["notifications", "favorites", "files", "tasks", "mindmaps", "shares"];
 const NAVIGATION_MODULE_IDS = new Set<string>(NAVIGATION_MODULE_ORDER);
 const TASK_CENTER_OPTIONAL_MODULE_IDS = new Set<string>(["inbox", "my-day", "planner", "habits", "stats"]);
 const CODE_BLOCK_THEMES = new Set<CodeBlockTheme>([
@@ -141,7 +139,6 @@ function normalizePreferenceValue<K extends PreferenceKey>(
     case "showNoteListUpdatedTime":
     case "enableNoteTabs":
     case "noteListTitleOnly":
-    case "journalLockOnEntry":
     case "showNoteListDividers":
       return (typeof value === "boolean" ? value : fallback) as SyncedUserPreferences[K];
     case "hiddenNavigationModules":

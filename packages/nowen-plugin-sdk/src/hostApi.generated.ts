@@ -1,5 +1,5 @@
 // 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/host-api-contract.json 生成，请勿手动修改。
-import type { Attachment, DiaryEntry, Mindmap, Note, Notebook, NoteSummary, Tag, Task } from "./index.js";
+import type { Attachment, Mindmap, Note, Notebook, NoteSummary, Tag, Task } from "./index.js";
 
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -10,8 +10,8 @@ function deepFreeze<T>(value: T): T {
 }
 
 export type PluginHostRuntime = "node-action" | "sandbox-js";
-export type HostApiPermission = "attachments:read" | "capture:write" | "diary:read" | "diary:write" | "external:fetch" | "mindmaps:read" | "mindmaps:write" | "notebooks:read" | "notebooks:write" | "notes:read" | "notes:write" | "plugin-storage:read" | "plugin-storage:write" | "secrets:use" | "tags:read" | "tags:write" | "tasks:read" | "tasks:write";
-export type HostApiMethod = "attachments.get" | "attachments.list" | "capture.importUrl" | "diary.create" | "diary.get" | "diary.list" | "external.fetch" | "mindmaps.create" | "mindmaps.get" | "mindmaps.list" | "mindmaps.update" | "notebooks.create" | "notebooks.get" | "notebooks.list" | "notes.create" | "notes.get" | "notes.list" | "notes.update" | "runtime.capabilities" | "secrets.crypt" | "secrets.digest" | "settings.get" | "storage.delete" | "storage.get" | "storage.set" | "tags.addToNote" | "tags.create" | "tags.list" | "tags.removeFromNote" | "tasks.create" | "tasks.get" | "tasks.list" | "tasks.update";
+export type HostApiPermission = "attachments:read" | "capture:write" | "external:fetch" | "mindmaps:read" | "mindmaps:write" | "notebooks:read" | "notebooks:write" | "notes:read" | "notes:write" | "plugin-storage:read" | "plugin-storage:write" | "secrets:use" | "tags:read" | "tags:write" | "tasks:read" | "tasks:write";
+export type HostApiMethod = "attachments.get" | "attachments.list" | "capture.importUrl" | "external.fetch" | "mindmaps.create" | "mindmaps.get" | "mindmaps.list" | "mindmaps.update" | "notebooks.create" | "notebooks.get" | "notebooks.list" | "notes.create" | "notes.get" | "notes.list" | "notes.update" | "runtime.capabilities" | "secrets.crypt" | "secrets.digest" | "settings.get" | "storage.delete" | "storage.get" | "storage.set" | "tags.addToNote" | "tags.create" | "tags.list" | "tags.removeFromNote" | "tasks.create" | "tasks.get" | "tasks.list" | "tasks.update";
 
 export interface HostApiContractEntry {
   method: HostApiMethod;
@@ -61,39 +61,6 @@ export const HOST_API_CONTRACT: readonly HostApiContractEntry[] = deepFreeze([
     "method": "capture.importUrl",
     "sinceApiVersion": 2,
     "permission": "capture:write",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.create",
-    "sinceApiVersion": 1,
-    "permission": "diary:write",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.get",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.list",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
     "runtimes": [
       "node-action",
       "sandbox-js"
@@ -448,12 +415,6 @@ export interface AttachmentsApi {
   list(input?: { limit?: number }): Promise<Attachment[]>;
 }
 
-export interface DiaryApi {
-  create(input: { workspaceId?: string | null; contentText: string; mood?: string; createdAt?: string }): Promise<{ id: string }>;
-  get(input: { diaryId: string }): Promise<DiaryEntry>;
-  list(input?: { limit?: number }): Promise<DiaryEntry[]>;
-}
-
 export interface MindmapsApi {
   create(input: { workspaceId?: string | null; title?: string; data?: unknown }): Promise<{ id: string }>;
   get(input: { mindmapId: string }): Promise<Mindmap>;
@@ -497,7 +458,6 @@ export interface NowenHostApi {
   tags: TagsApi;
   tasks: TasksApi;
   attachments: AttachmentsApi;
-  diary: DiaryApi;
   mindmaps: MindmapsApi;
   storage: StorageApi;
   external: ExternalApi;

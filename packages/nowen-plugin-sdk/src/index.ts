@@ -18,7 +18,6 @@ export interface Notebook { id: string; parentId: string | null; name: string; d
 export interface Tag { id: string; name: string; color: string; workspaceId: string | null; createdAt: string }
 export interface Task extends JsonObject { id: string; title: string; userId: string; workspaceId: string | null; isCompleted: number; priority: number }
 export interface Attachment { id: string; noteId: string; filename: string; mimeType: string; size: number; createdAt: string }
-export interface DiaryEntry extends JsonObject { id: string; userId: string; workspaceId: string | null; contentText: string; mood: string; createdAt: string }
 export interface Mindmap extends JsonObject { id: string; userId: string; workspaceId: string | null; title: string; data?: unknown; createdAt?: string; updatedAt?: string }
 
 export interface PluginExecutionInfo { executionId: string; correlationId?: string; causationId?: string; depth?: number; idempotencyKey?: string }

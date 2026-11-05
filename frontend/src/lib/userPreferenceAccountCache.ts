@@ -49,7 +49,6 @@ export interface UserPreferences {
   hiddenNavigationModules: NavigationModuleId[];
   navigationModuleOrder: NavigationModuleId[];
   hiddenTaskCenterModules: TaskCenterOptionalModuleId[];
-  journalLockOnEntry: boolean;
   showNoteListDividers: boolean;
 }
 
@@ -89,7 +88,6 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   hiddenNavigationModules: [],
   navigationModuleOrder: [...NAVIGATION_MODULE_IDS],
   hiddenTaskCenterModules: [],
-  journalLockOnEntry: false,
   showNoteListDividers: false,
 };
 
@@ -199,9 +197,6 @@ export function normalizeUserPreferences(
     hiddenTaskCenterModules: Array.isArray(raw.hiddenTaskCenterModules)
       ? normalizeHiddenTaskCenterModules(raw.hiddenTaskCenterModules)
       : [...fallback.hiddenTaskCenterModules],
-    journalLockOnEntry: typeof raw.journalLockOnEntry === "boolean"
-      ? raw.journalLockOnEntry
-      : fallback.journalLockOnEntry,
     showNoteListDividers: typeof raw.showNoteListDividers === "boolean"
       ? raw.showNoteListDividers
       : fallback.showNoteListDividers,

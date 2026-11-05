@@ -353,42 +353,6 @@ function initSchema(db: DatabaseSync) {
       createdAt TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
-    -- 说说/动态表
-    CREATE TABLE IF NOT EXISTS diaries (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      contentText TEXT DEFAULT '',
-      mood TEXT DEFAULT '',
-      -- 图片：JSON 数组字符串，元素是 diary_attachments.id（uuid）。
-      -- 默认 '[]' 而不是 NULL，方便 SQL/前端无脑 JSON.parse。
-      images TEXT NOT NULL DEFAULT '[]',
-      -- 媒体：JSON 数组字符串，元素形如 { id, type: 'image' | 'video' }。
-      media TEXT NOT NULL DEFAULT '[]',
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_diaries_user_created ON diaries(userId, createdAt DESC);
-
-    -- 说说图片附件表（与 notes 的 attachments 表平行，避免 noteId NOT NULL 限制）
-    --   diaryId 可空：发布前先上传（拿到 id 后再 attach 到 diary），
-    --                 配合 createdAt 做"超时未绑定 → 视为孤儿清理"
-    --   path 与 attachments 表语义一致：相对 ATTACHMENTS_DIR 的文件名
-    CREATE TABLE IF NOT EXISTS diary_attachments (
-      id TEXT PRIMARY KEY,
-      diaryId TEXT,
-      userId TEXT NOT NULL,
-      mimeType TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      path TEXT NOT NULL,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (diaryId) REFERENCES diaries(id) ON DELETE CASCADE,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_diary_attachments_diary ON diary_attachments(diaryId);
-    CREATE INDEX IF NOT EXISTS idx_diary_attachments_user_created ON diary_attachments(userId, createdAt);
-
     -- 分享记录表
     CREATE TABLE IF NOT EXISTS shares (
       id TEXT PRIMARY KEY,
@@ -909,63 +873,10 @@ function initSchema(db: DatabaseSync) {
     db.prepare("ALTER TABLE notes ADD COLUMN isLocked INTEGER DEFAULT 0").run();
   }
 
-  // 迁移：如果旧版 diaries 表有 date 列，删掉重建
-  try {
-    db.prepare("SELECT date FROM diaries LIMIT 1").get();
-    // 旧表存在 date 列 → 重建
-    db.exec("DROP TABLE IF EXISTS diaries");
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS diaries (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        contentText TEXT DEFAULT '',
-        mood TEXT DEFAULT '',
-        images TEXT NOT NULL DEFAULT '[]',
-        media TEXT NOT NULL DEFAULT '[]',
-        createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-      );
-      CREATE INDEX IF NOT EXISTS idx_diaries_user_created ON diaries(userId, createdAt DESC);
-    `);
-  } catch {
-    // 新表或表不存在，跳过
-  }
-
-  // 迁移：旧版 diaries 表（date 已清理但还没有 images 列）补加 images 列。
-  // 与 notes.isLocked / users.lockedUntil 等迁移同款 ALTER TABLE 模式。
-  try {
-    db.prepare("SELECT images FROM diaries LIMIT 1").get();
-  } catch {
-    db.prepare("ALTER TABLE diaries ADD COLUMN images TEXT NOT NULL DEFAULT '[]'").run();
-  }
-  try {
-    db.prepare("SELECT media FROM diaries LIMIT 1").get();
-  } catch {
-    db.prepare("ALTER TABLE diaries ADD COLUMN media TEXT NOT NULL DEFAULT '[]'").run();
-  }
-
-  // 迁移：补建 diary_attachments 表（旧库初始化时这张表还不存在）。
-  // CREATE TABLE IF NOT EXISTS 是幂等的，直接 exec 即可。
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS diary_attachments (
-      id TEXT PRIMARY KEY,
-      diaryId TEXT,
-      userId TEXT NOT NULL,
-      mimeType TEXT NOT NULL,
-      size INTEGER NOT NULL,
-      path TEXT NOT NULL,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (diaryId) REFERENCES diaries(id) ON DELETE CASCADE,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_diary_attachments_diary ON diary_attachments(diaryId);
-    CREATE INDEX IF NOT EXISTS idx_diary_attachments_user_created ON diary_attachments(userId, createdAt);
-  `);
-
   // 任务附件表（待办事项模块支持插入图片）
   // ----------------------------------------------------------------------
   // 设计要点：
-  //   - 与 attachments / diary_attachments 同款：文件落盘到 ATTACHMENTS_DIR，
+  //   - 与 attachments 同款：文件落盘到 ATTACHMENTS_DIR，
   //     行里只存元数据。
   //   - taskId 可空：允许"先上传图片、再随新任务一起提交"的链路（典型场景：
   //     用户在新建任务输入框里粘贴图片，那一刻 task 行还没创建）。前端创建
@@ -1042,57 +953,6 @@ function initSchema(db: DatabaseSync) {
     );
 
     CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(userId, revokedAt, lastSeenAt DESC);
-  `);
-
-  // ==============================================================
-  // AI 知识问答聊天记录（跨会话持久化）
-  // ==============================================================
-  //
-  // v10 起支持"多会话"：每条消息挂到 ai_chat_conversations 的一条会话下。
-  // 新装库这里就建带 conversationId 列的最终形态；老库由 migrations v10 补列 + 回填。
-  //
-  // 每条消息一行：user 的提问和 assistant 的回复各存一条，按 createdAt 升序即为对话时间线。
-  //   id              消息 ID（前端生成的也可以，只要全局唯一；本端路由直接用时间戳+随机串）
-  //   userId          所属用户；ON DELETE CASCADE 使账号删除时连带清理
-  //   conversationId  所属会话；NULL 仅出现在 v10 迁移中途的极短窗口，业务层一律按会话维度读写
-  //   role            'user' | 'assistant'
-  //   content         纯文本消息内容（Markdown 原文）
-  //   referencesJson  可选，仅 assistant 消息使用，存 [{id,title},...] 的 JSON 字符串；
-  //                   笔记后续可能被删，恢复时前端点击跳转自行容错即可
-  //   createdAt       创建时间，用于排序和按时间窗口裁剪
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS ai_chat_conversations (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      title TEXT NOT NULL DEFAULT '',
-      archived INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_chat_conv_user
-      ON ai_chat_conversations(userId, archived, updatedAt DESC);
-
-    CREATE TABLE IF NOT EXISTS ai_chat_messages (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      conversationId TEXT,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL DEFAULT '',
-      referencesJson TEXT,
-      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_ai_chat_user_created ON ai_chat_messages(userId, createdAt);
-    -- 注意：idx_ai_chat_msg_conv (conversationId, createdAt) 的建立**不能**放在
-    -- initSchema 里。原因：对 v9 或更早版本创建的老库，ai_chat_messages 表已存在
-    -- 但没有 conversationId 列，此处 CREATE TABLE IF NOT EXISTS 不会补列，紧接着
-    -- 建索引会抛 SqliteError: no such column: conversationId，导致 initSchema
-    -- 崩溃，连后面的 runMigrations（v10 会补列）都没机会跑 —— 死锁。
-    -- 该索引由 migrations.ts 的 v10 迁移统一创建（addColumnIfMissing 后建索引），
-    -- 对全新库也会在同一次启动补建（IF NOT EXISTS 幂等）。
   `);
 
   // ==============================================================

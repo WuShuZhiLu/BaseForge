@@ -61,16 +61,6 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "risk": "data-write"
       },
       {
-        "id": "diary:read",
-        "description": "Read diary entries visible to the invoking user",
-        "risk": "sensitive-read"
-      },
-      {
-        "id": "diary:write",
-        "description": "Create diary entries",
-        "risk": "sensitive-write"
-      },
-      {
         "id": "external:fetch",
         "description": "Make host-brokered network requests to declared hosts",
         "risk": "network"
@@ -229,87 +219,6 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
           }
         ],
         "sdkSignature": "importUrl(input: { url: string; notebookId: string; tags?: string[]; comment?: string }): Promise<{ id: string; title: string; imagesImported: number; imagesSkipped: number }>;"
-      },
-      {
-        "method": "diary.create",
-        "sinceApiVersion": 1,
-        "permission": "diary:write",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "contentText": "Today..."
-            }
-          }
-        ],
-        "sdkSignature": "create(input: { workspaceId?: string | null; contentText: string; mood?: string; createdAt?: string }): Promise<{ id: string }>;"
-      },
-      {
-        "method": "diary.get",
-        "sinceApiVersion": 1,
-        "permission": "diary:read",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "diaryId": "diary-id"
-            }
-          }
-        ],
-        "sdkSignature": "get(input: { diaryId: string }): Promise<DiaryEntry>;"
-      },
-      {
-        "method": "diary.list",
-        "sinceApiVersion": 1,
-        "permission": "diary:read",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "limit": 30
-            }
-          }
-        ],
-        "sdkSignature": "list(input?: { limit?: number }): Promise<DiaryEntry[]>;"
       },
       {
         "method": "external.fetch",

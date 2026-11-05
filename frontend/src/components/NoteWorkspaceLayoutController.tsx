@@ -36,8 +36,6 @@ const WIDE_SIDEBAR_HEADER_SELECTOR =
 const NON_NOTE_WORKSPACE_VIEWS = new Set([
   "tasks",
   "mindmaps",
-  "ai-chat",
-  "diary",
   "files",
   "shares",
 ]);

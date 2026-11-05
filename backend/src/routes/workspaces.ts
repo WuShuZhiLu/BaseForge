@@ -636,7 +636,6 @@ app.post("/join", async (c) => {
 
 const FEATURE_KEYS: WorkspaceFeature[] = [
   "notes",
-  "diaries",
   "tasks",
   "mindmaps",
   "files",

@@ -2090,17 +2090,11 @@ export default function NoteList() {
     }
   };
 
-  const handleCreateNote = async (noteType: "normal" | "markdown" | "word" | "journal" | "yuque" = "normal") => {
+  const handleCreateNote = async (noteType: "normal" | "markdown" | "word" | "yuque" = "normal") => {
     haptic.light();
     // 回收站视图禁止新建笔记
     if (state.viewMode === "trash") {
       toast.info(t('noteList.cannotCreateInTrash'));
-      return;
-    }
-
-    // 今日日记：不需要选择笔记本，直接调用 API
-    if (noteType === "journal") {
-      await handleOpenTodayJournal();
       return;
     }
 
@@ -2155,44 +2149,12 @@ export default function NoteList() {
     }
   };
 
-  // 一键打开/创建今日日记
-  const handleOpenTodayJournal = async () => {
-    try {
-      const result = await api.journals.getOrCreateToday();
-      if (!result.existed) {
-        toast.success(t("journal.created", { defaultValue: "今日日记已创建" }));
-      } else {
-        toast.info(t("journal.opened", { defaultValue: "已打开今日日记" }));
-      }
-      // 打开笔记
-      actions.setActiveNote(result as any);
-      // 如果笔记不在列表中，添加到列表
-      actions.addNoteToList({
-        id: result.id,
-        userId: result.userId,
-        title: result.title,
-        contentText: result.contentText || "",
-        isPinned: result.isPinned || 0,
-        isFavorite: result.isFavorite || 0,
-        isLocked: result.isLocked || 0,
-        isArchived: result.isArchived || 0,
-        isTrashed: result.isTrashed || 0,
-        version: result.version || 1,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-      } as any);
-    } catch (err: any) {
-      console.error("Failed to open today journal:", err);
-      toast.error(err?.message || t("journal.error", { defaultValue: "打开今日日记失败" }));
-    }
-  };
-
   // 实际执行创建笔记的逻辑，抽出供选择器回调复用
   // noteType="word" 时：弹文件选择器，走 importDocxAsNote（解析 .docx 为富文本笔记）。
   // noteType="yuque" 时：弹出导入面板，导入目标固定为所选笔记本。
   const createNoteInNotebook = async (
     notebookId: string,
-    noteType: "normal" | "markdown" | "word" | "journal" | "yuque" = "normal",
+    noteType: "normal" | "markdown" | "word" | "yuque" = "normal",
   ) => {
     try {
       if (noteType === "yuque") {

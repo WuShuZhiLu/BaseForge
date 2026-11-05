@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -1488,7 +1488,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
     hasPreferences?: boolean;
   }>("/user-preferences"),
@@ -1504,7 +1503,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
   }) => request<{
     noteTitleAsAppTitle: boolean;
@@ -1518,7 +1516,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
     hasPreferences?: boolean;
   }>("/user-preferences", { method: "PUT", body: JSON.stringify(data) }),
@@ -3136,7 +3133,7 @@ export const api = {
   },
 
   // Mind Maps
-  // Y4: 与 tasks/diary 一致——"集合"接口自动带当前 workspaceId（personal 不带），
+  // Y4: 与 tasks 一致——"集合"接口自动带当前 workspaceId（personal 不带），
   //   "按 id"接口（get/update/delete）不带，后端按行自带的 workspaceId 做 ACL。
   getMindMaps: (workspaceId?: string | null) => {
     const ws = workspaceId === undefined ? getCurrentWorkspace() : workspaceId;
@@ -3174,301 +3171,6 @@ export const api = {
   deleteMindMapFolder: (id: string) => request(`/mindmap-folders/${id}`, { method: "DELETE" }),
   moveMindMap: (id: string, folderId: string | null) =>
     request<MindMap>(`/mindmaps/${id}/move`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
-
-  // Diary (说说/动态)
-  // Y2: 自动注入当前工作区。后端按 workspaceId 隔离数据：
-  //   - 'personal' 或省略 → 个人空间（diaries.workspaceId IS NULL）
-  //   - <uuid>            → 指定工作区（要求成员身份 + diaries 功能开关未关闭）
-  // 在工作区中：发布权限按"是否成员 + 功能开关"，删除权限按 canManageResource
-  //   （创建者本人 / admin / owner）。
-  postDiary: (data: { contentText: string; mood?: string; images?: string[]; media?: DiaryMediaItem[]; createdAt?: string }) => {
-    const ws = getCurrentWorkspace();
-    const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    return request<Diary>(`/diary${qs}`, { method: "POST", body: JSON.stringify(data) });
-  },
-  getDiaryTimeline: (
-    cursor?: string,
-    limit?: number,
-    range?: { from?: string; to?: string; mediaType?: string; mood?: string; q?: string },
-    workspaceOverride?: string,
-  ) => {
-    const params = new URLSearchParams();
-    if (cursor) params.set("cursor", cursor);
-    if (limit) params.set("limit", String(limit));
-    if (range?.mediaType && range.mediaType !== "all") params.set("mediaType", range.mediaType);
-    if (range?.mood) params.set("mood", range.mood);
-    if (range?.q) params.set("q", range.q);
-    // from/to 接收 "YYYY-MM-DD" 或完整 ISO 时间；后端会做 normalize
-    if (range?.from) params.set("from", range.from);
-    if (range?.to) params.set("to", range.to);
-    const ws = workspaceOverride ?? getCurrentWorkspace();
-    if (ws && ws !== "personal") params.set("workspaceId", ws);
-    const qs = params.toString();
-    return request<DiaryTimeline>(`/diary/timeline${qs ? `?${qs}` : ""}`);
-  },
-  deleteDiary: (id: string) => request(`/diary/${id}`, { method: "DELETE" }),
-  /**
-   * 编辑一条说说。仅传入需要修改的字段；图片字段传入即覆盖（差集
-   * attach / 反 attach 由后端处理，会自动清理被移除的图片）。
-   * 鉴权：作者本人 + 工作区 admin/owner（与 deleteDiary 一致）。
-   */
-  updateDiary: (
-    id: string,
-    data: { contentText?: string; mood?: string; images?: string[]; media?: DiaryMediaItem[]; createdAt?: string },
-  ) =>
-    request<Diary>(`/diary/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  getDiaryStats: (range?: { from?: string; to?: string; mediaType?: string; mood?: string; q?: string }) => {
-    const params = new URLSearchParams();
-    if (range?.from) params.set("from", range.from);
-    if (range?.to) params.set("to", range.to);
-    if (range?.mediaType && range.mediaType !== "all") params.set("mediaType", range.mediaType);
-    if (range?.mood) params.set("mood", range.mood);
-    if (range?.q) params.set("q", range.q);
-    const ws = getCurrentWorkspace();
-    if (ws && ws !== "personal") params.set("workspaceId", ws);
-    const qs = params.toString();
-    return request<DiaryStats>(`/diary/stats${qs ? `?${qs}` : ""}`);
-  },
-
-  // 今日日记
-  journals: {
-    /** 获取或创建今日日记（POST 语义，避免 GET 副作用） */
-    getOrCreateToday: async (localDate?: string) => {
-      const result = await request<{
-        id: string;
-        title: string;
-        existed: boolean;
-        userId: string;
-        contentText?: string;
-        isPinned?: number;
-        isFavorite?: number;
-        isLocked?: number;
-        isArchived?: number;
-        isTrashed?: number;
-        version?: number;
-        createdAt: string;
-        updatedAt: string;
-        [key: string]: unknown;
-      }>("/journals/today", {
-        method: "POST",
-        body: JSON.stringify({ localDate }),
-      });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
-          detail: { reason: result.existed ? "journal-archive-repaired" : "journal-created" },
-        }));
-      }
-      return result;
-    },
-    /** 检查今日日记是否存在（只读，不创建） */
-    checkToday: (date?: string) => {
-      const qs = date ? `?date=${encodeURIComponent(date)}` : "";
-      return request<{ exists: boolean; noteId: string | null; title: string | null }>(`/journals/check${qs}`);
-    },
-    /** 获取或创建当前工作区的共享日期日记 */
-    getOrCreateWorkspace: async (workspaceId: string, localDate: string) => {
-      const result = await request<{
-        id: string;
-        title: string;
-        existed: boolean;
-        canWrite: boolean;
-        role: string;
-        workspaceId: string;
-        scope: "workspace";
-        [key: string]: unknown;
-      }>(`/journals/workspace/${encodeURIComponent(workspaceId)}/resolve`, {
-        method: "POST",
-        body: JSON.stringify({ localDate }),
-      });
-      if (typeof window !== "undefined" && result.canWrite) {
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
-          detail: {
-            reason: result.existed ? "workspace-journal-repaired" : "workspace-journal-created",
-            workspaceId,
-          },
-        }));
-      }
-      return result;
-    },
-    /** 检查工作区共享日记是否存在；只读成员也可调用 */
-    checkWorkspace: (workspaceId: string, date?: string) => {
-      const qs = date ? `?date=${encodeURIComponent(date)}` : "";
-      return request<{
-        exists: boolean;
-        noteId: string | null;
-        title: string | null;
-        canWrite: boolean;
-        role: string;
-        scope: "workspace";
-        workspaceId: string;
-      }>(`/journals/workspace/${encodeURIComponent(workspaceId)}/check${qs}`);
-    },
-    /** 将已有日记迁移到真实的个人日记 / 年 / 月目录 */
-    organizeArchive: () => request<{
-      success: boolean;
-      total: number;
-      organized: number;
-      moved: number;
-      alreadyOrganized: number;
-      skippedInvalidDate: number;
-      skippedWorkspaceJournal: number;
-      foldersCreated: number;
-      foldersAdopted: number;
-      foldersReused: number;
-      rootNotebookId: string | null;
-    }>("/journals/organize", { method: "POST" }),
-    /** 预览迁移后可安全清理的旧空目录 */
-    previewArchiveCleanup: () => request<{
-      previewToken: string;
-      candidateCount: number;
-      blockedCount: number;
-      candidates: Array<{
-        id: string;
-        name: string;
-        parentId: string | null;
-        updatedAt: string;
-        evidenceCount: number;
-      }>;
-      blocked: Array<{
-        id: string;
-        name: string;
-        reasons: string[];
-      }>;
-    }>("/journals/cleanup-preview"),
-    /** 按预览令牌软删除已确认的空旧目录 */
-    cleanupArchive: (data: { previewToken: string; candidateIds?: string[] }) => request<{
-      success: boolean;
-      cleanupId: string;
-      cleaned: number;
-      alreadyDeleted: number;
-      cleanedNotebooks: Array<{ id: string; name: string }>;
-    }>("/journals/cleanup", { method: "POST", body: JSON.stringify(data) }),
-    /** 撤销一次旧目录清理 */
-    restoreArchiveCleanup: (cleanupId: string) => request<{
-      success: boolean;
-      cleanupId: string;
-      restored: number;
-      alreadyActive: number;
-      missing: number;
-      restoredNotebooks: Array<{ id: string; name: string }>;
-    }>("/journals/cleanup/restore", { method: "POST", body: JSON.stringify({ cleanupId }) }),
-    /** 个人日记隐私状态；状态查询本身不要求已解锁。 */
-    getPrivacyStatus: () => request<{
-      exists: boolean;
-      rootNotebookId: string | null;
-      rootNodeId: string | null;
-      title: string;
-      isPasswordProtected: boolean;
-      unlocked: boolean;
-    }>("/journals/privacy"),
-    /** 只确保稳定的个人日记根存在，不会创建当天日记。 */
-    ensurePrivacyRoot: () => request<{
-      exists: boolean;
-      rootNotebookId: string | null;
-      rootNodeId: string | null;
-      title: string;
-      isPasswordProtected: boolean;
-      unlocked: boolean;
-    }>("/journals/privacy/ensure", { method: "POST" }),
-    /** 获取个人日记轻量档案列表。 */
-    list: (options: {
-      year?: string;
-      month?: string;
-      from?: string;
-      to?: string;
-      mood?: string;
-      q?: string;
-      sort?: "date_desc" | "date_asc" | "updated_desc" | "updated_asc";
-      offset?: number;
-      limit?: number;
-      tzOffsetMinutes?: number;
-    } = {}) => {
-      const params = new URLSearchParams();
-      if (options.year) params.set("year", options.year);
-      if (options.month) params.set("month", options.month);
-      if (options.from) params.set("from", options.from);
-      if (options.to) params.set("to", options.to);
-      if (options.mood) params.set("mood", options.mood);
-      if (options.q) params.set("q", options.q);
-      if (options.sort) params.set("sort", options.sort);
-      if (typeof options.offset === "number") params.set("offset", String(options.offset));
-      if (typeof options.limit === "number") params.set("limit", String(options.limit));
-      params.set("tzOffsetMinutes", String(
-        options.tzOffsetMinutes ?? (typeof Date !== "undefined" ? -new Date().getTimezoneOffset() : 0),
-      ));
-      const qs = params.toString();
-      return request<{
-        items: Array<{
-          id: string;
-          title: string;
-          subtitle: string;
-          journalDate: string;
-          preview: string;
-          moods: string[];
-          createdAt: string;
-          updatedAt: string;
-        }>;
-        total: number;
-        hasMore: boolean;
-        nextOffset: number | null;
-        nextCursor: string | null;
-      }>(`/journals/list?${qs}`);
-    },
-    /** 获取日记年月归档结构 */
-    getArchive: () =>
-      request<{
-        years: Array<{
-          year: string;
-          count: number;
-          months: Array<{
-            month: string;
-            count: number;
-            journals: Array<{
-              id: string;
-              title: string;
-              subtitle?: string;
-              journalDate: string;
-              createdAt: string;
-              updatedAt: string;
-            }>;
-          }>;
-        }>;
-      }>("/journals/archive"),
-  },
-
-  // 说说图片：上传 / 删除悬空 / 拼 URL。
-  // 上传时机：用户选好图就立即上传（不是发布时再传），体验上能即时看到缩略图、
-  // 失败也能立即提示。返回的 id 在用户点"发布"时一并提交给 postDiary({ images })。
-  diaryImages: {
-    upload: async (
-      file: File,
-    ): Promise<{ id: string; url: string; mimeType: string; size: number; filename?: string; type: "image" | "video" }> => {
-      const token = getToken();
-      const form = new FormData();
-      form.append("file", file);
-      // Y2: 上传时即记录目标工作区，发布时再 attach 一致。
-      const ws = getCurrentWorkspace();
-      const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-      const res = await fetch(`${getBaseUrl()}/diary/attachments${qs}`, {
-        method: "POST",
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: form,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `图片上传失败: ${res.status}`);
-      }
-      return res.json();
-    },
-    /** 删除一张悬空（未发布）的图片。已发布的图片只能通过删除整条说说级联清理。 */
-    remove: (id: string) =>
-      request<{ success: boolean }>(`/diary/attachments/${id}`, { method: "DELETE" }),
-    /** 拼出图片完整 URL，给 <img src> 用。 */
-    urlFor: (id: string): string => `${getBaseUrl()}/diary/attachments/${id}`,
-  },
 
   // ========== Files（文件管理模块：统一查看/上传/删除附件资源）==========
   //
@@ -3993,90 +3695,6 @@ export const api = {
     return result;
   },
 
-  aiAsk: async (
-    question: string,
-    history?: { role: string; content: string }[],
-    onChunk?: (chunk: string) => void,
-    onReferences?: (refs: {
-      id: string;
-      title: string;
-      // v8：附件命中时后端会把 kind='attachment' + attachmentId/filename 一起发。
-      // 老后端没有这些字段，这里标为可选保持前后向兼容。
-      kind?: "note" | "attachment";
-      attachmentId?: string;
-      attachmentFilename?: string;
-    }[]) => void,
-    options?: { notebookId?: string; includeChildren?: boolean }
-  ): Promise<string> => {
-    const token = getToken();
-    // v7 RAG 隔离：把当前 scope 透传给后端
-    //   personal → 不带 ?workspaceId（后端按 workspaceId IS NULL 走个人空间）
-    //   <uuid>   → 带 ?workspaceId=<uuid>（后端校验成员身份后按工作区检索）
-    const ws = getCurrentWorkspace();
-    const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    const res = await fetch(`${getBaseUrl()}/ai/ask${qs}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ question, history, notebookId: options?.notebookId, includeChildren: options?.includeChildren }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `AI 请求失败: ${res.status}`);
-    }
-
-    let result = "";
-    const handleArray = (arr: AiReferenceItem[]) => {
-      // 后端在内容流里夹一条数组 = 参考笔记列表 [{id,title},...]
-      if (arr.length > 0 && arr[0]?.id && arr[0]?.title) {
-        onReferences?.(arr);
-      }
-    };
-    const emit = (chunks: string[]) => {
-      for (const c of chunks) {
-        if (!c) continue;
-        result += c;
-        onChunk?.(c);
-      }
-    };
-
-    if (!res.body || typeof res.body.getReader !== "function") {
-      const fullText = await res.text();
-      const { events } = parseSseChunks(fullText + "\n\n");
-      for (const data of events) {
-        if (data === "[DONE]") break;
-        emit(extractContentChunks(data, handleArray));
-      }
-      return result;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let done = false;
-    while (!done) {
-      const r = await reader.read();
-      done = r.done;
-      if (r.value) buffer += decoder.decode(r.value, { stream: true });
-      const parsed = parseSseChunks(buffer);
-      buffer = parsed.rest;
-      for (const data of parsed.events) {
-        if (data === "[DONE]") { done = true; break; }
-        emit(extractContentChunks(data, handleArray));
-      }
-    }
-    if (buffer.trim()) {
-      const tail = parseSseChunks(buffer + "\n\n");
-      for (const data of tail.events) {
-        if (data === "[DONE]") break;
-        emit(extractContentChunks(data, handleArray));
-      }
-    }
-    return result;
-  },
-
   getKnowledgeStats: async (): Promise<{
     noteCount: number;
     ftsCount: number;
@@ -4122,124 +3740,6 @@ export const api = {
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `请求失败: ${res.status}`); }
     return res.json();
-  },
-
-  // 这些方法失败时抛错由调用方决定如何容错（通常面板加载失败就退回空列表即可）。
-  getAiChatHistory: async (
-    limit = 100,
-    conversationId?: string,
-  ): Promise<{
-    messages: {
-      id: string;
-      role: "user" | "assistant";
-      content: string;
-      references?: {
-        id: string;
-        title: string;
-        kind?: "note" | "attachment";
-        attachmentId?: string;
-        attachmentFilename?: string;
-      }[];
-      createdAt: string;
-    }[];
-    conversationId: string | null;
-  }> => {
-    const token = getToken();
-    const params = new URLSearchParams();
-    params.set("limit", String(limit));
-    if (conversationId) params.set("conversationId", conversationId);
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history?${params.toString()}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error("加载聊天记录失败");
-    return res.json();
-  },
-
-  appendAiChatHistory: async (msg: {
-    id?: string;
-    conversationId?: string;
-    role: "user" | "assistant";
-    content: string;
-    references?: {
-      id: string;
-      title: string;
-      kind?: "note" | "attachment";
-      attachmentId?: string;
-      attachmentFilename?: string;
-    }[];
-  }): Promise<{ ok: boolean; id?: string; createdAt?: string; skipped?: boolean; conversationId?: string }> => {
-    const token = getToken();
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(msg),
-    });
-    if (!res.ok) throw new Error("保存聊天记录失败");
-    return res.json();
-  },
-
-  clearAiChatHistory: async (conversationId?: string): Promise<{ ok: boolean; deleted: number }> => {
-    const token = getToken();
-    const params = new URLSearchParams();
-    if (conversationId) params.set("conversationId", conversationId);
-    const qs = params.toString();
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history${qs ? `?${qs}` : ""}`, {
-      method: "DELETE",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error("清空聊天记录失败");
-    return res.json();
-  },
-
-  // ========== AI 会话（多对话）==========
-  // 约定：一个会话就是一个"话题"，可改名、可删除。消息通过 conversationId 挂到会话。
-  // 列表失败由组件自行兜底（退化到"空列表 + 创建默认会话"即可）。
-  aiConversations: {
-    list: () =>
-      request<{
-        conversations: {
-          id: string;
-          title: string;
-          archived: boolean;
-          createdAt: string;
-          updatedAt: string;
-          messageCount: number;
-          lastMessage: string | null;
-          lastRole: string | null;
-        }[];
-      }>("/ai/conversations"),
-    create: (data?: { title?: string }) =>
-      request<{
-        conversation: {
-          id: string;
-          title: string;
-          archived: boolean;
-          createdAt: string;
-          updatedAt: string;
-          messageCount: number;
-          lastMessage: string | null;
-          lastRole: string | null;
-        };
-      }>("/ai/conversations", {
-        method: "POST",
-        body: JSON.stringify(data || {}),
-      }),
-    update: (id: string, data: { title?: string; archived?: boolean }) =>
-      request<{ ok: boolean }>(`/ai/conversations/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    remove: (id: string) =>
-      request<{ ok: boolean }>(`/ai/conversations/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }),
   },
 
   // ========== AI 自定义指令模板（P2）==========
@@ -5043,7 +4543,6 @@ export const api = {
           rows: number;
           bytes: number;
           attachments: { count: number; bytes: number };
-          diaryAttachments: { count: number; bytes: number };
           taskAttachments: { count: number; bytes: number };
         };
         local: { dir: string; files: number; bytes: number };

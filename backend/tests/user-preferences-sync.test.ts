@@ -193,11 +193,11 @@ test("syncs navigation visibility preferences and rejects unknown module ids", a
   assert.deepEqual(before.json.hiddenTaskCenterModules, []);
 
   const saved = await requestJson("PUT", {
-    hiddenNavigationModules: ["tasks", "diary", "tasks"],
+    hiddenNavigationModules: ["tasks", "files", "tasks"],
     hiddenTaskCenterModules: ["habits", "stats"],
   });
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.json.hiddenNavigationModules, ["tasks", "diary"]);
+  assert.deepEqual(saved.json.hiddenNavigationModules, ["tasks", "files"]);
   assert.deepEqual(saved.json.hiddenTaskCenterModules, ["habits", "stats"]);
 
   const invalidNav = await requestJson("PUT", { hiddenNavigationModules: ["tasks", "unknown-module"] });
@@ -213,16 +213,16 @@ test("syncs navigation visibility preferences and rejects unknown module ids", a
 test("syncs navigation module order, appends future/default modules, and rejects unknown ids", async () => {
   const before = await requestJson("GET");
   assert.deepEqual(before.json.navigationModuleOrder, [
-    "notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares",
+    "notifications", "favorites", "files", "tasks", "mindmaps", "shares",
   ]);
 
   const saved = await requestJson("PUT", { navigationModuleOrder: ["tasks", "favorites", "notifications"] });
   assert.equal(saved.status, 200);
   assert.deepEqual(saved.json.navigationModuleOrder, [
-    "tasks", "favorites", "notifications", "files", "diary", "mindmaps", "ai-chat", "shares",
+    "tasks", "favorites", "notifications", "files", "mindmaps", "shares",
   ]);
   assert.deepEqual((await requestJson("GET", undefined, OTHER_ID)).json.navigationModuleOrder, [
-    "notifications", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares",
+    "notifications", "favorites", "files", "tasks", "mindmaps", "shares",
   ]);
 
   const invalid = await requestJson("PUT", { navigationModuleOrder: ["tasks", "unknown-module"] });
@@ -243,22 +243,6 @@ test("persists notification entry visibility per account and supports restoring 
   assert.equal(shown.status, 200);
   assert.deepEqual((await requestJson("GET")).json.hiddenNavigationModules, ["tasks"]);
 });
-
-test("syncs journal lock-on-entry preference per account", async () => {
-  const before = await requestJson("GET");
-  assert.equal(before.json.journalLockOnEntry, false);
-
-  const saved = await requestJson("PUT", { journalLockOnEntry: true });
-  assert.equal(saved.status, 200);
-  assert.equal(saved.json.journalLockOnEntry, true);
-  assert.equal((await requestJson("GET")).json.journalLockOnEntry, true);
-  assert.equal((await requestJson("GET", undefined, OTHER_ID)).json.journalLockOnEntry, false);
-
-  const invalid = await requestJson("PUT", { journalLockOnEntry: "yes" });
-  assert.equal(invalid.status, 400);
-  assert.equal(invalid.json.code, "INVALID_USER_PREFERENCE");
-});
-
 
 test("syncs note-list divider preference per account", async () => {
   const before = await requestJson("GET");
