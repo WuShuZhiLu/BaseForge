@@ -113,7 +113,7 @@ export type ToolRouteKey = (typeof TOOL_TAB_KEYS)[number];
  */
 export const SETTINGS_TAB_KEYS = [
   "appearance", "switches", "shortcuts", "ai", "voice", "automation",
-  "security", "tokens", "data", "backup", "sync", "folderSync",
+  "security", "tokens", "data", "sync", "folderSync",
   "users", "workspaces", "download", "about",
 ] as const;
 export type SettingsTabKey = (typeof SETTINGS_TAB_KEYS)[number];

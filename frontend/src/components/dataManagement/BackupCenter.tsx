@@ -25,7 +25,9 @@ type BackupStatus = Awaited<ReturnType<typeof api.backup.status>>;
 type BackupRow = Awaited<ReturnType<typeof api.backup.list>>[number];
 type RestoreDryRun = NonNullable<Awaited<ReturnType<typeof api.backup.restore>>["dryRun"]>;
 
-export default function BackupCenter({ migration, advanced }: { migration: React.ReactNode; advanced: React.ReactNode }) {
+// migration 插槽可选：原先由设置页塞入一排「导入 / 导出」按钮，但那组按钮既与
+// 「数据管理」Tab 重复，回调又只改自身 state（点了无反应），已移除。
+export default function BackupCenter({ migration, advanced }: { migration?: React.ReactNode; advanced: React.ReactNode }) {
   const { t } = useTranslation();
   const locationLabel = t(isElectronFullLocalRuntime(getServerUrl(), isDesktop()) ? "dataManager.overview.local" : "dataManager.overview.server");
   const [advancedOpen, setAdvancedOpen] = useState(false);

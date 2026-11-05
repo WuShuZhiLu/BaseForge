@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom";
 import { Capacitor } from "@capacitor/core";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, RefreshCw, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, Mail, Mic, Workflow, CalendarClock, Archive, Search } from "lucide-react";
+import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, RefreshCw, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, Mail, Mic, Workflow, CalendarClock, Search } from "lucide-react";
 import { CODE_BLOCK_THEMES } from "@/lib/codeBlockTheme";
 import { useTranslation } from "react-i18next";
 import qqGroupQr from "@/assets/feedback/qq-group.jpg";
@@ -13,7 +13,6 @@ import TokenManagement from "@/components/TokenManagement";
 import DataManager from "@/components/DataManager";
 import FolderSyncSettings from "@/components/settings/FolderSyncSettings";
 import SyncSettingsTab from "@/components/settings/SyncSettingsTab";
-import BackupCenterTab from "@/components/settings/BackupCenterTab";
 import ShortcutSettingsPanel from "@/components/settings/ShortcutSettingsPanel";
 import AISettingsPanel from "@/components/AISettingsPanel";
 import SidebarDisplaySettings from "@/components/settings/SidebarDisplaySettings";
@@ -44,7 +43,7 @@ import {
   type MobileKnowledgeTreeViewMode,
 } from "@/lib/mobileKnowledgeTreeViewMode";
 
-type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "folderSync" | "users" | "workspaces" | "download" | "about";
+type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "voice" | "automation" | "security" | "tokens" | "data" | "sync" | "folderSync" | "users" | "workspaces" | "download" | "about";
 
 /** 设置导航的五个分组。分组只影响导航层展示，不改变任何面板的内容或归属。 */
 type SettingsGroupId = "personal" | "connection" | "data" | "system" | "about";
@@ -69,12 +68,11 @@ const SETTING_TAB_KEYWORDS: Record<TabId, string> = {
   automation: "自动化 任务简报 Webhook 时区 定时",
   security: "密码 两步验证 2FA 恢复码 会话 头像 昵称 文件夹锁定",
   tokens: "令牌 token CLI 笔记本范围 授权",
-  data: "导入 导出 数据库 危险区 全库 工作区范围",
-  backup: "备份 恢复 快照 WebDAV 备份 数据文件",
+  data: "导入 导出 备份 恢复 快照 WebDAV 数据库 危险区 全库 空间范围 数据文件",
   sync: "同步 冲突中心 服务器连接 多设备 工作区同步",
   folderSync: "文件夹同步 本地目录 桌面",
   users: "用户 成员 管理员 账号 权限",
-  workspaces: "工作区 空间 协作 成员",
+  workspaces: "空间管理 工作区 空间 协作 成员",
   download: "下载 安装包 客户端 Docker 桌面 移动",
   about: "关于 版本 反馈 开源 更新",
 };
@@ -1474,9 +1472,8 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     { id: "security" as const, group: "personal" as const, label: t('settings.security'), icon: Shield },
     // 连接：令牌供 MCP / CLI 使用；MCP 的服务端点与可用工具在 AI 面板里
     { id: "tokens" as const, group: "connection" as const, label: t('settings.tokens', { defaultValue: '访问令牌' }), icon: Key },
-    // 数据：DataManager 内部仍按 isAdmin 分流（管理员三 scope / 普通用户仅个人空间）
-    { id: "data" as const, group: "data" as const, label: t('settings.dataManagement'), icon: Database },
-    { id: "backup" as const, group: "data" as const, label: "备份中心", icon: Archive },
+    // 数据：DataManager 内部按 scope 分流（空间 = 所有人；系统 = 仅管理员）
+    { id: "data" as const, group: "data" as const, label: t('settings.dataAndBackup'), icon: Database },
     ...(syncSurfaceAvailable ? [{ id: "sync" as const, group: "data" as const, label: "同步", icon: RefreshCw }] : []),
     ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, group: "data" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
     // 系统管理：仅管理员可见
@@ -1708,10 +1705,9 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
             {activeTab === "tokens" && <TokenManagement />}
                   {activeTab === "users" && isAdmin && <UserManagement currentUserId={currentUser?.id ?? null} />}
                   {activeTab === "workspaces" && isAdmin && <WorkspaceManagement />}
-                  {/* data tab 对所有用户可见：DataManager 内部会按 isAdmin 自动分流
-                       —— 管理员看到完整三 scope；普通用户只看"个人空间"的导出/导入。 */}
+                  {/* data tab 对所有用户可见：DataManager 内部按 scope 分流
+                       —— 「空间」所有人可用；「系统」仅管理员。 */}
                   {activeTab === "data" && <DataManager />}
-                  {activeTab === "backup" && <BackupCenterTab />}
                   {activeTab === "sync" && <SyncSettingsTab />}
                   {activeTab === "folderSync" && <FolderSyncSettings />}
                   {activeTab === "download" && <DownloadPanel />}

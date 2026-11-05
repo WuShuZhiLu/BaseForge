@@ -82,4 +82,29 @@ describe("设置导航分组与搜索契约", () => {
     expect(settings).toContain('activeTab === "sync"');
     expect(whitelistIds()).toContain("sync");
   });
+
+  it("备份入口唯一：备份中心并入「数据与备份」的系统 scope", () => {
+    const dataManager = readSource("src/components/DataManager.tsx");
+
+    // 侧栏不再单列「备份中心」，数据 tab 改名为「数据与备份」
+    expect(whitelistIds()).not.toContain("backup");
+    expect(settings).toContain("settings.dataAndBackup");
+    expect(settings).not.toContain("BackupCenterTab");
+
+    // 数据管理只有两个 scope：空间（所有人可用）/ 系统（仅管理员）
+    expect(dataManager).toContain('type Scope = "space" | "system"');
+    expect(dataManager).toContain('system: ["backup", "database", "danger"]');
+    expect(dataManager).toContain('activeSubTab === "backup"');
+    expect(dataManager).toContain("<BackupCenter");
+  });
+
+  it("空间 scope 对所有登录用户开放，不再限制管理员", () => {
+    const dataManager = readSource("src/components/DataManager.tsx");
+
+    // 「空间」必须是非 adminOnly；只有「系统」保留 adminOnly
+    expect(dataManager).toContain(`{ id: "space", icon: FolderOpen, label: t('dataManager.scope.space'), adminOnly: false }`);
+    expect(dataManager).toContain(`{ id: "system", icon: ServerCog, label: t('dataManager.scope.system'), adminOnly: true }`);
+    // 旧的「工作区」scope 已并入「空间」
+    expect(dataManager).not.toContain('{ id: "workspace"');
+  });
 });

@@ -8,8 +8,8 @@ import {
   Lock, Eye, EyeOff, X,
   Mail, Send, Settings as SettingsIcon, ChevronDown, ChevronRight,
   BookOpen, ExternalLink,
-  User as UserIcon, Users, ServerCog, Package, Smartphone, FolderOpen, Heart,
-  ListTodo,
+  ServerCog, Package, Smartphone, FolderOpen, Heart,
+  ListTodo, Archive,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { exportAllNotes, ExportProgress } from "@/lib/exportService";
@@ -48,6 +48,7 @@ import WeChatFavoritesImport from "@/components/WeChatFavoritesImport";
 import UrlImport from "@/components/UrlImport";
 import YuqueImport from "@/components/YuqueImport";
 import RemoteImageLocalizationPanel from "@/components/RemoteImageLocalizationPanel";
+import BackupCenter from "@/components/dataManagement/BackupCenter";
 import {
   IMPORT_METHOD_GROUPS,
   persistImportMethod,
@@ -62,22 +63,25 @@ import { runFullBackupJob } from "@/lib/fullBackupJobClient";
 import { confirm } from "@/components/ui/confirm";
 
 // ============================================================================
-// 一级 Tab：scope —— 个人空间 / 工作区 / 系统
+// 一级 Tab：scope —— 空间 / 系统
 // ----------------------------------------------------------------------------
 // 拆分动机：
-//   - 个人空间 / 工作区：导出/导入是真正"按数据范围隔离"的——后端 export 路由
-//     已支持 ?workspaceId= 过滤（personal=NULL）。两个 Tab 各自带自己的 scope，
-//     不依赖侧边栏当前选中的 workspace（避免在弹窗里改 currentWorkspace
-//     触发 App 顶层的"工作区切换重置流程"）。
-//   - 系统：数据库 / 备份 / 危险区在后端是 SQLite 文件级 / 全库范围操作，
-//     本质上和"哪个工作区"无关，单独一栏并显著标注"全库范围"，避免误导。
+//   - 空间：所有登录用户可用。导出支持多选空间（个人空间 + 我有权限的协作空间），
+//     每个空间产出一个 zip；导入只落到单一目标空间。后端 export 路由已支持
+//     ?workspaceId= 过滤（personal=NULL），多选由前端串行调用实现。
+//   - 系统：备份灾备 / 数据库 / 危险区，仅系统管理员。三者在后端都是 SQLite
+//     文件级 / 全库范围操作，与具体空间无关。
+//
+// 「备份」子页复用 dataManagement/BackupCenter（全库快照、自动备份、WebDAV、
+//   恢复中心、邮件投递），原先独立的「备份中心」设置 Tab 已合并到这里，
+//   避免两套入口重复。
 //
 // 入口闸门：整个 DataManager 仅系统管理员（User.role === "admin"）可访问；
 //   外层 SettingsModal 已用 isAdmin 控制 tab 可见性，这里再加一层防御性闸门。
 // ============================================================================
 
-type Scope = "personal" | "workspace" | "system";
-type SubTab = "export" | "import" | "database" | "backup" | "danger";
+type Scope = "space" | "system";
+type SubTab = "export" | "import" | "backup" | "database" | "danger";
 type MobileMemoMethod = "xiaomi" | "oppo" | "iphone";
 
 const IMPORT_FORMAT_STORAGE = {
@@ -125,10 +129,15 @@ function isSiyuanNativePackageFilename(filename: string): boolean {
 
 /** 各 scope 下允许的二级 Tab 集合（顺序即展示顺序） */
 const SUBTABS_BY_SCOPE: Record<Scope, ReadonlyArray<SubTab>> = {
-  personal: ["export", "import"],
-  workspace: ["export", "import"],
-  system: ["database", "backup", "danger"],
+  // 空间：备份（导出多选空间）/ 恢复与导入（单一目标空间）
+  space: ["export", "import"],
+  // 系统：备份与灾备统一在这里（BackupCenter：全库快照、自动备份、WebDAV、
+  // 恢复中心、邮件投递），另有数据库文件与危险区。
+  system: ["backup", "database", "danger"],
 };
+
+/** 空间选择项：个人空间是虚拟项（后端用 workspaceId=personal），协作空间来自 api.getWorkspaces() */
+type SpaceOption = { id: string; name: string };
 
 function formatSyncTime(ts: number | null): string {
   if (!ts) return "尚未同步";
@@ -384,11 +393,11 @@ export default function DataManager() {
   // -----------------------------------------------------------------
   // 一级 / 二级 tab 状态
   // -----------------------------------------------------------------
-  const [scope, setScope] = useState<Scope>("personal");
+  const [scope, setScope] = useState<Scope>("space");
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("export");
 
   // 切换一级 tab 时，把二级 tab 自动重置到该 scope 下的首项，避免出现
-  // "工作区 Tab 但激活的是 database"这种非法组合。
+  // "系统 Tab 但激活的是 export"这种非法组合。
   useEffect(() => {
     const allowed = SUBTABS_BY_SCOPE[scope];
     if (!allowed.includes(activeSubTab)) {
@@ -397,43 +406,54 @@ export default function DataManager() {
   }, [scope, activeSubTab]);
 
   // -----------------------------------------------------------------
-  // 工作区列表（仅在 scope=workspace 时使用，用于下拉选择目标工作区）
+  // 空间列表：个人空间（虚拟项 "personal"）+ 我可访问的协作空间。
+  //   - 导出：多选（exportSpaceIds），每个空间产出一个 zip；
+  //   - 导入：单选（importSpaceId），必须落到唯一目标空间。
   // -----------------------------------------------------------------
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
+  const [exportSpaceIds, setExportSpaceIds] = useState<string[]>(["personal"]);
+  const [importSpaceId, setImportSpaceId] = useState<string>("personal");
   useEffect(() => {
-    if (scope !== "workspace") return;
+    if (scope !== "space") return;
     let cancelled = false;
     api.getWorkspaces()
       .then((list) => {
         if (cancelled) return;
         setWorkspaces(list || []);
-        // 自动选中第一个工作区，避免空态
-        if ((list?.length ?? 0) > 0 && !selectedWorkspaceId) {
-          setSelectedWorkspaceId(list[0].id);
-        }
       })
       .catch(() => { if (!cancelled) setWorkspaces([]); });
     return () => { cancelled = true; };
-    // selectedWorkspaceId 不依赖：仅首次拉列表时尝试默认选中
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope]);
 
-  /** 当前 scope 实际要传给 export/import API 的 workspaceId 字符串：
-   *   - personal → "personal"
-   *   - workspace → 用户在下拉里选的工作区 id（未选时返回 "" 表示尚未就绪）
+  const spaceOptions: SpaceOption[] = useMemo(
+    () => [
+      { id: "personal", name: t('dataManager.scope.personal') },
+      ...workspaces.map((w) => ({ id: w.id, name: w.name })),
+    ],
+    [workspaces, t],
+  );
+
+  /** 当前 scope 实际要传给 import API 的 workspaceId 字符串：
+   *   - space → 用户在「导入到」里选的空间（"personal" 或 uuid）
    *   - system → 不参与
    */
   const effectiveWorkspaceId: string = useMemo(() => {
-    if (scope === "personal") return "personal";
-    if (scope === "workspace") return selectedWorkspaceId || "";
-    return "";
-  }, [scope, selectedWorkspaceId]);
+    if (scope === "system") return "";
+    return importSpaceId || "";
+  }, [scope, importSpaceId]);
 
   const selectedWorkspaceName = useMemo(() => {
-    if (scope !== "workspace") return "";
-    return workspaces.find((w) => w.id === selectedWorkspaceId)?.name ?? "";
-  }, [scope, selectedWorkspaceId, workspaces]);
+    if (scope !== "space") return "";
+    return spaceOptions.find((o) => o.id === importSpaceId)?.name ?? "";
+  }, [scope, importSpaceId, spaceOptions]);
+
+  /** 本次备份实际要导出的空间：勾选了、且个人空间未被管理员关闭导出 */
+  const exportTargets = useMemo(
+    () => spaceOptions.filter(
+      (o) => exportSpaceIds.includes(o.id) && !(o.id === "personal" && personalExportLocked),
+    ),
+    [spaceOptions, exportSpaceIds, personalExportLocked],
+  );
 
   // Export state
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
@@ -512,15 +532,32 @@ export default function DataManager() {
   const [exportInlineImages, setExportInlineImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 全量导出 —— 按当前 scope（个人空间 / 工作区）
+  // 全量导出 —— 按选中的空间逐个导出（每个空间产出一个 zip）。
+  // 后端 /api/export/notes 与打包任务都只认单个 workspaceId，多选由前端串行调用；
+  // 连续多次下载可能被浏览器拦截，UI 上给了说明，用户可重复点击补下。
   const handleExportAll = async () => {
-    if (!effectiveWorkspaceId) return; // 工作区 scope 但未选中，按钮已禁用，这里再防御
+    const targets = exportTargets;
+    if (targets.length === 0) return;
     setIsExporting(true);
     setExportProgress(null);
-    await exportAllNotes(
-      (p) => setExportProgress(p),
-      { inlineImages: exportInlineImages, workspaceId: effectiveWorkspaceId },
-    );
+    const failed: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i];
+      const prefix = targets.length > 1 ? `${target.name} (${i + 1}/${targets.length}) · ` : "";
+      const ok = await exportAllNotes(
+        (p) => setExportProgress(prefix ? { ...p, message: `${prefix}${p.message}` } : p),
+        { inlineImages: exportInlineImages, workspaceId: target.id },
+      );
+      if (!ok) failed.push(target.name);
+    }
+    if (failed.length > 0) {
+      setExportProgress({
+        phase: "error",
+        current: 0,
+        total: 0,
+        message: t("dataManager.exportPartialFailed", { spaces: failed.join("、") }),
+      });
+    }
     setIsExporting(false);
   };
 
@@ -867,9 +904,8 @@ export default function DataManager() {
       // 用户最常踩的坑：从 A 工作区导出 → DataManager 选 B 导入 → 弹窗关闭后侧
       // 边栏还在 A，看不到笔记，误以为"显示成功但没导入"。
       const targetName =
-        scope === "personal"
-          ? t('dataManager.scope.personal')
-          : (selectedWorkspaceName || t('dataManager.scope.workspace'));
+        spaceOptions.find((o) => o.id === effectiveWorkspaceId)?.name
+        ?? t('dataManager.scope.space');
       setLastImportTarget({
         workspaceId: effectiveWorkspaceId,
         workspaceName: targetName,
@@ -976,9 +1012,9 @@ export default function DataManager() {
     }
   };
 
-  // 工作区 scope 但还没选中具体工作区时（如该用户没有任何协作工作区），
-  // 导出/导入按钮应被禁用，避免发出 ?workspaceId= （后端会按个人空间错处理）
-  const workspaceScopeNotReady = scope === "workspace" && !effectiveWorkspaceId;
+  // 导入目标空间尚未就绪时（理论上不会发生：默认落到个人空间），
+  // 导出/导入按钮应被禁用，避免发出空 ?workspaceId= （后端会按个人空间处理）
+  const workspaceScopeNotReady = scope === "space" && !effectiveWorkspaceId;
 
   const importMethodConfigs: Record<ImportMethod, {
     icon: React.ComponentType<{ className?: string }>;
@@ -1102,39 +1138,9 @@ export default function DataManager() {
           {t('dataManager.description')}
         </p>
 
-        <section className="mb-4 flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-800/30 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-              <ListTodo size={19} />
-            </div>
-            <div className="min-w-0">
-              <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">任务数据</h4>
-              <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-                导入或导出当前空间的待办、项目、层级、提醒和任务图片。
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={openTaskDataTransfer}
-            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-700 dark:hover:text-indigo-400"
-          >
-            管理导入与导出
-            <ChevronRight size={14} />
-          </button>
-        </section>
-
-        <div className="space-y-3 mb-4">
-          <SyncCenterCard />
-          <DesktopDataSafetyCard />
-          <RemoteImageLocalizationPanel />
-        </div>
-
-        {/* ===== 一级 Tab：scope（个人空间 / 工作区 / 系统） =====
-            把"导出/导入/数据库/备份/危险区"按数据范围拆开：
-              - 个人空间：你自己的数据（notes.workspaceId IS NULL）
-              - 工作区：当前选中的协作工作区数据
-              - 系统：SQLite 文件级 / 全库范围操作（与具体工作区无关）
+        {/* ===== 一级 Tab：scope（空间 / 系统） =====
+            空间：所有登录用户可用，按空间备份与恢复（个人空间 + 我有权限的空间）；
+            系统：仅管理员，全库备份 / 数据库文件 / 危险区。
             选中后，下方的二级 tab 会按 SUBTABS_BY_SCOPE 自动过滤。 */}
         <div
           role="tablist"
@@ -1142,12 +1148,11 @@ export default function DataManager() {
           className="flex flex-wrap gap-1 p-1 mb-3 rounded-lg bg-zinc-100/70 dark:bg-zinc-800/50 border border-zinc-200/60 dark:border-zinc-800"
         >
           {([
-            { id: "personal", icon: UserIcon, label: t('dataManager.scope.personal'), adminOnly: false },
-            { id: "workspace", icon: Users, label: t('dataManager.scope.workspace'), adminOnly: true },
+            { id: "space", icon: FolderOpen, label: t('dataManager.scope.space'), adminOnly: false },
             { id: "system", icon: ServerCog, label: t('dataManager.scope.system'), adminOnly: true },
           ] as const)
-            // 非管理员：只保留 personal。workspace/system 涉及跨用户/全库操作，
-            // 严格 admin-only —— 不仅隐藏按钮，连 tab 都不渲染，避免被看见。
+            // 非管理员：只保留 space。「系统」涉及全库操作，严格 admin-only ——
+            // 不仅隐藏按钮，连 tab 都不渲染，避免被看见。
             .filter((s) => isAdmin || !s.adminOnly)
             .map((s) => {
               const active = scope === s.id;
@@ -1170,42 +1175,11 @@ export default function DataManager() {
             })}
         </div>
 
-        {/* ===== 当前 scope 提示横幅 =====
-            明确告诉用户当前正在操作哪部分数据；workspace scope 还要让用户选具体工作区。 */}
-        {scope === "personal" && (
+        {/* ===== 当前 scope 提示横幅 ===== */}
+        {scope === "space" && (
           <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-indigo-200/60 dark:border-indigo-900/40 bg-indigo-50/40 dark:bg-indigo-500/5 text-xs text-indigo-700 dark:text-indigo-300">
-            <UserIcon size={14} className="flex-shrink-0 mt-0.5" />
-            <span>{t('dataManager.scope.personalHint')}</span>
-          </div>
-        )}
-        {scope === "workspace" && (
-          <div className="mb-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                {t('dataManager.scope.currentWorkspaceLabel')}
-              </span>
-              {workspaces.length === 0 ? (
-                <span className="text-xs text-amber-600 dark:text-amber-400">
-                  {t('dataManager.scope.workspaceNeedSwitch')}
-                </span>
-              ) : (
-                <select
-                  value={selectedWorkspaceId}
-                  onChange={(e) => setSelectedWorkspaceId(e.target.value)}
-                  className="text-xs rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
-                >
-                  {workspaces.map((w) => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-            {selectedWorkspaceName && (
-              <div className="flex items-start gap-2 px-3 py-2 rounded-lg border border-emerald-200/60 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-500/5 text-xs text-emerald-700 dark:text-emerald-300">
-                <Users size={14} className="flex-shrink-0 mt-0.5" />
-                <span>{t('dataManager.scope.workspaceHint', { name: selectedWorkspaceName })}</span>
-              </div>
-            )}
+            <FolderOpen size={14} className="flex-shrink-0 mt-0.5" />
+            <span>{t('dataManager.scope.spaceHint')}</span>
           </div>
         )}
         {scope === "system" && (
@@ -1215,9 +1189,35 @@ export default function DataManager() {
           </div>
         )}
 
-        {/* ===== 二级 Tab 切换 =====
-            按当前 scope 过滤可见项：personal/workspace 只显示导出/导入；
-            system 显示数据库/备份/危险区。 */}
+        {/* ===== 空间概览：任务数据 + 同步状态（仅空间 scope） ===== */}
+        {scope === "space" && (
+          <div className="space-y-3 mb-4">
+            <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-800 dark:bg-zinc-800/30 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                  <ListTodo size={19} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">任务数据</h4>
+                  <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                    导入或导出所选空间的待办、项目、层级、提醒和任务图片。
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={openTaskDataTransfer}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-sm transition-colors hover:border-indigo-300 hover:text-indigo-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-indigo-700 dark:hover:text-indigo-400"
+              >
+                管理导入与导出
+                <ChevronRight size={14} />
+              </button>
+            </section>
+            <SyncCenterCard />
+          </div>
+        )}
+
+        {/* ===== 二级 Tab 切换 ===== */}
         <div
           role="tablist"
           aria-label={t('dataManager.title')}
@@ -1226,8 +1226,8 @@ export default function DataManager() {
           {([
             { id: "export", icon: FolderDown, label: t('dataManager.tabs.export'), tone: "indigo" },
             { id: "import", icon: FileUp, label: t('dataManager.tabs.import'), tone: "emerald" },
+            { id: "backup", icon: Archive, label: t('dataManager.tabs.backup'), tone: "amber" },
             { id: "database", icon: Database, label: t('dataManager.tabs.database'), tone: "sky" },
-            { id: "backup", icon: Save, label: t('dataManager.tabs.backup'), tone: "violet" },
             { id: "danger", icon: AlertTriangle, label: t('dataManager.tabs.danger'), tone: "red" },
           ] as const).filter((tab) => SUBTABS_BY_SCOPE[scope].includes(tab.id)).map((tab) => {
             const active = activeSubTab === tab.id;
@@ -1278,6 +1278,67 @@ export default function DataManager() {
               {t('dataManager.exportDescription')}
             </p>
 
+            {/* 备份范围：多选空间。个人空间是虚拟项，其余来自「我创建/加入的空间」。 */}
+            <div className="mb-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  {t('dataManager.scope.exportRange')}
+                </span>
+                <div className="flex items-center gap-3 text-[11px]">
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={() => setExportSpaceIds(spaceOptions
+                      .filter((o) => !(o.id === "personal" && personalExportLocked))
+                      .map((o) => o.id))}
+                    className="text-indigo-600 hover:underline disabled:opacity-50 dark:text-indigo-400"
+                  >
+                    {t('dataManager.scope.selectAll')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExporting}
+                    onClick={() => setExportSpaceIds([])}
+                    className="text-zinc-500 hover:underline disabled:opacity-50 dark:text-zinc-400"
+                  >
+                    {t('dataManager.scope.clearAll')}
+                  </button>
+                </div>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-2">
+                {spaceOptions.map((opt) => {
+                  const locked = opt.id === "personal" && personalExportLocked;
+                  const checked = exportSpaceIds.includes(opt.id);
+                  return (
+                    <label
+                      key={opt.id}
+                      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${locked
+                        ? "border-zinc-200 bg-zinc-100/60 text-zinc-400 cursor-not-allowed dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-600"
+                        : checked
+                          ? "border-indigo-300 bg-indigo-50/70 text-zinc-800 dark:border-indigo-700 dark:bg-indigo-500/10 dark:text-zinc-100"
+                          : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-300"
+                        }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={locked || isExporting}
+                        onChange={() => setExportSpaceIds((prev) =>
+                          prev.includes(opt.id) ? prev.filter((id) => id !== opt.id) : [...prev, opt.id])}
+                        className="h-3.5 w-3.5 accent-indigo-600"
+                      />
+                      <span className="truncate" title={opt.name}>{opt.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {spaceOptions.length > 1 && exportSpaceIds.length > 1 && (
+                <p className="mt-1.5 text-[11px] leading-4 text-zinc-400 dark:text-zinc-500">
+                  {t('dataManager.scope.multiExportHint')}
+                </p>
+              )}
+            </div>
+
             {exportProgress && (
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -1326,8 +1387,8 @@ export default function DataManager() {
 
             <button
               onClick={handleExportAll}
-              disabled={isExporting || workspaceScopeNotReady || personalExportLocked}
-              className={`flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${isExporting || workspaceScopeNotReady || personalExportLocked
+              disabled={isExporting || exportTargets.length === 0}
+              className={`flex items-center justify-center w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all ${isExporting || exportTargets.length === 0
                 ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
                 : exportProgress?.phase === "done"
                   ? "bg-green-500 hover:bg-green-600 text-white shadow-md"
@@ -1398,6 +1459,26 @@ export default function DataManager() {
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
             {t('dataManager.importDescription')}
           </p>
+
+          {/* 导入目标空间：单选。导入必须落到唯一空间，多选没有意义。 */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900/40">
+            <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+              {t('dataManager.scope.importTarget')}
+            </span>
+            <select
+              value={importSpaceId}
+              onChange={(e) => setImportSpaceId(e.target.value)}
+              disabled={isImporting}
+              className="rounded-md border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            >
+              {spaceOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+            <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
+              {t('dataManager.scope.importTargetHint')}
+            </span>
+          </div>
 
           {personalImportLocked && (
             <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-200/60 dark:border-amber-900/40 bg-amber-50/40 dark:bg-amber-500/5 text-xs text-amber-700 dark:text-amber-300">
@@ -2079,13 +2160,23 @@ export default function DataManager() {
       )}
 
       {/* ===== 数据库文件 (.data) 导出/导入/占用统计 ===== */}
-      {activeSubTab === "database" && (
-        <DataFileSection />
+      {/* ===== 系统备份与灾备（仅管理员）
+          全库快照 / 自动备份 / 备份目录 / WebDAV 通道 / 恢复中心 / 邮件投递，
+          全部复用 dataManagement/BackupCenter；原先独立的「备份中心」设置 Tab
+          已合并到这里，避免两套备份入口。 */}
+      {activeSubTab === "backup" && (
+        <BackupCenter
+          advanced={
+            <>
+              <DesktopDataSafetyCard />
+              <RemoteImageLocalizationPanel />
+            </>
+          }
+        />
       )}
 
-      {/* ===== 备份与灾备（B 系列） ===== */}
-      {activeSubTab === "backup" && (
-        <BackupSection />
+      {activeSubTab === "database" && (
+        <DataFileSection />
       )}
 
       {/* ===== 危险区域 (Danger Zone) ===== */}
@@ -3759,6 +3850,13 @@ export function DataFileSection() {
   );
 }
 
+// ============================================================================
+// ============================================================================
+// ⚠ 以下整段（BackupSection 及其 5 个子对话框）当前无调用方。
+//   设置「数据管理」的系统 scope 只保留 database / danger，备份与灾备统一由
+//   「备份中心」承担（dataManagement/BackupCenter.tsx，是其能力超集：多了
+//   WebDAV 通道、恢复中心、健康概览与邮件通道）。整段保留是为了避免一次性
+//   大段删除的风险，后续专门的清理可以整体移除，勿再在别处引用这里的分支。
 // ============================================================================
 // 备份 / 灾备 子组件 —— 消费 /api/backups + /api/backups/status
 // ----------------------------------------------------------------------------
