@@ -33,6 +33,66 @@ function inferTargetArch(targetPlatform) {
 }
 
 /**
+ * 内嵌 node 二进制所在目录名，与 scripts/fetch-node.mjs 的 TARGETS key 保持一致。
+ * 目录结构：electron/node/<platform>-<arch>/node[.exe]
+ */
+function embeddedNodePlatformDir() {
+  const platform = inferTargetPlatformFromArgv();
+  const arch = inferTargetArch(platform);
+  if (platform === "win32") return "win32-x64";
+  if (platform === "darwin") return arch === "arm64" ? "darwin-arm64" : "darwin-x64";
+  if (platform === "linux") return arch === "arm64" ? "linux-arm64" : "linux-x64";
+  return `${platform}-${arch}`;
+}
+
+/** 内嵌 node 的最低版本：node:sqlite 自 22.5.0 起提供。 */
+const MIN_EMBED_NODE_MAJOR = 22;
+
+/**
+ * 校验内嵌 node 存在且版本够新。
+ * 少了它打包不会报错，但装到用户机上后端会因为 `Cannot find module 'node:sqlite'`
+ * 直接启动失败——所以在打包前拦住。
+ */
+function checkEmbeddedNode() {
+  const dirName = embeddedNodePlatformDir();
+  const targetPlatform = dirName.split("-")[0];
+  const exeName = targetPlatform === "win32" ? "node.exe" : "node";
+  const nodeFile = path.resolve(__dirname, "node", dirName, exeName);
+  if (!fs.existsSync(nodeFile)) {
+    throw new Error(
+      `[builder] 未找到内嵌 Node 二进制：${nodeFile}\n` +
+        `后端依赖内建 node:sqlite，打包必须内嵌 Node ${MIN_EMBED_NODE_MAJOR}+。\n` +
+        `修复：npm run fetch:node（跨平台打包用 npm run fetch:node:all）`
+    );
+  }
+
+  // 跨平台打包时目标二进制在本机跑不起来（Windows exe 不能在 Linux 上执行），
+  // 只校验文件存在；同平台时才真的问它版本。
+  if (targetPlatform !== process.platform) {
+    console.log(`[builder] ✓ embedded node found (${dirName}, cross-compiling, version unverified)`);
+    return;
+  }
+
+  const probe = require("child_process").spawnSync(nodeFile, ["-p", "process.versions.node"], {
+    encoding: "utf8",
+  });
+  if (probe.status !== 0) {
+    throw new Error(
+      `[builder] 内嵌 Node 无法执行：${nodeFile}\n${(probe.stderr || "").trim()}`
+    );
+  }
+  const version = (probe.stdout || "").trim();
+  const major = Number.parseInt(version.split(".")[0], 10);
+  if (!Number.isFinite(major) || major < MIN_EMBED_NODE_MAJOR) {
+    throw new Error(
+      `[builder] 内嵌 Node 版本过低：v${version}（要求 >= ${MIN_EMBED_NODE_MAJOR}）\n` +
+        `后端需要 node:sqlite。修复：执行 npm run fetch:node 重新下载。`
+    );
+  }
+  console.log(`[builder] ✓ embedded node v${version} (${dirName})`);
+}
+
+/**
  * 通过文件魔数识别 .node 目标平台 + 架构，避免 stamp 被错误标注时假通过。
  *   Windows PE:   "MZ"（不解析 arch，Win 我们只发 x64）
  *   Linux ELF:    "\x7FELF"，第 19 字节 e_machine 区分 x86_64(0x3E)/aarch64(0xB7)
@@ -134,10 +194,11 @@ function checkNativeModule() {
     "better_sqlite3.node"
   );
   if (!fs.existsSync(nodeFile)) {
-    throw new Error(
-      `[builder] better-sqlite3 原生模块不存在：${nodeFile}\n` +
-        `请先运行 npm run rebuild:native 编译为 Electron ABI！`
-    );
+    // 后端已迁到内建 node:sqlite（Node 22.5+），不再 require better-sqlite3。
+    // 打包改用内嵌 Node 跑后端，所以这个 .node 存在与否都不影响运行；
+    // 只有残留时顺手校验一下，缺了直接跳过而不是阻断打包。
+    console.log("[builder] better-sqlite3 未安装（后端已改用 node:sqlite），跳过 ABI 校验");
+    return;
   }
   const stat = fs.statSync(nodeFile);
   console.log(
@@ -147,12 +208,11 @@ function checkNativeModule() {
 
   const stampFile = path.resolve(path.dirname(nodeFile), ".electron-abi.json");
   if (!fs.existsSync(stampFile)) {
-    throw new Error(
-      `[builder] 未找到 Electron ABI stamp（${stampFile}）。\n` +
-        `这说明 better_sqlite3.node 没有经过 rebuild-native 重新编译，\n` +
-        `打出来的包到用户机会报 ERR_DLOPEN_FAILED。\n` +
-        `修复：执行 npm run rebuild:native 后再打包。`
+    console.warn(
+      `[builder] ⚠ 未找到 Electron ABI stamp（${stampFile}），跳过 ABI 校验。\n` +
+        `   后端用内建 node:sqlite，better-sqlite3 不再参与运行时。`
     );
+    return;
   }
   let stamp;
   try {
@@ -372,6 +432,8 @@ module.exports = {
   productName: "BaseForge",
   // 打包前自动校验原生模块，避免漏跑 rebuild:native 导致安装后崩溃
   beforeBuild() {
+    // 后端要跑在内嵌的 Node 22 上（node:sqlite），这是硬前提
+    checkEmbeddedNode();
     checkNativeModule();
     verifySyncNotificationUi();
     return true; // 返回 true 表示继续打包
@@ -435,9 +497,15 @@ module.exports = {
       role: "Editor",
     },
   ],
-  // 不再内嵌 node：后端以 ELECTRON_RUN_AS_NODE 模式跑在 Electron 自身
-  // 原生模块（better-sqlite3）通过 `electron-builder install-app-deps` 对齐 ABI
+  // 内嵌一份真正的 Node 22 二进制（scripts/fetch-node.mjs 下载 → electron/node/<platform>/）。
+  // 后端用内建 node:sqlite，而 Electron 33 基于 Node 20 没有这个模块，
+  // 所以打包后必须用内嵌 node 跑后端，不能用 ELECTRON_RUN_AS_NODE 兜底。
   extraResources: [
+    {
+      from: `electron/node/${embeddedNodePlatformDir()}`,
+      to: `node/${embeddedNodePlatformDir()}`,
+      filter: ["**/*"],
+    },
     {
       from: "backend/dist",
       to: "backend/dist",

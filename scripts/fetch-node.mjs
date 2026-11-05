@@ -5,10 +5,14 @@
  * 下载指定版本的 Node.js 官方二进制到 electron/node/<platform>/，
  * 供 electron-builder 通过 extraResources 打进安装包。
  *
+ * 为什么必须内嵌：后端用 node:sqlite（Node 22.5+ 才有的内建模块）。
+ * Electron 33 基于 Node 20，没有 node:sqlite，所以打包后的后端必须跑
+ * 一个真正的 Node 22 二进制，不能退回 ELECTRON_RUN_AS_NODE。
+ *
  * 用法：
  *   node scripts/fetch-node.mjs               # 默认仅当前平台
  *   node scripts/fetch-node.mjs --all         # 三平台全下（win/mac/linux x64 + mac arm64）
- *   NODE_EMBED_VERSION=v20.18.0 node scripts/fetch-node.mjs
+ *   NODE_EMBED_VERSION=v22.23.4 node scripts/fetch-node.mjs
  *
  * 产物目录：
  *   electron/node/win32-x64/node.exe
@@ -27,7 +31,11 @@ const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 const OUT_DIR = path.join(ROOT, "electron", "node");
 
-const VERSION = process.env.NODE_EMBED_VERSION || "v20.18.0";
+/**
+ * 内嵌 Node 版本。必须是 v22.5.0 以上：后端依赖内建 node:sqlite。
+ * 22 线是当前 LTS，桌面端后端就跑这个版本。
+ */
+const VERSION = process.env.NODE_EMBED_VERSION || "v22.23.4";
 const MIRROR = process.env.NODE_MIRROR || "https://nodejs.org/dist";
 
 const TARGETS = {
@@ -167,10 +175,35 @@ async function fetchOne(key) {
   if (!cfg) throw new Error(`unknown target: ${key}`);
   const platDir = path.join(OUT_DIR, key);
   const outFile = path.join(platDir, cfg.exe);
+  // 版本戳：NODE_EMBED_VERSION 变了必须重下，否则会拿旧版本二进制打进包，
+  // 表现为「明明改了版本，装完还是旧的 node」。
+  //
+  // 但已有二进制时不要盲下：之前下过的目录里没有戳（或戳是旧格式）很常见，
+  // 直接问它自己的版本就能判断，省掉几十 MB 的无谓下载。
+  const stampFile = path.join(platDir, ".version");
+  const stamp = fs.existsSync(stampFile)
+    ? fs.readFileSync(stampFile, "utf8").trim()
+    : "";
 
   if (fs.existsSync(outFile) && fs.statSync(outFile).size > 0) {
-    console.log(`[fetch-node] ✓ ${key} already exists, skip`);
-    return;
+    if (stamp === VERSION) {
+      console.log(`[fetch-node] ✓ ${key} already exists (${VERSION}), skip`);
+      return;
+    }
+    // 同平台才能执行探测；跨平台（例如在 Linux 上备 win32-x64）只能信戳
+    const hostMatches = key.split("-")[0] === process.platform;
+    if (hostMatches) {
+      const probe = spawnSync(outFile, ["-p", "process.versions.node"], { encoding: "utf8" });
+      const actual = (probe.stdout || "").trim();
+      if (probe.status === 0 && actual === VERSION.replace(/^v/, "")) {
+        fs.writeFileSync(stampFile, VERSION);
+        console.log(`[fetch-node] ✓ ${key} already v${actual}，补写版本戳后跳过`);
+        return;
+      }
+      if (probe.status === 0 && actual) {
+        console.log(`[fetch-node] ${key} 现有 v${actual}，目标 ${VERSION}，重新下载`);
+      }
+    }
   }
   ensureDir(platDir);
 
@@ -183,7 +216,8 @@ async function fetchOne(key) {
     await extractTarGz(archivePath, cfg.entry, outFile);
   }
   fs.unlinkSync(archivePath);
-  console.log(`[fetch-node] ✓ ${key} -> ${outFile}`);
+  fs.writeFileSync(stampFile, VERSION);
+  console.log(`[fetch-node] ✓ ${key} -> ${outFile} (${VERSION})`);
 }
 
 async function main() {
