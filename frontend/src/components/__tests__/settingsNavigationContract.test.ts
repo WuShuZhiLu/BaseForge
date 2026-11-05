@@ -68,4 +68,18 @@ describe("设置导航分组与搜索契约", () => {
     expect(whitelistIds()).not.toContain("mcp");
     expect(ai).toContain("McpSettings");
   });
+
+  it("「同步」只在客户端运行时进入导航（浏览器直连服务器时无同步可言）", () => {
+    // SyncSettingsTab 在浏览器运行时只会渲染一句「无需另外开启同步」的说明，
+    // 而 0.1 只分发 Docker 镜像——对该形态必须隐藏，不能留一个只有一句说明的 tab。
+    expect(settings).toContain(
+      "const syncSurfaceAvailable = isDesktop() || Capacitor.isNativePlatform();",
+    );
+    expect(settings).toContain("...(syncSurfaceAvailable ? [{ id: \"sync\"");
+    // 不得回退成无条件列出
+    expect(settings).not.toMatch(/^ {4}\{ id: "sync" as const/m);
+    // 面板与深链渲染分支保留：桌面/原生端仍要能打开
+    expect(settings).toContain('activeTab === "sync"');
+    expect(whitelistIds()).toContain("sync");
+  });
 });

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { Capacitor } from "@capacitor/core";
 import { motion, AnimatePresence } from "framer-motion";
 import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, RefreshCw, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, Mail, Mic, Workflow, CalendarClock, Archive, Search } from "lucide-react";
 import { CODE_BLOCK_THEMES } from "@/lib/codeBlockTheme";
@@ -1456,6 +1457,12 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
 
   // 每个 tab 的 group 只用于导航层分组展示；面板内容、可见性条件与渲染分支都不变。
   // 白名单（appRoute.ts 的 SETTINGS_TAB_KEYS）必须与这里的 id 集合保持一致。
+  // 「同步」只在客户端（桌面 / 移动原生）成立：它同步的是客户端本地副本与服务器。
+  // 浏览器直连服务器时数据本来就在服务器上，SyncSettingsTab 在该运行时只会渲染一句
+  // 「无需另外开启同步」的说明——对只发 Docker 镜像的部署就是纯噪音。
+  // 判定口径与 SyncSettingsTab 内部一致：桌面桥存在，或 Capacitor 原生平台。
+  const syncSurfaceAvailable = isDesktop() || Capacitor.isNativePlatform();
+
   const SETTING_TABS = useMemo(() => [
     // 个人
     { id: "appearance" as const, group: "personal" as const, label: t('settings.appearance'), icon: Palette },
@@ -1470,7 +1477,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     // 数据：DataManager 内部仍按 isAdmin 分流（管理员三 scope / 普通用户仅个人空间）
     { id: "data" as const, group: "data" as const, label: t('settings.dataManagement'), icon: Database },
     { id: "backup" as const, group: "data" as const, label: "备份中心", icon: Archive },
-    { id: "sync" as const, group: "data" as const, label: "同步", icon: RefreshCw },
+    ...(syncSurfaceAvailable ? [{ id: "sync" as const, group: "data" as const, label: "同步", icon: RefreshCw }] : []),
     ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, group: "data" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
     // 系统管理：仅管理员可见
     ...(isAdmin ? [{ id: "users" as const, group: "system" as const, label: t('settings.users'), icon: Users }] : []),
@@ -1478,7 +1485,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     // 关于：下载客户端保留入口（内容按 VITE_CLIENT_DOWNLOADS_ENABLED 屏蔽）
     { id: "download" as const, group: "about" as const, label: t('settings.download', { defaultValue: '下载客户端' }), icon: Download },
     { id: "about" as const, group: "about" as const, label: t('about.title'), icon: Info },
-  ], [t, shortcutSurface, isAdmin]);
+  ], [t, shortcutSurface, isAdmin, syncSurfaceAvailable]);
 
   // 设置内搜索：匹配 tab 标签或关键词索引，点击结果直接切到对应面板。
   const visibleTabs = useMemo(() => {
