@@ -29,7 +29,6 @@ import {
   ClipboardList,
   Download,
   ExternalLink,
-  FolderOpen,
   ListTodo,
   Loader2,
   PackageOpen,
@@ -137,7 +136,6 @@ function installedUpdatedAt(plugin: InstalledPlugin): string {
 function iconFor(plug: BuiltinPluginDef, size: number) {
   switch (plug.icon) {
     case "tasks": return <ListTodo size={size} className="text-violet-500" />;
-    case "remote-files": return <FolderOpen size={size} className="text-cyan-500" />;
     case "pm": return <ClipboardList size={size} className="text-emerald-500" />;
     default: return <Puzzle size={size} className="text-tx-tertiary" />;
   }
@@ -580,7 +578,7 @@ function BuiltinDetail({ plug }: { plug: BuiltinPluginDef }) {
       <SectionCard title="功能与贡献">
         <ul className="mt-2 space-y-1 text-xs text-tx-secondary">
           <li>· 侧栏迷你面板：{plug.sidebarPanel.title}（知识库视图内嵌）</li>
-          <li>· 主区视图：{plug.embedded ? "无（嵌入文件管理）" : plug.viewMode}</li>
+          <li>· 主区视图：{plug.viewMode}</li>
           <li>· 停用后入口消失，数据始终保留</li>
         </ul>
       </SectionCard>

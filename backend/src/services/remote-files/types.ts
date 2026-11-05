@@ -1,7 +1,7 @@
 /**
- * 远程文件管理插件 —— 提供方抽象与共享类型。
+ * 远程文件 —— 提供方抽象与共享类型（内核能力，非插件）。
  *
- * 设计（docs/plugin-remote-files.md）：
+ * 设计（docs/remote-files.md）：
  * - 每个远程存储类型实现 RemoteProvider（list/read/write/mkdir/remove/rename）；
  * - 路径一律使用「源内相对路径」（不含 baseUrl 与 rootPath 前缀），以 / 分隔，
  *   根目录为 ""；越界（..）由 normalizeRemotePath 统一拒绝；

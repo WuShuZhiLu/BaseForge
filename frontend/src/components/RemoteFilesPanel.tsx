@@ -1,9 +1,9 @@
 /**
- * 远程文件管理插件 —— 主区全屏中心（官方内置插件 remote-files）。
+ * 远程文件 —— 文件管理里的「远程」来源视图（内核能力，非插件）。
  *
  * 布局：左列源列表 / 中列文件浏览器（面包屑 + 目录导航 + 重命名/删除）/ 右列文本编辑器。
  * 所有远程操作走后端 /api/remote-files 代理：凭据只在服务端加密存储，前端永不见明文。
- * 支持源：WebDAV（完整）、百度网盘（实验性，access_token 手动配置）；SMB 后续版本。
+ * 支持源：WebDAV、SMB、百度网盘。
  */
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { alert, confirm } from "@/components/ui/confirm";
@@ -631,18 +631,6 @@ export default function RemoteFilesPanel() {
   }, []);
 
   useEffect(() => { void reloadSources(); }, [reloadSources]);
-  // 侧栏「存储」选择：外部指定激活源（nowen:files-remote-source）
-  useEffect(() => {
-    const onSource = (event: Event) => {
-      const sourceId = (event as CustomEvent<{ sourceId?: string }>).detail?.sourceId;
-      if (!sourceId) return;
-      setActiveId(sourceId);
-      setCwd("");
-      setOpenPath("");
-    };
-    window.addEventListener("nowen:files-remote-source", onSource);
-    return () => window.removeEventListener("nowen:files-remote-source", onSource);
-  }, []);
 
   useEffect(() => { loadLinks(); }, [loadLinks, activeId]);
 

@@ -3386,7 +3386,7 @@ export const api = {
   clearNoteVersions: (noteId: string) =>
     request<{ success: boolean; count: number; skippedManual: number }>(`/shares/note/${noteId}/versions`, { method: "DELETE" }),
 
-  // 远程文件管理插件（remote-files）
+  // 远程文件（内核能力：WebDAV / SMB / 百度网盘）
   getRemoteFileSources: () =>
     request<{ sources: RemoteSourcePublic[]; types: string[] }>("/remote-files/sources"),
   saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string }) =>

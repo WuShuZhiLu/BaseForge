@@ -8,8 +8,11 @@
  *
  * 与社区插件的区别：代码在仓库内（不经 manifest 打包/沙箱），但走同一条
  * contributions 消费链路（registry → host → 面板），未来可平移为独立插件包。
+ *
+ * 注意：远程文件（WebDAV / SMB / 百度网盘）是内核能力，不从属于本注册表——
+ * 它是文件管理里的一个来源，没有启停开关，也不在插件工作区里出现。
  */
-export type BuiltinPluginId = "tasks" | "remote-files" | "pm";
+export type BuiltinPluginId = "tasks" | "pm";
 
 /**
  * 内置插件来源：用于在 UI 上如实标注，而不是笼统写成"官方内置"。
@@ -23,9 +26,9 @@ export interface BuiltinPluginDef {
   name: string;
   description: string;
   version: string;
-  icon: "tasks" | "remote-files" | "pm";
+  icon: "tasks" | "pm";
   /** 主区 viewMode（ Rail / 打开主区用） */
-  viewMode: "tasks" | "remote-files" | "projects";
+  viewMode: "tasks" | "projects";
   /** 主区入口所需的 WorkspaceFeatures 键 */
   workspaceFeature: "tasks" | "notes";
   /** 来源：nowen = 沿用上游实现；builtin = 本仓库自研内置 */
@@ -34,8 +37,6 @@ export interface BuiltinPluginDef {
   defaultEnabled: boolean;
   /** 启用后进入该插件的入口位置（详情页展示，避免用户找不到） */
   entryHint: string;
-  /** 增强型插件：不占独立导航徽章，嵌入宿主视图（如文件管理的远程文件面板） */
-  embedded?: boolean;
   /** 侧栏迷你面板贡献 */
   sidebarPanel: {
     id: string;
@@ -56,20 +57,6 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
     defaultEnabled: false,
     entryHint: "导航栏徽章「待办」",
     sidebarPanel: { id: "tasks-panel", title: "待办" },
-  },
-  {
-    id: "remote-files",
-    name: "远程文件",
-    description: "WebDAV / 百度网盘等远程文档管理（读取 / 编辑 / 写回）",
-    version: "0.1.0",
-    icon: "remote-files",
-    embedded: true,
-    viewMode: "remote-files",
-    workspaceFeature: "notes",
-    origin: "builtin",
-    defaultEnabled: false,
-    entryHint: "文件管理 → 远程文件",
-    sidebarPanel: { id: "remote-files-panel", title: "远程文件" },
   },
   {
     id: "pm",

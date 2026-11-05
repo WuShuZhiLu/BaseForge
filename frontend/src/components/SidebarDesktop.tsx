@@ -3113,7 +3113,7 @@ export default function SidebarDesktop() {
           <div className="shrink-0">
             {(() => {
               const def = BUILTIN_PLUGINS.find((p) => p.id === openPluginPanel);
-              if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
+              if (!def || !isBuiltinPluginEnabled(def.id)) return null;
               const standalone = def.id === "tasks";
               const PanelIcon = def.id === "tasks" ? ListTodo : Sparkles;
               return (
@@ -3286,7 +3286,7 @@ export default function SidebarDesktop() {
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
             <PanelSection label="来源">
               <div className="space-y-0.5">
-                {([["all", FolderOpen, "文件"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", Cloud, "远程文件"]] : [])] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
+                {([["all", FolderOpen, "文件"], ["remote", Cloud, "远程文件"]] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
                   <button
                     key={key}
                     type="button"

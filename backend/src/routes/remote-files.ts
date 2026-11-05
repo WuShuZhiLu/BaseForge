@@ -1,5 +1,5 @@
 /**
- * 远程文件管理插件 —— 服务端入口。
+ * 远程文件 —— 服务端入口（内核能力，非插件）。
  *
  * 职责：
  * - 源配置 CRUD（按用户隔离，存 system_settings KV `remote_files_sources:<userId>`，

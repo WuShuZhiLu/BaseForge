@@ -262,7 +262,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(headers[0].className).toContain("text-[15px]");
     expect(headers[0].className).toContain("font-semibold");
     expect(headers[0].textContent).toContain("插件");
-    expect(headers[0].textContent).toContain("5 个");
+    expect(headers[0].textContent).toContain("2 个");
     expect(headers[0].querySelector("svg")).toBeTruthy();
     // 「社区插件」不再作为标题/说明出现在页面上（只剩空态主文案里的字样）
     expect(content).not.toContain("从市场或插件包安装的插件");
@@ -299,7 +299,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     // 内置插件在同一容器内：32px 分区行，点开才把行接在下面
     const builtinSection = panel?.querySelector("[data-plugin-builtin-section]") as HTMLElement | null;
     expect(builtinSection?.textContent).toContain("内置插件");
-    expect(builtinSection?.textContent).toContain("· 5 个");
+    expect(builtinSection?.textContent).toContain("· 2 个");
     expect(builtinSection?.className).toContain("h-8");
     expect(content).not.toContain("待办事项");
     click(builtinSection as HTMLElement);

@@ -10,7 +10,7 @@ BaseForge 当前的文件管理采用"三来源"分隔设计，前端通过 `Fil
 |------|--------|---------|------|-------------|
 | **附件** | `"attachments"` | 📎 | 绑定文档的非图片文件 | PDF、Word、Excel、压缩包、音频、视频、Markdown 等所有非图片类型 |
 | **图床** | `"imagehost"` | 🌐 | 公开直链分享的图片空间 | 仅 PNG / JPEG / WebP / GIF / SVG |
-| **远程文件** | `"remote"` | ☁️ | 第三方源文件 | WebDAV / 百度网盘 / SMB 等插件提供的文件 |
+| **远程文件** | `"remote"` | ☁️ | 第三方源文件 | WebDAV / 百度网盘 / SMB 等远程源上的文件（内核能力，非插件） |
 
 用户在侧栏（`frontend/src/components/SidebarDesktop.tsx`，约 3190 行附近）通过三个独立入口切换来源，每个来源有各自独立的筛选、排序和视图状态：
 
@@ -628,7 +628,7 @@ export function getFilesSource(): FilesSource {
 | **现有公开链接** | 保持有效，URL 格式不变（`{origin}/api/attachments/{id}`） |
 | **API 参数** | `category` 参数仍可用但标记为 deprecated，新参数 `mimeCategory` 优先 |
 | **前端 API 调用** | `FilesSource` 旧值 `"attachments"` / `"imagehost"` 在读取时自动映射为 `"all"` |
-| **插件兼容** | 远程文件插件接口不变，`FilesSource = "remote"` 保留 |
+| **远程文件** | 接口不变，`FilesSource = "remote"` 保留；0.2.0 起由内置插件改为内核能力，无启停开关 |
 
 ---
 

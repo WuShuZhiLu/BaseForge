@@ -52,7 +52,7 @@
 | [plugin-pm.md](./plugin-pm.md) | 插件：项目管理 |
 | [plugin-pm-analysis.md](./plugin-pm-analysis.md) | 插件：项目管理（分析） |
 | [plugin-pm-m3-design.md](./plugin-pm-m3-design.md) | 插件：项目管理（M3 设计） |
-| [plugin-remote-files.md](./plugin-remote-files.md) | 插件：远程文件 |
+| [remote-files.md](./remote-files.md) | 远程文件（内核能力：WebDAV / SMB / 百度网盘） |
 | [handover/HANDOVER-pm-and-remote-files.md](./HANDOVER-pm-and-remote-files.md) | 交接：PM 与远程文件 |
 
 ## 4. 子目录

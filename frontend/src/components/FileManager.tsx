@@ -60,7 +60,6 @@ import {
   Link2,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
-import { isBuiltinPluginEnabled } from "@/plugins/builtin/registry";
 import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
 import { navigateToolPage } from "@/components/toolTabs";
 
@@ -254,13 +253,8 @@ export default function FileManager() {
   const actions = useAppActions();
 
   // 列表状态
-  // 远程文件管理（remote-files 内置插件）：经侧栏「来源」切换，主区不重复提供入口
-  // 侧栏「远程」chip 入口：打开主区文件管理并直接切到远程 Tab（来源由侧栏 filesUi 驱动，无需本地状态）
-  useEffect(() => {
-    const handler = () => setFilesUi({ source: "remote" });
-    window.addEventListener("nowen:files-remote-tab", handler);
-    return () => window.removeEventListener("nowen:files-remote-tab", handler);
-  }, []);
+  // 远程文件是内核能力（WebDAV / SMB / 百度网盘），经侧栏「来源」切换，
+  // 主区不再重复提供入口，也没有启用/停用开关。
   const [items, setItems] = useState<FileItem[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<FileStats | null>(null);
@@ -310,9 +304,7 @@ export default function FileManager() {
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
   void filesUiVersion; // 仅为订阅；实际值在渲染期从 getter 读取
   const source = getFilesSource();
-  // remote-files 是内置插件，关闭后「保存到远程」等联动入口也必须消失
-  const remoteFilesEnabled = isBuiltinPluginEnabled("remote-files");
-  const isRemoteSource = source === "remote" && remoteFilesEnabled;
+  const isRemoteSource = source === "remote";
   const sourceTab = isRemoteSource ? "remote" : "local";
   // 统一文件池：类型（图片/视频/音频/文档/其他）是筛选维度而非分隔容器；
   // 范围（全部/我的上传/未引用）与它正交，两者可叠加。
@@ -633,7 +625,7 @@ export default function FileManager() {
     [loadStats, loadReclaimable, loadList, items.length, page, notifyStorageChanged],
   );
 
-  // ---- 附件另存到远程（remote-files 内置插件联动）----
+  // ---- 附件另存到远程（内核能力：WebDAV / SMB / 百度网盘）----
   const [remoteSaveDlg, setRemoteSaveDlg] = useState<{ attachmentId: string; filename: string } | null>(null);
   const [remoteSaveSources, setRemoteSaveSources] = useState<RemoteSourcePublic[]>([]);
   const [remoteSaveSourceId, setRemoteSaveSourceId] = useState("");
@@ -1251,7 +1243,7 @@ export default function FileManager() {
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      {/* 保存到远程：把本地附件另存到远程源（remote-files 内置插件联动） */}
+      {/* 保存到远程：把本地附件另存到远程源（内核能力，无启停开关） */}
       {remoteSaveDlg && (
         <div
           className="absolute inset-0 z-40 flex items-center justify-center bg-black/30"
@@ -1409,7 +1401,7 @@ export default function FileManager() {
       </>
       )}
 
-      {/* 远程文件视图（remote-files 内置插件）：与本地附件并列的补充视图，经顶栏 Tab 切换 */}
+      {/* 远程文件视图（内核能力）：与本地附件并列的来源，经侧栏「来源」切换 */}
       {sourceTab === "remote" ? (
         <div className="min-h-0 flex-1 min-w-0">
           <RemoteFilesPanel />
@@ -1701,7 +1693,7 @@ export default function FileManager() {
                             onJumpToNote={jumpToNote}
                             onDownload={downloadItem}
                             onDelete={afterDelete}
-                            onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
+                            onSaveRemote={openRemoteSave}
                             onShare={(item) => void openShare(item.id)}
                             copiedId={copiedId}
                             downloadingId={downloadingId}
@@ -1738,7 +1730,7 @@ export default function FileManager() {
                  onJumpToNote={jumpToNote}
                  onDownload={downloadItem}
                  onDelete={handleDelete}
-                 onSaveRemote={remoteFilesEnabled ? openRemoteSave : undefined}
+                 onSaveRemote={openRemoteSave}
                 onShare={(item) => void openShare(item.id)}
                 copiedId={copiedId}
                 downloadingId={downloadingId}
@@ -2198,7 +2190,7 @@ function ListView({
   onJumpToNote: (noteId: string) => void;
   onDownload: (item: FileItem) => void;
   onDelete: (id: string) => void;
-  /** 未传（remote-files 插件关闭）时不渲染「保存到远程」按钮 */
+  /** 未传时不渲染「保存到远程」按钮 */
   onSaveRemote?: (item: FileItem) => void;
   onShare: (item: FileItem) => void;
   copiedId: string | null;
