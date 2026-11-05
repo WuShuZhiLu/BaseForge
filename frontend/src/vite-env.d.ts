@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string;
   readonly VITE_DEMO_USERNAME?: string;
   readonly VITE_DEMO_PASSWORD?: string;
+  // 客户端安装包尚未产出。设为 "true" 才在「设置 → 下载客户端」渲染安装包列表。
+  readonly VITE_CLIENT_DOWNLOADS_ENABLED?: string;
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv;

@@ -1,10 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, Heart, Sparkles, RefreshCw, ZoomIn, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, CloudDownload, Mail, Mic, Workflow, CalendarClock, Archive } from "lucide-react";
+import { Palette, Shield, Database, X, Settings, Camera, Save, Loader2, Trash2, Upload, Type, Check, ChevronDown, Globe, Bot, Users, Info, ExternalLink, RefreshCw, Key, Keyboard, Building2, BookOpen, ToggleLeft, Download, FolderSync, Mail, Mic, Workflow, CalendarClock, Archive, Search } from "lucide-react";
+import { CODE_BLOCK_THEMES } from "@/lib/codeBlockTheme";
 import { useTranslation } from "react-i18next";
-import wechatSponsorQr from "@/assets/sponsor/weixin.jpg";
-import alipaySponsorQr from "@/assets/sponsor/zhifubao.png";
 import qqGroupQr from "@/assets/feedback/qq-group.jpg";
 import ThemeToggle from "@/components/ThemeToggle";
 import SkinSwitcher from "@/components/SkinSwitcher";
@@ -24,7 +23,6 @@ import MobileAccountSettings from "@/components/settings/MobileAccountSettings";
 import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
 import UserManagement from "@/components/UserManagement";
 import WorkspaceManagement from "@/components/WorkspaceManagement";
-import WhatsNewModal from "@/components/WhatsNewModal";
 import DownloadPanel from "@/components/DownloadPanel";
 import { useSiteSettings, BUILTIN_FONTS, getBuiltinFontName } from "@/hooks/useSiteSettings";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
@@ -34,23 +32,51 @@ import { CustomFont } from "@/types";
 import { cn } from "@/lib/utils";
 import { detectShortcutSurface } from "@/lib/shortcutRegistry";
 import {
-  DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT,
-  DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY,
   loadMobileKnowledgeTreeCompact,
-  loadDesktopKnowledgeTreeViewMode,
   loadMobileKnowledgeTreeViewMode,
   MOBILE_KNOWLEDGE_TREE_COMPACT_CHANGED_EVENT,
   MOBILE_KNOWLEDGE_TREE_COMPACT_STORAGE_KEY,
   MOBILE_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT,
   MOBILE_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY,
-  saveDesktopKnowledgeTreeViewMode,
   saveMobileKnowledgeTreeCompact,
   saveMobileKnowledgeTreeViewMode,
-  type DesktopKnowledgeTreeViewMode,
   type MobileKnowledgeTreeViewMode,
 } from "@/lib/mobileKnowledgeTreeViewMode";
 
-type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "offlineSync" | "folderSync" | "users" | "workspaces" | "download" | "about";
+type TabId = "appearance" | "switches" | "shortcuts" | "ai" | "voice" | "automation" | "security" | "tokens" | "data" | "backup" | "sync" | "folderSync" | "users" | "workspaces" | "download" | "about";
+
+/** 设置导航的五个分组。分组只影响导航层展示，不改变任何面板的内容或归属。 */
+type SettingsGroupId = "personal" | "connection" | "data" | "system" | "about";
+const SETTINGS_GROUPS: ReadonlyArray<{ id: SettingsGroupId; label: string }> = [
+  { id: "personal", label: "个人" },
+  { id: "connection", label: "连接" },
+  { id: "data", label: "数据" },
+  { id: "system", label: "系统管理" },
+  { id: "about", label: "关于" },
+];
+
+/**
+ * 设置内搜索的关键词索引：每一项都对应面板里真实存在的设置项或能力，
+ * 只用于把搜索词定位到 tab，不新增、不隐藏任何设置。
+ */
+const SETTING_TAB_KEYWORDS: Record<TabId, string> = {
+  appearance: "主题 明暗 字体 语言 阅读密度 侧栏文字 站点名称 图标 编辑器默认 代码块主题 笔记列表",
+  switches: "功能开关 大纲 笔记标签页 自动锁定 菜单栏 网页端 目录树",
+  shortcuts: "快捷键 键位 组合键 冲突 导入 导出",
+  ai: "AI 模型 服务商 API Key 提示词包 文档整理 写作助手 MCP RAG 外部 AI 端点 知识库 启动命令",
+  voice: "语音 转写 Whisper 识别",
+  automation: "自动化 任务简报 Webhook 时区 定时",
+  security: "密码 两步验证 2FA 恢复码 会话 头像 昵称 文件夹锁定",
+  tokens: "令牌 token CLI 笔记本范围 授权",
+  data: "导入 导出 数据库 危险区 全库 工作区范围",
+  backup: "备份 恢复 快照 WebDAV 备份 数据文件",
+  sync: "同步 冲突中心 服务器连接 多设备 工作区同步",
+  folderSync: "文件夹同步 本地目录 桌面",
+  users: "用户 成员 管理员 账号 权限",
+  workspaces: "工作区 空间 协作 成员",
+  download: "下载 安装包 客户端 Docker 桌面 移动",
+  about: "关于 版本 反馈 开源 更新",
+};
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -289,15 +315,23 @@ function VersionCompareCard() {
           )}
           {portable ? (
             <>
-              <a
-                href="https://github.com/cropflre/nowen-note/releases/latest"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-primary text-white text-xs font-medium hover:opacity-90"
-              >
-                <ExternalLink size={12} />
-                前往下载页
-              </a>
+              {/* 下载地址只从后端返回的 release 里取，不写死仓库：
+                  发布仓库可由部署方配置，写死会把用户导到无关的下载页。 */}
+              {release?.available && release.htmlUrl ? (
+                <a
+                  href={release.htmlUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-primary text-white text-xs font-medium hover:opacity-90"
+                >
+                  <ExternalLink size={12} />
+                  前往下载页
+                </a>
+              ) : (
+                <span className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-200/70 dark:bg-zinc-700/40 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+                  暂无下载地址
+                </span>
+              )}
               <p className="text-[11px] text-zinc-400 dark:text-zinc-500 text-center leading-relaxed">
                 免安装版不支持自动更新，请下载新版本 portable.exe 替换当前文件。
               </p>
@@ -403,19 +437,10 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt?: string; onClo
 
 function AboutPanel() {
   const { t } = useTranslation();
-  const feedbackEmail = "nowenlab@qq.com";
+  const feedbackEmail = "lingzhi_gong@foxmail.com";
   const feedbackMailto = `mailto:${feedbackEmail}?subject=${encodeURIComponent("[BaseForge 反馈]")}`;
   const feedbackQqGroupNumber = "1093473044";
-  const [showSponsor, setShowSponsor] = useState(false);
-  const [sponsorMethod, setSponsorMethod] = useState<"wechat" | "alipay">("wechat");
-  const [showWhatsNew, setShowWhatsNew] = useState(false);
-  // 赞赏码大图预览：点击赞赏码缩略图时弹起 Lightbox
-  const [sponsorPreviewOpen, setSponsorPreviewOpen] = useState(false);
   const [feedbackQqPreviewOpen, setFeedbackQqPreviewOpen] = useState(false);
-  const sponsorImage = sponsorMethod === "wechat" ? wechatSponsorQr : alipaySponsorQr;
-  const sponsorLabel = sponsorMethod === "wechat"
-    ? t('about.sponsorWechat')
-    : t('about.sponsorAlipay');
   return (
     <div className="space-y-6">
       {/* 标题区 */}
@@ -457,44 +482,32 @@ function AboutPanel() {
 
       {/* 开源信息 */}
       <div className="flex items-center justify-between p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30">
-        <div>
+        <div className="min-w-0">
           <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{t('about.openSource')}</span>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{t('about.license')}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            {t('about.basedOn')}{" "}
+            <a
+              href="https://github.com/cropflre/nowen-note"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-0.5 text-accent-primary underline underline-offset-2 decoration-accent-primary/40 hover:decoration-accent-primary"
+            >
+              nowen-note
+              <ExternalLink size={10} />
+            </a>
+          </p>
         </div>
         <a
           href="https://github.com/cropflre/nowen-note"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium hover:opacity-80 transition-opacity"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium hover:opacity-80 transition-opacity shrink-0 ml-3"
         >
           <ExternalLink size={12} />
           {t('about.github')}
         </a>
       </div>
-
-      {/* 更新日志 */}
-      <button
-        type="button"
-        onClick={() => setShowWhatsNew(true)}
-        className="w-full flex items-center justify-between p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-accent-primary/10 text-accent-primary">
-            <Sparkles size={16} />
-          </span>
-          <div>
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {t('about.changelog')}
-            </div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              {t('about.changelogDesc')}
-            </div>
-          </div>
-        </div>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
-          {t('about.viewChangelog')}
-        </span>
-      </button>
 
       {/* 意见与 Bug 反馈 */}
       <a
@@ -561,133 +574,16 @@ function AboutPanel() {
         </div>
       </div>
 
-      {/* 支持作者 / 打赏 */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setShowSponsor((v) => !v)}
-          className="w-full flex items-center justify-between p-4 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-rose-500/10 text-rose-500">
-              <Heart size={16} fill="currentColor" />
-            </span>
-            <div className="text-left">
-              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                {t('about.sponsor')}
-              </div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                {t('about.sponsorDesc')}
-              </div>
-            </div>
-          </div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
-            {showSponsor ? t('about.sponsorCollapse') : t('about.sponsorAction')}
-          </span>
-        </button>
-        <AnimatePresence initial={false}>
-          {showSponsor && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="px-4 pb-4 pt-2 flex flex-col items-center gap-3 border-t border-zinc-200/60 dark:border-zinc-800/60">
-                <div
-                  className="grid w-full max-w-xs grid-cols-2 rounded-lg bg-zinc-200/70 p-1 dark:bg-zinc-800"
-                  role="tablist"
-                  aria-label={t('about.sponsorMethod')}
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sponsorMethod === "wechat"}
-                    onClick={() => setSponsorMethod("wechat")}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                      sponsorMethod === "wechat"
-                        ? "bg-emerald-500 text-white shadow-sm"
-                        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
-                    )}
-                  >
-                    {t('about.sponsorWechat')}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={sponsorMethod === "alipay"}
-                    onClick={() => setSponsorMethod("alipay")}
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                      sponsorMethod === "alipay"
-                        ? "bg-blue-500 text-white shadow-sm"
-                        : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
-                    )}
-                  >
-                    {t('about.sponsorAlipay')}
-                  </button>
-                </div>
-                {/* 点击图片打开 Lightbox 看大图（按钮包裹 → 无障碍/键盘可达） */}
-                <button
-                  type="button"
-                  onClick={() => setSponsorPreviewOpen(true)}
-                  className="group relative rounded-lg overflow-hidden cursor-zoom-in focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
-                  title={sponsorLabel}
-                  aria-label={sponsorLabel}
-                >
-                  <img
-                    src={sponsorImage}
-                    alt={sponsorLabel}
-                    className="w-44 sm:w-52 max-h-72 object-contain rounded-lg bg-white p-2 shadow-sm transition-transform duration-200 group-hover:scale-[1.02]"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                  {/* hover 时浮现的放大图标提示 */}
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 px-2 py-1 rounded-md bg-black/60 text-white text-[11px]">
-                      <ZoomIn size={12} />
-                      点击放大
-                    </span>
-                  </span>
-                </button>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center">
-                  {sponsorMethod === "wechat"
-                    ? t('about.sponsorWechatTip')
-                    : t('about.sponsorAlipayTip')}
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
       {/* 底部 */}
       <p className="text-center text-xs text-zinc-400 dark:text-zinc-600">
         {t('about.madeWith')}
       </p>
-
-      {/* 更新日志 Modal —— 用户点"查看更新"按钮时唤起 */}
-      <WhatsNewModal
-        open={showWhatsNew}
-        onClose={() => setShowWhatsNew(false)}
-      />
 
       {feedbackQqPreviewOpen && (
         <ImageLightbox
           src={qqGroupQr}
           alt={t('about.feedbackQqGroupNumber', { number: feedbackQqGroupNumber })}
           onClose={() => setFeedbackQqPreviewOpen(false)}
-        />
-      )}
-
-      {/* 赞赏码大图预览 Lightbox */}
-      {sponsorPreviewOpen && (
-        <ImageLightbox
-          src={sponsorImage}
-          alt={sponsorLabel}
-          onClose={() => setSponsorPreviewOpen(false)}
         />
       )}
     </div>
@@ -708,25 +604,47 @@ function SwitchesPanel() {
   const [mobileKnowledgeTreeCompact, setMobileKnowledgeTreeCompact] = useState(
     () => loadMobileKnowledgeTreeCompact(),
   );
-  const [desktopKnowledgeTreeMode, setDesktopKnowledgeTreeMode] = useState<DesktopKnowledgeTreeViewMode>(
-    () => loadDesktopKnowledgeTreeViewMode(),
-  );
   const desktop = isDesktop();
   const supportsDesktopMenuBarToggle = desktop && desktopPlatform !== "darwin";
+  // 移动端专有开关只在实际走移动端外壳时才出现：Android 原生运行时，
+  // 或视口窄到触发移动抽屉（<md，与 App.tsx 里 SidebarMobile 容器的 md:hidden 一致）。
+  // 这样桌面端/Web 大窗口不会看到一半用不上的项。
+  const [narrowViewport, setNarrowViewport] = useState(
+    () => typeof window !== "undefined"
+      && typeof window.matchMedia === "function"
+      && window.matchMedia("(max-width: 767px)").matches,
+  );
+  const isMobileRuntime = isAndroidNativeRuntime() || narrowViewport;
   const markdownDefaultModes = [
     { value: "source" as const, label: t("markdown.view.source") },
     { value: "preview" as const, label: t("markdown.view.preview") },
     { value: "split" as const, label: t("markdown.view.split") },
   ];
 
+  // 运行时跟随视口变化：桌面窗口缩到移动断点以下时移动端开关即时出现/消失。
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 767px)");
+    const onChange = (event: MediaQueryListEvent) => setNarrowViewport(event.matches);
+    setNarrowViewport(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     api.getMe()
-      .then((u) => { if (!cancelled) setIsAdmin((u as any)?.role === "admin"); })
+      .then((u) => {
+        if (cancelled) return;
+        const admin = (u as any)?.role === "admin";
+        setIsAdmin(admin);
+        // 「关闭网页端页面」是站点级配置，只有管理员需要它，非管理员请求也拿不到可写权限。
+        if (!admin) return;
+        api.getSiteSettings()
+          .then((s) => { if (!cancelled) setWebUiEnabled(s.web_ui_enabled !== "false"); })
+          .catch(() => {});
+      })
       .catch(() => { if (!cancelled) setIsAdmin(false); });
-    api.getSiteSettings()
-      .then((s) => { if (!cancelled) setWebUiEnabled(s.web_ui_enabled !== "false"); })
-      .catch(() => {});
     if (desktop) {
       getAppInfo()
         .then((info) => {
@@ -765,19 +683,6 @@ function SwitchesPanel() {
     };
   }, []);
 
-  useEffect(() => {
-    const syncMode = () => setDesktopKnowledgeTreeMode(loadDesktopKnowledgeTreeViewMode());
-    const syncStorage = (event: StorageEvent) => {
-      if (event.key === DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY) syncMode();
-    };
-    window.addEventListener(DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT, syncMode);
-    window.addEventListener("storage", syncStorage);
-    return () => {
-      window.removeEventListener(DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT, syncMode);
-      window.removeEventListener("storage", syncStorage);
-    };
-  }, []);
-
   const handleToggleMobileKnowledgeTreeMode = (treeEnabled: boolean) => {
     const nextMode: MobileKnowledgeTreeViewMode = treeEnabled ? "tree" : "navigator";
     setMobileKnowledgeTreeMode(nextMode);
@@ -787,12 +692,6 @@ function SwitchesPanel() {
   const handleToggleMobileKnowledgeTreeCompact = (nextCompact: boolean) => {
     setMobileKnowledgeTreeCompact(nextCompact);
     saveMobileKnowledgeTreeCompact(nextCompact);
-  };
-
-  const handleToggleDesktopKnowledgeTreeMode = (quickEnabled: boolean) => {
-    const nextMode: DesktopKnowledgeTreeViewMode = quickEnabled ? "quick" : "tree";
-    setDesktopKnowledgeTreeMode(nextMode);
-    saveDesktopKnowledgeTreeViewMode(nextMode);
   };
 
   const handleToggleWebUi = async (next: boolean) => {
@@ -838,11 +737,6 @@ function SwitchesPanel() {
       key: "lockOnOpen" as const,
       label: t('settings.prefLockOnOpen'),
       hint: t('settings.prefLockOnOpenHint'),
-    },
-    {
-      key: "enableNoteTabs" as const,
-      label: t('settings.enableNoteTabs'),
-      hint: t('settings.enableNoteTabsDesc'),
     },
   ];
 
@@ -905,65 +799,51 @@ function SwitchesPanel() {
           </label>
         ))}
 
-        <label
-          data-settings-switch="mobile-knowledge-tree"
-          className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
-        >
-          <input
-            type="checkbox"
-            checked={mobileKnowledgeTreeMode === "tree"}
-            onChange={(event) => handleToggleMobileKnowledgeTreeMode(event.target.checked)}
-            className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-none">
-              {t("settings.mobileKnowledgeTreeMode")}
-            </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
-              {t("settings.mobileKnowledgeTreeModeDesc")}
-            </p>
-          </div>
-        </label>
+        {/* 移动端专有项：只在移动端外壳（Android 原生 / 窄视口抽屉）里出现，
+            桌面端与 Web 大窗口不再列这些用不上的开关。 */}
+        {isMobileRuntime && (
+          <>
+            <label
+              data-settings-switch="mobile-knowledge-tree"
+              className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={mobileKnowledgeTreeMode === "tree"}
+                onChange={(event) => handleToggleMobileKnowledgeTreeMode(event.target.checked)}
+                className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-none">
+                  {t("settings.mobileKnowledgeTreeMode")}
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
+                  {t("settings.mobileKnowledgeTreeModeDesc")}
+                </p>
+              </div>
+            </label>
 
-        <label
-          data-settings-switch="mobile-knowledge-tree-compact"
-          className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
-        >
-          <input
-            type="checkbox"
-            checked={mobileKnowledgeTreeCompact}
-            onChange={(event) => handleToggleMobileKnowledgeTreeCompact(event.target.checked)}
-            className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-none">
-              {t("settings.mobileKnowledgeTreeCompact")}
-            </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
-              {t("settings.mobileKnowledgeTreeCompactDesc")}
-            </p>
-          </div>
-        </label>
-
-        <label
-          data-settings-switch="desktop-knowledge-tree"
-          className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
-        >
-          <input
-            type="checkbox"
-            checked={desktopKnowledgeTreeMode === "quick"}
-            onChange={(event) => handleToggleDesktopKnowledgeTreeMode(event.target.checked)}
-            className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-none">
-              {t("settings.desktopKnowledgeTreeMode")}
-            </div>
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
-              {t("settings.desktopKnowledgeTreeModeDesc")}
-            </p>
-          </div>
-        </label>
+            <label
+              data-settings-switch="mobile-knowledge-tree-compact"
+              className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={mobileKnowledgeTreeCompact}
+                onChange={(event) => handleToggleMobileKnowledgeTreeCompact(event.target.checked)}
+                className="mt-0.5 w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-none">
+                  {t("settings.mobileKnowledgeTreeCompact")}
+                </div>
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-snug">
+                  {t("settings.mobileKnowledgeTreeCompactDesc")}
+                </p>
+              </div>
+            </label>
+          </>
+        )}
 
         {supportsDesktopMenuBarToggle && (
           <label className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors">
@@ -986,8 +866,12 @@ function SwitchesPanel() {
           </label>
         )}
 
+        {/* 站点级配置：仅管理员可见。普通用户看到会误以为是自己的账号设置。 */}
         {isAdmin && (
-          <label className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors">
+          <label
+            data-settings-switch="web-ui-enabled"
+            className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-white/60 dark:hover:bg-zinc-900/25 transition-colors"
+          >
             <input
               type="checkbox"
               checked={!webUiEnabled}
@@ -1468,6 +1352,60 @@ function AppearancePanel() {
           </div>
         </div>
 
+        {/* 编辑器默认值：这些偏好此前只能在编辑器工具条里改，设置页没有入口。
+            这里只补入口，不改动 useUserPreferences 的读写语义，也不移除既有工具条。 */}
+        <div className="space-y-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 p-4">
+          <div>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">编辑器默认值</span>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              新建笔记时使用的编辑器、代码块配色与笔记列表密度。
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">默认编辑器</span>
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+              {([
+                { code: "tiptap" as const, label: "富文本" },
+                { code: "md" as const, label: "Markdown" },
+              ]).map(opt => (
+                <button
+                  key={opt.code}
+                  onClick={() => setUserPref("defaultEditorMode", opt.code)}
+                  className={cn(
+                    "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+                    userPrefs.defaultEditorMode === opt.code
+                      ? "bg-white dark:bg-zinc-700 text-accent-primary shadow-sm"
+                      : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">代码块主题</span>
+            <select
+              value={userPrefs.codeBlockTheme}
+              onChange={(e) => setUserPref("codeBlockTheme", e.target.value as typeof userPrefs.codeBlockTheme)}
+              className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs text-zinc-700 dark:text-zinc-300"
+            >
+              {CODE_BLOCK_THEMES.map(theme => (
+                <option key={theme.id} value={theme.id}>{theme.label}</option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">笔记列表仅显示标题</span>
+            <input
+              type="checkbox"
+              checked={userPrefs.noteListTitleOnly}
+              onChange={(e) => setUserPref("noteListTitleOnly", e.target.checked)}
+              className="h-4 w-4 accent-indigo-500"
+            />
+          </label>
+        </div>
+
         {/*
          * 个人空间导入/导出的功能开关已下沉为 per-user 字段
          * （users.personalExportEnabled / personalImportEnabled，schema v6 起）。
@@ -1483,6 +1421,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   function SettingsModal({ onClose, defaultTab = "appearance" }, ref) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>(defaultTab);
+  const [settingsQuery, setSettingsQuery] = useState("");
   const { siteConfig } = useSiteSettings();
   const shortcutSurface = detectShortcutSurface();
   const [currentUser, setCurrentUser] = useState<{ id: string; role?: string; displayName?: string; username?: string } | null>(null);
@@ -1515,39 +1454,40 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
 
   const isAdmin = currentUser?.role === "admin";
 
-  const SETTING_TABS = [
-    { id: "appearance" as const, label: t('settings.appearance'), icon: Palette },
-    { id: "switches" as const, label: t('settings.switches'), icon: ToggleLeft },
-    ...(shortcutSurface !== "android" ? [{ id: "shortcuts" as const, label: "快捷键", icon: Keyboard }] : []),
-    { id: "ai" as const, label: t('settings.ai'), icon: Bot },
-    // 插件管理已合并到侧栏「插件」中心（内置/已安装/市场/管理），设置里不再重复一份。
-    { id: "voice" as const, label: t('speech.title', { defaultValue: '语音转写' }), icon: Mic },
-    { id: "automation" as const, label: t('automation.title', { defaultValue: '自动化' }), icon: Workflow },
-    { id: "security" as const, label: t('settings.security'), icon: Shield },
-    // 【个人访问令牌】任意登录用户都可管理自己的 token；与 security 同为"账号安全"类别，
-    // 不需要 isAdmin 判定。
-    { id: "tokens" as const, label: t('settings.tokens', { defaultValue: '访问令牌' }), icon: Key },
-    ...(isAdmin ? [{ id: "users" as const, label: t('settings.users'), icon: Users }] : []),
-    ...(isAdmin ? [{ id: "workspaces" as const, label: t('settings.workspaces'), icon: Building2 }] : []),
-    // 「数据管理」面板：
-    //   - 管理员：展示三个一级 tab（个人空间 / 工作区 / 系统），包含跨用户/全库范围
-    //     的高危操作（备份、灾难恢复、工厂重置、SQLite 文件级导入导出等）；
-    //   - 普通用户：DataManager 内部只渲染"个人空间"scope 的导出/导入 —— 这是
-    //     用户对自己数据的基本自主权。是否可用再叠加后端下发的 feature flag
-    //     （personalExport/Import Enabled），由管理员集中控制。
-    //   组件内部也做了一层防御性闸门，防止用户从深链绕过这里直达 admin-only 区域。
-    { id: "data" as const, label: t('settings.dataManagement'), icon: Database },
-    { id: "backup" as const, label: "备份中心", icon: Archive },
-    { id: "sync" as const, label: "同步", icon: RefreshCw },
-    // 「文件夹同步」：桌面端专属，Phase B 只做配置 CRUD
-    ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
-    // 「下载客户端」面板：面向所有用户（含未登录、本地、云端）。需求背景：
-    //   用户主要在中国大陆，GitHub Releases 下载体验差，这里按平台列出产物并提供
-    //   「GitHub 直连 + 多个公共加速代理」的换源能力。与 about 的「前往下载页」区别：后者只能调起
-    //   GitHub 。该面板本身不调用任何需要鉴权的接口（releases/latest 未鉴权）。
-    { id: "download" as const, label: t('settings.download', { defaultValue: '下载客户端' }), icon: Download },
-    { id: "about" as const, label: t('about.title'), icon: Info },
-  ];
+  // 每个 tab 的 group 只用于导航层分组展示；面板内容、可见性条件与渲染分支都不变。
+  // 白名单（appRoute.ts 的 SETTINGS_TAB_KEYS）必须与这里的 id 集合保持一致。
+  const SETTING_TABS = useMemo(() => [
+    // 个人
+    { id: "appearance" as const, group: "personal" as const, label: t('settings.appearance'), icon: Palette },
+    { id: "switches" as const, group: "personal" as const, label: t('settings.switches'), icon: ToggleLeft },
+    ...(shortcutSurface !== "android" ? [{ id: "shortcuts" as const, group: "personal" as const, label: "快捷键", icon: Keyboard }] : []),
+    { id: "ai" as const, group: "personal" as const, label: t('settings.aiAndMcp', { defaultValue: 'AI 与 MCP' }), icon: Bot },
+    { id: "voice" as const, group: "personal" as const, label: t('speech.title', { defaultValue: '语音转写' }), icon: Mic },
+    { id: "automation" as const, group: "personal" as const, label: t('automation.title', { defaultValue: '自动化' }), icon: Workflow },
+    { id: "security" as const, group: "personal" as const, label: t('settings.security'), icon: Shield },
+    // 连接：令牌供 MCP / CLI 使用；MCP 的服务端点与可用工具在 AI 面板里
+    { id: "tokens" as const, group: "connection" as const, label: t('settings.tokens', { defaultValue: '访问令牌' }), icon: Key },
+    // 数据：DataManager 内部仍按 isAdmin 分流（管理员三 scope / 普通用户仅个人空间）
+    { id: "data" as const, group: "data" as const, label: t('settings.dataManagement'), icon: Database },
+    { id: "backup" as const, group: "data" as const, label: "备份中心", icon: Archive },
+    { id: "sync" as const, group: "data" as const, label: "同步", icon: RefreshCw },
+    ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, group: "data" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
+    // 系统管理：仅管理员可见
+    ...(isAdmin ? [{ id: "users" as const, group: "system" as const, label: t('settings.users'), icon: Users }] : []),
+    ...(isAdmin ? [{ id: "workspaces" as const, group: "system" as const, label: t('settings.workspaces'), icon: Building2 }] : []),
+    // 关于：下载客户端保留入口（内容按 VITE_CLIENT_DOWNLOADS_ENABLED 屏蔽）
+    { id: "download" as const, group: "about" as const, label: t('settings.download', { defaultValue: '下载客户端' }), icon: Download },
+    { id: "about" as const, group: "about" as const, label: t('about.title'), icon: Info },
+  ], [t, shortcutSurface, isAdmin]);
+
+  // 设置内搜索：匹配 tab 标签或关键词索引，点击结果直接切到对应面板。
+  const visibleTabs = useMemo(() => {
+    const q = settingsQuery.trim().toLowerCase();
+    if (!q) return SETTING_TABS;
+    return SETTING_TABS.filter((tab) =>
+      `${tab.label} ${SETTING_TAB_KEYWORDS[tab.id]}`.toLowerCase().includes(q)
+    );
+  }, [settingsQuery, SETTING_TABS]);
 
   // 用 Portal 挂载到 body：
   //   SettingsModal 调用点位于 SidebarMobile 组件内部（见 SidebarMobile.tsx 的 AnimatePresence）。
@@ -1615,7 +1555,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
           style={{ paddingTop: 'var(--safe-area-top)', touchAction: 'pan-x' }}
         >
           <div className="flex-1 flex items-center gap-1 px-3 py-2 overflow-x-auto no-scrollbar" style={{ touchAction: 'pan-x' }}>
-            {SETTING_TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -1643,30 +1583,58 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
           </button>
         </div>
 
-        {/* 桌面端：左侧导航栏 */}
+        {/* 桌面端：左侧导航栏（搜索 + 五组分组，只改导航层，不动任何面板） */}
         <div className="hidden md:flex w-56 flex-shrink-0 bg-zinc-50 dark:bg-zinc-900/50 border-r border-zinc-200 dark:border-zinc-800 p-4 flex-col">
-          <div className="flex items-center gap-2 mb-6 px-2">
+          <div className="flex items-center gap-2 mb-4 px-2">
             <Settings className="w-4 h-4 text-zinc-500 dark:text-zinc-400" />
             <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{t('settings.title')}</span>
           </div>
 
-          <nav className="flex-1 min-h-0 overflow-y-auto space-y-0.5 pr-1">
-            {SETTING_TABS.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 pointer-events-none" />
+            <input
+              type="search"
+              value={settingsQuery}
+              onChange={(e) => setSettingsQuery(e.target.value)}
+              placeholder="搜索设置"
+              aria-label="搜索设置"
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 pl-8 pr-2 py-1.5 text-xs text-zinc-700 dark:text-zinc-300 outline-none focus:border-indigo-400 dark:focus:border-indigo-500"
+            />
+          </div>
+
+          <nav className="flex-1 min-h-0 overflow-y-auto pr-1">
+            {visibleTabs.length === 0 && (
+              <p className="px-3 py-4 text-xs text-zinc-400 dark:text-zinc-600">没有匹配的设置项</p>
+            )}
+            {SETTINGS_GROUPS.map((group) => {
+              const tabs = visibleTabs.filter((tab) => tab.group === group.id);
+              if (tabs.length === 0) return null;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-zinc-200/70 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400"
-                      : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-200"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
+                <div key={group.id} className="mb-3">
+                  <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-600">
+                    {group.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setActiveTab(tab.id)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? "bg-zinc-200/70 dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400"
+                              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/40 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-zinc-200"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {tab.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </nav>

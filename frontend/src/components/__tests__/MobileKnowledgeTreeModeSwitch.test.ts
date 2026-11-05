@@ -40,6 +40,13 @@ describe("mobile knowledge tree mode switch contract", () => {
     expect(enSource).toContain('"mobileKnowledgeTreeMode": "Use tree view on mobile"');
   });
 
+  it("renders the mobile-only switches only in a mobile runtime", () => {
+    // 移动端专有项按运行时裁剪：Android 原生运行时，或视口窄到触发移动抽屉。
+    expect(settingsSource).toContain("const isMobileRuntime = isAndroidNativeRuntime() || narrowViewport");
+    expect(settingsSource).toContain('window.matchMedia("(max-width: 767px)")');
+    expect(settingsSource).toMatch(/\{isMobileRuntime && \(/);
+  });
+
   it("persists the choice and keeps the new navigator as the default", () => {
     expect(helperSource).toContain('export type MobileKnowledgeTreeViewMode = "navigator" | "tree"');
     expect(helperSource).toContain('return value && VALID_MODES.has(value) ? value : "navigator"');

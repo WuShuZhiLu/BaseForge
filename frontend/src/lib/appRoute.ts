@@ -107,10 +107,13 @@ export type AppRoute = AppRouteKind & { q?: string; scope?: string; tree?: strin
 export const TOOL_TAB_KEYS = ["tasks", "shares", "files", "trash"] as const;
 export type ToolRouteKey = (typeof TOOL_TAB_KEYS)[number];
 
-/** 设置弹窗 tab key（与 NavRailDesktop 的 TabId 保持一致）。 */
+/**
+ * 设置弹窗 tab key，必须与 SettingsModal 的 SETTING_TABS / TabId 保持一致。
+ * 白名单里的值都会被视为合法深链，多列一个就会让 /settings/:tab 打开空白内容区。
+ */
 export const SETTINGS_TAB_KEYS = [
-  "appearance", "switches", "shortcuts", "ai", "plugins", "voice", "automation",
-  "security", "tokens", "data", "backup", "sync", "offlineSync", "folderSync",
+  "appearance", "switches", "shortcuts", "ai", "voice", "automation",
+  "security", "tokens", "data", "backup", "sync", "folderSync",
   "users", "workspaces", "download", "about",
 ] as const;
 export type SettingsTabKey = (typeof SETTINGS_TAB_KEYS)[number];

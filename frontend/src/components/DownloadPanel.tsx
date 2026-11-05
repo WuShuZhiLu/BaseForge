@@ -261,7 +261,46 @@ async function copyText(value: string): Promise<boolean> {
   }
 }
 
+/**
+ * 客户端下载开关。
+ *
+ * 0.1 只发布 Docker 镜像，桌面 / 移动 / NAS 安装包尚未产出。此时保留「下载客户端」
+ * 入口，但不渲染 GitHub Releases 列表——那些链接指向上游仓库，且在当前版本下全部无效。
+ * 打包流水线就绪后，构建时设置 VITE_CLIENT_DOWNLOADS_ENABLED=true 即可恢复内容，
+ * 不需要改代码。
+ */
+const CLIENT_DOWNLOADS_ENABLED = import.meta.env.VITE_CLIENT_DOWNLOADS_ENABLED === "true";
+
+function ClientDownloadsPlaceholder() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1 flex items-center gap-2">
+          <Download size={18} className="text-accent-primary" />
+          下载客户端
+        </h3>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          桌面、移动与 NAS 安装包尚未发布。
+        </p>
+      </div>
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 p-4 space-y-2">
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          当前版本仅提供 Docker 镜像部署：运行镜像后，在浏览器中访问服务即可使用。
+        </p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          打包版本就绪后，这里会按平台列出安装包并提供加速下载源。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function DownloadPanel() {
+  if (!CLIENT_DOWNLOADS_ENABLED) return <ClientDownloadsPlaceholder />;
+  return <DownloadPanelContent />;
+}
+
+function DownloadPanelContent() {
   const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);

@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { confirm } from "@/components/ui/confirm";
 import PluginPromptPackSettingsSection from "@/components/settings/PluginPromptPackSettingsSection";
-import SpeechSettingsPanel from "@/components/SpeechSettingsPanel";
+import McpSettings from "@/components/settings/McpSettings";
 import {
   aiProfiles,
   emitAIProfilesChanged,
@@ -61,7 +61,7 @@ function getCopy() {
   if (!language.startsWith("zh")) {
     return {
       title: "AI service profiles",
-      description: "Save multiple providers and switch them directly in AI Chat.",
+      description: "Save multiple AI service profiles for document tidy-up, writing assistance and collaboration features.",
       profiles: "Saved profiles",
       newProfile: "New profile",
       profileName: "Profile name",
@@ -91,7 +91,7 @@ function getCopy() {
   }
   return {
     title: "AI 服务配置",
-    description: "保存多个 AI 服务，并可在 AI 问答标题栏直接切换。",
+    description: "保存多个 AI 服务，供 AI 整理文档、辅助协作等功能使用。",
     profiles: "已保存配置",
     newProfile: "新建配置",
     profileName: "配置名称",
@@ -487,8 +487,10 @@ export default function AISettingsPanel() {
           </div>
         </section>
       </div>
+      {/* MCP 与 AI 配置同属「对外能力」：一边是模型服务的入站配置，一边是把知识库
+          暴露给外部 AI 客户端的出站通道，放在同一面板里避免在两处来回切。 */}
+      <McpSettings />
       <PluginPromptPackSettingsSection />
-      <SpeechSettingsPanel />
     </div>
   );
 }

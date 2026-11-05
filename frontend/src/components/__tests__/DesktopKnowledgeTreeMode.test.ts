@@ -18,12 +18,15 @@ describe("desktop knowledge tree browsing mode", () => {
     expect(modeSource).toContain("DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT");
   });
 
-  it("places the desktop quick-browse switch in Settings", () => {
-    expect(settingsSource).toContain('checked={desktopKnowledgeTreeMode === "quick"}');
-    expect(settingsSource).toContain('saveDesktopKnowledgeTreeViewMode(nextMode)');
-    expect(settingsSource).toContain('t("settings.desktopKnowledgeTreeMode")');
-    expect(settingsSource).toContain('data-settings-switch="desktop-knowledge-tree"');
-    expect(zhSource).toContain('"desktopKnowledgeTreeMode": "桌面端使用快捷浏览"');
+  it("no longer exposes a desktop quick-browse switch in Settings", () => {
+    // 该项唯一消费点是 SidebarMobile 的 variant="desktop" 分支，而该组件目前只以
+    // variant="mobile" 挂在移动抽屉里，桌面端点开关没有任何效果。设置里已移除，
+    // 只剩底层偏好读写函数给 SidebarMobile 使用。
+    expect(settingsSource).not.toContain('data-settings-switch="desktop-knowledge-tree"');
+    expect(settingsSource).not.toContain("saveDesktopKnowledgeTreeViewMode");
+    expect(settingsSource).not.toContain("loadDesktopKnowledgeTreeViewMode");
+    expect(settingsSource).not.toContain("desktopKnowledgeTreeMode");
+    expect(zhSource).not.toContain('"desktopKnowledgeTreeMode"');
   });
 
   it("switches only the desktop sidebar surface", () => {
