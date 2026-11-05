@@ -12,6 +12,8 @@ Format:
 
 ## Unreleased
 
+## v0.1.0 - 2026-11-05
+
 BaseForge forked from nowen note **v1.4.16** and absorbed the functional and framework updates of upstream **v1.5.1** (sync engine, encrypted notes / encrypted blocks, task center, plugin platform foundation, notifications / comments / trash, data management / backup, note appearance themes, i18n, and more). The entries below cover the changes BaseForge made after the fork. The first alpha release ships a Docker image only — no desktop or mobile builds.
 
 ### Added

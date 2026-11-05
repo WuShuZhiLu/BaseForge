@@ -1,4 +1,5 @@
-# tag：push tag 取名字去掉 v，手动触发取 package.json 的 version；推送时同步 :latest。
+# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v（:v0.1.0），同时推 :latest。
+# tag 触发时校验 tag 与 CHANGELOG 一致，避免镜像版本和更新日志脱节。
 # 仓库地址与凭据全部来自仓库变量/密钥，代码里不写死任何地址：
 # 未配置任何仓库时只构建、不推送。
 # 配置项（逗号分隔、按序号对应，免登录写 anon）：vars.IMAGE_REPOSITORIES /
@@ -101,29 +102,42 @@ jobs:
             exit 1
           fi
 
-          # 优先用 GITHUB_REF 解析（Gitea 老版本没有 GITHUB_REF_TYPE，
-          # 会导致 tag 触发时静默回退到 package.json，把旧版本号覆盖推上去）。
-          TAG=""
+          # 版本号以 CHANGELOG.md 的最新已发布版本为准（标题形如 "## v0.1.0 - 2026-11-05"）；
+          # 本次是 tag 触发时，tag 必须与之一致，避免镜像版本和更新日志脱节。
+          REF_TAG=""
           case "${GITHUB_REF:-}" in
-            refs/tags/*) TAG="${GITHUB_REF#refs/tags/}" ;;
+            refs/tags/*) REF_TAG="${GITHUB_REF#refs/tags/}" ;;
           esac
-          if [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-            TAG="${GITHUB_REF_NAME:-}"
+          if [ -z "$REF_TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            REF_TAG="${GITHUB_REF_NAME:-}"
           fi
-          TAG="${TAG#v}"
-          if [ -z "$TAG" ]; then
-            TAG="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+          REF_TAG="${REF_TAG#v}"
+
+          CL_VERSION="$(sed -n 's/^## v\([0-9][0-9A-Za-z.+-]*\).*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)"
+          if [ -n "$CL_VERSION" ]; then
+            if [ -n "$REF_TAG" ] && [ "$REF_TAG" != "$CL_VERSION" ]; then
+              echo "::error::tag v${REF_TAG} 与 CHANGELOG 最新版本 v${CL_VERSION} 不一致：先更新 CHANGELOG 再打 tag"
+              exit 1
+            fi
+            VER="$CL_VERSION"
+            echo "版本号取自 CHANGELOG.md：v${VER}"
+          else
+            VER="$REF_TAG"
+            if [ -z "$VER" ]; then
+              VER="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+            fi
+            if [ -z "$VER" ]; then
+              echo "::error::推导不出版本号（CHANGELOG / tag 名 / package.json 都拿不到）"
+              exit 1
+            fi
+            echo "::warning::CHANGELOG.md 里没有已发布版本段，回退用 v${VER}"
           fi
-          if [ -z "$TAG" ]; then
-            echo "::error::推导不出版本号（tag 名与 package.json 都拿不到）"
-            exit 1
-          fi
-          echo "版本号：${TAG}"
+          TAG="v${VER}"
 
           # 本地构建用固定 tag，推送时再 retag 到具体仓库，避免依赖仓库地址
           BUILD_REF="baseforge-build:${TAG}"
           docker build -f Dockerfile -t "$BUILD_REF" \
-            --build-arg APP_VERSION="$TAG" \
+            --build-arg APP_VERSION="$VER" \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --build-arg VCS_REF="${GITHUB_SHA:-}" .
 
@@ -319,8 +333,9 @@ jobs:
               failed_list="${failed_list} ${repo}"
               continue
             fi
-            # tag 本身是 latest 时不必重复推一次
-            if push_with_retry "$ref" && { [ "$ref" = "$latest_ref" ] || push_with_retry "$latest_ref"; }; then
+            # 版本 tag 与 latest 都要推，任意一个失败就算该仓库失败
+            echo "推送 ${ref} 与 ${latest_ref}"
+            if push_with_retry "$ref" && push_with_retry "$latest_ref"; then
               verify_pushed "$ref" "$scheme"
               pushed_list="${pushed_list} ${repo}"
             else
