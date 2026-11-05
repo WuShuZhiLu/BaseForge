@@ -27,6 +27,7 @@ import DownloadPanel from "@/components/DownloadPanel";
 import { useSiteSettings, BUILTIN_FONTS, getBuiltinFontName } from "@/hooks/useSiteSettings";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { api } from "@/lib/api";
+import { fetchMe, getCachedMe } from "@/lib/meCache";
 import { isDesktop, checkForUpdates, onUpdaterStatus, getReleaseChannel, isPortableDesktop, getAppInfo, setDesktopHideMenuBar as setDesktopHideMenuBarPreference, type UpdaterPayload } from "@/lib/desktopBridge";
 import { CustomFont } from "@/types";
 import { cn } from "@/lib/utils";
@@ -905,12 +906,12 @@ function AppearancePanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 站点标识属于全站共享配置，只有系统管理员能改。
-  // 这里独立拉一次身份（不依赖父组件传 props），与 DataManager 的做法保持一致，
-  // 避免修改 SettingsModal 主体的渲染契约。
-  const [isAdmin, setIsAdmin] = useState(false);
+  // 身份从 meCache 同步初始化（应用启动时已预热），避免"先按非管理员渲染、
+  // getMe 返回后瞬间翻转成管理员视图"的闪变；后台仍刷新一次兜底。
+  const [isAdmin, setIsAdmin] = useState(() => getCachedMe()?.role === "admin");
   useEffect(() => {
     let cancelled = false;
-    api.getMe()
+    fetchMe()
       .then((u) => { if (!cancelled) setIsAdmin((u as any)?.role === "admin"); })
       .catch(() => { if (!cancelled) setIsAdmin(false); });
     return () => { cancelled = true; };
@@ -1423,11 +1424,11 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   const [settingsQuery, setSettingsQuery] = useState("");
   const { siteConfig } = useSiteSettings();
   const shortcutSurface = detectShortcutSurface();
-  const [currentUser, setCurrentUser] = useState<{ id: string; role?: string; displayName?: string; username?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; role?: string; displayName?: string; username?: string } | null>(() => getCachedMe());
 
   const fetchCurrentUser = useCallback(() => {
     let cancelled = false;
-    api.getMe()
+    fetchMe()
       .then((u) => { if (!cancelled) setCurrentUser({ id: u.id, role: (u as any).role, displayName: (u as any).displayName, username: (u as any).username }); })
       .catch(() => { if (!cancelled) setCurrentUser(null); });
     return () => { cancelled = true; };
@@ -1515,22 +1516,24 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   //     - 模态主体 touch-action: pan-y pinch-zoom，避免被 WebView 当作系统返回手势；
   //     - 顶层 motion.div 不绑 click，避免漏到外层的点击被解释成关闭。
   return createPortal(
-    <motion.div
+    // 外层容器不做任何动画（此前这里也有 opacity 0→1，会把静态 blur 层一起拖进
+    // 逐帧重采样）。入场/出场动画只发生在 tint 层与主体两层上。
+    // 退出动画经 PresenceContext 传给子级 motion 组件，AnimatePresence 照常生效。
+    <div
       ref={ref}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 md:sm:p-6"
       // data-swipe-blocker：让 App.tsx::useSwipeGesture 在本子树内的 touchstart 上主动跳过
       // 判定。整个 portal 子树（含移动端 tab 栏 / panel 内容）一并受保护。
       data-swipe-blocker="settings-modal"
     >
       {/* 背景遮罩：仅桌面端渲染。移动端模态主体已全屏覆盖，遮罩不可见且只会
-          带来\"轻触即关闭\"的误触，故直接不挂载。 */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+          带来\"轻触即关闭\"的误触，故直接不挂载。
+
+          性能与观感：单层静态遮罩（颜色+blur 一体），不做任何动画——
+          此前 blur 层与 tint 层分离且 tint 淡入，blur 先到位、颜色后跟上，
+          视觉上是"闪一下"；而 backdrop-filter 参与动画则每帧重采样、掉帧。
+          静态层只合成一次，主体自身的淡入提供动感就够了。 */}
+      <div
         onClick={onClose}
         className="hidden md:block absolute inset-0 bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm"
       />
@@ -1539,12 +1542,9 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
           - touch-action: pan-y pinch-zoom：声明本容器内部只允许竖向滚动 + 双指缩放，
             禁止 WebView 把横向 / 边缘手势解释为系统级返回 / 抽屉手势；
           - onPointerDownCapture stopPropagation：把指针事件在捕获阶段就拦下，
-            杜绝事件\"绕过\"主体冒到外层 motion.div 上。 */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ type: "spring", duration: 0.5, bounce: 0 }}
+            杜绝事件\"绕过\"主体冒到外层 motion.div 上。
+          - 无入场动画：此前 0.5s spring + 缩放被反馈"慢、顿、闪"，改为直接出现。 */}
+      <div
         className="relative w-[min(1100px,86vw)] h-[min(78vh,calc(100dvh-4rem))] flex flex-col md:flex-row overflow-hidden bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 max-md:h-[100dvh] max-md:w-full max-md:max-h-none max-md:max-w-none max-md:rounded-none max-md:border-0"
         style={{ touchAction: "pan-y pinch-zoom" }}
         onClick={(e) => e.stopPropagation()}
@@ -1659,16 +1659,10 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
             <X className="w-4 h-4" />
           </button>
 
-          {/* 动态渲染内容 */}
+          {/* 动态渲染内容（无动画：tab 内容此前带 x:12 滑入，弹窗改即时出现后
+              它是唯一还在动的层，被反馈"内容瞬间变一下"，直接去掉） */}
           <div className="p-4 md:p-8 md:pr-14">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, x: 12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: 0.15 }}
-              >
+            <div>
                 {/*
                   PanelErrorBoundary 用 activeTab 做 key：每次切 tab 都重新创建一个
                   Boundary 实例，已经"中过招"的 panel 不会污染下一个 panel 的状态；
@@ -1713,12 +1707,11 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
                   {activeTab === "download" && <DownloadPanel />}
                   {activeTab === "about" && <AboutPanel />}
                 </PanelErrorBoundary>
-              </motion.div>
-            </AnimatePresence>
+            </div>
           </div>
         </div>
-      </motion.div>
-    </motion.div>,
+      </div>
+    </div>,
     document.body
   );
 });

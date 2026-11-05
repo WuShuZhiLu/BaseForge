@@ -29,6 +29,7 @@ import { useTheme } from "next-themes";
 
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api, broadcastLogout, getCurrentWorkspace } from "@/lib/api";
+import { fetchMe, invalidateMe } from "@/lib/meCache";
 import { isDesktop as isDesktopApp, clearDesktopLocalAuth } from "@/lib/desktopBridge";
 import { BUILTIN_PLUGINS, isBuiltinPluginEnabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/workspaceIssueNavigation";
@@ -297,12 +298,14 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   const showLabel = railMode === "label";
 
   useEffect(() => {
-    api.getMe().then((u) => setMe(u)).catch(() => undefined);
+    // 走 meCache：启动时预热当前用户缓存，设置弹窗等处可同步拿到身份，
+    // 避免"打开后内容瞬间翻转"的闪变。
+    fetchMe().then((u) => setMe(u as never)).catch(() => undefined);
   }, []);
 
   // 头像等用户资料变更后刷新（SecuritySettings 上传/移除头像时广播）
   useEffect(() => {
-    const onUserUpdated = () => { api.getMe().then((u) => setMe(u)).catch(() => undefined); };
+    const onUserUpdated = () => { invalidateMe(); fetchMe().then((u) => setMe(u as never)).catch(() => undefined); };
     window.addEventListener("nowen:user-updated", onUserUpdated);
     return () => window.removeEventListener("nowen:user-updated", onUserUpdated);
   }, []);
