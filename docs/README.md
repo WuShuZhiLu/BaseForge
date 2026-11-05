@@ -61,13 +61,11 @@
 |---|---|
 | [plugins/](./plugins/) | 插件平台与贡献点说明 |
 | [product/](./product/) | 产品设计与决策记录 |
-| [performance/](./performance/) | 性能基线与分析 |
 | [tutorials/](./tutorials/) | 用户教程（含 MCP 安装等） |
 | [screenshots/](./screenshots/) | 文档截图资源 |
-| [superpowers/](./superpowers/) | **上游 nowen-note 遗留文档**（保留以记录历史，不代表当前实现） |
 
 ## 约定
 
 - 新增面向用户/运维的文档，直接放 `docs/` 根并按上面四类归位；
 - 一次性分析、评估类文档（`*-assessment.md`、`plugin-pm-analysis.md`）属过程记录，不再更新；
-- 上游遗留内容（`superpowers/`、`tutorials/` 中的版本声明）保持原样，改动需单独说明。
+- 上游遗留内容（`tutorials/` 中的版本声明）保持原样，改动需单独说明。
