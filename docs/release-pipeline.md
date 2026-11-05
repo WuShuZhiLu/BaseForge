@@ -82,6 +82,26 @@ node scripts/sync-release-assets.mjs --tag <TAG> --dry-run            # 指定 t
 | `GH_MIRROR_REPO` | Variable | GitHub 镜像仓 `owner/repo` |
 | `GITEE_REPO` | Variable | Gitee 镜像仓 `owner/repo` |
 
+**Gitea 仓库**（镜像推送侧，`docker-image.yml`）
+| 名称 | 类型 | 用途 |
+|---|---|---|
+| `IMAGE_REPOSITORIES` | Variable | 镜像仓库列表，逗号分隔，列表里每个仓库都会推送 |
+| `REGISTRY_USERS` | Variable | 用户名列表，逗号分隔，按序号与仓库一一对应 |
+| `REGISTRY_TOKENS` | Secret | 密码 / token 列表，逗号分隔，同上 |
+| `IMAGE_PUSH_REQUIRE_ALL` | Variable | 可选，默认 `true`：任一仓库失败即让 job 失败 |
+
+免登录的仓库，用户名与 token 两项都写 `anon`（缺项或留空也按 `anon` 处理）：
+
+```bash
+IMAGE_REPOSITORIES = wushuzhilu/baseforge,http://docker-registry:5000/baseforge
+REGISTRY_USERS     = wushuzhilu,anon
+REGISTRY_TOKENS    = dckr_pat_xxx,anon
+```
+
+内网 HTTP registry 需先在宿主 daemon 侧做好两件事：`daemon.json` 加
+`"insecure-registries": ["docker-registry:5000"]` 并重启 docker；同时确保 daemon 所在宿主能解析
+该主机名（compose 服务名在宿主上通常解析不到，改用局域网 IP 更稳）。
+
 ## 6. 一次发版的完整操作顺序
 
 1. 在本仓确认版本号：根 `package.json` 的 `version` 与要打的 tag 完全一致（`release.yml` 的 `version-guard` 会校验）；

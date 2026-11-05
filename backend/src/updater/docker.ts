@@ -3,9 +3,18 @@ import fs from "fs";
 import path from "path";
 import { brandEnv } from "../lib/envBrand.js";
 
-export const OFFICIAL_IMAGE_REPOSITORY = (
-  brandEnv("UPDATER_ALLOWED_IMAGE") || "docker.betheone.cc.cd/baseforge"
-).trim();
+/**
+ * 允许更新的镜像仓库。代码里不内置默认地址，由部署环境通过
+ * BASEFORGE_UPDATER_ALLOWED_IMAGE / BASEFORGE_IMAGE_REPOSITORY 显式提供；
+ * 未配置时直接报错，避免把某个注册表地址写死。
+ */
+export function officialImageRepository(): string {
+  const value = (brandEnv("UPDATER_ALLOWED_IMAGE") || brandEnv("IMAGE_REPOSITORY") || "").trim();
+  if (!value) {
+    throw new Error("未配置镜像仓库：请设置 BASEFORGE_UPDATER_ALLOWED_IMAGE 或 BASEFORGE_IMAGE_REPOSITORY");
+  }
+  return value;
+}
 export const MANAGED_INSTANCE = (brandEnv("UPDATER_INSTANCE") || "baseforge").trim();
 export const MANAGED_CONTAINER_NAME = (brandEnv("UPDATER_CONTAINER_NAME") || "baseforge").trim();
 export const DOCKER_SOCKET = brandEnv("DOCKER_SOCKET") || "/var/run/docker.sock";
@@ -224,7 +233,7 @@ export function validateTargetVersion(input: unknown): string {
 }
 
 export function imageRefForVersion(version: string): string {
-  return `${OFFICIAL_IMAGE_REPOSITORY}:v${validateTargetVersion(version)}`;
+  return `${officialImageRepository()}:v${validateTargetVersion(version)}`;
 }
 
 export function splitImageRef(imageRef: string): { repository: string; tag: string } {
@@ -242,7 +251,7 @@ export function normalizeArchitecture(raw: string | undefined): string {
 }
 
 export function resolveDigest(image: DockerImageInspect): string | null {
-  const prefix = `${OFFICIAL_IMAGE_REPOSITORY}@sha256:`;
+  const prefix = `${officialImageRepository()}@sha256:`;
   return image.RepoDigests?.find((item) => item.startsWith(prefix)) || image.RepoDigests?.[0] || null;
 }
 
@@ -295,7 +304,8 @@ export function assertManagedContainer(container: DockerContainerInspect): void 
   if (!valid) throw new Error("目标容器缺少 BaseForge 受管标签，已拒绝操作");
 
   const configuredImage = container.Config.Image || "";
-  if (!configuredImage.startsWith(`${OFFICIAL_IMAGE_REPOSITORY}:`) && !configuredImage.startsWith(`${OFFICIAL_IMAGE_REPOSITORY}@`)) {
+  const officialRepo = officialImageRepository();
+  if (!configuredImage.startsWith(`${officialRepo}:`) && !configuredImage.startsWith(`${officialRepo}@`)) {
     throw new Error(`目标容器镜像不在允许仓库：${configuredImage}`);
   }
 }

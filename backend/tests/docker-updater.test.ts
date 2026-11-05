@@ -10,9 +10,16 @@ import {
 } from "../src/updater/docker";
 
 test("updater only accepts a concrete semantic version in the official image repository", () => {
-  assert.equal(validateTargetVersion("v1.4.2"), "1.4.2");
-  assert.equal(validateTargetVersion("1.4.2-rc.1"), "1.4.2-rc.1");
-  assert.equal(imageRefForVersion("1.4.2"), "docker.betheone.cc.cd/baseforge:v1.4.2");
+  process.env.BASEFORGE_UPDATER_ALLOWED_IMAGE = "wushuzhilu/baseforge";
+  try {
+    assert.equal(validateTargetVersion("v1.4.2"), "1.4.2");
+    assert.equal(validateTargetVersion("1.4.2-rc.1"), "1.4.2-rc.1");
+    assert.equal(imageRefForVersion("1.4.2"), "wushuzhilu/baseforge:v1.4.2");
+  } finally {
+    delete process.env.BASEFORGE_UPDATER_ALLOWED_IMAGE;
+  }
+  // 未配置仓库时不能静默回退到写死的地址
+  assert.throws(() => imageRefForVersion("1.4.2"), /未配置镜像仓库/);
   assert.throws(() => validateTargetVersion("latest"));
   assert.throws(() => validateTargetVersion("cropflre/other:1.0.0"));
   assert.throws(() => validateTargetVersion("1.4.2;rm -rf /"));
