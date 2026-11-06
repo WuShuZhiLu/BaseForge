@@ -411,104 +411,77 @@ export class BaseForgeApiClient {
     });
   }
 
-  // ==================== AI ====================
+  // ==================== 远程文件（内核能力） ====================
 
-  /** 知识库问答（非流式，收集完整响应） */
-  async askKnowledge(question: string): Promise<{ answer: string; references: { id: string; title: string }[] }> {
-    const res = await fetch(`${this.baseUrl}/api/ai/ask`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiToken}`,
-      },
-      body: JSON.stringify({ question }),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`AI 请求失败 (${res.status}): ${err}`);
-    }
-
-    // 解析 SSE 流，收集完整响应
-    const text = await res.text();
-    const lines = text.split("\n");
-    let answer = "";
-    let references: { id: string; title: string }[] = [];
-
-    for (const line of lines) {
-      if (line.startsWith("event: references")) {
-        // 下一行是 data
-        continue;
-      }
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") break;
-
-        // 尝试解析 references
-        try {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed) && parsed[0]?.id && parsed[0]?.title) {
-            references = parsed;
-            continue;
-          }
-          if (parsed && typeof parsed === "object" && typeof parsed.t === "string") {
-            answer += parsed.t;
-            continue;
-          }
-          if (parsed && typeof parsed === "object" && typeof parsed.mode === "string") {
-            continue;
-          }
-        } catch {
-          // 不是 JSON，是普通文本内容
-        }
-
-        answer += data;
-      }
-    }
-
-    return { answer, references };
+  /** 列出远程源配置（凭据始终由服务端掩码） */
+  listRemoteSources(): Promise<any> {
+    return this.request("/api/remote-files/sources");
   }
 
-  /** AI 写作助手（非流式，收集完整响应） */
-  async aiChat(params: {
-    action: string;
-    text: string;
-    context?: string;
-    customPrompt?: string;
-  }): Promise<string> {
-    const res = await fetch(`${this.baseUrl}/api/ai/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiToken}`,
-      },
-      body: JSON.stringify(params),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`AI 请求失败 (${res.status}): ${err}`);
-    }
-
-    // 解析 SSE 流
-    const text = await res.text();
-    const lines = text.split("\n");
-    let result = "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") break;
-        result += data;
-      }
-    }
-
-    return result;
+  /** 新建或更新远程源；body 带 id 时为更新 */
+  saveRemoteSource(params: Record<string, unknown>): Promise<any> {
+    return this.request("/api/remote-files/sources", { method: "POST", body: params });
   }
 
-  /** 知识库统计 */
-  async knowledgeStats(): Promise<any> {
-    return this.request("/api/ai/knowledge-stats");
+  deleteRemoteSource(sourceId: string): Promise<any> {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}`, { method: "DELETE" });
+  }
+
+  testRemoteSource(sourceId: string): Promise<any> {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}/test`, {
+      method: "POST", body: {},
+    });
+  }
+
+  /** 远程文件操作：list / read / write / mkdir / delete / rename / save-attachment */
+  remoteFileOp(
+    sourceId: string,
+    op: "list" | "read" | "write" | "mkdir" | "delete" | "rename" | "save-attachment",
+    params: Record<string, unknown>,
+  ): Promise<any> {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}/${op}`, {
+      method: "POST", body: params,
+    });
+  }
+
+  listRemoteLinks(): Promise<any> {
+    return this.request("/api/remote-files/links");
+  }
+
+  manageRemoteLink(action: "create" | "update" | "delete", params: Record<string, unknown>): Promise<any> {
+    const path = action === "create"
+      ? "/api/remote-files/links"
+      : `/api/remote-files/links/${action}`;
+    return this.request(path, { method: "POST", body: params });
+  }
+
+  // ==================== 导出与分享 ====================
+
+  /** 导出笔记（后端返回全量；工具侧按 notebookId 过滤，避免跨知识库泄露） */
+  exportNotes(workspaceId?: string): Promise<any[]> {
+    return this.request("/api/export/notes", { query: { workspaceId } });
+  }
+
+  listShares(): Promise<any[]> {
+    return this.request("/api/shares");
+  }
+
+  createShare(params: {
+    noteId: string;
+    permission?: "view" | "comment" | "edit" | "edit_auth";
+    password?: string;
+    expiresAt?: string | null;
+    maxViews?: number;
+  }): Promise<any> {
+    return this.request("/api/shares", { method: "POST", body: params });
+  }
+
+  updateShare(id: string, params: Record<string, unknown>): Promise<any> {
+    return this.request(`/api/shares/${encodeURIComponent(id)}`, { method: "PUT", body: params });
+  }
+
+  deleteShare(id: string): Promise<any> {
+    return this.request(`/api/shares/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   // ==================== 插件 ====================

@@ -21248,81 +21248,54 @@ ${markdown}` : markdown;
       version: note.version || 1
     });
   }
-  // ==================== AI ====================
-  /** 知识库问答（非流式，收集完整响应） */
-  async askKnowledge(question) {
-    const res = await fetch(`${this.baseUrl}/api/ai/ask`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiToken}`
-      },
-      body: JSON.stringify({ question })
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`AI \u8BF7\u6C42\u5931\u8D25 (${res.status}): ${err}`);
-    }
-    const text = await res.text();
-    const lines = text.split("\n");
-    let answer = "";
-    let references = [];
-    for (const line of lines) {
-      if (line.startsWith("event: references")) {
-        continue;
-      }
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") break;
-        try {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed) && parsed[0]?.id && parsed[0]?.title) {
-            references = parsed;
-            continue;
-          }
-          if (parsed && typeof parsed === "object" && typeof parsed.t === "string") {
-            answer += parsed.t;
-            continue;
-          }
-          if (parsed && typeof parsed === "object" && typeof parsed.mode === "string") {
-            continue;
-          }
-        } catch {
-        }
-        answer += data;
-      }
-    }
-    return { answer, references };
+  // ==================== 远程文件（内核能力） ====================
+  /** 列出远程源配置（凭据始终由服务端掩码） */
+  listRemoteSources() {
+    return this.request("/api/remote-files/sources");
   }
-  /** AI 写作助手（非流式，收集完整响应） */
-  async aiChat(params) {
-    const res = await fetch(`${this.baseUrl}/api/ai/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.apiToken}`
-      },
-      body: JSON.stringify(params)
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`AI \u8BF7\u6C42\u5931\u8D25 (${res.status}): ${err}`);
-    }
-    const text = await res.text();
-    const lines = text.split("\n");
-    let result = "";
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") break;
-        result += data;
-      }
-    }
-    return result;
+  /** 新建或更新远程源；body 带 id 时为更新 */
+  saveRemoteSource(params) {
+    return this.request("/api/remote-files/sources", { method: "POST", body: params });
   }
-  /** 知识库统计 */
-  async knowledgeStats() {
-    return this.request("/api/ai/knowledge-stats");
+  deleteRemoteSource(sourceId) {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}`, { method: "DELETE" });
+  }
+  testRemoteSource(sourceId) {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}/test`, {
+      method: "POST",
+      body: {}
+    });
+  }
+  /** 远程文件操作：list / read / write / mkdir / delete / rename / save-attachment */
+  remoteFileOp(sourceId, op, params) {
+    return this.request(`/api/remote-files/sources/${encodeURIComponent(sourceId)}/${op}`, {
+      method: "POST",
+      body: params
+    });
+  }
+  listRemoteLinks() {
+    return this.request("/api/remote-files/links");
+  }
+  manageRemoteLink(action, params) {
+    const path2 = action === "create" ? "/api/remote-files/links" : `/api/remote-files/links/${action}`;
+    return this.request(path2, { method: "POST", body: params });
+  }
+  // ==================== 导出与分享 ====================
+  /** 导出笔记（后端返回全量；工具侧按 notebookId 过滤，避免跨知识库泄露） */
+  exportNotes(workspaceId) {
+    return this.request("/api/export/notes", { query: { workspaceId } });
+  }
+  listShares() {
+    return this.request("/api/shares");
+  }
+  createShare(params) {
+    return this.request("/api/shares", { method: "POST", body: params });
+  }
+  updateShare(id, params) {
+    return this.request(`/api/shares/${encodeURIComponent(id)}`, { method: "PUT", body: params });
+  }
+  deleteShare(id) {
+    return this.request(`/api/shares/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
   // ==================== 插件 ====================
   /** 获取已加载的插件列表 */
@@ -21442,6 +21415,21 @@ if (!config2.apiToken) {
   process.exit(1);
 }
 var api = new BaseForgeApiClient(config2);
+function textResult(data) {
+  return {
+    content: [{
+      type: "text",
+      text: typeof data === "string" ? data : JSON.stringify(data, null, 2)
+    }]
+  };
+}
+function errorResult(err) {
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    content: [{ type: "text", text: `\u9519\u8BEF: ${message}` }],
+    isError: true
+  };
+}
 var server = new McpServer({
   name: "baseforge",
   version: "1.0.0"
@@ -21981,74 +21969,231 @@ ${JSON.stringify(tag, null, 2)}` }] };
   }
 );
 server.tool(
-  "baseforge_ai_ask",
-  "\u5411 BaseForge \u77E5\u8BC6\u5E93\u63D0\u95EE\u3002\u7CFB\u7EDF\u4F1A\u81EA\u52A8\u68C0\u7D22\u76F8\u5173\u7B14\u8BB0\u5185\u5BB9\uFF0C\u7ED3\u5408 AI \u751F\u6210\u56DE\u7B54\uFF0C\u5E76\u6807\u6CE8\u4FE1\u606F\u6765\u6E90",
-  {
-    question: external_exports.string().describe("\u8981\u63D0\u95EE\u7684\u95EE\u9898")
-  },
-  async ({ question }) => {
-    try {
-      const { answer, references } = await api.askKnowledge(question);
-      let text = answer;
-      if (references.length > 0) {
-        text += "\n\n\u{1F4CC} \u53C2\u8003\u7B14\u8BB0:\n";
-        text += references.map((r, i) => `  ${i + 1}. [${r.title}] (id: ${r.id})`).join("\n");
-      }
-      return { content: [{ type: "text", text }] };
-    } catch (err) {
-      return { content: [{ type: "text", text: `\u9519\u8BEF: ${err.message}` }], isError: true };
-    }
-  }
-);
-server.tool(
-  "baseforge_ai_process",
-  "\u4F7F\u7528 AI \u5904\u7406\u7B14\u8BB0\u6587\u672C\u3002\u652F\u6301\u7EED\u5199\u3001\u6539\u5199\u3001\u6DA6\u8272\u3001\u7CBE\u7B80\u3001\u6269\u5C55\u3001\u7FFB\u8BD1\u3001\u6458\u8981\u3001\u89E3\u91CA\u3001\u7EA0\u9519\u3001\u683C\u5F0F\u5316\u7B49\u64CD\u4F5C",
-  {
-    action: external_exports.enum([
-      "continue",
-      "rewrite",
-      "polish",
-      "shorten",
-      "expand",
-      "translate_en",
-      "translate_zh",
-      "summarize",
-      "explain",
-      "fix_grammar",
-      "format_markdown",
-      "format_code",
-      "custom"
-    ]).describe("\u5904\u7406\u7C7B\u578B"),
-    text: external_exports.string().describe("\u8981\u5904\u7406\u7684\u6587\u672C\u5185\u5BB9"),
-    customPrompt: external_exports.string().optional().describe("\u81EA\u5B9A\u4E49\u6307\u4EE4\uFF08action \u4E3A custom \u65F6\u5FC5\u586B\uFF09")
-  },
-  async ({ action, text, customPrompt }) => {
-    try {
-      const result = await api.aiChat({ action, text, customPrompt });
-      return { content: [{ type: "text", text: result }] };
-    } catch (err) {
-      return { content: [{ type: "text", text: `\u9519\u8BEF: ${err.message}` }], isError: true };
-    }
-  }
-);
-server.tool(
-  "baseforge_knowledge_stats",
-  "\u83B7\u53D6 BaseForge \u77E5\u8BC6\u5E93\u7684\u7EDF\u8BA1\u4FE1\u606F\uFF0C\u5305\u62EC\u7B14\u8BB0\u6570\u3001\u7B14\u8BB0\u672C\u6570\u3001\u6807\u7B7E\u6570\u3001FTS \u7D22\u5F15\u72B6\u6001\u7B49",
+  "baseforge_list_remote_sources",
+  "\u5217\u51FA\u5DF2\u914D\u7F6E\u7684\u8FDC\u7A0B\u6587\u4EF6\u6E90\uFF08WebDAV / \u767E\u5EA6\u7F51\u76D8 / SMB\uFF09\u3002\u51ED\u636E\u7531\u670D\u52A1\u7AEF\u63A9\u7801\uFF0C\u53EA\u8FD4\u56DE\u540D\u79F0\u3001\u7C7B\u578B\u4E0E\u5730\u5740",
   {},
   async () => {
     try {
-      const stats = await api.knowledgeStats();
-      return {
-        content: [{ type: "text", text: JSON.stringify(stats, null, 2) }]
-      };
+      return textResult(await api.listRemoteSources());
     } catch (err) {
-      return { content: [{ type: "text", text: `\u9519\u8BEF: ${err.message}` }], isError: true };
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_manage_remote_source",
+  "\u65B0\u5EFA\u3001\u66F4\u65B0\u3001\u5220\u9664\u6216\u6D4B\u8BD5\u8FDC\u7A0B\u6587\u4EF6\u6E90\u3002create/update \u9700\u63D0\u4F9B type \u4E0E name\uFF1BWebDAV/SMB \u9700 baseUrl\uFF0C\u767E\u5EA6\u7F51\u76D8\u9700 accessToken\u3002\u4EC5\u66F4\u65B0\u65F6\u4F20 sourceId \u4F5C\u4E3A id",
+  {
+    action: external_exports.enum(["create", "update", "delete", "test"]).describe("\u64CD\u4F5C\u7C7B\u578B"),
+    sourceId: external_exports.string().optional().describe("\u6E90 ID\uFF1Bupdate/delete/test \u5FC5\u586B"),
+    type: external_exports.enum(["webdav", "baidu", "smb"]).optional().describe("\u5B58\u50A8\u7C7B\u578B\uFF1Bcreate \u5FC5\u586B"),
+    name: external_exports.string().optional().describe("\u6E90\u540D\u79F0\uFF1Bcreate \u5FC5\u586B"),
+    baseUrl: external_exports.string().optional().describe("WebDAV/SMB \u5730\u5740"),
+    username: external_exports.string().optional().describe("\u7528\u6237\u540D"),
+    password: external_exports.string().optional().describe("\u5BC6\u7801\uFF08\u4EC5\u5728\u521B\u5EFA/\u66F4\u65B0\u65F6\u63D0\u4EA4\uFF0C\u63A5\u53E3\u4E0D\u4F1A\u56DE\u4F20\uFF09"),
+    rootPath: external_exports.string().optional().describe("\u6839\u8DEF\u5F84"),
+    accessToken: external_exports.string().optional().describe("\u767E\u5EA6\u7F51\u76D8 access_token"),
+    domain: external_exports.string().optional().describe("SMB \u57DF"),
+    clientId: external_exports.string().optional().describe("OAuth clientId"),
+    clientSecret: external_exports.string().optional().describe("OAuth clientSecret"),
+    refreshToken: external_exports.string().optional().describe("OAuth refreshToken")
+  },
+  async ({ action, sourceId, ...fields }) => {
+    try {
+      if (action === "delete" || action === "test") {
+        if (!sourceId) throw new Error(`${action} \u9700\u8981\u63D0\u4F9B sourceId`);
+        return textResult(action === "delete" ? await api.deleteRemoteSource(sourceId) : await api.testRemoteSource(sourceId));
+      }
+      const body = { ...fields };
+      if (action === "update") {
+        if (!sourceId) throw new Error("update \u9700\u8981\u63D0\u4F9B sourceId");
+        body.id = sourceId;
+      }
+      return textResult(await api.saveRemoteSource(body));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_list_remote_files",
+  "\u5217\u51FA\u8FDC\u7A0B\u6E90\u67D0\u4E2A\u76EE\u5F55\u4E0B\u7684\u6587\u4EF6\u4E0E\u5B50\u76EE\u5F55",
+  {
+    sourceId: external_exports.string().describe("\u8FDC\u7A0B\u6E90 ID"),
+    path: external_exports.string().optional().describe("\u8FDC\u7A0B\u76EE\u5F55\u8DEF\u5F84\uFF0C\u9ED8\u8BA4\u6839\u76EE\u5F55")
+  },
+  async ({ sourceId, path: path2 }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "list", { path: path2 || "" }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_read_remote_file",
+  "\u8BFB\u53D6\u8FDC\u7A0B\u6E90\u4E0A\u7684\u6587\u672C\u7C7B\u6587\u4EF6\uFF08md/txt/json \u7B49\uFF09\uFF0C\u8FD4\u56DE\u5185\u5BB9\u4E0E\u5143\u4FE1\u606F",
+  {
+    sourceId: external_exports.string().describe("\u8FDC\u7A0B\u6E90 ID"),
+    path: external_exports.string().describe("\u8FDC\u7A0B\u6587\u4EF6\u8DEF\u5F84")
+  },
+  async ({ sourceId, path: path2 }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "read", { path: path2 }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_write_remote_file",
+  "\u628A\u6587\u672C\u5185\u5BB9\u5199\u56DE\u8FDC\u7A0B\u6E90\u4E0A\u7684\u6587\u672C\u7C7B\u6587\u4EF6\u3002\u4F1A\u8986\u76D6\u8FDC\u7AEF\u6587\u4EF6\uFF0C\u8BF7\u5148\u7528 read \u786E\u8BA4\u5185\u5BB9",
+  {
+    sourceId: external_exports.string().describe("\u8FDC\u7A0B\u6E90 ID"),
+    path: external_exports.string().describe("\u8FDC\u7A0B\u6587\u4EF6\u8DEF\u5F84"),
+    content: external_exports.string().describe("\u8981\u5199\u5165\u7684\u5B8C\u6574\u6587\u672C\u5185\u5BB9")
+  },
+  async ({ sourceId, path: path2, content }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "write", { path: path2, content }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_manage_remote_file",
+  "\u8FDC\u7A0B\u6587\u4EF6\u7BA1\u7406\uFF1A\u521B\u5EFA\u76EE\u5F55\u3001\u5220\u9664\u6587\u4EF6\u6216\u76EE\u5F55\u3001\u91CD\u547D\u540D\u3002\u5220\u9664\u4E0D\u53EF\u6062\u590D\uFF0C\u8BF7\u8C28\u614E\u8C03\u7528",
+  {
+    sourceId: external_exports.string().describe("\u8FDC\u7A0B\u6E90 ID"),
+    action: external_exports.enum(["mkdir", "delete", "rename"]).describe("\u64CD\u4F5C\u7C7B\u578B"),
+    path: external_exports.string().describe("\u76EE\u6807\u8DEF\u5F84"),
+    newName: external_exports.string().optional().describe("rename \u65F6\u7684\u65B0\u540D\u79F0\uFF08\u4E0D\u542B\u8DEF\u5F84\u5206\u9694\u7B26\uFF09")
+  },
+  async ({ sourceId, action, path: path2, newName }) => {
+    try {
+      if (action === "rename" && !newName) throw new Error("rename \u9700\u8981\u63D0\u4F9B newName");
+      return textResult(await api.remoteFileOp(sourceId, action, { path: path2, newName }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_list_remote_links",
+  "\u5217\u51FA\u8FDC\u7A0B\u6587\u4EF6\u4E0E\u672C\u5730\u7B14\u8BB0\u7684\u94FE\u63A5\u6620\u5C04\uFF08\u7528\u4E8E\u8FDC\u7A0B\u6587\u6863\u4E0E\u7B14\u8BB0\u540C\u6B65\uFF09",
+  {},
+  async () => {
+    try {
+      return textResult(await api.listRemoteLinks());
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_manage_remote_link",
+  "\u65B0\u5EFA\u3001\u66F4\u65B0\u6216\u5220\u9664\u8FDC\u7A0B\u6587\u4EF6\u4E0E\u672C\u5730\u7B14\u8BB0\u7684\u94FE\u63A5\u6620\u5C04\u3002create \u9700 noteId\uFF0Cdelete \u9700 sourceId + remotePath",
+  {
+    action: external_exports.enum(["create", "update", "delete"]).describe("\u64CD\u4F5C\u7C7B\u578B"),
+    sourceId: external_exports.string().describe("\u8FDC\u7A0B\u6E90 ID"),
+    remotePath: external_exports.string().describe("\u8FDC\u7A0B\u6587\u4EF6\u8DEF\u5F84"),
+    noteId: external_exports.string().optional().describe("\u672C\u5730\u7B14\u8BB0 ID\uFF1Bcreate \u5FC5\u586B"),
+    title: external_exports.string().optional().describe("\u94FE\u63A5\u6807\u9898"),
+    baseRemoteHash: external_exports.string().optional().describe("\u8FDC\u7AEF\u5185\u5BB9\u57FA\u7EBF\u54C8\u5E0C"),
+    baseNoteHash: external_exports.string().optional().describe("\u7B14\u8BB0\u5185\u5BB9\u57FA\u7EBF\u54C8\u5E0C")
+  },
+  async ({ action, ...fields }) => {
+    try {
+      if (action === "create" && !fields.noteId) throw new Error("create \u9700\u8981\u63D0\u4F9B noteId");
+      return textResult(await api.manageRemoteLink(action, fields));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_export_notes",
+  "\u6309\u77E5\u8BC6\u5E93\u5BFC\u51FA\u7B14\u8BB0\u3002\u8FD4\u56DE\u8BE5\u7B14\u8BB0\u672C\u4E0B\u6240\u6709\u7B14\u8BB0\u7684\u6807\u9898\u3001\u6B63\u6587\u3001\u6240\u5C5E\u7B14\u8BB0\u672C\u4E0E\u66F4\u65B0\u65F6\u95F4\uFF08\u670D\u52A1\u7AEF\u6309\u7528\u6237\u9694\u79BB\uFF0C\u5DE5\u5177\u4FA7\u53EA\u8FD4\u56DE\u6307\u5B9A\u7B14\u8BB0\u672C\uFF09",
+  {
+    notebookId: external_exports.string().describe("\u8981\u5BFC\u51FA\u7684\u7B14\u8BB0\u672C ID"),
+    workspaceId: external_exports.string().optional().describe("\u5DE5\u4F5C\u533A ID\uFF1B\u4E2A\u4EBA\u7A7A\u95F4\u7559\u7A7A")
+  },
+  async ({ notebookId, workspaceId }) => {
+    try {
+      const notes = await api.exportNotes(workspaceId);
+      const filtered = (Array.isArray(notes) ? notes : []).filter((n) => n.notebookId === notebookId);
+      return textResult({ notebookId, count: filtered.length, notes: filtered });
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_list_shares",
+  "\u5217\u51FA\u5F53\u524D\u7528\u6237\u521B\u5EFA\u7684\u5206\u4EAB\u94FE\u63A5\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
+  {},
+  async () => {
+    try {
+      return textResult(await api.listShares());
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_create_share",
+  "\u4E3A\u4E00\u7BC7\u7B14\u8BB0\u521B\u5EFA\u5206\u4EAB\u94FE\u63A5\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09\u3002\u9ED8\u8BA4 7 \u5929\u540E\u8FC7\u671F\uFF0CexpiresAt \u4F20 null \u8868\u793A\u6C38\u4E45",
+  {
+    noteId: external_exports.string().describe("\u8981\u5206\u4EAB\u7684\u7B14\u8BB0 ID"),
+    permission: external_exports.enum(["view", "comment", "edit", "edit_auth"]).optional().describe("\u5206\u4EAB\u6743\u9650\uFF0C\u9ED8\u8BA4 view"),
+    password: external_exports.string().optional().describe("\u8BBF\u95EE\u5BC6\u7801"),
+    expiresAt: external_exports.string().nullable().optional().describe("\u8FC7\u671F\u65F6\u95F4 ISO \u5B57\u7B26\u4E32\uFF1Bnull \u8868\u793A\u6C38\u4E45"),
+    maxViews: external_exports.number().int().positive().optional().describe("\u6700\u5927\u8BBF\u95EE\u4F1A\u8BDD\u6570")
+  },
+  async (params) => {
+    try {
+      return textResult(await api.createShare(params));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_update_share",
+  "\u4FEE\u6539\u5206\u4EAB\u94FE\u63A5\u7684\u6743\u9650\u3001\u8FC7\u671F\u65F6\u95F4\u3001\u8BBF\u95EE\u4E0A\u9650\u6216\u542F\u7528\u72B6\u6001\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
+  {
+    id: external_exports.string().describe("\u5206\u4EAB ID"),
+    permission: external_exports.enum(["view", "comment", "edit", "edit_auth"]).optional(),
+    expiresAt: external_exports.string().nullable().optional(),
+    maxViews: external_exports.number().int().positive().nullable().optional(),
+    isActive: external_exports.boolean().optional()
+  },
+  async ({ id, ...fields }) => {
+    try {
+      return textResult(await api.updateShare(id, fields));
+    } catch (err) {
+      return errorResult(err);
+    }
+  }
+);
+server.tool(
+  "baseforge_delete_share",
+  "\u540A\u9500\u5206\u4EAB\u94FE\u63A5\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
+  {
+    id: external_exports.string().describe("\u5206\u4EAB ID")
+  },
+  async ({ id }) => {
+    try {
+      return textResult(await api.deleteShare(id));
+    } catch (err) {
+      return errorResult(err);
     }
   }
 );
 server.tool(
   "baseforge_list_plugins",
-  "\u83B7\u53D6 BaseForge \u4E2D\u5DF2\u52A0\u8F7D\u7684\u63D2\u4EF6\u5217\u8868\uFF0C\u6BCF\u4E2A\u63D2\u4EF6\u58F0\u660E\u4E86\u5B83\u652F\u6301\u7684\u80FD\u529B\uFF08action\uFF09",
+  "\u83B7\u53D6 BaseForge \u4E2D\u5DF2\u52A0\u8F7D\u7684\u63D2\u4EF6\u5217\u8868\uFF0C\u6BCF\u4E2A\u63D2\u4EF6\u58F0\u660E\u4E86\u5B83\u652F\u6301\u7684\u80FD\u529B\uFF08action\uFF09\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {},
   async () => {
     try {
@@ -22061,7 +22206,7 @@ server.tool(
 );
 server.tool(
   "baseforge_execute_plugin",
-  "\u6267\u884C BaseForge \u4E2D\u6307\u5B9A\u540D\u79F0\u7684\u63D2\u4EF6\uFF0C\u4F20\u5165\u53C2\u6570\u5E76\u83B7\u53D6\u5904\u7406\u7ED3\u679C",
+  "\u6267\u884C BaseForge \u4E2D\u6307\u5B9A\u540D\u79F0\u7684\u63D2\u4EF6\uFF0C\u4F20\u5165\u53C2\u6570\u5E76\u83B7\u53D6\u5904\u7406\u7ED3\u679C\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {
     pluginName: external_exports.string().describe("\u63D2\u4EF6\u540D\u79F0"),
     params: external_exports.record(external_exports.any()).describe("\u4F20\u7ED9\u63D2\u4EF6\u7684\u53C2\u6570\u5BF9\u8C61")
@@ -22080,7 +22225,7 @@ server.tool(
 );
 server.tool(
   "baseforge_list_webhooks",
-  "\u83B7\u53D6 BaseForge \u4E2D\u5DF2\u914D\u7F6E\u7684 Webhook \u5217\u8868",
+  "\u83B7\u53D6 BaseForge \u4E2D\u5DF2\u914D\u7F6E\u7684 Webhook \u5217\u8868\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {},
   async () => {
     try {
@@ -22093,7 +22238,7 @@ server.tool(
 );
 server.tool(
   "baseforge_create_webhook",
-  "\u5728 BaseForge \u4E2D\u521B\u5EFA\u65B0\u7684 Webhook\uFF0C\u5F53\u6307\u5B9A\u4E8B\u4EF6\u53D1\u751F\u65F6\u81EA\u52A8\u63A8\u9001 HTTP \u901A\u77E5",
+  "\u5728 BaseForge \u4E2D\u521B\u5EFA\u65B0\u7684 Webhook\uFF0C\u5F53\u6307\u5B9A\u4E8B\u4EF6\u53D1\u751F\u65F6\u81EA\u52A8\u63A8\u9001 HTTP \u901A\u77E5\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {
     url: external_exports.string().describe("Webhook \u56DE\u8C03 URL"),
     events: external_exports.array(external_exports.string()).optional().describe("\u76D1\u542C\u7684\u4E8B\u4EF6\u5217\u8868\uFF0C\u5982 ['note.created', 'note.updated']\uFF0C\u9ED8\u8BA4\u4E3A ['*'] \u63A5\u6536\u6240\u6709"),
@@ -22114,7 +22259,7 @@ Secret: ${webhook.secret}
 );
 server.tool(
   "baseforge_audit_stats",
-  "\u83B7\u53D6 BaseForge \u7684\u64CD\u4F5C\u5BA1\u8BA1\u7EDF\u8BA1\uFF08\u6309\u5206\u7C7B\u3001\u7EA7\u522B\u7EDF\u8BA1\uFF0C\u4EE5\u53CA\u6700\u8FD1\u64CD\u4F5C\u8BB0\u5F55\uFF09",
+  "\u83B7\u53D6 BaseForge \u7684\u64CD\u4F5C\u5BA1\u8BA1\u7EDF\u8BA1\uFF08\u6309\u5206\u7C7B\u3001\u7EA7\u522B\u7EDF\u8BA1\uFF0C\u4EE5\u53CA\u6700\u8FD1\u64CD\u4F5C\u8BB0\u5F55\uFF09\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {},
   async () => {
     try {
@@ -22144,7 +22289,7 @@ server.tool(
 );
 server.tool(
   "baseforge_list_backups",
-  "\u83B7\u53D6 BaseForge \u7684\u6570\u636E\u5907\u4EFD\u5217\u8868",
+  "\u83B7\u53D6 BaseForge \u7684\u6570\u636E\u5907\u4EFD\u5217\u8868\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {},
   async () => {
     try {
@@ -22164,7 +22309,7 @@ server.tool(
 );
 server.tool(
   "baseforge_create_backup",
-  "\u521B\u5EFA BaseForge \u6570\u636E\u5907\u4EFD\u3002db-only \u4EC5\u5907\u4EFD\u6570\u636E\u5E93\uFF0Cfull \u5907\u4EFD\u6240\u6709\u6570\u636E",
+  "\u521B\u5EFA BaseForge \u6570\u636E\u5907\u4EFD\u3002db-only \u4EC5\u5907\u4EFD\u6570\u636E\u5E93\uFF0Cfull \u5907\u4EFD\u6240\u6709\u6570\u636E\uFF08\u4EC5 unrestricted Token \u53EF\u7528\uFF09",
   {
     type: external_exports.enum(["db-only", "full"]).optional().describe("\u5907\u4EFD\u7C7B\u578B\uFF0C\u9ED8\u8BA4 db-only")
   },

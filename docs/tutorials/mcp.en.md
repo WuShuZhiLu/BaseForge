@@ -104,6 +104,23 @@ Restart the client completely and confirm `baseforge` started in its MCP setting
 | `BASEFORGE_URL` | BaseForge server address | `http://localhost:3001` |
 | `BASEFORGE_API_TOKEN` | Personal API Token (required; startup fails with a clear error when missing) | — |
 
+## Token scopes and tool groups
+
+Grant only the scopes the tools need:
+
+| Scope | Tools |
+|---|---|
+| `notes:read` / `notes:write` / `notebooks:read` / `notebooks:write` | Notes, notebooks, blocks, search |
+| `attachments:write` / `tags:read` / `tags:write` | Attachments and tags |
+| `remote_files:read` / `remote_files:write` | Remote files (sources, read/write, link mappings) |
+| `export:import` | `baseforge_export_notes` |
+| `shares:read` / `shares:write` | Share links (also requires an unrestricted Token) |
+| `tasks:read` / `tasks:write` | Task API for REST/SDK clients (MCP does not expose task tools yet) |
+
+Tool groups: notebooks and notes; blocks and backlinks; attachments and tags; remote files (`baseforge_list_remote_sources`, `baseforge_manage_remote_source`, `baseforge_list_remote_files`, `baseforge_read_remote_file`, `baseforge_write_remote_file`, `baseforge_manage_remote_file`, `baseforge_list_remote_links`, `baseforge_manage_remote_link`); export and sharing (`baseforge_export_notes`, `baseforge_list_shares`, `baseforge_create_share`, `baseforge_update_share`, `baseforge_delete_share`); system operations (`baseforge_list_plugins`, `baseforge_execute_plugin`, `baseforge_list_webhooks`, `baseforge_create_webhook`, `baseforge_audit_stats`, `baseforge_list_backups`, `baseforge_create_backup`).
+
+A share link can publish any note publicly, which a notebook resource grant cannot constrain. Therefore restricted Tokens are rejected for sharing tools and system operations; those tools require an unrestricted Token. In-product AI Q&A has been removed, and the former `baseforge_ai_ask`, `baseforge_ai_process`, `baseforge_knowledge_stats` tools are gone.
+
 ## Verification
 
 After restarting the client, confirm `baseforge_list_notebooks` appears in the tool list, then run a read-only test:

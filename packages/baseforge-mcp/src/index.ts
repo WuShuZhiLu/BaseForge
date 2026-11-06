@@ -33,6 +33,24 @@ if (!config.apiToken) {
 
 const api = new BaseForgeApiClient(config);
 
+/** 统一的工具返回包装：字符串原样输出，其余序列化为 JSON。 */
+function textResult(data: unknown) {
+  return {
+    content: [{
+      type: "text" as const,
+      text: typeof data === "string" ? data : JSON.stringify(data, null, 2),
+    }],
+  };
+}
+
+function errorResult(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    content: [{ type: "text" as const, text: `错误: ${message}` }],
+    isError: true as const,
+  };
+}
+
 // ===== 创建 MCP Server =====
 const server = new McpServer({
   name: "baseforge",
@@ -606,72 +624,255 @@ server.tool(
   }
 );
 
-// ==================== AI 工具 ====================
+// ==================== 远程文件（内核能力） ====================
+// 需要在 Token 上授予 remote_files:read / remote_files:write。
 
 server.tool(
-  "baseforge_ai_ask",
-  "向 BaseForge 知识库提问。系统会自动检索相关笔记内容，结合 AI 生成回答，并标注信息来源",
-  {
-    question: z.string().describe("要提问的问题"),
-  },
-  async ({ question }) => {
-    try {
-      const { answer, references } = await api.askKnowledge(question);
-      let text = answer;
-      if (references.length > 0) {
-        text += "\n\n📌 参考笔记:\n";
-        text += references.map((r, i) => `  ${i + 1}. [${r.title}] (id: ${r.id})`).join("\n");
-      }
-      return { content: [{ type: "text" as const, text }] };
-    } catch (err: any) {
-      return { content: [{ type: "text" as const, text: `错误: ${err.message}` }], isError: true };
-    }
-  }
-);
-
-server.tool(
-  "baseforge_ai_process",
-  "使用 AI 处理笔记文本。支持续写、改写、润色、精简、扩展、翻译、摘要、解释、纠错、格式化等操作",
-  {
-    action: z.enum([
-      "continue", "rewrite", "polish", "shorten", "expand",
-      "translate_en", "translate_zh", "summarize", "explain",
-      "fix_grammar", "format_markdown", "format_code", "custom",
-    ]).describe("处理类型"),
-    text: z.string().describe("要处理的文本内容"),
-    customPrompt: z.string().optional().describe("自定义指令（action 为 custom 时必填）"),
-  },
-  async ({ action, text, customPrompt }) => {
-    try {
-      const result = await api.aiChat({ action, text, customPrompt });
-      return { content: [{ type: "text" as const, text: result }] };
-    } catch (err: any) {
-      return { content: [{ type: "text" as const, text: `错误: ${err.message}` }], isError: true };
-    }
-  }
-);
-
-server.tool(
-  "baseforge_knowledge_stats",
-  "获取 BaseForge 知识库的统计信息，包括笔记数、笔记本数、标签数、FTS 索引状态等",
+  "baseforge_list_remote_sources",
+  "列出已配置的远程文件源（WebDAV / 百度网盘 / SMB）。凭据由服务端掩码，只返回名称、类型与地址",
   {},
   async () => {
     try {
-      const stats = await api.knowledgeStats();
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(stats, null, 2) }],
-      };
-    } catch (err: any) {
-      return { content: [{ type: "text" as const, text: `错误: ${err.message}` }], isError: true };
+      return textResult(await api.listRemoteSources());
+    } catch (err) {
+      return errorResult(err);
     }
-  }
+  },
+);
+
+server.tool(
+  "baseforge_manage_remote_source",
+  "新建、更新、删除或测试远程文件源。create/update 需提供 type 与 name；WebDAV/SMB 需 baseUrl，百度网盘需 accessToken。仅更新时传 sourceId 作为 id",
+  {
+    action: z.enum(["create", "update", "delete", "test"]).describe("操作类型"),
+    sourceId: z.string().optional().describe("源 ID；update/delete/test 必填"),
+    type: z.enum(["webdav", "baidu", "smb"]).optional().describe("存储类型；create 必填"),
+    name: z.string().optional().describe("源名称；create 必填"),
+    baseUrl: z.string().optional().describe("WebDAV/SMB 地址"),
+    username: z.string().optional().describe("用户名"),
+    password: z.string().optional().describe("密码（仅在创建/更新时提交，接口不会回传）"),
+    rootPath: z.string().optional().describe("根路径"),
+    accessToken: z.string().optional().describe("百度网盘 access_token"),
+    domain: z.string().optional().describe("SMB 域"),
+    clientId: z.string().optional().describe("OAuth clientId"),
+    clientSecret: z.string().optional().describe("OAuth clientSecret"),
+    refreshToken: z.string().optional().describe("OAuth refreshToken"),
+  },
+  async ({ action, sourceId, ...fields }) => {
+    try {
+      if (action === "delete" || action === "test") {
+        if (!sourceId) throw new Error(`${action} 需要提供 sourceId`);
+        return textResult(action === "delete"
+          ? await api.deleteRemoteSource(sourceId)
+          : await api.testRemoteSource(sourceId));
+      }
+      const body: Record<string, unknown> = { ...fields };
+      if (action === "update") {
+        if (!sourceId) throw new Error("update 需要提供 sourceId");
+        body.id = sourceId;
+      }
+      return textResult(await api.saveRemoteSource(body));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_list_remote_files",
+  "列出远程源某个目录下的文件与子目录",
+  {
+    sourceId: z.string().describe("远程源 ID"),
+    path: z.string().optional().describe("远程目录路径，默认根目录"),
+  },
+  async ({ sourceId, path }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "list", { path: path || "" }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_read_remote_file",
+  "读取远程源上的文本类文件（md/txt/json 等），返回内容与元信息",
+  {
+    sourceId: z.string().describe("远程源 ID"),
+    path: z.string().describe("远程文件路径"),
+  },
+  async ({ sourceId, path }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "read", { path }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_write_remote_file",
+  "把文本内容写回远程源上的文本类文件。会覆盖远端文件，请先用 read 确认内容",
+  {
+    sourceId: z.string().describe("远程源 ID"),
+    path: z.string().describe("远程文件路径"),
+    content: z.string().describe("要写入的完整文本内容"),
+  },
+  async ({ sourceId, path, content }) => {
+    try {
+      return textResult(await api.remoteFileOp(sourceId, "write", { path, content }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_manage_remote_file",
+  "远程文件管理：创建目录、删除文件或目录、重命名。删除不可恢复，请谨慎调用",
+  {
+    sourceId: z.string().describe("远程源 ID"),
+    action: z.enum(["mkdir", "delete", "rename"]).describe("操作类型"),
+    path: z.string().describe("目标路径"),
+    newName: z.string().optional().describe("rename 时的新名称（不含路径分隔符）"),
+  },
+  async ({ sourceId, action, path, newName }) => {
+    try {
+      if (action === "rename" && !newName) throw new Error("rename 需要提供 newName");
+      return textResult(await api.remoteFileOp(sourceId, action, { path, newName }));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_list_remote_links",
+  "列出远程文件与本地笔记的链接映射（用于远程文档与笔记同步）",
+  {},
+  async () => {
+    try {
+      return textResult(await api.listRemoteLinks());
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_manage_remote_link",
+  "新建、更新或删除远程文件与本地笔记的链接映射。create 需 noteId，delete 需 sourceId + remotePath",
+  {
+    action: z.enum(["create", "update", "delete"]).describe("操作类型"),
+    sourceId: z.string().describe("远程源 ID"),
+    remotePath: z.string().describe("远程文件路径"),
+    noteId: z.string().optional().describe("本地笔记 ID；create 必填"),
+    title: z.string().optional().describe("链接标题"),
+    baseRemoteHash: z.string().optional().describe("远端内容基线哈希"),
+    baseNoteHash: z.string().optional().describe("笔记内容基线哈希"),
+  },
+  async ({ action, ...fields }) => {
+    try {
+      if (action === "create" && !fields.noteId) throw new Error("create 需要提供 noteId");
+      return textResult(await api.manageRemoteLink(action, fields));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+// ==================== 导出与分享（知识库为单位） ====================
+// 导出需要 export:import；分享需要 shares:read / shares:write 且仅 unrestricted Token 可用。
+
+server.tool(
+  "baseforge_export_notes",
+  "按知识库导出笔记。返回该笔记本下所有笔记的标题、正文、所属笔记本与更新时间（服务端按用户隔离，工具侧只返回指定笔记本）",
+  {
+    notebookId: z.string().describe("要导出的笔记本 ID"),
+    workspaceId: z.string().optional().describe("工作区 ID；个人空间留空"),
+  },
+  async ({ notebookId, workspaceId }) => {
+    try {
+      const notes = await api.exportNotes(workspaceId);
+      const filtered = (Array.isArray(notes) ? notes : []).filter((n: any) => n.notebookId === notebookId);
+      return textResult({ notebookId, count: filtered.length, notes: filtered });
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_list_shares",
+  "列出当前用户创建的分享链接（仅 unrestricted Token 可用）",
+  {},
+  async () => {
+    try {
+      return textResult(await api.listShares());
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_create_share",
+  "为一篇笔记创建分享链接（仅 unrestricted Token 可用）。默认 7 天后过期，expiresAt 传 null 表示永久",
+  {
+    noteId: z.string().describe("要分享的笔记 ID"),
+    permission: z.enum(["view", "comment", "edit", "edit_auth"]).optional().describe("分享权限，默认 view"),
+    password: z.string().optional().describe("访问密码"),
+    expiresAt: z.string().nullable().optional().describe("过期时间 ISO 字符串；null 表示永久"),
+    maxViews: z.number().int().positive().optional().describe("最大访问会话数"),
+  },
+  async (params) => {
+    try {
+      return textResult(await api.createShare(params));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_update_share",
+  "修改分享链接的权限、过期时间、访问上限或启用状态（仅 unrestricted Token 可用）",
+  {
+    id: z.string().describe("分享 ID"),
+    permission: z.enum(["view", "comment", "edit", "edit_auth"]).optional(),
+    expiresAt: z.string().nullable().optional(),
+    maxViews: z.number().int().positive().nullable().optional(),
+    isActive: z.boolean().optional(),
+  },
+  async ({ id, ...fields }) => {
+    try {
+      return textResult(await api.updateShare(id, fields));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "baseforge_delete_share",
+  "吊销分享链接（仅 unrestricted Token 可用）",
+  {
+    id: z.string().describe("分享 ID"),
+  },
+  async ({ id }) => {
+    try {
+      return textResult(await api.deleteShare(id));
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
 );
 
 // ==================== 插件工具 ====================
 
 server.tool(
   "baseforge_list_plugins",
-  "获取 BaseForge 中已加载的插件列表，每个插件声明了它支持的能力（action）",
+  "获取 BaseForge 中已加载的插件列表，每个插件声明了它支持的能力（action）（仅 unrestricted Token 可用）",
   {},
   async () => {
     try {
@@ -685,7 +886,7 @@ server.tool(
 
 server.tool(
   "baseforge_execute_plugin",
-  "执行 BaseForge 中指定名称的插件，传入参数并获取处理结果",
+  "执行 BaseForge 中指定名称的插件，传入参数并获取处理结果（仅 unrestricted Token 可用）",
   {
     pluginName: z.string().describe("插件名称"),
     params: z.record(z.any()).describe("传给插件的参数对象"),
@@ -707,7 +908,7 @@ server.tool(
 
 server.tool(
   "baseforge_list_webhooks",
-  "获取 BaseForge 中已配置的 Webhook 列表",
+  "获取 BaseForge 中已配置的 Webhook 列表（仅 unrestricted Token 可用）",
   {},
   async () => {
     try {
@@ -721,7 +922,7 @@ server.tool(
 
 server.tool(
   "baseforge_create_webhook",
-  "在 BaseForge 中创建新的 Webhook，当指定事件发生时自动推送 HTTP 通知",
+  "在 BaseForge 中创建新的 Webhook，当指定事件发生时自动推送 HTTP 通知（仅 unrestricted Token 可用）",
   {
     url: z.string().describe("Webhook 回调 URL"),
     events: z.array(z.string()).optional().describe("监听的事件列表，如 ['note.created', 'note.updated']，默认为 ['*'] 接收所有"),
@@ -741,7 +942,7 @@ server.tool(
 
 server.tool(
   "baseforge_audit_stats",
-  "获取 BaseForge 的操作审计统计（按分类、级别统计，以及最近操作记录）",
+  "获取 BaseForge 的操作审计统计（按分类、级别统计，以及最近操作记录）（仅 unrestricted Token 可用）",
   {},
   async () => {
     try {
@@ -766,7 +967,7 @@ server.tool(
 
 server.tool(
   "baseforge_list_backups",
-  "获取 BaseForge 的数据备份列表",
+  "获取 BaseForge 的数据备份列表（仅 unrestricted Token 可用）",
   {},
   async () => {
     try {
@@ -786,7 +987,7 @@ server.tool(
 
 server.tool(
   "baseforge_create_backup",
-  "创建 BaseForge 数据备份。db-only 仅备份数据库，full 备份所有数据",
+  "创建 BaseForge 数据备份。db-only 仅备份数据库，full 备份所有数据（仅 unrestricted Token 可用）",
   {
     type: z.enum(["db-only", "full"]).optional().describe("备份类型，默认 db-only"),
   },

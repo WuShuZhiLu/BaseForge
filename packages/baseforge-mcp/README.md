@@ -34,6 +34,15 @@ BaseForge 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI �
 | `BASEFORGE_URL` | BaseForge 后端地址 | `http://localhost:3001` |
 | `BASEFORGE_API_TOKEN` | Personal API Token（必填，缺失时启动即报错） | — |
 
+## 工具与 scope
+
+工具分组：笔记本与笔记、块与双链、附件与标签、**远程文件**（源配置 / 列目录 / 读 / 写 / 管理 / 链接映射）、**导出与分享**（按笔记本导出、分享链接 CRUD）、系统运维（插件 / Webhook / 备份 / 审计）。
+
+创建 Token 时按组授予 scope：`notes:read/write`、`notebooks:read/write`、`attachments:write`、`tags:read/write`、`remote_files:read/write`、`export:import`、`shares:read/write`、`tasks:read/write`。
+
+- 分享链接与系统运维工具**仅 unrestricted Token 可用**（restricted Token 的笔记本边界无法约束公开链接）。
+- 项目内 AI 问答已移除，旧的 `baseforge_ai_ask` / `baseforge_ai_process` / `baseforge_knowledge_stats` 已删除；知识库通过检索、读取、导出工具供外部 AI 使用。
+
 ## 开发
 
 ```bash

@@ -60,8 +60,48 @@ const TOOL_GROUPS: Array<{ label: string; tools: string[] }> = [
     ],
   },
   {
-    label: "AI 文本处理与统计",
-    tools: ["baseforge_ai_process", "baseforge_knowledge_stats"],
+    label: "远程文件（内核能力）",
+    tools: [
+      "baseforge_list_remote_sources",
+      "baseforge_manage_remote_source",
+      "baseforge_list_remote_files",
+      "baseforge_read_remote_file",
+      "baseforge_write_remote_file",
+      "baseforge_manage_remote_file",
+      "baseforge_list_remote_links",
+      "baseforge_manage_remote_link",
+    ],
+  },
+  {
+    label: "导出与分享",
+    tools: [
+      "baseforge_export_notes",
+      "baseforge_list_shares",
+      "baseforge_create_share",
+      "baseforge_update_share",
+      "baseforge_delete_share",
+    ],
+  },
+  {
+    label: "块与双链",
+    tools: [
+      "baseforge_get_block",
+      "baseforge_search_blocks",
+      "baseforge_get_backlinks",
+      "baseforge_resolve_link",
+    ],
+  },
+  {
+    label: "系统运维（仅 unrestricted 令牌）",
+    tools: [
+      "baseforge_list_plugins",
+      "baseforge_execute_plugin",
+      "baseforge_list_webhooks",
+      "baseforge_create_webhook",
+      "baseforge_audit_stats",
+      "baseforge_list_backups",
+      "baseforge_create_backup",
+    ],
   },
 ];
 
@@ -176,6 +216,12 @@ export default function McpSettings() {
             令牌明文只显示一次，形如 <InlineCode>nkn_xxxxxxxxxxxxxxxxx</InlineCode>，请立即复制保存。
           </li>
           <li>
+            按工具组授予 scope：文档用 <InlineCode>notes:read</InlineCode> / <InlineCode>notes:write</InlineCode>，远程文件用{" "}
+            <InlineCode>remote_files:read</InlineCode> / <InlineCode>remote_files:write</InlineCode>，分享用{" "}
+            <InlineCode>shares:read</InlineCode> / <InlineCode>shares:write</InlineCode>，任务接口用{" "}
+            <InlineCode>tasks:read</InlineCode> / <InlineCode>tasks:write</InlineCode>。
+          </li>
+          <li>
             <InlineCode>restricted</InlineCode> 令牌的笔记本资源列表为空时采用 fail-closed，所有笔记本访问都会被拒绝；历史令牌默认保持 <InlineCode>unrestricted</InlineCode>。
           </li>
         </ul>
@@ -196,8 +242,9 @@ export default function McpSettings() {
           ))}
         </dl>
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-6 text-amber-700 dark:text-amber-300">
-          项目内 AI 问答已移除；MCP 中残留的 <InlineCode>baseforge_ai_ask</InlineCode> 对应后端 <InlineCode>/api/ai/ask</InlineCode> 已下线，请勿使用。
-          <InlineCode>baseforge_ai_process</InlineCode> 与 <InlineCode>baseforge_knowledge_stats</InlineCode> 分别走仍在的 <InlineCode>/api/ai/chat</InlineCode> 与 <InlineCode>/api/ai/knowledge-stats</InlineCode>。
+          项目内 AI 问答已移除，MCP 也不再提供 AI 类工具；旧的 <InlineCode>baseforge_ai_ask</InlineCode>、
+          <InlineCode>baseforge_ai_process</InlineCode> 与 <InlineCode>baseforge_knowledge_stats</InlineCode> 已下线，请勿使用。
+          知识库内容通过检索、读取与导出工具提供给外部 AI，不在产品内做 AI 问答。
         </p>
         <p className="text-xs leading-6 text-tx-secondary">
           <InlineCode>baseforge_search</InlineCode> 为全文搜索，结果自动限定在 Token 授权范围内。

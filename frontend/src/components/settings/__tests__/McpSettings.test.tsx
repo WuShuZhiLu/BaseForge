@@ -77,8 +77,36 @@ const REQUIRED_FACTS = [
   "baseforge_attach_to_note",
   "baseforge_list_tags",
   "baseforge_manage_tags",
-  "baseforge_ai_process",
-  "baseforge_knowledge_stats",
+  // 远程文件（内核能力）
+  "baseforge_list_remote_sources",
+  "baseforge_manage_remote_source",
+  "baseforge_list_remote_files",
+  "baseforge_read_remote_file",
+  "baseforge_write_remote_file",
+  "baseforge_manage_remote_file",
+  "baseforge_list_remote_links",
+  "baseforge_manage_remote_link",
+  // 导出与分享
+  "baseforge_export_notes",
+  "baseforge_list_shares",
+  "baseforge_create_share",
+  "baseforge_update_share",
+  "baseforge_delete_share",
+  // 系统运维
+  "baseforge_list_plugins",
+  "baseforge_execute_plugin",
+  "baseforge_list_webhooks",
+  "baseforge_create_webhook",
+  "baseforge_audit_stats",
+  "baseforge_list_backups",
+  "baseforge_create_backup",
+  // 新增 scopes
+  "remote_files:read",
+  "remote_files:write",
+  "shares:read",
+  "shares:write",
+  "tasks:read",
+  "tasks:write",
 ];
 
 /** 面板禁止出现：禁用词、伪造的连接状态字段、不存在的安装方式、跨模块耦合。 */
@@ -172,16 +200,18 @@ describe("McpSettings 纯文本契约", () => {
     }
   });
 
-  it("不宣传已下线的项目内 AI 问答，并如实标注残留工具不可用", () => {
+  it("不宣传已下线的项目内 AI 问答，并如实标注旧 AI 工具已移除", () => {
     expect(componentSource).toContain("项目内 AI 问答已移除");
-    expect(componentSource).toContain("/api/ai/ask");
     expect(componentSource).toContain("已下线，请勿使用");
+    expect(componentSource).toContain("baseforge_ai_ask");
+    expect(componentSource).toContain("baseforge_ai_process");
+    expect(componentSource).toContain("baseforge_knowledge_stats");
     expect(componentSource).not.toContain("AI_ASK_EXAMPLE");
     expect(componentSource).not.toContain("baseforge_ai_ask({");
     expect(componentSource).not.toContain("结合 AI 生成回答并标注信息来源");
-    // 仍在的端点必须写明，避免用户误以为 AI 处理能力也被删掉
-    expect(componentSource).toContain("/api/ai/chat");
-    expect(componentSource).toContain("/api/ai/knowledge-stats");
+    // 不再把仍在的 AI 端点写成可用能力
+    expect(componentSource).not.toContain("/api/ai/chat");
+    expect(componentSource).not.toContain("/api/ai/knowledge-stats");
   });
 
   it("令牌指引使用静态文案，不跳转、不派发事件", () => {

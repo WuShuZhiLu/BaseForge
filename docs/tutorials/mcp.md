@@ -98,6 +98,21 @@ VS Code 顶层字段是 `servers`，不是 `mcpServers`：
 | `BASEFORGE_URL` | BaseForge 服务地址 | `http://localhost:3001` |
 | `BASEFORGE_API_TOKEN` | Personal API Token（必填，缺失时启动即报错） | — |
 
+## Token scopes
+
+工具按 scope 授权，创建 Token 时按需勾选（最小权限）：
+
+| scope | 覆盖工具 |
+|---|---|
+| `notes:read` / `notes:write` / `notebooks:read` / `notebooks:write` | 笔记、笔记本、块、搜索 |
+| `attachments:write` / `tags:read` / `tags:write` | 附件与标签 |
+| `remote_files:read` / `remote_files:write` | 远程文件（源配置、读写、链接映射） |
+| `export:import` | `baseforge_export_notes` |
+| `shares:read` / `shares:write` | 分享链接（另需 unrestricted Token） |
+| `tasks:read` / `tasks:write` | 任务接口（供 REST/SDK 使用，MCP 暂不暴露任务工具） |
+
+**restricted Token 的限制**：分享链接可把任意笔记公开到外网，笔记本资源边界无法约束，因此 restricted Token 调用分享工具会被服务端拒绝；系统运维工具（插件、Webhook、备份、审计）同样仅 unrestricted Token 可用。
+
 ## 可用工具
 
 ### 笔记本
@@ -135,15 +150,26 @@ VS Code 顶层字段是 `servers`，不是 `mcpServers`：
 | `baseforge_attach_to_note` | 将附件插入 Markdown 笔记 |
 | `baseforge_list_tags` / `baseforge_manage_tags` | 标签读取与管理 |
 
-### AI 与知识库
+### 远程文件（内核能力）
 
 | 工具 | 说明 |
 |---|---|
-| `baseforge_ai_ask` | 按指定笔记本进行知识库问答 |
-| `baseforge_ai_process` | AI 处理调用方直接提供的文本 |
-| `baseforge_knowledge_stats` | 知识库统计 |
+| `baseforge_list_remote_sources` | 列出远程源（凭据由服务端掩码） |
+| `baseforge_manage_remote_source` | 新建 / 更新 / 删除 / 测试远程源（WebDAV、百度网盘、SMB） |
+| `baseforge_list_remote_files` | 列出远程目录 |
+| `baseforge_read_remote_file` | 读取远程文本文件 |
+| `baseforge_write_remote_file` | 写回远程文本文件（覆盖，需谨慎） |
+| `baseforge_manage_remote_file` | 创建目录 / 删除 / 重命名 |
+| `baseforge_list_remote_links` / `baseforge_manage_remote_link` | 远程文件与笔记的链接映射 |
 
-### 系统（需要对应 scope）
+### 导出与分享（知识库为单位）
+
+| 工具 | 说明 |
+|---|---|
+| `baseforge_export_notes` | 按笔记本导出笔记，只返回指定笔记本的内容 |
+| `baseforge_list_shares` / `baseforge_create_share` / `baseforge_update_share` / `baseforge_delete_share` | 分享链接管理（仅 unrestricted Token） |
+
+### 系统（仅 unrestricted Token）
 
 | 工具 | 说明 |
 |---|---|
@@ -151,6 +177,8 @@ VS Code 顶层字段是 `servers`，不是 `mcpServers`：
 | `baseforge_list_webhooks` / `baseforge_create_webhook` | Webhook 管理 |
 | `baseforge_list_backups` / `baseforge_create_backup` | 备份查询与创建 |
 | `baseforge_audit_stats` | 审计统计 |
+
+> 项目内 AI 问答已移除，`baseforge_ai_ask`、`baseforge_ai_process`、`baseforge_knowledge_stats` 等 AI 工具也已删除。知识库内容通过检索、读取与导出工具提供给外部 AI。
 
 ## 验证是否安装成功
 
