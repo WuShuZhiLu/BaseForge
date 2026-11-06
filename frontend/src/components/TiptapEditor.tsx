@@ -64,6 +64,7 @@ import { CellSelection } from "@tiptap/pm/tables";
 import { markdownToSimpleHtml } from "@/lib/importService";
 import { repairTiptapJson } from "@/lib/tiptapSchemaRepair";
 import { EditorToolbarPortal, useEditorToolbarSlot } from "@/components/CollapsibleEditorToolbar";
+import { ToolbarButton, ToolbarDivider } from "@/components/editors/ToolbarPrimitives";
 import { markdownToHtml as mdToFullHtml, detectFormat as detectContentFormat, tiptapJsonToMarkdown } from "@/lib/contentFormat";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { findInternalMarkdownMarkerRanges } from "@/lib/markdownUserContent";
@@ -1019,44 +1020,6 @@ function createKeyboardExtension(flushSaveRef: React.MutableRefObject<() => void
 }
 
 
-interface ToolbarButtonProps {
-  onClick: () => void;
-  isActive?: boolean;
-  disabled?: boolean;
-  children: React.ReactNode;
-  title?: string;
-  compact?: boolean;
-  className?: string;
-}
-
-function ToolbarButton({ onClick, isActive, disabled, children, title, compact, className }: ToolbarButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(event) => event.preventDefault()}
-      disabled={disabled}
-      title={title}
-      className={cn(
-        // 统一固定高度：行高不随"哪个按钮被换行到第几行"变化，
-        // 保证折叠单行与展开态第一行高度一致
-        "flex h-7 shrink-0 items-center justify-center rounded-full transition-colors",
-        compact ? "p-1" : "p-1.5",
-        isActive
-          ? "bg-accent-primary/20 text-accent-primary"
-          : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-        disabled && "opacity-30 cursor-not-allowed",
-        className,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToolbarDivider() {
-  return <div className="h-5 w-px shrink-0 bg-app-border mx-1" />;
-}
 
 interface ToolbarMenuItem {
   key: string;
