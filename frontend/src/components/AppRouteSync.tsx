@@ -69,10 +69,9 @@ export default function AppRouteSync() {
   const expectedUrlRef = useRef<string>(resolveCurrentAppPathname());
   // 知识库上下文（聚焦库 / 打开文档）的最近位置：切到其它功能再切回来时恢复用。
   const lastNotebookPathRef = useRef<string | null>(null);
-  const lastNotebookPathKey = () => `nowen:last-kb-path:${getCurrentWorkspace()}`;
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(lastNotebookPathKey());
+      const saved = localStorage.getItem(`nowen:last-kb-path:${getCurrentWorkspace()}`);
       if (saved && saved.startsWith("/kb/")) lastNotebookPathRef.current = saved;
     } catch { /* ignore */ }
     // 只在挂载时读一次（后续由路由变化写入）
@@ -86,9 +85,20 @@ export default function AppRouteSync() {
   useEffect(() => {
     let disposed = false;
 
+    // 记忆的唯一写入口：ref 与 localStorage 必须同步，否则刷新恢复的位置与本会话
+    // 内的 ref 会分叉。按空间分别存（空间不进 URL，但记忆按空间隔离）。
+    const lastNotebookPathKey = () => `nowen:last-kb-path:${getCurrentWorkspace()}`;
+    const rememberKbPath = (target: string) => {
+      lastNotebookPathRef.current = target;
+      try { localStorage.setItem(lastNotebookPathKey(), target); } catch { /* ignore */ }
+    };
+
     const dispatchRoute = (route: AppRoute, event?: Event) => {
       if (route.kind === "note") {
         const noteId = route.noteId;
+        // 提前取成 const：闭包里 route 的窄化不保活，直接访问 route.kbId 过不了类型检查。
+        const routeKbId = route.kbId ?? null;
+        const routeSpace = route.space ?? getCurrentWorkspace();
         if (activeNoteRef.current?.id === noteId) {
           pendingRouteNoteIdRef.current = null;
           actions.setMobileView("editor");
@@ -130,6 +140,18 @@ export default function AppRouteSync() {
             activeNoteRef.current = null;
             actions.setActiveNote(null);
             actions.setMobileView("list");
+            // 记忆里若正指向这篇打不开的文档，降级到它所属的库（拿不到 kbId 时退到
+            // 空间根）。否则用户切到回收站等模块再点知识库，会再次被 (A1) 送回这条
+            // 死链——表现为「URL 明明已经修好，切一圈又跳回已删除的文档」。
+            const rememberedRoute = lastNotebookPathRef.current
+              ? parseAppRoute(lastNotebookPathRef.current.split("?")[0])
+              : null;
+            if (rememberedRoute?.kind === "note" && rememberedRoute.noteId === noteId) {
+              const kbPath = routeKbId
+                ? `/kb/${encodeURIComponent(routeSpace)}/${encodeURIComponent(routeKbId)}`
+                : null;
+              rememberKbPath(kbPath ?? moduleAppPath("notebook", getCurrentWorkspace()) ?? KB_ROOT_APP_PATH);
+            }
             // 不再 toast + 跳回库根：保留 URL 与上下文，由主区渲染「打不开」状态页，
             // 让用户看清状态并自己决定返回还是重试（分享链接场景刷新也不会丢位置）。
             const status = (error as { status?: number })?.status;
@@ -223,11 +245,16 @@ export default function AppRouteSync() {
       // 记住知识库上下文（聚焦的库 / 打开的文档）：切到回收站、插件等功能再切回来时
       // 用它恢复上次位置，而不是一律回到知识库根。按空间分别存。
       // 停在库根时也要记录（否则记忆会停留在更早的库/文档，切回来跳到旧位置）。
-      if (route.kind === "kb" || route.kind === "note"
-        || (route.kind === "module" && route.viewMode === "notebook")) {
-        const remembered = `${pathname}${window.location.search}`;
-        lastNotebookPathRef.current = remembered;
-        try { localStorage.setItem(lastNotebookPathKey(), remembered); } catch {}
+      // 注意 /kb/:space 这种「知识库根」被解析成 home（二段遗留形态），漏掉它会让
+      // 「返回知识库」后的正常 URL 不覆盖旧记忆——切走再点知识库又被恢复成旧位置
+      // （典型症状：停留在已删除文档的 URL 上，返回知识库后一切正常，一去回收站
+      // 再回来又跳到那条死链）。旧版树节点深链 /kb/notebook:* 不算知识库位置。
+      const insideKbContext = route.kind === "kb"
+        || route.kind === "note"
+        || (route.kind === "module" && route.viewMode === "notebook")
+        || (route.kind === "home" && !!route.space && !route.space.startsWith("notebook:"));
+      if (insideKbContext) {
+        rememberKbPath(`${pathname}${window.location.search}`);
       }
       if (
         event?.type === APP_PATH_CHANGED_EVENT
