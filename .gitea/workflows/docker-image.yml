@@ -1,4 +1,4 @@
-# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v（:v0.1.0），同时推 :latest。
+# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v，同时推 :latest。
 # tag 触发时校验 tag 与 CHANGELOG 一致，避免镜像版本和更新日志脱节。
 # 仓库地址与凭据全部来自仓库变量/密钥，代码里不写死任何地址：
 # 未配置任何仓库时只构建、不推送。
@@ -328,12 +328,13 @@ jobs:
               echo "该仓库未提供账号密码，按匿名推送"
             fi
 
-            if ! docker tag "$BUILD_REF" "$ref"; then
+            # 版本 tag 与 latest 都要先在本地打上，push 只能推本地已存在的 tag
+            if ! docker tag "$BUILD_REF" "$ref" || ! docker tag "$BUILD_REF" "$latest_ref"; then
               echo "::warning::打标失败，跳过 ${repo}"
               failed_list="${failed_list} ${repo}"
               continue
             fi
-            # 版本 tag 与 latest 都要推，任意一个失败就算该仓库失败
+            # 两个都推，任意一个失败就算该仓库失败
             echo "推送 ${ref} 与 ${latest_ref}"
             if push_with_retry "$ref" && push_with_retry "$latest_ref"; then
               verify_pushed "$ref" "$scheme"
