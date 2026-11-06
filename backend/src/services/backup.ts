@@ -11,7 +11,10 @@
  *       - meta.json           包内自描述：版本、表清单、各表行数、checksum
  *     恢复时这 5 类一并还原，不会出现"恢复后图片 404 / 用户被踢登录"。
  *  2. **schema_version 校验**：meta.json 记录备份产生时的 schema_version 与
- *     `sqlite_master` 表清单。恢复前比对当前 DB 版本：版本不匹配直接拒绝。
+ *     `sqlite_master` 表清单。恢复前比对当前 DB 版本：
+ *       - 备份版本 <= 当前程序最高版本 → 允许，恢复后由 initSchema + runMigrations
+ *         把库从备份版本升到当前版本（这是「导入旧 nowen-note 备份」的常规路径）；
+ *       - 备份版本 > 当前程序最高版本 → 拒绝（防降级：新库灌进旧程序会数据不一致）。
  *  3. **恢复事务整体回滚**：任何一行 INSERT 失败都向上 throw，撤销整个
  *     transaction —— 不再"catch 吞错返回 success: true"。
  *  4. **dry-run 模式**：恢复前可预览"将清空 N 行 / 将插入 M 行"。
@@ -30,7 +33,9 @@ import os from "os";
 import JSZip from "jszip";
 import { DatabaseSync } from "node:sqlite";
 import { closeDb, getDb, getDbSchemaVersion } from "../db/schema.js";
+import { MIGRATIONS } from "../db/migrations.js";
 import { requireSqliteVecForStoredTables } from "../db/sqlite-vec-extension.js";
+import { synchronizeRecoveredBlockAuthority } from "./blockAuthorityRecovery.js";
 import { noteVersionsRepository } from "../repositories";
 import {
   createBackupFilename,
@@ -285,6 +290,12 @@ export interface RestoreResult {
     tables: { name: string; willClear: number; willInsert: number }[];
     files: { attachments: number; fonts: number; plugins: number };
     schemaVersion: number;
+    /**
+     * 恢复后会把备份库升到当前版本时要执行的迁移条数。
+     * 0 表示备份版本与当前程序一致；主要给「导入旧 nowen-note 备份」这种
+     * 跨版本场景做提前告知（实测上游 v80 备份升到 v140 要跑 60 条）。
+     */
+    pendingMigrations?: number;
     backupType?: "full" | "db-only" | "legacy";
     attachmentAudit?: {
       metaCount: number | null;
@@ -439,6 +450,67 @@ function verifyCurrentDbUsable(curDbPath: string): void {
 
   closeDb();
   cleanupWalShm(curDbPath);
+}
+
+/**
+ * 恢复完成后重建「派生数据」，让恢复出来的库立刻可搜、block 权威自洽。
+ *
+ * 为什么需要：恢复的库来自 older schema（例如上游 nowen-note 的 v80 升到当前
+ * v140），里面可能存在两类派生数据缺陷：
+ *   1. notes.contentText 为空 —— 搜索、列表摘要都读它，为空等于这篇搜不到。
+ *      实测 2026-11-06 那份真实备份：283 篇里 164 篇为空，其中 160 篇是
+ *      「contentFormat=tiptap-json 但 content 实际存的是 HTML」的上古老数据。
+ *   2. note_block_documents.status='mismatch' —— shadow 与 content 已分叉。
+ *
+ * 只挑确实需要修的笔记，不对整库全量重建（避免几千篇时拖长恢复时间）。
+ * 全程尽力而为：失败只告警，绝不影响恢复结果本身。
+ */
+function repairRestoredDerivedState(): void {
+  try {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT n.id AS id
+      FROM notes n
+      LEFT JOIN note_block_documents d ON d.noteId = n.id
+      WHERE (n.contentText IS NULL OR n.contentText = '')
+         OR d.status = 'mismatch'
+    `).all() as Array<{ id: string }>;
+    if (rows.length === 0) return;
+
+    const startedAt = Date.now();
+    const result = synchronizeRecoveredBlockAuthority(db, rows.map((row) => row.id));
+    console.log(
+      `[Backup] 恢复后派生数据修复: ${result.synchronized}/${rows.length} 篇`
+      + (result.failures.length > 0 ? `，失败 ${result.failures.length} 篇` : "")
+      + `，耗时 ${Date.now() - startedAt}ms`,
+    );
+    for (const failure of result.failures.slice(0, 3)) {
+      console.warn(`[Backup]   修复失败 noteId=${failure.noteId}: ${failure.error}`);
+    }
+  } catch (error) {
+    console.warn(
+      "[Backup] 恢复后派生数据修复失败，已跳过（不影响数据完整性）:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/**
+ * 预览「恢复后要跑多少条迁移」。
+ *
+ * 只读连接上不能直接用 getPendingMigrations()（它内部 ensureMigrationsTable 会建表，
+ * 在 readOnly 连接上必失败），所以这里只读 MAX(version) 再跟迁移注册表比。
+ * 备份里没有 schema_migrations（很老的快照）时按全量计。
+ */
+function countPendingMigrationsFor(db: DatabaseSync): number {
+  let appliedMax = 0;
+  try {
+    const row = db.prepare("SELECT MAX(version) AS v FROM schema_migrations").get() as { v: number | null } | undefined;
+    appliedMax = row?.v ?? 0;
+  } catch {
+    appliedMax = 0;
+  }
+  return MIGRATIONS.filter((migration) => migration.version > appliedMax).length;
 }
 
 function rollbackDb(curDbPath: string, safetyBak: string, reason: unknown): never {
@@ -1406,6 +1478,9 @@ export class BackupManager {
           const willInsert = (tmp.prepare(`SELECT COUNT(*) as c FROM ${name}`).get() as { c: number }).c;
           return { name, willClear, willInsert };
         });
+        // 必须在 close 之前读：连接关掉后 prepare 会抛错，会被这里的兜底吞成 0，
+        // 算出来就是「全部迁移都待执行」这种离谱数字。
+        const pendingMigrations = countPendingMigrationsFor(tmp);
         tmp.close();
         return {
           success: true,
@@ -1417,6 +1492,7 @@ export class BackupManager {
               plugins: meta.files?.plugins?.count ?? 0,
             },
             schemaVersion: meta.schemaVersion ?? 1,
+            pendingMigrations,
             backupType: "full",
             attachmentAudit,
           },
@@ -1479,6 +1555,7 @@ export class BackupManager {
     try {
       replaceDbFile(tmpDb, curDbPath);
       verifyCurrentDbUsable(curDbPath);
+      repairRestoredDerivedState();
 
       // DB 已验证可用后，再安全替换文件目录；任一步失败都回滚 DB。
       await replaceDirectoriesFromStagingSafe([
@@ -1620,13 +1697,22 @@ export class BackupManager {
         const willInsert = (tmp.prepare(`SELECT COUNT(*) as c FROM ${name}`).get() as { c: number }).c;
         return { name, willClear, willInsert };
       });
+      let backupSchemaVersion = 1;
+      try {
+        const row = tmp.prepare("SELECT MAX(version) AS v FROM schema_migrations").get() as { v: number | null } | undefined;
+        backupSchemaVersion = row?.v ?? 1;
+      } catch {
+        /* 没有 schema_migrations：当作老库 */
+      }
+      const pendingMigrations = countPendingMigrationsFor(tmp);
       tmp.close();
       return {
         success: true,
         dryRun: {
           tables: list,
           files: { attachments: 0, fonts: 0, plugins: 0 },
-          schemaVersion: 1,
+          schemaVersion: backupSchemaVersion,
+          pendingMigrations,
           backupType: "db-only",
         },
       };
@@ -1649,6 +1735,7 @@ export class BackupManager {
       fs.copyFileSync(filePath, curDbPath);
       cleanupWalShm(curDbPath);
       verifyCurrentDbUsable(curDbPath);
+      repairRestoredDerivedState();
     } catch (e) {
       rollbackDb(curDbPath, safetyBak, e);
     }
