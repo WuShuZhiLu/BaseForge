@@ -3112,3 +3112,28 @@ html[data-electron="darwin"][data-fullscreen="1"] main::before {
 .bg-accent-primary\/15 { background-color: color-mix(in srgb, var(--color-accent-primary) 15%, transparent); }
 .bg-accent-primary\/20 { background-color: color-mix(in srgb, var(--color-accent-primary) 20%, transparent); }
 .bg-accent-primary\/25 { background-color: color-mix(in srgb, var(--color-accent-primary) 25%, transparent); }
+
+/* PDF 文档编辑器的文本层（pdfjs TextLayer 依赖的定位规则）。
+   只抄 textLayer 必需的部分，不引入整个 pdf_viewer.css（100KB 且含 viewer UI 样式）。
+   span 的 left/top/font-size 由 pdfjs 写成 inline style，这里只负责容器与选中色。 */
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+}
+.pdf-text-layer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.pdf-text-layer span.markedContent { top: 0; height: 0; }
+.pdf-text-layer span[role="img"] { user-select: none; cursor: default; }
+.pdf-text-layer ::selection { background: rgba(55, 138, 221, 0.28); }
