@@ -7,6 +7,7 @@ import {
   ChevronsDown,
   ChevronsUp,
   CircleAlert,
+  Cloud,
   CloudDownload,
   Folder,
   Loader2,
@@ -48,6 +49,7 @@ import { api } from "@/lib/api";
 import { affectedKnowledgeNoteIds } from "@/lib/knowledgeTreeDeleteReconcile";
 import { useSidebarTextStyle } from "@/hooks/useSidebarTextStyle";
 import { isActiveKnowledgeTreeDocument } from "@/lib/knowledgeTreeModel";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 import { useMobileSidebarControlsCollapsed } from "@/hooks/useMobileSidebarControlsCollapsed";
 import {
   knowledgeTreeRangeSelection,
@@ -1178,6 +1180,8 @@ export function KnowledgeTreePanel({
 
   const treeIndent = variant === "mobile" ? 12 : 16;
   const treeInset = variant === "mobile" ? 0 : 2;
+  // 远程投影文档：树节点上标出来，否则不知道哪些文档的保存会写回远程
+  const remoteLinkedNoteIds = useRemoteLinkedNoteIds();
 
   const renderDraft = (depth: number) => {
     if (!draft) return null;
@@ -1371,6 +1375,15 @@ export function KnowledgeTreePanel({
             )}
           {nodeIcon(node)}
           <span className={cn("min-w-0 flex-1 truncate", classicText && "text-xs")}>{node.title}</span>
+            {node.resourceType === "note" && remoteLinkedNoteIds.has(node.resourceId) && (
+              <span
+                className="flex shrink-0 items-center text-sky-500"
+                title="来自远程文件，保存会写回远程"
+                aria-label="来自远程文件"
+              >
+                <Cloud size={11} aria-hidden="true" />
+              </span>
+            )}
             {node.nodeType === "folder" && node.isPasswordProtected === 1 && (
               <LockKeyhole size={11} className="shrink-0 text-tx-tertiary" aria-label="密码保护" />
             )}

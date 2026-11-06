@@ -273,6 +273,10 @@ export interface RemoteSourcePublic {
   baseUrl: string;
   username: string;
   rootPath: string;
+  /** SMB：主机名/IP（多共享源才有；单共享源仍用 baseUrl 的 UNC） */
+  host?: string;
+  /** SMB：挂载的共享名（多共享时路径第一段即共享名） */
+  shares?: string[];
   /** SMB：域/工作组（可选） */
   domain?: string;
   /** 百度 OAuth：API Key（可选） */
@@ -280,6 +284,8 @@ export interface RemoteSourcePublic {
   /** 百度 OAuth：已配置 refresh_token（可自动续期） */
   hasOAuth?: boolean;
   hasPassword: boolean;
+  /** unreadable = 存了凭据但解不开（换机 / 换密钥 / 跨机恢复备份），需重新输入密码 */
+  credentialState?: "ok" | "unreadable";
   createdAt: string;
 }
 

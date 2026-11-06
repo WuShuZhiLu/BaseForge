@@ -1,14 +1,25 @@
 /**
  * 远程文件 —— 文件管理里的「远程」来源视图（内核能力，非插件）。
  *
- * 布局：左列源列表 / 中列文件浏览器（面包屑 + 目录导航 + 重命名/删除）/ 右列文本编辑器。
+ * 布局：顶栏 / 工具条 / 面包屑 / 文件列表 / 右侧文本编辑器，全部与本地「文件」视图同一套
+ * 节奏（h-12 顶栏带 32px 图标方块与状态徽章、h-10 工具条：搜索 + 分割线 + 统计 + 排序、
+ * 列表带表头与复选框），这样两个来源切换时不会像换了个产品。
+ *
+ * 存储（源）不在这里切换，统一放侧栏「存储」分组（filesUi 的 remoteSourceId），
+ * 与侧栏「来源」的选择模型一致；本面板只负责当前源的文件浏览与编辑。
+ *
  * 所有远程操作走后端 /api/remote-files 代理：凭据只在服务端加密存储，前端永不见明文。
- * 支持源：WebDAV、SMB、百度网盘。
+ * 支持源（按常用顺序）：WebDAV、SMB、百度网盘（直连，建议改用 OpenList + WebDAV）。
  */
-import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { alert, confirm } from "@/components/ui/confirm";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { MenuItem, MenuSurface } from "@/components/ui/menu";
+import { cn } from "@/lib/utils";
 import {
+  AlertTriangle,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   Cloud,
@@ -17,6 +28,7 @@ import {
   GitCompare,
   Folder,
   FolderPlus,
+  Loader2,
   NotebookPen,
   Pencil,
   Plus,
@@ -24,16 +36,40 @@ import {
   Save,
   Search,
   Settings2,
+  Square,
   Trash2,
   X,
 } from "lucide-react";
 
-import { api } from "@/lib/api";
+import { api, getCurrentWorkspace } from "@/lib/api";
+import { navigateToAppPath } from "@/lib/appPathNavigation";
+import { invalidateRemoteNoteLinks, setRemoteNoteLinksCache } from "@/lib/remoteNoteSync";
+import RemoteLinkDialog, { rememberRemoteLinkNotebook, type RemoteLinkTarget } from "@/components/RemoteLinkDialog";
 import { markdownToTiptapJSON, normalizeToMarkdown } from "@/lib/contentFormat";
-import { filterSortRemoteEntries, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesUiVersion, subscribeFilesUi } from "@/features/files/filesUi";
+import {
+  FILE_REMOTE_SORT_OPTIONS,
+  filterSortRemoteEntries,
+  getFilesRemoteSort,
+  getFilesRemoteSourceId,
+  getFilesRemoteTime,
+  getFilesRemoteTypes,
+  getFilesUiVersion,
+  setFilesUi,
+  subscribeFilesUi,
+  type FilesRemoteSortKey,
+} from "@/features/files/filesUi";
 import type { RemoteFileEntry, RemoteNoteLink, RemoteSourcePublic } from "@/types";
 
 type SourceType = "webdav" | "baidu" | "smb";
+
+/** 类型顺序按实际使用频率排：自建 NAS 多为 WebDAV / SMB，云盘直连是少数场景 */
+const SOURCE_TYPE_ORDER: SourceType[] = ["webdav", "smb", "baidu"];
+
+const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
+  webdav: "WebDAV",
+  smb: "SMB / 局域网共享",
+  baidu: "百度网盘（直连）",
+};
 
 interface SourceDraft {
   id?: string;
@@ -45,10 +81,10 @@ interface SourceDraft {
   password: string;
   /** 百度网盘 access_token；WebDAV/SMB 源时忽略 */
   accessToken: string;
-  /** SMB 主机（IP 或主机名），共享由「获取共享」列出后选择，不手填 */
+  /** SMB 主机（IP 或主机名），共享由「浏览共享」列出后选择，不手填 */
   smbHost: string;
-  /** SMB 共享名，来自服务端枚举 */
-  smbShare: string;
+  /** SMB 共享名（可多选：一个设备上文件分散在几个共享时不用配多遍） */
+  smbShares: string[];
   /** SMB 域/工作组（可选） */
   domain: string;
   rootPath: string;
@@ -64,8 +100,8 @@ interface SourceDraft {
   oauthCode: string;
 }
 
-const emptyDraft = (): SourceDraft => ({
-  type: "webdav",
+const emptyDraft = (type: SourceType = "webdav"): SourceDraft => ({
+  type,
   name: "",
   baseUrl: "",
   username: "",
@@ -74,7 +110,7 @@ const emptyDraft = (): SourceDraft => ({
   domain: "",
   rootPath: "",
   smbHost: "",
-  smbShare: "",
+  smbShares: [],
   clientId: "",
   clientSecret: "",
   refreshToken: "",
@@ -103,6 +139,21 @@ function fnvHash(s: string): string {
   return (h >>> 0).toString(16).padStart(8, "0") + ":" + s.length.toString(16);
 }
 
+/**
+ * 目标知识库里已占用标题 → 加 (2)(3) 后缀。
+ *
+ * 远程目录里不同子目录可以有同名文件（README.md 到处都是），
+ * 链接进同一个知识库后如果都叫「README」，靠标题就分不出谁是谁了。
+ */
+function uniqueNoteTitle(base: string, used: Set<string>): string {
+  if (!used.has(base)) return base;
+  for (let index = 2; index < 100; index += 1) {
+    const candidate = `${base} (${index})`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `${base} (${Date.now().toString(36)})`;
+}
+
 function formatSize(bytes: number): string {
   if (!bytes) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -119,15 +170,23 @@ function formatTime(iso: string | null): string {
   }
 }
 
-/** SMB 主机 + 共享名 → 后端仍使用的 UNC 地址（数据模型不变） */
-function composeSmbBaseUrl(host: string, share: string): string {
-  const bs = String.fromCharCode(92);
-  const h = host.trim().replace(/^smb:\/\//i, "").replace(/^\\+/, "").split(/[\\/:?#]/)[0];
-  const s = share.trim().replace(/^\\+/, "").split(/[\\/]/).filter(Boolean).join(bs);
-  return h && s ? `${bs}${bs}${h}${bs}${s}` : "";
+const BS = String.fromCharCode(92);
+
+/** 跳到知识库里的某条笔记（远程投影笔记的落点）：/kb/:space/:kb/notes/:noteId */
+function navigateToNote(noteId: string, notebookId?: string): void {
+  const space = getCurrentWorkspace();
+  if (!notebookId) {
+    navigateToAppPath(`/kb/${encodeURIComponent(space)}`);
+    return;
+  }
+  // 链接映射刚变过：让编辑器侧的缓存失效，打开时才会按新基线判断三态
+  invalidateRemoteNoteLinks();
+  navigateToAppPath(
+    `/kb/${encodeURIComponent(space)}/${encodeURIComponent(notebookId)}/notes/${encodeURIComponent(noteId)}`,
+  );
 }
 
-/** 编辑已有源时把 UNC / smb:// 地址拆回主机与共享名 */
+/** 编辑已有源时把 UNC / smb:// 地址拆回主机与共享名（历史数据只有 baseUrl） */
 function splitSmbBaseUrl(baseUrl: string): { host: string; share: string } {
   const raw = String(baseUrl || "").trim();
   const smb = raw.match(/^smb:\/\/([^/:?#]+)(?::\d+)?\/(.+)$/i);
@@ -136,40 +195,31 @@ function splitSmbBaseUrl(baseUrl: string): { host: string; share: string } {
   return { host: parts[0] || "", share: parts[1] || "" };
 }
 
-/** 共享选择：复用项目统一的下拉浮层样式，不使用原生 select */
-function ShareSelect(props: {
-  value: string;
-  options: Array<{ name: string; comment: string }>;
-  onChange: (value: string) => void;
-}) {
-  const { value, options, onChange } = props;
+/** 类型选择：项目统一下拉浮层（不用原生 select） */
+function TypeSelect({ value, onChange }: { value: SourceType; onChange: (value: SourceType) => void }) {
   const [open, setOpen] = useState(false);
-  const current = options.find((option) => option.name === value);
   return (
-    <div className="relative w-full">
+    <div className="relative shrink-0">
       <button
         type="button"
-        disabled={options.length === 0}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-7 w-full items-center gap-1.5 rounded border border-app-border bg-transparent px-2 text-xs text-tx-primary hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 text-[11.5px] text-tx-secondary hover:bg-app-hover"
       >
-        <span className="min-w-0 flex-1 truncate text-left">
-          {current?.name || (options.length ? "选择共享" : value || "请先点「获取共享」")}
-        </span>
-        <ChevronDown size={12} className={`shrink-0 text-tx-tertiary transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="whitespace-nowrap font-medium text-tx-primary">{SOURCE_TYPE_LABEL[value]}</span>
+        <ChevronDown size={12} className={cn("shrink-0 transition-transform", open && "rotate-180")} />
       </button>
       {open ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <MenuSurface className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-[160px] overflow-y-auto">
-            {options.map((option) => (
+          <MenuSurface className="absolute left-0 top-full z-50 mt-1 w-52">
+            {SOURCE_TYPE_ORDER.map((type) => (
               <MenuItem
-                key={option.name}
-                label={option.comment ? `${option.name} · ${option.comment}` : option.name}
-                checked={option.name === value}
-                onClick={() => { onChange(option.name); setOpen(false); }}
+                key={type}
+                label={SOURCE_TYPE_LABEL[type]}
+                checked={type === value}
+                onClick={() => { onChange(type); setOpen(false); }}
               />
             ))}
           </MenuSurface>
@@ -202,44 +252,75 @@ function SourceManager(props: {
   const [draft, setDraft] = useState<SourceDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [testResult, setTestResult] = useState("");
+  const [notice, setNotice] = useState("");
   const [testState, setTestState] = useState<Record<string, string>>({});
   const [shareOptions, setShareOptions] = useState<Array<{ name: string; comment: string }>>([]);
   const [sharesLoading, setSharesLoading] = useState(false);
+  const [browsed, setBrowsed] = useState(false);
 
-  /** 用填写的主机与凭据向后端枚举共享；列表不落库，可随时重新获取 */
-  const loadShares = useCallback(async () => {
+  /**
+   * 「浏览共享」= 一次动作同时完成连通性测试与共享枚举（用户反馈原来「获取共享 + 测试连接」
+   * 两步分开很别扭）。失败时按网络不可达 / 认证失败 / 协议不兼容分类给出可操作的提示。
+   */
+  const browseShares = useCallback(async () => {
     if (!draft) return;
-    if (!draft.smbHost.trim()) { setTestResult("请先填写 SMB 主机地址"); return; }
+    const host = draft.smbHost.trim();
+    if (!host) { setError("请先填写 SMB 主机地址（IP 或主机名）"); return; }
     setSharesLoading(true);
-    setTestResult("正在获取共享…");
+    setError("");
+    setNotice("正在连接并枚举共享…");
     try {
       const res = await api.listSmbShares({
-        host: draft.smbHost.trim(),
+        host,
         username: draft.username.trim(),
         password: draft.password,
         domain: draft.domain.trim(),
         ...(draft.id ? { sourceId: draft.id } : {}),
       });
       setShareOptions(res.shares);
-      setTestResult(res.shares.length
-        ? `找到 ${res.shares.length} 个共享，请选择`
-        : "未发现可用共享（检查账号权限或 NAS 共享设置）");
+      setBrowsed(true);
+      // 已保存过共享的源：新枚举结果里保留原选择；否则默认全选（用户说「一个或多个」，
+      // 全选最省事，不想用的再点掉）
+      setDraft((cur) => {
+        if (!cur) return cur;
+        const names = res.shares.map((share) => share.name);
+        const kept = cur.smbShares.filter((name) => names.includes(name));
+        return { ...cur, smbShares: kept.length ? kept : names };
+      });
+      setNotice(res.shares.length
+        ? `连接成功，找到 ${res.shares.length} 个共享，点选要挂载的（可多选）`
+        : "连接成功，但该账号下没有可见的磁盘共享（检查 NAS 共享设置与账号权限）");
     } catch (err: any) {
       setShareOptions([]);
-      setTestResult(err?.message || "获取共享失败");
+      setBrowsed(false);
+      setNotice("");
+      setError(err?.message || "连接失败");
     } finally {
       setSharesLoading(false);
     }
   }, [draft]);
 
+  const toggleShare = useCallback((name: string) => {
+    setDraft((cur) => {
+      if (!cur) return cur;
+      return {
+        ...cur,
+        smbShares: cur.smbShares.includes(name)
+          ? cur.smbShares.filter((item) => item !== name)
+          : [...cur.smbShares, name],
+      };
+    });
+  }, []);
+
   const save = useCallback(async () => {
     if (!draft) return;
-    const baseUrl = draft.type === "smb"
-      ? composeSmbBaseUrl(draft.smbHost, draft.smbShare)
-      : draft.baseUrl;
-    if (draft.type === "smb" && !baseUrl) {
-      setError("请先点「获取共享」并选择要使用的共享");
+    if (!draft.name.trim()) { setError("请填写名称"); return; }
+    if (draft.type === "smb" && (draft.smbShares.length === 0 || !draft.smbHost.trim())) {
+      setError("请点「浏览共享」并至少选择一个共享");
+      return;
+    }
+    if (draft.type === "webdav" && !/^https?:\/\//i.test(draft.baseUrl.trim())) {
+      setError("WebDAV 地址需以 http(s):// 开头，如 https://nas.local:5006");
       return;
     }
     setBusy(true);
@@ -248,8 +329,10 @@ function SourceManager(props: {
       await api.saveRemoteFileSource({
         id: draft.id,
         type: draft.type,
-        name: draft.name,
-        baseUrl,
+        name: draft.name.trim(),
+        baseUrl: draft.type === "smb" ? "" : draft.baseUrl.trim(),
+        // SMB 只传主机 + 共享列表，由后端决定落库形态（单共享沿用历史 UNC）
+        ...(draft.type === "smb" ? { host: draft.smbHost.trim(), shares: draft.smbShares } : {}),
         username: draft.username,
         rootPath: draft.rootPath,
         ...(draft.domain ? { domain: draft.domain } : {}),
@@ -261,6 +344,7 @@ function SourceManager(props: {
         ...(draft.tokenExpiresAt ? { tokenExpiresAt: draft.tokenExpiresAt } : {}),
       });
       setDraft(null);
+      setNotice("");
       onChanged();
     } catch (err: any) {
       setError(err?.message || "保存失败");
@@ -271,38 +355,34 @@ function SourceManager(props: {
 
   const testConnection = useCallback(async () => {
     if (!draft) return;
-    const baseUrl = draft.type === "smb"
-      ? composeSmbBaseUrl(draft.smbHost, draft.smbShare)
-      : draft.baseUrl;
-    if (draft.type === "smb" && !baseUrl) {
-      setTestResult("请先点「获取共享」并选择要使用的共享");
-      return;
-    }
-    setTestResult("测试中…");
+    setNotice("测试中…");
+    setError("");
     try {
       await api.testRemoteFileSource({
         type: draft.type,
-        baseUrl,
+        baseUrl: draft.type === "smb" ? "" : draft.baseUrl.trim(),
         username: draft.username,
         password: draft.password,
         accessToken: draft.accessToken,
         domain: draft.domain,
         rootPath: draft.rootPath,
+        ...(draft.type === "smb" ? { host: draft.smbHost.trim(), shares: draft.smbShares } : {}),
       });
-      setTestResult("连接成功");
+      setNotice("连接成功");
     } catch (err: any) {
-      setTestResult(err?.message || "连接失败");
+      setNotice("");
+      setError(err?.message || "连接失败");
     }
   }, [draft]);
 
   /** 百度 OAuth：打开授权页（oob，授权码由用户复制） */
   const openBaiduAuthorize = useCallback(async () => {
-    if (!draft?.clientId) { setTestResult("请先填写 API Key"); return; }
+    if (!draft?.clientId) { setError("请先填写 API Key"); return; }
     try {
       const res = await api.getBaiduAuthorizeUrl(draft.clientId);
       window.open(res.url, "_blank");
     } catch (err: any) {
-      setTestResult(err?.message || "生成授权链接失败");
+      setError(err?.message || "生成授权链接失败");
     }
   }, [draft]);
 
@@ -310,10 +390,11 @@ function SourceManager(props: {
   const exchangeBaiduCode = useCallback(async () => {
     if (!draft) return;
     if (!draft.oauthCode.trim() || !draft.clientId || !draft.clientSecret) {
-      setTestResult("换令牌需要：API Key + Secret Key + 授权码");
+      setError("换令牌需要：API Key + Secret Key + 授权码");
       return;
     }
     setBusy(true);
+    setError("");
     try {
       const res = await api.exchangeBaiduToken(draft.oauthCode.trim(), draft.clientId, draft.clientSecret);
       setDraft({
@@ -323,9 +404,9 @@ function SourceManager(props: {
         tokenExpiresAt: new Date(Date.now() + res.expiresIn * 1000).toISOString(),
         oauthCode: "",
       });
-      setTestResult("令牌已填入，请保存源");
+      setNotice("令牌已填入，请保存源");
     } catch (err: any) {
-      setTestResult(err?.message || "换取令牌失败");
+      setError(err?.message || "换取令牌失败");
     } finally {
       setBusy(false);
     }
@@ -358,7 +439,7 @@ function SourceManager(props: {
   }, []);
 
   const editSource = useCallback((source: RemoteSourcePublic) => {
-    const smb = source.type === "smb" ? splitSmbBaseUrl(source.baseUrl) : { host: "", share: "" };
+    const legacy = source.type === "smb" ? splitSmbBaseUrl(source.baseUrl) : { host: "", share: "" };
     setDraft({
       id: source.id,
       type: source.type,
@@ -369,8 +450,8 @@ function SourceManager(props: {
       accessToken: "",
       domain: source.domain || "",
       rootPath: source.rootPath,
-      smbHost: smb.host,
-      smbShare: smb.share,
+      smbHost: source.host || legacy.host,
+      smbShares: source.shares && source.shares.length > 0 ? source.shares : (legacy.share ? [legacy.share] : []),
       clientId: source.clientId || "",
       clientSecret: "",
       refreshToken: "",
@@ -378,20 +459,32 @@ function SourceManager(props: {
       oauthCode: "",
     });
     setShareOptions([]);
-    setTestResult("");
+    setBrowsed(false);
+    setNotice("");
+    setError("");
   }, []);
+
+  const sourceSubtitle = (source: RemoteSourcePublic) => {
+    if (source.type === "baidu") return "百度网盘 · 需要开放平台应用凭据";
+    if (source.type === "smb") {
+      if (source.host) return `${source.host} · ${source.shares?.length ?? 0} 个共享`;
+      return source.baseUrl;
+    }
+    return source.baseUrl;
+  };
 
   return (
     <Overlay onClose={onClose}>
-      <div className="flex max-h-[80vh] w-[560px] flex-col overflow-hidden rounded-xl border border-app-border bg-white shadow-2xl  ">
-        <div className="flex items-center gap-2 border-b border-app-border px-4 py-3 ">
+      <div className="flex max-h-[82vh] w-[600px] flex-col overflow-hidden rounded-xl border border-app-border bg-app-elevated shadow-2xl">
+        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
           <Settings2 size={15} className="text-accent-primary" />
-          <span className="text-sm font-semibold">管理远程源</span>
+          <span className="text-[13px] font-semibold text-tx-primary">管理远程存储</span>
           <span className="flex-1" />
           <button
             type="button"
             className="rounded p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
             onClick={onClose}
+            aria-label="关闭"
           >
             <X size={15} />
           </button>
@@ -399,24 +492,30 @@ function SourceManager(props: {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {sources.length === 0 && !draft ? (
-            <p className="py-6 text-center text-xs text-tx-tertiary">尚未配置远程源，点击下方按钮新增。</p>
+            <p className="py-6 text-center text-xs text-tx-tertiary">尚未配置远程存储，点下方按钮新增。</p>
           ) : null}
+
           {sources.map((source) => (
             <div
               key={source.id}
-              className="mb-2 flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 "
+              className="mb-1.5 flex items-center gap-2 rounded-lg border border-app-border px-3 py-2 hover:bg-app-hover/40"
             >
-              <span className="rounded bg-app-hover px-1.5 py-0.5 text-[10px] font-medium text-tx-tertiary">
-                {source.type}
+              <span className="shrink-0 rounded-md bg-app-hover px-1.5 py-0.5 text-[10px] font-medium text-tx-tertiary">
+                {source.type === "smb" ? "SMB" : source.type === "webdav" ? "WebDAV" : "百度网盘"}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium">{source.name}</p>
-                <p className="truncate text-[10px] text-tx-tertiary">
-                  {source.type === "baidu" ? "百度网盘" : source.baseUrl}
+                <p className="truncate text-xs font-medium text-tx-primary">{source.name}</p>
+                <p className="truncate text-[10.5px] text-tx-tertiary">
+                  {sourceSubtitle(source)}
                   {source.rootPath ? ` · 根: ${source.rootPath}` : ""}
                 </p>
+                {source.credentialState === "unreadable" ? (
+                  <p className="flex items-center gap-1 text-[10.5px] text-amber-600 dark:text-amber-400">
+                    <AlertTriangle size={11} /> 凭据已失效（换机或恢复过备份），请重新输入密码
+                  </p>
+                ) : null}
                 {testState[source.id] ? (
-                  <p className="truncate text-[10px] text-emerald-500">{testState[source.id]}</p>
+                  <p className="truncate text-[10.5px] text-emerald-500">{testState[source.id]}</p>
                 ) : null}
               </div>
               <button
@@ -425,7 +524,7 @@ function SourceManager(props: {
                 className="rounded p-1 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
                 onClick={() => void testSource(source)}
               >
-                <Settings2 size={13} />
+                <RefreshCw size={13} />
               </button>
               <button
                 type="button"
@@ -447,195 +546,237 @@ function SourceManager(props: {
           ))}
 
           {draft ? (
-            <div className="mt-3 space-y-2 rounded-lg border border-app-border p-3 ">
-              <div className="flex gap-2">
-                <select
-                  className="h-7 rounded border border-app-border bg-transparent px-1.5 text-xs "
+            <div className="mt-3 space-y-2 rounded-lg border border-app-border p-3">
+              <div className="flex items-center gap-2">
+                <TypeSelect
                   value={draft.type}
-                  onChange={(e) => setDraft({ ...draft, type: e.target.value as SourceType })}
-                >
-                  <option value="webdav">WebDAV</option>
-                  <option value="baidu">百度网盘（实验性）</option>
-                  <option value="smb">SMB</option>
-                </select>
-                <input
-                  className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
-                  placeholder="源名称，如：群晖 NAS"
+                  onChange={(type) => setDraft({ ...draft, type })}
+                />
+                <Input
+                  className="h-7 min-w-0 flex-1 text-xs"
+                  placeholder="名称，如：家里 NAS"
                   value={draft.name}
                   onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 />
               </div>
+
               {draft.type === "smb" ? (
                 <>
                   <div className="flex gap-2">
-                    <input
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
-                      placeholder="SMB 主机，如 192.168.100.3"
+                    <Input
+                      className="h-7 min-w-0 flex-1 text-xs"
+                      placeholder="主机地址，如 192.168.100.3"
                       value={draft.smbHost}
                       onChange={(e) => setDraft({ ...draft, smbHost: e.target.value })}
                     />
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 shrink-0 whitespace-nowrap px-2 text-[11px]"
                       disabled={busy || sharesLoading}
-                      onClick={() => void loadShares()}
-                      className="h-7 shrink-0 whitespace-nowrap rounded border border-app-border px-2 text-[11px] text-tx-secondary hover:bg-app-hover disabled:opacity-50"
+                      onClick={() => void browseShares()}
                     >
-                      {sharesLoading ? "获取中…" : "获取共享"}
-                    </button>
+                      {sharesLoading ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
+                      {sharesLoading ? "连接中…" : "浏览共享"}
+                    </Button>
                   </div>
-                  <ShareSelect
-                    value={draft.smbShare}
-                    options={shareOptions}
-                    onChange={(value) => setDraft({ ...draft, smbShare: value })}
-                  />
                   <div className="flex gap-2">
-                    <input
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
-                      placeholder="域/工作组（可选）"
-                      value={draft.domain}
-                      onChange={(e) => setDraft({ ...draft, domain: e.target.value })}
-                    />
-                    <input
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                    <Input
+                      className="h-7 min-w-0 flex-1 text-xs"
                       placeholder="用户名（可留空）"
                       value={draft.username}
                       onChange={(e) => setDraft({ ...draft, username: e.target.value })}
                     />
-                    <input
+                    <Input
                       type="password"
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
-                      placeholder={draft.id ? "密码（留空保持不变）" : "密码"}
+                      className="h-7 min-w-0 flex-1 text-xs"
+                      placeholder={draft.id ? "密码（留空保持不变）" : "密码（可留空）"}
                       value={draft.password}
                       onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     />
+                    <Input
+                      className="h-7 w-24 shrink-0 text-xs"
+                      placeholder="域（可选）"
+                      value={draft.domain}
+                      onChange={(e) => setDraft({ ...draft, domain: e.target.value })}
+                    />
                   </div>
-                  <input
-                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
-                    placeholder="共享内根路径（可选，如 /项目文档）"
-                    value={draft.rootPath}
-                    onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
-                  />
-                  <p className="text-[10px] leading-4 text-tx-tertiary">
-                    共享由服务端自动发现，无需手填路径；主机或共享变动时重新点「获取共享」即可。需 NAS/服务器可直连该 SMB 主机（445 端口）；支持 SMB 2.1 ~ 3.1.1 与 SMB3 传输加密。
+
+                  {/* 共享多选：一个设备上的文件可能分散在几个共享，全都挂到一个源里 */}
+                  {browsed && shareOptions.length > 0 ? (
+                    <div className="rounded-md border border-app-border">
+                      <div className="flex items-center justify-between border-b border-app-border px-2 py-1 text-[10.5px] text-tx-tertiary">
+                        <span>共享（可多选）</span>
+                        <span className="tabular-nums">已选 {draft.smbShares.length} / {shareOptions.length}</span>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto p-1">
+                        {shareOptions.map((share) => {
+                          const checked = draft.smbShares.includes(share.name);
+                          return (
+                            <button
+                              key={share.name}
+                              type="button"
+                              onClick={() => toggleShare(share.name)}
+                              className={cn(
+                                "flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] hover:bg-app-hover",
+                                checked ? "text-tx-primary" : "text-tx-secondary",
+                              )}
+                            >
+                              {checked ? <CheckSquare size={13} className="shrink-0 text-accent-primary" /> : <Square size={13} className="shrink-0 text-tx-tertiary" />}
+                              <span className="min-w-0 flex-1 truncate">{share.name}</span>
+                              {share.comment ? <span className="max-w-[45%] truncate text-[10px] text-tx-tertiary">{share.comment}</span> : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <details className="rounded border border-app-border px-2 py-1 text-[11px]">
+                    <summary className="cursor-pointer select-none text-tx-tertiary">高级（共享内根路径）</summary>
+                    <div className="mt-1.5">
+                      <Input
+                        className="h-7 w-full text-xs"
+                        placeholder="共享内根路径（可选，如 /项目文档）"
+                        value={draft.rootPath}
+                        onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
+                      />
+                    </div>
+                  </details>
+                  <p className="text-[10.5px] leading-4 text-tx-tertiary">
+                    用户名与密码按需填写：公开共享（guest）两个都留空即可。「浏览共享」会同时验证连通性，
+                    连不上会直接说明是地址不可达、账号密码不对还是协议不兼容。支持 SMB 2.1 ~ 3.1.1。
                   </p>
                 </>
               ) : draft.type === "webdav" ? (
                 <>
-                  <input
-                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
-                    placeholder="服务器地址，如 https://nas.local:5006"
+                  <Input
+                    className="h-7 w-full text-xs"
+                    placeholder="服务器地址，如 https://nas.local:5006/dav"
                     value={draft.baseUrl}
                     onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
                   />
                   <div className="flex gap-2">
-                    <input
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                    <Input
+                      className="h-7 min-w-0 flex-1 text-xs"
                       placeholder="用户名（可留空）"
                       value={draft.username}
                       onChange={(e) => setDraft({ ...draft, username: e.target.value })}
                     />
-                    <input
+                    <Input
                       type="password"
-                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
-                      placeholder={draft.id ? "密码（留空保持不变）" : "密码"}
+                      className="h-7 min-w-0 flex-1 text-xs"
+                      placeholder={draft.id ? "密码（留空保持不变）" : "密码（可留空）"}
                       value={draft.password}
                       onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     />
                   </div>
-                  <input
-                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
+                  <Input
+                    className="h-7 w-full text-xs"
                     placeholder="根路径（可选，如 /docs）"
                     value={draft.rootPath}
                     onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
                   />
+                  <p className="text-[10.5px] leading-4 text-tx-tertiary">
+                    百度网盘 / 夸克 / 115 / 阿里云盘等可以先用
+                    <a className="mx-1 text-accent-primary underline-offset-2 hover:underline" href="https://github.com/OpenListTeam/OpenList" target="_blank" rel="noreferrer">OpenList</a>
+                    挂载（自建实例自带 WebDAV：<span className="font-mono">http://主机:5244/dav/</span>），
+                    这里填那个地址即可——一个协议覆盖所有网盘，不用逐个做授权。
+                  </p>
                 </>
               ) : (
                 <>
-                  <input
+                  <div className="rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1.5 text-[10.5px] leading-4 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                    直连需要百度开放平台的应用凭据，且令牌会过期。更省事的方式：用
+                    <a className="mx-1 underline underline-offset-2" href="https://github.com/OpenListTeam/OpenList" target="_blank" rel="noreferrer">OpenList</a>
+                    挂载百度网盘，再用上面的 WebDAV 方式接入。
+                  </div>
+                  <Input
                     type="password"
-                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
+                    className="h-7 w-full text-xs"
                     placeholder={draft.id ? "access_token（留空保持不变）" : "百度网盘 access_token"}
                     value={draft.accessToken}
                     onChange={(e) => setDraft({ ...draft, accessToken: e.target.value })}
                   />
-                  <p className="text-[10px] leading-4 text-tx-tertiary">
-                    手动路径：在百度网盘开放平台创建应用并完成授权后，把 access_token 粘贴到这里。支持分片上传大文件（超过 4MB 自动分片）。
-                  </p>
-                  <details className="rounded border border-app-border px-2 py-1 text-[11px] ">
+                  <details className="rounded border border-app-border px-2 py-1 text-[11px]">
                     <summary className="cursor-pointer select-none text-tx-tertiary">应用凭据（可选：授权码换令牌 + 30 天自动续期）</summary>
                     <div className="mt-1.5 space-y-1.5">
                       <div className="flex gap-2">
-                        <input
-                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                        <Input
+                          className="h-7 min-w-0 flex-1 text-xs"
                           placeholder="API Key（client_id）"
                           value={draft.clientId}
                           onChange={(e) => setDraft({ ...draft, clientId: e.target.value })}
                         />
-                        <input
+                        <Input
                           type="password"
-                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                          className="h-7 min-w-0 flex-1 text-xs"
                           placeholder="Secret Key（留空保持不变）"
                           value={draft.clientSecret}
                           onChange={(e) => setDraft({ ...draft, clientSecret: e.target.value })}
                         />
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          className="shrink-0 rounded border border-app-border px-2 py-1 text-[11px] text-tx-tertiary hover:bg-app-hover"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0 px-2 text-[11px]"
                           disabled={busy || !draft.clientId}
                           onClick={() => void openBaiduAuthorize()}
                         >
                           打开授权页
-                        </button>
-                        <input
-                          className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                        </Button>
+                        <Input
+                          className="h-7 min-w-0 flex-1 text-xs"
                           placeholder="粘贴授权码（oob 页面显示）"
                           value={draft.oauthCode}
                           onChange={(e) => setDraft({ ...draft, oauthCode: e.target.value })}
                         />
-                        <button
-                          type="button"
-                          className="shrink-0 rounded border border-app-border px-2 py-1 text-[11px] text-tx-tertiary hover:bg-app-hover"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0 px-2 text-[11px]"
                           disabled={busy}
                           onClick={() => void exchangeBaiduCode()}
                         >
                           换令牌
-                        </button>
+                        </Button>
                       </div>
-                      <p className="text-[10px] leading-4 text-tx-tertiary">授权页登录后复制显示的授权码，点「换令牌」自动填入上方 access_token；配置凭据后令牌临近过期会自动续期。</p>
                     </div>
                   </details>
                 </>
               )}
-              {error ? <p className="text-[11px] text-red-500">{error}</p> : null}
-              {testResult ? (
-                <p className={`break-words text-[11px] ${testResult === "连接成功" ? "text-emerald-600" : "text-tx-tertiary"}`}>
-                  {testResult}
+
+              {error ? <p className="break-words text-[11px] text-red-500">{error}</p> : null}
+              {notice ? (
+                <p className={cn("break-words text-[11px]", notice === "连接成功" ? "text-emerald-600" : "text-tx-tertiary")}>
+                  {notice}
                 </p>
               ) : null}
+
               <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  className="shrink-0 whitespace-nowrap rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                <Button
+                  size="sm"
+                  className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
                   disabled={busy || !draft.name.trim()}
                   onClick={() => void save()}
                 >
                   保存
-                </button>
-                <button
-                  type="button"
-                  className="shrink-0 whitespace-nowrap rounded-md border border-app-border px-3 py-1 text-xs "
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
                   disabled={busy}
                   onClick={() => void testConnection()}
                 >
                   测试连接
-                </button>
+                </Button>
                 <span className="min-w-0 flex-1" />
                 <button
                   type="button"
-                  className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
-                  onClick={() => { setDraft(null); setError(""); }}
+                  className="shrink-0 whitespace-nowrap text-[11.5px] text-tx-tertiary hover:text-tx-secondary"
+                  onClick={() => { setDraft(null); setError(""); setNotice(""); setShareOptions([]); setBrowsed(false); }}
                 >
                   取消
                 </button>
@@ -645,9 +786,9 @@ function SourceManager(props: {
             <button
               type="button"
               className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-app-border py-2 text-xs text-tx-tertiary hover:border-accent-primary hover:text-accent-primary"
-              onClick={() => { setDraft(emptyDraft()); setShareOptions([]); setTestResult(""); }}
+              onClick={() => { setDraft(emptyDraft()); setShareOptions([]); setBrowsed(false); setError(""); setNotice(""); }}
             >
-              <Plus size={13} /> 新增远程源
+              <Plus size={13} /> 新增远程存储
             </button>
           )}
         </div>
@@ -671,6 +812,9 @@ export default function RemoteFilesPanel() {
   const [newFolderName, setNewFolderName] = useState("");
   const [renameTarget, setRenameTarget] = useState<RemoteFileEntry | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
 
   const [openPath, setOpenPath] = useState("");
   const [editorText, setEditorText] = useState("");
@@ -679,6 +823,9 @@ export default function RemoteFilesPanel() {
   const [saving, setSaving] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
   const [links, setLinks] = useState<RemoteNoteLink[]>([]);
+  /** 待链接到知识库的远程文件（null = 弹窗关闭） */
+  const [linkTargets, setLinkTargets] = useState<RemoteFileEntry[] | null>(null);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [diffDlg, setDiffDlg] = useState<{
     entry: RemoteFileEntry;
     link: RemoteNoteLink;
@@ -691,7 +838,11 @@ export default function RemoteFilesPanel() {
 
   const loadLinks = useCallback(() => {
     api.getRemoteNoteLinks()
-      .then((r) => setLinks(r.links))
+      .then((r) => {
+        setLinks(r.links);
+        // 同步给 knowledge 侧的「远程来源」标记，连接/移动后图标能立刻更新
+        setRemoteNoteLinksCache(r.links);
+      })
       .catch(() => setLinks([]));
   }, []);
 
@@ -705,30 +856,122 @@ export default function RemoteFilesPanel() {
     window.setTimeout(() => setActionMsg((cur) => (cur === msg ? "" : cur)), 4000);
   }, []);
 
-  /** 远程文本文件 → 本地笔记（markdown → Tiptap JSON，零后端改动） */
-  const importToNote = useCallback(async (entry: RemoteFileEntry) => {
-    if (!activeId) return;
-    try {
-      const res = await api.readRemoteFile(activeId, entry.path);
-      const json = markdownToTiptapJSON(res.content);
-      const title = entry.name.replace(/\.[^.]+$/, "") || "未命名";
-      const note = await api.createNote({
-        title,
-        content: JSON.stringify(json),
-        contentText: res.content.replace(/[#*`>\-|_\[\]()]/g, "").replace(/\n{2,}/g, "\n").trim(),
-      });
-      flash(`已导入为笔记「${title}」`);
-      // 建立同步映射：基线 = 导入时的远程内容与笔记 markdown
-      const baseRemoteHash = fnvHash(res.content);
-      const baseNoteHash = fnvHash(normalizeToMarkdown(JSON.stringify(json)) || "");
-      try {
-        await api.linkRemoteNote({ sourceId: activeId, remotePath: entry.path, noteId: note.id, title, baseRemoteHash, baseNoteHash });
-        loadLinks();
-      } catch { /* 映射失败不影响导入 */ }
-    } catch (err: any) {
-      flash(err?.message || "导入为笔记失败");
+  /**
+   * 链接到知识库（第一步）：把待链接的文件放进弹窗，由用户选目标知识库。
+   *
+   * 语义：远程文件**不导入副本**，而是在选定的知识库里出现为一条普通笔记
+   * （正文是远程内容的本地缓存），之后在编辑器里改完保存会自动写回远程
+   * （见 lib/remoteNoteSync.ts）。已链接的文件走快捷路径直接跳笔记，不重复建。
+   */
+  const requestLink = useCallback((entries: RemoteFileEntry[]) => {
+    const linkable = entries.filter((entry) => !entry.isFolder && isTextFileName(entry.name));
+    if (linkable.length === 0) {
+      flash("选中项里没有可链接的文本文件（图片、压缩包等不能进知识库）");
+      return;
     }
-  }, [activeId, flash, loadLinks]);
+    const skipped = entries.length - linkable.length;
+    if (skipped > 0) flash(`${skipped} 项不是文本文件，已跳过`);
+    setLinkTargets(linkable);
+  }, [flash]);
+
+  /**
+   * 链接到知识库（第二步）：批量落库。
+   *
+   * 三种情况分开计：
+   *   - 未链接 → 读远程内容建笔记 + 建同步映射（笔记归属目标库，不是游离笔记）；
+   *   - 已链接但笔记在别的库 → 移动过去，不重建（同步基线保留，笔记内容不丢）；
+   *   - 已链接且就在目标库 → 跳过。
+   * 单项操作完成后直接跳到那条笔记；批量则留在列表给出汇总。
+   */
+  const performLink = useCallback(async (target: RemoteLinkTarget) => {
+    if (!activeId || !linkTargets || linkTargets.length === 0) return;
+    setLinkBusy(true);
+    rememberRemoteLinkNotebook(target.notebookId);
+
+    // 目标库已有标题 → 重名加后缀（远程目录里 README.md 这类同名文件很常见）
+    const usedTitles = new Set<string>();
+    try {
+      const existingNotes = await api.getNotes({ notebookId: target.notebookId });
+      for (const note of existingNotes) {
+        if (!note.isTrashed) usedTitles.add((note.title || "").trim());
+      }
+    } catch {
+      /* 拿不到列表就当作空库，重名由用户自己整理 */
+    }
+
+    let created = 0;
+    let moved = 0;
+    let skipped = 0;
+    let failed = 0;
+    let lastNoteId = "";
+
+    for (const entry of linkTargets) {
+      const linked = links.find((item) => item.sourceId === activeId && item.remotePath === entry.path);
+      try {
+        if (linked) {
+          const note = await api.getNote(linked.noteId);
+          if (note.notebookId === target.notebookId) {
+            skipped += 1;
+            continue;
+          }
+          await api.updateNote(linked.noteId, { notebookId: target.notebookId });
+          moved += 1;
+          lastNoteId = linked.noteId;
+          continue;
+        }
+
+        const res = await api.readRemoteFile(activeId, entry.path);
+        const json = markdownToTiptapJSON(res.content);
+        const baseTitle = entry.name.replace(/\.[^.]+$/, "") || "未命名";
+        const title = uniqueNoteTitle(baseTitle, usedTitles);
+        usedTitles.add(title);
+        const note = await api.createNote({
+          title,
+          // 关键：不传 notebookId 会变成不属于任何知识库的游离笔记，知识树里根本看不到
+          notebookId: target.notebookId,
+          content: JSON.stringify(json),
+          contentText: res.content.replace(/[#*`>\-|_\[\]()]/g, "").replace(/\n{2,}/g, "\n").trim(),
+        });
+        // 建立同步映射：基线 = 打开时远程内容与笔记 markdown
+        const baseRemoteHash = fnvHash(res.content);
+        const baseNoteHash = fnvHash(normalizeToMarkdown(JSON.stringify(json)) || "");
+        try {
+          await api.linkRemoteNote({
+            sourceId: activeId,
+            remotePath: entry.path,
+            noteId: note.id,
+            title,
+            baseRemoteHash,
+            baseNoteHash,
+          });
+        } catch {
+          /* 映射失败不影响笔记可用，正文已经落在本地了 */
+        }
+        created += 1;
+        lastNoteId = note.id;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    void loadLinks();
+    invalidateRemoteNoteLinks();
+    setLinkBusy(false);
+    setLinkTargets(null);
+    setSelected(new Set());
+
+    const parts: string[] = [];
+    if (created) parts.push(`新建 ${created} 条笔记`);
+    if (moved) parts.push(`移动 ${moved} 条`);
+    if (skipped) parts.push(`${skipped} 条已在目标库`);
+    if (failed) parts.push(`${failed} 条失败`);
+    flash(parts.length
+      ? `已链接到「${target.notebookName}」：${parts.join("，")}`
+      : "没有需要处理的文件");
+
+    // 单项操作直接进笔记；批量留在列表，避免把用户从批量上下文里踢走
+    if (linkTargets.length === 1 && lastNoteId) navigateToNote(lastNoteId, target.notebookId);
+  }, [activeId, flash, linkTargets, links, loadLinks]);
 
   /** 远程文件 → 本地附件（走文件管理存储管线：holder note + hash 去重） */
   const saveToLocal = useCallback(async (entry: RemoteFileEntry) => {
@@ -745,11 +988,12 @@ export default function RemoteFilesPanel() {
 
   const activeSource = sources.find((s) => s.id === activeId) || null;
 
-  // 侧栏类型 chips + 排序（filesUi 共享 store，事件驱动刷新）
+  // 侧栏共享 store：类型 chips / 排序 / 时间 / 当前存储都由它驱动
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
   void filesUiVersion;
   const remoteTypes = getFilesRemoteTypes();
   const remoteSort = getFilesRemoteSort();
+  const storeSourceId = getFilesRemoteSourceId();
   // 文件夹始终置顶且不受类型过滤影响；类型/搜索/排序只作用于文件条目。
   const displayedEntries = filterSortRemoteEntries(entries, remoteQuery, remoteTypes, remoteSort, getFilesRemoteTime());
 
@@ -757,15 +1001,48 @@ export default function RemoteFilesPanel() {
     try {
       const res = await api.getRemoteFileSources();
       setSources(res.sources);
-      setActiveId((prev) => (prev && res.sources.some((s) => s.id === prev) ? prev : res.sources[0]?.id || ""));
+      setActiveId((prev) => {
+        if (prev && res.sources.some((s) => s.id === prev)) return prev;
+        if (storeSourceId && res.sources.some((s) => s.id === storeSourceId)) return storeSourceId;
+        return res.sources[0]?.id || "";
+      });
     } catch {
       setSources([]);
     }
+    // storeSourceId 只在首次解析时读取，之后由本面板回写，不应成为依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 主区确定当前存储后回写 store，让侧栏「存储」高亮跟上（首次自动选中第一个源）
+  useEffect(() => {
+    if (!activeId) return;
+    if (!sources.some((source) => source.id === activeId)) return;
+    if (activeId === getFilesRemoteSourceId()) return;
+    setFilesUi({ remoteSourceId: activeId });
+  }, [activeId, sources]);
 
   useEffect(() => { void reloadSources(); }, [reloadSources]);
 
+  // 侧栏「存储」切换 → 主区跟随（同一份 localStorage 状态）
+  useEffect(() => {
+    if (storeSourceId && storeSourceId !== activeId && sources.some((s) => s.id === storeSourceId)) {
+      setActiveId(storeSourceId);
+      setCwd("");
+      setOpenPath("");
+      setEditorText("");
+      setSelected(new Set());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeSourceId, sources]);
+
   useEffect(() => { loadLinks(); }, [loadLinks, activeId]);
+
+  // 侧栏「存储」里的「＋ 添加存储」/「管理」广播这里打开配置对话框
+  useEffect(() => {
+    const open = () => setManagerOpen(true);
+    window.addEventListener("nowen:remote-open-manager", open);
+    return () => window.removeEventListener("nowen:remote-open-manager", open);
+  }, []);
 
   const loadList = useCallback(async (sourceId: string, path: string) => {
     if (!sourceId) { setEntries([]); return; }
@@ -785,6 +1062,8 @@ export default function RemoteFilesPanel() {
   useEffect(() => {
     if (activeId) void loadList(activeId, cwd);
   }, [activeId, cwd, loadList]);
+
+  useEffect(() => { setSelected(new Set()); }, [activeId, cwd]);
 
   const openFile = useCallback(async (entry: RemoteFileEntry) => {
     if (!activeId) return;
@@ -957,254 +1236,449 @@ export default function RemoteFilesPanel() {
     }
   }, [activeId, renameTarget, renameValue, loadList]);
 
+  const toggleSelect = useCallback((path: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const selectedEntries = useMemo(
+    () => displayedEntries.filter((entry) => selected.has(entry.path)),
+    [displayedEntries, selected],
+  );
+
+  const handleBatchLocal = useCallback(async () => {
+    if (!activeId || selectedEntries.length === 0) return;
+    setBatchBusy(true);
+    let ok = 0;
+    for (const entry of selectedEntries) {
+      if (entry.isFolder) continue;
+      try {
+        await api.uploadRemoteFileToLocal(activeId, entry.path, entry.name);
+        ok += 1;
+      } catch { /* 单个失败继续 */ }
+    }
+    setBatchBusy(false);
+    setSelected(new Set());
+    flash(`已存入文件管理 ${ok} 个文件`);
+  }, [activeId, selectedEntries, flash]);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (!activeId || selectedEntries.length === 0) return;
+    const ok = await confirm({
+      title: `删除选中的 ${selectedEntries.length} 项？`,
+      description: "包含目录时其内容也会一并删除，此操作不可撤销。",
+      confirmText: "删除",
+      danger: true,
+    });
+    if (!ok) return;
+    setBatchBusy(true);
+    let done = 0;
+    for (const entry of selectedEntries) {
+      try {
+        await api.deleteRemoteFile(activeId, entry.path);
+        done += 1;
+      } catch { /* 单个失败继续 */ }
+    }
+    setBatchBusy(false);
+    setSelected(new Set());
+    void loadList(activeId, cwd);
+    flash(`已删除 ${done} 项`);
+  }, [activeId, selectedEntries, cwd, loadList, flash]);
+
   const crumbs = cwd ? cwd.split("/") : [];
+  const currentSortLabel = FILE_REMOTE_SORT_OPTIONS.find((option) => option.value === remoteSort)?.label ?? "名称 A→Z";
+  const credentialBroken = activeSource?.credentialState === "unreadable";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 顶栏：h-12 与模块面板头同一节奏；存储切换在侧栏 */}
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
-        <Cloud size={18} className="shrink-0 text-tx-secondary" />
-        <span className="text-[15px] font-semibold">远程文件</span>
-        <span className="rounded-lg bg-app-hover px-1.5 py-px text-[10.5px] tabular-nums text-tx-tertiary">
-          {entries.length} 个文件
-        </span>
-        <span className="flex-1" />
-        <button
-          type="button"
-          title="刷新"
-          className="inline-flex items-center gap-1 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs text-tx-secondary hover:bg-app-hover"
+      {/* 顶栏：与本地「文件」视图同构（32px 图标方块 + 15px 标题 + 状态徽章 + 右侧统一 Button） */}
+      <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
+          <Cloud size={18} />
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="whitespace-nowrap text-[15px] font-semibold text-tx-primary">远程文件</h2>
+          <div
+            className={cn(
+              "hidden items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] sm:flex",
+              credentialBroken
+                ? "border-amber-300/60 text-amber-600 dark:border-amber-500/30 dark:text-amber-400"
+                : "border-app-border text-tx-tertiary",
+            )}
+            title={credentialBroken ? "凭据已失效，请到「管理远程存储」重新输入密码" : activeSource?.name || "未选择存储"}
+          >
+            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", credentialBroken ? "bg-amber-500" : activeSource ? "bg-emerald-500" : "bg-tx-tertiary")} />
+            <span className="max-w-[160px] truncate font-medium">{activeSource ? activeSource.name : "未配置存储"}</span>
+          </div>
+        </div>
+        <div className="flex-1" />
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0"
           onClick={() => activeId && void loadList(activeId, cwd)}
+          title="刷新当前目录"
         >
-          <RefreshCw size={13} /> 刷新
-        </button>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 rounded-lg border border-app-border bg-app-bg px-3 py-1.5 text-xs text-tx-secondary hover:bg-app-hover"
-          onClick={() => setManagerOpen(true)}
-        >
-          ＋ 配置存储
-        </button>
+          <RefreshCw size={14} className="mr-1" /> 刷新
+        </Button>
+        <Button size="sm" className="shrink-0" onClick={() => setManagerOpen(true)}>
+          <Plus size={14} className="mr-1" /> 配置存储
+        </Button>
       </div>
-
-            {/* 搜索 + 当前存储 */}
-            <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4 text-xs">
-              <span className="flex items-center gap-1.5 rounded-lg bg-app-hover px-2.5 py-1 text-tx-tertiary">
-                <Search size={13} />
-                <input
-                  value={remoteQuery}
-                  onChange={(e) => setRemoteQuery(e.target.value)}
-                  placeholder="搜索远程文件…"
-                  className="w-48 border-none bg-transparent text-tx-primary outline-none no-focus-ring placeholder:text-tx-tertiary"
-                />
-              </span>
-              <span className="ml-auto text-tx-tertiary">
-                {activeSource ? `当前存储：${activeSource.name}${cwd ? ` · /${cwd}` : ""}` : ""}
-              </span>
-            </div>
 
       {sources.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-tx-tertiary">
           <Cloud size={32} className="opacity-40" />
-          <p>尚未配置远程源（WebDAV / 百度网盘）</p>
-          <button
-            type="button"
-            className="rounded-md bg-accent-primary px-3 py-1.5 text-xs font-medium text-white"
-            onClick={() => setManagerOpen(true)}
-          >
-            添加远程源
-          </button>
+          <p>还没有远程存储（WebDAV / SMB / 百度网盘）</p>
+          <Button size="sm" onClick={() => setManagerOpen(true)}>添加远程存储</Button>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
-          {/* 文件浏览器 */}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {/* 面包屑 + 工具行 */}
-            <div className="flex h-10 shrink-0 items-center gap-1 border-b border-app-border px-4 text-xs">
-              <button type="button" className="text-tx-tertiary hover:text-accent-primary" onClick={() => setCwd("")}>
-                {activeSource?.name || "根目录"}
-              </button>
-              {crumbs.map((part, index) => (
-                <React.Fragment key={`${index}-${part}`}>
-                  <ChevronRight size={11} className="text-app-border" />
-                  <button
-                    type="button"
-                    className="text-tx-tertiary hover:text-accent-primary"
-                    onClick={() => setCwd(crumbs.slice(0, index + 1).join("/"))}
-                  >
-                    {part}
-                  </button>
-                </React.Fragment>
-              ))}
-              <span className="flex-1" />
-              {actionMsg ? <span className="text-[11px] text-emerald-500">{actionMsg}</span> : null}
-              {newFolderOpen ? (
-                <span className="flex items-center gap-1">
-                  <input
-                    autoFocus
-                    className="h-6 w-36 rounded border border-app-border bg-transparent px-1.5 text-xs "
-                    placeholder="新文件夹名"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
-                  />
-                  <button type="button" className="text-accent-primary" onClick={() => void createFolder()}>确定</button>
-                  <button type="button" className="text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
-                </span>
-              ) : (
+        <>
+          {/* 工具条：h-10，搜索最左 + 分割线 + 统计 + 右端排序（与本地文件视图一致） */}
+          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface/20 px-4">
+            <label className="relative block w-[210px] shrink-0">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+              <Input
+                placeholder="搜索远程文件（如 md）…"
+                value={remoteQuery}
+                onChange={(e) => setRemoteQuery(e.target.value)}
+                className="h-7 pl-7 pr-7 text-[11.5px]"
+              />
+              {remoteQuery ? (
                 <button
                   type="button"
-                  title="新建文件夹"
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
-                  onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
+                  className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+                  onClick={() => setRemoteQuery("")}
                 >
-                  <FolderPlus size={13} /> 新建文件夹
+                  <X size={12} />
                 </button>
-              )}
-            </div>
-
-
-            {/* 条目列表 */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
-              {listLoading ? (
-                <p className="py-8 text-center text-xs text-tx-tertiary">加载中…</p>
-              ) : listError ? (
-                <p className="py-8 text-center text-xs text-red-400">{listError}</p>
-              ) : entries.length === 0 ? (
-                <p className="py-8 text-center text-xs text-tx-tertiary">空目录</p>
-              ) : displayedEntries.length === 0 ? (
-                <p className="py-8 text-center text-xs text-tx-tertiary">没有匹配的远程文件</p>
-              ) : (
-                displayedEntries.map((entry) => (
-                  <div
-                    key={entry.path}
-                    className={`group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-app-hover ${openPath === entry.path ? "bg-app-hover" : ""}`}
-                  >
-                    {entry.isFolder ? (
-                      <Folder size={14} className="shrink-0 text-amber-500" />
-                    ) : (
-                      <FileText size={14} className="shrink-0 text-sky-500" />
-                    )}
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 truncate text-left"
-                      onClick={() => (entry.isFolder ? (setCwd(entry.path), setOpenPath("")) : void openFile(entry))}
-                    >
-                      {entry.name}
-                      {linkForEntry(entry) ? <span className="ml-1 text-[10px] text-sky-400">已链接</span> : null}
-                    </button>
-                    <span className="w-16 shrink-0 text-right text-[10px] text-tx-tertiary">
-                      {entry.isFolder ? "—" : formatSize(entry.size)}
-                    </span>
-                    <span className="hidden w-36 shrink-0 truncate text-right text-[10px] text-tx-tertiary md:block">
-                      {formatTime(entry.modifiedAt)}
-                    </span>
-                    <span className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
-                      {!entry.isFolder && linkForEntry(entry) ? (
-                        <button
-                          type="button"
-                          title="与笔记对比 / 同步"
-                          className="rounded p-1 text-sky-400 hover:text-sky-300"
-                          onClick={() => void openDiff(entry, linkForEntry(entry)!)}
-                        >
-                          <GitCompare size={12} />
-                        </button>
-                      ) : null}
-                      {!entry.isFolder && (
-                        <button
-                          type="button"
-                          title={isTextFileName(entry.name) ? "导入为笔记" : "仅文本类文件可导入为笔记"}
-                          className="rounded p-1 text-tx-tertiary hover:text-accent-primary disabled:opacity-40"
-                          disabled={!isTextFileName(entry.name)}
-                          onClick={() => void importToNote(entry)}
-                        >
-                          <NotebookPen size={12} />
-                        </button>
-                      )}
-                      {!entry.isFolder && (
-                        <button
-                          type="button"
-                          title="存到文件管理"
-                          className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
-                          onClick={() => void saveToLocal(entry)}
-                        >
-                          <Download size={12} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        title="重命名"
-                        className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
-                        onClick={() => { setRenameTarget(entry); setRenameValue(entry.name); }}
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        type="button"
-                        title="删除"
-                        className="rounded p-1 text-tx-tertiary hover:text-red-500"
-                        onClick={() => void removeEntry(entry)}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* 编辑器 */}
-          <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-app-border ">
-            <div className="flex h-9 shrink-0 items-center gap-2 border-b border-app-border px-3 text-xs ">
-              <FileText size={13} className="shrink-0 text-sky-500" />
-              <span className="min-w-0 flex-1 truncate text-tx-tertiary">{openPath || "未打开文件"}</span>
-              {openPath ? (
+              ) : null}
+            </label>
+            <span className="hidden h-4 w-px shrink-0 bg-app-border lg:block" />
+            <p className="hidden shrink-0 text-[11px] leading-none text-tx-tertiary lg:block">
+              {displayedEntries.length} 项{remoteQuery ? ` · 匹配「${remoteQuery}」` : ""}
+            </p>
+            <span className="hidden h-4 w-px shrink-0 bg-app-border lg:block" />
+            <div className="flex-1" />
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={sortOpen}
+                onClick={() => setSortOpen((v) => !v)}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
+              >
+                排序：<span className="font-medium text-tx-primary">{currentSortLabel}</span>
+                <ChevronDown size={12} />
+              </button>
+              {sortOpen ? (
                 <>
-                  {dirty ? <span className="text-[10px] text-amber-500">未保存</span> : null}
-                  <button
-                    type="button"
-                    className="flex items-center gap-1 rounded-md bg-accent-primary px-2 py-1 text-[11px] font-medium text-white disabled:opacity-50"
-                    disabled={saving || !dirty}
-                    onClick={() => void saveFile()}
-                  >
-                    <Save size={11} /> {saving ? "保存中…" : "写回远程"}
-                  </button>
-                  <button
-                    type="button"
-                    title="关闭"
-                    className="rounded p-1 text-tx-tertiary hover:text-tx-secondary"
-                    onClick={() => { setOpenPath(""); setEditorText(""); setDirty(false); }}
-                  >
-                    <X size={13} />
-                  </button>
+                  <div className="fixed inset-0 z-40" onClick={() => setSortOpen(false)} />
+                  <MenuSurface className="absolute right-0 top-full z-50 mt-1 w-36">
+                    {FILE_REMOTE_SORT_OPTIONS.map((option) => (
+                      <MenuItem
+                        key={option.value}
+                        label={option.label}
+                        checked={option.value === remoteSort}
+                        onClick={() => { setFilesUi({ remoteSort: option.value as FilesRemoteSortKey }); setSortOpen(false); }}
+                      />
+                    ))}
+                  </MenuSurface>
                 </>
               ) : null}
             </div>
-            {editorLoading ? (
-              <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">读取中…</p>
-            ) : openPath ? (
-              <textarea
-                className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none"
-                spellCheck={false}
-                value={editorText}
-                onChange={(e) => { setEditorText(e.target.value); setDirty(true); }}
-              />
-            ) : (
-              <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">
-                点击左侧文本文件（md / txt / json 等）进行读取与编辑
-              </p>
-            )}
           </div>
-        </div>
+
+          {credentialBroken ? (
+            <div className="flex shrink-0 items-center gap-2 border-b border-amber-300/60 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+              <AlertTriangle size={12} className="shrink-0" />
+              <span className="min-w-0 flex-1">该存储的凭据已失效（换机或恢复过备份），需要重新输入密码才能访问。</span>
+              <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => setManagerOpen(true)}>
+                去处理
+              </button>
+            </div>
+          ) : null}
+
+          <div className="flex min-h-0 flex-1">
+            {/* 文件浏览器 */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {/* 面包屑 + 目录级操作 */}
+              <div className="flex h-9 shrink-0 items-center gap-1 border-b border-app-border px-4 text-[11.5px]">
+                <button type="button" className="truncate text-tx-tertiary hover:text-accent-primary" onClick={() => { setCwd(""); setOpenPath(""); }}>
+                  {activeSource?.name || "根目录"}
+                </button>
+                {crumbs.map((part, index) => (
+                  <React.Fragment key={`${index}-${part}`}>
+                    <ChevronRight size={11} className="shrink-0 text-app-border" />
+                    <button
+                      type="button"
+                      className="max-w-[160px] truncate text-tx-tertiary hover:text-accent-primary"
+                      onClick={() => { setCwd(crumbs.slice(0, index + 1).join("/")); setOpenPath(""); }}
+                    >
+                      {part}
+                    </button>
+                  </React.Fragment>
+                ))}
+                <span className="flex-1" />
+                {actionMsg ? <span className="truncate text-[11px] text-emerald-500">{actionMsg}</span> : null}
+                {newFolderOpen ? (
+                  <span className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      className="h-6 w-36 rounded border border-app-border bg-transparent px-1.5 text-xs"
+                      placeholder="新文件夹名"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
+                    />
+                    <button type="button" className="text-accent-primary" onClick={() => void createFolder()}>确定</button>
+                    <button type="button" className="text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    title="新建文件夹"
+                    className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
+                    onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
+                  >
+                    <FolderPlus size={13} /> 新建文件夹
+                  </button>
+                )}
+              </div>
+
+              {/* 批量操作栏：与本地文件视图的选择模式同一套语义 */}
+              {selected.size > 0 ? (
+                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
+                  <span className="text-[11.5px] text-tx-secondary">
+                    已选 <b className="text-accent-primary">{selected.size}</b> 项
+                  </span>
+                  <div className="flex-1" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11.5px]"
+                    disabled={batchBusy || linkBusy}
+                    onClick={() => requestLink(selectedEntries)}
+                  >
+                    <NotebookPen size={12} className="mr-1" /> 链接到知识库
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11.5px]"
+                    disabled={batchBusy || linkBusy}
+                    onClick={() => void handleBatchLocal()}
+                  >
+                    <Download size={12} className="mr-1" /> 存入文件管理
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11.5px] text-accent-danger"
+                    disabled={batchBusy}
+                    onClick={() => void handleBatchDelete()}
+                  >
+                    <Trash2 size={12} className="mr-1" /> 删除
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-[11px] text-tx-tertiary hover:text-tx-secondary"
+                    onClick={() => setSelected(new Set())}
+                  >
+                    取消选择
+                  </button>
+                </div>
+              ) : null}
+
+              {/* 表头：列宽与行一致 */}
+              <div className="flex h-7 shrink-0 items-center gap-2 border-b border-app-border px-4 text-[10.5px] text-tx-tertiary">
+                <span className="w-4 shrink-0" />
+                <span className="min-w-0 flex-1">名称</span>
+                <span className="w-16 shrink-0 text-right">大小</span>
+                <span className="hidden w-36 shrink-0 text-right md:block">修改时间</span>
+                <span className="w-[104px] shrink-0" />
+              </div>
+
+              {/* 条目列表 */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+                {listLoading ? (
+                  <p className="py-8 text-center text-xs text-tx-tertiary">加载中…</p>
+                ) : listError ? (
+                  <p className="break-words px-4 py-8 text-center text-xs text-red-400">{listError}</p>
+                ) : entries.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-tx-tertiary">空目录</p>
+                ) : displayedEntries.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-tx-tertiary">没有匹配的远程文件</p>
+                ) : (
+                  displayedEntries.map((entry) => {
+                    const checked = selected.has(entry.path);
+                    const linked = linkForEntry(entry);
+                    return (
+                      <div
+                        key={entry.path}
+                        className={cn(
+                          "group flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-app-hover",
+                          openPath === entry.path && "bg-app-hover",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          aria-label={checked ? "取消选择" : "选择"}
+                          className="shrink-0 text-tx-tertiary hover:text-accent-primary"
+                          onClick={() => toggleSelect(entry.path)}
+                        >
+                          {checked ? <CheckSquare size={13} className="text-accent-primary" /> : <Square size={13} />}
+                        </button>
+                        {entry.isFolder ? (
+                          <Folder size={14} className="shrink-0 text-amber-500" />
+                        ) : (
+                          <FileText size={14} className="shrink-0 text-sky-500" />
+                        )}
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 truncate text-left"
+                          onClick={() => (entry.isFolder
+                            ? (setCwd(entry.path), setOpenPath(""))
+                            : void openFile(entry))}
+                        >
+                          {entry.name}
+                          {linked ? <span className="ml-1 text-[10px] text-sky-400">已链接</span> : null}
+                        </button>
+                        <span className="w-16 shrink-0 text-right text-[10px] text-tx-tertiary">
+                          {entry.isFolder ? "—" : formatSize(entry.size)}
+                        </span>
+                        <span className="hidden w-36 shrink-0 truncate text-right text-[10px] text-tx-tertiary md:block">
+                          {formatTime(entry.modifiedAt)}
+                        </span>
+                        <span className="flex w-[104px] shrink-0 items-center justify-end opacity-0 transition-opacity group-hover:opacity-100">
+                          {!entry.isFolder && linked ? (
+                            <button
+                              type="button"
+                              title="与笔记对比 / 同步"
+                              className="rounded p-1 text-sky-400 hover:text-sky-300"
+                              onClick={() => void openDiff(entry, linked)}
+                            >
+                              <GitCompare size={12} />
+                            </button>
+                          ) : null}
+                          {!entry.isFolder ? (
+                            <button
+                              type="button"
+                              title={linked
+                                ? `在知识库打开「${linked.title}」`
+                                : isTextFileName(entry.name)
+                                  ? "链接到知识库（用知识库编辑器直接读写远程文件）"
+                                  : "仅文本类文件可链接到知识库"}
+                              className={cn(
+                                "rounded p-1 hover:text-accent-primary disabled:opacity-40",
+                                linked ? "text-sky-400" : "text-tx-tertiary",
+                              )}
+                              disabled={!linked && !isTextFileName(entry.name)}
+                              onClick={() => {
+                                if (linked) {
+                                  // 跳笔记必须带容器的知识库 id，否则只会落到 /kb/:space 列表页
+                                  void api.getNote(linked.noteId)
+                                    .then((note) => navigateToNote(linked.noteId, note.notebookId || undefined))
+                                    .catch(() => flash("这条笔记已不在知识库里"));
+                                  return;
+                                }
+                                requestLink([entry]);
+                              }}
+                            >
+                              <NotebookPen size={12} />
+                            </button>
+                          ) : null}
+                          {!entry.isFolder ? (
+                            <button
+                              type="button"
+                              title="存到文件管理"
+                              className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
+                              onClick={() => void saveToLocal(entry)}
+                            >
+                              <Download size={12} />
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            title="重命名"
+                            className="rounded p-1 text-tx-tertiary hover:text-accent-primary"
+                            onClick={() => { setRenameTarget(entry); setRenameValue(entry.name); }}
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            title="删除"
+                            className="rounded p-1 text-tx-tertiary hover:text-red-500"
+                            onClick={() => void removeEntry(entry)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* 编辑器 */}
+            <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-app-border">
+              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-app-border px-3 text-xs">
+                <FileText size={13} className="shrink-0 text-sky-500" />
+                <span className="min-w-0 flex-1 truncate text-tx-tertiary">{openPath || "未打开文件"}</span>
+                {openPath ? (
+                  <>
+                    {dirty ? <span className="shrink-0 text-[10px] text-amber-500">未保存</span> : null}
+                    <Button
+                      size="sm"
+                      className="h-7 shrink-0 px-2 text-[11px]"
+                      disabled={saving || !dirty}
+                      onClick={() => void saveFile()}
+                    >
+                      <Save size={11} className="mr-1" /> {saving ? "保存中…" : "写回远程"}
+                    </Button>
+                    <button
+                      type="button"
+                      title="关闭"
+                      className="shrink-0 rounded p-1 text-tx-tertiary hover:text-tx-secondary"
+                      onClick={() => { setOpenPath(""); setEditorText(""); setDirty(false); }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </>
+                ) : null}
+              </div>
+              {editorLoading ? (
+                <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">读取中…</p>
+              ) : openPath ? (
+                <textarea
+                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none"
+                  spellCheck={false}
+                  value={editorText}
+                  onChange={(e) => { setEditorText(e.target.value); setDirty(true); }}
+                />
+              ) : (
+                <p className="flex-1 px-6 py-8 text-center text-xs leading-5 text-tx-tertiary">
+                  点击左侧文本文件（md / txt / json 等）即可读取与写回
+                </p>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {diffDlg ? (
         <Overlay onClose={() => setDiffDlg(null)}>
-          <div className="w-[430px] rounded-xl border border-app-border bg-white p-4 shadow-2xl  ">
+          <div className="w-[430px] rounded-xl border border-app-border bg-app-elevated p-4 shadow-2xl">
             <p className="text-xs font-semibold text-tx-primary">
               同步：{diffDlg.entry.name} ↔ 笔记
             </p>
-            <div className="mt-2 space-y-1 text-[11px] leading-5 text-tx-tertiary dark:text-tx-tertiary">
+            <div className="mt-2 space-y-1 text-[11px] leading-5 text-tx-tertiary">
               <p>远程：{diffDlg.remoteChanged ? "已修改" : "未变化"}</p>
               <p>笔记：{diffDlg.noteChanged ? "已修改" : "未变化"}</p>
               <p>
@@ -1221,24 +1695,14 @@ export default function RemoteFilesPanel() {
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               {diffDlg.remoteChanged ? (
-                <button
-                  type="button"
-                  disabled={diffDlg.busy}
-                  className="rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-                  onClick={() => void syncFromRemote()}
-                >
+                <Button size="sm" className="h-7 px-3 text-[11.5px]" disabled={diffDlg.busy} onClick={() => void syncFromRemote()}>
                   远程 → 笔记
-                </button>
+                </Button>
               ) : null}
               {diffDlg.noteChanged ? (
-                <button
-                  type="button"
-                  disabled={diffDlg.busy}
-                  className="rounded-md border border-app-border px-3 py-1 text-xs text-tx-secondary hover:bg-app-hover"
-                  onClick={() => void syncFromNote()}
-                >
+                <Button size="sm" variant="outline" className="h-7 px-3 text-[11.5px]" disabled={diffDlg.busy} onClick={() => void syncFromNote()}>
                   笔记 → 远程
-                </button>
+                </Button>
               ) : null}
               <button
                 type="button"
@@ -1248,14 +1712,9 @@ export default function RemoteFilesPanel() {
               >
                 解除链接
               </button>
-              <button
-                type="button"
-                disabled={diffDlg.busy}
-                className="rounded-md border border-app-border px-3 py-1 text-xs text-tx-secondary "
-                onClick={() => setDiffDlg(null)}
-              >
+              <Button size="sm" variant="outline" className="h-7 px-3 text-[11.5px]" disabled={diffDlg.busy} onClick={() => setDiffDlg(null)}>
                 关闭
-              </button>
+              </Button>
             </div>
           </div>
         </Overlay>
@@ -1263,22 +1722,22 @@ export default function RemoteFilesPanel() {
 
       {renameTarget ? (
         <Overlay onClose={() => setRenameTarget(null)}>
-          <div className="w-80 rounded-xl border border-app-border bg-white p-4 shadow-2xl  ">
+          <div className="w-80 rounded-xl border border-app-border bg-app-elevated p-4 shadow-2xl">
             <p className="mb-2 text-xs font-semibold">重命名</p>
             <input
               autoFocus
-              className="h-8 w-full rounded border border-app-border bg-transparent px-2 text-xs "
+              className="h-8 w-full rounded border border-app-border bg-transparent px-2 text-xs"
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void submitRename(); if (e.key === "Escape") setRenameTarget(null); }}
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button type="button" className="rounded-md border border-app-border px-3 py-1 text-xs " onClick={() => setRenameTarget(null)}>
+              <Button size="sm" variant="outline" className="h-7 px-3 text-[11.5px]" onClick={() => setRenameTarget(null)}>
                 取消
-              </button>
-              <button type="button" className="rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white" onClick={() => void submitRename()}>
+              </Button>
+              <Button size="sm" className="h-7 px-3 text-[11.5px]" onClick={() => void submitRename()}>
                 确定
-              </button>
+              </Button>
             </div>
           </div>
         </Overlay>
@@ -1291,6 +1750,14 @@ export default function RemoteFilesPanel() {
           onChanged={() => void reloadSources()}
         />
       ) : null}
+
+      <RemoteLinkDialog
+        open={linkTargets !== null}
+        count={linkTargets?.length ?? 0}
+        busy={linkBusy}
+        onClose={() => { if (!linkBusy) setLinkTargets(null); }}
+        onConfirm={(target) => { void performLink(target); }}
+      />
     </div>
   );
 }

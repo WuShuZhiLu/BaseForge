@@ -35,6 +35,7 @@ const KEYS = {
   remoteTypes: "nowen.filesUi.remoteTypes",
   remoteTime: "nowen.filesUi.remoteTime",
   remoteSort: "nowen.filesUi.remoteSort",
+  remoteSource: "nowen.filesUi.remoteSource",
 } as const;
 
 /** 三来源时代的遗留键：只在首次读取时用于迁移，不再写入。 */
@@ -127,7 +128,12 @@ export function getFilesRemoteSort(): FilesRemoteSortKey {
   return (localStorage.getItem(KEYS.remoteSort) as FilesRemoteSortKey) || "name_asc";
 }
 
-export function setFilesUi(patch: { source?: FilesSource; type?: FilesTypeFilter; category?: string; share?: FileShareStatus | "all"; time?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string }): void {
+/** 远程来源：当前选中的存储（源 id）；空串 = 用第一个源。侧栏「存储」分组与主区共用。 */
+export function getFilesRemoteSourceId(): string {
+  return localStorage.getItem(KEYS.remoteSource) || "";
+}
+
+export function setFilesUi(patch: { source?: FilesSource; type?: FilesTypeFilter; category?: string; share?: FileShareStatus | "all"; time?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string; remoteSourceId?: string }): void {
   if (patch.source !== undefined) localStorage.setItem(KEYS.source, patch.source);
   if (patch.type !== undefined) localStorage.setItem(KEYS.type, patch.type);
   if (patch.category !== undefined) localStorage.setItem(KEYS.category, patch.category);
@@ -139,6 +145,7 @@ export function setFilesUi(patch: { source?: FilesSource; type?: FilesTypeFilter
   if (patch.remoteTypes !== undefined) localStorage.setItem(KEYS.remoteTypes, JSON.stringify(patch.remoteTypes));
   if (patch.remoteSort !== undefined) localStorage.setItem(KEYS.remoteSort, patch.remoteSort);
   if (patch.remoteTime !== undefined) localStorage.setItem(KEYS.remoteTime, patch.remoteTime);
+  if (patch.remoteSourceId !== undefined) localStorage.setItem(KEYS.remoteSource, patch.remoteSourceId);
   emit();
 }
 

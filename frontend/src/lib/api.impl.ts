@@ -3389,7 +3389,7 @@ export const api = {
   // 远程文件（内核能力：WebDAV / SMB / 百度网盘）
   getRemoteFileSources: () =>
     request<{ sources: RemoteSourcePublic[]; types: string[] }>("/remote-files/sources"),
-  saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string }) =>
+  saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string; clientSecret?: string; refreshToken?: string; tokenExpiresAt?: string }) =>
     request<{ source: RemoteSourcePublic }>("/remote-files/sources", { method: "POST", body: JSON.stringify(data) }),
   deleteRemoteFileSource: (sourceId: string) =>
     request<{ success: boolean }>(`/remote-files/sources/${sourceId}`, { method: "DELETE" }),

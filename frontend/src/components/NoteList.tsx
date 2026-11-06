@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette } from "lucide-react";
+import { Plus, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
@@ -61,6 +61,7 @@ import {
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 // "导入 Word 文档" 走 dynamic import（见 createNoteInNotebook），减少首屏 bundle 体积。
 
 /* ===== 排序模式 ===== */
@@ -1043,6 +1044,8 @@ const NoteCard = React.memo(function NoteCard({
   // （短标题时不明显，因为预览整体行数少；长标题挤占空间后尤为严重）。
   const isSearchResult = !!searchQuery;
   const { t } = useTranslation();
+  // 远程投影笔记：正文读写的是远程文件，列表上必须能一眼区分出来
+  const isRemoteLinked = useRemoteLinkedNoteIds().has(note.id);
   const colorMarkHex = getNoteColorMarkHex(note.colorMark);
   const classicText = useSidebarTextStyle()[0] === "classic";
   const preview = (
@@ -1157,6 +1160,11 @@ const NoteCard = React.memo(function NoteCard({
             ) : (
               <span className="text-[10px] px-1 py-0.5 rounded border border-app-border bg-app-hover text-tx-tertiary leading-none" title={t('note.format.richText')}>
                 {t('note.format.richTextShort')}
+              </span>
+            )}
+            {isRemoteLinked && (
+              <span className="flex items-center text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                <Cloud size={11} />
               </span>
             )}
             {isShared && <Share2 size={11} className="text-emerald-500" />}

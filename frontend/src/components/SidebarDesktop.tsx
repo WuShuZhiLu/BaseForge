@@ -70,6 +70,9 @@ import {
   Unlock,
   FolderOpen,
   Cloud,
+  Globe,
+  Server,
+  Archive,
   FileCode,
   Network,
   PenTool,
@@ -125,7 +128,7 @@ import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActi
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
+import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteSourceId, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -3405,25 +3408,69 @@ export default function SidebarDesktop() {
             </PanelSection>
             </>)}
             {getFilesSource() === "remote" && (<>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
-              <div className="flex flex-wrap gap-1 px-1">
-                {FILE_REMOTE_TYPE_CHIPS.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    aria-pressed={getFilesRemoteTypes().includes(chip.key)}
-                    onClick={() => {
-                      const current = getFilesRemoteTypes();
-                      setFilesUi({ remoteTypes: current.includes(chip.key) ? current.filter((t) => t !== chip.key) : [...current, chip.key] });
-                    }}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTypes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >{chip.label}</button>
-                ))}
+            {/* 存储：与「来源」同一套选中模型（radio 行 + 高亮），不再是一组无归属的筛选块。
+                远程文件的筛选维度按此排列：存储 → 类型 → 排序 → 修改时间，与本地视图同构。 */}
+            <PanelSection
+              label="存储"
+              extra={(
+                <button
+                  type="button"
+                  className="text-[11px] text-accent-primary hover:underline"
+                  onClick={() => window.dispatchEvent(new Event("nowen:remote-open-manager"))}
+                >
+                  管理
+                </button>
+              )}
+            >
+              <div className="space-y-0.5">
+                {remoteSources.length === 0 ? (
+                  <p className="px-1 py-1 text-[11px] leading-4 text-tx-tertiary">还没有远程存储，点右上「管理」添加。</p>
+                ) : null}
+                {remoteSources.map((source) => {
+                  const active = getFilesRemoteSourceId() === source.id;
+                  const Icon = source.type === "smb" ? Server : source.type === "webdav" ? Globe : Cloud;
+                  return (
+                    <button
+                      key={source.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setFilesUi({ remoteSourceId: source.id })}
+                      className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${active ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+                      title={source.type === "smb" ? "SMB / 局域网共享" : source.type === "webdav" ? "WebDAV" : "百度网盘（直连）"}
+                    >
+                      <Icon size={14} className="shrink-0 opacity-80" />
+                      <span className="min-w-0 flex-1 truncate text-left">{source.name}</span>
+                      <span className="shrink-0 text-[10px] uppercase text-tx-tertiary">
+                        {source.type === "smb" ? "smb" : source.type === "webdav" ? "dav" : "pan"}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("nowen:remote-open-manager"))}
+                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] text-tx-tertiary hover:bg-app-hover hover:text-accent-primary"
+                >
+                  <Plus size={14} className="shrink-0 opacity-80" />
+                  <span className="min-w-0 flex-1 truncate text-left">添加存储</span>
+                </button>
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">排序</div>
+            </PanelSection>
+            <TypeFilterPopover
+              label="类型"
+              items={FILE_REMOTE_TYPE_CHIPS.map((chip) => ({
+                key: chip.key,
+                label: chip.label,
+                icon: chip.key === "doc" ? <FileText size={12} />
+                  : chip.key === "image" ? <Image size={12} />
+                  : chip.key === "archive" ? <Archive size={12} />
+                  : <FileQuestion size={12} />,
+              }))}
+              selected={getFilesRemoteTypes()}
+              onChange={(keys) => setFilesUi({ remoteTypes: keys })}
+              multi
+            />
+            <PanelSection label="排序">
               <div className="flex flex-wrap gap-1 px-1">
                 {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
                   <button
@@ -3435,7 +3482,7 @@ export default function SidebarDesktop() {
                   >{opt.label}</button>
                 ))}
               </div>
-            </div>
+            </PanelSection>
             <PanelSection label="修改时间">
               <div className="flex flex-wrap gap-1 px-1">
                 {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"], ["older", "更早"]] as Array<[string, string]>).map(([key, label]) => (

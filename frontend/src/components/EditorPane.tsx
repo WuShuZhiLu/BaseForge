@@ -42,6 +42,7 @@ import NoteThemeMenuSelect from "@/components/NoteThemeMenuSelect";
 import type { NoteColorMark } from "@/types";
 import { haptic } from "@/hooks/useCapacitor";
 import { toast } from "@/lib/toast";
+import { pullRemoteNote, scheduleRemoteNotePush } from "@/lib/remoteNoteSync";
 import { exportNoteAsImage, exportSingleNote, exportSingleNoteAsPDF, printNote } from "@/lib/exportService";
 import KnowledgeTreePermissionsDialog from "@/components/KnowledgeTreePermissionsDialog";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
@@ -210,6 +211,31 @@ function EditorPaneCore({
       .catch(() => {});
     return () => { cancelled = true; };
   }, [activeNoteIdForVersion]);
+  // 远程投影笔记：打开时对齐远程文件。
+  // 远程变了、本地没动 → 直接拉取（安全）；两边都改了 → 弹窗让用户选方向。
+  // 远程不可用（离线 / NAS 关机）时不打扰，本地笔记照常可编辑。
+  const remotePulledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const note = activeNoteRef.current;
+    if (!note?.id) return;
+    if (remotePulledRef.current === note.id) return;
+    remotePulledRef.current = note.id;
+    let cancelled = false;
+    void pullRemoteNote(note)
+      .then((result) => {
+        if (cancelled || !result) return;
+        if (result.status === "pulled") {
+          actions.setActiveNote(result.note);
+          toast.info("已同步远程文件的最新内容");
+        } else {
+          toast.success("已保留本地改动并写回远程");
+        }
+      })
+      .catch((error) => {
+        console.warn("[editor] remote note pull skipped:", error);
+      });
+    return () => { cancelled = true; };
+  }, [activeNoteIdForVersion, actions]);
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ noteId: string; version: number }>).detail;
@@ -1871,6 +1897,11 @@ function EditorPaneCore({
           committedContent,
           (updated as Note & { __offlineQueued?: boolean }).__offlineQueued ? "queued" : "saved",
         );
+      }
+
+      // 远程投影笔记：本地保存成功后写回远程文件（1.2s 内合并；失败会明确提示，绝不静默）
+      if (updated && typeof data.content === "string") {
+        scheduleRemoteNotePush(currentNote.id, data.content);
       }
 
       // ���ڱ���ıʼ����ǵ�ǰ����ʼ�ʱ����״̬����ֹ�����л�ʱ���Ǵ���ʼǣ�
