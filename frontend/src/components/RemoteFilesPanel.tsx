@@ -7,7 +7,9 @@
  */
 import React, { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { alert, confirm } from "@/components/ui/confirm";
+import { MenuItem, MenuSurface } from "@/components/ui/menu";
 import {
+  ChevronDown,
   ChevronRight,
   Cloud,
   Download,
@@ -43,6 +45,10 @@ interface SourceDraft {
   password: string;
   /** 百度网盘 access_token；WebDAV/SMB 源时忽略 */
   accessToken: string;
+  /** SMB 主机（IP 或主机名），共享由「获取共享」列出后选择，不手填 */
+  smbHost: string;
+  /** SMB 共享名，来自服务端枚举 */
+  smbShare: string;
   /** SMB 域/工作组（可选） */
   domain: string;
   rootPath: string;
@@ -67,6 +73,8 @@ const emptyDraft = (): SourceDraft => ({
   accessToken: "",
   domain: "",
   rootPath: "",
+  smbHost: "",
+  smbShare: "",
   clientId: "",
   clientSecret: "",
   refreshToken: "",
@@ -111,6 +119,66 @@ function formatTime(iso: string | null): string {
   }
 }
 
+/** SMB 主机 + 共享名 → 后端仍使用的 UNC 地址（数据模型不变） */
+function composeSmbBaseUrl(host: string, share: string): string {
+  const bs = String.fromCharCode(92);
+  const h = host.trim().replace(/^smb:\/\//i, "").replace(/^\\+/, "").split(/[\\/:?#]/)[0];
+  const s = share.trim().replace(/^\\+/, "").split(/[\\/]/).filter(Boolean).join(bs);
+  return h && s ? `${bs}${bs}${h}${bs}${s}` : "";
+}
+
+/** 编辑已有源时把 UNC / smb:// 地址拆回主机与共享名 */
+function splitSmbBaseUrl(baseUrl: string): { host: string; share: string } {
+  const raw = String(baseUrl || "").trim();
+  const smb = raw.match(/^smb:\/\/([^/:?#]+)(?::\d+)?\/(.+)$/i);
+  if (smb) return { host: smb[1], share: smb[2].split(/[\\/]/).filter(Boolean)[0] || "" };
+  const parts = raw.replace(/^\\+/, "").split(/[\\/]/).filter(Boolean);
+  return { host: parts[0] || "", share: parts[1] || "" };
+}
+
+/** 共享选择：复用项目统一的下拉浮层样式，不使用原生 select */
+function ShareSelect(props: {
+  value: string;
+  options: Array<{ name: string; comment: string }>;
+  onChange: (value: string) => void;
+}) {
+  const { value, options, onChange } = props;
+  const [open, setOpen] = useState(false);
+  const current = options.find((option) => option.name === value);
+  return (
+    <div className="relative w-full">
+      <button
+        type="button"
+        disabled={options.length === 0}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-7 w-full items-center gap-1.5 rounded border border-app-border bg-transparent px-2 text-xs text-tx-primary hover:bg-app-hover disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="min-w-0 flex-1 truncate text-left">
+          {current?.name || (options.length ? "选择共享" : value || "请先点「获取共享」")}
+        </span>
+        <ChevronDown size={12} className={`shrink-0 text-tx-tertiary transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <MenuSurface className="absolute left-0 top-full z-50 mt-1 max-h-56 w-full min-w-[160px] overflow-y-auto">
+            {options.map((option) => (
+              <MenuItem
+                key={option.name}
+                label={option.comment ? `${option.name} · ${option.comment}` : option.name}
+                checked={option.name === value}
+                onClick={() => { onChange(option.name); setOpen(false); }}
+              />
+            ))}
+          </MenuSurface>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div
@@ -136,9 +204,44 @@ function SourceManager(props: {
   const [error, setError] = useState("");
   const [testResult, setTestResult] = useState("");
   const [testState, setTestState] = useState<Record<string, string>>({});
+  const [shareOptions, setShareOptions] = useState<Array<{ name: string; comment: string }>>([]);
+  const [sharesLoading, setSharesLoading] = useState(false);
+
+  /** 用填写的主机与凭据向后端枚举共享；列表不落库，可随时重新获取 */
+  const loadShares = useCallback(async () => {
+    if (!draft) return;
+    if (!draft.smbHost.trim()) { setTestResult("请先填写 SMB 主机地址"); return; }
+    setSharesLoading(true);
+    setTestResult("正在获取共享…");
+    try {
+      const res = await api.listSmbShares({
+        host: draft.smbHost.trim(),
+        username: draft.username.trim(),
+        password: draft.password,
+        domain: draft.domain.trim(),
+        ...(draft.id ? { sourceId: draft.id } : {}),
+      });
+      setShareOptions(res.shares);
+      setTestResult(res.shares.length
+        ? `找到 ${res.shares.length} 个共享，请选择`
+        : "未发现可用共享（检查账号权限或 NAS 共享设置）");
+    } catch (err: any) {
+      setShareOptions([]);
+      setTestResult(err?.message || "获取共享失败");
+    } finally {
+      setSharesLoading(false);
+    }
+  }, [draft]);
 
   const save = useCallback(async () => {
     if (!draft) return;
+    const baseUrl = draft.type === "smb"
+      ? composeSmbBaseUrl(draft.smbHost, draft.smbShare)
+      : draft.baseUrl;
+    if (draft.type === "smb" && !baseUrl) {
+      setError("请先点「获取共享」并选择要使用的共享");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -146,7 +249,7 @@ function SourceManager(props: {
         id: draft.id,
         type: draft.type,
         name: draft.name,
-        baseUrl: draft.baseUrl,
+        baseUrl,
         username: draft.username,
         rootPath: draft.rootPath,
         ...(draft.domain ? { domain: draft.domain } : {}),
@@ -168,11 +271,18 @@ function SourceManager(props: {
 
   const testConnection = useCallback(async () => {
     if (!draft) return;
+    const baseUrl = draft.type === "smb"
+      ? composeSmbBaseUrl(draft.smbHost, draft.smbShare)
+      : draft.baseUrl;
+    if (draft.type === "smb" && !baseUrl) {
+      setTestResult("请先点「获取共享」并选择要使用的共享");
+      return;
+    }
     setTestResult("测试中…");
     try {
       await api.testRemoteFileSource({
         type: draft.type,
-        baseUrl: draft.baseUrl,
+        baseUrl,
         username: draft.username,
         password: draft.password,
         accessToken: draft.accessToken,
@@ -248,6 +358,7 @@ function SourceManager(props: {
   }, []);
 
   const editSource = useCallback((source: RemoteSourcePublic) => {
+    const smb = source.type === "smb" ? splitSmbBaseUrl(source.baseUrl) : { host: "", share: "" };
     setDraft({
       id: source.id,
       type: source.type,
@@ -258,12 +369,15 @@ function SourceManager(props: {
       accessToken: "",
       domain: source.domain || "",
       rootPath: source.rootPath,
+      smbHost: smb.host,
+      smbShare: smb.share,
       clientId: source.clientId || "",
       clientSecret: "",
       refreshToken: "",
       tokenExpiresAt: "",
       oauthCode: "",
     });
+    setShareOptions([]);
     setTestResult("");
   }, []);
 
@@ -353,11 +467,26 @@ function SourceManager(props: {
               </div>
               {draft.type === "smb" ? (
                 <>
-                  <input
-                    className="h-7 w-full rounded border border-app-border bg-transparent px-2 text-xs "
-                    placeholder="服务器地址，如 \\192.168.1.10\docs 或 smb://nas:445/docs"
-                    value={draft.baseUrl}
-                    onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
+                  <div className="flex gap-2">
+                    <input
+                      className="h-7 min-w-0 flex-1 rounded border border-app-border bg-transparent px-2 text-xs "
+                      placeholder="SMB 主机，如 192.168.100.3"
+                      value={draft.smbHost}
+                      onChange={(e) => setDraft({ ...draft, smbHost: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || sharesLoading}
+                      onClick={() => void loadShares()}
+                      className="h-7 shrink-0 whitespace-nowrap rounded border border-app-border px-2 text-[11px] text-tx-secondary hover:bg-app-hover disabled:opacity-50"
+                    >
+                      {sharesLoading ? "获取中…" : "获取共享"}
+                    </button>
+                  </div>
+                  <ShareSelect
+                    value={draft.smbShare}
+                    options={shareOptions}
+                    onChange={(value) => setDraft({ ...draft, smbShare: value })}
                   />
                   <div className="flex gap-2">
                     <input
@@ -387,7 +516,7 @@ function SourceManager(props: {
                     onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
                   />
                   <p className="text-[10px] leading-4 text-tx-tertiary">
-                    需 NAS/服务器可直连该 SMB 主机（445 端口）。不支持强制 SMB3 加密的主机；桌面端也可改用资源管理器打开共享后由系统凭据访问。
+                    共享由服务端自动发现，无需手填路径；主机或共享变动时重新点「获取共享」即可。需 NAS/服务器可直连该 SMB 主机（445 端口）；支持 SMB 2.1 ~ 3.1.1 与 SMB3 传输加密。
                   </p>
                 </>
               ) : draft.type === "webdav" ? (
@@ -480,10 +609,15 @@ function SourceManager(props: {
                 </>
               )}
               {error ? <p className="text-[11px] text-red-500">{error}</p> : null}
+              {testResult ? (
+                <p className={`break-words text-[11px] ${testResult === "连接成功" ? "text-emerald-600" : "text-tx-tertiary"}`}>
+                  {testResult}
+                </p>
+              ) : null}
               <div className="flex items-center gap-2 pt-1">
                 <button
                   type="button"
-                  className="rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  className="shrink-0 whitespace-nowrap rounded-md bg-accent-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
                   disabled={busy || !draft.name.trim()}
                   onClick={() => void save()}
                 >
@@ -491,17 +625,16 @@ function SourceManager(props: {
                 </button>
                 <button
                   type="button"
-                  className="rounded-md border border-app-border px-3 py-1 text-xs "
+                  className="shrink-0 whitespace-nowrap rounded-md border border-app-border px-3 py-1 text-xs "
                   disabled={busy}
                   onClick={() => void testConnection()}
                 >
                   测试连接
                 </button>
-                {testResult ? <span className="text-[11px] text-tx-tertiary">{testResult}</span> : null}
-                <span className="flex-1" />
+                <span className="min-w-0 flex-1" />
                 <button
                   type="button"
-                  className="text-xs text-tx-tertiary hover:text-tx-secondary"
+                  className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
                   onClick={() => { setDraft(null); setError(""); }}
                 >
                   取消
@@ -512,7 +645,7 @@ function SourceManager(props: {
             <button
               type="button"
               className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-app-border py-2 text-xs text-tx-tertiary hover:border-accent-primary hover:text-accent-primary"
-              onClick={() => { setDraft(emptyDraft()); setTestResult(""); }}
+              onClick={() => { setDraft(emptyDraft()); setShareOptions([]); setTestResult(""); }}
             >
               <Plus size={13} /> 新增远程源
             </button>

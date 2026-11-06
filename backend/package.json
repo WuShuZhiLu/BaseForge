@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
-    "@marsaud/smb2": "^0.18.0",
     "@mozilla/readability": "^0.6.0",
     "@types/ws": "^8.18.1",
     "archiver": "^7.0.1",
@@ -40,6 +39,7 @@
     "quickjs-emscripten": "^0.32.0",
     "sanitize-html": "^2.17.5",
     "sharp": "^0.33.5",
+    "smb3-client": "^0.2.0",
     "sqlite-vec": "^0.1.9",
     "unpdf": "^1.6.2",
     "unzipper": "^0.12.3",

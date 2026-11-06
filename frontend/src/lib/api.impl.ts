@@ -3395,6 +3395,10 @@ export const api = {
     request<{ success: boolean }>(`/remote-files/sources/${sourceId}`, { method: "DELETE" }),
   testRemoteFileSource: (data: Record<string, unknown>) =>
     request<{ success: boolean }>("/remote-files/sources/test", { method: "POST", body: JSON.stringify(data) }),
+  listSmbShares: (data: { host: string; username?: string; password?: string; domain?: string; sourceId?: string }) =>
+    request<{ host: string; port: number; shares: Array<{ name: string; comment: string }> }>(
+      "/remote-files/smb/shares", { method: "POST", body: JSON.stringify(data) },
+    ),
   listRemoteFiles: (sourceId: string, path: string) =>
     request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
   readRemoteFile: (sourceId: string, path: string) =>

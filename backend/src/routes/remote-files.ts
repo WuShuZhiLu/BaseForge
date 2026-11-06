@@ -13,6 +13,9 @@
  * - 读取内容限制为文本类扩展名，编辑写回仅覆盖文本。
  */
 import { Hono } from "hono";
+// smb3-client 是纯 ESM（exports 只有 import 条件），dev 下 tsx 以 CJS 加载后端，
+// 顶层静态 import 会被转成 require 而触发 ERR_PACKAGE_PATH_NOT_EXPORTED。
+// 改成端点内原生 dynamic import：tsx 保留 import()，esbuild 打包时仍会内联。
 import { systemSettingsRepository } from "../repositories";
 import { getDb } from "../db/schema";
 import { readAttachmentObject } from "../services/attachment-storage";
@@ -64,7 +67,7 @@ interface RequestUser {
   userId: string;
   source: RemoteSourceConfig;
   provider: RemoteProvider;
-  ctx: { baseUrl: string; username: string; password: string; rootPath: string; accessToken?: string };
+  ctx: { baseUrl: string; username: string; password: string; rootPath: string; accessToken?: string; domain?: string };
 }
 
 type HonoJsonError = { status: number; body: Record<string, unknown> };
@@ -83,11 +86,12 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
     source,
     provider,
     ctx: {
-      baseUrl: source.baseUrl,
-      username: source.username,
-      password: decryptSecret(source.passwordEnc),
-      rootPath: source.rootPath,
+      baseUrl: source.baseUrl || "",
+      username: source.username || "",
+      password: decryptSecret(source.passwordEnc) || "",
+      rootPath: source.rootPath || "",
       accessToken: decryptSecret(source.accessTokenEnc || ""),
+      domain: source.domain || "",
     },
   };
 }
@@ -463,6 +467,7 @@ remoteFilesRouter.post("/sources/test", async (c) => {
     password: typeof body.password === "string" ? body.password : "",
     rootPath: typeof body.rootPath === "string" ? body.rootPath : "",
     accessToken: typeof body.accessToken === "string" ? body.accessToken : "",
+    domain: typeof body.domain === "string" ? body.domain.trim() : "",
   };
   try {
     await provider.list(ctx, "");
@@ -470,6 +475,69 @@ remoteFilesRouter.post("/sources/test", async (c) => {
   } catch (error) {
     const mapped = mapError(error);
     return c.json(mapped.body, mapped.status as any);
+  }
+});
+
+/** 从用户填的主机串里取出纯主机名/IP（允许 smb:// 前缀、尾随路径与端口） */
+function normalizeSmbHost(raw: string): { host: string; port: number } {
+  const value = String(raw || "").trim();
+  const withoutScheme = value.replace(/^smb:\/\//i, "").replace(/^\\\\/, "");
+  const authority = withoutScheme.split(/[\\/]/)[0] || "";
+  const match = authority.match(/^([^:]+)(?::(\d+))?$/);
+  if (!match) return { host: "", port: 445 };
+  return {
+    host: match[1].trim(),
+    port: match[2] ? Number(match[2]) : 445,
+  };
+}
+
+// SMB 共享自动发现：填主机 + 凭据，列出该主机上的共享，不用手填共享名。
+// 只返回共享名与备注，绝不回传凭据；列表不落库，用户每次可重新获取。
+remoteFilesRouter.post("/smb/shares", async (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!userId) return c.json({ error: "未登录" }, 401);
+  const body = await readBody(c);
+  // 编辑已有源时密码字段为空（「留空保持不变」），此时复用服务端已解密的凭据。
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const saved = sourceId
+    ? readSources(userId).find((source) => source.id === sourceId && source.type === "smb")
+    : undefined;
+  if (sourceId && !saved) return c.json({ error: "远程源不存在或非 SMB 源" }, 404);
+  const hostInput = typeof body.host === "string" && body.host.trim()
+    ? body.host
+    : (saved?.baseUrl || "");
+  const { host, port } = normalizeSmbHost(hostInput);
+  if (!host) return c.json({ error: "请填写 SMB 主机地址（IP 或主机名）" }, 400);
+
+  const { Client } = await import("smb3-client");
+  const client = new Client({
+    host,
+    port,
+    domain: typeof body.domain === "string" && body.domain.trim() ? body.domain.trim() : (saved?.domain || ""),
+    username: typeof body.username === "string" && body.username.trim() ? body.username.trim() : (saved?.username || ""),
+    password: typeof body.password === "string" && body.password ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
+    connectTimeout: 6000,
+    requestTimeout: 10000,
+    signing: "if-offered",
+    encryption: "if-offered",
+  });
+  try {
+    await client.connect();
+    const all = await client.listShares();
+    const shares = all
+      .filter((share) => share.type === "disk" && !share.name.endsWith("$"))
+      .map((share) => ({ name: share.name, comment: share.comment || "" }));
+    return c.json({ host, port, shares });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    const auth = /AUTH|LOGON|ACCESS_DENIED|denied/i.test(message);
+    return c.json({
+      error: auth
+        ? "SMB 认证失败：请检查用户名、密码和域/工作组"
+        : `无法枚举 SMB 共享（${host}:${port}）：${message}`,
+    }, auth ? 403 : 502);
+  } finally {
+    try { await client.close(); } catch { /* 连接未建立时忽略 */ }
   }
 });
 

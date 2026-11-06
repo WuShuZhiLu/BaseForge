@@ -25,7 +25,7 @@
    │  源配置 CRUD（KV system_settings `remote_files_sources:<userId>`，凭据 AES-256-GCM 加密）
    ├─ services/remote-files/webdav.ts   PROPFIND/GET/PUT/MKCOL/DELETE/MOVE
    ├─ services/remote-files/baidu.ts    百度网盘开放平台 REST
-   └─ services/remote-files/smb.ts      @marsaud/smb2 纯 JS 协议栈
+   └─ services/remote-files/smb.ts      smb3-client（SMB 2.1 ~ 3.1.1，共享枚举 + 文件读写同一套栈）
 ```
 
 - 提供方接口：`list / read / write / mkdir / remove / rename`，路径一律为「源内相对路径」（根目录 `""`），
@@ -53,10 +53,18 @@ localStorage 启停）。0.2.0 起改为内核能力，注册表条目、启停�
 | --- | --- | --- |
 | WebDAV | 全功能（列/读/写/建目录/删/改名） | 目录删除依赖服务器 Depth: infinity；XML 命名空间无关解析已适配常见 NAS |
 | 百度网盘 | 列/读/写（≤4MB 单发，>4MB precreate→分片→create）/建目录/删/改名 | access_token 手动粘贴（开放平台应用授权）；有限流 |
-| SMB | 全功能（@marsaud/smb2 纯 JS 协议栈，0.18.0） | **不支持 SMB3 传输加密**（NAS 强制加密时连不上，需关闭或改用 WebDAV）；dialect 协商上限 3.0.2；目录条目单次上限 200 |
+| SMB | 全功能（smb3-client，dialect 协商 2.1 / 3.0 / 3.0.2 / 3.1.1，支持 SMB3 signing 与传输加密） | 目录条目单次上限 200；真实 NAS 兼容性待实测 |
 
 SMB 三形态通吃（桌面 Electron / NAS Docker / 云服务器 Linux）：纯用户态协议实现，不依赖 OS 挂载。
-地址双格式 `\\host\share` 与 `smb://host[:445]/share`；支持域/工作组字段。
+源配置界面只需填**主机**（IP/主机名）+ 凭据，点「获取共享」由 `POST /api/remote-files/smb/shares`
+（smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`）自动列出磁盘共享，下拉选择即可；列表不落库，可随时重新获取。
+保存时仍拼成 `\\host\share` 存入 `baseUrl`，因此既有源、链接映射与 MCP 工具契约不变。
+编辑已有源时会把地址拆回主机与共享名回填。支持域/工作组字段。
+
+文件读写同样走 `smb3-client`（`services/remote-files/smb.ts`）：路径第一段是共享名、
+其余为共享内路径，根目录用共享名而非空路径（旧 `@marsaud/smb2` 对空根目录发 CREATE 会被
+部分 NAS 以 `STATUS_INVALID_PARAMETER` 拒绝，该依赖已移除）。`signing` / `encryption` 均为
+`if-offered`，NAS 要求加密时自动启用，不再有「不支持 SMB3 传输加密」的限制。
 
 ## 6. 笔记级同步
 

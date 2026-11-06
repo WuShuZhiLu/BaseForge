@@ -1,48 +1,65 @@
 /**
- * 远程文件管理插件 —— SMB 提供方单测（mock SMB2 客户端工厂，不触网）。
- * 路径键全部动态构造（BS = 反斜杠），规避源码转义歧义。
+ * 远程文件管理 —— SMB 提供方单测（mock smb3-client 工厂，不触网）。
+ * 路径用正斜杠：第一段是共享名，其余为共享内路径。
  */
 import assert from "node:assert/strict";
 import { beforeEach, describe, it } from "node:test";
 
-import { parseSmbBaseUrl, setSmb2Factory, smbProvider, type Smb2ClientLike } from "../src/services/remote-files/smb";
+import {
+  parseSmbBaseUrl,
+  parseSmbTarget,
+  setSmbClientFactory,
+  smbProvider,
+  type SmbClientLike,
+} from "../src/services/remote-files/smb";
 import { RemoteProviderError } from "../src/services/remote-files/types";
 
-const BS = String.fromCharCode(92);
-const KEY_BMD = BS + "docs" + BS + "b.md";
-const KEY_SUB = BS + "docs" + BS + "sub";
-const KEY_ABMD = BS + "docs" + BS + "a" + BS + "b.md";
-const KEY_OUT = BS + "docs" + BS + "out.bin";
-const KEY_CMD = BS + "docs" + BS + "c.md";
-const CTX = { baseUrl: "\\\\nas\\\\docs", username: "u", password: "p", rootPath: "/docs", domain: "WORKGROUP" };
+const CTX = { baseUrl: "\\\\nas\\docs", username: "u", password: "p", rootPath: "", domain: "WORKGROUP" };
 
 interface Call { op: string; args: unknown[] }
 let calls: Call[] = [];
-let readdirResult: string[] = [];
-let statMap: Record<string, { isDirectory(): boolean; size: number; mtime?: Date }> = {};
+let direntResult: Array<{ name: string; isFile: () => boolean; isDirectory: () => boolean }> = [];
+let statMap: Record<string, { isDirectory: boolean; size: number; mtime?: Date }> = {};
 let readFileResult: Buffer = Buffer.alloc(0);
+
+const dirent = (name: string, isDirectory: boolean) => ({
+  name,
+  isFile: () => !isDirectory,
+  isDirectory: () => isDirectory,
+});
 
 beforeEach(() => {
   calls = [];
-  readdirResult = ["b.md", "sub"];
+  direntResult = [dirent("b.md", false), dirent("sub", true)];
   statMap = {
-    ["\\docs\\b.md"]: { isDirectory: () => false, size: 5, mtime: new Date("2026-10-19T00:00:00Z") },
-    ["\\docs\\sub"]: { isDirectory: () => true, size: 0 },
+    "docs/b.md": { isDirectory: false, size: 5, mtime: new Date("2026-10-19T00:00:00Z") },
+    "docs/sub": { isDirectory: true, size: 0 },
   };
   readFileResult = Buffer.from("smb-content", "utf8");
-  setSmb2Factory((cfg) => {
+  setSmbClientFactory(async (cfg) => {
     calls.push({ op: "new", args: [cfg] });
     return {
-      readdir: (p: string, cb: any) => { calls.push({ op: "readdir", args: [p] }); cb(null, p === KEY_SUB ? [] : readdirResult); },
-      stat: (p: string, cb: any) => { calls.push({ op: "stat", args: [p] }); const st = statMap[p]; if (!st) cb({ code: "STATUS_OBJECT_NAME_NOT_FOUND" }); else cb(null, st); },
-      readFile: (p: string, cb: any) => { calls.push({ op: "readFile", args: [p] }); cb(null, readFileResult); },
-      writeFile: (p: string, data: Buffer, cb: any) => { calls.push({ op: "writeFile", args: [p, data] }); cb(null); },
-      mkdir: (p: string, cb: any) => { calls.push({ op: "mkdir", args: [p] }); cb(null); },
-      rename: (a: string, b: string, cb: any) => { calls.push({ op: "rename", args: [a, b] }); cb(null); },
-      unlink: (p: string, cb: any) => { calls.push({ op: "unlink", args: [p] }); cb(null); },
-      rmdir: (p: string, cb: any) => { calls.push({ op: "rmdir", args: [p] }); cb(null); },
-      close: () => { calls.push({ op: "close", args: [] }); },
-    } as Smb2ClientLike;
+      readdir: async (p: string, opts?: unknown) => {
+        calls.push({ op: "readdir", args: [p, opts] });
+        return p === "docs/sub" ? [] : direntResult;
+      },
+      stat: async (p: string) => {
+        calls.push({ op: "stat", args: [p] });
+        const st = statMap[p];
+        if (!st) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return st;
+      },
+      readFile: async (p: string) => {
+        calls.push({ op: "readFile", args: [p] });
+        return readFileResult;
+      },
+      writeFile: async (p: string, data: Buffer | string) => { calls.push({ op: "writeFile", args: [p, data] }); },
+      mkdir: async (p: string) => { calls.push({ op: "mkdir", args: [p] }); },
+      rm: async (p: string) => { calls.push({ op: "unlink", args: [p] }); },
+      rmdir: async (p: string) => { calls.push({ op: "rmdir", args: [p] }); },
+      rename: async (a: string, b: string) => { calls.push({ op: "rename", args: [a, b] }); },
+      close: async () => { calls.push({ op: "close", args: [] }); },
+    } as SmbClientLike;
   });
 });
 
@@ -55,15 +72,46 @@ describe("parseSmbBaseUrl", () => {
   });
 });
 
+describe("parseSmbTarget", () => {
+  it("拆出主机、端口与共享名", () => {
+    assert.deepEqual(parseSmbTarget("\\\\192.168.100.3\\workspace"), {
+      host: "192.168.100.3", port: 445, shareName: "workspace",
+    });
+    assert.deepEqual(parseSmbTarget("smb://nas:4455/share/sub"), {
+      host: "nas", port: 4455, shareName: "share",
+    });
+    assert.throws(() => parseSmbTarget("\\\\onlyhost"), RemoteProviderError);
+  });
+});
+
 describe("smb provider", () => {
-  it("list：readdir+stat，路径转换与排序（目录优先）", async () => {
+  it("空域 / 空用户名时仍向客户端传字符串，避免认证阶段崩溃", async () => {
+    await smbProvider.list({ baseUrl: "\\\\nas\\docs", username: "", password: "", rootPath: "" }, "");
+    const cfg = calls.find((c) => c.op === "new")?.args[0] as Record<string, unknown>;
+    assert.equal(typeof cfg.domain, "string", "domain 不能是 undefined");
+    assert.equal(cfg.domain, "");
+    assert.equal(typeof cfg.username, "string", "username 不能是 undefined");
+    assert.equal(typeof cfg.password, "string", "password 不能是 undefined");
+  });
+
+  it("连接 / 认证失败转成业务错误，不冒泡成 500", async () => {
+    setSmbClientFactory(async () => {
+      throw Object.assign(new Error("SESSION_SETUP AUTH failed"), { code: "AUTH" });
+    });
+    await assert.rejects(
+      smbProvider.list(CTX, ""),
+      (err: unknown) => err instanceof RemoteProviderError && err.status === 403,
+    );
+  });
+
+  it("list：根目录传共享名而非空路径，排序且目录优先", async () => {
     const entries = await smbProvider.list(CTX, "");
     assert.equal(entries[0].name, "sub");
     assert.equal(entries[0].isFolder, true);
     assert.equal(entries[0].path, "sub");
     assert.equal(entries[1].name, "b.md");
     assert.equal(entries[1].size, 5);
-    assert.ok(calls.some((c) => c.op === "readdir" && c.args[0] === "\\docs"), "smb dir path");
+    assert.ok(calls.some((c) => c.op === "readdir" && c.args[0] === "docs"), "根目录路径 = 共享名");
     assert.ok(calls.some((c) => c.op === "close"), "client closed");
   });
 
@@ -71,7 +119,7 @@ describe("smb provider", () => {
     const buffer = await smbProvider.readBinary(CTX, "a/b.md");
     assert.ok(Buffer.isBuffer(buffer));
     assert.equal(buffer.toString("utf8"), "smb-content");
-    assert.equal(calls.find((c) => c.op === "readFile")?.args[0], "\\docs\\a\\b.md");
+    assert.equal(calls.find((c) => c.op === "readFile")?.args[0], "docs/a/b.md");
     const text = await smbProvider.read(CTX, "a/b.md");
     assert.equal(text.content, "smb-content");
   });
@@ -79,7 +127,7 @@ describe("smb provider", () => {
   it("writeBinary：writeFile 写入；write 走 Buffer", async () => {
     await smbProvider.writeBinary(CTX, "out.bin", Buffer.from("bin", "utf8"));
     const call = calls.find((c) => c.op === "writeFile");
-    assert.equal(call?.args[0], "\\docs\\out.bin");
+    assert.equal(call?.args[0], "docs/out.bin");
     assert.equal((call?.args[1] as Buffer).toString("utf8"), "bin");
     await smbProvider.write(CTX, "out.txt", "hello");
     const w = calls.filter((c) => c.op === "writeFile").pop();
@@ -88,18 +136,18 @@ describe("smb provider", () => {
 
   it("mkdir / rename：路径与目标正确", async () => {
     await smbProvider.mkdir(CTX, "新建目录");
-    assert.equal(calls.find((c) => c.op === "mkdir")?.args[0], BS + "docs" + BS + "新建目录");
+    assert.equal(calls.find((c) => c.op === "mkdir")?.args[0], "docs/新建目录");
     await smbProvider.rename(CTX, "b.md", "c.md");
     const r = calls.find((c) => c.op === "rename");
-    assert.equal(r?.args[0], "\\docs\\b.md");
-    assert.equal(r?.args[1], "\\docs\\c.md");
+    assert.equal(r?.args[0], "docs/b.md");
+    assert.equal(r?.args[1], "docs/c.md");
   });
 
-  it("remove：目录递归删除，文件 unlink", async () => {
+  it("remove：目录递归删除，文件 rm", async () => {
     await smbProvider.remove(CTX, "sub");
-    assert.ok(calls.some((c) => c.op === "rmdir" && c.args[0] === "\\docs\\sub"));
+    assert.ok(calls.some((c) => c.op === "rmdir" && c.args[0] === "docs/sub"));
     await smbProvider.remove(CTX, "b.md");
-    assert.ok(calls.some((c) => c.op === "unlink" && c.args[0] === "\\docs\\b.md"));
+    assert.ok(calls.some((c) => c.op === "unlink" && c.args[0] === "docs/b.md"));
   });
 
   it("stat 缺失时 list 不中断（降级条目）", async () => {
