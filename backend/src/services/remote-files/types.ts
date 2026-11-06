@@ -19,6 +19,16 @@ export interface RemoteSourceConfig {
   username: string;
   passwordEnc: string;
   rootPath: string;
+  /**
+   * SMB：主机名/IP（不含共享名）。与 shares 一起构成「一台设备 = 一个源」。
+   * 历史数据无此字段，baseUrl 里是 `\\host\share` 的完整 UNC（仍兼容，见 smb.ts）。
+   */
+  host?: string;
+  /**
+   * SMB：该设备上要挂载的共享名（可多个，一个设备上文件分散在几个共享时不用配多遍）。
+   * 有该字段时，路径第一段是共享名；空/缺失则回落到 baseUrl 的单共享模式。
+   */
+  shares?: string[];
   /** 百度网盘：access_token（加密存储） */
   accessTokenEnc?: string;
   /** SMB：域/工作组（非机密，明文存储） */
@@ -47,6 +57,10 @@ export interface RemoteProviderContext {
   username: string;
   password: string;
   rootPath: string;
+  /** SMB 多共享：路径第一段即共享名；为空时走 baseUrl 里的单共享（历史兼容） */
+  shares?: string[];
+  /** SMB 主机（可以是 host:port）；多共享模式下 baseUrl 不再含共享名 */
+  host?: string;
   accessToken?: string;
   domain?: string;
   clientId?: string;

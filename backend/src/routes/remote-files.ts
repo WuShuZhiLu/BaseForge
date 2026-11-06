@@ -20,8 +20,14 @@ import { systemSettingsRepository } from "../repositories";
 import { getDb } from "../db/schema";
 import { readAttachmentObject } from "../services/attachment-storage";
 import { decryptSecret, encryptSecret } from "../services/remote-files/credentials";
-import { REMOTE_PROVIDERS, readUserRemoteSources } from "../services/remote-files";
-import { parseSmbBaseUrl } from "../services/remote-files/smb";
+import {
+  REMOTE_PROVIDERS,
+  readUserRemoteSources,
+  resolveSmbTargets,
+  sourceCredentialState,
+  upgradeUserRemoteSecrets,
+} from "../services/remote-files";
+import { listSmbShares, parseSmbBaseUrl, parseSmbTarget } from "../services/remote-files/smb";
 import {
   isProbablyTextFile,
   normalizeRemotePath,
@@ -41,7 +47,14 @@ function sourcesKey(userId: string): string {
   return `remote_files_sources:${userId}`;
 }
 
-const readSources = readUserRemoteSources;
+/** 读源并顺手把历史 v1 密文升级成 v2（独立密钥文件），失败不影响读取。 */
+const readSources = (userId: string): RemoteSourceConfig[] => {
+  try {
+    // 升级过就重读一次，让本次请求用上的就是 v2 密文（否则还要走一次 scrypt 解 v1）
+    if (upgradeUserRemoteSecrets(userId)) return readUserRemoteSources(userId);
+  } catch { /* 升级失败保持原值 */ }
+  return readUserRemoteSources(userId);
+};
 
 function writeSources(userId: string, sources: RemoteSourceConfig[]): void {
   systemSettingsRepository.set(sourcesKey(userId), JSON.stringify(sources));
@@ -55,10 +68,14 @@ function publicSource(source: RemoteSourceConfig): Record<string, unknown> {
     baseUrl: source.baseUrl,
     username: source.username,
     rootPath: source.rootPath,
+    host: source.host || "",
+    shares: source.shares || [],
     domain: source.domain || "",
     clientId: source.clientId || "",
     hasOAuth: Boolean(source.refreshTokenEnc),
     hasPassword: Boolean(source.passwordEnc) || Boolean(source.accessTokenEnc),
+    /** unreadable = 存了凭据但解不开（换机 / 换密钥 / 跨机恢复备份），UI 提示重新输入密码 */
+    credentialState: sourceCredentialState(source),
     createdAt: source.createdAt,
   };
 }
@@ -67,7 +84,16 @@ interface RequestUser {
   userId: string;
   source: RemoteSourceConfig;
   provider: RemoteProvider;
-  ctx: { baseUrl: string; username: string; password: string; rootPath: string; accessToken?: string; domain?: string };
+  ctx: {
+    baseUrl: string;
+    username: string;
+    password: string;
+    rootPath: string;
+    shares?: string[];
+    host?: string;
+    accessToken?: string;
+    domain?: string;
+  };
 }
 
 type HonoJsonError = { status: number; body: Record<string, unknown> };
@@ -81,6 +107,7 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
   if (!source) return { error: { status: 404, body: { error: "远程源不存在" } } };
   const provider = PROVIDERS[source.type];
   if (!provider) return { error: { status: 400, body: { error: "不支持的存储类型" } } };
+  const smbTargets = source.type === "smb" ? resolveSmbTargets(source) : null;
   return {
     userId,
     source,
@@ -90,6 +117,9 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
       username: source.username || "",
       password: decryptSecret(source.passwordEnc) || "",
       rootPath: source.rootPath || "",
+      // 只有多共享才带 shares/host；单共享继续走 baseUrl 的历史路径形态
+      shares: smbTargets && source.host ? smbTargets.shares : undefined,
+      host: smbTargets ? smbTargets.host : undefined,
       accessToken: decryptSecret(source.accessTokenEnc || ""),
       domain: source.domain || "",
     },
@@ -98,6 +128,14 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
 
 function isErr(value: unknown): value is { error: HonoJsonError } {
   return typeof value === "object" && value !== null && "error" in value;
+}
+
+/** host + 共享名 → 历史 UNC 形态 `\\host\share`（单共享源继续用这个，保持既有链接路径不变） */
+function composeSmbUnc(host: string, share: string): string {
+  const bs = String.fromCharCode(92);
+  const cleanHost = String(host || "").trim().replace(/^smb:\/\//i, "").replace(/^\\+/, "").split(/[\\/:?#]/)[0];
+  const cleanShare = String(share || "").trim().replace(/^\\+/, "").split(/[\\/]/).filter(Boolean).join(bs);
+  return cleanHost && cleanShare ? `${bs}${bs}${cleanHost}${bs}${cleanShare}` : "";
 }
 
 function mapError(error: unknown): { status: number; body: Record<string, unknown> } {
@@ -132,11 +170,22 @@ remoteFilesRouter.post("/sources", async (c) => {
   if (type === "baidu" && !(typeof body.accessToken === "string" && body.accessToken.trim())) {
     return c.json({ error: "请填写百度网盘 access_token" }, 400);
   }
+  const smbHost = typeof body.host === "string" ? body.host.trim() : "";
+  const smbShares: string[] = Array.isArray(body.shares)
+    ? [...new Set<string>(body.shares.map((item: unknown) => String(item ?? "").trim()).filter((name: string) => name.length > 0))].slice(0, 32)
+    : [];
   if (type === "smb") {
-    try {
-      parseSmbBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
-    } catch (err) {
-      return c.json({ error: err instanceof RemoteProviderError ? err.message : "SMB 地址不合法" }, 400);
+    if (smbShares.length === 0) return c.json({ error: "请点「浏览共享」并至少选择一个共享" }, 400);
+    if (smbShares.some((name) => name.includes("/") || name.includes("\\"))) {
+      return c.json({ error: "共享名不能包含斜杠或反斜杠" }, 400);
+    }
+    if (!smbHost) {
+      // 兼容旧客户端：没传 host 时仍接受完整 UNC
+      try {
+        parseSmbBaseUrl(typeof body.baseUrl === "string" ? body.baseUrl : "");
+      } catch (err) {
+        return c.json({ error: err instanceof RemoteProviderError ? err.message : "SMB 地址不合法" }, 400);
+      }
     }
   }
 
@@ -144,12 +193,25 @@ remoteFilesRouter.post("/sources", async (c) => {
   const now = new Date().toISOString();
   const existingIndex = body.id ? sources.findIndex((item) => item.id === body.id) : -1;
   const id = existingIndex >= 0 ? sources[existingIndex].id : `rf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  /**
+   * SMB 单共享沿用历史形态（baseUrl=`\\host\share`、无 host/shares 字段）：
+   * 已存的「远程 ↔ 笔记」链接路径是共享内相对路径，改形态会让它们全部失效。
+   * 只有多共享才启用虚拟根（路径第一段=共享名）。
+   */
+  const multiShare = type === "smb" && smbShares.length > 1;
+  const smbBaseUrl = type === "smb" && smbHost
+    ? (multiShare
+      ? `${String.fromCharCode(92)}${String.fromCharCode(92)}${smbHost}`
+      : composeSmbUnc(smbHost, smbShares[0]))
+    : (typeof body.baseUrl === "string" ? body.baseUrl.trim() : "");
   const record: RemoteSourceConfig = {
     id,
     type,
     name,
-    baseUrl: typeof body.baseUrl === "string" ? body.baseUrl.trim() : "",
+    baseUrl: smbBaseUrl,
     username: typeof body.username === "string" ? body.username.trim() : "",
+    host: multiShare ? smbHost : "",
+    shares: multiShare ? smbShares : [],
     passwordEnc:
       typeof body.password === "string" && body.password.length > 0
         ? encryptSecret(body.password)
@@ -461,16 +523,24 @@ remoteFilesRouter.post("/sources/test", async (c) => {
   const type = SOURCE_TYPES.includes(body.type) ? (body.type as RemoteStorageType) : null;
   if (!type) return c.json({ error: "不支持的存储类型" }, 400);
   const provider = PROVIDERS[type];
+  const smbHost = typeof body.host === "string" ? body.host.trim() : "";
+  const smbShares = Array.isArray(body.shares)
+    ? body.shares.map((item: unknown) => String(item ?? "").trim()).filter(Boolean)
+    : [];
   const ctx = {
     baseUrl: typeof body.baseUrl === "string" ? body.baseUrl.trim() : "",
     username: typeof body.username === "string" ? body.username.trim() : "",
     password: typeof body.password === "string" ? body.password : "",
     rootPath: typeof body.rootPath === "string" ? body.rootPath : "",
+    // 表单里共享是「选出来的」，此时 baseUrl 还没拼好：带 shares 让路径解析走共享名，
+    // 并真的碰一次服务器（只列虚拟根不会建连接，会假成功）
+    shares: smbShares.length > 0 ? smbShares : undefined,
+    host: smbHost || undefined,
     accessToken: typeof body.accessToken === "string" ? body.accessToken : "",
     domain: typeof body.domain === "string" ? body.domain.trim() : "",
   };
   try {
-    await provider.list(ctx, "");
+    await provider.list(ctx, ctx.shares ? ctx.shares[0] : "");
     return c.json({ success: true });
   } catch (error) {
     const mapped = mapError(error);
@@ -505,40 +575,50 @@ remoteFilesRouter.post("/smb/shares", async (c) => {
   if (sourceId && !saved) return c.json({ error: "远程源不存在或非 SMB 源" }, 404);
   const hostInput = typeof body.host === "string" && body.host.trim()
     ? body.host
-    : (saved?.baseUrl || "");
+    : (saved?.host || saved?.baseUrl || "");
   const { host, port } = normalizeSmbHost(hostInput);
   if (!host) return c.json({ error: "请填写 SMB 主机地址（IP 或主机名）" }, 400);
 
-  const { Client } = await import("smb3-client");
-  const client = new Client({
-    host,
-    port,
-    domain: typeof body.domain === "string" && body.domain.trim() ? body.domain.trim() : (saved?.domain || ""),
-    username: typeof body.username === "string" && body.username.trim() ? body.username.trim() : (saved?.username || ""),
-    password: typeof body.password === "string" && body.password ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
-    connectTimeout: 6000,
-    requestTimeout: 10000,
-    signing: "if-offered",
-    encryption: "if-offered",
-  });
   try {
-    await client.connect();
-    const all = await client.listShares();
-    const shares = all
-      .filter((share) => share.type === "disk" && !share.name.endsWith("$"))
-      .map((share) => ({ name: share.name, comment: share.comment || "" }));
+    const shares = await listSmbShares({
+      host,
+      port,
+      domain: typeof body.domain === "string" && body.domain.trim() ? body.domain.trim() : (saved?.domain || ""),
+      username: typeof body.username === "string" && body.username.trim() ? body.username.trim() : (saved?.username || ""),
+      password: typeof body.password === "string" && body.password ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
+    });
     return c.json({ host, port, shares });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error ?? "");
-    const auth = /AUTH|LOGON|ACCESS_DENIED|denied/i.test(message);
-    return c.json({
-      error: auth
-        ? "SMB 认证失败：请检查用户名、密码和域/工作组"
-        : `无法枚举 SMB 共享（${host}:${port}）：${message}`,
-    }, auth ? 403 : 502);
-  } finally {
-    try { await client.close(); } catch { /* 连接未建立时忽略 */ }
+    return c.json(classifySmbConnectError(error, host, port), 502);
   }
 });
+
+/**
+ * SMB 连接/枚举失败 → 用户能看懂的原因。
+ * 用户实测反馈：只回一句「格式不对」或原始 NT_STATUS 都不可用，必须区分
+ * 「连不上（地址/网络/端口）」「认证失败（账号密码域）」「连上了但没权限枚举」。
+ */
+function classifySmbConnectError(error: unknown, host: string, port: number): { error: string; code: string } {
+  const detail = error as { code?: string; statusName?: string; message?: string } | null;
+  const text = [detail?.code, detail?.statusName, detail?.message, error instanceof Error ? error.message : String(error ?? "")]
+    .filter(Boolean)
+    .join(" | ");
+  if (/ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH|ECONNREFUSED|ETIMEDOUT|ECONNRESET|connect timeout|timed? ?out/i.test(text)) {
+    return {
+      error: `无法连接到 ${host}:${port}——请确认地址可达、SMB 服务已开启（默认 445 端口）、防火墙未拦截`,
+      code: "SMB_UNREACHABLE",
+    };
+  }
+  if (/LOGON_FAILURE|AUTH|ACCESS_DENIED|STATUS_ACCESS_DENIED|WRONG_PASSWORD|ACCOUNT/i.test(text)) {
+    return {
+      error: "SMB 认证失败：请检查用户名、密码与域/工作组（工作组可留空）",
+      code: "SMB_AUTH_FAILED",
+    };
+  }
+  if (/NOT_SUPPORTED|PROTOCOL|DIALECT/i.test(text)) {
+    return { error: "对方 SMB 服务协议不兼容（支持 SMB 2.1 ~ 3.1.1，SMB1 已不再支持）", code: "SMB_PROTOCOL" };
+  }
+  return { error: `枚举 SMB 共享失败：${error instanceof Error ? error.message : String(error ?? "")}`, code: "SMB_SHARES_FAILED" };
+}
 
 export default remoteFilesRouter;

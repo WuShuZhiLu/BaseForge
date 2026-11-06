@@ -157,3 +157,46 @@ describe("smb provider", () => {
     assert.equal(entries[0].size, 0);
   });
 });
+
+/** 一个设备上文件分散在多个共享：虚拟根 + 路径第一段即共享名（用户实测提出的用法）。 */
+describe("smb 多共享（虚拟根）", () => {
+  const MULTI = {
+    baseUrl: "",
+    host: "nas",
+    shares: ["docs", "media"],
+    username: "",
+    password: "",
+    rootPath: "",
+    domain: "",
+  };
+
+  it("根目录把配置的共享并列成文件夹，且不建立连接", async () => {
+    const entries = await smbProvider.list(MULTI, "");
+    assert.deepEqual(entries.map((entry) => entry.name), ["docs", "media"]);
+    assert.ok(entries.every((entry) => entry.isFolder));
+    assert.equal(entries[0].path, "docs");
+    assert.equal(calls.length, 0, "虚拟根不需要连服务器");
+  });
+
+  it("路径第一段解析成共享名，返回路径也带共享前缀", async () => {
+    direntResult = [dirent("b.md", false)];
+    statMap = { "media/b.md": { isDirectory: false, size: 7 } };
+    const entries = await smbProvider.list(MULTI, "media");
+    assert.ok(calls.some((call) => call.op === "readdir" && call.args[0] === "media"));
+    assert.equal(entries[0].path, "media/b.md");
+    assert.equal(entries[0].size, 7);
+  });
+
+  it("读写落在对应共享下", async () => {
+    await smbProvider.write(MULTI, "docs/sub/a.md", "hi");
+    const w = calls.filter((call) => call.op === "writeFile").pop();
+    assert.equal(w?.args[0], "docs/sub/a.md");
+  });
+
+  it("不在共享列表里的第一段报 404，而不是拼成畸形路径", async () => {
+    await assert.rejects(
+      smbProvider.read(MULTI, "unknown/a.md"),
+      (err: unknown) => err instanceof RemoteProviderError && err.status === 404,
+    );
+  });
+});

@@ -100,11 +100,73 @@ function targetPath(shareName: string, ctx: RemoteProviderContext, relPath: stri
   return joined ? `${shareName}/${joined}` : shareName;
 }
 
-async function openClient(ctx: RemoteProviderContext): Promise<{ client: SmbClientLike; shareName: string }> {
-  const { host, port, shareName } = parseSmbTarget(ctx.baseUrl);
-  let client: SmbClientLike;
+/**
+ * 解析「源内路径」→ 共享名 + 共享内子路径。
+ * - 多共享模式（ctx.shares 有值）：路径第一段必须是共享名，根目录 "" 代表虚拟根；
+ * - 单共享模式（历史数据）：共享名取 baseUrl，整条路径都是共享内子路径。
+ */
+function resolveTarget(ctx: RemoteProviderContext, relPath: string): { shareName: string; subPath: string; isVirtualRoot: boolean } {
+  const path = normalizeRemotePath(relPath);
+  const shares = (ctx.shares || []).filter(Boolean);
+  if (shares.length > 0) {
+    if (!path) return { shareName: "", subPath: "", isVirtualRoot: true };
+    const [shareName, ...rest] = path.split("/");
+    if (!shares.includes(shareName)) {
+      throw new RemoteProviderError(`共享「${shareName}」不在该来源的共享列表中`, 404);
+    }
+    return { shareName, subPath: rest.join("/"), isVirtualRoot: false };
+  }
+  return { shareName: parseSmbTarget(ctx.baseUrl).shareName, subPath: path, isVirtualRoot: false };
+}
+
+/** 枚举主机上的磁盘共享（过滤 IPC$ / 管理共享 / 打印机），供源配置向导使用。 */
+export async function listSmbShares(options: {
+  host: string;
+  port?: number;
+  domain?: string;
+  username?: string;
+  password?: string;
+}): Promise<Array<{ name: string; comment: string }>> {
+  const { Client } = await loadSmb3();
+  const client = new Client({
+    host: options.host,
+    port: options.port ?? 445,
+    // 空串兜底：历史版本把 undefined 传给 NTLM 会在 socket 回调里抛未捕获异常，导致整个后端进程退出
+    domain: options.domain || "",
+    username: options.username || "",
+    password: options.password || "",
+    connectTimeout: 6000,
+    requestTimeout: 10000,
+    signing: "if-offered",
+    encryption: "if-offered",
+  });
   try {
-    client = await createClient({
+    await client.connect();
+    const all = await client.listShares();
+    return all
+      .filter((share) => share.type === "disk" && !share.name.endsWith("$"))
+      .map((share) => ({ name: share.name, comment: share.comment || "" }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  } finally {
+    try { await client.close(); } catch { /* 连接未建立时忽略 */ }
+  }
+}
+
+/** 解析主机与端口：多共享模式读 ctx.host，历史数据回落到 baseUrl 的 UNC。 */
+function resolveHost(ctx: RemoteProviderContext): { host: string; port: number } {
+  const raw = String(ctx.host || "").trim();
+  if (raw) {
+    const match = raw.replace(/^smb:\/\//i, "").match(/^([^:/\\]+)(?::(\d+))?$/);
+    if (match) return { host: match[1], port: match[2] ? Number(match[2]) : 445 };
+  }
+  const parsed = parseSmbTarget(ctx.baseUrl);
+  return { host: parsed.host, port: parsed.port };
+}
+
+async function openClient(ctx: RemoteProviderContext): Promise<SmbClientLike> {
+  const { host, port } = resolveHost(ctx);
+  try {
+    return await createClient({
       host,
       port,
       domain: ctx.domain || "",
@@ -119,7 +181,6 @@ async function openClient(ctx: RemoteProviderContext): Promise<{ client: SmbClie
     // 连接 / 握手 / 认证失败统一转成业务错误，避免路由层兜底成 500。
     throw mapSmbError(err, "连接 SMB 主机失败");
   }
-  return { client, shareName };
 }
 
 async function closeQuietly(client: SmbClientLike): Promise<void> {
@@ -165,25 +226,39 @@ export const smbProvider: RemoteProvider = {
 
   async list(ctx, path) {
     const dirPath = normalizeRemotePath(path);
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, dirPath);
+    // 多共享的虚拟根：把配置的共享并列成文件夹，顺序按配置顺序
+    if (target.isVirtualRoot) {
+      return (ctx.shares || []).map((name) => ({
+        name,
+        path: name,
+        isFolder: true,
+        size: 0,
+        modifiedAt: null,
+      }));
+    }
+    const client = await openClient(ctx);
+    // 多共享模式路径带共享名前缀；历史单共享模式保持「共享内相对路径」不变（已存链接不失效）
+    const multi = (ctx.shares || []).filter(Boolean).length > 0;
+    const withShare = (relative: string) => (multi ? `${target.shareName}/${relative}` : relative);
     try {
-      const dir = targetPath(shareName, ctx, dirPath);
+      const dir = targetPath(target.shareName, ctx, target.subPath);
       const items = await readdirEntries(client, dir);
       // 逐条 stat 获取类型/大小/时间（目录条目上限 200，避免大目录请求风暴）
       const entries = await Promise.all(
         items.slice(0, 200).map(async (item): Promise<RemoteFileEntry> => {
-          const relative = dirPath ? `${dirPath}/${item.name}` : item.name;
+          const relative = target.subPath ? `${target.subPath}/${item.name}` : item.name;
           try {
             const st = await client.stat(`${dir}/${item.name}`);
             return {
               name: item.name,
-              path: relative,
+              path: withShare(relative),
               isFolder: st.isDirectory,
               size: st.size || 0,
               modifiedAt: st.mtime ? new Date(st.mtime).toISOString() : null,
             };
           } catch {
-            return { name: item.name, path: relative, isFolder: item.isDirectory(), size: 0, modifiedAt: null };
+            return { name: item.name, path: withShare(relative), isFolder: item.isDirectory(), size: 0, modifiedAt: null };
           }
         }),
       );
@@ -202,9 +277,10 @@ export const smbProvider: RemoteProvider = {
   },
 
   async readBinary(ctx, path) {
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, path);
+    const client = await openClient(ctx);
     try {
-      return await client.readFile(targetPath(shareName, ctx, path));
+      return await client.readFile(targetPath(target.shareName, ctx, target.subPath));
     } catch (err) {
       throw mapSmbError(err, "读取 SMB 文件失败");
     } finally {
@@ -217,9 +293,10 @@ export const smbProvider: RemoteProvider = {
   },
 
   async writeBinary(ctx, path, data) {
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, path);
+    const client = await openClient(ctx);
     try {
-      await client.writeFile(targetPath(shareName, ctx, path), data);
+      await client.writeFile(targetPath(target.shareName, ctx, target.subPath), data);
     } catch (err) {
       throw mapSmbError(err, "写入 SMB 文件失败");
     } finally {
@@ -228,9 +305,10 @@ export const smbProvider: RemoteProvider = {
   },
 
   async mkdir(ctx, path) {
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, path);
+    const client = await openClient(ctx);
     try {
-      await client.mkdir(targetPath(shareName, ctx, path));
+      await client.mkdir(targetPath(target.shareName, ctx, target.subPath));
     } catch (err) {
       throw mapSmbError(err, "创建 SMB 目录失败");
     } finally {
@@ -239,12 +317,13 @@ export const smbProvider: RemoteProvider = {
   },
 
   async remove(ctx, path) {
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, path);
+    const client = await openClient(ctx);
     try {
-      const target = targetPath(shareName, ctx, path);
-      const st = await client.stat(target);
-      if (st.isDirectory) await removeTree(client, target);
-      else await client.rm(target);
+      const full = targetPath(target.shareName, ctx, target.subPath);
+      const st = await client.stat(full);
+      if (st.isDirectory) await removeTree(client, full);
+      else await client.rm(full);
     } catch (err) {
       throw mapSmbError(err, "删除 SMB 文件失败");
     } finally {
@@ -253,11 +332,12 @@ export const smbProvider: RemoteProvider = {
   },
 
   async rename(ctx, path, newName) {
-    const { client, shareName } = await openClient(ctx);
+    const target = resolveTarget(ctx, path);
+    const client = await openClient(ctx);
     try {
-      const from = targetPath(shareName, ctx, path);
-      const parent = normalizeRemotePath(path).split("/").slice(0, -1).join("/");
-      const to = `${targetPath(shareName, ctx, parent)}/${newName}`;
+      const from = targetPath(target.shareName, ctx, target.subPath);
+      const subParent = target.subPath.split("/").slice(0, -1).join("/");
+      const to = `${targetPath(target.shareName, ctx, subParent)}/${newName}`;
       await client.rename(from, to);
     } catch (err) {
       throw mapSmbError(err, "SMB 重命名失败");
