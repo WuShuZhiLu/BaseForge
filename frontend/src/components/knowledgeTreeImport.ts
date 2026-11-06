@@ -105,15 +105,20 @@ export async function importPdfIntoKnowledgeTree(
     noteId = note.id;
     // 2) 原件存附件
     const attachment = await api.attachments.upload(note.id, file);
-    // 3) 回填原件引用
-    await api.updateNote(note.id, {
+    // 3) 回填原件引用。
+    //    content / contentText 属于「必须带版本」的写入字段（noteSyncSafety 的
+    //    isVersionedNoteMutation），漏传 version 会被拦成 VERSION_REQUIRED_CLIENT
+    //    「缺少服务端版本，已阻止不安全保存」，导入随之失败并把半成品笔记丢进回收站。
+    const withAttachment = await api.updateNote(note.id, {
       content: JSON.stringify({ attachmentId: attachment.id, annotations: [] }),
       contentText: "",
+      version: note.version,
     });
     await moveImportedNote(note.id, notebookId, options.parent);
     toast.dismiss(toastId);
     toast.success("导入成功");
-    return note as LoadedNote;
+    // 返回回填后的笔记：调用方拿它直接渲染 PDF 预览，不必等下次重新加载才有 attachmentId
+    return (withAttachment || note) as LoadedNote;
   } catch (error) {
     toast.dismiss(toastId);
     // 失败回滚：把半成品笔记移入回收站（best-effort）

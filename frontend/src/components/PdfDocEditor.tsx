@@ -41,7 +41,10 @@ const PdfDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const [page, setPage] = useState(1);
     const [focusAnnotationId, setFocusAnnotationId] = useState<string | null>(null);
 
+    /** 有还没抛给上层的改动（防抖窗口内） */
     const dirtyRef = useRef(false);
+    /** 已经抛给上层、但还没确认落库的改动（防抖抛出的那次只进草稿） */
+    const unconfirmedRef = useRef(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const docRef = useRef(doc);
     docRef.current = doc;
@@ -74,21 +77,56 @@ const PdfDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       return () => { alive = false; };
     }, [note.id]);
 
-    const flush = useCallback(() => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      if (!dirtyRef.current) return;
-      dirtyRef.current = false;
+    /**
+     * 把当前批注写出去。
+     *
+     * `flushNow` 决定这是不是「显式保存」：EditorPane 的产品决策是普通编辑只更新本地草稿
+     * 并显示「待保存」，真正落库只发生在显式入口（Ctrl+S / 点状态区 / 定时保存）。
+     * 所以防抖到期调 flush(false) 只让上层标记 pending，flushSave() 才带 `_flush: true`
+     * 真正 PUT——否则每加一条批注就会产生一次版本记录。
+     */
+    const emitUpdate = useCallback((flushNow: boolean) => {
       const current = docRef.current;
       onUpdate({
         title: noteRef.current.title,
         content: serializePdfDocContent(current),
         contentText: pdfDocContentText(current),
+        ...(flushNow ? { _flush: true } : {}),
         _noteId: noteRef.current.id,
       });
     }, [onUpdate]);
+
+    /**
+     * 把当前批注写出去。
+     *
+     * `flushNow` 决定这是不是「显式保存」：EditorPane 的产品决策是普通编辑只更新本地草稿
+     * 并显示「待保存」，真正落库只发生在显式入口（Ctrl+S / 点状态区 / 定时保存）。
+     * 所以防抖到期调 flush(false) 只让上层标记 pending，flushSave() 才带 `_flush: true`
+     * 真正 PUT——否则每加一条批注就会产生一次版本记录。
+     *
+     * 坑：防抖那次已经把 dirtyRef 清掉了，如果显式保存时只看 dirtyRef 就会「什么都不发」，
+     * 批注永远落不了库。所以另记一个 unconfirmedRef，显式保存时即便没有新改动也要补发一次。
+     */
+    const flush = useCallback((flushNow = false) => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const hasUnsent = dirtyRef.current;
+      if (!hasUnsent && !(flushNow && unconfirmedRef.current)) return;
+      dirtyRef.current = false;
+      unconfirmedRef.current = true;
+      emitUpdate(flushNow);
+    }, [emitUpdate]);
+
+    // 服务端 ACK 回来（note.content 与本地批注一致）才算真的落库；失败则保持 unconfirmed，
+    // 用户再按一次 Ctrl+S 会重发，而不是「以为保存过了」。
+    useEffect(() => {
+      if (!unconfirmedRef.current) return;
+      if (serializePdfDocContent(parsePdfDocContent(note.content)) === serializePdfDocContent(docRef.current)) {
+        unconfirmedRef.current = false;
+      }
+    }, [note.content]);
 
     const scheduleSave = useCallback(() => {
       dirtyRef.current = true;
@@ -99,9 +137,17 @@ const PdfDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       }, SAVE_DEBOUNCE_MS);
     }, [flush]);
 
+    // 卸载时把防抖窗口里的改动抛给上层（只存草稿，不发 PUT），否则切走就丢
     useEffect(() => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    }, []);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (dirtyRef.current) {
+        dirtyRef.current = false;
+        emitUpdate(false);
+      }
+    }, [emitUpdate]);
 
     const mutateDoc = useCallback((next: PdfDocContent) => {
       setDoc(next);
@@ -129,13 +175,14 @@ const PdfDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     }, [mutateDoc]);
 
     useImperativeHandle(ref, () => ({
-      flushSave: flush,
+      flushSave: () => flush(true),
       discardPending: () => {
         if (timerRef.current) {
           clearTimeout(timerRef.current);
           timerRef.current = null;
         }
         dirtyRef.current = false;
+        unconfirmedRef.current = false;
       },
       getSnapshot: () => {
         const current = docRef.current;
