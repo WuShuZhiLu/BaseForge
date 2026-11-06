@@ -444,6 +444,26 @@ function contentTextFromCandidates(candidates: BlockCandidate[]): string {
     .join("\n\n");
 }
 
+/**
+ * HTML 正文 → 纯文本（contentText 派生，供搜索与列表摘要）。
+ * 去脚本/样式、去标签、解常见实体——旧库里有整批 notes.content 是 HTML，
+ * 详情文本里留着 `&amp;` 会让搜索与摘要看起来像乱码。
+ */
+function htmlToSearchText(content: string): string {
+  return content
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function syncNoteBlocks(
   db: DatabaseSync,
   noteId: string,
@@ -455,7 +475,7 @@ export function syncNoteBlocks(
     db.prepare("DELETE FROM note_blocks_index WHERE noteId = ?").run(noteId);
     return {
       content,
-      contentText: content.replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+      contentText: htmlToSearchText(content),
       blocks: [],
       changed: false,
     };

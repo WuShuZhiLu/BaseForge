@@ -4,6 +4,11 @@ import path from "path";
 import JSZip from "jszip";
 import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
+import {
+  beginManualTransaction,
+  commitManualTransaction,
+  rollbackManualTransaction,
+} from "../db/sqlite-ext";
 import { ensureRoundTripImportBatchesSchema } from "../db/roundtripImportBatchesMigration";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import {
@@ -698,7 +703,7 @@ export async function undoRoundTripImportBatch(userId: string, batchId: string):
     .sort((a, b) => notebookDepth(b, createdNotebookMap) - notebookDepth(a, createdNotebookMap));
 
   try {
-    getDb().exec("BEGIN TRANSACTION");
+    beginManualTransaction(getDb());
     for (const note of state.updated.notes) {
       const noteId = String(note.row.id || "");
       if (!noteId) continue;
@@ -725,9 +730,9 @@ export async function undoRoundTripImportBatch(userId: string, batchId: string):
          SET status = 'undone', undoAvailable = 0, undoneAt = datetime('now'), undoError = NULL
        WHERE id = ?
     `).run(batchId);
-    getDb().exec("COMMIT");
+    commitManualTransaction(getDb());
   } catch (error) {
-    try { getDb().exec("ROLLBACK"); } catch { /* ignore */ }
+    try { rollbackManualTransaction(getDb()); } catch { /* ignore */ }
     const message = error instanceof Error ? error.message : String(error);
     getDb().prepare("UPDATE roundtrip_import_batches SET undoError = ? WHERE id = ?").run(message, batchId);
     throw new RoundTripImportUndoError(`撤销失败：${message}`, "IMPORT_BATCH_UNDO_FAILED", 409);

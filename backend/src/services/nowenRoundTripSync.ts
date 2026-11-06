@@ -3,6 +3,11 @@ import path from "path";
 import JSZip from "jszip";
 import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
+import {
+  beginManualTransaction,
+  commitManualTransaction,
+  rollbackManualTransaction,
+} from "../db/sqlite-ext";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import {
   deleteAttachmentObject,
@@ -1124,7 +1129,7 @@ export async function importRoundTripPackageSync(
   const tagIdMap = new Map<string, string>();
   const rewrittenByNote = new Map<string, string>();
   try {
-    db.exec("BEGIN TRANSACTION");
+    beginManualTransaction(db);
 
     for (const plan of notebookPlans) {
       if (plan.action === "create" || plan.action === "recreate") {
@@ -1304,9 +1309,9 @@ export async function importRoundTripPackageSync(
       });
     }
 
-    db.exec("COMMIT");
+    commitManualTransaction(db);
   } catch (error) {
-    try { db.exec("ROLLBACK"); } catch { /* ignore */ }
+    try { rollbackManualTransaction(db); } catch { /* ignore */ }
     await Promise.all(writtenPaths.map((item) => deleteAttachmentObject(item).catch(() => undefined)));
     return {
       success: false,

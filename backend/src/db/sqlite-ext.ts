@@ -56,6 +56,38 @@ function rollbackScope(db: DatabaseSync): void {
   txDepth.set(db, depth)
 }
 
+/**
+ * 手动事务登记：给仍直接写 `db.exec("BEGIN TRANSACTION")` 的调用点用。
+ *
+ * 这些调用点绕过本补丁的深度计数，而事务体里又会调用 `db.transaction(...)`
+ * （典型：导入 → synchronizeRecoveredBlockAuthority → syncNoteBlocks）。
+ * 不登记时内层 transaction() 会误判「不在事务中」而重发 BEGIN，SQLite 抛
+ * `cannot start a transaction within a transaction`——结果不是崩溃，而是导入后
+ * 每篇笔记的 block 权威状态都被静默标成 mismatch。
+ */
+export function beginManualTransaction(db: DatabaseSync): void {
+  const depth = depthOf(db)
+  if (depth !== 0) {
+    throw new Error(`[sqlite-ext] 手动事务只能在最外层开启（当前嵌套深度 ${depth}）`)
+  }
+  db.exec("BEGIN TRANSACTION")
+  txDepth.set(db, 1)
+}
+
+export function commitManualTransaction(db: DatabaseSync): void {
+  const depth = depthOf(db)
+  if (depth !== 1) {
+    throw new Error(`[sqlite-ext] 手动事务提交时深度不匹配（当前 ${depth}，期望 1）——可能存在未释放的子事务`)
+  }
+  db.exec("COMMIT")
+  txDepth.set(db, 0)
+}
+
+export function rollbackManualTransaction(db: DatabaseSync): void {
+  txDepth.set(db, 0)
+  db.exec("ROLLBACK")
+}
+
 function makeRunner<T extends (...args: never[]) => unknown>(db: DatabaseSync, fn: T, mode: TxMode) {
   const run = ((...args: Parameters<T>): ReturnType<T> => {
     beginScope(db, mode)

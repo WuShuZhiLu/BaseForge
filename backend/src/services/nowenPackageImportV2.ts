@@ -3,6 +3,11 @@ import path from "path";
 import JSZip from "jszip";
 import { v4 as uuid } from "uuid";
 import { getDb, getDbSchemaVersion } from "../db/schema";
+import {
+  beginManualTransaction,
+  commitManualTransaction,
+  rollbackManualTransaction,
+} from "../db/sqlite-ext";
 import { getUserWorkspaceRole, hasRole, isSystemAdmin } from "../middleware/acl";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import {
@@ -757,7 +762,7 @@ export async function importNowenPackageV2(zipBuffer: Buffer, params: ImportPara
   if (!importedRootIds.length && fallbackRootId) importedRootIds.push(fallbackRootId);
 
   try {
-    db.exec("BEGIN TRANSACTION");
+    beginManualTransaction(db);
 
     for (const plan of notebookPlan.plans) {
       if (!plan.create) continue;
@@ -859,9 +864,9 @@ export async function importNowenPackageV2(zipBuffer: Buffer, params: ImportPara
       });
     }
 
-    db.exec("COMMIT");
+    commitManualTransaction(db);
   } catch (error) {
-    try { db.exec("ROLLBACK"); } catch { /* ignore */ }
+    try { rollbackManualTransaction(db); } catch { /* ignore */ }
     await Promise.all(writtenStoragePaths.map((storagePath) => deleteAttachmentObject(storagePath).catch(() => undefined)));
     return {
       success: false,
