@@ -68,7 +68,7 @@ Development tools live in `packages/`: `nowen-plugin-sdk`, `nowen-plugin-cli`, t
 
 ### MCP Server
 
-`packages/nowen-mcp` provides the MCP Server. AI agents such as Claude Code, Cursor and VS Code use BaseForge through MCP, with knowledge bases as their retrieval source; the accessible scope is determined by a Personal API Token. Available tools are grouped by purpose:
+`packages/baseforge-mcp` provides the MCP Server. AI agents such as Claude Code, Cursor and VS Code use BaseForge through MCP, with knowledge bases as their retrieval source; the accessible scope is determined by a Personal API Token. Available tools are grouped by purpose:
 
 | Group | Tools |
 | --- | --- |
@@ -78,7 +78,7 @@ Development tools live in `packages/`: `nowen-plugin-sdk`, `nowen-plugin-cli`, t
 | Attachments and tags | `upload_attachment`, `list_attachments`, `attach_to_note`, `list_tags`, `manage_tags` |
 | Operations | `list_plugins`, `execute_plugin`, `list_webhooks`, `create_webhook`, `audit_stats`, `list_backups`, `create_backup` |
 
-Block-level writes must carry the note version and an operation ID for concurrency checks and deduplication on retry. Installation steps are in the [MCP guide](./docs/tutorials/mcp.en.md) ([中文](./docs/tutorials/mcp.md)); package documentation is in [`packages/nowen-mcp`](./packages/nowen-mcp/README.md).
+Block-level writes must carry the note version and an operation ID for concurrency checks and deduplication on retry. Installation steps are in the [MCP guide](./docs/tutorials/mcp.en.md) ([中文](./docs/tutorials/mcp.md)); package documentation is in [`packages/baseforge-mcp`](./packages/baseforge-mcp/README.md).
 
 ### HTTP API and tools
 

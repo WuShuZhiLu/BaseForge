@@ -69,7 +69,7 @@ BaseForge 基于 nowen note v1.4.16 分叉，合并v1.5.1功能，后彻底独�
 
 ### MCP Server
 
-`packages/nowen-mcp` 提供 MCP Server。AI agent（Claude Code、Cursor、VS Code 等）通过 MCP 使用 BaseForge，将知识库作为检索来源，可访问范围由 Personal API Token 决定。可用工具按用途分组：
+`packages/baseforge-mcp` 提供 MCP Server。AI agent（Claude Code、Cursor、VS Code 等）通过 MCP 使用 BaseForge，将知识库作为检索来源，可访问范围由 Personal API Token 决定。可用工具按用途分组：
 
 | 分组 | 工具 |
 | --- | --- |
@@ -79,7 +79,7 @@ BaseForge 基于 nowen note v1.4.16 分叉，合并v1.5.1功能，后彻底独�
 | 附件与标签 | `upload_attachment`、`list_attachments`、`attach_to_note`、`list_tags`、`manage_tags` |
 | 运维 | `list_plugins`、`execute_plugin`、`list_webhooks`、`create_webhook`、`audit_stats`、`list_backups`、`create_backup` |
 
-块级写操作需要携带笔记版本与操作 ID，用于并发校验与重试去重。安装步骤见 [MCP 教程](./docs/tutorials/mcp.md)（[English](./docs/tutorials/mcp.en.md)），包说明见 [`packages/nowen-mcp`](./packages/nowen-mcp/README.md)。
+块级写操作需要携带笔记版本与操作 ID，用于并发校验与重试去重。安装步骤见 [MCP 教程](./docs/tutorials/mcp.md)（[English](./docs/tutorials/mcp.en.md)），包说明见 [`packages/baseforge-mcp`](./packages/baseforge-mcp/README.md)。
 
 ### HTTP API 与工具
 

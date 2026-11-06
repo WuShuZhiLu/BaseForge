@@ -53,26 +53,26 @@ API Token 的最终权限取三者交集：
 ```json
 {
   "mcpServers": {
-    "nowen-investment": {
+    "baseforge": {
       "command": "node",
-      "args": ["/home/user/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"],
+      "args": ["/home/user/Base-Notes/packages/baseforge-mcp/dist/baseforge-mcp.mjs"],
       "env": {
-        "NOWEN_URL": "http://localhost:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx"
+        "BASEFORGE_URL": "http://localhost:3001",
+        "BASEFORGE_API_TOKEN": "nkn_xxx"
       }
     }
   }
 }
 ```
 
-`ALLOWED_NOTEBOOK_IDS` 仍可作为 MCP 实例侧的第二道限制。两者同时配置时，实际范围是服务端授权与本地白名单的交集。
+笔记本资源授权由服务端执行；MCP 侧不再有本地白名单，实际范围就是 Token 授权。
 
 ## 知识库问答
 
-restricted Token 调用 `nowen_ai_ask` 时必须指定 `notebookId`：
+restricted Token 调用 `baseforge_ai_ask` 时必须指定 `notebookId`：
 
 ```text
-nowen_ai_ask({
+baseforge_ai_ask({
   question: "总结本笔记本中的投资策略",
   notebookId: "investment-notebook-id",
   includeChildren: true

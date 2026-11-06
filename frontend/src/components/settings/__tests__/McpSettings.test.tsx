@@ -14,18 +14,16 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = resolve(process.cwd(), "..");
 const COMPONENT_PATH = resolve(process.cwd(), "src/components/settings/McpSettings.tsx");
 
-/** 只读事实源：team 指定的第 1～4 项真实代码与文档。 */
+/** 只读事实源：真实代码与文档。 */
 const FACT_FILES = [
-  "packages/nowen-mcp/package.json",
-  "packages/nowen-mcp/README.md",
-  "packages/nowen-mcp/bin/nowen-mcp.mjs",
-  "packages/nowen-mcp/bin/runtime-diagnostics.mjs",
-  "packages/nowen-mcp/src/index.ts",
-  "packages/nowen-mcp/src/scoped-entry.ts",
-  "packages/nowen-mcp/src/scope-policy.ts",
-  "packages/nowen-mcp/src/knowledge-scope-tool.ts",
-  "packages/nowen-mcp/src/api-client.ts",
+  "packages/baseforge-mcp/package.json",
+  "packages/baseforge-mcp/README.md",
+  "packages/baseforge-mcp/dist/baseforge-mcp.mjs",
+  "packages/baseforge-mcp/scripts/build.mjs",
+  "packages/baseforge-mcp/src/index.ts",
+  "packages/baseforge-mcp/src/api-client.ts",
   "docs/tutorials/mcp.md",
+  "docs/tutorials/mcp.en.md",
   "docs/tutorials/mcp-token-resource-scope.md",
   "frontend/src/components/TokenManagement.tsx",
   "backend/src/routes/tokens.ts",
@@ -36,17 +34,16 @@ const allFacts = FACT_FILES.map((file) => readFileSync(resolve(REPO_ROOT, file),
 
 /** 面板应当包含、且必须能在事实源逐行找到依据的关键项。 */
 const REQUIRED_FACTS = [
-  // 包名、构建产物与稳定启动器
-  "nowen-mcp",
-  "packages/nowen-mcp",
-  "dist/scoped-entry.js",
-  "bin/nowen-mcp.mjs",
+  // 包名、单文件产物
+  "baseforge-mcp",
+  "packages/baseforge-mcp",
+  "dist/baseforge-mcp.mjs",
   // 客户端配置字段与路径
   "mcpServers",
   "servers",
   ".vscode/mcp.json",
   ".cursor/mcp.json",
-  "nowen-note",
+  "baseforge",
   "stdio",
   "nkn_xxx",
   // 命令与运行环境
@@ -55,18 +52,10 @@ const REQUIRED_FACTS = [
   "Node.js 20+",
   "Ctrl+C",
   // 环境变量
-  "NOWEN_URL",
-  "NOWEN_API_TOKEN",
-  "NOWEN_USERNAME",
-  "NOWEN_PASSWORD",
-  "NOWEN_MCP_HEARTBEAT_MS",
-  "ALLOWED_NOTEBOOK_IDS",
-  "MCP_ACCESS_MODE",
-  "MCP_INCLUDE_DESCENDANTS",
+  "BASEFORGE_URL",
+  "BASEFORGE_API_TOKEN",
   "http://localhost:3001",
   "http://192.168.1.20:3001",
-  "read-only",
-  "read-write",
   // 令牌能力
   "scopes",
   "notes:read",
@@ -74,22 +63,22 @@ const REQUIRED_FACTS = [
   "restricted",
   "unrestricted",
   "fail-closed",
-  // 常用 tools（docs/tutorials/mcp.md「可用工具」+ packages/nowen-mcp/src/index.ts）
-  "nowen_list_notebooks",
-  "nowen_create_notebook",
-  "nowen_list_notes",
-  "nowen_read_note",
-  "nowen_create_note",
-  "nowen_update_note",
-  "nowen_delete_note",
-  "nowen_search",
-  "nowen_upload_attachment",
-  "nowen_list_attachments",
-  "nowen_attach_to_note",
-  "nowen_list_tags",
-  "nowen_manage_tags",
-  "nowen_ai_process",
-  "nowen_knowledge_stats",
+  // 常用 tools（docs/tutorials/mcp.md「可用工具」+ packages/baseforge-mcp/src/index.ts）
+  "baseforge_list_notebooks",
+  "baseforge_create_notebook",
+  "baseforge_list_notes",
+  "baseforge_read_note",
+  "baseforge_create_note",
+  "baseforge_update_note",
+  "baseforge_delete_note",
+  "baseforge_search",
+  "baseforge_upload_attachment",
+  "baseforge_list_attachments",
+  "baseforge_attach_to_note",
+  "baseforge_list_tags",
+  "baseforge_manage_tags",
+  "baseforge_ai_process",
+  "baseforge_knowledge_stats",
 ];
 
 /** 面板禁止出现：禁用词、伪造的连接状态字段、不存在的安装方式、跨模块耦合。 */
@@ -107,7 +96,10 @@ const FORBIDDEN_STRINGS = [
   "isEnabled",
   "启用 MCP",
   "停用 MCP",
-  "npx nowen-mcp",
+  "npx baseforge-mcp",
+  "nowen-mcp",
+  "nowen_",
+  "NOWEN_",
   "一键 DXT",
   "SettingsModal",
   "dispatchEvent",
@@ -142,9 +134,9 @@ describe("McpSettings 纯文本契约", () => {
   it("面板里出现的每个技术标识符都必须能在真实文档 / 代码中找到（防止编造）", () => {
     const tokens = new Set<string>();
     const patterns = [
-      /\bNOWEN_[A-Z0-9_]+\b/g,
+      /\bBASEFORGE_[A-Z0-9_]+\b/g,
       /\b(?:ALLOWED_NOTEBOOK_IDS|MCP_ACCESS_MODE|MCP_INCLUDE_DESCENDANTS)\b/g,
-      /\bnowen_[a-z0-9_]+\b/g,
+      /\bbaseforge_[a-z0-9_]+\b/g,
       /\bnkn_[A-Za-z0-9_x]*\b/g,
     ];
     for (const pattern of patterns) {
@@ -185,7 +177,7 @@ describe("McpSettings 纯文本契约", () => {
     expect(componentSource).toContain("/api/ai/ask");
     expect(componentSource).toContain("已下线，请勿使用");
     expect(componentSource).not.toContain("AI_ASK_EXAMPLE");
-    expect(componentSource).not.toContain("nowen_ai_ask({");
+    expect(componentSource).not.toContain("baseforge_ai_ask({");
     expect(componentSource).not.toContain("结合 AI 生成回答并标注信息来源");
     // 仍在的端点必须写明，避免用户误以为 AI 处理能力也被删掉
     expect(componentSource).toContain("/api/ai/chat");

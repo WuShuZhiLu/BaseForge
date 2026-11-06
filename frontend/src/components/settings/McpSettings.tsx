@@ -9,65 +9,59 @@ import {
   Waypoints,
 } from "lucide-react";
 
-/* 客户端最小配置：packages/nowen-mcp/README.md · docs/tutorials/mcp.md */
+/* 客户端最小配置：packages/baseforge-mcp/README.md · docs/tutorials/mcp.md */
 const MINIMAL_CONFIG = `{
   "mcpServers": {
-    "nowen-note": {
+    "baseforge": {
       "command": "node",
-      "args": ["/absolute/path/to/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"],
+      "args": ["/absolute/path/to/Base-Notes/packages/baseforge-mcp/dist/baseforge-mcp.mjs"],
       "env": {
-        "NOWEN_URL": "http://192.168.1.20:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx"
+        "BASEFORGE_URL": "http://192.168.1.20:3001",
+        "BASEFORGE_API_TOKEN": "nkn_xxx"
       }
     }
   }
 }`;
 
-const BUILD_COMMANDS = `cd packages/nowen-mcp
+const BUILD_COMMANDS = `cd packages/baseforge-mcp
 npm install
 npm run build`;
 
-const QUICK_CHECK = `node ./bin/nowen-mcp.mjs`;
+const QUICK_CHECK = `node ./dist/baseforge-mcp.mjs`;
 
-/* 环境变量：packages/nowen-mcp/README.md · docs/tutorials/mcp.md「环境变量」 */
+/* 环境变量：packages/baseforge-mcp/README.md · docs/tutorials/mcp.md「环境变量」 */
 const ENV_VARS: Array<[string, string, string]> = [
-  ["NOWEN_URL", "BaseForge 服务地址", "http://localhost:3001"],
-  ["NOWEN_API_TOKEN", "Personal API Token，优先于用户名密码", "—"],
-  ["NOWEN_USERNAME", "旧版用户名认证，仅用于兼容旧配置", "admin"],
-  ["NOWEN_PASSWORD", "旧版密码认证，仅用于兼容旧配置", "admin123"],
-  ["ALLOWED_NOTEBOOK_IDS", "MCP 实例侧笔记本白名单，逗号分隔", "未启用"],
-  ["MCP_ACCESS_MODE", "read-only 或 read-write", "read-write"],
-  ["MCP_INCLUDE_DESCENDANTS", "本地白名单是否包含子笔记本", "false"],
-  ["NOWEN_MCP_HEARTBEAT_MS", "可选 stderr 心跳间隔（毫秒），0/off 关闭", "0"],
+  ["BASEFORGE_URL", "BaseForge 服务地址", "http://localhost:3001"],
+  ["BASEFORGE_API_TOKEN", "Personal API Token，必填，缺失时启动即报错", "—"],
 ];
 
-/* 可用工具：docs/tutorials/mcp.md「可用工具」与 packages/nowen-mcp/src/index.ts */
+/* 可用工具：docs/tutorials/mcp.md「可用工具」与 packages/baseforge-mcp/src/index.ts */
 const TOOL_GROUPS: Array<{ label: string; tools: string[] }> = [
-  { label: "笔记本", tools: ["nowen_list_notebooks", "nowen_create_notebook"] },
+  { label: "笔记本", tools: ["baseforge_list_notebooks", "baseforge_create_notebook"] },
   {
     label: "笔记与搜索",
     tools: [
-      "nowen_list_notes",
-      "nowen_read_note",
-      "nowen_create_note",
-      "nowen_update_note",
-      "nowen_delete_note",
-      "nowen_search",
+      "baseforge_list_notes",
+      "baseforge_read_note",
+      "baseforge_create_note",
+      "baseforge_update_note",
+      "baseforge_delete_note",
+      "baseforge_search",
     ],
   },
   {
     label: "附件与标签",
     tools: [
-      "nowen_upload_attachment",
-      "nowen_list_attachments",
-      "nowen_attach_to_note",
-      "nowen_list_tags",
-      "nowen_manage_tags",
+      "baseforge_upload_attachment",
+      "baseforge_list_attachments",
+      "baseforge_attach_to_note",
+      "baseforge_list_tags",
+      "baseforge_manage_tags",
     ],
   },
   {
     label: "AI 文本处理与统计",
-    tools: ["nowen_ai_process", "nowen_knowledge_stats"],
+    tools: ["baseforge_ai_process", "baseforge_knowledge_stats"],
   },
 ];
 
@@ -110,7 +104,7 @@ export default function McpSettings() {
         </div>
         <p className="mt-1.5 text-sm leading-6 text-tx-tertiary">
           BaseForge 的知识库可作为外部 AI 的检索来源（检索增强 / RAG）。本地 MCP Server{" "}
-          <InlineCode>nowen-mcp</InlineCode>{" "}
+          <InlineCode>baseforge-mcp</InlineCode>{" "}
           以 stdio 方式运行，让 Claude Code、Cursor、VS Code 等 AI 客户端在授权范围内搜索、读取和维护笔记。
         </p>
       </header>
@@ -124,21 +118,22 @@ export default function McpSettings() {
 
       <Section icon={<Server size={16} />} title="运作方式与准备">
         <ul className="list-disc space-y-1.5 pl-5 text-xs leading-6 text-tx-secondary">
-          <li>当前提供的是源码安装方式，需要 Node.js 20+ 与 npm。</li>
+          <li>
+            MCP Server 是单文件 <InlineCode>packages/baseforge-mcp/dist/baseforge-mcp.mjs</InlineCode>，依赖已全部打进文件，使用方只需 Node.js 20+。
+          </li>
           <li>
             MCP Server 由外部 AI 客户端以本地 stdio 方式启动；stdout 仅用于 MCP stdio 协议，诊断日志写入 stderr。
           </li>
-          <li>从仓库获取源码后，在 <InlineCode>packages/nowen-mcp</InlineCode> 目录执行构建：</li>
+          <li>
+            若仓库中没有构建产物（或需要更新），在 <InlineCode>packages/baseforge-mcp</InlineCode> 目录执行：
+          </li>
         </ul>
         <CodeBlock>{BUILD_COMMANDS}</CodeBlock>
         <p className="text-xs leading-6 text-tx-secondary">
-          构建产物 <InlineCode>dist/scoped-entry.js</InlineCode> 是稳定启动器内部加载的入口，不要直接配置给客户端；客户端应配置稳定启动器{" "}
-          <InlineCode>bin/nowen-mcp.mjs</InlineCode>。快速检查（stdio Server 正常会等待客户端输入并保持静默，按 <InlineCode>Ctrl+C</InlineCode> 结束）：
+          快速检查：命令行运行 <CodeBlock>{QUICK_CHECK}</CodeBlock>，提示缺少 <InlineCode>BASEFORGE_API_TOKEN</InlineCode> 即表示文件可执行（按 <InlineCode>Ctrl+C</InlineCode> 结束）。
         </p>
-        <CodeBlock>{QUICK_CHECK}</CodeBlock>
         <p className="text-xs leading-6 text-tx-secondary">
-          认证优先级为 <InlineCode>NOWEN_API_TOKEN</InlineCode>，其次 <InlineCode>NOWEN_USERNAME</InlineCode> 与{" "}
-          <InlineCode>NOWEN_PASSWORD</InlineCode>（仅用于兼容旧配置，不建议长期使用）。最终权限是用户 ACL、Token scopes 与 Token 笔记本资源授权的交集。
+          权限完全由 <InlineCode>BASEFORGE_API_TOKEN</InlineCode> 决定：最终权限是用户 ACL、Token scopes 与 Token 笔记本资源授权的交集，全部由服务端执行。
         </p>
       </Section>
 
@@ -149,8 +144,8 @@ export default function McpSettings() {
         </p>
         <CodeBlock>{MINIMAL_CONFIG}</CodeBlock>
         <p className="text-xs leading-6 text-tx-secondary">
-          需要替换 <InlineCode>args</InlineCode> 中启动器的绝对路径、<InlineCode>NOWEN_URL</InlineCode> 与{" "}
-          <InlineCode>NOWEN_API_TOKEN</InlineCode>。路径必须是绝对路径；Windows JSON 路径中的反斜杠需写成双反斜杠；Linux、macOS 和 WSL 路径必须以 / 开头。若服务部署在 NAS，<InlineCode>NOWEN_URL</InlineCode> 填写能从当前电脑访问的地址，例如{" "}
+          需要替换 <InlineCode>args</InlineCode> 中单文件的绝对路径、<InlineCode>BASEFORGE_URL</InlineCode> 与{" "}
+          <InlineCode>BASEFORGE_API_TOKEN</InlineCode>。路径必须是绝对路径；Windows JSON 路径中的反斜杠需写成双反斜杠；Linux、macOS 和 WSL 路径必须以 / 开头。若服务部署在 NAS，<InlineCode>BASEFORGE_URL</InlineCode> 填写能从当前电脑访问的地址，例如{" "}
           <InlineCode>http://192.168.1.20:3001</InlineCode>。
         </p>
         <div>
@@ -166,10 +161,6 @@ export default function McpSettings() {
             ))}
           </dl>
         </div>
-        <p className="text-xs leading-6 text-tx-secondary">
-          <InlineCode>ALLOWED_NOTEBOOK_IDS</InlineCode>、<InlineCode>MCP_ACCESS_MODE</InlineCode> 与{" "}
-          <InlineCode>MCP_INCLUDE_DESCENDANTS</InlineCode> 是 MCP 实例侧的本地白名单，可作为服务端 <InlineCode>restricted</InlineCode> 令牌授权之外的第二道限制；两层同时启用时，实际范围取交集。
-        </p>
       </Section>
 
       <Section icon={<KeyRound size={16} />} title="访问令牌">
@@ -192,7 +183,7 @@ export default function McpSettings() {
 
       <Section icon={<BookOpen size={16} />} title="可用工具">
         <p className="text-xs leading-6 text-tx-secondary">
-          重启客户端后，可先确认工具列表中出现 <InlineCode>nowen_list_notebooks</InlineCode>、<InlineCode>nowen_list_notes</InlineCode>、<InlineCode>nowen_read_note</InlineCode>、<InlineCode>nowen_search</InlineCode>。常用工具分组如下：
+          重启客户端后，可先确认工具列表中出现 <InlineCode>baseforge_list_notebooks</InlineCode>、<InlineCode>baseforge_list_notes</InlineCode>、<InlineCode>baseforge_read_note</InlineCode>、<InlineCode>baseforge_search</InlineCode>。常用工具分组如下：
         </p>
         <dl className="space-y-2">
           {TOOL_GROUPS.map((group) => (
@@ -205,11 +196,11 @@ export default function McpSettings() {
           ))}
         </dl>
         <p className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs leading-6 text-amber-700 dark:text-amber-300">
-          项目内 AI 问答已移除；MCP 中残留的 <InlineCode>nowen_ai_ask</InlineCode> 对应后端 <InlineCode>/api/ai/ask</InlineCode> 已下线，请勿使用。
-          <InlineCode>nowen_ai_process</InlineCode> 与 <InlineCode>nowen_knowledge_stats</InlineCode> 分别走仍在的 <InlineCode>/api/ai/chat</InlineCode> 与 <InlineCode>/api/ai/knowledge-stats</InlineCode>。
+          项目内 AI 问答已移除；MCP 中残留的 <InlineCode>baseforge_ai_ask</InlineCode> 对应后端 <InlineCode>/api/ai/ask</InlineCode> 已下线，请勿使用。
+          <InlineCode>baseforge_ai_process</InlineCode> 与 <InlineCode>baseforge_knowledge_stats</InlineCode> 分别走仍在的 <InlineCode>/api/ai/chat</InlineCode> 与 <InlineCode>/api/ai/knowledge-stats</InlineCode>。
         </p>
         <p className="text-xs leading-6 text-tx-secondary">
-          <InlineCode>nowen_search</InlineCode> 为全文搜索，结果自动限定在授权范围内；<InlineCode>nowen_knowledge_stats</InlineCode> 的全局统计在本地 scoped 模式下默认拒绝。
+          <InlineCode>baseforge_search</InlineCode> 为全文搜索，结果自动限定在 Token 授权范围内。
         </p>
       </Section>
 
@@ -219,9 +210,9 @@ export default function McpSettings() {
           <li>
             不要把令牌提交到 Git 仓库，也不要把真实令牌写进 <InlineCode>.cursor/mcp.json</InlineCode>、<InlineCode>.vscode/mcp.json</InlineCode> 等配置后提交。
           </li>
-          <li><InlineCode>NOWEN_URL</InlineCode> 指向 NAS 时，先从客户端电脑浏览器验证地址可访问。</li>
+          <li><InlineCode>BASEFORGE_URL</InlineCode> 指向 NAS 时，先从客户端电脑浏览器验证地址可访问。</li>
           <li>
-            返回 401 表示令牌错误、过期或已撤销；403 表示 scope、用户 ACL、笔记本授权或本地白名单拒绝了请求，不要改用管理员密码绕过。
+            返回 401 表示令牌错误、过期或已撤销；403 表示 scope、用户 ACL 或笔记本授权拒绝了请求，不要改用管理员密码绕过。
           </li>
         </ul>
       </Section>

@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /**
  * BaseForge MCP Server
- * 
+ *
  * 让 Codex CLI / Claude Desktop / Cursor 等 AI 工具直接操作 BaseForge 笔记系统。
- * 
+ *
  * 环境变量：
- *   NOWEN_URL      — BaseForge 后端地址（默认 http://localhost:3001）
- *   NOWEN_USERNAME — 登录用户名（默认 admin）
- *   NOWEN_PASSWORD — 登录密码（默认 admin123）
+ *   BASEFORGE_URL       — BaseForge 后端地址（默认 http://localhost:3001）
+ *   BASEFORGE_API_TOKEN — Personal API Token（设置 → 个人访问令牌 创建）
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { NowenApiClient } from "./api-client.js";
+import { BaseForgeApiClient } from "./api-client.js";
 import {
   CONTENT_FORMAT_VALUES,
   buildCreateNotePayload,
@@ -23,23 +22,27 @@ import {
 
 // ===== 从环境变量读取配置 =====
 const config = {
-  baseUrl: process.env.NOWEN_URL || "http://localhost:3001",
-  username: process.env.NOWEN_USERNAME || "admin",
-  password: process.env.NOWEN_PASSWORD || "admin123",
+  baseUrl: process.env.BASEFORGE_URL || "http://localhost:3001",
+  apiToken: process.env.BASEFORGE_API_TOKEN || "",
 };
 
-const api = new NowenApiClient(config);
+if (!config.apiToken) {
+  console.error("缺少 BASEFORGE_API_TOKEN。请在 BaseForge 设置 → 个人访问令牌 创建一个 Token，并写入客户端 MCP 配置的 env。");
+  process.exit(1);
+}
+
+const api = new BaseForgeApiClient(config);
 
 // ===== 创建 MCP Server =====
 const server = new McpServer({
-  name: "nowen-note",
+  name: "baseforge",
   version: "1.0.0",
 });
 
 // ==================== 笔记本工具 ====================
 
 server.tool(
-  "nowen_list_notebooks",
+  "baseforge_list_notebooks",
   "获取 BaseForge 中的所有笔记本列表（支持树形结构），返回每个笔记本的 id、名称、图标、颜色和笔记数量",
   {},
   async () => {
@@ -63,7 +66,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_create_notebook",
+  "baseforge_create_notebook",
   "在 BaseForge 中创建一个新笔记本",
   {
     name: z.string().describe("笔记本名称"),
@@ -85,7 +88,7 @@ server.tool(
 // ==================== 笔记工具 ====================
 
 server.tool(
-  "nowen_list_notes",
+  "baseforge_list_notes",
   "获取 BaseForge 中的笔记列表。可按笔记本、标签、收藏状态、日期范围等筛选。返回笔记概要（不含完整内容）",
   {
     notebookId: z.string().optional().describe("按笔记本 ID 筛选"),
@@ -128,7 +131,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_read_note",
+  "baseforge_read_note",
   "读取指定笔记，可返回纯文本、Markdown/原始正文或结构化块树",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -174,7 +177,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_create_note",
+  "baseforge_create_note",
   "在 BaseForge 中创建一篇新笔记。需要指定目标笔记本 ID",
   {
     notebookId: z.string().describe("目标笔记本 ID"),
@@ -196,7 +199,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_update_note",
+  "baseforge_update_note",
   "更新 BaseForge 中已有笔记的标题或内容",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -218,7 +221,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_delete_note",
+  "baseforge_delete_note",
   "将 BaseForge 中指定笔记移入回收站（软删除），或从回收站永久删除",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -245,7 +248,7 @@ server.tool(
 const noteBlockTypeSchema = z.enum(["heading", "paragraph", "listItem", "taskItem", "blockquote", "codeBlock"]);
 
 server.tool(
-  "nowen_resolve_link",
+  "baseforge_resolve_link",
   "解析 note: 内部链接，返回目标笔记和可选目标块",
   { link: z.string().describe("note:<noteId> 或 note:<noteId>#blk:<blockId>") },
   async ({ link }) => {
@@ -259,7 +262,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_get_backlinks",
+  "baseforge_get_backlinks",
   "获取引用指定笔记的来源笔记和来源块",
   {
     noteId: z.string().describe("目标笔记 ID"),
@@ -276,7 +279,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_get_block",
+  "baseforge_get_block",
   "按 noteId + blockId 读取单个结构化块",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -293,7 +296,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_search_blocks",
+  "baseforge_search_blocks",
   "全文搜索块，返回 noteId、blockId、块类型、文本和路径",
   {
     query: z.string().describe("搜索关键词"),
@@ -311,7 +314,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_get_block_backlinks",
+  "baseforge_get_block_backlinks",
   "获取指向指定块的来源笔记和来源块",
   {
     noteId: z.string().describe("目标笔记 ID"),
@@ -328,7 +331,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_create_block",
+  "baseforge_create_block",
   "在笔记中创建块；通过 expectedNoteVersion 防并发覆盖，operationId 保证重试幂等",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -349,7 +352,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_update_block",
+  "baseforge_update_block",
   "更新块文本，要求笔记版本和幂等操作 ID",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -369,7 +372,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_delete_block",
+  "baseforge_delete_block",
   "删除块，要求笔记版本和幂等操作 ID",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -388,7 +391,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_move_block",
+  "baseforge_move_block",
   "在同一父块内移动块，要求笔记版本和幂等操作 ID",
   {
     noteId: z.string().describe("笔记 ID"),
@@ -411,7 +414,7 @@ server.tool(
 // ==================== 附件工具 ====================
 
 server.tool(
-  "nowen_upload_attachment",
+  "baseforge_upload_attachment",
   "上传本地文件到 BaseForge。传 noteId 时绑定指定笔记；不传 noteId 时上传到文件管理。返回的 url 可直接写入 Markdown 图片或链接",
   {
     filePath: z.string().describe("本地文件路径"),
@@ -447,7 +450,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_list_attachments",
+  "baseforge_list_attachments",
   "列出 BaseForge 文件管理中的附件，可按类型、笔记、笔记本、文件夹、关键词和引用状态筛选",
   {
     category: z.enum(["all", "image", "file"]).optional().describe("附件类型，默认 all"),
@@ -486,7 +489,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_attach_to_note",
+  "baseforge_attach_to_note",
   "把已上传附件插入指定 Markdown 笔记正文。图片生成 ![alt](url)，其它文件生成下载链接，并携带当前 version 更新笔记",
   {
     noteId: z.string().describe("目标笔记 ID"),
@@ -513,7 +516,7 @@ server.tool(
 // ==================== 搜索工具 ====================
 
 server.tool(
-  "nowen_search",
+  "baseforge_search",
   "搜索笔记或块；块级搜索会返回稳定 blockId",
   {
     query: z.string().describe("搜索关键词"),
@@ -547,7 +550,7 @@ server.tool(
 // ==================== 标签工具 ====================
 
 server.tool(
-  "nowen_list_tags",
+  "baseforge_list_tags",
   "获取 BaseForge 中的所有标签列表，包含每个标签的颜色和关联笔记数",
   {},
   async () => {
@@ -569,7 +572,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_manage_tags",
+  "baseforge_manage_tags",
   "管理 BaseForge 中笔记的标签：创建标签、给笔记添加标签、或移除笔记标签",
   {
     action: z.enum(["create", "add_to_note", "remove_from_note"]).describe("操作类型: create=创建标签, add_to_note=给笔记添加标签, remove_from_note=移除笔记标签"),
@@ -606,7 +609,7 @@ server.tool(
 // ==================== AI 工具 ====================
 
 server.tool(
-  "nowen_ai_ask",
+  "baseforge_ai_ask",
   "向 BaseForge 知识库提问。系统会自动检索相关笔记内容，结合 AI 生成回答，并标注信息来源",
   {
     question: z.string().describe("要提问的问题"),
@@ -627,7 +630,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_ai_process",
+  "baseforge_ai_process",
   "使用 AI 处理笔记文本。支持续写、改写、润色、精简、扩展、翻译、摘要、解释、纠错、格式化等操作",
   {
     action: z.enum([
@@ -649,7 +652,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_knowledge_stats",
+  "baseforge_knowledge_stats",
   "获取 BaseForge 知识库的统计信息，包括笔记数、笔记本数、标签数、FTS 索引状态等",
   {},
   async () => {
@@ -667,7 +670,7 @@ server.tool(
 // ==================== 插件工具 ====================
 
 server.tool(
-  "nowen_list_plugins",
+  "baseforge_list_plugins",
   "获取 BaseForge 中已加载的插件列表，每个插件声明了它支持的能力（action）",
   {},
   async () => {
@@ -681,7 +684,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_execute_plugin",
+  "baseforge_execute_plugin",
   "执行 BaseForge 中指定名称的插件，传入参数并获取处理结果",
   {
     pluginName: z.string().describe("插件名称"),
@@ -703,7 +706,7 @@ server.tool(
 // ==================== Webhook 工具 ====================
 
 server.tool(
-  "nowen_list_webhooks",
+  "baseforge_list_webhooks",
   "获取 BaseForge 中已配置的 Webhook 列表",
   {},
   async () => {
@@ -717,7 +720,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_create_webhook",
+  "baseforge_create_webhook",
   "在 BaseForge 中创建新的 Webhook，当指定事件发生时自动推送 HTTP 通知",
   {
     url: z.string().describe("Webhook 回调 URL"),
@@ -737,7 +740,7 @@ server.tool(
 // ==================== 审计日志工具 ====================
 
 server.tool(
-  "nowen_audit_stats",
+  "baseforge_audit_stats",
   "获取 BaseForge 的操作审计统计（按分类、级别统计，以及最近操作记录）",
   {},
   async () => {
@@ -762,7 +765,7 @@ server.tool(
 // ==================== 备份工具 ====================
 
 server.tool(
-  "nowen_list_backups",
+  "baseforge_list_backups",
   "获取 BaseForge 的数据备份列表",
   {},
   async () => {
@@ -782,7 +785,7 @@ server.tool(
 );
 
 server.tool(
-  "nowen_create_backup",
+  "baseforge_create_backup",
   "创建 BaseForge 数据备份。db-only 仅备份数据库，full 备份所有数据",
   {
     type: z.enum(["db-only", "full"]).optional().describe("备份类型，默认 db-only"),
@@ -801,7 +804,7 @@ server.tool(
 
 server.resource(
   "notebooks",
-  "nowen://notebooks",
+  "baseforge://notebooks",
   async (uri) => {
     const notebooks = await api.listNotebooks();
     return {
@@ -821,7 +824,6 @@ export async function main() {
   await server.connect(transport);
   console.error(`🚀 BaseForge MCP Server 已启动`);
   console.error(`   连接目标: ${config.baseUrl}`);
-  console.error(`   用户: ${config.username}`);
 }
 
 await main();

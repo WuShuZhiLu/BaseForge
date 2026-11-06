@@ -1,17 +1,17 @@
 {
-  "name": "nowen-mcp",
+  "name": "baseforge-mcp",
   "version": "1.0.0",
   "description": "BaseForge MCP Server — 让 AI 工具直接操作笔记系统",
   "type": "module",
-  "main": "dist/scoped-entry.js",
+  "main": "dist/baseforge-mcp.mjs",
   "bin": {
-    "nowen-mcp": "./bin/nowen-mcp.mjs"
+    "baseforge-mcp": "./dist/baseforge-mcp.mjs"
   },
   "scripts": {
-    "dev": "tsx watch src/scoped-entry.ts",
-    "build": "tsc",
-    "start": "node ./bin/nowen-mcp.mjs",
-    "test": "npm run build && node --test dist/scope-policy.test.js && tsx --test tests/note-format.test.ts && node --test tests/runtime-diagnostics.test.mjs"
+    "dev": "tsx watch src/index.ts",
+    "build": "node ./scripts/build.mjs",
+    "start": "node ./dist/baseforge-mcp.mjs",
+    "test": "tsx --test tests/note-format.test.ts tests/attachments.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

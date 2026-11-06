@@ -6,12 +6,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export interface NowenApiConfig {
+export interface BaseForgeApiConfig {
   baseUrl: string;   // 例如 http://localhost:3001
-  username: string;
-  password: string;
+  apiToken: string;  // Personal API Token（nkn_xxx）
 }
-
 export interface AttachmentUploadResult {
   id: string;
   url: string;
@@ -30,38 +28,13 @@ export interface AttachmentListResult {
   pageSize: number;
 }
 
-export class NowenApiClient {
+export class BaseForgeApiClient {
   private baseUrl: string;
-  private username: string;
-  private password: string;
-  private token: string | null = null;
+  private apiToken: string;
 
-  constructor(config: NowenApiConfig) {
+  constructor(config: BaseForgeApiConfig) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
-    this.username = config.username;
-    this.password = config.password;
-  }
-
-  /** 登录获取 JWT Token */
-  private async login(): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: this.username, password: this.password }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`登录失败 (${res.status}): ${err}`);
-    }
-    const data = await res.json() as { token: string };
-    this.token = data.token;
-  }
-
-  /** 确保已认证 */
-  private async ensureAuth(): Promise<void> {
-    if (!this.token) {
-      await this.login();
-    }
+    this.apiToken = config.apiToken;
   }
 
   /** 发送带认证的 API 请求 */
@@ -73,12 +46,10 @@ export class NowenApiClient {
       query?: Record<string, string | number | boolean | undefined | null>;
     } = {}
   ): Promise<T> {
-    await this.ensureAuth();
-
     const url = this.buildUrl(path, options.query);
 
     const headers: Record<string, string> = {
-      "Authorization": `Bearer ${this.token}`,
+      "Authorization": `Bearer ${this.apiToken}`,
     };
     if (options.body) {
       headers["Content-Type"] = "application/json";
@@ -89,23 +60,6 @@ export class NowenApiClient {
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
-
-    // Token 过期，重新登录后重试
-    if (res.status === 401) {
-      this.token = null;
-      await this.login();
-      headers["Authorization"] = `Bearer ${this.token}`;
-      const retryRes = await fetch(url, {
-        method: options.method || "GET",
-        headers,
-        body: options.body ? JSON.stringify(options.body) : undefined,
-      });
-      if (!retryRes.ok) {
-        const err = await retryRes.text();
-        throw new Error(`API 请求失败 (${retryRes.status}): ${err}`);
-      }
-      return retryRes.json() as Promise<T>;
-    }
 
     if (!res.ok) {
       const err = await res.text();
@@ -135,10 +89,9 @@ export class NowenApiClient {
     form: FormData,
     query?: Record<string, string | number | boolean | undefined | null>,
   ): Promise<T> {
-    await this.ensureAuth();
     const url = this.buildUrl(pathname, query);
     const headers: Record<string, string> = {
-      "Authorization": `Bearer ${this.token}`,
+      "Authorization": `Bearer ${this.apiToken}`,
     };
 
     const res = await fetch(url, {
@@ -146,21 +99,6 @@ export class NowenApiClient {
       headers,
       body: form,
     });
-
-    if (res.status === 401) {
-      this.token = null;
-      await this.login();
-      const retryRes = await fetch(url, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${this.token}` },
-        body: form,
-      });
-      if (!retryRes.ok) {
-        const err = await retryRes.text();
-        throw new Error(`API 上传失败 (${retryRes.status}): ${err}`);
-      }
-      return retryRes.json() as Promise<T>;
-    }
 
     if (!res.ok) {
       const err = await res.text();
@@ -477,13 +415,11 @@ export class NowenApiClient {
 
   /** 知识库问答（非流式，收集完整响应） */
   async askKnowledge(question: string): Promise<{ answer: string; references: { id: string; title: string }[] }> {
-    await this.ensureAuth();
-
     const res = await fetch(`${this.baseUrl}/api/ai/ask`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.token}`,
+        "Authorization": `Bearer ${this.apiToken}`,
       },
       body: JSON.stringify({ question }),
     });
@@ -540,13 +476,11 @@ export class NowenApiClient {
     context?: string;
     customPrompt?: string;
   }): Promise<string> {
-    await this.ensureAuth();
-
     const res = await fetch(`${this.baseUrl}/api/ai/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.token}`,
+        "Authorization": `Bearer ${this.apiToken}`,
       },
       body: JSON.stringify(params),
     });

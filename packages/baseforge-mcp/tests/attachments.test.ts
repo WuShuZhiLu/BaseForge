@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { NowenApiClient } from "../src/api-client.js";
+import { BaseForgeApiClient } from "../src/api-client.js";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -13,7 +13,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 test("MCP uploadAttachment sends multipart data without JSON content type", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "nowen-mcp-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "baseforge-mcp-"));
   const filePath = path.join(dir, "图片.png");
   await writeFile(filePath, Buffer.from("png-bytes"));
 
@@ -21,7 +21,6 @@ test("MCP uploadAttachment sends multipart data without JSON content type", asyn
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init: init || {} });
-    if (calls.length === 1) return jsonResponse({ token: "token-1" });
     return jsonResponse({
       id: "att-1",
       url: "/api/attachments/att-1",
@@ -33,10 +32,9 @@ test("MCP uploadAttachment sends multipart data without JSON content type", asyn
   }) as typeof fetch;
 
   try {
-    const client = new NowenApiClient({
+    const client = new BaseForgeApiClient({
       baseUrl: "http://example.test",
-      username: "admin",
-      password: "pw",
+      apiToken: "nkn_test",
     });
 
     const result = await client.uploadAttachment({
@@ -46,11 +44,11 @@ test("MCP uploadAttachment sends multipart data without JSON content type", asyn
     });
 
     assert.equal(result.id, "att-1");
-    assert.equal(calls[1].url, "http://example.test/api/attachments");
-    assert.equal(calls[1].init.method, "POST");
-    assert.equal((calls[1].init.headers as Record<string, string>).Authorization, "Bearer token-1");
-    assert.equal((calls[1].init.headers as Record<string, string>)["Content-Type"], undefined);
-    assert.ok(calls[1].init.body instanceof FormData);
+    assert.equal(calls[0].url, "http://example.test/api/attachments");
+    assert.equal(calls[0].init.method, "POST");
+    assert.equal((calls[0].init.headers as Record<string, string>).Authorization, "Bearer nkn_test");
+    assert.equal((calls[0].init.headers as Record<string, string>)["Content-Type"], undefined);
+    assert.ok(calls[0].init.body instanceof FormData);
   } finally {
     globalThis.fetch = originalFetch;
     await rm(dir, { recursive: true, force: true });
@@ -62,7 +60,6 @@ test("MCP attachToNote appends markdown link with current note version", async (
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init: init || {} });
-    if (calls.length === 1) return jsonResponse({ token: "token-1" });
     if (String(url).endsWith("/api/files/att-1")) {
       return jsonResponse({ id: "att-1", filename: "截图.png", mimeType: "image/png", category: "image" });
     }
@@ -73,10 +70,9 @@ test("MCP attachToNote appends markdown link with current note version", async (
   }) as typeof fetch;
 
   try {
-    const client = new NowenApiClient({
+    const client = new BaseForgeApiClient({
       baseUrl: "http://example.test",
-      username: "admin",
-      password: "pw",
+      apiToken: "nkn_test",
     });
 
     await client.attachToNote({
@@ -86,7 +82,7 @@ test("MCP attachToNote appends markdown link with current note version", async (
       mode: "append",
     });
 
-    const update = calls[3];
+    const update = calls[2];
     assert.equal(update.url, "http://example.test/api/notes/note-1");
     assert.equal(update.init.method, "PUT");
     const body = JSON.parse(String(update.init.body));
@@ -101,7 +97,7 @@ test("MCP attachToNote appends markdown link with current note version", async (
 test("MCP server registers attachment tools", async () => {
   const source = await readFile(path.resolve("src/index.ts"), "utf8");
 
-  assert.match(source, /nowen_upload_attachment/);
-  assert.match(source, /nowen_list_attachments/);
-  assert.match(source, /nowen_attach_to_note/);
+  assert.match(source, /baseforge_upload_attachment/);
+  assert.match(source, /baseforge_list_attachments/);
+  assert.match(source, /baseforge_attach_to_note/);
 });
