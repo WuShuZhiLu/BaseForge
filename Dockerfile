@@ -4,7 +4,8 @@
 ARG TARGETARCH=amd64
 
 # ---------- Stage 1: 前端构建 ----------
-FROM --platform=$BUILDPLATFORM node:20-alpine AS frontend-build
+# Node 必须 >= 22.5：后端运行时依赖内置 node:sqlite（见 package.json engines）。
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-build
 ARG TARGETARCH
 WORKDIR /app/frontend
 
@@ -31,7 +32,7 @@ COPY scripts/verify-sync-notification-ui.cjs /app/scripts/verify-sync-notificati
 RUN npm run build:web
 
 # ---------- Stage 2: 后端构建（包含 updater 专用入口） ----------
-FROM node:20-alpine AS backend-build
+FROM node:22-alpine AS backend-build
 WORKDIR /app/backend
 # 仅编译用，指向已存在文件让 ffmpeg-static 跳过下载（本阶段不需要真二进制）
 ENV FFMPEG_BIN=/bin/true
@@ -46,8 +47,10 @@ RUN npx tsc \
 RUN apk del .build-deps
 
 # ---------- Stage 3: 运行时镜像 ----------
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
+# 运行时硬依赖内置 sqlite，基础镜像降级会在这里直接构建失败，而不是等到容器启动才崩
+RUN node -e "require('node:sqlite');const v=process.versions.node;const [M,m]=v.split('.').map(Number);if(M<22||(M===22&&m<5))throw new Error('Node '+v+' 不支持 node:sqlite，需要 >= 22.5');console.log('node:sqlite ok:',v)"
 RUN apk add --no-cache tini tzdata ffmpeg
 # 运行时用系统 ffmpeg；同时让 npm ci 里 ffmpeg-static 跳过下载
 ENV FFMPEG_PATH=/usr/bin/ffmpeg
