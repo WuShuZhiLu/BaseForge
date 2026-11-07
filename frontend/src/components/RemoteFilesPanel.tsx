@@ -16,6 +16,7 @@ import { alert, confirm } from "@/components/ui/confirm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MenuItem, MenuSurface } from "@/components/ui/menu";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -788,6 +789,7 @@ function SourceManager(props: {
 
 /** ============ 主区中心 ============ */
 export default function RemoteFilesPanel() {
+  const { t } = useTranslation();
   const [sources, setSources] = useState<RemoteSourcePublic[]>([]);
   const [activeId, setActiveId] = useState("");
   const [managerOpen, setManagerOpen] = useState(false);
@@ -1448,7 +1450,7 @@ export default function RemoteFilesPanel() {
             <label className="relative block w-[210px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
-                placeholder="搜索"
+                placeholder={t("common.search")}
                 value={remoteQuery}
                 onChange={(e) => setRemoteQuery(e.target.value)}
                 className="h-[30px] pl-7 pr-7 text-[11.5px]"

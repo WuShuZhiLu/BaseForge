@@ -1437,7 +1437,7 @@ export default function FileManager() {
             <label className="relative block w-[190px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
-                placeholder="搜索"
+                placeholder={t("common.search")}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="h-[30px] pl-7 pr-7 text-[11.5px]"

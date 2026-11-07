@@ -15,6 +15,7 @@
     "close": "Close"
   },
   "common": {
+    "search": "Search",
     "cancel": "Cancel",
     "chars": "chars",
     "confirm": "Confirm",

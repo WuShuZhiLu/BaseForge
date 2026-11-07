@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/confirm";
 import { useApp } from "@/store/AppContext";
+import { useTranslation } from "react-i18next";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
 import { attachmentShareApi } from "@/lib/attachmentShareApi";
@@ -192,6 +193,7 @@ function IconAction({ label, onClick, danger = false, children }: {
 }
 
 export default function ShareManagementPage() {
+  const { t } = useTranslation();
   const { siteConfig } = useSiteSettings();
   const { state } = useApp();
   const [data, setData] = useState<ShareCenterResponse | null>(null);
@@ -621,7 +623,7 @@ export default function ShareManagementPage() {
                 aria-label="搜索分享"
                 value={searchDraft}
                 onChange={(event) => setSearchDraft(event.target.value)}
-                placeholder="搜索"
+                placeholder={t("common.search")}
                 className="h-[30px] pl-7 pr-7 text-[11.5px]"
               />
               {searchDraft && (
