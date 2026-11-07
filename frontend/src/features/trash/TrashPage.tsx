@@ -222,10 +222,10 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
           <input type="checkbox" disabled={disabled || !visible.length} checked={!!visible.length && visible.every((item) => selected.includes(item.id))} onChange={(event) => setSelected(event.target.checked ? [...new Set([...selected, ...visible.map((item) => item.id)])] : selected.filter((id) => !visible.some((item) => item.id === id)))} />
           {t("trashCenter.selectAll")}
         </label>
-        <span>{t("trashCenter.selected", { count: selectedItems.length })}</span>
-        <button className={`${buttonClass} h-7 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}><RotateCcw size={13} />{t("trashCenter.restore")}</button>
-        <button className={`${buttonClass} h-7 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}><Trash2 size={13} />{t("trashCenter.permanent")}</button>
-        <button className="shrink-0 text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
+          <span>{t("trashCenter.selected", { count: selectedItems.length })}</span>
+          <button className={`${buttonClass} h-7 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}>{t("trashCenter.restore")}</button>
+          <button className="shrink-0 text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
+          <button className={`${buttonClass} h-7 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}>{t("trashCenter.permanent")}</button>
       </div>
     )}
     <div className="flex min-h-0 flex-1">

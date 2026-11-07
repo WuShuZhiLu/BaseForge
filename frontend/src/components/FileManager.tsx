@@ -1569,7 +1569,7 @@ export default function FileManager() {
             disabled={selectedIds.size === 0 || batchSharing}
             title="为选中附件开启只读分享链接，并全部复制到剪贴板"
           >
-            {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Link2 size={14} className="mr-1" />}
+            {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : null}
             生成公开链接
           </Button>
           <Button
@@ -1587,7 +1587,7 @@ export default function FileManager() {
             disabled={selectedIds.size === 0 || batchDeleting}
             className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
           >
-            {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}
+            {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : null}
             删除选中
           </Button>
         </div>

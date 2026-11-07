@@ -694,13 +694,20 @@ export default function ShareManagementPage() {
       {/* 批量操作栏：点击选择后出现 */}
       {selectionMode && (
         <div className="flex flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+          <button
+            className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
+            disabled={selectableItems.length === 0}
+            onClick={() => setSelected(new Map(selectableItems.map((item) => [itemKey(item), item])))}
+          >
+            <CheckSquare size={14} className="text-accent-primary" />
+            全选
+          </button>
           <span className="font-medium text-tx-primary">已选 {selected.size} 项</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <Button size="sm" variant="outline" onClick={() => void batchDisable()}>批量停用</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchExpire()}>批量设过期（30 天后）</Button>
             <Button size="sm" variant="outline" onClick={() => void batchCopy()}>批量复制全部链接</Button>
-            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>批量删除</Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Map())}>取消</Button>
+            <Button size="sm" variant="outline" onClick={() => setSelected(new Map())}>清空选择</Button>
+            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>删除选中</Button>
           </div>
         </div>
       )}

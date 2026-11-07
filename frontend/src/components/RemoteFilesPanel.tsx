@@ -1558,7 +1558,7 @@ export default function RemoteFilesPanel() {
             className="h-7 shrink-0 px-2 text-[11.5px]"
             onClick={() => setSelected(new Set(entries.filter((e) => !e.isFolder).map((e) => e.path)))}
           >
-            全选文件
+            全选
           </Button>
           <Button
             size="sm"
@@ -1567,7 +1567,7 @@ export default function RemoteFilesPanel() {
             disabled={batchBusy || linkBusy}
             onClick={() => requestLink(selectedEntries)}
           >
-            <NotebookPen size={12} className="mr-1" /> 链接到知识库
+            链接到知识库
           </Button>
           <Button
             size="sm"
@@ -1576,8 +1576,15 @@ export default function RemoteFilesPanel() {
             disabled={batchBusy || linkBusy}
             onClick={() => void handleBatchLocal()}
           >
-            <Download size={12} className="mr-1" /> 存入文件管理
+            导入本地文件
           </Button>
+          <button
+            type="button"
+            className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
+            onClick={() => setSelected(new Set())}
+          >
+            清空选择
+          </button>
           <Button
             size="sm"
             variant="outline"
@@ -1585,15 +1592,8 @@ export default function RemoteFilesPanel() {
             disabled={batchBusy}
             onClick={() => void handleBatchDelete()}
           >
-            <Trash2 size={12} className="mr-1" /> 删除
+            删除选中
           </Button>
-          <button
-            type="button"
-            className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
-            onClick={() => setSelected(new Set())}
-          >
-            取消选择
-          </button>
         </div>
       )}
 
