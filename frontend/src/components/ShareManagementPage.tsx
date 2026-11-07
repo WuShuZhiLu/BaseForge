@@ -604,19 +604,7 @@ export default function ShareManagementPage() {
           {data?.total || 0} 条
         </span>
         <span className="flex-1" />
-        {selected.size > 0 ? (
-          <>
-            {/* ── 多选态：批量操作 ── */}
-            <span className="shrink-0 text-xs font-medium text-tx-primary">已选 {selected.size} 项</span>
-            <Button size="sm" variant="outline" onClick={() => void batchDisable()}>批量停用</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchExpire()}>批量设过期（30 天后）</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchCopy()}>批量复制全部链接</Button>
-            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>批量删除</Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Map())}>取消</Button>
-          </>
-        ) : (
-          <>
-            {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 / 新建分享 ── */}
+            {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 ── */}
             <label className="relative block w-[190px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
@@ -701,9 +689,21 @@ export default function ShareManagementPage() {
                 </div>
               )}
             </div>
-          </>
-        )}
       </header>
+
+      {/* 批量操作栏：点击选择后出现 */}
+      {selectionMode && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+          <span className="font-medium text-tx-primary">已选 {selected.size} 项</span>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="outline" onClick={() => void batchDisable()}>批量停用</Button>
+            <Button size="sm" variant="outline" onClick={() => void batchExpire()}>批量设过期（30 天后）</Button>
+            <Button size="sm" variant="outline" onClick={() => void batchCopy()}>批量复制全部链接</Button>
+            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>批量删除</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Map())}>取消</Button>
+          </div>
+        </div>
+      )}
 
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-app-bg">
         {loading ? (

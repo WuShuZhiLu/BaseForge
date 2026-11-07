@@ -1359,80 +1359,7 @@ export default function FileManager() {
         )}
         <div className="flex-1" />
 
-        {selectionMode ? (
-          <>
-            {/* ── 多选态：批量操作 ── */}
-            <button
-              onClick={toggleSelectAll}
-              className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
-              disabled={items.length === 0}
-              title={allSelectedOnPage ? "取消选择本页全部" : "选择本页全部"}
-            >
-              {allSelectedOnPage ? <CheckSquare size={14} className="text-accent-primary" /> : <Square size={14} />}
-              {allSelectedOnPage ? "取消全选" : "全选本页"}
-            </button>
-            <span className="text-xs text-tx-tertiary whitespace-nowrap">
-              已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
-              {displayItems.length > 0 && (
-                <span className="ml-1 opacity-60">（本页 {displayItems.length} / 全部 {total}）</span>
-              )}
-            </span>
-            <select
-              value=""
-              disabled={selectedIds.size === 0 || batchMoving}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (!v) return;
-                void handleBatchMove(v === "__unarchived__" ? null : v);
-              }}
-              className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
-              title="把选中文件归档到附件文件夹"
-            >
-              <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
-              <option value="__unarchived__">未归档</option>
-              {attachmentFolders.map((f) => (
-                <option key={f.id} value={f.id}>{f.name}</option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBatchShareLinks}
-              disabled={selectedIds.size === 0 || batchSharing}
-              title="为选中附件开启只读分享链接，并全部复制到剪贴板"
-            >
-              {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Link2 size={14} className="mr-1" />}
-              生成公开链接
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setSelectedIds(new Set())}
-              disabled={selectedIds.size === 0}
-            >
-              清空选择
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleBatchDelete}
-              disabled={selectedIds.size === 0 || batchDeleting}
-              className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
-            >
-              {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}
-              删除选中
-            </Button>
-            <Button
-              size="sm"
-              onClick={toggleSelectionMode}
-              className="h-7 shrink-0 bg-accent-primary px-2 text-white hover:bg-accent-primary/90"
-              title="退出多选（Esc）"
-            >
-              <X size={14} className="mr-1" />退出
-            </Button>
-          </>
-        ) : (
-          <>
+        <>
             {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 / 上传 ── */}
             <label className="relative block w-[190px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
@@ -1562,9 +1489,75 @@ export default function FileManager() {
               className="hidden"
               onChange={onFileInputChange}
             />
-          </>
-        )}
+        </>
       </div>
+
+      {/* 批量操作栏：选择模式下出现在顶栏下方 */}
+      {selectionMode && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
+            disabled={items.length === 0}
+            title={allSelectedOnPage ? "取消选择本页全部" : "选择本页全部"}
+          >
+            {allSelectedOnPage ? <CheckSquare size={14} className="text-accent-primary" /> : <Square size={14} />}
+            {allSelectedOnPage ? "取消全选" : "全选本页"}
+          </button>
+          <span className="text-xs text-tx-tertiary whitespace-nowrap">
+            已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
+            {displayItems.length > 0 && (
+              <span className="ml-1 opacity-60">（本页 {displayItems.length} / 全部 {total}）</span>
+            )}
+          </span>
+          <div className="flex-1" />
+          <select
+            value=""
+            disabled={selectedIds.size === 0 || batchMoving}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              void handleBatchMove(v === "__unarchived__" ? null : v);
+            }}
+            className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
+            title="把选中文件归档到附件文件夹"
+          >
+            <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
+            <option value="__unarchived__">未归档</option>
+            {attachmentFolders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchShareLinks}
+            disabled={selectedIds.size === 0 || batchSharing}
+            title="为选中附件开启只读分享链接，并全部复制到剪贴板"
+          >
+            {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Link2 size={14} className="mr-1" />}
+            生成公开链接
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={selectedIds.size === 0}
+          >
+            清空选择
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchDelete}
+            disabled={selectedIds.size === 0 || batchDeleting}
+            className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
+          >
+            {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}
+            删除选中
+          </Button>
+        </div>
+      )}
 
       {/* "我的上传"二级子筛选条：仅在该主 tab 选中时出现。
           三选一：全部 / 已引用 / 未引用。徽标计数来自 stats.myUploads。

@@ -161,30 +161,8 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
         {trash.items.length} 项
       </span>
       <span className="flex-1" />
-      {selectedItems.length > 0 ? (
-        <>
-          {/* ── 多选态：批量操作 ── */}
-          <label className="flex shrink-0 items-center gap-1.5 text-xs text-tx-secondary">
-            <input type="checkbox" disabled={disabled || !visible.length} checked={!!visible.length && visible.every((item) => selected.includes(item.id))} onChange={(event) => setSelected(event.target.checked ? [...new Set([...selected, ...visible.map((item) => item.id)])] : selected.filter((id) => !visible.some((item) => item.id === id)))} />
-            {t("trashCenter.selectAll")}
-          </label>
-          <span className="shrink-0 text-xs text-tx-tertiary">{t("trashCenter.selected", { count: selectedItems.length })}</span>
-          <button className={`${buttonClass} h-7 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}><RotateCcw size={13} />{t("trashCenter.restore")}</button>
-          <button className={`${buttonClass} h-7 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}><Trash2 size={13} />{t("trashCenter.permanent")}</button>
-          <button className="shrink-0 text-xs text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
-          <button
-            className={`${buttonClass} h-7 px-2 bg-accent-primary text-white hover:opacity-90`}
-            style={{ color: "#fff" }}
-            onClick={toggleSelectionMode}
-            title="退出多选（Esc）"
-          >
-            <X size={13} />退出
-          </button>
-        </>
-      ) : (
-        <>
-          {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 ── */}
-          <label className="relative block w-[190px] shrink-0">
+      {/* ── 常驻态：搜索 / 排序 / 选择 / 清空 ── */}
+      <label className="relative block w-[190px] shrink-0">
             <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
             <Input
               value={query}
@@ -236,9 +214,20 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
             {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
           </button>
           <button className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])} title={t("trashCenter.cleanup")}><Trash2 size={14} /></button>
-        </>
-      )}
     </header>
+    {/* 批量操作栏：点击选择后出现 */}
+    {selectionMode && (
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+        <label className="flex shrink-0 items-center gap-1.5">
+          <input type="checkbox" disabled={disabled || !visible.length} checked={!!visible.length && visible.every((item) => selected.includes(item.id))} onChange={(event) => setSelected(event.target.checked ? [...new Set([...selected, ...visible.map((item) => item.id)])] : selected.filter((id) => !visible.some((item) => item.id === id)))} />
+          {t("trashCenter.selectAll")}
+        </label>
+        <span>{t("trashCenter.selected", { count: selectedItems.length })}</span>
+        <button className={`${buttonClass} h-7 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}><RotateCcw size={13} />{t("trashCenter.restore")}</button>
+        <button className={`${buttonClass} h-7 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}><Trash2 size={13} />{t("trashCenter.permanent")}</button>
+        <button className="shrink-0 text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
+      </div>
+    )}
     <div className="flex min-h-0 flex-1">
       {/* 列表 */}
       <div className="min-w-0 flex-1 overflow-y-auto px-4 py-2">

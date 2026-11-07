@@ -1397,57 +1397,8 @@ export default function RemoteFilesPanel() {
         ) : null}
         {actionMsg ? <span className="max-w-[200px] truncate text-[11px] text-emerald-500">{actionMsg}</span> : null}
         <span className="flex-1" />
-        {selected.size > 0 ? (
-          <>
-            <span className="shrink-0 whitespace-nowrap text-xs text-tx-secondary">
-              已选 <b className="text-accent-primary">{selected.size}</b> 项
-            </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 shrink-0 px-2 text-[11.5px]"
-              onClick={() => setSelected(new Set(entries.filter((e) => !e.isFolder).map((e) => e.path)))}
-            >
-              全选文件
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 shrink-0 px-2 text-[11.5px]"
-              disabled={batchBusy || linkBusy}
-              onClick={() => requestLink(selectedEntries)}
-            >
-              <NotebookPen size={12} className="mr-1" /> 链接到知识库
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 shrink-0 px-2 text-[11.5px]"
-              disabled={batchBusy || linkBusy}
-              onClick={() => void handleBatchLocal()}
-            >
-              <Download size={12} className="mr-1" /> 存入文件管理
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 shrink-0 px-2 text-[11.5px] text-accent-danger"
-              disabled={batchBusy}
-              onClick={() => void handleBatchDelete()}
-            >
-              <Trash2 size={12} className="mr-1" /> 删除
-            </Button>
-            <button
-              type="button"
-              className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
-              onClick={() => setSelected(new Set())}
-            >
-              取消选择
-            </button>
-          </>
-        ) : (
-          <>
-            <label className="relative block w-[210px] shrink-0">
+        <>
+          <label className="relative block w-[210px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
                 placeholder={t("common.search")}
@@ -1576,8 +1527,58 @@ export default function RemoteFilesPanel() {
               <Plus size={14} className="mr-1" /> 配置存储
             </Button>
           </>
-        )}
       </div>
+
+      {/* 批量操作栏：点击选择后出现 */}
+      {selectionMode && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
+          <span className="shrink-0 whitespace-nowrap text-xs text-tx-secondary">
+            已选 <b className="text-accent-primary">{selected.size}</b> 项
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 px-2 text-[11.5px]"
+            onClick={() => setSelected(new Set(entries.filter((e) => !e.isFolder).map((e) => e.path)))}
+          >
+            全选文件
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 px-2 text-[11.5px]"
+            disabled={batchBusy || linkBusy}
+            onClick={() => requestLink(selectedEntries)}
+          >
+            <NotebookPen size={12} className="mr-1" /> 链接到知识库
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 px-2 text-[11.5px]"
+            disabled={batchBusy || linkBusy}
+            onClick={() => void handleBatchLocal()}
+          >
+            <Download size={12} className="mr-1" /> 存入文件管理
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 shrink-0 px-2 text-[11.5px] text-accent-danger"
+            disabled={batchBusy}
+            onClick={() => void handleBatchDelete()}
+          >
+            <Trash2 size={12} className="mr-1" /> 删除
+          </Button>
+          <button
+            type="button"
+            className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
+            onClick={() => setSelected(new Set())}
+          >
+            取消选择
+          </button>
+        </div>
+      )}
 
       {sources.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-tx-tertiary">
