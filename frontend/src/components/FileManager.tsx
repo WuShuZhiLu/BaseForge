@@ -58,6 +58,9 @@ import {
   Square,
   Share2,
   Link2,
+  MoreHorizontal,
+  ArrowDownUp,
+  RefreshCw,
 } from "lucide-react";
 import { api, resolveAttachmentUrl } from "@/lib/api";
 import { useToolPageActive, type ToolPageHeaderMode } from "@/lib/toolPage";
@@ -270,6 +273,9 @@ export default function FileManager() {
   const [searchQuery, setSearchQuery] = useState(""); // debounced
   // 工具行右端排序下拉（对齐分享页「排序：xxx ▾」，选项复用 FILE_SORT_OPTIONS）
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  // 「⋯ 更多」菜单：收纳低频操作（清理/刷新/视图/分组），单行工具栏的一部分
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
   // 排序菜单的外部点击关闭
@@ -281,6 +287,17 @@ export default function FileManager() {
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [sortMenuOpen]);
+
+  // 更多菜单的外部点击关闭
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) setMoreMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [moreMenuOpen]);
+
 
   // 附件文件夹列表（groupMode === "folder" 时使用）
   const [attachmentFolders, setAttachmentFolders] = useState<Array<{ id: string; name: string; fileCount: number }>>([]);
@@ -707,6 +724,15 @@ export default function FileManager() {
       return next;
     });
   }, []);
+  // Esc 退出多选
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSelectedIds(new Set()); setSelectionMode(false); }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [selectionMode]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -1299,202 +1325,245 @@ export default function FileManager() {
       )}
       {sourceTab !== "remote" && (
       <>
-      {/* 顶栏：h-12 与侧栏工作区头同一节奏 */}
-      <div
-        className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4"
-      >
-        {/* 左侧：标题区 */}
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors shrink-0 bg-accent-primary/10 text-accent-primary">
-            <FolderOpen size={18} />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">文件</h2>
-              {storageBadge && (
-                <div
-                  className={cn(
-                    "hidden sm:flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] shrink-0",
-                    storageBadge.className,
-                  )}
-                  title={storageBadge.detail ? `${storageBadge.label} · ${storageBadge.detail}` : storageBadge.label}
-                >
-                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", storageBadge.dotClassName)} />
-                  <span className="whitespace-nowrap font-medium">{storageBadge.label}</span>
-                  {storageBadge.detail && (
-                    <span className="hidden max-w-[120px] truncate opacity-75 lg:inline">
-                      {storageBadge.detail}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+      {/* 顶栏单行（原型 toolbar-single-row-v1）：标题+徽章(左)；搜索/排序/选择/更多/上传(右)。
+          多选时右端原地切换为批量操作，不再另起一层。 */}
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface/40 px-4">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-accent-primary/10 text-accent-primary">
+          <FolderOpen size={18} />
         </div>
-
-        <div className="flex-1" />
-
-{!isRemoteSource && (
-        <>
-        {/* 多选 / 清理 / 上传：附件与图床的操作；远程来源有面板自带操作 */}
-        <Button
-          size="sm"
-          variant={selectionMode ? "default" : "outline"}
-          onClick={toggleSelectionMode}
-          className="shrink-0"
-          title={selectionMode ? "退出多选" : "进入多选"}
-        >
-          {selectionMode ? (
-            <>
-              <X size={14} className="mr-1" />
-              退出多选
-            </>
-          ) : (
-            <>
-              <CheckSquare size={14} className="mr-1" />
-              选择
-            </>
-          )}
-        </Button>
-
-        {/* 手动清理始终可见，避免用户只有在扫描到孤儿后才偶然发现这项能力。 */}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleCleanupOrphans}
-          disabled={cleaningUp}
-          className={cn(
-            "shrink-0 text-accent-danger",
-          )}
-          title={
-            reclaimable && reclaimable.items > 0
-              ? `发现 ${reclaimable.items} 个没有被任何笔记引用的附件，可释放约 ${humanSize(reclaimable.bytes)}`
-              : "扫描并清理没有被任何笔记引用的附件"
-          }
-        >
-          {cleaningUp ? (
-            <Loader2 size={14} className="mr-1 animate-spin" />
-          ) : (
-            <Trash2 size={14} className="mr-1" />
-          )}
-          <span>清理</span>
-          {reclaimable && reclaimable.items > 0 && (
-            <span className="hidden sm:inline ml-1 text-[10px] opacity-80">
-              {humanSize(reclaimable.bytes)} · {reclaimable.items} 项
-            </span>
-          )}
-        </Button>
-
-        <Button size="sm" onClick={() => setUploadDialogOpen(true)} disabled={uploading} className="shrink-0">
-          {uploading ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
-          {uploading ? "上传中" : "上传文件"}
-        </Button>
-        {/* 统一文件池：不限制上传类型（图片 / 视频 / 音频 / 文档一律进池子） */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={onFileInputChange}
-        />
-        </>
-      )}
-      </div>
-
-      </>
-      )}
-
-      {/* 远程文件视图（内核能力）：与本地附件并列的来源，经侧栏「来源」切换 */}
-      {sourceTab === "remote" ? (
-        <div className="min-h-0 flex-1 min-w-0">
-          <RemoteFilesPanel />
-        </div>
-      ) : (
-        <>
-
-      {/* 工具条：h-10 与侧栏面板头对齐；搜索最左，中间筛选，右端排序下拉（对齐分享页布局） */}
-      <div className="flex h-10 shrink-0 items-center gap-2 px-4 border-b border-app-border bg-app-surface/20">
-        {/* 搜索：与分享页同款 w-[210px] 输入框 */}
-        <label className="relative block w-[210px] shrink-0">
-          <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
-          <Input
-            placeholder="搜索文件名或类型（如 pdf）…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="h-7 pl-7 pr-7 text-[11.5px]"
-          />
-          {searchInput && (
-            <button
-              className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
-              onClick={() => setSearchInput("")}
-            >
-              <X size={12} />
-            </button>
-          )}
-        </label>
-        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-        <p className="hidden shrink-0 text-[11px] text-tx-tertiary leading-none lg:block">
-          {statsLine || " "}
-        </p>
-        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-        {/* 类型筛选已上移侧栏（主区只保留搜索 + 排序 + 操作按钮，与回收站/分享中心一致） */}
+        <h2 className="text-[15px] font-semibold text-tx-primary whitespace-nowrap">本地文件</h2>
+        {storageBadge && (
+          <div
+            className={cn(
+              "hidden sm:flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] shrink-0",
+              storageBadge.className,
+            )}
+            title={storageBadge.detail ? `${storageBadge.label} · ${storageBadge.detail}` : storageBadge.label}
+          >
+            <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", storageBadge.dotClassName)} />
+            <span className="whitespace-nowrap font-medium">{storageBadge.label}</span>
+          </div>
+        )}
+        {/* 侧栏筛选生效中的可摘除标签（保留自旧工具条） */}
         {getFilesTime() !== "all" && (
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-accent-primary/10 px-2.5 text-[11.5px] text-accent-primary">
             {{ today: "今天", week: "近 7 天", month: "近 30 天" }[getFilesTime()] || getFilesTime()}
             <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ time: "all" })}>✕</button>
           </span>
         )}
-        {/* 已分享的附件：侧栏选中后在主区给一个可单独掉的标签，避免用户忘了自己在筛分享状态 */}
         {shareFilter !== "all" && (
-          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-[#e8efff] px-2.5 text-[11.5px] text-accent-primary">
+          <span className="flex h-7 shrink-0 items-center gap-1 rounded-full bg-accent-primary/10 px-2.5 text-[11.5px] text-accent-primary">
             {shareFilter === "shared" ? "已分享" : "未分享"}
             <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ share: "all" })}>✕</button>
           </span>
         )}
-        {(typeFilterActive || getFilesTime() !== "all" || shareFilter !== "all") && (
-          <button
-            type="button"
-            className="shrink-0 text-[10.5px] text-tx-tertiary hover:text-tx-secondary"
-            onClick={() => setFilesUi({ types: ["all"], time: "all", share: "all" })}
-          >
-            清除筛选
-          </button>
-        )}
-        <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
         <div className="flex-1" />
 
-        {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」，复用 FILE_SORT_OPTIONS */}
-        <div ref={sortMenuRef} className="relative shrink-0">
-          <button
-            type="button"
-            aria-haspopup="listbox"
-            aria-expanded={sortMenuOpen}
-            onClick={() => setSortMenuOpen((value) => !value)}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
-          >
-            排序：<span className="font-medium text-tx-primary">{FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
-            <ChevronDown size={12} />
-          </button>
-          {sortMenuOpen && (
-            <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
-              {FILE_SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={sort === option.value}
-                  onClick={() => { setFilesUi({ sort: option.value }); setSortMenuOpen(false); }}
-                  className={cn(
-                    "flex w-full items-center px-2.5 py-1.5 text-left text-[11.5px] hover:bg-app-hover",
-                    sort === option.value ? "text-accent-primary" : "text-tx-secondary",
-                  )}
-                >
-                  {option.label}
-                </button>
+        {selectionMode ? (
+          <>
+            {/* ── 多选态：批量操作 ── */}
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
+              disabled={items.length === 0}
+              title={allSelectedOnPage ? "取消选择本页全部" : "选择本页全部"}
+            >
+              {allSelectedOnPage ? <CheckSquare size={14} className="text-accent-primary" /> : <Square size={14} />}
+              {allSelectedOnPage ? "取消全选" : "全选本页"}
+            </button>
+            <span className="text-xs text-tx-tertiary whitespace-nowrap">
+              已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
+              {displayItems.length > 0 && (
+                <span className="ml-1 opacity-60">（本页 {displayItems.length} / 全部 {total}）</span>
+              )}
+            </span>
+            <select
+              value=""
+              disabled={selectedIds.size === 0 || batchMoving}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                void handleBatchMove(v === "__unarchived__" ? null : v);
+              }}
+              className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
+              title="把选中文件归档到附件文件夹"
+            >
+              <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
+              <option value="__unarchived__">未归档</option>
+              {attachmentFolders.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
               ))}
+            </select>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchShareLinks}
+              disabled={selectedIds.size === 0 || batchSharing}
+              title="为选中附件开启只读分享链接，并全部复制到剪贴板"
+            >
+              {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Link2 size={14} className="mr-1" />}
+              生成公开链接
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setSelectedIds(new Set())}
+              disabled={selectedIds.size === 0}
+            >
+              清空选择
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchDelete}
+              disabled={selectedIds.size === 0 || batchDeleting}
+              className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
+            >
+              {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Trash2 size={14} className="mr-1" />}
+              删除选中
+            </Button>
+            <Button
+              size="sm"
+              onClick={toggleSelectionMode}
+              className="h-7 shrink-0 bg-accent-primary px-2 text-white hover:bg-accent-primary/90"
+              title="退出多选（Esc）"
+            >
+              <X size={14} className="mr-1" />退出
+            </Button>
+          </>
+        ) : (
+          <>
+            {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 / 上传 ── */}
+            <label className="relative block w-[190px] shrink-0">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+              <Input
+                placeholder="搜索文件名或类型（如 pdf）…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="h-7 pl-7 pr-7 text-[11.5px]"
+              />
+              {searchInput && (
+                <button
+                  className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+                  onClick={() => setSearchInput("")}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </label>
+            {/* 排序：图标化（悬停提示），选项菜单不变 */}
+            <div ref={sortMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={sortMenuOpen}
+                title={`排序：${FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label ?? ""}`}
+                onClick={() => setSortMenuOpen((value) => !value)}
+                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <ArrowDownUp size={13} />
+              </button>
+              {sortMenuOpen && (
+                <div role="listbox" className="absolute right-0 z-40 mt-1 w-36 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                  {FILE_SORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={sort === option.value}
+                      onClick={() => { setFilesUi({ sort: option.value }); setSortMenuOpen(false); }}
+                      className={cn(
+                        "flex w-full items-center px-2.5 py-1.5 text-left text-[11.5px] hover:bg-app-hover",
+                        sort === option.value ? "text-accent-primary" : "text-tx-secondary",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+            {/* 选择：图标化 */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={toggleSelectionMode}
+              className="h-8 w-10 shrink-0 justify-center px-0"
+              title={selectionMode ? "退出多选（Esc）" : "进入多选"}
+            >
+              {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
+            </Button>
+            {/* 更多：低频操作收纳 */}
+            <div ref={moreMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                title="更多操作"
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+                onClick={() => setMoreMenuOpen((v) => !v)}
+                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {moreMenuOpen && (
+                <div role="menu" className="absolute right-0 z-40 mt-1 w-52 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); void handleCleanupOrphans(); }}
+                  >
+                    <Trash2 size={13} className="shrink-0" />
+                    清理未引用附件
+                    {reclaimable && reclaimable.items > 0 && (
+                      <span className="ml-auto text-[10px] text-tx-tertiary">{reclaimable.items} 项</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); void loadList(); }}
+                  >
+                    <RefreshCw size={13} className="shrink-0" /> 刷新
+                  </button>
+                  <div className="my-1 h-px bg-app-border" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); setFilesUi({ view: viewMode === "list" ? "grid" : "list" }); }}
+                  >
+                    {viewMode === "list" ? <LayoutGrid size={13} className="shrink-0" /> : <List size={13} className="shrink-0" />}
+                    {viewMode === "list" ? "网格视图" : "列表视图"}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); setFilesUi({ group: groupMode === "flat" ? "folder" : "flat" }); }}
+                  >
+                    <FolderOpen size={13} className="shrink-0" />
+                    {groupMode === "flat" ? "按文件夹分组" : "取消分组"}
+                  </button>
+                </div>
+              )}
+            </div>
+            <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
+            <Button size="sm" onClick={() => setUploadDialogOpen(true)} disabled={uploading} className="shrink-0">
+              {uploading ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Upload size={14} className="mr-1" />}
+              {uploading ? "上传中" : "上传文件"}
+            </Button>
+            {/* 统一文件池：不限制上传类型（图片 / 视频 / 音频 / 文档一律进池子） */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={onFileInputChange}
+            />
+          </>
+        )}
       </div>
 
       {/* "我的上传"二级子筛选条：仅在该主 tab 选中时出现。
@@ -1548,100 +1617,6 @@ export default function FileManager() {
           ))}
         </div>
       )}
-
-      {/* 批量操作栏（仅选择模式下出现） */}
-      <AnimatePresence initial={false}>
-        {selectionMode && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="overflow-hidden border-b border-app-border bg-accent-primary/5"
-          >
-            <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-2">
-              <button
-                onClick={toggleSelectAll}
-                className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
-                disabled={items.length === 0}
-                title={allSelectedOnPage ? "取消选择本页全部" : "选择本页全部"}
-              >
-                {allSelectedOnPage ? (
-                  <CheckSquare size={14} className="text-accent-primary" />
-                ) : (
-                  <Square size={14} />
-                )}
-                {allSelectedOnPage ? "取消全选" : "全选本页"}
-              </button>
-              <span className="text-xs text-tx-tertiary">
-                已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
-                {displayItems.length > 0 && (
-                  <span className="ml-1 opacity-60">
-                    （本页 {displayItems.length} / 全部 {total}）
-                  </span>
-                )}
-              </span>
-
-              <div className="flex-1" />
-
-              {/* 批量归档：同一个附件文件夹体系（上传对话框 / 分组视图共用） */}
-              <select
-                value=""
-                disabled={selectedIds.size === 0 || batchMoving}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return;
-                  void handleBatchMove(v === "__unarchived__" ? null : v);
-                }}
-                className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
-                title="把选中文件归档到附件文件夹"
-              >
-                <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
-                <option value="__unarchived__">未归档</option>
-                {attachmentFolders.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBatchShareLinks}
-                disabled={selectedIds.size === 0 || batchSharing}
-                title="为选中附件开启只读分享链接，并全部复制到剪贴板"
-              >
-                {batchSharing ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                ) : (
-                  <Link2 size={14} className="mr-1" />
-                )}
-                生成公开链接
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSelectedIds(new Set())}
-                disabled={selectedIds.size === 0}
-              >
-                清空选择
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBatchDelete}
-                disabled={selectedIds.size === 0 || batchDeleting}
-                className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
-              >
-                {batchDeleting ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                ) : (
-                  <Trash2 size={14} className="mr-1" />
-                )}
-                删除选中
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* 主区 */}
       <div className="flex-1 min-h-0 relative">
@@ -1833,6 +1808,13 @@ export default function FileManager() {
         defaultFolderId={null}
       />
         </>
+      )}
+
+      {/* 远程来源：整块交给 RemoteFilesPanel（自带单行顶栏） */}
+      {sourceTab === "remote" && (
+        <div className="min-h-0 flex-1 min-w-0">
+          <RemoteFilesPanel />
+        </div>
       )}
     </div>
   );

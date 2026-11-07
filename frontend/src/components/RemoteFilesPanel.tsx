@@ -39,6 +39,9 @@ import {
   Square,
   Trash2,
   X,
+  ArrowDownUp,
+  MoreHorizontal,
+  Settings,
 } from "lucide-react";
 
 import { api, getCurrentWorkspace } from "@/lib/api";
@@ -799,6 +802,11 @@ export default function RemoteFilesPanel() {
   const [renameTarget, setRenameTarget] = useState<RemoteFileEntry | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  /** 多选模式：勾选框只在多选模式下显示（与本地文件视图同语义） */
+  const [selectionMode, setSelectionMode] = useState(false);
+  /** 「⋯ 更多」菜单（单行工具栏）：新建文件夹/刷新/管理存储 */
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -1046,6 +1054,26 @@ export default function RemoteFilesPanel() {
     if (activeId === getFilesRemoteSourceId()) return;
     setFilesUi({ remoteSourceId: activeId });
   }, [activeId, sources]);
+
+  // 「⋯ 更多」菜单外部点击关闭
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) setMoreMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [moreMenuOpen]);
+
+  // Esc 退出多选
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSelected(new Set()); setSelectionMode(false); }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [selectionMode]);
 
   useEffect(() => { void reloadSources(); }, [reloadSources]);
 
@@ -1321,7 +1349,7 @@ export default function RemoteFilesPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* 顶栏：与本地「文件」视图同构（32px 图标方块 + 15px 标题 + 状态徽章 + 右侧统一 Button） */}
+      {/* 顶栏单行：标题+存储徽章+面包屑(左)；多选时右端为批量操作，否则为搜索/新建/排序/刷新/选择/配置 */}
       <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
           <Cloud size={18} />
@@ -1341,31 +1369,82 @@ export default function RemoteFilesPanel() {
             <span className="max-w-[160px] truncate font-medium">{activeSource ? activeSource.name : "未配置存储"}</span>
           </div>
         </div>
-        <div className="flex-1" />
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0"
-          onClick={() => activeId && void loadList(activeId, cwd)}
-          title="刷新当前目录"
-        >
-          <RefreshCw size={14} className="mr-1" /> 刷新
-        </Button>
-        <Button size="sm" className="shrink-0" onClick={() => setManagerOpen(true)}>
-          <Plus size={14} className="mr-1" /> 配置存储
-        </Button>
-      </div>
-
-      {sources.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-tx-tertiary">
-          <Cloud size={32} className="opacity-40" />
-          <p>还没有远程存储（WebDAV / SMB / 百度网盘）</p>
-          <Button size="sm" onClick={() => setManagerOpen(true)}>添加远程存储</Button>
-        </div>
-      ) : (
-        <>
-          {/* 工具条：h-10，搜索最左 + 分割线 + 统计 + 右端排序（与本地文件视图一致） */}
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface/20 px-4">
+        {/* 面包屑：仅在进入子目录后出现（根目录时存储徽章已表达位置） */}
+        {crumbs.length > 0 ? (
+          <div className="flex min-w-0 items-center">
+            <ChevronRight size={12} className="shrink-0 text-app-border" />
+            {crumbs.map((part, index) => {
+              const isLast = index === crumbs.length - 1;
+              return (
+                <React.Fragment key={`${index}-${part}`}>
+                  {index > 0 ? <ChevronRight size={12} className="shrink-0 text-app-border" /> : null}
+                  <button
+                    type="button"
+                    className={cn(
+                      "max-w-[160px] truncate rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-app-hover hover:text-accent-primary",
+                      isLast ? "font-semibold text-tx-primary" : "text-tx-secondary",
+                    )}
+                    onClick={() => { setCwd(crumbs.slice(0, index + 1).join("/")); setOpenPath(""); }}
+                  >
+                    {part}
+                  </button>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        ) : null}
+        {actionMsg ? <span className="max-w-[200px] truncate text-[11px] text-emerald-500">{actionMsg}</span> : null}
+        <span className="flex-1" />
+        {selected.size > 0 ? (
+          <>
+            <span className="shrink-0 whitespace-nowrap text-xs text-tx-secondary">
+              已选 <b className="text-accent-primary">{selected.size}</b> 项
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 px-2 text-[11.5px]"
+              onClick={() => setSelected(new Set(entries.filter((e) => !e.isFolder).map((e) => e.path)))}
+            >
+              全选文件
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 px-2 text-[11.5px]"
+              disabled={batchBusy || linkBusy}
+              onClick={() => requestLink(selectedEntries)}
+            >
+              <NotebookPen size={12} className="mr-1" /> 链接到知识库
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 px-2 text-[11.5px]"
+              disabled={batchBusy || linkBusy}
+              onClick={() => void handleBatchLocal()}
+            >
+              <Download size={12} className="mr-1" /> 存入文件管理
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 px-2 text-[11.5px] text-accent-danger"
+              disabled={batchBusy}
+              onClick={() => void handleBatchDelete()}
+            >
+              <Trash2 size={12} className="mr-1" /> 删除
+            </Button>
+            <button
+              type="button"
+              className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
+              onClick={() => setSelected(new Set())}
+            >
+              取消选择
+            </button>
+          </>
+        ) : (
+          <>
             <label className="relative block w-[210px] shrink-0">
               <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
               <Input
@@ -1384,22 +1463,42 @@ export default function RemoteFilesPanel() {
                 </button>
               ) : null}
             </label>
-            <span className="hidden h-4 w-px shrink-0 bg-app-border lg:block" />
             <p className="hidden shrink-0 text-[11px] leading-none text-tx-tertiary lg:block">
               {displayedEntries.length} 项{remoteQuery ? ` · 匹配「${remoteQuery}」` : ""}
             </p>
-            <span className="hidden h-4 w-px shrink-0 bg-app-border lg:block" />
-            <div className="flex-1" />
+            {newFolderOpen ? (
+              <span className="flex shrink-0 items-center gap-1">
+                <input
+                  autoFocus
+                  className="h-7 w-32 rounded-md border border-app-border bg-transparent px-1.5 text-xs"
+                  placeholder="新文件夹名"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
+                />
+                <button type="button" className="text-xs text-accent-primary" onClick={() => void createFolder()}>确定</button>
+                <button type="button" className="text-xs text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                title="新建文件夹"
+                className="flex shrink-0 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
+              >
+                <FolderPlus size={13} /> 新建文件夹
+              </button>
+            )}
             <div className="relative shrink-0">
               <button
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={sortOpen}
+                title={`排序：${currentSortLabel}`}
                 onClick={() => setSortOpen((v) => !v)}
-                className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
+                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
               >
-                排序：<span className="font-medium text-tx-primary">{currentSortLabel}</span>
-                <ChevronDown size={12} />
+                <ArrowDownUp size={13} />
               </button>
               {sortOpen ? (
                 <>
@@ -1417,112 +1516,93 @@ export default function RemoteFilesPanel() {
                 </>
               ) : null}
             </div>
-          </div>
-
-          {credentialBroken ? (
-            <div className="flex shrink-0 items-center gap-2 border-b border-amber-300/60 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-              <AlertTriangle size={12} className="shrink-0" />
-              <span className="min-w-0 flex-1">该存储的凭据已失效（换机或恢复过备份），需要重新输入密码才能访问。</span>
-              <button type="button" className="shrink-0 underline underline-offset-2" onClick={() => setManagerOpen(true)}>
-                去处理
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => { setSelectionMode((v) => !v); setSelected(new Set()); }}
+              className="h-8 w-10 shrink-0 justify-center px-0"
+              title={selectionMode ? "退出多选（Esc）" : "进入多选"}
+            >
+              {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
+            </Button>
+            {/* 更多：新建文件夹 / 刷新 / 管理存储 */}
+            <div ref={moreMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                title="更多操作"
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+                onClick={() => setMoreMenuOpen((v) => !v)}
+                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <MoreHorizontal size={14} />
               </button>
+              {moreMenuOpen && (
+                <div role="menu" className="absolute right-0 z-40 mt-1 w-44 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                  {newFolderOpen ? (
+                    <div className="flex items-center gap-1 px-2 py-1.5">
+                      <input
+                        autoFocus
+                        className="h-7 w-28 rounded-md border border-app-border bg-transparent px-1.5 text-xs"
+                        placeholder="新文件夹名"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
+                      />
+                      <button type="button" className="text-xs text-accent-primary" onClick={() => void createFolder()}>确定</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                      onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
+                    >
+                      <FolderPlus size={13} className="shrink-0" /> 新建文件夹
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); activeId && void loadList(activeId, cwd); }}
+                  >
+                    <RefreshCw size={13} className="shrink-0" /> 刷新
+                  </button>
+                  <div className="my-1 h-px bg-app-border" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); setManagerOpen(true); }}
+                  >
+                    <Settings size={13} className="shrink-0" /> 管理存储…
+                  </button>
+                </div>
+              )}
             </div>
-          ) : null}
+            <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
+            <Button size="sm" className="shrink-0" onClick={() => setManagerOpen(true)}>
+              <Plus size={14} className="mr-1" /> 配置存储
+            </Button>
+          </>
+        )}
+      </div>
 
+      {sources.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-tx-tertiary">
+          <Cloud size={32} className="opacity-40" />
+          <p>还没有远程存储（WebDAV / SMB / 百度网盘）</p>
+          <Button size="sm" onClick={() => setManagerOpen(true)}>添加远程存储</Button>
+        </div>
+      ) : (
+        <>
           <div className="flex min-h-0 flex-1">
             {/* 文件浏览器 */}
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              {/* 面包屑 + 目录级操作 */}
-              <div className="flex h-9 shrink-0 items-center gap-1 border-b border-app-border px-4 text-[11.5px]">
-                <button type="button" className="truncate text-tx-tertiary hover:text-accent-primary" onClick={() => { setCwd(""); setOpenPath(""); }}>
-                  {activeSource?.name || "根目录"}
-                </button>
-                {crumbs.map((part, index) => (
-                  <React.Fragment key={`${index}-${part}`}>
-                    <ChevronRight size={11} className="shrink-0 text-app-border" />
-                    <button
-                      type="button"
-                      className="max-w-[160px] truncate text-tx-tertiary hover:text-accent-primary"
-                      onClick={() => { setCwd(crumbs.slice(0, index + 1).join("/")); setOpenPath(""); }}
-                    >
-                      {part}
-                    </button>
-                  </React.Fragment>
-                ))}
-                <span className="flex-1" />
-                {actionMsg ? <span className="truncate text-[11px] text-emerald-500">{actionMsg}</span> : null}
-                {newFolderOpen ? (
-                  <span className="flex items-center gap-1">
-                    <input
-                      autoFocus
-                      className="h-6 w-36 rounded border border-app-border bg-transparent px-1.5 text-xs"
-                      placeholder="新文件夹名"
-                      value={newFolderName}
-                      onChange={(e) => setNewFolderName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") void createFolder(); if (e.key === "Escape") setNewFolderOpen(false); }}
-                    />
-                    <button type="button" className="text-accent-primary" onClick={() => void createFolder()}>确定</button>
-                    <button type="button" className="text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    title="新建文件夹"
-                    className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
-                    onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
-                  >
-                    <FolderPlus size={13} /> 新建文件夹
-                  </button>
-                )}
-              </div>
-
-              {/* 批量操作栏：与本地文件视图的选择模式同一套语义 */}
-              {selected.size > 0 ? (
-                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
-                  <span className="text-[11.5px] text-tx-secondary">
-                    已选 <b className="text-accent-primary">{selected.size}</b> 项
-                  </span>
-                  <div className="flex-1" />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-[11.5px]"
-                    disabled={batchBusy || linkBusy}
-                    onClick={() => requestLink(selectedEntries)}
-                  >
-                    <NotebookPen size={12} className="mr-1" /> 链接到知识库
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-[11.5px]"
-                    disabled={batchBusy || linkBusy}
-                    onClick={() => void handleBatchLocal()}
-                  >
-                    <Download size={12} className="mr-1" /> 存入文件管理
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 px-2 text-[11.5px] text-accent-danger"
-                    disabled={batchBusy}
-                    onClick={() => void handleBatchDelete()}
-                  >
-                    <Trash2 size={12} className="mr-1" /> 删除
-                  </Button>
-                  <button
-                    type="button"
-                    className="text-[11px] text-tx-tertiary hover:text-tx-secondary"
-                    onClick={() => setSelected(new Set())}
-                  >
-                    取消选择
-                  </button>
-                </div>
-              ) : null}
-
               {/* 表头：列宽与行一致 */}
               <div className="flex h-7 shrink-0 items-center gap-2 border-b border-app-border px-4 text-[10.5px] text-tx-tertiary">
-                <span className="w-4 shrink-0" />
+                <span className={cn("shrink-0", selectionMode ? "w-4" : "w-[13px]")} />
                 <span className="min-w-0 flex-1">名称</span>
                 <span className="w-16 shrink-0 text-right">大小</span>
                 <span className="hidden w-36 shrink-0 text-right md:block">修改时间</span>
@@ -1551,14 +1631,18 @@ export default function RemoteFilesPanel() {
                           openPath === entry.path && "bg-app-hover",
                         )}
                       >
-                        <button
-                          type="button"
-                          aria-label={checked ? "取消选择" : "选择"}
-                          className="shrink-0 text-tx-tertiary hover:text-accent-primary"
-                          onClick={() => toggleSelect(entry.path)}
-                        >
-                          {checked ? <CheckSquare size={13} className="text-accent-primary" /> : <Square size={13} />}
-                        </button>
+                        {selectionMode ? (
+                          <button
+                            type="button"
+                            aria-label={checked ? "取消选择" : "选择"}
+                            className="shrink-0 text-tx-tertiary hover:text-accent-primary"
+                            onClick={() => toggleSelect(entry.path)}
+                          >
+                            {checked ? <CheckSquare size={13} className="text-accent-primary" /> : <Square size={13} />}
+                          </button>
+                        ) : (
+                          <span className="w-[13px] shrink-0" />
+                        )}
                         {entry.isFolder ? (
                           <Folder size={14} className="shrink-0 text-amber-500" />
                         ) : (
