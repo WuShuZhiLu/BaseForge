@@ -693,22 +693,48 @@ export default function ShareManagementPage() {
 
       {/* 批量操作栏：点击选择后出现 */}
       {selectionMode && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+          <span className="shrink-0 whitespace-nowrap">{t("common.selectedCount", { count: selected.size })}</span>
+          <div className="flex-1" />
           <button
-            className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
+            className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-md border border-app-border bg-app-bg px-2.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
             disabled={selectableItems.length === 0}
             onClick={() => setSelected(new Map(selectableItems.map((item) => [itemKey(item), item])))}
           >
-            <CheckSquare size={14} className="text-accent-primary" />
-            全选
+            {t("common.selectAll")}
           </button>
-          <span className="font-medium text-tx-primary">已选 {selected.size} 项</span>
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button size="sm" variant="outline" onClick={() => void batchDisable()}>批量停用</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchCopy()}>批量复制全部链接</Button>
-            <Button size="sm" variant="outline" onClick={() => setSelected(new Map())}>清空选择</Button>
-            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>删除选中</Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => void batchDisable()}
+          >
+            {t("shareCenter.batchDisable", { defaultValue: "批量停用" })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => void batchCopy()}
+          >
+            {t("shareCenter.batchCopyLinks", { defaultValue: "批量复制全部链接" })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => setSelected(new Map())}
+          >
+            {t("common.clearSelection")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs text-rose-600 dark:text-rose-300"
+            onClick={() => void batchDelete()}
+          >
+            {t("common.deleteSelected")}
+          </Button>
         </div>
       )}
 

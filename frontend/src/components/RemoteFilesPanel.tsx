@@ -1550,49 +1550,51 @@ export default function RemoteFilesPanel() {
       {selectionMode && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
           <span className="shrink-0 whitespace-nowrap text-xs text-tx-secondary">
-            已选 <b className="text-accent-primary">{selected.size}</b> 项
+            {t("common.selectedCount", { count: selected.size })}
           </span>
+          <div className="flex-1" />
           <Button
             size="sm"
             variant="outline"
-            className="h-7 shrink-0 px-2 text-[11.5px]"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
             onClick={() => setSelected(new Set(entries.filter((e) => !e.isFolder).map((e) => e.path)))}
           >
-            全选
+            {t("common.selectAll")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="h-7 shrink-0 px-2 text-[11.5px]"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
             disabled={batchBusy || linkBusy}
             onClick={() => requestLink(selectedEntries)}
           >
-            链接到知识库
+            {t("common.linkToKnowledge")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="h-7 shrink-0 px-2 text-[11.5px]"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
             disabled={batchBusy || linkBusy}
             onClick={() => void handleBatchLocal()}
           >
-            导入本地文件
+            {t("common.importToLocal")}
           </Button>
-          <button
-            type="button"
-            className="shrink-0 whitespace-nowrap text-xs text-tx-tertiary hover:text-tx-secondary"
-            onClick={() => setSelected(new Set())}
-          >
-            清空选择
-          </button>
           <Button
             size="sm"
             variant="outline"
-            className="h-7 shrink-0 px-2 text-[11.5px] text-accent-danger"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => setSelected(new Set())}
+          >
+            {t("common.clearSelection")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs text-accent-danger"
             disabled={batchBusy}
             onClick={() => void handleBatchDelete()}
           >
-            删除选中
+            {t("common.deleteSelected")}
           </Button>
         </div>
       )}

@@ -1529,22 +1529,21 @@ export default function FileManager() {
       {/* 批量操作栏：选择模式下出现在顶栏下方 */}
       {selectionMode && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
-          <button
-            onClick={() => void selectAllFiltered()}
-            className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
-            disabled={total === 0}
-            title="选中当前筛选下的全部文件（跨页）"
-          >
-            <CheckSquare size={14} className="text-accent-primary" />
-            全选
-          </button>
-          <span className="text-xs text-tx-tertiary whitespace-nowrap">
-            已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
+          <span className="shrink-0 whitespace-nowrap text-xs text-tx-secondary">
+            {t("common.selectedCount", { count: selectedIds.size })}
             {displayItems.length > 0 && (
               <span className="ml-1 opacity-60">（本页 {displayItems.length} / 全部 {total}）</span>
             )}
           </span>
           <div className="flex-1" />
+          <button
+            onClick={() => void selectAllFiltered()}
+            className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-md border border-app-border bg-app-bg px-2.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+            disabled={total === 0}
+            title="选中当前筛选下的全部文件（跨页）"
+          >
+            {t("common.selectAll")}
+          </button>
           <select
             value=""
             disabled={selectedIds.size === 0 || batchMoving}
@@ -1553,10 +1552,10 @@ export default function FileManager() {
               if (!v) return;
               void handleBatchMove(v === "__unarchived__" ? null : v);
             }}
-            className="h-7 max-w-[150px] rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
+            className="h-[30px] max-w-[150px] shrink-0 rounded-md border border-app-border bg-app-bg px-1.5 text-xs text-tx-secondary disabled:opacity-50"
             title="把选中文件归档到附件文件夹"
           >
-            <option value="">{batchMoving ? "移动中…" : "移动到文件夹…"}</option>
+            <option value="">{batchMoving ? "移动中…" : t("common.moveToFolder")}</option>
             <option value="__unarchived__">未归档</option>
             {attachmentFolders.map((f) => (
               <option key={f.id} value={f.id}>{f.name}</option>
@@ -1565,30 +1564,32 @@ export default function FileManager() {
           <Button
             size="sm"
             variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
             onClick={handleBatchShareLinks}
             disabled={selectedIds.size === 0 || batchSharing}
             title="为选中附件开启只读分享链接，并全部复制到剪贴板"
           >
             {batchSharing ? <Loader2 size={14} className="mr-1 animate-spin" /> : null}
-            生成公开链接
+            {t("common.makeShareLinks")}
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
             onClick={() => setSelectedIds(new Set())}
             disabled={selectedIds.size === 0}
           >
-            清空选择
+            {t("common.clearSelection")}
           </Button>
           <Button
             size="sm"
             variant="outline"
             onClick={handleBatchDelete}
             disabled={selectedIds.size === 0 || batchDeleting}
-            className="text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
+            className="h-[30px] shrink-0 px-2.5 text-xs text-red-500 border-red-500/40 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/60 disabled:opacity-50"
           >
             {batchDeleting ? <Loader2 size={14} className="mr-1 animate-spin" /> : null}
-            删除选中
+            {t("common.deleteSelected")}
           </Button>
         </div>
       )}
