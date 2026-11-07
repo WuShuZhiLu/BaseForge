@@ -1292,14 +1292,31 @@ export default function RemoteFilesPanel() {
     }
   }, [activeId, renameTarget, renameValue, loadList]);
 
-  const toggleSelect = useCallback((path: string) => {
+  /** Shift 连选锚点：上次点选条目在 displayedEntries 中的下标 */
+  const lastSelectIndexRef = useRef(-1);
+  const toggleSelect = useCallback((path: string, event?: { shiftKey?: boolean }) => {
+    const index = displayedEntries.findIndex((entry) => entry.path === path);
+    // Shift 连选：从上次点选到当前条目整段选中
+    if (event?.shiftKey && lastSelectIndexRef.current >= 0) {
+      const from = Math.min(lastSelectIndexRef.current, index);
+      const to = Math.max(lastSelectIndexRef.current, index);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) {
+          if (displayedEntries[i]) next.add(displayedEntries[i].path);
+        }
+        return next;
+      });
+      return;
+    }
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path);
       else next.add(path);
       return next;
     });
-  }, []);
+    lastSelectIndexRef.current = index;
+  }, [displayedEntries]);
 
   const selectedEntries = useMemo(
     () => displayedEntries.filter((entry) => selected.has(entry.path)),
@@ -1627,7 +1644,7 @@ export default function RemoteFilesPanel() {
                             type="button"
                             aria-label={checked ? "取消选择" : "选择"}
                             className="shrink-0 text-tx-tertiary hover:text-accent-primary"
-                            onClick={() => toggleSelect(entry.path)}
+                            onClick={(e) => toggleSelect(entry.path, e)}
                           >
                             {checked ? <CheckSquare size={13} className="text-accent-primary" /> : <Square size={13} />}
                           </button>

@@ -734,33 +734,67 @@ export default function FileManager() {
     return () => window.removeEventListener("keydown", handle);
   }, [selectionMode]);
 
-  const toggleSelect = useCallback((id: string) => {
+  /** Shift 连选锚点：上次点选条目在当前页 items 中的下标 */
+  const lastSelectIndexRef = useRef(-1);
+  type SelectEvent = { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean };
+  const toggleSelect = useCallback((id: string, event?: SelectEvent) => {
+    const index = items.findIndex((it) => it.id === id);
+    // Shift 连选：从上次点选到当前条目整段选中（当前页范围内）
+    if (event?.shiftKey && lastSelectIndexRef.current >= 0) {
+      const from = Math.min(lastSelectIndexRef.current, index);
+      const to = Math.max(lastSelectIndexRef.current, index);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (let i = from; i <= to; i++) {
+          if (items[i]) next.add(items[i].id);
+        }
+        return next;
+      });
+      return;
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }, []);
-
-  // 全选 / 反全选：仅作用于"当前页面已加载"的 items；不会越过分页边界。
-  const allSelectedOnPage =
-    items.length > 0 && items.every((it) => selectedIds.has(it.id));
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds((prev) => {
-      if (items.length === 0) return prev;
-      const allOn = items.every((it) => prev.has(it.id));
-      if (allOn) {
-        // 仅取消"当前页"的勾选；保留其它页已勾选的（如果有）
-        const next = new Set(prev);
-        for (const it of items) next.delete(it.id);
-        return next;
-      }
-      const next = new Set(prev);
-      for (const it of items) next.add(it.id);
-      return next;
-    });
+    lastSelectIndexRef.current = index;
   }, [items]);
+
+  // 全选：不分页——按当前筛选条件把所有页的附件 id 都拉回来选中
+  const selectAllFiltered = useCallback(async () => {
+    const apiFilter: "unreferenced" | "referenced" | "myUploads" | undefined =
+      category === "unreferenced" || category === "referenced" || category === "myUploads"
+        ? category
+        : undefined;
+    const ids: string[] = [];
+    let page = 1;
+    try {
+      // 后端单页上限 200，循环取完为止（上限 50 页兜底）
+      while (page <= 50) {
+        const res = await api.files.list({
+          mimeCategory: mimeCategoryParam,
+          filter: apiFilter,
+          shareStatus: shareFilter === "all" ? undefined : shareFilter,
+          uploadedWithin: getFilesTime() !== "all"
+            ? ({ today: 1, week: 7, month: 30 } as Record<string, number>)[getFilesTime()] || undefined
+            : undefined,
+          myUploadsRef:
+            category === "myUploads" && myUploadsRef !== "all" ? myUploadsRef : undefined,
+          q: searchQuery || undefined,
+          sort,
+          page,
+          pageSize: 200,
+        });
+        for (const it of res.items) ids.push(it.id);
+        if (ids.length >= res.total || res.items.length === 0) break;
+        page += 1;
+      }
+    } catch {
+      /* 拉取失败就用已拿到的部分 */
+    }
+    if (ids.length) setSelectedIds(new Set(ids));
+  }, [category, mimeCategoryParam, shareFilter, myUploadsRef, searchQuery, sort]);
 
   // ---- 批量删除 ----
   const handleBatchDelete = useCallback(async () => {
@@ -1496,13 +1530,13 @@ export default function FileManager() {
       {selectionMode && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5">
           <button
-            onClick={toggleSelectAll}
+            onClick={() => void selectAllFiltered()}
             className="flex items-center gap-1.5 text-xs text-tx-secondary hover:text-tx-primary transition-colors"
-            disabled={items.length === 0}
-            title={allSelectedOnPage ? "取消选择本页全部" : "选择本页全部"}
+            disabled={total === 0}
+            title="选中当前筛选下的全部文件（跨页）"
           >
-            {allSelectedOnPage ? <CheckSquare size={14} className="text-accent-primary" /> : <Square size={14} />}
-            {allSelectedOnPage ? "取消全选" : "全选本页"}
+            <CheckSquare size={14} className="text-accent-primary" />
+            全选
           </button>
           <span className="text-xs text-tx-tertiary whitespace-nowrap">
             已选 <b className="text-accent-primary">{selectedIds.size}</b> 个
@@ -1864,7 +1898,7 @@ function GridView({
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (id: string, event?: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) => void;
   /** 已开启分享（isActive）的附件 id 集合——卡片"已分享"角标的数据源 */
   sharedIds: Set<string>;
 }) {
@@ -1912,7 +1946,7 @@ interface GridCardProps {
   isDownloading: boolean;
   selectionMode: boolean;
   selected: boolean;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (id: string, event?: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) => void;
   /** 是否已开启只读分享链接（角标数据来自 attachment_shares） */
   isShared: boolean;
 }
@@ -1963,8 +1997,8 @@ const GridCard = React.memo(function GridCard({
     };
   }, [formatMenuOpen]);
 
-  const handleCardClick = () => {
-    if (selectionMode) onToggleSelect(item.id);
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (selectionMode) onToggleSelect(item.id, e);
     else onOpen(item.id);
   };
 
@@ -2066,7 +2100,7 @@ const GridCard = React.memo(function GridCard({
             )}
             onClick={(e) => {
               e.stopPropagation();
-              onToggleSelect(item.id);
+              onToggleSelect(item.id, e);
             }}
             title={selected ? "取消选择" : "选择"}
           >
@@ -2175,7 +2209,7 @@ function ListView({
   downloadingId: string | null;
   selectionMode: boolean;
   selectedIds: Set<string>;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (id: string, event?: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }) => void;
   /** 已开启分享（isActive）的附件 id 集合——“已分享”标记的数据源 */
   sharedIds: Set<string>;
 }) {
