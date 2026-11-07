@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { pdfjsAssetUrl } from "./pdfjsAssets";
 import { marked, Renderer } from "marked";
 import i18n from "i18next";
 import { Editor, generateJSON, Extension } from "@tiptap/core";
@@ -238,6 +239,10 @@ async function extractPdfToHtml(buffer: ArrayBuffer): Promise<string> {
     // 关闭外部 cmap/standardFont 远程下载，离线/内网环境也能解析
     isEvalSupported: false,
     useSystemFonts: true,
+    // cmap/standardFont 走本地构建产物（vite 拷贝），非外网下载，离线可用
+    cMapUrl: pdfjsAssetUrl("cmaps"),
+    cMapPacked: true,
+    standardFontDataUrl: pdfjsAssetUrl("standard_fonts"),
   });
   const pdf = await loadingTask.promise;
 

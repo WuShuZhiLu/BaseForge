@@ -14,6 +14,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import PdfPageView, { type PdfPageSize, type PdfTool } from "./PdfPageView";
+import { pdfjsAssetUrl } from "@/lib/pdfjsAssets";
 import type { PdfAnnotation, PdfAnnotationColor, PdfNormRect } from "@/lib/pdfDocContent";
 
 export interface PdfSelectionPayload {
@@ -90,8 +91,6 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
   const [visiblePages, setVisiblePages] = useState<number[]>([1]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  /** 用户手动缩放过就不再自动适应宽度，否则每次重排都会把用户的选择顶掉。 */
-  const userScaledRef = useRef(false);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const pageRef = useRef(page);
@@ -112,7 +111,6 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     setSizes({});
     setVisiblePages([1]);
     setPage(1);
-    userScaledRef.current = false;
 
     void (async () => {
       try {
@@ -129,6 +127,10 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
           data: new Uint8Array(await response.arrayBuffer()),
           isEvalSupported: false,
           useSystemFonts: true,
+          // CJK 字符映射与非内嵌标准字体：缺失会导致中文丢字、部分页渲染失败空白
+          cMapUrl: pdfjsAssetUrl("cmaps"),
+          cMapPacked: true,
+          standardFontDataUrl: pdfjsAssetUrl("standard_fonts"),
         });
         loadingTask = task;
         const next = await task.promise;
@@ -176,9 +178,8 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     };
   }, [url]);
 
-  const applyScale = useCallback((next: number, manual: boolean) => {
+  const applyScale = useCallback((next: number) => {
     const clamped = clampScale(next);
-    if (manual) userScaledRef.current = true;
     setScale(clamped);
     callbacksRef.current.onScaleChange?.(clamped);
   }, []);
@@ -188,8 +189,7 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     const first = sizes[1];
     if (!container || !first) return;
     const available = container.clientWidth - 40;
-    userScaledRef.current = false;
-    applyScale(available / first.width, false);
+    applyScale(available / first.width);
   }, [sizes, applyScale]);
 
   const fitPage = useCallback(() => {
@@ -198,16 +198,24 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     if (!container || !first) return;
     const availableWidth = container.clientWidth - 40;
     const availableHeight = container.clientHeight - 40;
-    userScaledRef.current = false;
-    applyScale(Math.min(availableWidth / first.width, availableHeight / first.height), false);
+    applyScale(Math.min(availableWidth / first.width, availableHeight / first.height));
   }, [sizes, applyScale]);
 
-  // 首次拿到尺寸与容器宽度后适应宽度
+  // Ctrl/Cmd + 滚轮缩放 PDF 页面本身；preventDefault 拦掉浏览器整页缩放。
+  // passive 必须显式为 false，否则 wheel 监听里不允许 preventDefault。
   useEffect(() => {
-    if (!sizes[1] || userScaledRef.current) return;
-    fitWidth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sizes[1]?.width]);
+    const container = scrollRef.current;
+    if (!container) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      applyScale(scaleRef.current * factor);
+    };
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+    // loading 期间 scroll 容器还没挂载，结束后再绑定
+  }, [applyScale, loading]);
 
   const gotoPage = useCallback((target: number) => {
     const clamped = Math.min(numPages || 1, Math.max(1, Math.round(target)));
@@ -223,8 +231,8 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
 
   useImperativeHandle(ref, () => ({
     gotoPage,
-    zoomIn: () => applyScale(scaleRef.current * ZOOM_STEP, true),
-    zoomOut: () => applyScale(scaleRef.current / ZOOM_STEP, true),
+    zoomIn: () => applyScale(scaleRef.current * ZOOM_STEP),
+    zoomOut: () => applyScale(scaleRef.current / ZOOM_STEP),
     fitWidth,
     fitPage,
   }), [gotoPage, applyScale, fitWidth, fitPage]);
@@ -244,10 +252,12 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     });
   }, []);
 
-  // 懒渲染：进入视口（含预取）才挂真渲染
+  // 懒渲染：进入视口（含预取）才挂真渲染。
+  // 注意必须等 loading 结束（wrapper 挂载后）再观察：numPages 变化时 UI 还在
+  // loading 占位，pageElementsRef 为空，此时观察 0 个元素会导致后页永远不渲染。
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container || !numPages) return;
+    if (!container || !numPages || loading) return;
     const targets = Array.from(pageElementsRef.current.values());
     const observer = new IntersectionObserver(
       (entries) => {
@@ -266,12 +276,13 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
     );
     for (const target of targets) observer.observe(target);
     return () => observer.disconnect();
-  }, [numPages]);
+  }, [numPages, loading]);
 
   // 当前页跟随滚动
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container) return;
+    // 同懒渲染：loading 期间 scroll 容器还没挂载，等它结束再绑定
+    if (!container || !numPages || loading) return;
     let frame = 0;
     const handle = () => {
       if (frame) return;
@@ -294,7 +305,7 @@ const PdfDocViewer = forwardRef<PdfDocViewerHandle, Props>(function PdfDocViewer
       container.removeEventListener("scroll", handle);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [numPages]);
+  }, [numPages, loading]);
 
   const annotationsByPage = useMemo(() => {
     const map = new Map<number, PdfAnnotation[]>();

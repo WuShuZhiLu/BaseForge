@@ -1,7 +1,47 @@
 import path from "path"
 import fs from "node:fs"
 import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { defineConfig, type Plugin } from "vite"
+
+// pdfjs-dist 的 CJK 字符映射与非内嵌标准字体资源目录。
+// getDocument 需配 cMapUrl / standardFontDataUrl 指向它们，
+// 否则中文 PDF 丢字（只剩英文）、部分页面渲染失败后整页空白。
+const PDFJS_DIST_DIR = path.resolve(__dirname, "node_modules/pdfjs-dist")
+
+// dev 用中间件直读 node_modules；build 时拷贝进 dist/pdfjs。
+function pdfjsAssetsPlugin(): Plugin {
+  const mime: Record<string, string> = {
+    ".bcmap": "application/octet-stream",
+    ".pfb": "application/octet-stream",
+    ".ttf": "font/ttf",
+  }
+  return {
+    name: "pdfjs-cmap-assets",
+    configureServer(server) {
+      server.middlewares.use("/pdfjs/", (req, res, next) => {
+        const rel = decodeURIComponent((req.url || "").split("?")[0]);
+        // connect 挂载在 /pdfjs/ 下会保留前导斜杠，故需 /? 可选；
+        // 只放行 cmaps/standard_fonts 下的一层文件名，防路径穿越
+        if (!/^\/?(cmaps|standard_fonts)\/[\w.-]+$/.test(rel)) {
+          next();
+          return;
+        }
+        res.setHeader("Content-Type", mime[path.extname(rel)] || "application/octet-stream");
+        try {
+          res.end(fs.readFileSync(path.join(PDFJS_DIST_DIR, rel)));
+        } catch {
+          res.statusCode = 404;
+          res.end();
+        }
+      });
+    },
+    closeBundle() {
+      for (const dir of ["cmaps", "standard_fonts"]) {
+        fs.cpSync(path.join(PDFJS_DIST_DIR, dir), path.resolve(__dirname, "dist/pdfjs", dir), { recursive: true });
+      }
+    },
+  };
+}
 
 // 读取根 package.json 的 version，注入到前端以便 UI 展示真实版本号
 // （release.sh 会在发布时更新根 package.json 的 version 字段）
@@ -15,7 +55,7 @@ export default defineConfig({
   // 使用相对 base，确保 file:// 下 /assets 不会解析到磁盘根目录。
   base: "./",
   root: path.resolve(__dirname),
-  plugins: [react()],
+  plugins: [react(), pdfjsAssetsPlugin()],
   define: {
     // 编译期常量；使用 JSON.stringify 确保是带引号的字符串字面量
     __APP_VERSION__: JSON.stringify(APP_VERSION),
