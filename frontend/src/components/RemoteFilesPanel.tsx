@@ -62,12 +62,12 @@ import type { RemoteFileEntry, RemoteNoteLink, RemoteSourcePublic } from "@/type
 
 type SourceType = "webdav" | "baidu" | "smb";
 
-/** 类型顺序按实际使用频率排：自建 NAS 多为 WebDAV / SMB，云盘直连是少数场景 */
-const SOURCE_TYPE_ORDER: SourceType[] = ["webdav", "smb", "baidu"];
+/** 类型顺序按实际使用频率排；百度网盘直连不再开放新增，已配置的源仍可查看编辑 */
+const SOURCE_TYPE_ORDER: SourceType[] = ["webdav", "smb"];
 
 const SOURCE_TYPE_LABEL: Record<SourceType, string> = {
   webdav: "WebDAV",
-  smb: "SMB / 局域网共享",
+  smb: "SMB",
   baidu: "百度网盘（直连）",
 };
 
@@ -127,6 +127,21 @@ const TEXT_EXTS = new Set([
 function isTextFileName(name: string): boolean {
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   return ext === "" || TEXT_EXTS.has(ext);
+}
+
+/** PDF / Word（docx）原件可链接进知识库；doc 老格式与表格演示文稿暂不支持 */
+function remoteDocKind(name: string): "pdf" | "docx" | null {
+  const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
+  if (ext === "pdf") return "pdf";
+  if (ext === "docx") return "docx";
+  return null;
+}
+
+/** 取远程二进制原件为 File（链接 PDF / Word 时用） */
+async function fetchRemoteFileAsFile(sourceId: string, entry: RemoteFileEntry): Promise<File> {
+  const res = await api.readRemoteFileBase64(sourceId, entry.path);
+  const bytes = Uint8Array.from(atob(res.contentBase64), (ch) => ch.charCodeAt(0));
+  return new File([bytes], entry.name, { type: "application/octet-stream" });
 }
 
 /** FNV-1a 32bit 字符串哈希（同步三态对比用，碰撞概率对单用户可接受） */
@@ -259,8 +274,8 @@ function SourceManager(props: {
   const [browsed, setBrowsed] = useState(false);
 
   /**
-   * 「浏览共享」= 一次动作同时完成连通性测试与共享枚举（用户反馈原来「获取共享 + 测试连接」
-   * 两步分开很别扭）。失败时按网络不可达 / 认证失败 / 协议不兼容分类给出可操作的提示。
+   * 「连接」= SMB 添加流程的主按钮：一次动作同时完成连通性验证与共享枚举。
+   * 失败时按网络不可达 / 认证失败 / 协议不兼容分类给出可操作的提示。
    */
   const browseShares = useCallback(async () => {
     if (!draft) return;
@@ -352,28 +367,6 @@ function SourceManager(props: {
       setBusy(false);
     }
   }, [draft, onChanged]);
-
-  const testConnection = useCallback(async () => {
-    if (!draft) return;
-    setNotice("测试中…");
-    setError("");
-    try {
-      await api.testRemoteFileSource({
-        type: draft.type,
-        baseUrl: draft.type === "smb" ? "" : draft.baseUrl.trim(),
-        username: draft.username,
-        password: draft.password,
-        accessToken: draft.accessToken,
-        domain: draft.domain,
-        rootPath: draft.rootPath,
-        ...(draft.type === "smb" ? { host: draft.smbHost.trim(), shares: draft.smbShares } : {}),
-      });
-      setNotice("连接成功");
-    } catch (err: any) {
-      setNotice("");
-      setError(err?.message || "连接失败");
-    }
-  }, [draft]);
 
   /** 百度 OAuth：打开授权页（oob，授权码由用户复制） */
   const openBaiduAuthorize = useCallback(async () => {
@@ -569,16 +562,6 @@ function SourceManager(props: {
                       value={draft.smbHost}
                       onChange={(e) => setDraft({ ...draft, smbHost: e.target.value })}
                     />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 shrink-0 whitespace-nowrap px-2 text-[11px]"
-                      disabled={busy || sharesLoading}
-                      onClick={() => void browseShares()}
-                    >
-                      {sharesLoading ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
-                      {sharesLoading ? "连接中…" : "浏览共享"}
-                    </Button>
                   </div>
                   <div className="flex gap-2">
                     <Input
@@ -644,8 +627,8 @@ function SourceManager(props: {
                     </div>
                   </details>
                   <p className="text-[10.5px] leading-4 text-tx-tertiary">
-                    用户名与密码按需填写：公开共享（guest）两个都留空即可。「浏览共享」会同时验证连通性，
-                    连不上会直接说明是地址不可达、账号密码不对还是协议不兼容。支持 SMB 2.1 ~ 3.1.1。
+                    用户名与密码按需填写：公开共享（guest）两个都留空即可。点「连接」会验证地址可达性
+                    与账号密码，成功后列出所有共享供选择。支持 SMB 2.1 ~ 3.1.1。
                   </p>
                 </>
               ) : draft.type === "webdav" ? (
@@ -755,22 +738,25 @@ function SourceManager(props: {
               ) : null}
 
               <div className="flex items-center gap-2 pt-1">
+                {draft.type === "smb" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
+                    disabled={busy || sharesLoading}
+                    onClick={() => void browseShares()}
+                  >
+                    {sharesLoading ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
+                    {sharesLoading ? "连接中…" : "连接"}
+                  </Button>
+                ) : null}
                 <Button
                   size="sm"
                   className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
-                  disabled={busy || !draft.name.trim()}
+                  disabled={busy || !draft.name.trim() || (draft.type === "smb" && !browsed && draft.smbShares.length === 0)}
                   onClick={() => void save()}
                 >
                   保存
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
-                  disabled={busy}
-                  onClick={() => void testConnection()}
-                >
-                  测试连接
                 </Button>
                 <span className="min-w-0 flex-1" />
                 <button
@@ -864,13 +850,13 @@ export default function RemoteFilesPanel() {
    * （见 lib/remoteNoteSync.ts）。已链接的文件走快捷路径直接跳笔记，不重复建。
    */
   const requestLink = useCallback((entries: RemoteFileEntry[]) => {
-    const linkable = entries.filter((entry) => !entry.isFolder && isTextFileName(entry.name));
+    const linkable = entries.filter((entry) => !entry.isFolder && (isTextFileName(entry.name) || remoteDocKind(entry.name)));
     if (linkable.length === 0) {
-      flash("选中项里没有可链接的文本文件（图片、压缩包等不能进知识库）");
+      flash("选中项里没有可链接的文件（支持文本 / PDF / Word；图片、压缩包等不能进知识库）");
       return;
     }
     const skipped = entries.length - linkable.length;
-    if (skipped > 0) flash(`${skipped} 项不是文本文件，已跳过`);
+    if (skipped > 0) flash(`${skipped} 项不支持链接（图片、压缩包等），已跳过`);
     setLinkTargets(linkable);
   }, [flash]);
 
@@ -920,6 +906,46 @@ export default function RemoteFilesPanel() {
           continue;
         }
 
+        const docKind = remoteDocKind(entry.name);
+        if (docKind === "pdf") {
+          // PDF：建 contentFormat=pdf 的笔记 + 原件挂附件（同 importPdfIntoKnowledgeTree 流程）。
+          // PDF 是批注型笔记不走 markdown 同步，映射基线用空串，仅保证「已链接」判定可用。
+          const file = await fetchRemoteFileAsFile(activeId, entry);
+          const baseTitle = entry.name.replace(/\.pdf$/i, "").trim() || "PDF 文档";
+          const title = uniqueNoteTitle(baseTitle, usedTitles);
+          usedTitles.add(title);
+          const note = await api.createNote({ title, notebookId: target.notebookId, contentFormat: "pdf" });
+          const attachment = await api.attachments.upload(note.id, file);
+          await api.updateNote(note.id, {
+            content: JSON.stringify({ attachmentId: attachment.id, annotations: [] }),
+            contentText: "",
+            version: note.version,
+          });
+          try {
+            await api.linkRemoteNote({
+              sourceId: activeId, remotePath: entry.path, noteId: note.id,
+              title, baseRemoteHash: fnvHash(""), baseNoteHash: fnvHash(""),
+            });
+          } catch { /* 映射失败不影响笔记可用 */ }
+          created += 1;
+          lastNoteId = note.id;
+          continue;
+        }
+        if (docKind === "docx") {
+          // Word（docx）：复用完整 docx 导入管线（IR 优先 / mammoth 兜底，图片自动传附件）
+          const file = await fetchRemoteFileAsFile(activeId, entry);
+          const { importDocxAsNoteSafe } = await import("@/lib/docxImportService");
+          const result = await importDocxAsNoteSafe({ file, notebookId: target.notebookId });
+          try {
+            await api.linkRemoteNote({
+              sourceId: activeId, remotePath: entry.path, noteId: result.note.id,
+              title: result.note.title || entry.name, baseRemoteHash: fnvHash(""), baseNoteHash: fnvHash(""),
+            });
+          } catch { /* 映射失败不影响笔记可用 */ }
+          created += 1;
+          lastNoteId = result.note.id;
+          continue;
+        }
         const res = await api.readRemoteFile(activeId, entry.path);
         const json = markdownToTiptapJSON(res.content);
         const baseTitle = entry.name.replace(/\.[^.]+$/, "") || "未命名";
@@ -1571,13 +1597,13 @@ export default function RemoteFilesPanel() {
                               title={linked
                                 ? `在知识库打开「${linked.title}」`
                                 : isTextFileName(entry.name)
-                                  ? "链接到知识库（用知识库编辑器直接读写远程文件）"
-                                  : "仅文本类文件可链接到知识库"}
+                                  ? "链接到知识库（文本可直接读写，PDF / Word 转为笔记）"
+                                  : "仅文本 / PDF / Word（docx）可链接到知识库"}
                               className={cn(
                                 "rounded p-1 hover:text-accent-primary disabled:opacity-40",
                                 linked ? "text-sky-400" : "text-tx-tertiary",
                               )}
-                              disabled={!linked && !isTextFileName(entry.name)}
+                              disabled={!linked && !isTextFileName(entry.name) && !remoteDocKind(entry.name)}
                               onClick={() => {
                                 if (linked) {
                                   // 跳笔记必须带容器的知识库 id，否则只会落到 /kb/:space 列表页
@@ -1626,48 +1652,42 @@ export default function RemoteFilesPanel() {
               </div>
             </div>
 
-            {/* 编辑器 */}
-            <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-app-border">
-              <div className="flex h-9 shrink-0 items-center gap-2 border-b border-app-border px-3 text-xs">
-                <FileText size={13} className="shrink-0 text-sky-500" />
-                <span className="min-w-0 flex-1 truncate text-tx-tertiary">{openPath || "未打开文件"}</span>
-                {openPath ? (
-                  <>
-                    {dirty ? <span className="shrink-0 text-[10px] text-amber-500">未保存</span> : null}
-                    <Button
-                      size="sm"
-                      className="h-7 shrink-0 px-2 text-[11px]"
-                      disabled={saving || !dirty}
-                      onClick={() => void saveFile()}
-                    >
-                      <Save size={11} className="mr-1" /> {saving ? "保存中…" : "写回远程"}
-                    </Button>
-                    <button
-                      type="button"
-                      title="关闭"
-                      className="shrink-0 rounded p-1 text-tx-tertiary hover:text-tx-secondary"
-                      onClick={() => { setOpenPath(""); setEditorText(""); setDirty(false); }}
-                    >
-                      <X size={13} />
-                    </button>
-                  </>
-                ) : null}
+            {/* 编辑器：打开文本文件才出现，关闭按钮或清空 openPath 后整个面板收起 */}
+            {openPath ? (
+              <div className="flex min-h-0 w-[42%] shrink-0 flex-col border-l border-app-border">
+                <div className="flex h-9 shrink-0 items-center gap-2 border-b border-app-border px-3 text-xs">
+                  <FileText size={13} className="shrink-0 text-sky-500" />
+                  <span className="min-w-0 flex-1 truncate text-tx-primary">{openPath}</span>
+                  {dirty ? <span className="shrink-0 text-[10px] text-amber-500">未保存</span> : null}
+                  <Button
+                    size="sm"
+                    className="h-7 shrink-0 px-2 text-[11px]"
+                    disabled={saving || !dirty}
+                    onClick={() => void saveFile()}
+                  >
+                    <Save size={11} className="mr-1" /> {saving ? "保存中…" : "写回远程"}
+                  </Button>
+                  <button
+                    type="button"
+                    title="关闭"
+                    className="shrink-0 rounded p-1 text-tx-tertiary hover:text-tx-secondary"
+                    onClick={() => { setOpenPath(""); setEditorText(""); setDirty(false); }}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+                {editorLoading ? (
+                  <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">读取中…</p>
+                ) : (
+                  <textarea
+                    className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none"
+                    spellCheck={false}
+                    value={editorText}
+                    onChange={(e) => { setEditorText(e.target.value); setDirty(true); }}
+                  />
+                )}
               </div>
-              {editorLoading ? (
-                <p className="flex-1 py-8 text-center text-xs text-tx-tertiary">读取中…</p>
-              ) : openPath ? (
-                <textarea
-                  className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-xs leading-5 outline-none"
-                  spellCheck={false}
-                  value={editorText}
-                  onChange={(e) => { setEditorText(e.target.value); setDirty(true); }}
-                />
-              ) : (
-                <p className="flex-1 px-6 py-8 text-center text-xs leading-5 text-tx-tertiary">
-                  点击左侧文本文件（md / txt / json 等）即可读取与写回
-                </p>
-              )}
-            </div>
+            ) : null}
           </div>
         </>
       )}
@@ -1747,7 +1767,11 @@ export default function RemoteFilesPanel() {
         <SourceManager
           sources={sources}
           onClose={() => setManagerOpen(false)}
-          onChanged={() => void reloadSources()}
+          onChanged={() => {
+            void reloadSources();
+            // 侧栏「存储」列表读的是自己的快照，广播让它跟着重载
+            window.dispatchEvent(new Event("nowen:remote-sources-changed"));
+          }}
         />
       ) : null}
 

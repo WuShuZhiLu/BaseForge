@@ -26,6 +26,7 @@ export type FilesTypeFilter = MimeCategory | "all";
 const KEYS = {
   source: "nowen.filesUi.source",
   type: "nowen.filesUi.unifiedType",
+  types: "nowen.filesUi.unifiedTypes",
   category: "nowen.filesUi.category",
   share: "nowen.filesUi.share",
   time: "nowen.filesUi.time",
@@ -70,15 +71,22 @@ function isFilesTypeFilter(raw: string | null): raw is FilesTypeFilter {
   return raw === "all" || raw === "image" || raw === "video" || raw === "audio" || raw === "doc" || raw === "other";
 }
 
-/** 统一类型筛选（图片/视频/音频/文档/其他），默认"全部"。 */
-export function getFilesType(): FilesTypeFilter {
-  const raw = localStorage.getItem(KEYS.type);
-  if (isFilesTypeFilter(raw)) return raw;
+/** 统一类型筛选（图片/视频/音频/文档/其他），多选；空或含 "all" = 全部。 */
+export function getFilesTypes(): FilesTypeFilter[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(KEYS.types) || "");
+    if (Array.isArray(raw)) {
+      const list = raw.filter((v: unknown): v is Exclude<FilesTypeFilter, "all"> =>
+        v === "image" || v === "video" || v === "audio" || v === "doc" || v === "other");
+      return list.length ? list : ["all"];
+    }
+  } catch { /* 旧值格式，走迁移 */ }
   // 首次升级：旧图床只展示图片（ihCategory 默认 "image"），迁移成"类型=图片"；
   // 其余情况保持"全部"，避免用户升级后突然看到一个被筛空的列表。
+  const legacySingle = localStorage.getItem(KEYS.type);
+  if (isFilesTypeFilter(legacySingle) && legacySingle !== "all") return [legacySingle];
   const migrated: FilesTypeFilter = localStorage.getItem(LEGACY_KEYS.ihCategory) === "image" ? "image" : "all";
-  localStorage.setItem(KEYS.type, migrated);
-  return migrated;
+  return [migrated];
 }
 
 /**
@@ -133,9 +141,9 @@ export function getFilesRemoteSourceId(): string {
   return localStorage.getItem(KEYS.remoteSource) || "";
 }
 
-export function setFilesUi(patch: { source?: FilesSource; type?: FilesTypeFilter; category?: string; share?: FileShareStatus | "all"; time?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string; remoteSourceId?: string }): void {
+export function setFilesUi(patch: { source?: FilesSource; types?: FilesTypeFilter[]; category?: string; share?: FileShareStatus | "all"; time?: string; sort?: FileSortKey; view?: FilesViewMode; group?: FilesGroupMode; remoteTypes?: string[]; remoteSort?: FilesRemoteSortKey; remoteTime?: string; remoteSourceId?: string }): void {
   if (patch.source !== undefined) localStorage.setItem(KEYS.source, patch.source);
-  if (patch.type !== undefined) localStorage.setItem(KEYS.type, patch.type);
+  if (patch.types !== undefined) localStorage.setItem(KEYS.types, JSON.stringify(patch.types));
   if (patch.category !== undefined) localStorage.setItem(KEYS.category, patch.category);
   if (patch.share !== undefined) localStorage.setItem(KEYS.share, patch.share);
   if (patch.time !== undefined) localStorage.setItem(KEYS.time, patch.time);

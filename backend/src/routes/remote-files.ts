@@ -305,6 +305,20 @@ remoteFilesRouter.post("/sources/:sourceId/read", withSource(async (c, resolved)
   return c.json({ path, ...result });
 }));
 
+// 二进制读取（base64）：供「链接到知识库」把 PDF / Word 原件取到前端建笔记用。
+// 与 read 不同：不限制文本扩展名，但限制单文件大小，避免把内存打爆。
+remoteFilesRouter.post("/sources/:sourceId/read-base64", withSource(async (c, resolved) => {
+  const body = await readBody(c);
+  const path = normalizeRemotePath(String(body.path ?? ""));
+  if (!path) return c.json({ error: "缺少文件路径" }, 400);
+  const buffer = await resolved.provider.readBinary(resolved.ctx, path);
+  const REMOTE_BINARY_READ_LIMIT = 100 * 1024 * 1024;
+  if (buffer.length > REMOTE_BINARY_READ_LIMIT) {
+    return c.json({ error: "文件超过 100MB，无法链接到知识库" }, 413);
+  }
+  return c.json({ path, size: buffer.length, contentBase64: buffer.toString("base64") });
+}));
+
 remoteFilesRouter.post("/sources/:sourceId/write", withSource(async (c, resolved) => {
   const body = await readBody(c);
   const path = normalizeRemotePath(String(body.path ?? ""));

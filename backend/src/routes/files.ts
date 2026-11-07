@@ -383,9 +383,14 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   if (scope.error) return c.json({ error: scope.error, code: "FORBIDDEN" }, 403);
 
   const category = (c.req.query("category") || "all").toLowerCase();
-  // 统一文件池的类型筛选（image / video / audio / doc / other）。非法值视为不筛选。
+  // 统一文件池的类型筛选（image / video / audio / doc / other）。
+  // 支持逗号分隔多选（mimeCategory=image,doc → OR 组合）；非法值剔除，全非法视为不筛。
   const mimeCategoryRaw = (c.req.query("mimeCategory") || "").toLowerCase();
-  const mimeCategory = isMimeCategory(mimeCategoryRaw) ? mimeCategoryRaw : null;
+  const mimeCategoryList = mimeCategoryRaw.split(",")
+    .map((entry) => entry.trim())
+    .filter((entry): entry is MimeCategory => isMimeCategory(entry));
+  const mimeCategory: MimeCategory | null = mimeCategoryList.length === 1 ? mimeCategoryList[0] : null;
+  const mimeCategoryMulti = mimeCategoryList.length > 1 ? mimeCategoryList : null;
   const filter = (c.req.query("filter") || "").toLowerCase();
   // shareStatus：按“是否存在生效中的只读分享链接”筛。与 attachmentShareApi.list()
   // 的 isActive 口径一致（前端卡片“已分享”角标用的就是它）。
@@ -426,7 +431,12 @@ app.get("/", requireWorkspaceFeature("files"), (c) => {
   // （image / file 二分，前端三来源时代的产物），仅在未传 mimeCategory 时生效。
   // 两者同时出现时不叠加——例如 mimeCategory=image + category=file 应该按
   // 新参数理解为"只看图片"，而不是交集为空。
-  if (mimeCategory) {
+  if (mimeCategoryMulti) {
+    // 多选：各分类条件 OR 组合
+    const conds = mimeCategoryMulti.map((m) => buildMimeCategoryWhere(m));
+    whereParts.push(`(${conds.map((cond) => cond.sql).join(" OR ")})`);
+    for (const cond of conds) params.push(...cond.params);
+  } else if (mimeCategory) {
     const cond = buildMimeCategoryWhere(mimeCategory);
     whereParts.push(cond.sql);
     params.push(...cond.params);

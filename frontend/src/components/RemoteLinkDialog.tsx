@@ -11,11 +11,14 @@
  *
  * 弹窗本身不碰远程文件，也不建笔记——只回吐目标知识库，由调用方批量落库。
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
+  ChevronDown,
+  ChevronRight,
   FolderClosed,
+  FolderOpen,
   Loader2,
   NotebookPen,
   Plus,
@@ -96,6 +99,8 @@ export default function RemoteLinkDialog({
   const [creatingOpen, setCreatingOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  /** 树形展开状态；undefined = 全部展开（默认） */
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -142,6 +147,21 @@ export default function RemoteLinkDialog({
 
   const byId = useMemo(() => new Map(notebooks.map((item) => [item.id, item])), [notebooks]);
 
+  /** parentId → 子库列表（按 sortOrder / 名称排序），重建树用 */
+  const childrenMap = useMemo(() => {
+    const map = new Map<string | null, Notebook[]>();
+    for (const item of notebooks) {
+      const key = item.parentId && byId.has(item.parentId) ? item.parentId : null;
+      const list = map.get(key);
+      if (list) list.push(item);
+      else map.set(key, [item]);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+    }
+    return map;
+  }, [byId, notebooks]);
+
   const filtered = useMemo(() => {
     const keyword = query.trim().toLowerCase();
     if (!keyword) return notebooks;
@@ -181,6 +201,43 @@ export default function RemoteLinkDialog({
   const submit = () => {
     if (!selected || locked) return;
     onConfirm({ notebookId: selected.id, notebookName: selected.name });
+  };
+
+  const toggleCollapse = (id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /** 知识树形渲染：父 → 子缩进展示，与知识库侧边栏的层级一致 */
+  const renderTree = (parentId: string | null, depth: number): React.ReactNode[] => {
+    const list = childrenMap.get(parentId) || [];
+    return list.flatMap((notebook) => {
+      const children = childrenMap.get(notebook.id) || [];
+      const isCollapsed = collapsed.has(notebook.id);
+      const active = notebook.id === selectedId;
+      const rows: React.ReactNode[] = [
+        <TreeRow
+          key={notebook.id}
+          notebook={notebook}
+          depth={depth}
+          active={active}
+          locked={locked}
+          hasChildren={children.length > 0}
+          collapsed={isCollapsed}
+          onToggle={() => toggleCollapse(notebook.id)}
+          onSelect={() => setSelectedId(notebook.id)}
+          onDoubleClick={() => submit()}
+        />,
+      ];
+      if (children.length > 0 && !isCollapsed) {
+        rows.push(...renderTree(notebook.id, depth + 1));
+      }
+      return rows;
+    });
   };
 
   return createPortal(
@@ -301,45 +358,27 @@ export default function RemoteLinkDialog({
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-xs text-tx-tertiary">没有匹配的知识库</p>
           ) : (
-            <div className="space-y-1">
-              {filtered.map((notebook) => {
-                const active = notebook.id === selectedId;
-                const path = notebookPath(notebook, byId);
-                return (
-                  <button
-                    key={notebook.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    disabled={locked}
-                    onClick={() => setSelectedId(notebook.id)}
-                    onDoubleClick={() => submit()}
-                    className={cn(
-                      "flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors",
-                      active
-                        ? "border-accent-primary/40 bg-accent-primary/10"
-                        : "border-transparent hover:bg-app-hover",
-                      locked && "opacity-60",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                        active ? "border-accent-primary text-accent-primary" : "border-app-border text-transparent",
-                      )}
-                    >
-                      <Check size={11} />
-                    </span>
-                    <FolderClosed size={14} className={cn("shrink-0", active ? "text-accent-primary" : "text-tx-tertiary")} />
-                    <span className="min-w-0 flex-1">
-                      <span className={cn("block truncate text-sm", active ? "text-tx-primary" : "text-tx-secondary")}>
-                        {notebook.name}
-                      </span>
-                      {path && <span className="mt-0.5 block truncate text-[11px] text-tx-tertiary">{path}</span>}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="space-y-0.5">
+              {query.trim()
+                // 搜索模式：平铺 + 父链路径，命中才能被看到
+                ? filtered.map((notebook) => {
+                  const active = notebook.id === selectedId;
+                  const path = notebookPath(notebook, byId);
+                  return (
+                    <TreeRow
+                      key={notebook.id}
+                      notebook={notebook}
+                      depth={0}
+                      active={active}
+                      locked={locked}
+                      hasChildren={false}
+                      onSelect={() => setSelectedId(notebook.id)}
+                      onDoubleClick={() => submit()}
+                      path={path}
+                    />
+                  );
+                })
+                : renderTree(null, 0)}
             </div>
           )}
         </div>
@@ -364,5 +403,78 @@ export default function RemoteLinkDialog({
       </section>
     </div>,
     document.body,
+  );
+}
+
+/** 树形/搜索两种模式下共用的知识库行 */
+function TreeRow({
+  notebook,
+  depth,
+  active,
+  locked,
+  hasChildren,
+  collapsed,
+  onToggle,
+  onSelect,
+  onDoubleClick,
+  path,
+}: {
+  notebook: Notebook;
+  depth: number;
+  active: boolean;
+  locked: boolean;
+  hasChildren: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+  onSelect: () => void;
+  onDoubleClick?: () => void;
+  path?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      disabled={locked}
+      onClick={onSelect}
+      onDoubleClick={onDoubleClick}
+      style={{ paddingLeft: 10 + depth * 16 }}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-lg border py-1.5 pr-2.5 text-left transition-colors",
+        active
+          ? "border-accent-primary/40 bg-accent-primary/10"
+          : "border-transparent hover:bg-app-hover",
+        locked && "opacity-60",
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+          active ? "border-accent-primary text-accent-primary" : "border-app-border text-transparent",
+        )}
+      >
+        <Check size={11} />
+      </span>
+      {hasChildren ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={collapsed ? "展开" : "折叠"}
+          onClick={(event) => { event.stopPropagation(); onToggle?.(); }}
+          className="shrink-0 rounded p-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
+        >
+          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        </button>
+      ) : (
+        <span className="w-[22px] shrink-0" />
+      )}
+      {collapsed ? <FolderClosed size={14} className="shrink-0 text-tx-tertiary" /> : <FolderOpen size={14} className={cn("shrink-0", active ? "text-accent-primary" : "text-tx-tertiary")} />}
+      <span className="min-w-0 flex-1">
+        <span className={cn("block truncate text-sm", active ? "text-tx-primary" : "text-tx-secondary")}>
+          {notebook.name}
+        </span>
+        {path && <span className="mt-0.5 block truncate text-[11px] text-tx-tertiary">{path}</span>}
+      </span>
+    </button>
   );
 }

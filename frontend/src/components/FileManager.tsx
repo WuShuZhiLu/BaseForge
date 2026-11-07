@@ -67,7 +67,7 @@ import { navigateToolPage } from "@/components/toolTabs";
 export const TOOL_PAGE_HEADER_MODE: ToolPageHeaderMode = "own";
 
 import { FileItem, FileStats } from "@/types";
-import { FILE_SORT_OPTIONS, FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
+import { FILE_SORT_OPTIONS, FILE_TYPE_CHIPS, MIME_CATEGORY_LABELS, getFilesCategory, getFilesGroupMode, getFilesShare, getFilesSort, getFilesSource, getFilesTime, getFilesTypes, getFilesUiVersion, getFilesViewMode, resolveMimeCategory, setFilesUi, subscribeFilesUi } from "@/features/files/filesUi";
 import type { FilesTypeFilter, FilesViewMode } from "@/features/files/filesUi";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -308,7 +308,10 @@ export default function FileManager() {
   const sourceTab = isRemoteSource ? "remote" : "local";
   // 统一文件池：类型（图片/视频/音频/文档/其他）是筛选维度而非分隔容器；
   // 范围（全部/我的上传/未引用）与它正交，两者可叠加。
-  const typeFilter = getFilesType();
+  const typeFilter = getFilesTypes();
+  /** "all" 或空 = 不筛；多选时逗号串传后端（后端支持列表 OR）。 */
+  const typeFilterActive = !typeFilter.includes("all");
+  const mimeCategoryParam = typeFilterActive ? typeFilter.join(",") : undefined;
   const category = getFilesCategory() as CategoryFilter;
   /** 分享状态（侧栏「分享状态」chips）：all = 不筛。 */
   const shareFilter = getFilesShare();
@@ -436,7 +439,7 @@ export default function FileManager() {
       c: category,
       // 仅在 myUploads 范围下子筛选才有意义；其他范围固定写空串避免污染 key
       mur: category === "myUploads" ? myUploadsRef : "",
-      t: typeFilter,
+      t: typeFilter.join(","),
       sh: shareFilter,
       tf: getFilesTime(),
       s: sort,
@@ -467,7 +470,7 @@ export default function FileManager() {
           ? category
           : undefined;
       const res = await api.files.list({
-        mimeCategory: typeFilter === "all" ? undefined : typeFilter,
+        mimeCategory: mimeCategoryParam,
         filter: apiFilter,
         shareStatus: shareFilter === "all" ? undefined : shareFilter,
         uploadedWithin: getFilesTime() !== "all"
@@ -1109,7 +1112,7 @@ export default function FileManager() {
   const isFirstPageNoResults = !loading && items.length === 0 && page === 1;
   // 空态文案分叉依据：类型 / 范围 / 时间 / 搜索 任一非默认即视为"筛选中"
   const hasAnyFilter =
-    Boolean(searchQuery) || category !== "all" || typeFilter !== "all" || shareFilter !== "all" || getFilesTime() !== "all";
+    Boolean(searchQuery) || category !== "all" || typeFilterActive || shareFilter !== "all" || getFilesTime() !== "all";
 
   // 扁平视图也按 id 去重，防止重复渲染
   const displayItems = useMemo(() => {
@@ -1448,11 +1451,11 @@ export default function FileManager() {
             <button type="button" className="cursor-pointer" onClick={() => setFilesUi({ share: "all" })}>✕</button>
           </span>
         )}
-        {(typeFilter !== "all" || getFilesTime() !== "all" || shareFilter !== "all") && (
+        {(typeFilterActive || getFilesTime() !== "all" || shareFilter !== "all") && (
           <button
             type="button"
             className="shrink-0 text-[10.5px] text-tx-tertiary hover:text-tx-secondary"
-            onClick={() => setFilesUi({ type: "all", time: "all", share: "all" })}
+            onClick={() => setFilesUi({ types: ["all"], time: "all", share: "all" })}
           >
             清除筛选
           </button>

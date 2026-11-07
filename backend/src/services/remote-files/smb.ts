@@ -184,7 +184,92 @@ async function openClient(ctx: RemoteProviderContext): Promise<SmbClientLike> {
 }
 
 async function closeQuietly(client: SmbClientLike): Promise<void> {
-  try { await client.close(); } catch { /* ignore */ }
+  // close 也可能在对端无响应时挂住：3s 兜底
+  try {
+    await Promise.race([
+      client.close(),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch { /* ignore */ }
+}
+
+/**
+ * SMB 连接复用缓存：每次请求都重新 connect + NTLM 握手，慢 NAS 上要 10s+，
+ * 是目录加载慢、前端 30s 超时失败的根源。按连接参数缓存客户端，
+ * 空闲 2 分钟后关闭；同一客户端上的操作串行执行，避免协议层并发问题。
+ */
+interface CachedSmbClient {
+  client: SmbClientLike;
+  queue: Promise<unknown>;
+  idleTimer: ReturnType<typeof setTimeout>;
+}
+const SMB_CLIENT_IDLE_MS = 120_000;
+const SMB_OP_TIMEOUT_MS = 45_000;
+const smbClientCache = new Map<string, CachedSmbClient>();
+
+function smbCacheKey(ctx: RemoteProviderContext): string {
+  const { host, port } = resolveHost(ctx);
+  return JSON.stringify([host, port, ctx.domain || "", ctx.username || "", ctx.password || ""]);
+}
+
+function touchIdleTimer(key: string, entry: CachedSmbClient): void {
+  clearTimeout(entry.idleTimer);
+  entry.idleTimer = setTimeout(() => {
+    smbClientCache.delete(key);
+    void closeQuietly(entry.client);
+  }, SMB_CLIENT_IDLE_MS);
+  // 定时器不阻止进程退出
+  entry.idleTimer.unref?.();
+}
+
+/** 连接类错误（缓存客户端可能已被 NAS 断开）：丢弃缓存，下次重连 */
+function isConnectionError(err: unknown): boolean {
+  const text = [err instanceof Error ? err.message : String(err ?? ""), (err as { code?: string })?.code || ""].join(" ");
+  return /连接 SMB 主机失败|ECONN|EPIPE|ETIMEDOUT|NOT_CONNECTED|CONNECTION|socket|timeout/i.test(text);
+}
+
+async function withSmbClient<T>(ctx: RemoteProviderContext, fn: (client: SmbClientLike) => Promise<T>): Promise<T> {
+  const key = smbCacheKey(ctx);
+  let entry = smbClientCache.get(key);
+  if (!entry) {
+    const client = await openClient(ctx);
+    entry = { client, queue: Promise.resolve(), idleTimer: null as unknown as ReturnType<typeof setTimeout> };
+    smbClientCache.set(key, entry);
+    touchIdleTimer(key, entry);
+  } else {
+    touchIdleTimer(key, entry);
+  }
+  const run = async (): Promise<T> => {
+    const startedAt = Date.now();
+    try {
+      // 单操作硬超时：smb3 的 requestTimeout 并不覆盖所有阶段（如 NTLM 会话建立），
+      // 一旦挂住会堵死该源上的所有后续操作。超时即弃连接，队列自动恢复。
+      const result = await Promise.race([
+        fn(entry.client),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new RemoteProviderError("SMB 操作超时（对端无响应），已重置连接", 504)), SMB_OP_TIMEOUT_MS)),
+      ]);
+      console.log(`[smb] op ok host=${(JSON.parse(key) as string[])[0]} ${Date.now() - startedAt}ms`);
+      return result;
+    } catch (err) {
+      console.log(`[smb] op fail host=${(JSON.parse(key) as string[])[0]} ${Date.now() - startedAt}ms err=${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof RemoteProviderError && err.status === 504) {
+        smbClientCache.delete(key);
+        void closeQuietly(entry.client);
+        throw err;
+      }
+      // 复用的连接可能已失效：丢弃缓存并原样抛错（下次操作自动重连）
+      if (entry !== smbClientCache.get(key)) throw err;
+      if (isConnectionError(err)) {
+        smbClientCache.delete(key);
+        void closeQuietly(entry.client);
+      }
+      throw err;
+    }
+  };
+  const result = entry.queue.then(run, run);
+  entry.queue = result.catch(() => { /* 队列吞掉错误，保持后续操作可执行 */ });
+  return result;
 }
 
 /** NT_STATUS / fs code → 业务错误映射 */
@@ -237,37 +322,37 @@ export const smbProvider: RemoteProvider = {
         modifiedAt: null,
       }));
     }
-    const client = await openClient(ctx);
     // 多共享模式路径带共享名前缀；历史单共享模式保持「共享内相对路径」不变（已存链接不失效）
     const multi = (ctx.shares || []).filter(Boolean).length > 0;
     const withShare = (relative: string) => (multi ? `${target.shareName}/${relative}` : relative);
     try {
-      const dir = targetPath(target.shareName, ctx, target.subPath);
-      const items = await readdirEntries(client, dir);
-      // 逐条 stat 获取类型/大小/时间（目录条目上限 200，避免大目录请求风暴）
-      const entries = await Promise.all(
-        items.slice(0, 200).map(async (item): Promise<RemoteFileEntry> => {
+      return await withSmbClient(ctx, async (client) => {
+        const dir = targetPath(target.shareName, ctx, target.subPath);
+        const items = await readdirEntries(client, dir);
+        // 逐条 stat 获取类型/大小/时间（目录条目上限 200）。
+        // 注意必须串行：不少 NAS / Windows 主机对单连接并发请求直接 RST
+        // （实测并发 3 即 ECONNRESET），串行虽慢但单个 stat 仅几 ms，200 条 <2s。
+        const entries: RemoteFileEntry[] = [];
+        for (const item of items.slice(0, 200)) {
           const relative = target.subPath ? `${target.subPath}/${item.name}` : item.name;
           try {
             const st = await client.stat(`${dir}/${item.name}`);
-            return {
+            entries.push({
               name: item.name,
               path: withShare(relative),
               isFolder: st.isDirectory,
               size: st.size || 0,
               modifiedAt: st.mtime ? new Date(st.mtime).toISOString() : null,
-            };
+            });
           } catch {
-            return { name: item.name, path: withShare(relative), isFolder: item.isDirectory(), size: 0, modifiedAt: null };
+            entries.push({ name: item.name, path: withShare(relative), isFolder: item.isDirectory(), size: 0, modifiedAt: null });
           }
-        }),
-      );
-      sortEntries(entries);
-      return entries;
+        }
+        sortEntries(entries);
+        return entries;
+      });
     } catch (err) {
       throw mapSmbError(err, "读取 SMB 目录失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 
@@ -278,13 +363,10 @@ export const smbProvider: RemoteProvider = {
 
   async readBinary(ctx, path) {
     const target = resolveTarget(ctx, path);
-    const client = await openClient(ctx);
     try {
-      return await client.readFile(targetPath(target.shareName, ctx, target.subPath));
+      return await withSmbClient(ctx, (client) => client.readFile(targetPath(target.shareName, ctx, target.subPath)));
     } catch (err) {
       throw mapSmbError(err, "读取 SMB 文件失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 
@@ -294,55 +376,47 @@ export const smbProvider: RemoteProvider = {
 
   async writeBinary(ctx, path, data) {
     const target = resolveTarget(ctx, path);
-    const client = await openClient(ctx);
     try {
-      await client.writeFile(targetPath(target.shareName, ctx, target.subPath), data);
+      await withSmbClient(ctx, (client) => client.writeFile(targetPath(target.shareName, ctx, target.subPath), data));
     } catch (err) {
       throw mapSmbError(err, "写入 SMB 文件失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 
   async mkdir(ctx, path) {
     const target = resolveTarget(ctx, path);
-    const client = await openClient(ctx);
     try {
-      await client.mkdir(targetPath(target.shareName, ctx, target.subPath));
+      await withSmbClient(ctx, (client) => client.mkdir(targetPath(target.shareName, ctx, target.subPath)));
     } catch (err) {
       throw mapSmbError(err, "创建 SMB 目录失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 
   async remove(ctx, path) {
     const target = resolveTarget(ctx, path);
-    const client = await openClient(ctx);
     try {
-      const full = targetPath(target.shareName, ctx, target.subPath);
-      const st = await client.stat(full);
-      if (st.isDirectory) await removeTree(client, full);
-      else await client.rm(full);
+      await withSmbClient(ctx, async (client) => {
+        const full = targetPath(target.shareName, ctx, target.subPath);
+        const st = await client.stat(full);
+        if (st.isDirectory) await removeTree(client, full);
+        else await client.rm(full);
+      });
     } catch (err) {
       throw mapSmbError(err, "删除 SMB 文件失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 
   async rename(ctx, path, newName) {
     const target = resolveTarget(ctx, path);
-    const client = await openClient(ctx);
     try {
-      const from = targetPath(target.shareName, ctx, target.subPath);
-      const subParent = target.subPath.split("/").slice(0, -1).join("/");
-      const to = `${targetPath(target.shareName, ctx, subParent)}/${newName}`;
-      await client.rename(from, to);
+      await withSmbClient(ctx, async (client) => {
+        const from = targetPath(target.shareName, ctx, target.subPath);
+        const subParent = target.subPath.split("/").slice(0, -1).join("/");
+        const to = `${targetPath(target.shareName, ctx, subParent)}/${newName}`;
+        await client.rename(from, to);
+      });
     } catch (err) {
       throw mapSmbError(err, "SMB 重命名失败");
-    } finally {
-      await closeQuietly(client);
     }
   },
 };

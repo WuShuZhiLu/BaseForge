@@ -831,14 +831,22 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
     else userSignal.addEventListener("abort", () => linkedController.abort(), { once: true });
   }
   // Android 原生壳里错误地址/弱网下 GET 体感很像"永远加载"；Web 端保持较长读超时。
-  const TIMEOUT_MS =
-    method === "GET" || method === "HEAD"
+  // 远程存储（WebDAV/SMB）首次连接 + 枚举在慢 NAS 上可达 10s+，放宽到 60s，
+  // 超时时 abort 带上原因，避免 UI 直接显示 "signal is aborted without reason"。
+  const isRemoteFilesCall = url.startsWith("/remote-files");
+  const TIMEOUT_MS = isRemoteFilesCall
+    ? 60000
+    : method === "GET" || method === "HEAD"
       ? isNativeCapacitor()
         ? 20000
         : 60000
       : 30000;
   const timeoutId = setTimeout(() => {
-    try { linkedController.abort(); } catch { /* ignore */ }
+    try {
+      linkedController.abort(isRemoteFilesCall
+        ? new Error("远程存储响应超时（NAS 连接较慢或不可达），请重试")
+        : undefined);
+    } catch { /* ignore */ }
   }, TIMEOUT_MS);
   try {
     // P0-3: 自动注入 X-Connection-Id（如果 WebSocket 已连接）。
@@ -3202,8 +3210,8 @@ export const api = {
      *  shareStatus=shared / unshared：按是否存在生效中的只读分享链接筛选。
      */
     list: (params: {
-      /** 统一文件池的类型筛选（image/video/audio/doc/other）。 */
-      mimeCategory?: import("@/types").MimeCategory;
+      /** 统一文件池的类型筛选；可传逗号分隔多选（如 "image,doc"），后端 OR 组合。 */
+      mimeCategory?: import("@/types").MimeCategory | string;
       /** @deprecated 三来源时代的来源二分筛选，新代码用 mimeCategory。 */
       category?: FileCategory;
       filter?: FileFilter;
@@ -3403,6 +3411,9 @@ export const api = {
     request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
   readRemoteFile: (sourceId: string, path: string) =>
     request<{ path: string; content: string; size: number }>(`/remote-files/sources/${sourceId}/read`, { method: "POST", body: JSON.stringify({ path }) }),
+  // 二进制读取（base64）：PDF / Word 链接到知识库时取原件
+  readRemoteFileBase64: (sourceId: string, path: string) =>
+    request<{ path: string; size: number; contentBase64: string }>(`/remote-files/sources/${sourceId}/read-base64`, { method: "POST", body: JSON.stringify({ path }) }),
   writeRemoteFile: (sourceId: string, path: string, content: string) =>
     request<{ success: boolean }>(`/remote-files/sources/${sourceId}/write`, { method: "POST", body: JSON.stringify({ path, content }) }),
   mkdirRemoteFile: (sourceId: string, path: string) =>

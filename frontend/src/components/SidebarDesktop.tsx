@@ -128,7 +128,7 @@ import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActi
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteSourceId, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
+import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteSourceId, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesTypes, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
@@ -726,6 +726,18 @@ export default function SidebarDesktop() {
     window.addEventListener("nowen:sidebar-view", onSwitch);
     return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
   }, [applySidebarView]);
+
+  // 远程存储增删后侧栏「存储」列表跟着刷新（主面板保存成功时广播）
+  useEffect(() => {
+    const reload = () => {
+      if (sidebarView !== "files") return;
+      api.getRemoteFileSources()
+        .then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type }))))
+        .catch(() => setRemoteSources([]));
+    };
+    window.addEventListener("nowen:remote-sources-changed", reload);
+    return () => window.removeEventListener("nowen:remote-sources-changed", reload);
+  }, [sidebarView]);
 
   // 插件工作区「打开侧栏面板」按钮 → 侧栏切到知识库视图并展开对应迷你面板
   useEffect(() => {
@@ -3289,7 +3301,7 @@ export default function SidebarDesktop() {
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
             <PanelSection label="来源">
               <div className="space-y-0.5">
-                {([["all", FolderOpen, "文件"], ["remote", Cloud, "远程文件"]] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
+                {([["all", FolderOpen, "本地文件"], ["remote", Cloud, "远程文件"]] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -3330,7 +3342,7 @@ export default function SidebarDesktop() {
                 ))}
               </div>
             </PanelSection>
-            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），单选 */}
+            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），多选 */}
             <TypeFilterPopover
               label="类型"
               items={FILE_TYPE_CHIPS.map((chip) => ({
@@ -3350,8 +3362,9 @@ export default function SidebarDesktop() {
                   : chip.key === "doc" ? <FileText size={12} />
                   : <FileQuestion size={12} />,
               }))}
-              selected={[getFilesType()]}
-              onChange={(keys) => setFilesUi({ type: keys[0] })}
+              selected={getFilesTypes()}
+              onChange={(keys) => setFilesUi({ types: keys })}
+              multi
               totalCount={fileStats?.total}
             />
             {/* 分享状态：只看生效中（未关闭且未过期）的只读分享链接。 */}
@@ -3458,31 +3471,24 @@ export default function SidebarDesktop() {
             </PanelSection>
             <TypeFilterPopover
               label="类型"
-              items={FILE_REMOTE_TYPE_CHIPS.map((chip) => ({
-                key: chip.key,
-                label: chip.label,
-                icon: chip.key === "doc" ? <FileText size={12} />
-                  : chip.key === "image" ? <Image size={12} />
-                  : chip.key === "archive" ? <Archive size={12} />
-                  : <FileQuestion size={12} />,
-              }))}
-              selected={getFilesRemoteTypes()}
-              onChange={(keys) => setFilesUi({ remoteTypes: keys })}
+              // 首项显式给「全部」：TypeFilterPopover 把 items[0] 当重置项，
+              // 不给的话「文档」会被当成全部，导致默认锁定且取消不掉。
+              items={[
+                { key: "all", label: "全部", icon: <Layers size={12} /> },
+                ...FILE_REMOTE_TYPE_CHIPS.map((chip) => ({
+                  key: chip.key,
+                  label: chip.label,
+                  icon: chip.key === "doc" ? <FileText size={12} />
+                    : chip.key === "image" ? <Image size={12} />
+                    : chip.key === "archive" ? <Archive size={12} />
+                    : <FileQuestion size={12} />,
+                })),
+              ]}
+              selected={getFilesRemoteTypes().length ? getFilesRemoteTypes() : ["all"]}
+              onChange={(keys) => setFilesUi({ remoteTypes: keys.filter((k) => k !== "all") })}
               multi
             />
-            <PanelSection label="排序">
-              <div className="flex flex-wrap gap-1 px-1">
-                {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={getFilesRemoteSort() === opt.value}
-                    onClick={() => setFilesUi({ remoteSort: opt.value as FilesRemoteSortKey })}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >{opt.label}</button>
-                ))}
-              </div>
-            </PanelSection>
+            {/* 排序不放侧栏：主区工具栏右端已有排序入口，避免两处重复 */}
             <PanelSection label="修改时间">
               <div className="flex flex-wrap gap-1 px-1">
                 {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"], ["older", "更早"]] as Array<[string, string]>).map(([key, label]) => (
