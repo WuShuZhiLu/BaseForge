@@ -424,7 +424,7 @@ function PanelSection({ label, extra, children }: {
       <div className="flex items-center justify-between pl-1 pr-1 pb-1">
         <span className="flex min-w-0 items-center gap-1.5">
           <Circle size={6} aria-hidden className="shrink-0 fill-current text-tx-tertiary" />
-          <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">{label}</span>
+          <span className="min-w-0 truncate text-[12px] font-medium text-tx-tertiary">{label}</span>
         </span>
         {extra}
       </div>
@@ -3191,7 +3191,7 @@ export default function SidebarDesktop() {
             </div>
             {/* 类型多选：与回收站/文件管理共用 TypeFilterPopover（触发行 + 两列勾选弹层） */}
             <TypeFilterPopover
-              label="类型 · 可多选"
+              label="类型"
               items={(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => ({
                 key,
                 label: key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key,
@@ -3263,7 +3263,6 @@ export default function SidebarDesktop() {
                   <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${weeklySummary ? "left-[15px]" : "left-0.5"}`} />
                 </button>
               </div>
-              <div className="px-1 pb-1 pt-0.5 text-[10px] leading-relaxed text-tx-tertiary">到期条目自动彻底删除；提醒走应用内通知与图标徽标</div>
             </PanelSection>
           </div>
         )}

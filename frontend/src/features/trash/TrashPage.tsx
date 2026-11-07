@@ -185,13 +185,13 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
         <>
           {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 ── */}
           <label className="relative block w-[190px] shrink-0">
-            <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+            <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("trashCenter.search")}
+              placeholder="搜索"
               aria-label={t("trashCenter.search")}
-              className="h-7 pl-7 pr-7 text-[11.5px]"
+              className="h-[30px] pl-7 pr-7 text-[11.5px]"
             />
             {query && (
               <button
@@ -211,7 +211,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
               aria-expanded={sortMenuOpen}
               title={`排序：${TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label ?? ""}`}
               onClick={() => setSortMenuOpen((value) => !value)}
-              className={`${buttonClass} w-10 justify-center px-0 text-tx-secondary hover:text-tx-primary`}
+              className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-tx-secondary hover:text-tx-primary`}
             >
               <ArrowDownUp size={14} />
             </button>
@@ -232,10 +232,10 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
               </div>
             )}
           </div>
-          <button className={`${buttonClass} w-10 justify-center px-0 text-tx-primary`} onClick={toggleSelectionMode} title={selectionMode ? `${t("trashCenter.exitSelection")}（Esc）` : t("trashCenter.select")}>
+          <button className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-tx-primary`} onClick={toggleSelectionMode} title={selectionMode ? `${t("trashCenter.exitSelection")}（Esc）` : t("trashCenter.select")}>
             {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
           </button>
-          <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])} title={t("trashCenter.cleanup")}><Trash2 size={14} /></button>
+          <button className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])} title={t("trashCenter.cleanup")}><Trash2 size={14} /></button>
         </>
       )}
     </header>
@@ -252,7 +252,6 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
               onToggle={(checked) => setSelected(checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
               onRestore={() => void operate("restore", [item.id])}
               onPurge={() => void operate("permanent", [item.id])} />)}</ul>}
-        <p className="mt-3 text-xs text-tx-tertiary">{t("trashCenter.protectedHint")}</p>
       </div>
       {/* 详情预览：仅在选中一条被删内容时出现，未选中时列表占满整宽（不留空占位） */}
       {active && (

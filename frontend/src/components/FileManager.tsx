@@ -1435,12 +1435,12 @@ export default function FileManager() {
           <>
             {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 / 上传 ── */}
             <label className="relative block w-[190px] shrink-0">
-              <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
-                placeholder="搜索文件名或类型（如 pdf）…"
+                placeholder="搜索"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="h-7 pl-7 pr-7 text-[11.5px]"
+                className="h-[30px] pl-7 pr-7 text-[11.5px]"
               />
               {searchInput && (
                 <button
@@ -1459,7 +1459,7 @@ export default function FileManager() {
                 aria-expanded={sortMenuOpen}
                 title={`排序：${FILE_SORT_OPTIONS.find((option) => option.value === sort)?.label ?? ""}`}
                 onClick={() => setSortMenuOpen((value) => !value)}
-                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                className="inline-flex h-[30px] w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
               >
                 <ArrowDownUp size={13} />
               </button>
@@ -1488,7 +1488,7 @@ export default function FileManager() {
               size="sm"
               variant="outline"
               onClick={toggleSelectionMode}
-              className="h-8 w-10 shrink-0 justify-center px-0"
+              className="h-[30px] w-10 shrink-0 justify-center px-0"
               title={selectionMode ? "退出多选（Esc）" : "进入多选"}
             >
               {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
@@ -1501,7 +1501,7 @@ export default function FileManager() {
                 aria-haspopup="menu"
                 aria-expanded={moreMenuOpen}
                 onClick={() => setMoreMenuOpen((v) => !v)}
-                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                className="inline-flex h-7 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
               >
                 <MoreHorizontal size={14} />
               </button>

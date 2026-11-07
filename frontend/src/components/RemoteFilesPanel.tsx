@@ -1446,12 +1446,12 @@ export default function RemoteFilesPanel() {
         ) : (
           <>
             <label className="relative block w-[210px] shrink-0">
-              <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
               <Input
-                placeholder="搜索远程文件（如 md）…"
+                placeholder="搜索"
                 value={remoteQuery}
                 onChange={(e) => setRemoteQuery(e.target.value)}
-                className="h-7 pl-7 pr-7 text-[11.5px]"
+                className="h-[30px] pl-7 pr-7 text-[11.5px]"
               />
               {remoteQuery ? (
                 <button
@@ -1496,7 +1496,7 @@ export default function RemoteFilesPanel() {
                 aria-expanded={sortOpen}
                 title={`排序：${currentSortLabel}`}
                 onClick={() => setSortOpen((v) => !v)}
-                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                className="inline-flex h-[30px] w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
               >
                 <ArrowDownUp size={13} />
               </button>
@@ -1520,7 +1520,7 @@ export default function RemoteFilesPanel() {
               size="sm"
               variant="outline"
               onClick={() => { setSelectionMode((v) => !v); setSelected(new Set()); }}
-              className="h-8 w-10 shrink-0 justify-center px-0"
+              className="h-[30px] w-10 shrink-0 justify-center px-0"
               title={selectionMode ? "退出多选（Esc）" : "进入多选"}
             >
               {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
@@ -1533,7 +1533,7 @@ export default function RemoteFilesPanel() {
                 aria-haspopup="menu"
                 aria-expanded={moreMenuOpen}
                 onClick={() => setMoreMenuOpen((v) => !v)}
-                className="inline-flex h-8 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+                className="inline-flex h-7 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
               >
                 <MoreHorizontal size={14} />
               </button>
