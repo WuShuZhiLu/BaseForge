@@ -1,8 +1,8 @@
 # 0.1 不含 Docker 在线升级（updater）；后端代码与 docs/docker-online-update.md 保留，后续版本再启用。
 services:
   baseforge:
-    # 镜像来自内部镜像仓库；上游来源在 README 与 Dockerfile 的归属说明中保留
-    image: ${BASEFORGE_IMAGE_REPOSITORY:-docker.betheone.cc.cd/baseforge}:${BASEFORGE_IMAGE_TAG:-latest}
+    # 镜像地址不写死在仓库里，必须由 .env 提供（示例见 .env.example）
+    image: ${BASEFORGE_IMAGE_REPOSITORY:?请先在 .env 里设置 BASEFORGE_IMAGE_REPOSITORY}:${BASEFORGE_IMAGE_TAG:-latest}
     container_name: baseforge
     restart: unless-stopped
     ports:
@@ -22,13 +22,13 @@ services:
       - PUBLIC_WEB_ORIGIN=${PUBLIC_WEB_ORIGIN:-}
       - BASEFORGE_DEPLOYMENT_TYPE=docker-compose-managed
       - BASEFORGE_IMAGE_TAG=${BASEFORGE_IMAGE_TAG:-latest}
-      - BASEFORGE_IMAGE_REPOSITORY=${BASEFORGE_IMAGE_REPOSITORY:-docker.betheone.cc.cd/baseforge}
+      - BASEFORGE_IMAGE_REPOSITORY=${BASEFORGE_IMAGE_REPOSITORY:?请先在 .env 里设置 BASEFORGE_IMAGE_REPOSITORY}
     labels:
       com.baseforge.managed: "true"
       com.baseforge.role: "app"
       com.baseforge.project: "baseforge"
       com.baseforge.instance: "${BASEFORGE_INSTANCE_ID:-baseforge}"
-      com.baseforge.image-repository: "${BASEFORGE_IMAGE_REPOSITORY:-docker.betheone.cc.cd/baseforge}"
+      com.baseforge.image-repository: "${BASEFORGE_IMAGE_REPOSITORY:?请先在 .env 里设置 BASEFORGE_IMAGE_REPOSITORY}"
     healthcheck:
       test:
         - CMD

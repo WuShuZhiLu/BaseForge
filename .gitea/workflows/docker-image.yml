@@ -1,5 +1,9 @@
-# tag：push tag 取名字去掉 v，手动触发取 package.json 的 version；推送时同步 :latest。
-# registry 与 namespace 都没配时只构建、不推送。
+# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v，同时推 :latest。
+# tag 触发时校验 tag 与 CHANGELOG 一致，避免镜像版本和更新日志脱节。
+# 仓库地址与凭据全部来自仓库变量/密钥，代码里不写死任何地址：
+# 未配置任何仓库时只构建、不推送。
+# 配置项（逗号分隔、按序号对应，免登录写 anon）：vars.IMAGE_REPOSITORIES /
+# vars.REGISTRY_USERS / secrets.REGISTRY_TOKENS；明细与内网 registry 前置条件见 docs/release-pipeline.md。
 
 name: Build Docker Image
 
@@ -27,6 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
+      IMAGE_REPOSITORIES: ${{ vars.IMAGE_REPOSITORIES }}
+      REGISTRY_USERS: ${{ vars.REGISTRY_USERS }}
+      REGISTRY_TOKENS: ${{ secrets.REGISTRY_TOKENS }}
+      # 任意一个仓库推送失败是否让 job 失败（默认 true）
+      IMAGE_PUSH_REQUIRE_ALL: ${{ vars.IMAGE_PUSH_REQUIRE_ALL }}
+      # 旧变量，仅在没有配置上面的列表时生效
       IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
       IMAGE_NAMESPACE: ${{ vars.IMAGE_NAMESPACE }}
       IMAGE_NAME: ${{ vars.IMAGE_NAME }}
@@ -38,41 +48,96 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build image
+        # 脚本用了函数与 local 等 bash 特性，显式指定以免落回 sh
+        shell: bash
         run: |
           set -eu
+
+          # ---- 列表 / 仓库解析辅助函数（bash 要求先定义后使用） ----
+          # 取仓库地址里的 registry host；输出为空表示 Docker Hub
+          registry_host() {
+            local host
+            host=$(printf '%s' "$1" | cut -d/ -f1)
+            case "$host" in
+              *.*|*:*|localhost) printf '%s' "$host" ;;
+              *) printf '' ;;
+            esac
+          }
+
+          # 按序号取逗号列表里的第 N 项（1 起）；越界或空项返回空字符串
+          list_item() {
+            [ -n "$1" ] || return 0
+            printf '%s\n' "$1" | tr ',' '\n' | sed -n "${2}p" \
+              | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+
+          # 逗号列表的项数（保留空项，用于校验与仓库是否一一对应）
+          count_items() {
+            [ -n "$1" ] || { printf '0'; return 0; }
+            printf '%s\n' "$1" | tr ',' '\n' | wc -l | tr -d ' '
+          }
+
+          # 免登录统一写 anon（大小写不敏感）；缺项或留空同样按 anon 处理
+          is_anon_marker() {
+            case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+              ''|anon) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
+          # 宿主 daemon 是否已把该 host 列为不受信任（HTTP）registry；
+          # daemon 不可达时不做判断（返回 0），避免每个仓库都刷一条误报。
+          registry_is_insecure() {
+            [ -n "$1" ] || return 1
+            local info
+            info="$(docker info 2>/dev/null || true)"
+            [ -n "$info" ] || return 0
+            printf '%s\n' "$info" \
+              | sed -n '/Insecure Registries:/,/^[[:space:]]*$/p' \
+              | grep -Fq -- "$1"
+          }
 
           if [ ! -f package.json ] || [ ! -f Dockerfile ]; then
             echo "::error::工作区里没有 package.json / Dockerfile，checkout 未生效"
             exit 1
           fi
 
-          TAG=""
-          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-            TAG="${GITHUB_REF_NAME:-}"
-            TAG="${TAG#v}"
+          # 版本号以 CHANGELOG.md 的最新已发布版本为准（标题形如 "## v0.1.0 - 2026-11-05"）；
+          # 本次是 tag 触发时，tag 必须与之一致，避免镜像版本和更新日志脱节。
+          REF_TAG=""
+          case "${GITHUB_REF:-}" in
+            refs/tags/*) REF_TAG="${GITHUB_REF#refs/tags/}" ;;
+          esac
+          if [ -z "$REF_TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            REF_TAG="${GITHUB_REF_NAME:-}"
           fi
-          if [ -z "$TAG" ]; then
-            TAG="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
-          fi
-          if [ -z "$TAG" ]; then
-            echo "::error::推导不出版本号（tag 名与 package.json 都拿不到）"
-            exit 1
-          fi
+          REF_TAG="${REF_TAG#v}"
 
-          NAME="${IMAGE_NAME:-baseforge}"
-          if [ -n "${IMAGE_NAMESPACE:-}" ]; then
-            NAME="${IMAGE_NAMESPACE}/${NAME}"
-          fi
-          if [ -n "${IMAGE_REGISTRY:-}" ]; then
-            REF="${IMAGE_REGISTRY}/${NAME}:${TAG}"
+          CL_VERSION="$(sed -n 's/^## v\([0-9][0-9A-Za-z.+-]*\).*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)"
+          if [ -n "$CL_VERSION" ]; then
+            if [ -n "$REF_TAG" ] && [ "$REF_TAG" != "$CL_VERSION" ]; then
+              echo "::error::tag v${REF_TAG} 与 CHANGELOG 最新版本 v${CL_VERSION} 不一致：先更新 CHANGELOG 再打 tag"
+              exit 1
+            fi
+            VER="$CL_VERSION"
+            echo "版本号取自 CHANGELOG.md：v${VER}"
           else
-            REF="${NAME}:${TAG}"
+            VER="$REF_TAG"
+            if [ -z "$VER" ]; then
+              VER="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+            fi
+            if [ -z "$VER" ]; then
+              echo "::error::推导不出版本号（CHANGELOG / tag 名 / package.json 都拿不到）"
+              exit 1
+            fi
+            echo "::warning::CHANGELOG.md 里没有已发布版本段，回退用 v${VER}"
           fi
+          TAG="v${VER}"
 
-          LATEST_REF="${REF%:*}:latest"
-          echo "构建镜像：${REF}"
-          docker build -f Dockerfile -t "$REF" \
-            --build-arg APP_VERSION="$TAG" \
+          # 本地构建用固定 tag，推送时再 retag 到具体仓库，避免依赖仓库地址
+          BUILD_REF="baseforge-build:${TAG}"
+          docker build -f Dockerfile -t "$BUILD_REF" \
+            --build-arg APP_VERSION="$VER" \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --build-arg VCS_REF="${GITHUB_SHA:-}" .
 
@@ -80,21 +145,218 @@ jobs:
             echo "push_image=false，只构建不推送"
             exit 0
           fi
-          if [ -z "${IMAGE_REGISTRY:-}" ] && [ -z "${IMAGE_NAMESPACE:-}" ]; then
-            echo "未配置 vars.IMAGE_REGISTRY / vars.IMAGE_NAMESPACE，只构建不推送"
+
+          REPOS_RAW="${IMAGE_REPOSITORIES:-}"
+          if [ -z "$REPOS_RAW" ]; then
+            # 兼容旧配置：由 IMAGE_REGISTRY / IMAGE_NAMESPACE / IMAGE_NAME 拼一个仓库
+            NAMESPACE="${IMAGE_NAMESPACE:-}"
+            NAMESPACE="${NAMESPACE#/}"
+            NAMESPACE="${NAMESPACE%/}"
+            NAME="${IMAGE_NAME:-baseforge}"
+            if [ -n "$NAMESPACE" ]; then
+              NAME="${NAMESPACE}/${NAME}"
+            fi
+            REGISTRY="${IMAGE_REGISTRY:-}"
+            REGISTRY="${REGISTRY#http://}"
+            REGISTRY="${REGISTRY#https://}"
+            REGISTRY="${REGISTRY%/}"
+            if [ -n "$REGISTRY" ]; then
+              REPOS_RAW="${REGISTRY}/${NAME}"
+            fi
+          fi
+          if [ -z "$REPOS_RAW" ]; then
+            echo "未配置 vars.IMAGE_REPOSITORIES，只构建不推送"
             exit 0
           fi
 
-          if [ -n "${REGISTRY_USER:-}" ] && [ -n "${REGISTRY_TOKEN:-}" ]; then
-            if [ -n "${IMAGE_REGISTRY:-}" ]; then
-              echo "$REGISTRY_TOKEN" | docker login "$IMAGE_REGISTRY" -u "$REGISTRY_USER" --password-stdin
-            else
-              echo "$REGISTRY_TOKEN" | docker login -u "$REGISTRY_USER" --password-stdin
-            fi
+          echo "候选仓库："
+          printf '%s\n' "$REPOS_RAW" | tr ',;' '\n' | sed '/^[[:space:]]*$/d' | sed 's/^[[:space:]]*/  - /'
+
+          # 末尾无换行时 printf '%s' 会让 wc -l 少算一行，这里统一带换行
+          repo_count=$(printf '%s\n' "$REPOS_RAW" | tr ',;' '\n' | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+          user_count=$(count_items "${REGISTRY_USERS:-}")
+          token_count=$(count_items "${REGISTRY_TOKENS:-}")
+          echo "仓库 ${repo_count} 个，账号 ${user_count} 项，密钥 ${token_count} 项"
+          if [ "$user_count" -ne 0 ] && [ "$user_count" -ne "$repo_count" ]; then
+            echo "::warning::REGISTRY_USERS 有 ${user_count} 项，与仓库数 ${repo_count} 不一致；缺的仓库按 anon 处理，请核对顺序"
+          fi
+          if [ "$token_count" -ne 0 ] && [ "$token_count" -ne "$repo_count" ]; then
+            echo "::warning::REGISTRY_TOKENS 有 ${token_count} 项，与仓库数 ${repo_count} 不一致，请核对顺序"
           fi
 
-          docker push "$REF"
-          if [ "$REF" != "$LATEST_REF" ]; then
-            docker tag "$REF" "$LATEST_REF"
-            docker push "$LATEST_REF"
+          # 大层上传到公网仓库时经常被中途 reset，Docker 自带的 blob 级重试
+          # 只在几十秒内放弃；这里按整次 push 重试，已上传成功的层会由 registry
+          # 判定 "Layer already exists" 直接跳过，所以重试成本很低。
+          push_with_retry() {
+            local ref="$1" attempt=1 max_attempts=4 delay=15 rc
+            while [ "$attempt" -le "$max_attempts" ]; do
+              echo "推送 ${ref}（第 ${attempt}/${max_attempts} 次）"
+              rc=0
+              # 单次 push 最长 20 分钟；同时落一份日志，用来区分“网络抖动”和“权限拒绝”
+              timeout 1200 docker push "$ref" 2>&1 | tee "$PUSH_LOG"
+              rc=${PIPESTATUS[0]}
+              if [ "$rc" -eq 0 ]; then
+                return 0
+              fi
+              # 认证 / 权限 / 名字非法：重试结果一样，直接失败，不白等 105 秒和 20 分钟超时
+              if grep -Eqi 'denied|unauthorized|no basic auth|invalid username|invalid reference|repository does not exist' "$PUSH_LOG"; then
+                echo "::warning::${ref} 被拒绝（认证或权限问题），不重试"
+                return 1
+              fi
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "::warning::推送 ${ref} 连续失败 ${max_attempts} 次"
+                echo "--- 最后一次 push 日志（尾部 20 行）---"
+                tail -n 20 "$PUSH_LOG" || true
+                echo "--- 各层体积（定位是哪一层过大导致上传失败）---"
+                docker history --no-trunc --format '{{.Size}}  {{.CreatedBy}}' "$ref" | head -n 20 || true
+                return 1
+              fi
+              echo "第 ${attempt} 次推送失败，${delay} 秒后重试（已成功的层会自动跳过）"
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+            done
+          }
+
+          # push 退出码为 0 不等于远端一定能拉到；这里回查一次 manifest。
+          # HTTP registry 需要 --insecure，否则 CLI 直连会报 x509/https 错误。
+          verify_pushed() {
+            local ref="$1" scheme="${2:-https}" interval=2
+            while [ "$interval" -le 10 ]; do
+              if [ "$scheme" = "http" ] && timeout 60 docker manifest inspect --insecure "$ref" >/dev/null 2>&1; then
+                echo "远端确认存在：${ref}"
+                return 0
+              fi
+              if timeout 60 docker manifest inspect "$ref" >/dev/null 2>&1; then
+                echo "远端确认存在：${ref}"
+                return 0
+              fi
+              sleep "$interval"
+              interval=$((interval + 2))
+            done
+            echo "::warning::无法在 registry 回查到 ${ref}，请确认仓库路径与账号权限"
+          }
+
+          pushed_list=""
+          failed_list=""
+          logged_hosts=""
+          index=0
+
+          # 仓库列表先落到临时文件：heredoc / 管道在 YAML block scalar 里
+          # 顶格内容会提前结束 scalar，写成文件既安全又能让循环里修改计数器生效。
+          REPO_LIST_FILE="$(mktemp)"
+          PUSH_LOG="$(mktemp)"
+          trap 'rm -f "$REPO_LIST_FILE" "$PUSH_LOG"' EXIT
+          printf '%s\n' "$REPOS_RAW" | tr ',;' '\n' > "$REPO_LIST_FILE"
+
+          while IFS= read -r raw_repo; do
+            repo=$(printf '%s' "$raw_repo" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+            [ -n "$repo" ] || continue
+            index=$((index + 1))
+
+            scheme="https"
+            case "$repo" in
+              http://*) scheme="http"; repo="${repo#http://}" ;;
+              https://*) scheme="https"; repo="${repo#https://}" ;;
+            esac
+            repo="${repo%/}"
+            [ -n "$repo" ] || continue
+
+            # 先体检一次名字，避免 docker tag 报一堆难懂的错：仓库名必须全小写，
+            # 只允许 小写字母数字 . _ - / : ，而且不能带 tag（tag 由脚本拼）
+            if printf '%s' "$repo" | grep -Eqv '^[a-z0-9]+([._/-][a-z0-9]+)*(:[0-9]+)?/[a-z0-9]+([._/-][a-z0-9]+)*$'; then
+              echo "::warning::仓库地址格式不合法（需全小写、不含 tag）：${repo}"
+              failed_list="${failed_list} ${repo}"
+              continue
+            fi
+
+            ref="${repo}:${TAG}"
+            latest_ref="${repo}:latest"
+            host=$(registry_host "$repo")
+
+            user=$(list_item "${REGISTRY_USERS:-}" "$index")
+            token=$(list_item "${REGISTRY_TOKENS:-}" "$index")
+            # 没配列表时回退到旧的单值凭据
+            if [ -z "${REGISTRY_USERS:-}" ] && [ -z "${REGISTRY_TOKENS:-}" ]; then
+              user="${REGISTRY_USER:-}"
+              token="${REGISTRY_TOKEN:-}"
+            fi
+            # 用户名写 anon 表示该仓库免登录；缺项或留空也按 anon 处理
+            if is_anon_marker "$user"; then
+              if [ -n "$token" ] && ! is_anon_marker "$token"; then
+                echo "::warning::仓库 ${index}（${repo}）的用户名是 anon，配的密钥会被忽略"
+              fi
+              user=""
+              token=""
+            elif is_anon_marker "$token"; then
+              if [ -n "$user" ]; then
+                echo "::warning::仓库 ${index}（${repo}）的用户名是 ${user}，但密钥也写成了 anon，将按匿名推送"
+              fi
+              token=""
+            fi
+
+            # 日志里的凭据描述要和实际行为一致：有账号无密钥时会在推送时按匿名处理
+            if [ -n "$user" ] && [ -n "$token" ]; then
+              cred_desc="$user"
+            elif [ -n "$user" ]; then
+              cred_desc="${user}（缺密钥，按匿名）"
+            else
+              cred_desc="匿名"
+            fi
+            echo "==> 仓库 ${index}：${repo}（host：${host:-docker.io}，账号：${cred_desc}）"
+            if [ "$scheme" = "http" ] && ! registry_is_insecure "$host"; then
+              echo "::warning::${host} 不在宿主 daemon 的 insecure-registries 里，HTTP 推送会 404/拒绝；在 daemon.json 加 \"insecure-registries\": [\"${host}\"] 后 systemctl restart docker"
+            fi
+            if [ -n "$user" ] && [ -n "$token" ]; then
+              if [ -n "$host" ]; then
+                echo "登录 ${host}（账号 ${user}）"
+                if ! echo "$token" | docker login "$host" -u "$user" --password-stdin; then
+                  echo "::warning::登录 ${host} 失败，跳过 ${repo}"
+                  failed_list="${failed_list} ${repo}"
+                  continue
+                fi
+              else
+                echo "登录 Docker Hub（账号 ${user}）"
+                if ! echo "$token" | docker login -u "$user" --password-stdin; then
+                  echo "::warning::登录 Docker Hub 失败，跳过 ${repo}"
+                  failed_list="${failed_list} ${repo}"
+                  continue
+                fi
+              fi
+              logged_hosts="${logged_hosts} ${host:-docker.io}"
+            else
+              echo "该仓库未提供账号密码，按匿名推送"
+            fi
+
+            # 版本 tag 与 latest 都要先在本地打上，push 只能推本地已存在的 tag
+            if ! docker tag "$BUILD_REF" "$ref" || ! docker tag "$BUILD_REF" "$latest_ref"; then
+              echo "::warning::打标失败，跳过 ${repo}"
+              failed_list="${failed_list} ${repo}"
+              continue
+            fi
+            # 两个都推，任意一个失败就算该仓库失败
+            echo "推送 ${ref} 与 ${latest_ref}"
+            if push_with_retry "$ref" && push_with_retry "$latest_ref"; then
+              verify_pushed "$ref" "$scheme"
+              pushed_list="${pushed_list} ${repo}"
+            else
+              failed_list="${failed_list} ${repo}"
+            fi
+          done < "$REPO_LIST_FILE"
+          rm -f "$REPO_LIST_FILE"
+
+          echo "推送成功：${pushed_list:-无}"
+          echo "推送失败：${failed_list:-无}"
+
+          # 推送结束立即注销，避免登录凭据留在 runner 的 ~/.docker/config.json
+          for host in $logged_hosts; do
+            docker logout "$host" >/dev/null 2>&1 || true
+          done
+
+          if [ -n "$failed_list" ]; then
+            if [ "${IMAGE_PUSH_REQUIRE_ALL:-true}" = "true" ]; then
+              echo "::error::有仓库推送失败：${failed_list}"
+              exit 1
+            fi
+            echo "::warning::有仓库推送失败（IMAGE_PUSH_REQUIRE_ALL=false，继续）：${failed_list}"
           fi

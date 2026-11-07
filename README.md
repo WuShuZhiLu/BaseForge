@@ -95,11 +95,12 @@ BaseForge 基于 nowen note v1.4.16 分叉，合并v1.5.1功能，后彻底独�
 
 ### Docker Compose
 
-需要 Docker Engine 与 Compose v2。镜像在内网镜像仓库 `docker.betheone.cc.cd`，不公开发布；内网可直接拉取，仓库要求认证时先执行 `docker login docker.betheone.cc.cd`。
+需要 Docker Engine 与 Compose v2。镜像地址不在仓库代码里写死，由 `.env` 的 `BASEFORGE_IMAGE_REPOSITORY` 指定（示例值见 [`.env.example`](./.env.example)）。
 
 ```bash
 git clone https://git.betheone.cc.cd/wushuzhilu/BaseForge.git
 cd BaseForge
+cp .env.example .env          # 至少确认 BASEFORGE_IMAGE_REPOSITORY
 docker compose up -d
 ```
 
@@ -123,7 +124,7 @@ docker compose pull && docker compose up -d   # 升级镜像
 └── .jwt_secret
 ```
 
-镜像地址、标签与端口由 `.env` 提供，供 `docker-compose.yml` 插值：`BASEFORGE_IMAGE_REPOSITORY`（默认 `docker.betheone.cc.cd/baseforge`）、`BASEFORGE_IMAGE_TAG`（默认 `latest`）、`BASEFORGE_PORT`（默认 `3001`）。
+镜像地址、标签与端口由 `.env` 提供，供 `docker-compose.yml` 插值：`BASEFORGE_IMAGE_REPOSITORY`（**必填**，如 `wushuzhilu/baseforge`）、`BASEFORGE_IMAGE_TAG`（默认 `latest`）、`BASEFORGE_PORT`（默认 `3001`）。
 
 应用读取的常用环境变量，完整模板见 [`.env.example`](./.env.example)：
 
