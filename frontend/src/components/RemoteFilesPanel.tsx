@@ -1352,7 +1352,7 @@ export default function RemoteFilesPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 顶栏单行：标题+存储徽章+面包屑(左)；多选时右端为批量操作，否则为搜索/新建/排序/刷新/选择/配置 */}
-      <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-app-border bg-app-surface/40 px-4">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface/40 px-4">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
           <Cloud size={18} />
         </div>
@@ -1465,9 +1465,6 @@ export default function RemoteFilesPanel() {
                 </button>
               ) : null}
             </label>
-            <p className="hidden shrink-0 text-[11px] leading-none text-tx-tertiary lg:block">
-              {displayedEntries.length} 项{remoteQuery ? ` · 匹配「${remoteQuery}」` : ""}
-            </p>
             {newFolderOpen ? (
               <span className="flex shrink-0 items-center gap-1">
                 <input
@@ -1481,16 +1478,7 @@ export default function RemoteFilesPanel() {
                 <button type="button" className="text-xs text-accent-primary" onClick={() => void createFolder()}>确定</button>
                 <button type="button" className="text-xs text-tx-tertiary" onClick={() => setNewFolderOpen(false)}>取消</button>
               </span>
-            ) : (
-              <button
-                type="button"
-                title="新建文件夹"
-                className="flex shrink-0 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2 py-1 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
-                onClick={() => { setNewFolderOpen(true); setNewFolderName(""); }}
-              >
-                <FolderPlus size={13} /> 新建文件夹
-              </button>
-            )}
+            ) : null}
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -1584,7 +1572,7 @@ export default function RemoteFilesPanel() {
               )}
             </div>
             <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-            <Button size="sm" className="shrink-0" onClick={() => setManagerOpen(true)}>
+            <Button size="sm" className="h-[30px] w-[98px] shrink-0 justify-center px-0" onClick={() => setManagerOpen(true)}>
               <Plus size={14} className="mr-1" /> 配置存储
             </Button>
           </>

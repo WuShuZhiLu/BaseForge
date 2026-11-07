@@ -1550,7 +1550,7 @@ export default function FileManager() {
               )}
             </div>
             <span className="hidden lg:block w-px h-4 bg-app-border shrink-0" />
-            <Button size="sm" onClick={() => setUploadDialogOpen(true)} disabled={uploading} className="shrink-0">
+            <Button size="sm" onClick={() => setUploadDialogOpen(true)} disabled={uploading} className="h-[30px] w-[98px] shrink-0 justify-center px-0">
               {uploading ? <Loader2 size={14} className="mr-1 animate-spin" /> : <Upload size={14} className="mr-1" />}
               {uploading ? "上传中" : "上传文件"}
             </Button>
