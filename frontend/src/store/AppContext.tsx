@@ -211,7 +211,7 @@ function trimOpenNoteTabs(tabs: OpenNoteTab[], activeId?: string | null): OpenNo
   return tabs.filter((_, tabIndex) => tabIndex !== index);
 }
 
-const OPEN_NOTE_TAB_STORAGE_KEY = "nowen-open-note-tabs";
+export const OPEN_NOTE_TAB_STORAGE_KEY = "nowen-open-note-tabs";
 
 /**
  * 从 localStorage 恢复「打开的」页签。恢复通道与 dispatch 通道走同样的防线：

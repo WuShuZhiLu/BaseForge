@@ -33,7 +33,7 @@ import AttachmentShareView from "@/components/AttachmentShareView";
 import LoginPage from "@/components/LoginPage";
 import QuickLoginGate from "@/components/QuickLoginGate";
 import QuickLoginEnrollDialog from "@/components/QuickLoginEnrollDialog";
-import { AppProvider, useApp, useAppActions, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH, MIN_NOTELIST_WIDTH, MAX_NOTELIST_WIDTH, DEFAULT_NOTELIST_WIDTH } from "@/store/AppContext";
+import { AppProvider, useApp, useAppActions, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH, MIN_NOTELIST_WIDTH, MAX_NOTELIST_WIDTH, DEFAULT_NOTELIST_WIDTH, OPEN_NOTE_TAB_STORAGE_KEY } from "@/store/AppContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { UserPreferencesProvider, useUserPreferences } from "@/hooks/useUserPreferences";
@@ -1056,6 +1056,14 @@ function AuthGate() {
   // 根路径 / 不带 redirect 参数：登录后按既有行为原地进入主界面，不整页刷新。
   useEffect(() => {
     if (isAuthenticated !== false) return;
+    // 退出登录 / 被踢下线 / 会话失效后重新登录属于新的工作会话：
+    // 清掉上一个会话持久化的「打开的编辑器」页签，避免重新登录后又把旧文档恢复出来。
+    // 这里只清页签（导航状态），不动草稿、主题、服务器地址等用户数据。
+    try {
+      localStorage.removeItem(OPEN_NOTE_TAB_STORAGE_KEY);
+    } catch {
+      // 隐私模式下 localStorage 不可用，忽略即可。
+    }
     const converge = () => {
       const pathname = resolveCurrentAppPathname();
       if (pathname === "/login") return;
