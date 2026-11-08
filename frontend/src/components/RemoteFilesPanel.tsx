@@ -1102,7 +1102,8 @@ export default function RemoteFilesPanel() {
    *   - 未链接 → 读远程内容建笔记 + 建同步映射（笔记归属目标库，不是游离笔记）；
    *   - 已链接但笔记在别的库 → 移动过去，不重建（同步基线保留，笔记内容不丢）；
    *   - 已链接且就在目标库 → 跳过。
-   * 单项操作完成后直接跳到那条笔记；批量则留在列表给出汇总。
+   * 单项/批量操作完成后都留在远程列表，只在顶部给出汇总提示——不自动跳去笔记，
+   * 避免把用户从远程浏览上下文里踢走（要看笔记可点行尾「在知识库打开」）。
    */
   const performLink = useCallback(async (target: RemoteLinkTarget) => {
     if (!activeId || !linkTargets || linkTargets.length === 0) return;
@@ -1124,7 +1125,6 @@ export default function RemoteFilesPanel() {
     let moved = 0;
     let skipped = 0;
     let failed = 0;
-    let lastNoteId = "";
 
     for (const entry of linkTargets) {
       const linked = links.find((item) => item.sourceId === activeId && item.remotePath === entry.path);
@@ -1137,7 +1137,6 @@ export default function RemoteFilesPanel() {
           }
           await api.updateNote(linked.noteId, { notebookId: target.notebookId });
           moved += 1;
-          lastNoteId = linked.noteId;
           continue;
         }
 
@@ -1163,7 +1162,6 @@ export default function RemoteFilesPanel() {
             });
           } catch { /* 映射失败不影响笔记可用 */ }
           created += 1;
-          lastNoteId = note.id;
           continue;
         }
         if (docKind === "docx") {
@@ -1178,7 +1176,6 @@ export default function RemoteFilesPanel() {
             });
           } catch { /* 映射失败不影响笔记可用 */ }
           created += 1;
-          lastNoteId = result.note.id;
           continue;
         }
         const res = await api.readRemoteFile(activeId, entry.path);
@@ -1209,7 +1206,6 @@ export default function RemoteFilesPanel() {
           /* 映射失败不影响笔记可用，正文已经落在本地了 */
         }
         created += 1;
-        lastNoteId = note.id;
       } catch {
         failed += 1;
       }
@@ -1229,9 +1225,6 @@ export default function RemoteFilesPanel() {
     flash(parts.length
       ? `已链接到「${target.notebookName}」：${parts.join("，")}`
       : "没有需要处理的文件");
-
-    // 单项操作直接进笔记；批量留在列表，避免把用户从批量上下文里踢走
-    if (linkTargets.length === 1 && lastNoteId) navigateToNote(lastNoteId, target.notebookId);
   }, [activeId, flash, linkTargets, links, loadLinks]);
 
   /** 远程文件 → 本地附件（走文件管理存储管线：holder note + hash 去重） */

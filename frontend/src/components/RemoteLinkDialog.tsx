@@ -15,10 +15,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Check,
-  ChevronDown,
   ChevronRight,
-  FolderClosed,
-  FolderOpen,
+  Folder,
+  Library,
   Loader2,
   NotebookPen,
   Plus,
@@ -30,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { notebookCoverIcon } from "@/lib/knowledgeTreeIcons";
 import { cn } from "@/lib/utils";
 import type { Notebook } from "@/types";
 
@@ -351,7 +351,7 @@ export default function RemoteLinkDialog({
             </div>
           ) : notebooks.length === 0 ? (
             <div className="flex min-h-40 flex-col items-center justify-center px-6 text-center">
-              <FolderClosed size={26} className="mb-3 text-tx-tertiary" />
+              <Library size={26} className="mb-3 text-tx-tertiary" />
               <p className="text-sm font-medium text-tx-secondary">这个空间还没有知识库</p>
               <p className="mt-1.5 text-xs leading-5 text-tx-tertiary">点上方「新建」建一个，文档会直接放进去</p>
             </div>
@@ -430,51 +430,53 @@ function TreeRow({
   onDoubleClick?: () => void;
   path?: string;
 }) {
+  const isRootNotebook = !notebook.parentId;
   return (
-    <button
-      type="button"
+    <div
       role="radio"
       aria-checked={active}
-      disabled={locked}
-      onClick={onSelect}
-      onDoubleClick={onDoubleClick}
-      style={{ paddingLeft: 10 + depth * 16 }}
+      tabIndex={locked ? -1 : 0}
+      onClick={() => { if (!locked) onSelect(); }}
+      onDoubleClick={() => { if (!locked) onDoubleClick?.(); }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          if (!locked) onSelect();
+        }
+      }}
+      style={{ paddingLeft: 8 + depth * 14 }}
       className={cn(
-        "flex w-full items-center gap-2 rounded-lg border py-1.5 pr-2.5 text-left transition-colors",
+        "flex h-9 w-full items-center gap-2 rounded-md pr-2 text-left text-[13px] transition-colors",
         active
-          ? "border-accent-primary/40 bg-accent-primary/10"
-          : "border-transparent hover:bg-app-hover",
-        locked && "opacity-60",
+          ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
+          : "text-tx-secondary hover:bg-app-hover",
+        locked && "pointer-events-none opacity-60",
       )}
     >
-      <span
-        className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-          active ? "border-accent-primary text-accent-primary" : "border-app-border text-transparent",
-        )}
-      >
-        <Check size={11} />
-      </span>
       {hasChildren ? (
         <button
           type="button"
           tabIndex={-1}
           aria-label={collapsed ? "展开" : "折叠"}
           onClick={(event) => { event.stopPropagation(); onToggle?.(); }}
-          className="shrink-0 rounded p-0.5 text-tx-tertiary hover:bg-app-hover hover:text-tx-secondary"
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-tx-tertiary hover:text-tx-primary"
         >
-          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+          <ChevronRight size={12} className={cn("transition-transform", !collapsed && "rotate-90")} />
         </button>
       ) : (
-        <span className="w-[22px] shrink-0" />
+        <span className="h-4 w-4 shrink-0" />
       )}
-      {collapsed ? <FolderClosed size={14} className="shrink-0 text-tx-tertiary" /> : <FolderOpen size={14} className={cn("shrink-0", active ? "text-accent-primary" : "text-tx-tertiary")} />}
-      <span className="min-w-0 flex-1">
-        <span className={cn("block truncate text-sm", active ? "text-tx-primary" : "text-tx-secondary")}>
-          {notebook.name}
-        </span>
-        {path && <span className="mt-0.5 block truncate text-[11px] text-tx-tertiary">{path}</span>}
+      {/* 与知识库侧栏一致：根层知识库用彩色书本封面，子层用文件夹 */}
+      {isRootNotebook
+        ? notebookCoverIcon(notebook.icon, 15)
+        : <Folder size={14} strokeWidth={2} className="shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />}
+      <span className={cn("min-w-0 flex-1 truncate", active ? "text-accent-primary" : "text-tx-primary")}>
+        {notebook.name}
       </span>
-    </button>
+      {path ? (
+        <span className="hidden max-w-[42%] shrink-0 truncate text-[11px] text-tx-tertiary sm:block">{path}</span>
+      ) : null}
+      {active ? <Check size={14} strokeWidth={2.5} className="shrink-0 text-accent-primary" /> : null}
+    </div>
   );
 }
