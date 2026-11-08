@@ -642,6 +642,10 @@ export function plainTextFromNoteContent(content: string, contentFormat: string)
   if (contentFormat === "pdf") {
     return pdfAnnotationsPlainText(content);
   }
+  if (contentFormat === "docx") {
+    // Word 原件预览笔记：正文只有附件引用，无纯文本可派生
+    return "";
+  }
   if (contentFormat === "board") {
     // Excalidraw 场景是 JSON；只取未绑定容器的文本元素，避免容器与文本重复。
     try {

@@ -691,6 +691,7 @@ app.post("/", async (c) => {
     : body.contentFormat === "board" ? "board"
     : body.contentFormat === "mindmap" ? "mindmap"
     : body.contentFormat === "pdf" ? "pdf"
+    : body.contentFormat === "docx" ? "docx"
     : body.contentFormat === "sheet" ? "sheet"
     : "tiptap-json";
   // 匿名文档：没有知识树节点，只通过宿主笔记里的嵌入块访问。
@@ -705,6 +706,7 @@ app.post("/", async (c) => {
     : contentFormat === "board" ? '{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}'
     : contentFormat === "mindmap" ? defaultMindmapContent(body.title || "无标题导图")
     : contentFormat === "pdf" ? '{"attachmentId":null,"annotations":[]}'
+    : contentFormat === "docx" ? '{"attachmentId":null}'
     : "{}";
   let initialContent = typeof body.content === "string" ? body.content : defaultContent;
   try {
