@@ -140,6 +140,7 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
+  importExcelIntoKnowledgeTree,
   importWordOriginalIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
@@ -889,7 +890,9 @@ export default function SidebarDesktop() {
             ? await importWordIntoKnowledgeTree(options)
             : importKind === "word-original"
               ? await importWordOriginalIntoKnowledgeTree(options)
-              : importKind === "pdf"
+              : importKind === "excel"
+                ? await importExcelIntoKnowledgeTree(options)
+                : importKind === "pdf"
                 ? await importPdfIntoKnowledgeTree(options)
                 : await importWeChatArticleIntoKnowledgeTree(options);
       if (!imported) return;

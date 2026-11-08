@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
+import { FileArchive, FileCode, FileSpreadsheet, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
 } from "lucide-react";
 import { FaBook } from "react-icons/fa";
 
@@ -47,6 +47,7 @@ const IMPORT_ITEMS = [
   { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
   { kind: "word", label: "导入 Word 转 Markdown", icon: FileType2 },
   { kind: "word-original", label: "导入 Word 原件预览", icon: FileType2 },
+  { kind: "excel", label: "导入 Excel 表格", icon: FileSpreadsheet },
   { kind: "pdf", label: "导入 PDF 文档", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },

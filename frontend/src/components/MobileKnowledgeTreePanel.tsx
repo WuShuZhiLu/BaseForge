@@ -46,6 +46,7 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
+  importExcelIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
   importWordOriginalIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
@@ -692,7 +693,7 @@ rememberOpened(created.id);
 
   const importIntoTree = useCallback(async (
     targetParentId: string | null,
-    kind: "markdown" | "markdown-zip" | "word" | "word-original" | "pdf" | "wechat" | "yuque",
+    kind: "markdown" | "markdown-zip" | "word" | "word-original" | "excel" | "pdf" | "wechat" | "yuque",
   ) => {
     setCreateMenu(null);
     const parent = targetParentId ? nodes.find((node) => node.id === targetParentId) || null : null;
@@ -722,7 +723,9 @@ rememberOpened(created.id);
             ? await importWordIntoKnowledgeTree(options)
             : kind === "word-original"
               ? await importWordOriginalIntoKnowledgeTree(options)
-              : kind === "pdf"
+              : kind === "excel"
+                ? await importExcelIntoKnowledgeTree(options)
+                : kind === "pdf"
                 ? await importPdfIntoKnowledgeTree(options)
                 : kind === "wechat"
                   ? await importWeChatArticleIntoKnowledgeTree(options)

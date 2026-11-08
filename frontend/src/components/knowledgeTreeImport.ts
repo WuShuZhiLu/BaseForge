@@ -1,5 +1,7 @@
 import { choose, prompt as appPrompt } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace } from "@/lib/api";
+import { getSheet, saveSheet } from "@/lib/sheetApi";
+import { parseWorkbookXlsx } from "@/lib/sheetXlsx";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import {
   formatMarkdownImportFailures,
@@ -88,6 +90,62 @@ export async function importWordIntoKnowledgeTree(
  * 导入 Word 原件（预览，不编辑）：走 contentFormat="docx" 专用链路，
  * 正文只存 { attachmentId }，打开笔记即用 DocxAttachmentPreview 渲染原件。
  */
+/**
+ * 导入 Excel 表格（.xlsx）：第一个工作表解析为轻量表格笔记。
+ * 解析复用 SheetEditor 的 parseWorkbookXlsx，保存走 saveSheet（乐观锁）。
+ */
+export async function importExcelIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const file = await pickExcelFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 Excel 表格…", 0);
+  try {
+    const workbook = await parseWorkbookXlsx(file);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("该 XLSX 没有可导入的工作表");
+    const title = file.name.replace(/\.xlsx$/i, "").trim() || sheet.name || "Excel 表格";
+    const note = await api.createNote({ title, notebookId, contentFormat: "sheet" });
+    // 先取 sheets 行的 updatedAt（乐观锁），再写入解析出的行/列数据
+    const document = await getSheet(note.id);
+    await saveSheet(note.id, sheet.data, document.updatedAt);
+    await moveImportedNote(note.id, notebookId, options.parent);
+    toast.dismiss(toastId);
+    toast.success("导入成功");
+    return note as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
+
+function pickExcelFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    let settled = false;
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+    input.onchange = () => {
+      settled = true;
+      const file = input.files?.[0] || null;
+      cleanup();
+      resolve(file);
+    };
+    input.oncancel = () => {
+      if (settled) return;
+      cleanup();
+      resolve(null);
+    };
+    input.click();
+  });
+}
+
 export async function importWordOriginalIntoKnowledgeTree(
   options: KnowledgeTreeImportOptions,
 ): Promise<LoadedNote | null> {

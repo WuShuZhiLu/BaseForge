@@ -212,12 +212,13 @@ export function importDocxAsNote(
   ));
 }
 
-/** 弹出文件选择器，取消时返回 null。 */
+/** 弹出文件选择器，取消时返回 null。选中 .doc 老格式时提示不支持并返回 null。 */
 export function pickDocxFile(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    // 放开 .doc 仅为给出明确提示：老格式无法前端解析，需另存为 .docx
+    input.accept = ".doc,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     input.style.display = "none";
     document.body.appendChild(input);
 
@@ -229,6 +230,14 @@ export function pickDocxFile(): Promise<File | null> {
       settled = true;
       const file = input.files?.[0] || null;
       cleanup();
+      if (file && /\.doc$/i.test(file.name)) {
+        // .doc 老格式无法前端解析，明确告知而不是默默失败
+        import("@/lib/toast").then(({ toast }) => {
+          toast.error("暂不支持 .doc 老格式，请先用 Word/WPS 另存为 .docx 再导入");
+        });
+        resolve(null);
+        return;
+      }
       resolve(file);
     };
     input.oncancel = () => {

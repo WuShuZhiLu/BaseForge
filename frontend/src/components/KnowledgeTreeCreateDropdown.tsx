@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BrainCircuit, Copy, FileArchive, FileCode, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
+import { BrainCircuit, Copy, FileArchive, FileCode, FileSpreadsheet, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
 import type { KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
 import { duplicateKnowledgeTreeNoteAsChild, resolveDuplicableKnowledgeTreeNote } from "@/lib/knowledgeTreeDuplicateAsChild";
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
@@ -24,6 +24,7 @@ const IMPORT_ITEMS = [
   { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
   { kind: "word", label: "导入 Word 转 Markdown", icon: FileType2 },
   { kind: "word-original", label: "导入 Word 原件预览", icon: FileType2 },
+  { kind: "excel", label: "导入 Excel 表格", icon: FileSpreadsheet },
   { kind: "pdf", label: "导入 PDF 文档", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
 ] as const;
