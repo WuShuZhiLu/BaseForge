@@ -10,6 +10,7 @@
   "main": "electron/main-bootstrap.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "source": "node scripts/npm-source.mjs",
     "dev:backend": "node ./backend/node_modules/tsx/dist/cli.mjs watch ./backend/src/index.hardened.ts",
     "dev:frontend": "cd frontend && npx vite",
     "install:all": "cd backend && npm install && cd ../frontend && npm install && cd .. && npm run rebuild:sqlite:node",

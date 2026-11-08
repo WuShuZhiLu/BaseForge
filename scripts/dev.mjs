@@ -5,6 +5,7 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { forceReleasePorts } from "./dev-port-manager.mjs"
 import { ensureWorkspaceDependencies } from "./dev-dependency-manager.mjs"
+import { readSourceEnv } from "./npm-sources.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const scriptsDir = path.dirname(__filename)
@@ -39,11 +40,20 @@ if (backendPort === frontendPort) {
 const backendUrl = `http://127.0.0.1:${backendPort}`
 const frontendUrl = `http://localhost:${frontendPort}`
 
+// 依赖下载源由 scripts/npm-source.mjs 切换（默认外网源）；这里只读取当前档位。
+// 外部已设置的同名环境变量优先，避免覆盖用户自己的镜像配置。
+const { profile: sourceProfile, env: sourceEnv } = readSourceEnv()
+const installEnv = {}
+for (const [key, value] of Object.entries(sourceEnv)) {
+  if (!process.env[key]) installEnv[key] = value
+}
+
 console.log("\n[dev] 正在检查项目依赖...")
+console.log(`[dev] 依赖下载源：${sourceProfile === "cn" ? "国内镜像" : "外网默认"}`)
 try {
-  ensureWorkspaceDependencies(rootDir, "根目录")
-  ensureWorkspaceDependencies(backendDir, "后端")
-  ensureWorkspaceDependencies(frontendDir, "前端")
+  ensureWorkspaceDependencies(rootDir, "根目录", { env: installEnv })
+  ensureWorkspaceDependencies(backendDir, "后端", { env: installEnv })
+  ensureWorkspaceDependencies(frontendDir, "前端", { env: installEnv })
 } catch (error) {
   console.error(`\n[dev] 依赖检查失败：${error instanceof Error ? error.message : String(error)}\n`)
   process.exit(1)

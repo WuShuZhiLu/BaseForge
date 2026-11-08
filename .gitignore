@@ -34,6 +34,9 @@ docs/samples/
 # siyuan
 /siyuan-master
 
+# 本地依赖下载源档位（npm run source 写入，属于个人环境选择）
+.npm-source.json
+
 # 临时调试/排查输出（不应入库）
 _td_test.js
 bt-detail.json

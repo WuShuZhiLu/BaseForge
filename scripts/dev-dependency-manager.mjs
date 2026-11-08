@@ -78,7 +78,7 @@ function formatDependencyList(state) {
   return parts.join("；")
 }
 
-export function ensureWorkspaceDependencies(workspaceDir, label) {
+export function ensureWorkspaceDependencies(workspaceDir, label, options = {}) {
   const initial = inspectDependencyState(workspaceDir)
   if (initial.ok) return { installed: false, state: initial }
   if (initial.reason) throw new Error(initial.reason)
@@ -93,6 +93,12 @@ export function ensureWorkspaceDependencies(workspaceDir, label) {
 
   console.log(`\n[dev] 检测到${label}依赖未同步：${formatDependencyList(initial)}`)
   console.log(`[dev] 正在自动执行 npm install：${workspaceDir}`)
+  const installEnv = { ...process.env, ...(options.env || {}) }
+  const appliedEnv = Object.entries(options.env || {})
+    .filter(([key, value]) => process.env[key] !== value)
+  if (appliedEnv.length > 0) {
+    console.log(`[dev] 使用下载加速：${appliedEnv.map(([key, value]) => `${key}=${value}`).join("，")}`)
+  }
   // Windows 上 npm 是 npm.cmd，Node 18.20.2+ / 20.12.2+ 起禁止在不带 shell 的情况下
   // 直接 spawn .cmd/.bat（安全策略），否则抛 spawnSync npm.cmd EINVAL。这里显式开启 shell。
   const result = spawnSync(installCommand, ["install", "--no-audit", "--no-fund"], {
@@ -100,6 +106,7 @@ export function ensureWorkspaceDependencies(workspaceDir, label) {
     stdio: "inherit",
     windowsHide: false,
     shell: process.platform === "win32",
+    env: installEnv,
   })
   if (result.error || result.status !== 0) {
     throw new Error(
