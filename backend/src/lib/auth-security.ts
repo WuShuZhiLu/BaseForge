@@ -16,11 +16,46 @@
 
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import fs from "node:fs";
+import path from "node:path";
 import type { Context } from "hono";
 
 // ========== JWT Secret 初始化 ==========
 
-const DEV_FALLBACK_SECRET = "baseforge-secret-key-change-in-production";
+// 与数据库同源的数据目录约定（backend/src/db/schema.ts）：
+// dev 下 cwd 为 backend/，即 backend/data/.jwt_secret；Electron 走 ELECTRON_USER_DATA。
+const DEV_DATA_DIR = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
+const DEV_SECRET_FILE = path.join(DEV_DATA_DIR, ".jwt_secret");
+
+/**
+ * 本地开发的 JWT 密钥：优先复用 <dataDir>/.jwt_secret（与 docker-entrypoint.sh、
+ * 备份打包/恢复的约定一致），缺失或过短时生成 48 字节随机密钥并落盘。
+ * - 落盘后跨进程/重启稳定：后端 tsx watch 重启不会把用户踢下线；
+ * - 备份包能拿到真实密钥，恢复后旧 token 仍有效；
+ * - 写盘失败时退化为仅本次进程有效，不 crash。
+ */
+function loadOrCreateDevSecret(): string {
+  try {
+    const existing = fs.readFileSync(DEV_SECRET_FILE, "utf8").trim();
+    if (existing.length >= 16) return existing;
+  } catch {
+    // 文件不存在或不可读 → 下面生成
+  }
+
+  const generated = crypto.randomBytes(48).toString("base64");
+  try {
+    fs.mkdirSync(DEV_DATA_DIR, { recursive: true });
+    fs.writeFileSync(DEV_SECRET_FILE, generated, { mode: 0o600 });
+    try {
+      fs.chmodSync(DEV_SECRET_FILE, 0o600);
+    } catch {
+      // Windows 无 chmod 概念
+    }
+  } catch {
+    // 无写权限等：本次进程内临时使用，下次启动会重新生成
+  }
+  return generated;
+}
 
 function resolveJwtSecret(): string {
   const fromEnv = process.env.JWT_SECRET;
@@ -39,12 +74,13 @@ function resolveJwtSecret(): string {
     process.exit(1);
   }
 
-  // 开发环境：给出明显警告，允许使用默认值继续
-  console.warn(
-    "\n⚠️  [SECURITY] JWT_SECRET 未设置（或长度 < 16），正在使用开发期默认密钥。\n" +
-    "   上线前请务必配置强随机密钥：openssl rand -base64 48\n",
+  // 开发/测试环境：优先复用 <dataDir>/.jwt_secret，缺失则生成并持久化。
+  // 不再使用硬编码默认密钥——那样每次重启都用同一把公开密钥，备份包里也没有真实密钥。
+  const devSecret = loadOrCreateDevSecret();
+  console.log(
+    `[auth] 未设置 JWT_SECRET，已使用本地开发密钥 ${DEV_SECRET_FILE}（生产环境请通过环境变量注入）`,
   );
-  return fromEnv || DEV_FALLBACK_SECRET;
+  return devSecret;
 }
 
 export const JWT_SECRET: string = resolveJwtSecret();

@@ -189,7 +189,7 @@ async function shutdown(exitCode = 0) {
 process.once("SIGINT", () => void shutdown(0))
 process.once("SIGTERM", () => void shutdown(0))
 
-startProcess(
+const backendChild = startProcess(
   "后端",
   process.execPath,
   // 直接用系统 node22 跑后端：sharp 在 Electron 内置 node（20.18）下会原生崩溃，
@@ -203,6 +203,31 @@ startProcess(
     },
   },
 )
+
+/**
+ * 等后端真正 listen 再起前端：vite 两三秒就绪、浏览器立刻打一批 /api，
+ * 而后端还在 tsx 编译 + 迁移 + vec-store 初始化，那几秒的请求全是 ECONNREFUSED。
+ */
+async function waitForBackendReady(timeoutMs = 120_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (backendChild.exitCode !== null || backendChild.signalCode !== null) return false
+    try {
+      const res = await fetch(`${backendUrl}/api/health`, { signal: AbortSignal.timeout(2000) })
+      if (res.ok) return true
+    } catch {
+      // 还没 listen，继续等
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  }
+  return false
+}
+
+console.log(`\n[dev] 等待后端就绪：${backendUrl}/api/health`)
+if (!(await waitForBackendReady())) {
+  console.error("[dev] 后端未在 120 秒内就绪，前端不启动（请查看上面的后端日志）")
+  await shutdown(1)
+}
 
 startProcess(
   "前端",
