@@ -1,5 +1,7 @@
-# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v，同时推 :latest。
+# 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v。
 # tag 触发时校验 tag 与 CHANGELOG 一致，避免镜像版本和更新日志脱节。
+# 发布门禁：tag 触发只推送 vX.Y.Z；latest 由发布门禁通过后 dispatch 本 workflow 的
+# latest_only 模式（拉取版本镜像并移动 latest），避免镜像先于 Release 生效。
 # 仓库地址与凭据全部来自仓库变量/密钥，代码里不写死任何地址：
 # 未配置任何仓库时只构建、不推送。
 # 配置项（逗号分隔、按序号对应，免登录写 anon）：vars.IMAGE_REPOSITORIES /
@@ -17,6 +19,14 @@ on:
         description: '是否推送到镜像仓库（false = 只构建）'
         required: false
         default: 'true'
+      latest_only:
+        description: '只把 latest 指向已存在的版本镜像（发布门禁通过后使用，不重新构建）'
+        required: false
+        default: 'false'
+      tag:
+        description: 'latest_only 模式下要指向的版本 tag（如 v1.2.3）'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -43,6 +53,8 @@ jobs:
       REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
       REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
       INPUT_PUSH: ${{ github.event.inputs.push_image }}
+      INPUT_LATEST_ONLY: ${{ github.event.inputs.latest_only }}
+      INPUT_TAG: ${{ github.event.inputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,44 +114,59 @@ jobs:
             exit 1
           fi
 
-          # 版本号以 CHANGELOG.md 的最新已发布版本为准（标题形如 "## v0.1.0 - 2026-11-05"）；
-          # 本次是 tag 触发时，tag 必须与之一致，避免镜像版本和更新日志脱节。
-          REF_TAG=""
-          case "${GITHUB_REF:-}" in
-            refs/tags/*) REF_TAG="${GITHUB_REF#refs/tags/}" ;;
-          esac
-          if [ -z "$REF_TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-            REF_TAG="${GITHUB_REF_NAME:-}"
-          fi
-          REF_TAG="${REF_TAG#v}"
-
-          CL_VERSION="$(sed -n 's/^## v\([0-9][0-9A-Za-z.+-]*\).*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)"
-          if [ -n "$CL_VERSION" ]; then
-            if [ -n "$REF_TAG" ] && [ "$REF_TAG" != "$CL_VERSION" ]; then
-              echo "::error::tag v${REF_TAG} 与 CHANGELOG 最新版本 v${CL_VERSION} 不一致：先更新 CHANGELOG 再打 tag"
+          # latest_only：发布门禁通过后，把 latest 指向已经推送好的版本镜像，不重新构建。
+          # 常规 tag 触发：只构建并推送 vX.Y.Z，latest 留给发布门禁移动。
+          LATEST_ONLY="${INPUT_LATEST_ONLY:-false}"
+          if [ "$LATEST_ONLY" = "true" ]; then
+            VER="${INPUT_TAG#v}"
+            VER="${VER#v}"
+            if [ -z "$VER" ]; then
+              echo "::error::latest_only 模式需要 inputs.tag（如 v1.2.3）"
               exit 1
             fi
-            VER="$CL_VERSION"
-            echo "版本号取自 CHANGELOG.md：v${VER}"
+            TAG="v${VER}"
+            BUILD_REF=""
+            echo "latest_only：不重新构建，只把 latest 指向 ${TAG}"
           else
-            VER="$REF_TAG"
-            if [ -z "$VER" ]; then
-              VER="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+            # 版本号以 CHANGELOG.md 的最新已发布版本为准（标题形如 "## v0.1.0 - 2026-11-05"）；
+            # 本次是 tag 触发时，tag 必须与之一致，避免镜像版本和更新日志脱节。
+            REF_TAG=""
+            case "${GITHUB_REF:-}" in
+              refs/tags/*) REF_TAG="${GITHUB_REF#refs/tags/}" ;;
+            esac
+            if [ -z "$REF_TAG" ] && [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+              REF_TAG="${GITHUB_REF_NAME:-}"
             fi
-            if [ -z "$VER" ]; then
-              echo "::error::推导不出版本号（CHANGELOG / tag 名 / package.json 都拿不到）"
-              exit 1
-            fi
-            echo "::warning::CHANGELOG.md 里没有已发布版本段，回退用 v${VER}"
-          fi
-          TAG="v${VER}"
+            REF_TAG="${REF_TAG#v}"
 
-          # 本地构建用固定 tag，推送时再 retag 到具体仓库，避免依赖仓库地址
-          BUILD_REF="baseforge-build:${TAG}"
-          docker build -f Dockerfile -t "$BUILD_REF" \
-            --build-arg APP_VERSION="$VER" \
-            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --build-arg VCS_REF="${GITHUB_SHA:-}" .
+            CL_VERSION="$(sed -n 's/^## v\([0-9][0-9A-Za-z.+-]*\).*/\1/p' CHANGELOG.md 2>/dev/null | head -n 1)"
+            if [ -n "$CL_VERSION" ]; then
+              if [ -n "$REF_TAG" ] && [ "$REF_TAG" != "$CL_VERSION" ]; then
+                echo "::error::tag v${REF_TAG} 与 CHANGELOG 最新版本 v${CL_VERSION} 不一致：先更新 CHANGELOG 再打 tag"
+                exit 1
+              fi
+              VER="$CL_VERSION"
+              echo "版本号取自 CHANGELOG.md：v${VER}"
+            else
+              VER="$REF_TAG"
+              if [ -z "$VER" ]; then
+                VER="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+              fi
+              if [ -z "$VER" ]; then
+                echo "::error::推导不出版本号（CHANGELOG / tag 名 / package.json 都拿不到）"
+                exit 1
+              fi
+              echo "::warning::CHANGELOG.md 里没有已发布版本段，回退用 v${VER}"
+            fi
+            TAG="v${VER}"
+
+            # 本地构建用固定 tag，推送时再 retag 到具体仓库，避免依赖仓库地址
+            BUILD_REF="baseforge-build:${TAG}"
+            docker build -f Dockerfile -t "$BUILD_REF" \
+              --build-arg APP_VERSION="$VER" \
+              --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              --build-arg VCS_REF="${GITHUB_SHA:-}" .
+          fi
 
           if [ "${INPUT_PUSH:-true}" != "true" ]; then
             echo "push_image=false，只构建不推送"
@@ -328,19 +355,40 @@ jobs:
               echo "该仓库未提供账号密码，按匿名推送"
             fi
 
-            # 版本 tag 与 latest 都要先在本地打上，push 只能推本地已存在的 tag
-            if ! docker tag "$BUILD_REF" "$ref" || ! docker tag "$BUILD_REF" "$latest_ref"; then
-              echo "::warning::打标失败，跳过 ${repo}"
-              failed_list="${failed_list} ${repo}"
-              continue
-            fi
-            # 两个都推，任意一个失败就算该仓库失败
-            echo "推送 ${ref} 与 ${latest_ref}"
-            if push_with_retry "$ref" && push_with_retry "$latest_ref"; then
-              verify_pushed "$ref" "$scheme"
-              pushed_list="${pushed_list} ${repo}"
+            if [ "$LATEST_ONLY" = "true" ]; then
+              # 发布门禁：版本镜像已经推送过，这里只把 latest 指向它，不重复构建/推版本 tag
+              echo "拉取 ${ref} 并把 latest 指向它"
+              if ! docker pull "$ref"; then
+                echo "::warning::拉取 ${ref} 失败，跳过 ${repo}"
+                failed_list="${failed_list} ${repo}"
+                continue
+              fi
+              if ! docker tag "$ref" "$latest_ref"; then
+                echo "::warning::latest 打标失败，跳过 ${repo}"
+                failed_list="${failed_list} ${repo}"
+                continue
+              fi
+              if push_with_retry "$latest_ref"; then
+                verify_pushed "$latest_ref" "$scheme"
+                pushed_list="${pushed_list} ${repo}"
+              else
+                failed_list="${failed_list} ${repo}"
+              fi
             else
-              failed_list="${failed_list} ${repo}"
+              # 版本 tag 与 latest 都要先在本地打上，push 只能推本地已存在的 tag
+              if ! docker tag "$BUILD_REF" "$ref" || ! docker tag "$BUILD_REF" "$latest_ref"; then
+                echo "::warning::打标失败，跳过 ${repo}"
+                failed_list="${failed_list} ${repo}"
+                continue
+              fi
+              # 只推版本 tag；latest 留到发布门禁通过后再移动
+              echo "推送 ${ref}"
+              if push_with_retry "$ref"; then
+                verify_pushed "$ref" "$scheme"
+                pushed_list="${pushed_list} ${repo}"
+              else
+                failed_list="${failed_list} ${repo}"
+              fi
             fi
           done < "$REPO_LIST_FILE"
           rm -f "$REPO_LIST_FILE"

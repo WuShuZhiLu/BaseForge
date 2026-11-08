@@ -1,5 +1,6 @@
-# 推送 v* tag 后自动创建/更新 Gitea Release：
+# 推送 v* tag 后创建/更新 Gitea Release 草稿：
 # 正文直接取 CHANGELOG.md 里对应版本的段落（## vX.Y.Z - 日期 到下一个 ## 之前）。
+# 草稿只做「记录 + 正文」，资产同步与转正式由 Sync Release Assets 在发布门禁里完成。
 # 认证优先用 secrets.RELEASE_TOKEN（仓库 PAT，需要 repo 写权限）；
 # 未配置时退回 Actions 内置 token（GITHUB_TOKEN）。
 
@@ -70,8 +71,10 @@ jobs:
           fi
 
           api="${SERVER_URL%/}/api/v1/repos/${REPO}"
-          # 单行 python3 组 JSON，避免 YAML block scalar 里嵌入 heredoc 的缩进问题
-          VER="$ver" SECTION="$section" python3 -c 'import json,os;v=os.environ["VER"];print(json.dumps({"tag_name":"v"+v,"name":"v"+v,"body":os.environ["SECTION"],"draft":False,"prerelease":"-" in v},ensure_ascii=False))' > /tmp/release.json
+          # 单行 python3 组 JSON，避免 YAML block scalar 里嵌入 heredoc 的缩进问题。
+          # 新建时固定 draft=true；更新时去掉 draft 字段，避免把已转正的 Release 改回草稿。
+          VER="$ver" SECTION="$section" python3 -c 'import json,os;v=os.environ["VER"];print(json.dumps({"tag_name":"v"+v,"name":"v"+v,"body":os.environ["SECTION"],"draft":True,"prerelease":"-" in v},ensure_ascii=False))' > /tmp/release.json
+          python3 -c 'import json;d=json.load(open("/tmp/release.json"));d.pop("draft",None);json.dump(d,open("/tmp/release-update.json","w"),ensure_ascii=False)'
 
           status="$(curl -sS -o /tmp/existing.json -w '%{http_code}' \
             -H "Authorization: token ${token}" "${api}/releases/tags/v${ver}")"
@@ -81,7 +84,7 @@ jobs:
             echo "更新已有 Release #${id}（${tag}）"
             status="$(curl -sS -o /tmp/response.json -w '%{http_code}' -X PATCH \
               -H "Authorization: token ${token}" -H 'Content-Type: application/json' \
-              --data @/tmp/release.json "${api}/releases/${id}")"
+              --data @/tmp/release-update.json "${api}/releases/${id}")"
           else
             echo "创建新 Release（${tag}）"
             status="$(curl -sS -o /tmp/response.json -w '%{http_code}' -X POST \
