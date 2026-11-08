@@ -23,7 +23,7 @@ const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
   { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
   { kind: "word", label: "导入 Word 文档", icon: FileType2 },
-  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
+  { kind: "pdf", label: "导入 PDF 文档", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
 ] as const;
 

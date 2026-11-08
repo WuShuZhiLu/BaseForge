@@ -138,7 +138,12 @@ export function getImportedNoteSemanticError(input: ImportedNoteSemanticInput): 
     return "服务端没有确认新的笔记版本";
   }
   if (!actual.content || actual.content.length < 10) return "服务端返回的正文为空或异常短";
-  if (normalizePlainText(actual.contentText) !== normalizePlainText(input.expectedContentText)) {
+  // contentText 由服务端从正文自行派生（notes PUT 覆盖客户端提交值），
+  // 与客户端导入管线的纯文本算法存在合理差异（图片节点/特殊节点抽取口径不同），
+  // 不能逐字对比。只拦截"大段内容丢失"：服务端文本不足期望的一半才判定不完整。
+  const expectedPlain = normalizePlainText(input.expectedContentText);
+  const actualPlain = normalizePlainText(actual.contentText);
+  if (expectedPlain.length > 0 && actualPlain.length < expectedPlain.length * 0.5) {
     return "服务端返回的纯文本内容不完整";
   }
   for (const url of input.expectedAttachmentUrls) {
