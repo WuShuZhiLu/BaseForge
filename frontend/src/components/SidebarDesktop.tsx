@@ -92,6 +92,7 @@ import {
 } from "@/lib/knowledgeTreeApi";
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
 import { knowledgeTreeIconFor, docIconForFormat } from "@/lib/knowledgeTreeIcons";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 import {
   getRetentionDays,
   getTrashSetting,
@@ -661,6 +662,8 @@ export default function SidebarDesktop() {
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
   const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  /** 远程投影笔记（正文读写远程文件）：树行/搜索结果上打个云朵角标区分 */
+  const remoteLinkedNoteIds = useRemoteLinkedNoteIds();
   /**
    * 侧栏「存储」列表加载：页面隐藏 / 后端重启会让 fetch 被 abort，
    * 这种瞬时失败不能当成「没有远程存储」——保留上一次结果并短暂重试，
@@ -2351,6 +2354,11 @@ export default function SidebarDesktop() {
                               <Link2 size={10} />
                             </span>
                           )}
+                          {!isFolder && remoteLinkedNoteIds.has(node.resourceId) && (
+                            <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                              <Cloud size={11} />
+                            </span>
+                          )}
                           {isFolder && (
                             <span className="shrink-0 text-[11px] tabular-nums text-tx-tertiary">
                               {docCountMap.get(node.id) ?? 0}
@@ -2543,6 +2551,11 @@ export default function SidebarDesktop() {
                         >
                           <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                           <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                          {remoteLinkedNoteIds.has(doc.id) && (
+                            <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                              <Cloud size={11} />
+                            </span>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -2743,7 +2756,14 @@ export default function SidebarDesktop() {
                   >
                     <span className="sbx-ico"><span className="text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span></span>
                     <span className="min-w-0 flex-1">
-                      <div className="truncate text-xs text-tx-primary">{doc.title}</div>
+                      <div className="truncate text-xs text-tx-primary">
+                        {doc.title}
+                        {remoteLinkedNoteIds.has(doc.id) && (
+                          <span className="ml-1 inline-flex align-[-1px] text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                            <Cloud size={11} />
+                          </span>
+                        )}
+                      </div>
                       <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
                     </span>
                     <span className="sbx-acts">
@@ -3073,6 +3093,11 @@ export default function SidebarDesktop() {
                     >
                       <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(node, node.parentId === null)}</span>
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
+                      {node.nodeType !== "folder" && remoteLinkedNoteIds.has(node.resourceId) && (
+                        <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                          <Cloud size={11} />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </>
@@ -3093,6 +3118,11 @@ export default function SidebarDesktop() {
                     >
                       <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                      {remoteLinkedNoteIds.has(doc.id) && (
+                        <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                          <Cloud size={11} />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </>

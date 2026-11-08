@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FaStar, FaRegStar } from "react-icons/fa";
-import { Bold, ChevronRight, Code as CodeIcon, Folder, Italic, Link as LinkIcon, List, ListOrdered, MoreHorizontal, NotebookPen, Palette, Pencil, Plus, Strikethrough, Trash2 } from "lucide-react";
+import { Bold, ChevronRight, Cloud, Code as CodeIcon, Folder, Italic, Link as LinkIcon, List, ListOrdered, MoreHorizontal, NotebookPen, Palette, Pencil, Plus, Strikethrough, Trash2 } from "lucide-react";
 
 import { getCurrentWorkspace } from "@/lib/api";
 import {
@@ -35,6 +35,7 @@ import {
   type NotebookCoverKey,
 } from "@/lib/knowledgeTreeIcons";
 import { defaultInlineCreateTitle, type KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import NotebookShareDialog from "@/components/NotebookShareDialog";
@@ -74,6 +75,8 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   const [notebooks, setNotebooks] = useState<Notebook[] | null>(null);
   // 统计走服务端聚合（文档数/字数/最近更新/贡献者）：不再全量拉 notes 本地累加。
   const [stats, setStats] = useState<KnowledgeNodeStats | null>(null);
+  /** 远程投影笔记：目录行加云朵角标，和侧栏树保持同一识别方式 */
+  const remoteLinkedNoteIds = useRemoteLinkedNoteIds();
   const [tocOpen, setTocOpen] = useState<Set<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -450,10 +453,15 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
               className="min-w-0 flex-1 rounded-md border border-app-border bg-app-bg px-1.5 py-0.5 text-[13.5px] text-tx-primary outline-none no-focus-ring focus:border-accent-primary"
             />
           ) : (
-            <span className="max-w-[70%] shrink-0 truncate whitespace-nowrap">
-              {node.title}
-              {node.isReference && <span className="ml-1 inline-flex align-[-1px]" title="同一份内容的另一条路径">{referenceNodeIcon(10)}</span>}
-            </span>
+            <>
+              <span className="max-w-[70%] shrink-0 truncate whitespace-nowrap">{node.title}</span>
+              {node.isReference && <span className="ml-1 inline-flex shrink-0 align-[-1px]" title="同一份内容的另一条路径">{referenceNodeIcon(10)}</span>}
+              {remoteLinkedNoteIds.has(node.resourceId) && (
+                <span className="ml-1 inline-flex shrink-0 align-[-1px] text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                  <Cloud size={10} />
+                </span>
+              )}
+            </>
           )}
           <span className="mx-2 h-0 min-w-4 flex-1 border-t border-dashed border-app-border" />
           <span className="shrink-0 text-[11.5px] tabular-nums text-tx-tertiary">{ts}</span>
