@@ -386,7 +386,7 @@ function SourceManager(props: {
       setWebdavBrowsePath(res.path);
       setWebdavBrowsed(true);
       setNotice(res.entries.length
-        ? "连接成功，勾选要挂载的目录（可多选），点名称进入子目录"
+        ? "连接成功，勾选要挂载的子目录（可多选）；一个都不勾则直接用服务器根"
         : "连接成功，该目录为空");
     } catch (err: any) {
       setWebdavBrowsed(false);
@@ -423,8 +423,6 @@ function SourceManager(props: {
     (path: string) => Boolean(draft?.rootPaths.some((root) => root.path === toRemoteRootPath(path))),
     [draft],
   );
-
-  const curRootSelected = rootSelected(webdavBrowsePath);
 
   const addRootFromInput = useCallback(() => {
     const raw = rootInput.trim();
@@ -808,15 +806,19 @@ function SourceManager(props: {
                         <span className="shrink-0 tabular-nums">已选 {draft.rootPaths.length}</span>
                       </div>
                       <div className="max-h-40 overflow-y-auto p-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleWebdavRoot(webdavBrowsePath)}
-                          className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-                        >
-                          {curRootSelected ? <CheckSquare size={13} className="shrink-0 text-accent-primary" /> : <Square size={13} className="shrink-0 text-tx-tertiary" />}
-                          <Folder size={13} className="shrink-0 text-amber-500" />
-                          <span className="min-w-0 flex-1 truncate">选择当前目录（{webdavBrowsePath || "根目录"}）</span>
-                        </button>
+                        {/* 服务器根不需要作为挂载项：不选任何根时源本身就指向服务器根，
+                            再勾一个「根目录」只会多一层虚拟目录。只在子目录里给「选当前目录」。 */}
+                        {webdavBrowsePath ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleWebdavRoot(webdavBrowsePath)}
+                            className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                          >
+                            {rootSelected(webdavBrowsePath) ? <CheckSquare size={13} className="shrink-0 text-accent-primary" /> : <Square size={13} className="shrink-0 text-tx-tertiary" />}
+                            <Folder size={13} className="shrink-0 text-amber-500" />
+                            <span className="min-w-0 flex-1 truncate">选择当前目录（{webdavBrowsePath}）</span>
+                          </button>
+                        ) : null}
                         {webdavFolders.length === 0 ? (
                           <p className="px-1.5 py-2 text-[11px] text-tx-tertiary">该目录下没有子文件夹</p>
                         ) : (
@@ -1257,9 +1259,14 @@ export default function RemoteFilesPanel() {
   // 文件夹始终置顶且不受类型过滤影响；类型/搜索/排序只作用于文件条目。
   const displayedEntries = filterSortRemoteEntries(entries, remoteQuery, remoteTypes, remoteSort, getFilesRemoteTime());
 
+  const reloadSourcesRef = useRef<(() => Promise<void>) | null>(null);
+  const sourcesAttemptRef = useRef(0);
+
   const reloadSources = useCallback(async () => {
+    const attempt = sourcesAttemptRef.current;
     try {
       const res = await api.getRemoteFileSources();
+      sourcesAttemptRef.current = 0;
       // 源配置变了（增删改、换根/换共享）→ 旧目录缓存不能再用
       const sig = res.sources
         .map((s) => [s.id, s.baseUrl, s.rootPath, JSON.stringify(s.rootPaths ?? []), JSON.stringify(s.shares ?? [])].join(":"))
@@ -1273,11 +1280,15 @@ export default function RemoteFilesPanel() {
         return res.sources[0]?.id || "";
       });
     } catch {
-      setSources([]);
+      // 页面隐藏 / 后端重启会 abort 请求：保留上一次已知的源，不要显示成「没有远程存储」
+      if (attempt >= 3) return;
+      sourcesAttemptRef.current = attempt + 1;
+      window.setTimeout(() => { void reloadSourcesRef.current?.(); }, 400 * (attempt + 1));
     }
     // storeSourceId 只在首次解析时读取，之后由本面板回写，不应成为依赖
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  reloadSourcesRef.current = reloadSources;
 
   // 主区确定当前存储后回写 store，让侧栏「存储」高亮跟上（首次自动选中第一个源）
   useEffect(() => {
@@ -1308,6 +1319,19 @@ export default function RemoteFilesPanel() {
   }, [selectionMode]);
 
   useEffect(() => { void reloadSources(); }, [reloadSources]);
+
+  // 页面隐藏导致的 abort 不该把面板打成空态：回到前台补拉一次源列表
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void reloadSources();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [reloadSources]);
 
   // 侧栏「存储」切换 → 主区跟随（同一份 localStorage 状态）
   useEffect(() => {

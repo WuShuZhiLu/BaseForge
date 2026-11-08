@@ -661,6 +661,27 @@ export default function SidebarDesktop() {
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
   const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  /**
+   * 侧栏「存储」列表加载：页面隐藏 / 后端重启会让 fetch 被 abort，
+   * 这种瞬时失败不能当成「没有远程存储」——保留上一次结果并短暂重试，
+   * 否则会出现主区有源、侧栏空空的割裂状态。
+   */
+  const remoteSourcesAttemptRef = useRef(0);
+  const loadRemoteSourcesRef = useRef<(() => void) | null>(null);
+  const loadRemoteSources = useCallback(() => {
+    const attempt = remoteSourcesAttemptRef.current;
+    api.getRemoteFileSources()
+      .then((r) => {
+        remoteSourcesAttemptRef.current = 0;
+        setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })));
+      })
+      .catch(() => {
+        if (attempt >= 3) return; // 连续失败就停：等下次切视图 / 回到前台再试
+        remoteSourcesAttemptRef.current = attempt + 1;
+        window.setTimeout(() => loadRemoteSourcesRef.current?.(), 400 * (attempt + 1));
+      });
+  }, []);
+  loadRemoteSourcesRef.current = loadRemoteSources;
   // 插件列表（后端 GET /plugins）
   const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "config">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
@@ -712,12 +733,16 @@ export default function SidebarDesktop() {
     if (view === "files") {
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => setFileItems([]));
       api.files.stats().then((s) => setFileStats(s)).catch(() => setFileStats(null));
-      api.getRemoteFileSources().then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })))).catch(() => setRemoteSources([]));
     }
     if (view === "plugins") {
       api.plugins.list().then((list) => setPlugins(list)).catch(() => setPlugins([]));
     }
   }, []);
+
+  // 进入「文件管理」视图时加载侧栏「存储」列表（初始挂载与切视图都覆盖）
+  useEffect(() => {
+    if (sidebarView === "files") loadRemoteSources();
+  }, [sidebarView, loadRemoteSources]);
 
   useEffect(() => {
     const onSwitch = (event: Event) => {
@@ -733,13 +758,24 @@ export default function SidebarDesktop() {
   useEffect(() => {
     const reload = () => {
       if (sidebarView !== "files") return;
-      api.getRemoteFileSources()
-        .then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type }))))
-        .catch(() => setRemoteSources([]));
+      loadRemoteSources();
     };
     window.addEventListener("nowen:remote-sources-changed", reload);
     return () => window.removeEventListener("nowen:remote-sources-changed", reload);
-  }, [sidebarView]);
+  }, [sidebarView, loadRemoteSources]);
+
+  // 页面隐藏时进行中的请求会被 abort；回到前台补拉一次，避免侧栏一直停在空态
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && sidebarView === "files") loadRemoteSources();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [sidebarView, loadRemoteSources]);
 
   // 插件工作区「打开侧栏面板」按钮 → 侧栏切到知识库视图并展开对应迷你面板
   useEffect(() => {
