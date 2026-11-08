@@ -97,6 +97,7 @@ import { noteColorMarkMigration } from "./noteColorMarkMigration.js";
 import { noteCommentNotificationsMigration } from "./noteCommentNotificationsMigration.js";
 import { dropDiaryTablesMigration } from "./dropDiaryTablesMigration.js";
 import { dropAiChatTablesMigration } from "./dropAiChatTablesMigration.js";
+import { disableOnboardingSeedMigration } from "./disableOnboardingSeedMigration.js";
 
 export type { Migration } from "./migrations.impl.js";
 
@@ -464,6 +465,7 @@ export const MIGRATIONS: Migration[] = [
   shareViewSessionClientMetaMigration,
   dropDiaryTablesMigration,
   dropAiChatTablesMigration,
+  disableOnboardingSeedMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(

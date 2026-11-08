@@ -7,6 +7,7 @@ import {
   onboardingWelcomeNoteId,
 } from "../src/db/newUserOnboardingMigration.js";
 import { newUserOnboardingFirstLoginMigration } from "../src/db/newUserOnboardingFirstLoginMigration.js";
+import { disableOnboardingSeedMigration } from "../src/db/disableOnboardingSeedMigration.js";
 
 function createDb(): Database.Database {
   const db = new Database(":memory:");
@@ -152,6 +153,31 @@ test("seeds Chinese and English guides only on a new account's first confirmed l
 
     assert.equal(notes.some((note) => note.title === "项目启动会议纪要"), false);
     assert.equal(notes.some((note) => note.title === "周末计划"), false);
+  } finally {
+    db.close();
+  }
+});
+
+test("v141 keeps a new account's knowledge base empty on first login", () => {
+  const db = createDb();
+  try {
+    installOnboarding(db);
+    disableOnboardingSeedMigration.up(db);
+
+    const userId = "blank-user";
+    db.prepare("INSERT INTO users (id, username, passwordHash) VALUES (?, ?, ?)")
+      .run(userId, "blank-user", "hash");
+    confirmLogin(db, userId);
+
+    const notebooks = db.prepare(
+      "SELECT COUNT(*) AS count FROM notebooks WHERE userId = ?",
+    ).get(userId) as { count: number };
+    const notes = db.prepare(
+      "SELECT COUNT(*) AS count FROM notes WHERE userId = ?",
+    ).get(userId) as { count: number };
+
+    assert.equal(notebooks.count, 0, "new databases must start with an empty knowledge tree");
+    assert.equal(notes.count, 0, "new databases must not contain demo or guide documents");
   } finally {
     db.close();
   }
