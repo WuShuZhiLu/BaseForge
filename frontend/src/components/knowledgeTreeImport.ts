@@ -84,6 +84,37 @@ export async function importWordIntoKnowledgeTree(
   }
 }
 
+/**
+ * 导入 Word 原件（预览，不编辑）：走 contentFormat="docx" 专用链路，
+ * 正文只存 { attachmentId }，打开笔记即用 DocxAttachmentPreview 渲染原件。
+ */
+export async function importWordOriginalIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const { pickDocxFile } = await import("@/lib/wordNoteService");
+  const file = await pickDocxFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 Word 原件…", 0);
+  try {
+    const title = file.name.replace(/\.docx$/i, "").trim() || "Word 文档";
+    const note = await api.createNote({ title, notebookId, contentFormat: "docx" });
+    const attachment = await api.attachments.upload(note.id, file);
+    const updated = await api.updateNote(note.id, {
+      content: JSON.stringify({ attachmentId: attachment.id }),
+      contentText: "",
+      version: note.version,
+    });
+    await moveImportedNote(note.id, notebookId, options.parent);
+    toast.dismiss(toastId);
+    toast.success("导入成功");
+    return (updated || note) as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
+
 export async function importPdfIntoKnowledgeTree(
   options: KnowledgeTreeImportOptions,
 ): Promise<LoadedNote | null> {

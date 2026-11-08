@@ -195,26 +195,6 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     pushAppPathState(kbNoteAppPath(ws, kbId, node.resourceId));
   }, [kbId]);
 
-  const createDoc = useCallback(async () => {
-    if (!kbNode || creating) return;
-    setCreating(true);
-    try {
-      const created = await knowledgeTreeApi.create({
-        parentId: kbNode.id,
-        nodeType: "note",
-        title: "新建文档",
-      });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      const ws = getCurrentWorkspace();
-      pushAppPathState(kbNoteAppPath(ws, kbId, created.resourceId));
-    } catch (err) {
-      console.error("[KbDetailPage] create doc failed:", err);
-      toast.error("新建文档失败");
-    } finally {
-      setCreating(false);
-    }
-  }, [kbNode, creating, kbId]);
-
   // 收藏/取消收藏知识库（树节点的 isFavorite，与侧栏收藏区共用一份数据）
   const toggleFavorite = useCallback(async () => {
     if (!kbNode) return;
@@ -739,16 +719,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
           <div className="mt-14 rounded-xl border-[1.5px] border-dashed border-app-border bg-app-elevated px-6 py-12 text-center">
             <span className="mx-auto block text-[30px] leading-none opacity-30">{knowledgeTreeEmojiFor(kbNode, true)}</span>
             <h3 className="mt-3 text-[15px] font-medium text-tx-primary">这个知识库还没有内容</h3>
-            <p className="mt-1 text-[12.5px] text-tx-tertiary">创建第一篇文档，开始沉淀你的知识</p>
-            <button
-              type="button"
-              onClick={() => void createDoc()}
-              disabled={creating}
-              className="mt-5 flex items-center gap-1.5 rounded-full bg-accent-primary px-5 py-2.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-60"
-            >
-              <Plus size={14} />
-              新建第一篇文档
-            </button>
+            <p className="mt-1 text-[12.5px] text-tx-tertiary">导入的内容会显示在这里</p>
           </div>
         ) : (
           <>

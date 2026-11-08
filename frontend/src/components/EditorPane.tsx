@@ -22,6 +22,7 @@ import PlainTextEditor from "@/components/PlainTextEditor";
 import BoardEditor from "@/components/BoardEditor";
 import MindMapDocEditor from "@/components/MindMapDocEditor";
 import PdfDocEditor from "@/components/PdfDocEditor";
+import WordDocEditor from "@/components/WordDocEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -286,7 +287,7 @@ function EditorPaneCore({
   // 大纲只属于「富文本 / Markdown」类文档：board / mindmap / pdf / plain 没有标题层级，
   // 不渲染右缘刻度条与面板，也不显示顶栏/⋯ 菜单里的大纲开关（否则是空面板 + 假入口）。
   const noteFormat = activeNote?.contentFormat ?? "tiptap-json";
-  const outlineSupported = !["board", "mindmap", "pdf", "plain"].includes(noteFormat);
+  const outlineSupported = !["board", "mindmap", "pdf", "docx", "plain"].includes(noteFormat);
   // 大纲宿主开关：全屏专注、用户隐藏（outlineHidden）或文档类型不支持时整体不渲染（连 mini 刻度条都没有）。
   const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden && outlineSupported;
 
@@ -4143,6 +4144,15 @@ const moveToTrash = useCallback(async () => {
             // PDF 文档：原件预览（pdfjs）+ 页码锚定批注层，正文走通用笔记保存。
             <PdfDocEditor
               key={`pdf-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "docx" ? (
+            // Word 原件预览：DocxAttachmentPreview（IR 渲染），只读不编辑，可下载原件。
+            <WordDocEditor
+              key={`docx-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}

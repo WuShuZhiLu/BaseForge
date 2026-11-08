@@ -140,6 +140,7 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
+  importWordOriginalIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import type { KnowledgeTreeImportRequest } from "@/components/KnowledgeTreePanel";
@@ -886,9 +887,11 @@ export default function SidebarDesktop() {
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : importKind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : importKind === "pdf"
-              ? await importPdfIntoKnowledgeTree(options)
-              : await importWeChatArticleIntoKnowledgeTree(options);
+            : importKind === "word-original"
+              ? await importWordOriginalIntoKnowledgeTree(options)
+              : importKind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : await importWeChatArticleIntoKnowledgeTree(options);
       if (!imported) return;
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
@@ -2210,16 +2213,6 @@ export default function SidebarDesktop() {
                       ? t("sidebarNext.emptyKb", { defaultValue: "这个知识库还没有内容" })
                       : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
                 </p>
-                {!searching && focusRoot && (
-                  <button
-                    type="button"
-                    onClick={() => void startCreateNote(focusRoot.id)}
-                    className="mt-1.5 flex items-center gap-1 rounded-md border border-dashed border-app-border px-2 py-1 text-[11px] text-tx-secondary hover:border-accent-primary hover:text-accent-primary"
-                  >
-                    <Plus size={12} />
-                    新建文档
-                  </button>
-                )}
               </div>
             ) : (
               // 空白区 = 根层末尾（行上的 dragOver/drop 已 stopPropagation，不会冒泡到这里）

@@ -42,6 +42,7 @@ import {
   importWeChatArticleIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
+  importWordOriginalIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
 import { useContextMenu } from "@/hooks/useContextMenu";
@@ -281,7 +282,7 @@ export interface KnowledgeTreeInlineCreateRequest {
 export interface KnowledgeTreeImportRequest {
   requestId: number;
   parentId: string | null;
-  kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque";
+  kind: "markdown" | "markdown-zip" | "word" | "word-original" | "pdf" | "wechat" | "yuque";
 }
 
 export interface KnowledgeTreeTemplateCreateRequest {
@@ -843,11 +844,13 @@ export function KnowledgeTreePanel({
             ? await importMarkdownZipIntoKnowledgeTree(options)
             : importRequest.kind === "word"
               ? await importWordIntoKnowledgeTree(options)
-              : importRequest.kind === "pdf"
-                ? await importPdfIntoKnowledgeTree(options)
-                : importRequest.kind === "wechat"
- ? await importWeChatArticleIntoKnowledgeTree(options)
- : null;
+              : importRequest.kind === "word-original"
+                ? await importWordOriginalIntoKnowledgeTree(options)
+                : importRequest.kind === "pdf"
+                  ? await importPdfIntoKnowledgeTree(options)
+                  : importRequest.kind === "wechat"
+                    ? await importWeChatArticleIntoKnowledgeTree(options)
+                    : null;
         if (!imported) return;
         revealCreatedKnowledgeTreeNote(parent?.id || null);
         activateNote(imported, parent?.id || null);

@@ -47,6 +47,7 @@ import {
   importWeChatArticleIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
+  importWordOriginalIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
 import { useContextMenu } from "@/hooks/useContextMenu";
@@ -691,7 +692,7 @@ rememberOpened(created.id);
 
   const importIntoTree = useCallback(async (
     targetParentId: string | null,
-    kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque",
+    kind: "markdown" | "markdown-zip" | "word" | "word-original" | "pdf" | "wechat" | "yuque",
   ) => {
     setCreateMenu(null);
     const parent = targetParentId ? nodes.find((node) => node.id === targetParentId) || null : null;
@@ -719,11 +720,13 @@ rememberOpened(created.id);
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : kind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : kind === "pdf"
-              ? await importPdfIntoKnowledgeTree(options)
-              : kind === "wechat"
- ? await importWeChatArticleIntoKnowledgeTree(options)
- : null;
+            : kind === "word-original"
+              ? await importWordOriginalIntoKnowledgeTree(options)
+              : kind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : kind === "wechat"
+                  ? await importWeChatArticleIntoKnowledgeTree(options)
+                  : null;
       if (!imported) return;
       activateNote(imported, parent?.id || null);
       emitTreeChanged("node-imported-quick-browse");
