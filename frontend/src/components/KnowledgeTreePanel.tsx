@@ -856,8 +856,9 @@ export function KnowledgeTreePanel({
                     : null;
         if (!imported) return;
         revealCreatedKnowledgeTreeNote(parent?.id || null);
-        // sheet 笔记走深链打开，excel 导入后不自动打开（树里点新节点即进表格）
-        if (importRequest.kind !== "excel") activateNote(imported, parent?.id || null);
+        // sheet 笔记走深链打开；excel 导入后直接打开生成的表格
+        if (importRequest.kind === "excel") pushSheetAppPath(imported.id);
+        else activateNote(imported, parent?.id || null);
         emitTreeChanged("node-imported-plus-menu");
         actions.refreshNotes();
         actions.refreshNotebooks();
