@@ -62,6 +62,33 @@ function writeSources(userId: string, sources: RemoteSourceConfig[]): void {
   systemSettingsRepository.set(sourcesKey(userId), JSON.stringify(sources));
 }
 
+/**
+ * 刷新（revalidate）时虚拟根若剔除了已不存在的共享/挂载根，把结果同步落库，
+ * 否则配置里会一直残留「NAS 上已删除但界面看不见、也取消不掉」的条目。
+ * 只在确有剔除且仍有剩余时写：全部失败（主机离线/权限问题）时保留原配置。
+ */
+function pruneMissingVirtualRoots(userId: string, sourceId: string, remainingNames: string[]): void {
+  const names = new Set(remainingNames);
+  const sources = readSources(userId);
+  const index = sources.findIndex((item) => item.id === sourceId);
+  if (index < 0) return;
+  const current = sources[index];
+
+  if (current.type === "smb" && current.shares && current.shares.length > 0) {
+    const next = current.shares.filter((name) => names.has(name));
+    if (next.length === current.shares.length || next.length === 0) return;
+    sources[index] = { ...current, shares: next };
+    writeSources(userId, sources);
+    return;
+  }
+  if (current.type === "webdav" && current.rootPaths && current.rootPaths.length > 0) {
+    const next = current.rootPaths.filter((root) => names.has(root.name));
+    if (next.length === current.rootPaths.length || next.length === 0) return;
+    sources[index] = { ...current, rootPaths: next };
+    writeSources(userId, sources);
+  }
+}
+
 function publicSource(source: RemoteSourceConfig): Record<string, unknown> {
   return {
     id: source.id,
@@ -318,7 +345,16 @@ function readBody(c: any): Promise<Record<string, any>> {
 remoteFilesRouter.post("/sources/:sourceId/list", withSource(async (c, resolved) => {
   const body = await readBody(c);
   const path = normalizeRemotePath(String(body.path ?? ""));
-  const entries = await resolved.provider.list(resolved.ctx, path);
+  // fast=true：只返回名称/类型（SMB 跳过逐条 stat），前端先出列表再补元数据
+  // revalidate=true：显式刷新时复核远端存在性（多共享/多根里已删除的条目会被剔除）
+  const entries = await resolved.provider.list(resolved.ctx, path, {
+    ...(body.fast === true ? { fast: true } : {}),
+    ...(body.revalidate === true ? { revalidate: true } : {}),
+  });
+  // 根目录刷新：把已不存在的共享/挂载根同步从配置里清掉
+  if (body.revalidate === true && path === "") {
+    pruneMissingVirtualRoots(resolved.userId, resolved.source.id, entries.map((entry) => entry.name));
+  }
   return c.json({ path, entries });
 }));
 

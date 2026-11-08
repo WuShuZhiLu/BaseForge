@@ -140,6 +140,28 @@ function appendRoot(list: RemoteRoot[], remotePath: string): RemoteRoot[] {
   return [...list, { name, path: remotePath }];
 }
 
+/**
+ * 目录列表会话缓存：同一存储的同一路径复用结果——回根目录、来回切目录都直接秒开；
+ * 显式刷新与增删改会强制重拉。超过 TTL 后先展示旧内容，再后台静默刷新（SWR）。
+ */
+const REMOTE_DIR_CACHE_TTL_MS = 30_000;
+const REMOTE_DIR_CACHE_MAX = 60;
+const remoteDirCache = new Map<string, { entries: RemoteFileEntry[]; at: number }>();
+
+function dirCacheKey(sourceId: string, path: string): string {
+  return `${sourceId}\u0000${path}`;
+}
+
+function rememberDir(key: string, entries: RemoteFileEntry[]): void {
+  remoteDirCache.delete(key);
+  remoteDirCache.set(key, { entries, at: Date.now() });
+  while (remoteDirCache.size > REMOTE_DIR_CACHE_MAX) {
+    const oldest = remoteDirCache.keys().next().value;
+    if (oldest === undefined) break;
+    remoteDirCache.delete(oldest);
+  }
+}
+
 const TEXT_EXTS = new Set([
   "md", "markdown", "txt", "json", "csv", "log", "yml", "yaml", "html", "htm", "css", "js", "ts",
   "py", "sh", "bat", "ini", "toml", "xml", "sql", "conf",
@@ -410,6 +432,15 @@ function SourceManager(props: {
     setDraft((cur) => (cur ? { ...cur, rootPaths: appendRoot(cur.rootPaths, toRemoteRootPath(raw)) } : cur));
     setRootInput("");
   }, [rootInput]);
+
+  /** 共享多选的可选项：已保存但远端已列举不到的共享也要显示（否则用户无法取消它） */
+  const shareChoices = useMemo(() => {
+    const listed = new Set(shareOptions.map((share) => share.name));
+    const missing = (draft?.smbShares ?? [])
+      .filter((name) => !listed.has(name))
+      .map((name) => ({ name, comment: "远端已不存在" }));
+    return [...shareOptions, ...missing];
+  }, [shareOptions, draft?.smbShares]);
 
   const toggleShare = useCallback((name: string) => {
     setDraft((cur) => {
@@ -696,15 +727,16 @@ function SourceManager(props: {
                     />
                   </div>
 
-                  {/* 共享多选：一个设备上的文件可能分散在几个共享，全都挂到一个源里 */}
-                  {browsed && shareOptions.length > 0 ? (
+                  {/* 共享多选：一个设备上的文件可能分散在几个共享，全都挂到一个源里。
+                      已保存但远端已删除的共享也列入，方便直接取消勾选。 */}
+                  {shareChoices.length > 0 ? (
                     <div className="rounded-md border border-app-border">
                       <div className="flex items-center justify-between border-b border-app-border px-2 py-1 text-[10.5px] text-tx-tertiary">
                         <span>共享（可多选）</span>
-                        <span className="tabular-nums">已选 {draft.smbShares.length} / {shareOptions.length}</span>
+                        <span className="tabular-nums">已选 {draft.smbShares.length} / {shareChoices.length}</span>
                       </div>
                       <div className="max-h-40 overflow-y-auto p-1">
-                        {shareOptions.map((share) => {
+                        {shareChoices.map((share) => {
                           const checked = draft.smbShares.includes(share.name);
                           return (
                             <button
@@ -994,6 +1026,12 @@ export default function RemoteFilesPanel() {
   /** 「⋯ 更多」菜单（单行工具栏）：新建文件夹/刷新/管理存储 */
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  /** 列目录请求序号：只让最后一次请求写 state（快速切目录时旧响应作废） */
+  const listSeqRef = useRef(0);
+  /** 源列表的即时快照：loadList 里判断是否 SMB（避免把 sources 变成 callback 依赖） */
+  const sourcesRef = useRef<RemoteSourcePublic[]>([]);
+  /** 源配置签名：增删改源后目录缓存必须作废（路径语义可能已变） */
+  const sourceSigRef = useRef<string | null>(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -1208,6 +1246,7 @@ export default function RemoteFilesPanel() {
   }, [activeId, flash]);
 
   const activeSource = sources.find((s) => s.id === activeId) || null;
+  sourcesRef.current = sources;
 
   // 侧栏共享 store：类型 chips / 排序 / 时间 / 当前存储都由它驱动
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
@@ -1221,6 +1260,12 @@ export default function RemoteFilesPanel() {
   const reloadSources = useCallback(async () => {
     try {
       const res = await api.getRemoteFileSources();
+      // 源配置变了（增删改、换根/换共享）→ 旧目录缓存不能再用
+      const sig = res.sources
+        .map((s) => [s.id, s.baseUrl, s.rootPath, JSON.stringify(s.rootPaths ?? []), JSON.stringify(s.shares ?? [])].join(":"))
+        .join("|");
+      if (sourceSigRef.current !== null && sourceSigRef.current !== sig) remoteDirCache.clear();
+      sourceSigRef.current = sig;
       setSources(res.sources);
       setActiveId((prev) => {
         if (prev && res.sources.some((s) => s.id === prev)) return prev;
@@ -1285,20 +1330,56 @@ export default function RemoteFilesPanel() {
     return () => window.removeEventListener("nowen:remote-open-manager", open);
   }, []);
 
-  const loadList = useCallback(async (sourceId: string, path: string) => {
+  const loadList = useCallback(async (sourceId: string, path: string, opts?: { force?: boolean; revalidate?: boolean }) => {
     if (!sourceId) { setEntries([]); return; }
-    setListLoading(true);
+    const key = dirCacheKey(sourceId, path);
+    // 只认最后一次请求：用户快速切目录时，旧响应不能覆盖新目录
+    const seq = ++listSeqRef.current;
+    const isCurrent = () => seq === listSeqRef.current;
+
+    const cached = opts?.force ? undefined : remoteDirCache.get(key);
+    if (cached) {
+      setEntries(cached.entries);
+      setListError("");
+      // TTL 内直接用缓存，连后台刷新都省掉
+      if (Date.now() - cached.at < REMOTE_DIR_CACHE_TTL_MS) { setListLoading(false); return; }
+    }
+    const sourceType = sourcesRef.current.find((source) => source.id === sourceId)?.type;
+    // SMB 首屏：先只取名称/类型（readdir 约 20ms），再后台补逐条 stat（约 350ms/200 条）。
+    // 显式刷新（revalidate）不用快速路径：刷新本来就要等一次完整结果（含远端复核）。
+    const fastFirst = !cached && !opts?.revalidate && sourceType === "smb";
+
+    setListLoading(!cached);
     setListError("");
     try {
-      const res = await api.listRemoteFiles(sourceId, path);
+      if (fastFirst) {
+        const quick = await api.listRemoteFiles(sourceId, path, { fast: true });
+        if (!isCurrent()) return;
+        setEntries(quick.entries);
+        setListLoading(false);
+        void api.listRemoteFiles(sourceId, path).then((full) => {
+          if (!isCurrent()) return;
+          setEntries(full.entries);
+          rememberDir(key, full.entries);
+        }).catch(() => {
+          // 详情补齐失败就保留快速列表，用户可手动刷新
+        });
+        return;
+      }
+      const res = await api.listRemoteFiles(sourceId, path, opts?.revalidate ? { revalidate: true } : undefined);
+      if (!isCurrent()) return;
       setEntries(res.entries);
+      rememberDir(key, res.entries);
+      // 刷新可能把已删除的共享/根从后端配置里剔掉了，同步侧栏「存储」与配置列表
+      if (opts?.revalidate) void reloadSources();
     } catch (err: any) {
+      if (!isCurrent()) return;
       setListError(err?.message || "加载目录失败");
-      setEntries([]);
+      if (!cached) setEntries([]);
     } finally {
-      setListLoading(false);
+      if (isCurrent()) setListLoading(false);
     }
-  }, []);
+  }, [reloadSources]);
 
   useEffect(() => {
     if (activeId) void loadList(activeId, cwd);
@@ -1330,7 +1411,7 @@ export default function RemoteFilesPanel() {
     try {
       await api.writeRemoteFile(activeId, openPath, editorText);
       setDirty(false);
-      void loadList(activeId, cwd);
+      void loadList(activeId, cwd, { force: true });
     } catch (err: any) {
       void alert({ title: "写回远程文件失败", description: err?.message || "写回失败" });
     } finally {
@@ -1434,7 +1515,7 @@ export default function RemoteFilesPanel() {
       await api.mkdirRemoteFile(activeId, cwd ? `${cwd}/${name}` : name);
       setNewFolderOpen(false);
       setNewFolderName("");
-      void loadList(activeId, cwd);
+      void loadList(activeId, cwd, { force: true });
     } catch (err: any) {
       void alert({ title: "创建目录失败", description: err?.message || "创建目录失败" });
     }
@@ -1456,7 +1537,7 @@ export default function RemoteFilesPanel() {
         setEditorText("");
         setDirty(false);
       }
-      void loadList(activeId, cwd);
+      void loadList(activeId, cwd, { force: true });
     } catch (err: any) {
       void alert({ title: "删除远程条目失败", description: err?.message || "删除失败" });
     }
@@ -1471,7 +1552,7 @@ export default function RemoteFilesPanel() {
     try {
       await api.renameRemoteFile(activeId, renameTarget.path, newName);
       setRenameTarget(null);
-      void loadList(activeId, cwd);
+      void loadList(activeId, cwd, { force: true });
     } catch (err: any) {
       void alert({ title: "重命名失败", description: err?.message || "重命名失败" });
     }
@@ -1543,7 +1624,7 @@ export default function RemoteFilesPanel() {
     }
     setBatchBusy(false);
     setSelected(new Set());
-    void loadList(activeId, cwd);
+    void loadList(activeId, cwd, { force: true });
     flash(`已删除 ${done} 项`);
   }, [activeId, selectedEntries, cwd, loadList, flash]);
 
@@ -1718,7 +1799,7 @@ export default function RemoteFilesPanel() {
                     type="button"
                     role="menuitem"
                     className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-                    onClick={() => { setMoreMenuOpen(false); activeId && void loadList(activeId, cwd); }}
+                    onClick={() => { setMoreMenuOpen(false); activeId && void loadList(activeId, cwd, { force: true, revalidate: true }); }}
                   >
                     <RefreshCw size={13} className="shrink-0" /> 刷新
                   </button>
@@ -1870,10 +1951,10 @@ export default function RemoteFilesPanel() {
                           {linked ? <span className="ml-1 text-[10px] text-sky-400">已链接</span> : null}
                         </button>
                         <span className="w-16 shrink-0 text-right text-[10px] text-tx-tertiary">
-                          {entry.isFolder ? "—" : formatSize(entry.size)}
+                          {entry.isFolder ? "—" : entry.metaPending ? "…" : formatSize(entry.size)}
                         </span>
                         <span className="hidden w-36 shrink-0 truncate text-right text-[10px] text-tx-tertiary md:block">
-                          {formatTime(entry.modifiedAt)}
+                          {entry.metaPending ? "…" : formatTime(entry.modifiedAt)}
                         </span>
                         <span className="flex w-[104px] shrink-0 items-center justify-end opacity-0 transition-opacity group-hover:opacity-100">
                           {!entry.isFolder && linked ? (

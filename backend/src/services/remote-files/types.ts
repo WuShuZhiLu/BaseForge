@@ -61,6 +61,15 @@ export interface RemoteFileEntry {
   isFolder: boolean;
   size: number;
   modifiedAt: string | null;
+  /** 快速列举：只拿到名称/类型，size 与 modifiedAt 待补（前端显示占位） */
+  metaPending?: boolean;
+}
+
+/** 列目录选项：fast=true 跳过逐条元数据（仅名称/类型）；revalidate=true 主动复核
+ *  远端是否仍然存在（如刷新时剔除 NAS 上已删除的多共享/多根条目）。 */
+export interface RemoteListOptions {
+  fast?: boolean;
+  revalidate?: boolean;
 }
 
 export interface RemoteProviderContext {
@@ -84,7 +93,7 @@ export interface RemoteProviderContext {
 export interface RemoteProvider {
   readonly type: RemoteStorageType;
   readonly displayName: string;
-  list(ctx: RemoteProviderContext, path: string): Promise<RemoteFileEntry[]>;
+  list(ctx: RemoteProviderContext, path: string, opts?: RemoteListOptions): Promise<RemoteFileEntry[]>;
   read(ctx: RemoteProviderContext, path: string): Promise<{ content: string; size: number }>;
   /** 二进制读取（转本地附件用） */
   readBinary(ctx: RemoteProviderContext, path: string): Promise<Buffer>;

@@ -406,6 +406,8 @@ export interface RemoteFileEntry {
   isFolder: boolean;
   size: number;
   modifiedAt: string | null;
+  /** 快速列举：只拿到名称/类型，size 与 modifiedAt 待后台补齐 */
+  metaPending?: boolean;
 }
 
 // ========== 文件管理（/api/files 聚合视图） ==========

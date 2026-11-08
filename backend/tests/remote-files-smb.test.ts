@@ -202,4 +202,31 @@ describe("smb 多共享（虚拟根）", () => {
       (err: unknown) => err instanceof RemoteProviderError && err.status === 404,
     );
   });
+
+  it("刷新复核：NAS 上已删除的共享从虚拟根剔除，其它错误仍保留", async () => {
+    statMap = {
+      docs: { isDirectory: true, size: 0 },
+      media: { isDirectory: true, size: 0 },
+    };
+    setSmbClientFactory(async () => ({
+      readdir: async () => [],
+      stat: async (p: string) => {
+        if (p === "media") throw Object.assign(new Error("TREE_CONNECT failed: STATUS_BAD_NETWORK_NAME"), { status: 404 });
+        const st = statMap[p];
+        if (!st) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        return st;
+      },
+      readFile: async () => Buffer.alloc(0),
+      writeFile: async () => {},
+      mkdir: async () => {},
+      rm: async () => {},
+      rmdir: async () => {},
+      rename: async () => {},
+      close: async () => {},
+    } as SmbClientLike));
+
+    // 独立主机名：避免复用前面用例缓存的 SMB client（缓存按 host 维度）
+    const entries = await smbProvider.list({ ...MULTI, host: "nas-refresh-check" }, "", { revalidate: true });
+    assert.deepEqual(entries.map((entry) => entry.name), ["docs"], "已删除的共享不再显示");
+  });
 });

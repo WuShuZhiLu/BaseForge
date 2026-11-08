@@ -108,16 +108,31 @@ export const webdavProvider: RemoteProvider = {
   type: "webdav",
   displayName: "WebDAV",
 
-  async list(ctx, path) {
+  async list(ctx, path, opts) {
     const target = resolveTarget(ctx, path);
     if (target.isVirtualRoot) {
-      return rootsOf(ctx).map((root) => ({
+      const roots = rootsOf(ctx);
+      const asEntries = (list: RemoteRoot[]) => list.map((root) => ({
         name: root.name,
         path: root.name,
         isFolder: true,
         size: 0,
         modifiedAt: null,
       }));
+      // 常规浏览不访问远端；显式刷新（revalidate）时才逐个确认根目录还在，
+      // 把远端已删除/改名的挂载根剔掉（404 = 不存在；其它错误保留显示）。
+      if (!opts?.revalidate) return asEntries(roots);
+      const visible: RemoteRoot[] = [];
+      for (const root of roots) {
+        try {
+          await run(() => createDavClient(ctx, root).getDirectoryContents("", { deep: false }));
+          visible.push(root);
+        } catch (error) {
+          if (statusOf(error) === 404) continue;
+          visible.push(root);
+        }
+      }
+      return asEntries(visible);
     }
     const client = createDavClient(ctx, target.root);
     const items = await run(() => client.getDirectoryContents(target.subPath, { deep: false }));

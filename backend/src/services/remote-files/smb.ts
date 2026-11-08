@@ -228,6 +228,17 @@ function isConnectionError(err: unknown): boolean {
   return /连接 SMB 主机失败|ECONN|EPIPE|ETIMEDOUT|NOT_CONNECTED|CONNECTION|socket|timeout/i.test(text);
 }
 
+/** NAS 上共享已被删除/改名（TREE_CONNECT BAD_NETWORK_NAME、共享根不存在），
+ *  与主机离线、权限不足区分开——前者可以放心从虚拟根里剔除。 */
+function isShareMissingError(err: unknown): boolean {
+  const detail = err as { code?: string; statusName?: string; message?: string } | null;
+  const text = [
+    err instanceof Error ? err.message : String(err ?? ""),
+    detail?.code, detail?.statusName, detail?.message,
+  ].filter(Boolean).join(" | ");
+  return /BAD_NETWORK_NAME|OBJECT_NAME_NOT_FOUND|OBJECT_PATH_NOT_FOUND|ENOENT|NO_SUCH_FILE/i.test(text);
+}
+
 async function withSmbClient<T>(ctx: RemoteProviderContext, fn: (client: SmbClientLike) => Promise<T>): Promise<T> {
   const key = smbCacheKey(ctx);
   let entry = smbClientCache.get(key);
@@ -317,26 +328,80 @@ export const smbProvider: RemoteProvider = {
   type: "smb",
   displayName: "SMB",
 
-  async list(ctx, path) {
+  async list(ctx, path, opts) {
     const dirPath = normalizeRemotePath(path);
     const target = resolveTarget(ctx, dirPath);
     // 多共享的虚拟根：把配置的共享并列成文件夹，顺序按配置顺序
     if (target.isVirtualRoot) {
-      return (ctx.shares || []).map((name) => ({
+      const shares = (ctx.shares || []).filter(Boolean);
+      const asEntries = (names: string[]): RemoteFileEntry[] => names.map((name) => ({
         name,
         path: name,
         isFolder: true,
         size: 0,
         modifiedAt: null,
       }));
+      // 常规浏览不连服务器（虚拟根没有网络语义）；只有显式刷新（revalidate）才逐个探测，
+      // 把 NAS 上已删除/改名的共享剔掉——否则配置里残留的共享会一直显示。
+      if (!opts?.revalidate) return asEntries(shares);
+      try {
+        return await withSmbClient(ctx, async (client) => {
+          const visible: string[] = [];
+          for (const name of shares) {
+            try {
+              const st = await client.stat(name);
+              if (st.isDirectory) visible.push(name);
+            } catch (err) {
+              // 主机级异常（断连/超时）交给外层回退整份配置列表，避免把临时离线误判成删除
+              if (isConnectionError(err)) throw err;
+              // 「共享不存在」类错误（TREE_CONNECT BAD_NETWORK_NAME 等）→ 刷新后不再显示
+              if (isShareMissingError(err)) continue;
+              // 权限不足等其它错误：共享仍在，保留显示
+              visible.push(name);
+            }
+          }
+          return asEntries(visible);
+        });
+      } catch {
+        return asEntries(shares);
+      }
     }
     // 多共享模式路径带共享名前缀；历史单共享模式保持「共享内相对路径」不变（已存链接不失效）
     const multi = (ctx.shares || []).filter(Boolean).length > 0;
     const withShare = (relative: string) => (multi ? `${target.shareName}/${relative}` : relative);
+
+    // 快速模式：只 readdir 拿名称/类型，跳过逐条 stat——SMB 的大目录里 stat 是绝对大头
+    // （实测 200 条约 350ms，readdir 仅 20ms），前端先用它把列表画出来再补详情。
+    if (opts?.fast) {
+      try {
+        return await withSmbClient(ctx, async (client) => {
+          const dir = targetPath(target.shareName, ctx, target.subPath);
+          const items = await readdirEntries(client, dir);
+          const entries: RemoteFileEntry[] = items.slice(0, 200).map((item) => {
+            const relative = target.subPath ? `${target.subPath}/${item.name}` : item.name;
+            return {
+              name: item.name,
+              path: withShare(relative),
+              isFolder: item.isDirectory(),
+              size: 0,
+              modifiedAt: null,
+              metaPending: true,
+            };
+          });
+          sortEntries(entries);
+          return entries;
+        });
+      } catch (err) {
+        throw mapSmbError(err, "读取 SMB 目录失败");
+      }
+    }
+
     try {
       return await withSmbClient(ctx, async (client) => {
         const dir = targetPath(target.shareName, ctx, target.subPath);
+        const startedAt = Date.now();
         const items = await readdirEntries(client, dir);
+        const readdirMs = Date.now() - startedAt;
         // 逐条 stat 获取类型/大小/时间（目录条目上限 200）。
         // 注意必须串行：不少 NAS / Windows 主机对单连接并发请求直接 RST
         // （实测并发 3 即 ECONNRESET），串行虽慢但单个 stat 仅几 ms，200 条 <2s。
@@ -357,6 +422,14 @@ export const smbProvider: RemoteProvider = {
           }
         }
         sortEntries(entries);
+        // 只在 stat 明显拖慢时打点：readdir 与逐条 stat 的耗时拆分，便于定位后续性能问题
+        const statsMs = Date.now() - startedAt - readdirMs;
+        if (entries.length > 0 && statsMs >= 50) {
+          console.log(
+            `[smb] list share=${target.shareName} dir="${target.subPath}" entries=${entries.length} ` +
+            `readdir=${readdirMs}ms stats=${statsMs}ms`,
+          );
+        }
         return entries;
       });
     } catch (err) {

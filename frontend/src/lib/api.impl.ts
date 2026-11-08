@@ -3412,8 +3412,18 @@ export const api = {
     request<{ path: string; entries: RemoteFileEntry[] }>(
       "/remote-files/webdav/list", { method: "POST", body: JSON.stringify(data) },
     ),
-  listRemoteFiles: (sourceId: string, path: string) =>
-    request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
+  listRemoteFiles: (sourceId: string, path: string, opts?: { fast?: boolean; revalidate?: boolean }) =>
+    request<{ path: string; entries: RemoteFileEntry[] }>(
+      `/remote-files/sources/${sourceId}/list`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          path,
+          ...(opts?.fast ? { fast: true } : {}),
+          ...(opts?.revalidate ? { revalidate: true } : {}),
+        }),
+      },
+    ),
   readRemoteFile: (sourceId: string, path: string) =>
     request<{ path: string; content: string; size: number }>(`/remote-files/sources/${sourceId}/read`, { method: "POST", body: JSON.stringify({ path }) }),
   // 二进制读取（base64）：PDF / Word 链接到知识库时取原件

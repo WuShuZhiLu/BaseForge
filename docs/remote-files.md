@@ -101,6 +101,18 @@ smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`），然后**多选**要挂载的
 （旧 `@marsaud/smb2` 对空根目录发 CREATE 会被部分 NAS 以 `STATUS_INVALID_PARAMETER` 拒绝，
 该依赖已移除）。`signing` / `encryption` 均为 `if-offered`，NAS 要求加密时自动启用。
 
+**列目录性能**：SMB 大目录里逐条 `stat` 是绝对大头（实测 200 条约 350ms，`readdir` 仅约 20ms），
+因为一次 `stat` = CREATE + CLOSE 两个往返。因此 `list` 支持 `fast: true`（只返回名称/类型），
+前端先用快速结果把列表画出来，再后台补 `size/modifiedAt`；另外前端有按 `(源, 路径)` 的会话级
+目录缓存（TTL 30s，显式刷新与增删改强制重拉），回根目录、来回切目录不再重复等 NAS。
+
+**刷新剔除已删除共享**：虚拟根平时只回配置里的共享名（不连服务器）；`list` 带 `revalidate: true`
+（界面「更多 → 刷新」）时才对每个共享做存在性探测，NAS 上已删除/改名的共享不再显示，并**同步从
+源配置里剔除**（只在确有剔除且还剩至少一个时写，避免把临时故障写成永久删除）。
+只剔除「共享不存在」类错误（`STATUS_BAD_NETWORK_NAME` / 对象名不存在），主机离线、权限不足等
+仍保留显示。管理存储的共享列表也会把「已保存但远端列举不到」的共享显示出来（标注「远端已不存在」），
+可手动取消，不会出现「看不见也取消不掉」的条目。
+
 ### 5.3 WebDAV：一个源可挂多个根目录
 
 与 SMB 多共享对齐：填完地址与凭据点「连接」，逐层浏览后**勾选**要挂载的目录（可多选），
@@ -116,6 +128,9 @@ smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`），然后**多选**要挂载的
 
 客户端用 `webdav` 5.x（`createClient`）：`authType: Auto` = 先 Basic，遇到 Digest 挑战自动降级重试，
 不再手写 PROPFIND XML 解析；目录删除先整删，409/405 时回退逐层删。
+
+刷新同理：`revalidate` 时对每个挂载根发一次 PROPFIND，404 的根（远端已删除/改名）从虚拟根剔除
+并同步从配置里清掉，其它错误（401/403、超时）仍保留。
 
 ## 6. 远程文档直接编辑（投影式）
 
@@ -169,5 +184,12 @@ smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`），然后**多选**要挂载的
 - 2026-11-08（SMB 修复）：`mapSmbError` 对已是 `RemoteProviderError` 的错误不再二次映射（认证失败曾从
   403 被洗成 502）；操作超时定时器随操作清除（泄漏会让进程/测试多挂 45s，该文件 48.2s → 1.8s）；
   `remote-files-smb` 14/14，remote-files 全家 47/47
+- 2026-11-08（列目录性能）：SMB `list` 增加 `fast: true`（只 readdir，真机 200 条约 15-22ms），前端先出列表、
+  后台补 stat（约 330-365ms）；前端加 `(源, 路径)` 会话缓存（TTL 30s，刷新/增删改强制重拉）。
+  后端 32/32、前后端 `tsc` 0 error；真机实测首屏 135ms 出内容、348ms 补齐详情，二次进入命中缓存 0 请求
+- 2026-11-08（刷新剔除已删除项）：SMB 虚拟根/WebDAV 多根支持 `revalidate`，只剔除「对象不存在」类错误，
+  主机离线与权限错误保留；剔除结果同步落库（源配置里的 `shares/rootPaths` 一并收敛），管理存储会显示
+  「远端已不存在」的已选共享供手动取消。`remote-files` 33/33；真机实测 SMB 根目录刷新后已删除共享
+  `workapce` 消失、管理存储由「3 个共享」变为「2 个共享」，再点根目录也不会回来
 - 未验证（待用户实测）：真实 WebDAV/NAS 连通、百度 access_token 实际读写（含 >4MB 分片）、
   SMB 多共享真机遍历
