@@ -113,3 +113,62 @@ test("knowledge tree creates rich-text and Markdown documents at root", async ()
     null,
   );
 });
+
+test("restore normalization merges root documents into the fallback notebook", async () => {
+  const { getDb } = await import("../src/db/schema.js");
+  const { createKnowledgeChild, listKnowledgeTree } = await import("../src/services/knowledgeTree.js");
+  const { mergeRootDocumentsIntoNotebook } = await import(
+    "../src/services/knowledgeTreeRootDocumentNormalization.js"
+  );
+
+  const db = getDb();
+  db.prepare("INSERT INTO users (id, username, passwordHash) VALUES (?, ?, ?)")
+    .run("restore-owner", "restore-owner", "hash");
+  db.prepare("INSERT INTO workspaces (id, name, ownerId) VALUES (?, ?, ?)")
+    .run("restore-ws", "Restored", "restore-owner");
+  db.prepare("INSERT INTO workspace_members (workspaceId, userId, role) VALUES (?, ?, ?)")
+    .run("restore-ws", "restore-owner", "owner");
+
+  const doc = createKnowledgeChild({
+    actorUserId: "restore-owner",
+    workspaceId: "restore-ws",
+    parentId: null,
+    nodeType: "markdown",
+    title: "根级待归并文档",
+    db,
+  });
+  const second = createKnowledgeChild({
+    actorUserId: "restore-owner",
+    workspaceId: "restore-ws",
+    parentId: null,
+    nodeType: "note",
+    title: "第二篇根级文档",
+    db,
+  });
+
+  const result = mergeRootDocumentsIntoNotebook({ db });
+  assert.ok(result.moved >= 2);
+  assert.equal(result.notebookName, "待整理");
+
+  const notebook = db.prepare(`
+    SELECT id, parentId, icon FROM notebooks
+     WHERE userId = ? AND workspaceId = ? AND name = '待整理'
+  `).get("restore-owner", "restore-ws") as { id: string; parentId: string | null; icon: string };
+  assert.ok(notebook);
+  assert.equal(notebook.parentId, null);
+  assert.equal(notebook.icon, "📥");
+
+  for (const node of [doc, second]) {
+    const note = db.prepare("SELECT notebookId FROM notes WHERE id = ?")
+      .get(node.resourceId) as { notebookId: string };
+    assert.equal(note.notebookId, notebook.id);
+    assert.equal(
+      listKnowledgeTree({ userId: "restore-owner", workspaceId: "restore-ws", db })
+        .find((item) => item.id === node.id)?.parentId,
+      `notebook:${notebook.id}`,
+    );
+  }
+
+  // 幂等：已经没有根层文档时不再做任何移动。
+  assert.equal(mergeRootDocumentsIntoNotebook({ db }).moved, 0);
+});

@@ -20,6 +20,7 @@ import {
   type AttachmentRestoreAudit,
 } from "../services/backup-restore-integrity.js";
 import { probeAttachmentStorage } from "../services/attachment-storage.js";
+import { mergeRootDocumentsIntoNotebook } from "../services/knowledgeTreeRootDocumentNormalization.js";
 
 const unzipper = require("unzipper");
 
@@ -456,6 +457,19 @@ async function restoreZipStreaming(
     try {
       replaceDbFile(tmpDb, curDbPath);
       verifyCurrentDbUsable(curDbPath);
+      // 完整备份是整库替换，不经过数据包导入的根文档兜底；在这里补一次归并。
+      // 尽力而为：失败只告警，不影响恢复结果。
+      try {
+        const merged = mergeRootDocumentsIntoNotebook({ db: getDb() });
+        if (merged.moved > 0) {
+          console.log(`[Backup] 恢复后根路径文档归并: ${merged.moved} 篇 → 「${merged.notebookName}」`);
+        }
+      } catch (mergeError) {
+        console.warn(
+          "[Backup] 恢复后根路径文档归并失败，已跳过（不影响数据完整性）:",
+          mergeError instanceof Error ? mergeError.message : mergeError,
+        );
+      }
       await replaceDirectoriesFromStagingSafe([
         { stagedDir: stagedAttachments, destDir: path.join(manager.dataDir, "attachments") },
         { stagedDir: stagedFonts, destDir: path.join(manager.dataDir, "fonts") },

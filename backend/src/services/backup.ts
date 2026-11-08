@@ -52,6 +52,7 @@ import {
 import { probeAttachmentStorage } from "./attachment-storage.js";
 import { quarantineRestoredPlugins } from "../plugins/pluginService.js";
 import { quarantineRestoredAutomations } from "../automation/recovery.js";
+import { mergeRootDocumentsIntoNotebook } from "./knowledgeTreeRootDocumentNormalization.js";
 
 // ===== 常量 =====
 
@@ -490,6 +491,27 @@ function repairRestoredDerivedState(): void {
   } catch (error) {
     console.warn(
       "[Backup] 恢复后派生数据修复失败，已跳过（不影响数据完整性）:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
+/**
+ * 恢复后把 nowen 的「根路径文档」归并进「待整理」知识库。
+ *
+ * 完整备份恢复是整库替换，不经过数据包导入的兜底逻辑；而 Web 端根层只允许
+ * 建知识库，根文档留在根层会变成无法管理的状态。这里补上同一语义。
+ * 尽力而为：失败只告警，不影响恢复结果本身。
+ */
+function mergeRestoredRootDocuments(): void {
+  try {
+    const result = mergeRootDocumentsIntoNotebook({ db: getDb() });
+    if (result.moved > 0) {
+      console.log(`[Backup] 恢复后根路径文档归并: ${result.moved} 篇 → 「${result.notebookName}」`);
+    }
+  } catch (error) {
+    console.warn(
+      "[Backup] 恢复后根路径文档归并失败，已跳过（不影响数据完整性）:",
       error instanceof Error ? error.message : error,
     );
   }
@@ -1556,6 +1578,7 @@ export class BackupManager {
       replaceDbFile(tmpDb, curDbPath);
       verifyCurrentDbUsable(curDbPath);
       repairRestoredDerivedState();
+      mergeRestoredRootDocuments();
 
       // DB 已验证可用后，再安全替换文件目录；任一步失败都回滚 DB。
       await replaceDirectoriesFromStagingSafe([
