@@ -92,12 +92,16 @@ export async function importWordIntoKnowledgeTree(
  */
 /**
  * 导入 Excel 表格（.xlsx）：第一个工作表解析为轻量表格笔记。
- * 解析复用 SheetEditor 的 parseWorkbookXlsx，保存走 saveSheet（乐观锁）。
+ *
+ * 必须走知识树 create({ nodeType: "sheet" }) 官方链路建节点——
+ * notes 表的 INSERT/UPDATE 触发器同步树节点 nodeType 时不认 sheet
+ * （只认 word/markdown），用 createNote+move 建出的树节点类型是 "note"，
+ * 前端会当普通笔记打开而不是轻量表格。
+ * 解析复用 SheetEditor 的 parseWorkbookXlsx，数据写入走 saveSheet（乐观锁）。
  */
 export async function importExcelIntoKnowledgeTree(
   options: KnowledgeTreeImportOptions,
 ): Promise<LoadedNote | null> {
-  const notebookId = await resolvePhysicalNotebookId(options);
   const file = await pickExcelFile();
   if (!file) return null;
   const toastId = toast.info("正在导入 Excel 表格…", 0);
@@ -106,14 +110,22 @@ export async function importExcelIntoKnowledgeTree(
     const sheet = workbook.sheets[0];
     if (!sheet) throw new Error("该 XLSX 没有可导入的工作表");
     const title = file.name.replace(/\.xlsx$/i, "").trim() || sheet.name || "Excel 表格";
-    const note = await api.createNote({ title, notebookId, contentFormat: "sheet" });
-    // 先取 sheets 行的 updatedAt（乐观锁），再写入解析出的行/列数据
-    const document = await getSheet(note.id);
-    await saveSheet(note.id, sheet.data, document.updatedAt);
-    await moveImportedNote(note.id, notebookId, options.parent);
+    // 目标树节点：优先用 parent 本身；否则找 notebookId 对应的 notebook 节点
+    const parent = options.parent
+      ?? options.nodes.find((node) => node.resourceType === "notebook" && node.resourceId === options.fallbackNotebookId)
+      ?? null;
+    const created = await knowledgeTreeApi.create({
+      parentId: parent?.id ?? null,
+      nodeType: "sheet",
+      title,
+    });
+    const sheetNoteId = created.resourceId;
+    const document = await getSheet(sheetNoteId);
+    await saveSheet(sheetNoteId, sheet.data, document.updatedAt);
     toast.dismiss(toastId);
     toast.success("导入成功");
-    return note as LoadedNote;
+    // 调用方对 excel 分支只刷新树、不走笔记打开（sheet 用深链打开）
+    return { id: sheetNoteId } as unknown as LoadedNote;
   } catch (error) {
     toast.dismiss(toastId);
     throw error;

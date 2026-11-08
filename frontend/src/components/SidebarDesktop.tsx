@@ -898,7 +898,8 @@ export default function SidebarDesktop() {
       if (!imported) return;
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      void openNoteFromTab(imported.id);
+      // sheet 笔记走深链打开，excel 导入后不自动打开（树里点新节点即进表格）
+      if (importKind !== "excel") void openNoteFromTab(imported.id);
       actions.refreshNotes();
       actions.refreshNotebooks();
     } catch (error) {

@@ -731,7 +731,8 @@ rememberOpened(created.id);
                   ? await importWeChatArticleIntoKnowledgeTree(options)
                   : null;
       if (!imported) return;
-      activateNote(imported, parent?.id || null);
+      // sheet 笔记走深链打开，excel 导入后不自动打开（树里点新节点即进表格）
+      if (kind !== "excel") activateNote(imported, parent?.id || null);
       emitTreeChanged("node-imported-quick-browse");
       actions.refreshNotes();
       actions.refreshNotebooks();

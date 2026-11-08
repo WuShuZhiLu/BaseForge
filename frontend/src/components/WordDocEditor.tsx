@@ -11,6 +11,10 @@ import { FileWarning, Loader2 } from "lucide-react";
 import type { NoteEditorHandle, NoteEditorProps } from "@/components/editors/types";
 import { api } from "@/lib/api";
 
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 5;
+const ZOOM_STEP = 1.15;
+
 const WordDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   function WordDocEditor({ note }, ref) {
     const [attachmentId, setAttachmentId] = useState<string>("");
@@ -19,8 +23,10 @@ const WordDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
     const [loading, setLoading] = useState(false);
     const [notFound, setNotFound] = useState(false);
     const [renderError, setRenderError] = useState("");
-    const [zoom, setZoom] = useState(1);
-    const renderContainerRef = useRef<HTMLDivElement | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const renderContainerRef = useRef<HTMLDivElement | null>(null);
+  const outerContainerRef = useRef<HTMLDivElement | null>(null);
+
 
     useImperativeHandle(ref, () => ({}), []);
 
@@ -113,9 +119,28 @@ const WordDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
       return () => { alive = false; };
     }, [note.id, note.content]);
 
+    // Ctrl/Cmd + 滚轮缩放 Word 页面本身；preventDefault 拦掉浏览器整页缩放。
+    // wheel 必须用非 passive 原生监听（React 的 onWheel 是 passive，preventDefault 无效）。
+    // 监听挂在外层容器（始终渲染）——挂在内层渲染区会在它挂载前落空。
+    useEffect(() => {
+      const container = outerContainerRef.current;
+      if (!container) return;
+      const handleWheel = (event: WheelEvent) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+        setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * factor)));
+      };
+      container.addEventListener("wheel", handleWheel, { passive: false });
+      return () => container.removeEventListener("wheel", handleWheel);
+    }, []);
+
     return (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="min-h-0 flex-1 overflow-hidden bg-app-bg">
+      <div
+        ref={outerContainerRef}
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-app-bg"
+      >
+        <div className="min-h-0 flex-1 overflow-hidden">
           {loading ? (
             <div className="flex h-full items-center justify-center text-sm text-tx-tertiary">
               <Loader2 size={18} className="mr-2 animate-spin" />正在加载 Word 原件…
@@ -134,16 +159,27 @@ const WordDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
             <div className="flex h-full min-h-0 flex-col">
               {/* 缩放工具条 */}
               <div className="flex h-9 shrink-0 items-center justify-end gap-2 border-b border-app-border px-3 text-xs text-tx-tertiary">
-                <button className="rounded px-1.5 hover:bg-app-hover" onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))}>−</button>
+                <button className="rounded px-1.5 hover:bg-app-hover" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z / ZOOM_STEP)))}>−</button>
                 <span className="w-12 text-center tabular-nums">{Math.round(zoom * 100)}%</span>
-                <button className="rounded px-1.5 hover:bg-app-hover" onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))}>＋</button>
+                <button className="rounded px-1.5 hover:bg-app-hover" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z * ZOOM_STEP)))}>＋</button>
                 <button className="rounded px-1.5 hover:bg-app-hover" onClick={() => setZoom(1)}>重置</button>
               </div>
-              <div className="min-h-0 flex-1 overflow-auto bg-app-panel py-4">
+              <div className="min-h-0 flex-1 overflow-auto bg-app-panel py-4 flex justify-center">
+                {/* 覆盖 docx-preview 默认样式（其默认样式注入在渲染容器内、晚于本规则，
+                    特异性相同必须用 !important 才能压过灰底与内边距） */}
+                <style>{`
+                  .docx-render-wrapper {
+                    background: transparent !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    min-width: 0 !important;
+                    min-height: 0 !important;
+                  }
+                `}</style>
                 <div
                   ref={renderContainerRef}
-                  className="mx-auto w-fit origin-top bg-white shadow-md"
-                  style={{ transform: `scale(${zoom})`, width: `${100 / zoom}%`, maxWidth: "none" }}
+                  className="w-fit bg-white shadow-md"
+                  style={{ zoom }}
                 />
               </div>
             </div>
