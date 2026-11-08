@@ -67,7 +67,7 @@ localStorage 启停）。0.2.0 起改为内核能力，注册表条目、启停�
 
 | 提供方 | 能力 | 已知限制 |
 | --- | --- | --- |
-| WebDAV（首选） | 全功能（列/读/写/建目录/删/改名） | 目录删除依赖服务器 Depth: infinity；XML 命名空间无关解析已适配常见 NAS |
+| WebDAV（首选） | 全功能（列/读/写/建目录/删/改名），一个源可挂多个根目录 | 目录删除先整删、服务器不支持递归删时回退逐层删 |
 | SMB（局域网） | 全功能，可挂多个共享（smb3-client，dialect 协商 2.1 / 3.0 / 3.0.2 / 3.1.1，支持 signing 与传输加密） | 目录条目单次上限 200；SMB1 不再支持 |
 | 百度网盘（直连，实验性） | 列/读/写（≤4MB 单发，>4MB precreate→分片→create）/建目录/删/改名 | 需要开放平台应用凭据，令牌会过期，有限流；建议改用 OpenList + WebDAV |
 
@@ -100,6 +100,22 @@ smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`），然后**多选**要挂载的
 文件读写同样走 `smb3-client`（`services/remote-files/smb.ts`）：根目录用共享名而非空路径
 （旧 `@marsaud/smb2` 对空根目录发 CREATE 会被部分 NAS 以 `STATUS_INVALID_PARAMETER` 拒绝，
 该依赖已移除）。`signing` / `encryption` 均为 `if-offered`，NAS 要求加密时自动启用。
+
+### 5.3 WebDAV：一个源可挂多个根目录
+
+与 SMB 多共享对齐：填完地址与凭据点「连接」，逐层浏览后**勾选**要挂载的目录（可多选），
+也可在「高级」里手动添加路径。
+
+数据模型：`RemoteSourceConfig` 新增 `rootPaths: { name, path }[]`。`path` 是相对服务器地址的
+绝对路径（`/` 表示服务器根），`name` 是源内路径第一段的别名（重名由后端加 `-2` 后缀）。
+
+- 有 `rootPaths` 即多根：根目录把各别名并列成文件夹，路径第一段是别名（`docs/2026/a.md`）；
+  保存时 `rootPath` 置空；
+- 无 `rootPaths` 沿用单根 `rootPath` —— 历史数据与已存的「远程 ↔ 笔记」链接路径不变；
+- 源级「测试连接」在多根 / 多共享时探第一个根，避免只列虚拟根造成的假成功。
+
+客户端用 `webdav` 5.x（`createClient`）：`authType: Auto` = 先 Basic，遇到 Digest 挑战自动降级重试，
+不再手写 PROPFIND XML 解析；目录删除先整删，409/405 时回退逐层删。
 
 ## 6. 远程文档直接编辑（投影式）
 
@@ -148,5 +164,10 @@ smb3-client 的 DCE/RPC `srvsvc.NetrShareEnum`），然后**多选**要挂载的
 - 2026-11-06（链接到知识库）：改为多选 + 目标知识库选择 / 就地新建；修掉 `createNote` 漏传
   `notebookId` 导致笔记游离的问题；知识库列表卡片与知识树节点加远程来源云图标。
   前端 `tsc` 0 error，知识树渲染 / 树面板契约 / 笔记拖拽排序测试 8/8 通过
+- 2026-11-08（WebDAV 换库 + 多根）：`remote-files-webdav` 18/18（`getPatcher()` 注入假 fetch：
+  单根读写/改名/删除回退/错误映射、多根虚拟根与别名解析、非法别名 404）；后端 `tsc` 0 error
+- 2026-11-08（SMB 修复）：`mapSmbError` 对已是 `RemoteProviderError` 的错误不再二次映射（认证失败曾从
+  403 被洗成 502）；操作超时定时器随操作清除（泄漏会让进程/测试多挂 45s，该文件 48.2s → 1.8s）；
+  `remote-files-smb` 14/14，remote-files 全家 47/47
 - 未验证（待用户实测）：真实 WebDAV/NAS 连通、百度 access_token 实际读写（含 >4MB 分片）、
   SMB 多共享真机遍历

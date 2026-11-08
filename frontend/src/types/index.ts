@@ -265,6 +265,12 @@ export interface SearchResult {
 export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "files" | "shares" | "issues" | "projects" | "plugins";
 
 // ========== 远程文件（内核能力：WebDAV / SMB / 百度网盘） ==========
+/** 多根目录：一个源可挂多个远端目录（对齐 SMB 多共享），name 是路径第一段的别名 */
+export interface RemoteRoot {
+  name: string;
+  path: string;
+}
+
 /** 已配置的远程源（凭据掩码，密码/token 不下发） */
 export interface RemoteSourcePublic {
   id: string;
@@ -273,6 +279,8 @@ export interface RemoteSourcePublic {
   baseUrl: string;
   username: string;
   rootPath: string;
+  /** WebDAV 多根：有值时路径第一段是别名（rootPath 不再参与拼接） */
+  rootPaths?: RemoteRoot[];
   /** SMB：主机名/IP（多共享源才有；单共享源仍用 baseUrl 的 UNC） */
   host?: string;
   /** SMB：挂载的共享名（多共享时路径第一段即共享名） */

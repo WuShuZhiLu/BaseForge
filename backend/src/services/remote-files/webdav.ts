@@ -1,90 +1,107 @@
 /**
- * WebDAV 提供方：PROPFIND 列目录 / GET 读取 / PUT 写回 / MKCOL 建目录 / DELETE 删除 / MOVE 重命名。
+ * WebDAV 提供方：基于 webdav 客户端库（fast-xml-parser 解析多状态响应，库内统一处理
+ * 命名空间、URL 编码与特殊文件名）。
  *
- * 兼容性策略：
- * - 多状态 XML 用命名空间无关正则解析（Apache/Nginx/群晖/坚果云等 server 的前缀不同）；
- * - href 可能是完整 URL、URL 编码路径，统一 decode 后去掉 baseUrl/root 前缀；
- * - DELETE 目录带 Depth: infinity（RFC4918，多数实现支持递归）。
+ * 认证：AuthType.Auto —— 先发 Basic，服务端要求 Digest（401 带 Digest 挑战）时库自动重试一次。
+ * 多根：ctx.rootPaths 有值时源内路径第一段是根目录别名（对齐 SMB 多共享），"" 是虚拟根。
+ * 删除：先整删；遇到 405/409（服务器不支持递归删目录）再逐层删子项后删空目录。
  */
+import { AuthType, createClient, type FileStat, type WebDAVClient } from "webdav";
 import {
   joinRemotePath,
   normalizeRemotePath,
   RemoteProviderError,
-  toRelativePath,
   type RemoteFileEntry,
   type RemoteProvider,
   type RemoteProviderContext,
+  type RemoteRoot,
 } from "./types";
 
-function requestUrl(ctx: RemoteProviderContext, path: string): string {
-  const base = String(ctx.baseUrl || "").replace(/\/+$/, "");
-  return `${base}${encodeURI(joinRemotePath(ctx.rootPath, path))}`;
+function rootsOf(ctx: RemoteProviderContext): RemoteRoot[] {
+  return (ctx.rootPaths || []).filter((root) => root && root.name && typeof root.path === "string");
 }
 
-function authHeaders(ctx: RemoteProviderContext, extra: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = { ...extra };
-  if (ctx.username || ctx.password) {
-    const token = Buffer.from(`${ctx.username}:${ctx.password}`).toString("base64");
-    headers.Authorization = `Basic ${token}`;
-  }
-  return headers;
-}
-
-async function davRequest(
-  ctx: RemoteProviderContext,
-  method: string,
-  path: string,
-  extra: Record<string, string> = {},
-  body?: string,
-): Promise<Response> {
-  const response = await fetch(requestUrl(ctx, path), {
-    method,
-    headers: authHeaders(ctx, extra),
-    body,
+/** 客户端根 = baseUrl + 根目录绝对路径（多根时用所选根的 path）。 */
+function createDavClient(ctx: RemoteProviderContext, root?: RemoteRoot | null): WebDAVClient {
+  const base = String(ctx.baseUrl || "").trim().replace(/\/+$/, "");
+  const remoteRoot = root ? root.path : joinRemotePath(ctx.rootPath, "");
+  return createClient(`${base}${remoteRoot === "/" ? "" : remoteRoot}`, {
+    username: ctx.username || undefined,
+    password: ctx.password || undefined,
+    authType: AuthType.Auto,
   });
-  if (!response.ok && response.status !== 207) {
-    if (response.status === 401) throw new RemoteProviderError("认证失败：请检查用户名/密码", 400);
-    if (response.status === 404) throw new RemoteProviderError("远程文件或目录不存在", 404);
-    throw new RemoteProviderError(`远程服务器返回 ${response.status}`, 502);
-  }
-  return response;
 }
 
-/** 命名空间无关地取第一个标签文本。 */
-function pickTag(xml: string, tag: string): string {
-  const match = xml.match(new RegExp(`<(?:[A-Za-z0-9_]+:)?${tag}[^>]*>([\\s\\S]*?)</(?:[A-Za-z0-9_]+:)?${tag}>`, "i"));
-  return match ? match[1].trim() : "";
+/** 源内路径 → 根目录 + 根内子路径；多根模式下第一段必须是已挂载的别名。 */
+function resolveTarget(
+  ctx: RemoteProviderContext,
+  relPath: string,
+): { root: RemoteRoot | null; subPath: string; isVirtualRoot: boolean } {
+  const path = normalizeRemotePath(relPath);
+  const roots = rootsOf(ctx);
+  if (roots.length === 0) return { root: null, subPath: path, isVirtualRoot: false };
+  if (!path) return { root: null, subPath: "", isVirtualRoot: true };
+  const [name, ...rest] = path.split("/");
+  const root = roots.find((item) => item.name === name);
+  if (!root) throw new RemoteProviderError(`「${name}」不在该来源的根目录列表中`, 404);
+  return { root, subPath: rest.join("/"), isVirtualRoot: false };
 }
 
-function parsePropfind(xml: string, ctx: RemoteProviderContext, dirPath: string): RemoteFileEntry[] {
-  const entries: RemoteFileEntry[] = [];
-  const responseBlocks = xml.match(/<(?:[A-Za-z0-9_]+:)?response\b[\s\S]*?<\/(?:[A-Za-z0-9_]+:)?response>/gi) ?? [];
-  for (const block of responseBlocks) {
-    const href = pickTag(block, "href");
-    if (!href) continue;
-    let decoded = href;
-    try {
-      decoded = decodeURIComponent(href);
-    } catch {
-      /* 保留原值 */
-    }
-    const pathOnly = decoded.replace(/^[a-z]+:\/\//i, "").replace(/^[^/]+/, "");
-    const relative = toRelativePath(ctx.rootPath, pathOnly);
-    if (!relative || relative === normalizeRemotePath(dirPath)) continue; // 跳过目录自身
-    const isFolder = /<(?:[A-Za-z0-9_]+:)?collection\b/i.test(block) || relative.endsWith("/");
-    const size = parseInt(pickTag(block, "getcontentlength") || "0", 10) || 0;
-    const modified = pickTag(block, "getlastmodified") || null;
-    const name = relative.split("/").pop() || relative;
-    entries.push({
-      name,
-      path: relative,
-      isFolder: isFolder || !name.includes("."),
-      size,
-      modifiedAt: modified ? new Date(modified).toISOString() : null,
-    });
+function statusOf(error: unknown): number | null {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === "number" ? status : null;
+}
+
+/** 库抛出的错误带 HTTP status，这里统一翻成前端可直接展示的文案。 */
+function toProviderError(error: unknown): RemoteProviderError {
+  const status = statusOf(error);
+  if (status === 401 || status === 403) return new RemoteProviderError("认证失败：请检查用户名/密码", 400);
+  if (status === 404) return new RemoteProviderError("远程文件或目录不存在", 404);
+  if (status !== null) return new RemoteProviderError(`远程服务器返回 ${status}`, 502);
+  const detail = error instanceof Error ? error.message : String(error ?? "");
+  return new RemoteProviderError(`连接失败：${detail}`, 502);
+}
+
+async function run<T>(task: () => Promise<T>): Promise<T> {
+  try {
+    return await task();
+  } catch (error) {
+    throw toProviderError(error);
   }
-  entries.sort((a, b) => (a.isFolder === b.isFolder ? a.name.localeCompare(b.name) : a.isFolder ? -1 : 1));
-  return entries;
+}
+
+function normaliseRelative(raw: string): string {
+  return String(raw ?? "").replace(/^\/+|\/+$/g, "");
+}
+
+function toEntry(stat: FileStat): RemoteFileEntry | null {
+  const path = normaliseRelative(stat.filename);
+  if (!path) return null;
+  const lastmod = stat.lastmod ? new Date(stat.lastmod) : null;
+  return {
+    name: stat.basename || path.split("/").pop() || path,
+    path,
+    isFolder: stat.type === "directory",
+    size: Number.isFinite(stat.size) ? stat.size : 0,
+    modifiedAt: lastmod && !Number.isNaN(lastmod.getTime()) ? lastmod.toISOString() : null,
+  };
+}
+
+/** 先整删；405/409 说明目录非空或服务器不支持递归删，改为逐层删除。 */
+async function deleteRemotePath(client: WebDAVClient, relPath: string): Promise<void> {
+  try {
+    await client.deleteFile(relPath);
+    return;
+  } catch (error) {
+    const status = statusOf(error);
+    if (status !== 405 && status !== 409) throw toProviderError(error);
+  }
+  const children = await run(() => client.getDirectoryContents(relPath, { deep: false }));
+  const childPaths = children.map((stat) => normaliseRelative(stat.filename)).filter((child) => child && child !== relPath);
+  for (const child of childPaths) {
+    await deleteRemotePath(client, child);
+  }
+  await run(() => client.deleteFile(relPath));
 }
 
 export const webdavProvider: RemoteProvider = {
@@ -92,14 +109,27 @@ export const webdavProvider: RemoteProvider = {
   displayName: "WebDAV",
 
   async list(ctx, path) {
-    const dirPath = normalizeRemotePath(path);
-    const body = `<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>`;
-    const response = await davRequest(ctx, "PROPFIND", dirPath, {
-      Depth: "1",
-      "Content-Type": "application/xml; charset=utf-8",
-    }, body);
-    const xml = await response.text();
-    return parsePropfind(xml, ctx, dirPath);
+    const target = resolveTarget(ctx, path);
+    if (target.isVirtualRoot) {
+      return rootsOf(ctx).map((root) => ({
+        name: root.name,
+        path: root.name,
+        isFolder: true,
+        size: 0,
+        modifiedAt: null,
+      }));
+    }
+    const client = createDavClient(ctx, target.root);
+    const items = await run(() => client.getDirectoryContents(target.subPath, { deep: false }));
+    const prefix = target.root ? `${target.root.name}/` : "";
+    const entries: RemoteFileEntry[] = [];
+    for (const stat of items) {
+      const entry = toEntry(stat);
+      if (!entry || entry.path === target.subPath) continue;
+      entries.push({ ...entry, path: `${prefix}${entry.path}` });
+    }
+    entries.sort((a, b) => (a.isFolder === b.isFolder ? a.name.localeCompare(b.name) : a.isFolder ? -1 : 1));
+    return entries;
   },
 
   async read(ctx, path) {
@@ -108,8 +138,11 @@ export const webdavProvider: RemoteProvider = {
   },
 
   async readBinary(ctx, path) {
-    const response = await davRequest(ctx, "GET", path);
-    return Buffer.from(await response.arrayBuffer());
+    const target = resolveTarget(ctx, path);
+    if (target.isVirtualRoot) throw new RemoteProviderError("请先选择要读取的根目录", 400);
+    const client = createDavClient(ctx, target.root);
+    const data = await run(() => client.getFileContents(target.subPath, { format: "binary" }));
+    return Buffer.isBuffer(data) ? data : Buffer.from(data as unknown as ArrayBuffer);
   },
 
   async write(ctx, path, content) {
@@ -117,28 +150,37 @@ export const webdavProvider: RemoteProvider = {
   },
 
   async writeBinary(ctx, path, data) {
-    await davRequest(ctx, "PUT", path, { "Content-Type": "application/octet-stream" }, data as unknown as string);
+    const target = resolveTarget(ctx, path);
+    if (target.isVirtualRoot) throw new RemoteProviderError("请先选择要写入的根目录", 400);
+    const client = createDavClient(ctx, target.root);
+    await run(() => client.putFileContents(target.subPath, data, { overwrite: true }));
   },
 
   async mkdir(ctx, path) {
+    const target = resolveTarget(ctx, path);
+    if (target.isVirtualRoot) throw new RemoteProviderError("请先选择要建目录的根目录", 400);
+    const client = createDavClient(ctx, target.root);
     try {
-      await davRequest(ctx, "MKCOL", path);
+      await client.createDirectory(target.subPath);
     } catch (error) {
-      if (error instanceof RemoteProviderError && error.message.includes("405")) {
-        throw new RemoteProviderError("目录已存在", 400);
-      }
-      throw error;
+      const status = statusOf(error);
+      if (status === 405 || status === 409) throw new RemoteProviderError("目录已存在", 400);
+      throw toProviderError(error);
     }
   },
 
   async remove(ctx, path) {
-    await davRequest(ctx, "DELETE", path, { Depth: "infinity" });
+    const target = resolveTarget(ctx, path);
+    if (target.isVirtualRoot) throw new RemoteProviderError("不能删除根目录", 400);
+    await deleteRemotePath(createDavClient(ctx, target.root), target.subPath);
   },
 
   async rename(ctx, oldPath, newName) {
-    const parent = normalizeRemotePath(oldPath).split("/").slice(0, -1).join("/");
-    const target = parent ? `${parent}/${newName}` : newName;
-    const destination = requestUrl(ctx, target);
-    await davRequest(ctx, "MOVE", oldPath, { Destination: encodeURI(destination), Overwrite: "F" });
+    const target = resolveTarget(ctx, oldPath);
+    if (target.isVirtualRoot) throw new RemoteProviderError("不能重命名根目录", 400);
+    const client = createDavClient(ctx, target.root);
+    const parent = target.subPath.split("/").slice(0, -1).join("/");
+    const next = parent ? `${parent}/${normalizeRemotePath(newName)}` : normalizeRemotePath(newName);
+    await run(() => client.moveFile(target.subPath, next, { overwrite: false }));
   },
 };

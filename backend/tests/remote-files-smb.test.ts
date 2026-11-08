@@ -112,7 +112,10 @@ describe("smb provider", () => {
     assert.equal(entries[1].name, "b.md");
     assert.equal(entries[1].size, 5);
     assert.ok(calls.some((c) => c.op === "readdir" && c.args[0] === "docs"), "根目录路径 = 共享名");
-    assert.ok(calls.some((c) => c.op === "close"), "client closed");
+    // 连接按参数缓存（慢 NAS 上每次重连要 10s+）：第二次 list 不该再新建 client
+    const created = calls.filter((c) => c.op === "new").length;
+    await smbProvider.list(CTX, "");
+    assert.equal(calls.filter((c) => c.op === "new").length, created, "复用缓存连接");
   });
 
   it("readBinary：readFile 返回 Buffer；read 转文本", async () => {

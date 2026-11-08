@@ -102,6 +102,7 @@ export function resolveRemoteSourceContext(
       username: source.username,
       password: decryptSecret(source.passwordEnc),
       rootPath: source.rootPath,
+      rootPaths: source.rootPaths,
       // 多共享只在「新数据」下启用（单共享仍走 baseUrl，保持历史链接路径不变）
       shares: smb && smb.shares.length > 0 && source.host ? smb.shares : undefined,
       host: smb ? smb.host : undefined,

@@ -62,7 +62,7 @@ import {
   subscribeFilesUi,
   type FilesRemoteSortKey,
 } from "@/features/files/filesUi";
-import type { RemoteFileEntry, RemoteNoteLink, RemoteSourcePublic } from "@/types";
+import type { RemoteFileEntry, RemoteNoteLink, RemoteRoot, RemoteSourcePublic } from "@/types";
 
 type SourceType = "webdav" | "baidu" | "smb";
 
@@ -92,6 +92,8 @@ interface SourceDraft {
   /** SMB 域/工作组（可选） */
   domain: string;
   rootPath: string;
+  /** WebDAV 多根目录（有值即多根模式：路径第一段是 name） */
+  rootPaths: RemoteRoot[];
   /** 百度 OAuth：API Key */
   clientId: string;
   /** 百度 OAuth：Secret Key（仅表单内，保存时加密上传） */
@@ -113,6 +115,7 @@ const emptyDraft = (type: SourceType = "webdav"): SourceDraft => ({
   accessToken: "",
   domain: "",
   rootPath: "",
+  rootPaths: [],
   smbHost: "",
   smbShares: [],
   clientId: "",
@@ -121,6 +124,21 @@ const emptyDraft = (type: SourceType = "webdav"): SourceDraft => ({
   tokenExpiresAt: "",
   oauthCode: "",
 });
+
+/** 浏览态路径（相对 baseUrl）→ 远端绝对路径（以 / 开头） */
+function toRemoteRootPath(raw: string): string {
+  const rel = String(raw ?? "").replace(/^\/+|\/+$/g, "");
+  return rel ? `/${rel}` : "/";
+}
+
+/** 追加一个根目录：别名取末段，重名自动加序号 */
+function appendRoot(list: RemoteRoot[], remotePath: string): RemoteRoot[] {
+  if (list.some((root) => root.path === remotePath)) return list;
+  const base = remotePath === "/" ? "根目录" : remotePath.split("/").filter(Boolean).pop() || "目录";
+  let name = base;
+  for (let seq = 2; list.some((root) => root.name === name); seq += 1) name = `${base}-${seq}`;
+  return [...list, { name, path: remotePath }];
+}
 
 const TEXT_EXTS = new Set([
   "md", "markdown", "txt", "json", "csv", "log", "yml", "yaml", "html", "htm", "css", "js", "ts",
@@ -281,6 +299,8 @@ function SourceManager(props: {
   const [webdavBrowsePath, setWebdavBrowsePath] = useState("");
   const [webdavEntries, setWebdavEntries] = useState<RemoteFileEntry[]>([]);
   const [webdavLoading, setWebdavLoading] = useState(false);
+  /** 手动添加根目录的输入框 */
+  const [rootInput, setRootInput] = useState("");
 
   /**
    * 「连接」= SMB 添加流程的主按钮：一次动作同时完成连通性验证与共享枚举。
@@ -344,7 +364,7 @@ function SourceManager(props: {
       setWebdavBrowsePath(res.path);
       setWebdavBrowsed(true);
       setNotice(res.entries.length
-        ? "连接成功；双击进入子目录，或点「设为根路径」"
+        ? "连接成功，勾选要挂载的目录（可多选），点名称进入子目录"
         : "连接成功，该目录为空");
     } catch (err: any) {
       setWebdavBrowsed(false);
@@ -362,6 +382,34 @@ function SourceManager(props: {
     parts.pop();
     void browseWebdav(parts.join("/"));
   }, [webdavBrowsePath, browseWebdav]);
+
+  /** WebDAV 根目录多选：已选则移除，未选则追加 */
+  const toggleWebdavRoot = useCallback((path: string) => {
+    const remotePath = toRemoteRootPath(path);
+    setDraft((cur) => {
+      if (!cur) return cur;
+      return cur.rootPaths.some((root) => root.path === remotePath)
+        ? { ...cur, rootPaths: cur.rootPaths.filter((root) => root.path !== remotePath) }
+        : { ...cur, rootPaths: appendRoot(cur.rootPaths, remotePath) };
+    });
+  }, []);
+
+  /** 浏览结果里的子目录（只有目录能当根） */
+  const webdavFolders = useMemo(() => webdavEntries.filter((entry) => entry.isFolder), [webdavEntries]);
+
+  const rootSelected = useCallback(
+    (path: string) => Boolean(draft?.rootPaths.some((root) => root.path === toRemoteRootPath(path))),
+    [draft],
+  );
+
+  const curRootSelected = rootSelected(webdavBrowsePath);
+
+  const addRootFromInput = useCallback(() => {
+    const raw = rootInput.trim();
+    if (!raw) return;
+    setDraft((cur) => (cur ? { ...cur, rootPaths: appendRoot(cur.rootPaths, toRemoteRootPath(raw)) } : cur));
+    setRootInput("");
+  }, [rootInput]);
 
   const toggleShare = useCallback((name: string) => {
     setDraft((cur) => {
@@ -397,7 +445,8 @@ function SourceManager(props: {
         // SMB 只传主机 + 共享列表，由后端决定落库形态（单共享沿用历史 UNC）
         ...(draft.type === "smb" ? { host: draft.smbHost.trim(), shares: draft.smbShares } : {}),
         username: draft.username,
-        rootPath: draft.rootPath,
+        rootPath: draft.type === "webdav" && draft.rootPaths.length > 0 ? "" : draft.rootPath,
+        ...(draft.type === "webdav" && draft.rootPaths.length > 0 ? { rootPaths: draft.rootPaths } : {}),
         ...(draft.domain ? { domain: draft.domain } : {}),
         ...(draft.password ? { password: draft.password } : {}),
         ...(draft.accessToken ? { accessToken: draft.accessToken } : {}),
@@ -491,6 +540,7 @@ function SourceManager(props: {
       accessToken: "",
       domain: source.domain || "",
       rootPath: source.rootPath,
+      rootPaths: source.rootPaths || [],
       smbHost: source.host || legacy.host,
       smbShares: source.shares && source.shares.length > 0 ? source.shares : (legacy.share ? [legacy.share] : []),
       clientId: source.clientId || "",
@@ -511,7 +561,9 @@ function SourceManager(props: {
       if (source.host) return `${source.host} · ${source.shares?.length ?? 0} 个共享`;
       return source.baseUrl;
     }
-    return source.baseUrl;
+    return source.rootPaths && source.rootPaths.length > 0
+      ? `${source.baseUrl} · ${source.rootPaths.length} 个目录`
+      : source.baseUrl;
   };
 
   return (
@@ -591,7 +643,18 @@ function SourceManager(props: {
               <div className="flex items-center gap-2">
                 <TypeSelect
                   value={draft.type}
-                  onChange={(type) => setDraft({ ...draft, type })}
+                  onChange={(type) => {
+                    if (type === draft.type) return;
+                    // 类型不可变：切类型即当新建，丢掉旧源的 id/地址/凭据与浏览结果，避免串类型
+                    setDraft({ ...emptyDraft(type), name: draft.name, username: draft.username });
+                    setShareOptions([]);
+                    setBrowsed(false);
+                    setWebdavBrowsed(false);
+                    setWebdavBrowsePath("");
+                    setWebdavEntries([]);
+                    setError("");
+                    setNotice("");
+                  }}
                 />
                 <Input
                   className="h-7 min-w-0 flex-1 text-xs"
@@ -674,16 +737,12 @@ function SourceManager(props: {
                       />
                     </div>
                   </details>
-                  <p className="text-[10.5px] leading-4 text-tx-tertiary">
-                    用户名与密码按需填写：公开共享（guest）两个都留空即可。点「连接」会验证地址可达性
-                    与账号密码，成功后列出所有共享供选择。支持 SMB 2.1 ~ 3.1.1。
-                  </p>
                 </>
               ) : draft.type === "webdav" ? (
                 <>
                   <Input
                     className="h-7 w-full text-xs"
-                    placeholder="服务器地址，如 https://nas.local:5006/dav"
+                    placeholder="服务器地址，如 https://nas.local:5006"
                     value={draft.baseUrl}
                     onChange={(e) => setDraft({ ...draft, baseUrl: e.target.value })}
                   />
@@ -703,7 +762,7 @@ function SourceManager(props: {
                     />
                   </div>
 
-                  {/* 目录浏览：连接后逐层浏览，选择根路径文件夹（也可手动填根路径） */}
+                  {/* 目录浏览：连接后逐层浏览，勾选要挂载的目录（可多选） */}
                   {webdavBrowsed ? (
                     <div className="rounded-md border border-app-border">
                       <div className="flex items-center justify-between border-b border-app-border px-2 py-1 text-[10.5px] text-tx-tertiary">
@@ -714,46 +773,88 @@ function SourceManager(props: {
                         >
                           {webdavBrowsePath || "根目录"}
                         </button>
-                        <button
-                          type="button"
-                          className="shrink-0 text-accent-primary hover:underline"
-                          onClick={() => setDraft({ ...draft, rootPath: webdavBrowsePath })}
-                        >
-                          设为根路径
-                        </button>
+                        <span className="shrink-0 tabular-nums">已选 {draft.rootPaths.length}</span>
                       </div>
                       <div className="max-h-40 overflow-y-auto p-1">
-                        {webdavEntries.filter((entry) => entry.isFolder).length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleWebdavRoot(webdavBrowsePath)}
+                          className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                        >
+                          {curRootSelected ? <CheckSquare size={13} className="shrink-0 text-accent-primary" /> : <Square size={13} className="shrink-0 text-tx-tertiary" />}
+                          <Folder size={13} className="shrink-0 text-amber-500" />
+                          <span className="min-w-0 flex-1 truncate">选择当前目录（{webdavBrowsePath || "根目录"}）</span>
+                        </button>
+                        {webdavFolders.length === 0 ? (
                           <p className="px-1.5 py-2 text-[11px] text-tx-tertiary">该目录下没有子文件夹</p>
                         ) : (
-                          webdavEntries.filter((entry) => entry.isFolder).map((folder) => (
-                            <button
-                              key={folder.path}
-                              type="button"
-                              onClick={() => browseWebdav(folder.path)}
-                              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
-                            >
-                              <Folder size={13} className="shrink-0 text-amber-500" />
-                              <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                            </button>
-                          ))
+                          webdavFolders.map((folder) => {
+                            const checked = rootSelected(folder.path);
+                            return (
+                              <div
+                                key={folder.path}
+                                className="flex items-center gap-2 rounded px-1.5 py-1 text-[11.5px] hover:bg-app-hover"
+                              >
+                                <button
+                                  type="button"
+                                  className="shrink-0"
+                                  onClick={() => toggleWebdavRoot(folder.path)}
+                                >
+                                  {checked ? <CheckSquare size={13} className="text-accent-primary" /> : <Square size={13} className="text-tx-tertiary" />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => browseWebdav(folder.path)}
+                                  className="flex min-w-0 flex-1 items-center gap-2 text-left text-tx-secondary hover:text-tx-primary"
+                                >
+                                  <Folder size={13} className="shrink-0 text-amber-500" />
+                                  <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                                </button>
+                              </div>
+                            );
+                          })
                         )}
                       </div>
                     </div>
                   ) : null}
 
-                  <Input
-                    className="h-7 w-full text-xs"
-                    placeholder="根路径（可点上方目录选择，也可手动填）"
-                    value={draft.rootPath}
-                    onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
-                  />
-                  <p className="text-[10.5px] leading-4 text-tx-tertiary">
-                    百度网盘 / 夸克 / 115 / 阿里云盘等可以先用
-                    <a className="mx-1 text-accent-primary underline-offset-2 hover:underline" href="https://github.com/OpenListTeam/OpenList" target="_blank" rel="noreferrer">OpenList</a>
-                    挂载（自建实例自带 WebDAV：<span className="font-mono">http://主机:5244/dav/</span>），
-                    这里填那个地址即可——一个协议覆盖所有网盘，不用逐个做授权。
-                  </p>
+                  <details className="rounded border border-app-border px-2 py-1 text-[11px]">
+                    <summary className="cursor-pointer select-none truncate text-tx-tertiary">
+                      高级（{draft.rootPaths.length > 0 ? `已选 ${draft.rootPaths.length} 个目录` : "根目录"}）
+                    </summary>
+                    <div className="mt-1.5 space-y-1.5">
+                      {draft.rootPaths.map((root) => (
+                        <div key={root.path} className="flex items-center gap-2 rounded px-1 py-0.5 text-[11.5px] hover:bg-app-hover">
+                          <span className="shrink-0 text-tx-primary">{root.name}</span>
+                          <span className="min-w-0 flex-1 truncate text-[10.5px] text-tx-tertiary">{root.path}</span>
+                          <button
+                            type="button"
+                            className="shrink-0 text-tx-tertiary hover:text-red-500"
+                            onClick={() => setDraft({ ...draft, rootPaths: draft.rootPaths.filter((item) => item.path !== root.path) })}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex gap-1.5">
+                        <Input
+                          className="h-7 min-w-0 flex-1 text-xs"
+                          placeholder="手动添加目录，如 /项目文档"
+                          value={rootInput}
+                          onChange={(e) => setRootInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRootFromInput(); } }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0 px-2 text-[11px]"
+                          onClick={addRootFromInput}
+                        >
+                          添加
+                        </Button>
+                      </div>
+                    </div>
+                  </details>
                 </>
               ) : (
                 <>
@@ -1476,11 +1577,21 @@ export default function RemoteFilesPanel() {
         {crumbs.length > 0 ? (
           <div className="flex min-w-0 items-center">
             <ChevronRight size={12} className="shrink-0 text-app-border" />
+            {/* 根目录：回到来源根（多根/多共享模式下是挂载根列表）。没有它一旦进入
+                多根来源的第一段（如 Workspace）就再也回不到根，面包屑也无处可点。 */}
+            <button
+              type="button"
+              title="返回根目录"
+              className="max-w-[120px] shrink-0 truncate rounded px-1.5 py-0.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-accent-primary"
+              onClick={() => { setCwd(""); setOpenPath(""); }}
+            >
+              根目录
+            </button>
             {crumbs.map((part, index) => {
               const isLast = index === crumbs.length - 1;
               return (
                 <React.Fragment key={`${index}-${part}`}>
-                  {index > 0 ? <ChevronRight size={12} className="shrink-0 text-app-border" /> : null}
+                  <ChevronRight size={12} className="shrink-0 text-app-border" />
                   <button
                     type="button"
                     className={cn(
@@ -1703,9 +1814,15 @@ export default function RemoteFilesPanel() {
                 <span className="w-[104px] shrink-0" />
               </div>
 
-              {/* 条目列表 */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
-                {listLoading ? (
+              {/* 条目列表：加载中保留上一屏条目（淡出 + 禁点），只有首屏无内容时才显示
+                  「加载中…」。否则切目录/点根目录时整块列表会先闪成空文案再闪回来。 */}
+              <div
+                className={cn(
+                  "min-h-0 flex-1 overflow-y-auto px-2 py-1 transition-opacity",
+                  listLoading && entries.length > 0 && "pointer-events-none opacity-50",
+                )}
+              >
+                {listLoading && entries.length === 0 ? (
                   <p className="py-8 text-center text-xs text-tx-tertiary">加载中…</p>
                 ) : listError ? (
                   <p className="break-words px-4 py-8 text-center text-xs text-red-400">{listError}</p>

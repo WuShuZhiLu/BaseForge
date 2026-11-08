@@ -10,6 +10,15 @@
 
 export type RemoteStorageType = "webdav" | "baidu" | "smb";
 
+/**
+ * 多根目录：一个源可挂多个远端目录（对齐 SMB 多共享）。
+ * name 是源内路径第一段的别名，path 是远端绝对路径（如 /data/docs）。
+ */
+export interface RemoteRoot {
+  name: string;
+  path: string;
+}
+
 /** 用户配置的一个远程源（passwordEnc 为服务端加密后的凭据，永不下发明文）。 */
 export interface RemoteSourceConfig {
   id: string;
@@ -19,6 +28,8 @@ export interface RemoteSourceConfig {
   username: string;
   passwordEnc: string;
   rootPath: string;
+  /** WebDAV 多根：有值即多根模式，路径第一段是 root.name（rootPath 留空） */
+  rootPaths?: RemoteRoot[];
   /**
    * SMB：主机名/IP（不含共享名）。与 shares 一起构成「一台设备 = 一个源」。
    * 历史数据无此字段，baseUrl 里是 `\\host\share` 的完整 UNC（仍兼容，见 smb.ts）。
@@ -57,6 +68,8 @@ export interface RemoteProviderContext {
   username: string;
   password: string;
   rootPath: string;
+  /** WebDAV 多根（对齐 shares）：有值时 rootPath 不参与拼接 */
+  rootPaths?: RemoteRoot[];
   /** SMB 多共享：路径第一段即共享名；为空时走 baseUrl 里的单共享（历史兼容） */
   shares?: string[];
   /** SMB 主机（可以是 host:port）；多共享模式下 baseUrl 不再含共享名 */

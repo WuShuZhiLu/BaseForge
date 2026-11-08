@@ -241,13 +241,17 @@ async function withSmbClient<T>(ctx: RemoteProviderContext, fn: (client: SmbClie
   }
   const run = async (): Promise<T> => {
     const startedAt = Date.now();
+    // 超时定时器必须随操作结束清掉：否则每次操作都留一个 45s 的引用（进程/测试退出被拖住）
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       // 单操作硬超时：smb3 的 requestTimeout 并不覆盖所有阶段（如 NTLM 会话建立），
       // 一旦挂住会堵死该源上的所有后续操作。超时即弃连接，队列自动恢复。
       const result = await Promise.race([
         fn(entry.client),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new RemoteProviderError("SMB 操作超时（对端无响应），已重置连接", 504)), SMB_OP_TIMEOUT_MS)),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new RemoteProviderError("SMB 操作超时（对端无响应），已重置连接", 504)), SMB_OP_TIMEOUT_MS);
+          timer.unref?.();
+        }),
       ]);
       console.log(`[smb] op ok host=${(JSON.parse(key) as string[])[0]} ${Date.now() - startedAt}ms`);
       return result;
@@ -265,6 +269,8 @@ async function withSmbClient<T>(ctx: RemoteProviderContext, fn: (client: SmbClie
         void closeQuietly(entry.client);
       }
       throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   };
   const result = entry.queue.then(run, run);
@@ -274,6 +280,8 @@ async function withSmbClient<T>(ctx: RemoteProviderContext, fn: (client: SmbClie
 
 /** NT_STATUS / fs code → 业务错误映射 */
 function mapSmbError(err: unknown, fallbackMsg: string): RemoteProviderError {
+  // 已经是业务错误（openClient / 操作超时抛的）就原样上抛：二次映射会把 403 洗成 502
+  if (err instanceof RemoteProviderError) return err;
   const detail = err as { code?: string; statusName?: string; message?: string } | null;
   // 不同层抛出的错误把关键字放在 code / statusName / message 的位置不一致，合并后判断。
   const code = [detail?.code, detail?.statusName, detail?.message, err instanceof Error ? err.message : String(err ?? "")]

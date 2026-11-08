@@ -34,6 +34,7 @@ import {
   normalizeRemotePath,
   RemoteProviderError,
   type RemoteProvider,
+  type RemoteRoot,
   type RemoteSourceConfig,
   type RemoteStorageType,
 } from "../services/remote-files/types";
@@ -69,6 +70,7 @@ function publicSource(source: RemoteSourceConfig): Record<string, unknown> {
     baseUrl: source.baseUrl,
     username: source.username,
     rootPath: source.rootPath,
+    rootPaths: source.rootPaths || [],
     host: source.host || "",
     shares: source.shares || [],
     domain: source.domain || "",
@@ -90,6 +92,7 @@ interface RequestUser {
     username: string;
     password: string;
     rootPath: string;
+    rootPaths?: RemoteRoot[];
     shares?: string[];
     host?: string;
     accessToken?: string;
@@ -118,6 +121,7 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
       username: source.username || "",
       password: decryptSecret(source.passwordEnc) || "",
       rootPath: source.rootPath || "",
+      rootPaths: source.rootPaths,
       // 只有多共享才带 shares/host；单共享继续走 baseUrl 的历史路径形态
       shares: smbTargets && source.host ? smbTargets.shares : undefined,
       host: smbTargets ? smbTargets.host : undefined,
@@ -129,6 +133,25 @@ function resolveContext(c: any, sourceId: string): RequestUser | { error: HonoJs
 
 function isErr(value: unknown): value is { error: HonoJsonError } {
   return typeof value === "object" && value !== null && "error" in value;
+}
+
+/** 多根目录：别名去重、路径规范化为远端绝对路径（允许根 "/"）。 */
+function normalizeRootPaths(raw: unknown): RemoteRoot[] {
+  if (!Array.isArray(raw)) return [];
+  const roots: RemoteRoot[] = [];
+  const used = new Set<string>();
+  for (const item of raw) {
+    const name = String((item as { name?: unknown } | null)?.name ?? "").trim().slice(0, 60);
+    const rawPath = String((item as { path?: unknown } | null)?.path ?? "").trim();
+    if (!name || name.includes("/") || !rawPath.startsWith("/")) continue;
+    const relative = normalizeRemotePath(rawPath);
+    let unique = name;
+    for (let seq = 2; used.has(unique); seq += 1) unique = `${name}-${seq}`;
+    used.add(unique);
+    roots.push({ name: unique, path: relative ? `/${relative}` : "/" });
+    if (roots.length >= 20) break;
+  }
+  return roots;
 }
 
 /** host + 共享名 → 历史 UNC 形态 `\\host\share`（单共享源继续用这个，保持既有链接路径不变） */
@@ -200,6 +223,8 @@ remoteFilesRouter.post("/sources", async (c) => {
    * 只有多共享才启用虚拟根（路径第一段=共享名）。
    */
   const multiShare = type === "smb" && smbShares.length > 1;
+  // WebDAV 多根：有选择就存 rootPaths（路径第一段是别名），否则沿用单根 rootPath
+  const rootPaths = type === "webdav" ? normalizeRootPaths(body.rootPaths) : [];
   const smbBaseUrl = type === "smb" && smbHost
     ? (multiShare
       ? `${String.fromCharCode(92)}${String.fromCharCode(92)}${smbHost}`
@@ -219,7 +244,8 @@ remoteFilesRouter.post("/sources", async (c) => {
         : existingIndex >= 0
           ? sources[existingIndex].passwordEnc
           : "",
-    rootPath: typeof body.rootPath === "string" ? normalizeRemotePath(body.rootPath) : existingIndex >= 0 ? sources[existingIndex].rootPath : "",
+    rootPath: rootPaths.length > 0 ? "" : typeof body.rootPath === "string" ? normalizeRemotePath(body.rootPath) : existingIndex >= 0 ? sources[existingIndex].rootPath : "",
+    ...(rootPaths.length > 0 ? { rootPaths } : {}),
     accessTokenEnc:
       typeof body.accessToken === "string" && body.accessToken.trim()
         ? encryptSecret(body.accessToken.trim())
@@ -424,7 +450,9 @@ remoteFilesRouter.post("/baidu/exchange", async (c) => {
 // 源级连接健康检查：用已保存凭据对指定源做一次 list 探测
 remoteFilesRouter.post("/sources/:sourceId/test", withSource(async (c, resolved) => {
   const started = Date.now();
-  await resolved.provider.list(resolved.ctx, "");
+  // 只列虚拟根不会建连接（会假成功）：多根 / 多共享时探第一个
+  const probe = resolved.ctx.rootPaths?.[0]?.name ?? (resolved.ctx.shares ? resolved.ctx.shares[0] : "");
+  await resolved.provider.list(resolved.ctx, probe);
   return c.json({ success: true, latencyMs: Date.now() - started });
 }));
 
@@ -582,12 +610,11 @@ remoteFilesRouter.post("/smb/shares", async (c) => {
   const userId = c.req.header("X-User-Id") || "";
   if (!userId) return c.json({ error: "未登录" }, 401);
   const body = await readBody(c);
-  // 编辑已有源时密码字段为空（「留空保持不变」），此时复用服务端已解密的凭据。
+  // sourceId 仅用于「凭据留空时复用已存值」；源不存在或类型不符时按新建处理，不阻断连接验证。
   const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
   const saved = sourceId
     ? readSources(userId).find((source) => source.id === sourceId && source.type === "smb")
     : undefined;
-  if (sourceId && !saved) return c.json({ error: "远程源不存在或非 SMB 源" }, 404);
   const hostInput = typeof body.host === "string" && body.host.trim()
     ? body.host
     : (saved?.host || saved?.baseUrl || "");
@@ -616,11 +643,11 @@ remoteFilesRouter.post("/webdav/list", async (c) => {
   const userId = c.req.header("X-User-Id") || "";
   if (!userId) return c.json({ error: "未登录" }, 401);
   const body = await readBody(c);
+  // 同 SMB：sourceId 仅用于凭据留空时复用，查不到就按新建处理。
   const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
   const saved = sourceId
     ? readSources(userId).find((source) => source.id === sourceId && source.type === "webdav")
     : undefined;
-  if (sourceId && !saved) return c.json({ error: "远程源不存在或非 WebDAV 源" }, 404);
   const baseUrl = typeof body.baseUrl === "string" && body.baseUrl.trim()
     ? body.baseUrl.trim()
     : (saved?.baseUrl || "");
@@ -630,8 +657,8 @@ remoteFilesRouter.post("/webdav/list", async (c) => {
     const entries = await webdavProvider.list(
       {
         baseUrl,
-        username: typeof body.username === "string" ? body.username : (saved ? decryptSecret(saved.passwordEnc) && (saved.username || "") : ""),
-        password: typeof body.password === "string" ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
+        username: typeof body.username === "string" && body.username.trim() ? body.username.trim() : (saved?.username || ""),
+        password: typeof body.password === "string" && body.password ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
         rootPath: "",
       },
       browsePath,
