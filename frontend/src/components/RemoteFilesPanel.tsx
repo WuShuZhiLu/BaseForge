@@ -276,6 +276,11 @@ function SourceManager(props: {
   const [shareOptions, setShareOptions] = useState<Array<{ name: string; comment: string }>>([]);
   const [sharesLoading, setSharesLoading] = useState(false);
   const [browsed, setBrowsed] = useState(false);
+  /** WebDAV 目录浏览：连接后逐层浏览，选根路径 */
+  const [webdavBrowsed, setWebdavBrowsed] = useState(false);
+  const [webdavBrowsePath, setWebdavBrowsePath] = useState("");
+  const [webdavEntries, setWebdavEntries] = useState<RemoteFileEntry[]>([]);
+  const [webdavLoading, setWebdavLoading] = useState(false);
 
   /**
    * 「连接」= SMB 添加流程的主按钮：一次动作同时完成连通性验证与共享枚举。
@@ -318,6 +323,45 @@ function SourceManager(props: {
       setSharesLoading(false);
     }
   }, [draft]);
+
+  /** WebDAV「连接」：验证连通性并列出指定路径的直接子项（逐层浏览选根路径） */
+  const browseWebdav = useCallback(async (path: string) => {
+    if (!draft) return;
+    if (draft.type !== "webdav") return;
+    if (!draft.baseUrl.trim() && !draft.id) { setError("请先填写服务器地址"); return; }
+    setWebdavLoading(true);
+    setError("");
+    setNotice("正在连接并列出目录…");
+    try {
+      const res = await api.listWebdavDir({
+        baseUrl: draft.baseUrl.trim(),
+        username: draft.username.trim(),
+        password: draft.password,
+        path,
+        ...(draft.id ? { sourceId: draft.id } : {}),
+      });
+      setWebdavEntries(res.entries);
+      setWebdavBrowsePath(res.path);
+      setWebdavBrowsed(true);
+      setNotice(res.entries.length
+        ? "连接成功；双击进入子目录，或点「设为根路径」"
+        : "连接成功，该目录为空");
+    } catch (err: any) {
+      setWebdavBrowsed(false);
+      setWebdavEntries([]);
+      setNotice("");
+      setError(err?.message || "连接失败");
+    } finally {
+      setWebdavLoading(false);
+    }
+  }, [draft]);
+
+  const browseWebdavParent = useCallback(() => {
+    if (!webdavBrowsePath) return;
+    const parts = webdavBrowsePath.split("/").filter(Boolean);
+    parts.pop();
+    void browseWebdav(parts.join("/"));
+  }, [webdavBrowsePath, browseWebdav]);
 
   const toggleShare = useCallback((name: string) => {
     setDraft((cur) => {
@@ -658,9 +702,49 @@ function SourceManager(props: {
                       onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     />
                   </div>
+
+                  {/* 目录浏览：连接后逐层浏览，选择根路径文件夹（也可手动填根路径） */}
+                  {webdavBrowsed ? (
+                    <div className="rounded-md border border-app-border">
+                      <div className="flex items-center justify-between border-b border-app-border px-2 py-1 text-[10.5px] text-tx-tertiary">
+                        <button
+                          type="button"
+                          className="truncate hover:text-accent-primary"
+                          onClick={() => browseWebdavParent()}
+                        >
+                          {webdavBrowsePath || "根目录"}
+                        </button>
+                        <button
+                          type="button"
+                          className="shrink-0 text-accent-primary hover:underline"
+                          onClick={() => setDraft({ ...draft, rootPath: webdavBrowsePath })}
+                        >
+                          设为根路径
+                        </button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto p-1">
+                        {webdavEntries.filter((entry) => entry.isFolder).length === 0 ? (
+                          <p className="px-1.5 py-2 text-[11px] text-tx-tertiary">该目录下没有子文件夹</p>
+                        ) : (
+                          webdavEntries.filter((entry) => entry.isFolder).map((folder) => (
+                            <button
+                              key={folder.path}
+                              type="button"
+                              onClick={() => browseWebdav(folder.path)}
+                              className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                            >
+                              <Folder size={13} className="shrink-0 text-amber-500" />
+                              <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
                   <Input
                     className="h-7 w-full text-xs"
-                    placeholder="根路径（可选，如 /docs）"
+                    placeholder="根路径（可点上方目录选择，也可手动填）"
                     value={draft.rootPath}
                     onChange={(e) => setDraft({ ...draft, rootPath: e.target.value })}
                   />
@@ -742,22 +826,22 @@ function SourceManager(props: {
               ) : null}
 
               <div className="flex items-center gap-2 pt-1">
-                {draft.type === "smb" ? (
+                {draft.type === "smb" || draft.type === "webdav" ? (
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
-                    disabled={busy || sharesLoading}
-                    onClick={() => void browseShares()}
+                    disabled={busy || sharesLoading || webdavLoading}
+                    onClick={() => void (draft.type === "smb" ? browseShares() : browseWebdav(""))}
                   >
-                    {sharesLoading ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
-                    {sharesLoading ? "连接中…" : "连接"}
+                    {sharesLoading || webdavLoading ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
+                    {sharesLoading || webdavLoading ? "连接中…" : "连接"}
                   </Button>
                 ) : null}
                 <Button
                   size="sm"
                   className="h-7 shrink-0 whitespace-nowrap px-3 text-[11.5px]"
-                  disabled={busy || !draft.name.trim() || (draft.type === "smb" && !browsed && draft.smbShares.length === 0)}
+                  disabled={busy || !draft.name.trim() || (draft.type === "smb" && !browsed && draft.smbShares.length === 0) || (draft.type === "webdav" && !webdavBrowsed && !draft.id)}
                   onClick={() => void save()}
                 >
                   保存
@@ -766,7 +850,7 @@ function SourceManager(props: {
                 <button
                   type="button"
                   className="shrink-0 whitespace-nowrap text-[11.5px] text-tx-tertiary hover:text-tx-secondary"
-                  onClick={() => { setDraft(null); setError(""); setNotice(""); setShareOptions([]); setBrowsed(false); }}
+                  onClick={() => { setDraft(null); setError(""); setNotice(""); setShareOptions([]); setBrowsed(false); setWebdavBrowsed(false); setWebdavBrowsePath(""); setWebdavEntries([]); }}
                 >
                   取消
                 </button>
@@ -776,7 +860,7 @@ function SourceManager(props: {
             <button
               type="button"
               className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-dashed border-app-border py-2 text-xs text-tx-tertiary hover:border-accent-primary hover:text-accent-primary"
-              onClick={() => { setDraft(emptyDraft()); setShareOptions([]); setBrowsed(false); setError(""); setNotice(""); }}
+              onClick={() => { setDraft(emptyDraft()); setShareOptions([]); setBrowsed(false); setWebdavBrowsed(false); setWebdavBrowsePath(""); setWebdavEntries([]); setError(""); setNotice(""); }}
             >
               <Plus size={13} /> 新增远程存储
             </button>

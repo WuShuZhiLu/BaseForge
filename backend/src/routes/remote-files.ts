@@ -27,6 +27,7 @@ import {
   sourceCredentialState,
   upgradeUserRemoteSecrets,
 } from "../services/remote-files";
+import { webdavProvider } from "../services/remote-files/webdav";
 import { listSmbShares, parseSmbBaseUrl, parseSmbTarget } from "../services/remote-files/smb";
 import {
   isProbablyTextFile,
@@ -604,6 +605,41 @@ remoteFilesRouter.post("/smb/shares", async (c) => {
     return c.json({ host, port, shares });
   } catch (error) {
     return c.json(classifySmbConnectError(error, host, port), 502);
+  }
+});
+
+/**
+ * WebDAV 目录浏览（连接验证 + 枚举一步完成）：列出指定路径的直接子项，
+ * 供添加流程逐层浏览并选择根路径。编辑已有源时凭据留空则复用已存凭据。
+ */
+remoteFilesRouter.post("/webdav/list", async (c) => {
+  const userId = c.req.header("X-User-Id") || "";
+  if (!userId) return c.json({ error: "未登录" }, 401);
+  const body = await readBody(c);
+  const sourceId = typeof body.sourceId === "string" ? body.sourceId : "";
+  const saved = sourceId
+    ? readSources(userId).find((source) => source.id === sourceId && source.type === "webdav")
+    : undefined;
+  if (sourceId && !saved) return c.json({ error: "远程源不存在或非 WebDAV 源" }, 404);
+  const baseUrl = typeof body.baseUrl === "string" && body.baseUrl.trim()
+    ? body.baseUrl.trim()
+    : (saved?.baseUrl || "");
+  if (!/^https?:\/\//i.test(baseUrl)) return c.json({ error: "WebDAV 地址需以 http(s):// 开头" }, 400);
+  const browsePath = normalizeRemotePath(typeof body.path === "string" ? body.path : "");
+  try {
+    const entries = await webdavProvider.list(
+      {
+        baseUrl,
+        username: typeof body.username === "string" ? body.username : (saved ? decryptSecret(saved.passwordEnc) && (saved.username || "") : ""),
+        password: typeof body.password === "string" ? body.password : (saved ? decryptSecret(saved.passwordEnc) : ""),
+        rootPath: "",
+      },
+      browsePath,
+    );
+    return c.json({ path: browsePath, entries });
+  } catch (error) {
+    const message = error instanceof RemoteProviderError ? error.message : "连接失败：请检查地址与凭据";
+    return c.json({ error: message }, 502);
   }
 });
 

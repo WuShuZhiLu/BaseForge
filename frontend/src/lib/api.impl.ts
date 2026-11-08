@@ -3407,6 +3407,11 @@ export const api = {
     request<{ host: string; port: number; shares: Array<{ name: string; comment: string }> }>(
       "/remote-files/smb/shares", { method: "POST", body: JSON.stringify(data) },
     ),
+  // WebDAV 目录浏览（连接验证 + 枚举一步完成）
+  listWebdavDir: (data: { baseUrl?: string; username?: string; password?: string; path?: string; sourceId?: string }) =>
+    request<{ path: string; entries: RemoteFileEntry[] }>(
+      "/remote-files/webdav/list", { method: "POST", body: JSON.stringify(data) },
+    ),
   listRemoteFiles: (sourceId: string, path: string) =>
     request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
   readRemoteFile: (sourceId: string, path: string) =>
