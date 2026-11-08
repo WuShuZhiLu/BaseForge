@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowUp, ChevronRight, FolderInput, Loader2, Trash2, TreePine, X } from "lucide-react";
 
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
-import { knowledgeTreeEmojiFor } from "@/lib/knowledgeTreeIcons";
+import { knowledgeTreeIconFor } from "@/lib/knowledgeTreeIcons";
 import {
   knowledgeTreeDescendantIds,
   topLevelSelectedKnowledgeNodes,
@@ -187,7 +187,7 @@ export function KnowledgeTreeBatchMovePanel({
               onClick={() => isFolder && setCurrentId(entry.id)}
               className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-tx-secondary hover:bg-app-hover hover:text-tx-primary disabled:cursor-not-allowed disabled:opacity-40 ${isFolder ? "" : "opacity-60"}`}
             >
-              <span className="shrink-0 text-[14px] leading-none">{knowledgeTreeEmojiFor(entry, entry.parentId === null && entry.resourceType === "notebook")}</span>
+              <span className="shrink-0">{knowledgeTreeIconFor(entry, entry.parentId === null && entry.resourceType === "notebook")}</span>
               <span className="min-w-0 flex-1 truncate">{entry.title}</span>
               {isFolder && <ChevronRight size={13} className="shrink-0 text-tx-tertiary" />}
             </button>

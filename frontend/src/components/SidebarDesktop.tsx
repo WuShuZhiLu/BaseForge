@@ -91,7 +91,7 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
-import { knowledgeTreeEmojiFor, docEmojiForFormat } from "@/lib/knowledgeTreeIcons";
+import { knowledgeTreeIconFor, docIconForFormat } from "@/lib/knowledgeTreeIcons";
 import {
   getRetentionDays,
   getTrashSetting,
@@ -382,7 +382,7 @@ function subtreeHasMatch(
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   // 与总览页共用一套 emoji 图标（见 knowledgeTreeIcons.ts），两处类型视觉一致
-  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, isRoot)}</span>;
+  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(node, isRoot)}</span>;
 }
 
 const TAG_DOT_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#06b6d4"];
@@ -2135,7 +2135,7 @@ export default function SidebarDesktop() {
   const sectionMap: Record<SectionId, React.ReactNode> = {
     kb: (
       <section key="kb" className="shrink-0" data-next-section="kb">
-        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「📘 库名 ＋ N ×」
+        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「封面图标 库名 ＋ N ×」
             （点×退出库内树空间，点库名回 Overview，＋在库内新建）。 */}
         {focusRoot ? (
           <div
@@ -2147,7 +2147,7 @@ export default function SidebarDesktop() {
               reorderActive === "kb" && "opacity-40",
             )}
           >
-            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(focusRoot, true)}</span>
+            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(focusRoot, true)}</span>
             <button
               type="button"
               onClick={() => openKbOverview(focusRoot.resourceId)}
@@ -2541,7 +2541,7 @@ export default function SidebarDesktop() {
                           onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                          <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                           <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                         </button>
                         <button
@@ -2613,7 +2613,7 @@ export default function SidebarDesktop() {
                       isActive ? "bg-app-active text-tx-primary" : "text-tx-primary hover:bg-app-hover",
                     )}
                   >
-                    <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(tab.contentFormat)}</span>
+                    <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(tab.contentFormat)}</span>
                     <button
                       type="button"
                       onClick={() => void openNoteFromTab(tab.id)}
@@ -2713,7 +2713,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(kb, true)}</span></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeIconFor(kb, true)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{kb.title}</div>
                       <div className="sbx-sub">知识库</div>
@@ -2741,7 +2741,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => { void openNoteFromTab(doc.id); }}
                   >
-                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{doc.title}</div>
                       <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
@@ -3021,7 +3021,7 @@ export default function SidebarDesktop() {
                             onClick={() => void openSearchDoc(doc.id)}
                             className="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                           >
-                            <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                            <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                             <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                           </button>
                         ))}
@@ -3042,7 +3042,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
                       <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
                     </button>
@@ -3071,7 +3071,7 @@ export default function SidebarDesktop() {
                       }}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, node.parentId === null)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(node, node.parentId === null)}</span>
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
                     </button>
                   ))}
@@ -3091,7 +3091,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                     </button>
                   ))}
