@@ -12,7 +12,7 @@ BaseForge 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI �
 
 ## 客户端配置
 
-前置：本机有 Node.js 20+，并已下载 `baseforge-mcp.mjs`（Release 附件，或仓库内 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`）。
+前置：本机有 Node.js 20+，并已下载 `baseforge-mcp.mjs`（Release 附件；在仓库内开发时先 `npm run mcp:build`，产物在 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`，该目录是构建产物、不入库）。
 
 ```json
 {

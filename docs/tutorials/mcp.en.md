@@ -43,7 +43,7 @@ Copy the Token, e.g. `nkn_xxxxxxxxxxxxxxxxx`. It is usually shown only once.
 
 ### 4. Configure the client
 
-All clients point at the downloaded `baseforge-mcp.mjs` (a Release asset; inside the repo it lives at `packages/baseforge-mcp/dist/baseforge-mcp.mjs`):
+All clients point at the downloaded `baseforge-mcp.mjs` (a Release asset; when working inside the repo, run `npm run mcp:build` first to produce `packages/baseforge-mcp/dist/baseforge-mcp.mjs`):
 
 #### Claude Code
 

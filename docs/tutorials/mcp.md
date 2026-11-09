@@ -37,7 +37,7 @@ node --version
 
 ### 4. 配置客户端
 
-客户端统一指向下载下来的 `baseforge-mcp.mjs`（Release 附件；仓库内开发时是 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`）：
+客户端统一指向下载下来的 `baseforge-mcp.mjs`（Release 附件；仓库内开发时先 `npm run mcp:build` 生成 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`）：
 
 #### Claude Code
 

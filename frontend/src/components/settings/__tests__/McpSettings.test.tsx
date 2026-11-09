@@ -15,10 +15,11 @@ const REPO_ROOT = resolve(process.cwd(), "..");
 const COMPONENT_PATH = resolve(process.cwd(), "src/components/settings/McpSettings.tsx");
 
 /** 只读事实源：真实代码与文档。 */
+// 注意：dist/baseforge-mcp.mjs 是构建产物（不入库，见 .gitignore 的 dist/），
+// 干净检出里不存在，不能当作事实源；产物名由 package.json 的 main/bin 佐证。
 const FACT_FILES = [
   "packages/baseforge-mcp/package.json",
   "packages/baseforge-mcp/README.md",
-  "packages/baseforge-mcp/dist/baseforge-mcp.mjs",
   "packages/baseforge-mcp/scripts/build.mjs",
   "packages/baseforge-mcp/src/index.ts",
   "packages/baseforge-mcp/src/api-client.ts",

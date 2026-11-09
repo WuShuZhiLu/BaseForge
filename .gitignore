@@ -101,5 +101,3 @@ tmp/fixtures/
 
 # 临时补丁不入库（ugcli 是 upk 打包必需工具，保留在库中）
 *.patch
-!packages/baseforge-mcp/dist/
-!packages/baseforge-mcp/dist/**

@@ -21,6 +21,12 @@ import {
 } from "./note-format.js";
 
 // ===== 从环境变量读取配置 =====
+// 版本号由 scripts/build.mjs 在打包时注入（取自本包 package.json），
+// 避免单文件产物里的版本与 Release 版本脱节。
+declare const __BASEFORGE_MCP_VERSION__: string;
+const VERSION =
+  typeof __BASEFORGE_MCP_VERSION__ === "string" ? __BASEFORGE_MCP_VERSION__ : "0.0.0-dev";
+
 const config = {
   baseUrl: process.env.BASEFORGE_URL || "http://localhost:3001",
   apiToken: process.env.BASEFORGE_API_TOKEN || "",
@@ -54,7 +60,7 @@ function errorResult(err: unknown) {
 // ===== 创建 MCP Server =====
 const server = new McpServer({
   name: "baseforge",
-  version: "1.0.0",
+  version: VERSION,
 });
 
 // ==================== 笔记本工具 ====================
