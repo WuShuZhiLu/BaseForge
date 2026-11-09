@@ -85,8 +85,8 @@ module.exports = {
   publish: [
     {
       provider: "github",
-      owner: "cropflre",
-      repo: "nowen-note",
+      owner: "WuShuZhiLu",
+      repo: "BaseForge",
       releaseType: "release",
       channel: "lite",
     },

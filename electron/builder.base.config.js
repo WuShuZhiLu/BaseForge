@@ -459,8 +459,8 @@ module.exports = {
   publish: [
     {
       provider: "github",
-      owner: "cropflre",
-      repo: "nowen-note",
+      owner: "WuShuZhiLu",
+      repo: "BaseForge",
       releaseType: "release",
       // channel 省略 = "latest"（保留 electron-builder 默认行为）
     },

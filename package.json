@@ -3,6 +3,10 @@
   "version": "0.2.0",
   "description": "BaseForge - A modern note-taking application",
   "author": "BaseForge Team",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WuShuZhiLu/BaseForge.git"
+  },
   "private": true,
   "engines": {
     "node": ">=22.5.0"

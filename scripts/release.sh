@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LEGACY_SCRIPT="${SCRIPT_DIR}/release-legacy.sh"
 VERIFY_SCRIPT="${SCRIPT_DIR}/verify-release-update-assets.mjs"
-GITHUB_REPO_SLUG="cropflre/nowen-note"
+GITHUB_REPO_SLUG="WuShuZhiLu/BaseForge"
 ANDROID_NODE22_IMAGE="cimg/android:2025.10.1-node"
 
 [ -f "$LEGACY_SCRIPT" ] || { echo "[release-guard] missing $LEGACY_SCRIPT" >&2; exit 1; }

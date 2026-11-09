@@ -50,8 +50,8 @@ set -euo pipefail
 # -------------------- 配置 --------------------
 DEFAULT_IMAGE_NAME="cropflre/nowen-note"
 DEFAULT_BRANCH="main"
-GITHUB_REPO_URL="https://github.com/cropflre/nowen-note"
-GITHUB_REPO_SLUG="cropflre/nowen-note"   # gh release create 需要的 "owner/repo"
+GITHUB_REPO_URL="https://github.com/WuShuZhiLu/BaseForge"
+GITHUB_REPO_SLUG="WuShuZhiLu/BaseForge"   # gh release create 需要的 "owner/repo"
 BUILDX_BUILDER="nowen-note-builder"
 DEFAULT_TAR_OUT="nowen-note-arm64.tar"
 
