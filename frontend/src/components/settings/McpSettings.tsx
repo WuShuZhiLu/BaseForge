@@ -14,7 +14,7 @@ const MINIMAL_CONFIG = `{
   "mcpServers": {
     "baseforge": {
       "command": "node",
-      "args": ["/absolute/path/to/Base-Notes/packages/baseforge-mcp/dist/baseforge-mcp.mjs"],
+      "args": ["/absolute/path/to/baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -159,7 +159,7 @@ export default function McpSettings() {
       <Section icon={<Server size={16} />} title="运作方式与准备">
         <ul className="list-disc space-y-1.5 pl-5 text-xs leading-6 text-tx-secondary">
           <li>
-            MCP Server 是单文件 <InlineCode>packages/baseforge-mcp/dist/baseforge-mcp.mjs</InlineCode>，依赖已全部打进文件，使用方只需 Node.js 20+。
+            MCP Server 是单文件 <InlineCode>baseforge-mcp.mjs</InlineCode>（发布时作为 Release 附件提供，仓库内为 <InlineCode>packages/baseforge-mcp/dist/baseforge-mcp.mjs</InlineCode>），依赖已全部打进文件，使用方只需 Node.js 20+。
           </li>
           <li>
             MCP Server 由外部 AI 客户端以本地 stdio 方式启动；stdout 仅用于 MCP stdio 协议，诊断日志写入 stderr。

@@ -55,7 +55,7 @@ API Token 的最终权限取三者交集：
   "mcpServers": {
     "baseforge": {
       "command": "node",
-      "args": ["/home/user/Base-Notes/packages/baseforge-mcp/dist/baseforge-mcp.mjs"],
+      "args": ["/home/user/Downloads/baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://localhost:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"

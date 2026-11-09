@@ -1,7 +1,7 @@
 # 版本号取 CHANGELOG.md 最新已发布版本（## vX.Y.Z - 日期）：镜像 tag 同样带 v。
 # tag 触发时校验 tag 与 CHANGELOG 一致，避免镜像版本和更新日志脱节。
-# 发布门禁：tag 触发只推送 vX.Y.Z；latest 由发布门禁通过后 dispatch 本 workflow 的
-# latest_only 模式（拉取版本镜像并移动 latest），避免镜像先于 Release 生效。
+# tag 触发同时推送 vX.Y.Z 与 latest：镜像不参与桌面端发布门禁，tag 即代表已发布。
+# latest_only 模式保留为手动补救：只把 latest 指向已存在的版本镜像，不重新构建。
 # 仓库地址与凭据全部来自仓库变量/密钥，代码里不写死任何地址：
 # 未配置任何仓库时只构建、不推送。
 # 配置项（逗号分隔、按序号对应，免登录写 anon）：vars.IMAGE_REPOSITORIES /
@@ -114,8 +114,8 @@ jobs:
             exit 1
           fi
 
-          # latest_only：发布门禁通过后，把 latest 指向已经推送好的版本镜像，不重新构建。
-          # 常规 tag 触发：只构建并推送 vX.Y.Z，latest 留给发布门禁移动。
+          # latest_only：手动补救，把 latest 指向已经推送好的版本镜像，不重新构建。
+          # 常规 tag 触发：构建并同时推送 vX.Y.Z 与 latest（先版本，成功后才动 latest）。
           LATEST_ONLY="${INPUT_LATEST_ONLY:-false}"
           if [ "$LATEST_ONLY" = "true" ]; then
             VER="${INPUT_TAG#v}"
@@ -381,10 +381,16 @@ jobs:
                 failed_list="${failed_list} ${repo}"
                 continue
               fi
-              # 只推版本 tag；latest 留到发布门禁通过后再移动
+              # 先推版本 tag，成功后才移动 latest：latest 绝不能指向一个没推上去的版本
               echo "推送 ${ref}"
-              if push_with_retry "$ref"; then
-                verify_pushed "$ref" "$scheme"
+              if ! push_with_retry "$ref"; then
+                failed_list="${failed_list} ${repo}"
+                continue
+              fi
+              verify_pushed "$ref" "$scheme"
+              echo "推送 ${latest_ref}"
+              if push_with_retry "$latest_ref"; then
+                verify_pushed "$latest_ref" "$scheme"
                 pushed_list="${pushed_list} ${repo}"
               else
                 failed_list="${failed_list} ${repo}"

@@ -6,9 +6,9 @@
 
 ## 先看结论
 
-- MCP 是一个**单文件** Node.js 程序：`packages/baseforge-mcp/dist/baseforge-mcp.mjs`，所有依赖已打进文件里，无需 `npm install`。
+- MCP 是一个**单文件** Node.js 程序 `baseforge-mcp.mjs`：从 Release 附件下载即可，所有依赖已打进文件，无需 `npm install`。
 - 只需要两个环境变量：`BASEFORGE_URL`（BaseForge 地址）和 `BASEFORGE_API_TOKEN`（个人访问令牌）。
-- 不要直接照抄 `/path/to/...`。客户端配置中的脚本路径必须替换为你电脑上的**绝对路径**。
+- 不要直接照抄 `/path/to/...`。客户端配置里的脚本路径必须换成该文件在你电脑上的**绝对路径**。
 - 如果 BaseForge 部署在 NAS 或其他服务器，`BASEFORGE_URL` 应填写该设备能从当前电脑访问的地址，例如 `http://192.168.1.20:3001`，而不是 `localhost`。
 - 权限完全由 Token 决定：建议为每个 AI 客户端创建独立的 restricted Token（限定笔记本、最小 scope），不要把管理员密码写进 MCP 配置。
 
@@ -37,7 +37,7 @@ node --version
 
 ### 4. 配置客户端
 
-客户端配置统一指向仓库里的单文件 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`：
+客户端统一指向下载下来的 `baseforge-mcp.mjs`（Release 附件；仓库内开发时是 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`）：
 
 #### Claude Code
 
@@ -45,7 +45,7 @@ node --version
 claude mcp add baseforge --scope user \
   --env BASEFORGE_URL=http://192.168.1.20:3001 \
   --env BASEFORGE_API_TOKEN=nkn_xxx \
-  -- node "C:\Users\YourName\Base-Notes\packages\baseforge-mcp\dist\baseforge-mcp.mjs"
+  -- node "C:\Users\YourName\Downloads\baseforge-mcp.mjs"
 ```
 
 #### Cursor（`.cursor/mcp.json`）
@@ -55,7 +55,7 @@ claude mcp add baseforge --scope user \
   "mcpServers": {
     "baseforge": {
       "command": "node",
-      "args": ["C:\\Users\\YourName\\Base-Notes\\packages\\baseforge-mcp\\dist\\baseforge-mcp.mjs"],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -75,7 +75,7 @@ VS Code 顶层字段是 `servers`，不是 `mcpServers`：
     "baseforge": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:\\Users\\YourName\\Base-Notes\\packages\\baseforge-mcp\\dist\\baseforge-mcp.mjs"],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -87,7 +87,7 @@ VS Code 顶层字段是 `servers`，不是 `mcpServers`：
 
 #### 其他通用客户端
 
-支持本地 stdio MCP 的客户端都用同一结构：`command: node` + 单文件绝对路径 + 两个 env。Windows 路径 `\` 需转义为 `\\`；Linux/macOS 路径必须以 `/` 开头。
+支持本地 stdio MCP 的客户端都用同一结构：`command: node` + `baseforge-mcp.mjs` 的绝对路径 + 两个 env。Windows 路径 `\` 需转义为 `\\`；Linux/macOS 路径必须以 `/` 开头。
 
 保存后完全重启客户端，在 MCP 设置中确认 `baseforge` 已启动。
 

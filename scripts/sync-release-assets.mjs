@@ -2,10 +2,10 @@
 /**
  * Release 资产跨仓同步：GitHub Release → Gitea / Gitee。
  *
- * 设计要点（与 .cmp 里的发布链路设计一致）：
- *  - GitHub 负责 Windows / macOS / iOS 构建（需要 Windows/macOS runner，Gitea act_runner 做不到）；
- *  - 构建产物先发到 GitHub Release（draft，全部资产齐全后才转正式）；
- *  - 再由本脚本搬运到 Gitea（主仓）与 Gitee（镜像）：Gitea 默认也先建草稿，
+ * 设计要点（与 docs/release-pipeline.md 一致）：
+ *  - GitHub 是主仓与权威发布点：负责 Windows / macOS / iOS 构建（需要 Windows/macOS runner，
+ *    Gitea act_runner 做不到），构建产物先发到 GitHub Release（draft，资产齐全后才转正式）；
+ *  - 再由本脚本把已转正的 GitHub 资产搬到 Gitea（镜像仓）与 Gitee（镜像仓）：Gitea 默认也先建草稿，
  *    `--publish` 时先校验资产齐全，再把 Gitea Release 转正式；Gitee 没有草稿语义，
  *    所以放在 targets 里最后处理（`gitea,gitee`）；
  *  - 幂等：目标端 release 已存在则复用，资产按「文件名 + 大小」判定，已存在跳过；

@@ -1,12 +1,28 @@
 {
   "name": "baseforge-mcp",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "description": "BaseForge MCP Server — 让 AI 工具直接操作笔记系统",
   "type": "module",
   "main": "dist/baseforge-mcp.mjs",
   "bin": {
     "baseforge-mcp": "./dist/baseforge-mcp.mjs"
   },
+  "files": [
+    "dist/baseforge-mcp.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "baseforge",
+    "notes",
+    "knowledge-base"
+  ],
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "node ./scripts/build.mjs",

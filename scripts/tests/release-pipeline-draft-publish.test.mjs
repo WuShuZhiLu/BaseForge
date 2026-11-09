@@ -14,10 +14,15 @@ test("GitHub Release 先建 draft、校验资产后才转正", async () => {
   const workflow = await readRepoFile(".github/workflows/release.yml");
   assert.match(workflow, /prepare-release:/);
   assert.match(workflow, /gh release create "\$TAG" "\$\{ARGS\[@\]\}"/);
-  assert.match(workflow, /--draft --generate-notes/);
+  assert.match(workflow, /--draft --notes-file \/tmp\/release-notes\.md/);
   assert.match(workflow, /draft:\s*false/);
-  assert.match(workflow, /needs:\s*\[version-guard, prepare-release, build\]/);
+  // publish 必须等全部构建产物就绪（含 MCP 单文件），所以只校验依赖里包含这几项。
+  const publishNeeds = workflow.match(/publish:[\s\S]*?needs:\s*\[([^\]]+)\]/)?.[1] || "";
+  for (const dep of ["version-guard", "prepare-release", "build", "build-mcp"]) {
+    assert.ok(publishNeeds.includes(dep), `publish 缺少依赖 ${dep}（当前：${publishNeeds}）`);
+  }
   assert.match(workflow, /verify-release-update-assets\.mjs local/);
+  assert.match(workflow, /assert-release-matrix\.mjs/);
 });
 
 test("GitHub Release 只汇总已签名 Windows，不带签名前候选", async () => {
@@ -36,13 +41,14 @@ test("GitHub 发布后 dispatch Gitea 同步并开启 publish", async () => {
   assert.match(workflow, /--input "publish=true"/);
 });
 
-test("Gitea 同步 workflow 支持 publish 与 latest_only 门禁", async () => {
-  const workflow = await readRepoFile(".github/workflows/sync-release.yml");
+test("Gitea 同步 workflow 位于 .gitea 目录，支持 publish 且不再移动 docker latest", async () => {
+  const workflow = await readRepoFile(".gitea/workflows/sync-release.yml");
   assert.match(workflow, /publish:/);
   assert.match(workflow, /ARGS\+=\(--publish\)/);
-  assert.match(workflow, /dispatch-gitea-workflow\.mjs/);
-  assert.match(workflow, /--workflow docker-image\.yml/);
-  assert.match(workflow, /--input "latest_only=true"/);
+  // latest 由 docker-image.yml 在 tag 阶段直接推送，这里不应再 dispatch latest_only
+  assert.doesNotMatch(workflow, /--input "latest_only=true"/);
+  // Gitee 没有草稿语义：只有要求转正（或演练）时才同步，publish=false 不得公开
+  assert.match(workflow, /github\.event\.inputs\.publish == 'true'/);
 });
 
 test("同步脚本创建草稿、校验齐全后才转正", async () => {
@@ -54,19 +60,28 @@ test("同步脚本创建草稿、校验齐全后才转正", async () => {
   assert.match(script, /args\.publish/);
 });
 
-test("Gitea Release workflow 新建草稿、更新时不回退已发布状态", async () => {
-  const workflow = await readRepoFile(".gitea/workflows/release.yml");
-  assert.match(workflow, /"draft":True/);
-  assert.match(workflow, /release-update\.json/);
-  assert.match(workflow, /d\.pop\("draft",None\)/);
+test("Release 正文只有单一来源（CHANGELOG），Gitea 不再单独维护", async () => {
+  await assert.rejects(
+    readRepoFile(".gitea/workflows/release.yml"),
+    /ENOENT/,
+    "Gitea 侧不应再有独立的 Release 正文 workflow，否则两端正文取决于谁先建 Release",
+  );
+  const workflow = await readRepoFile(".github/workflows/release.yml");
+  assert.match(workflow, /Extract release notes from CHANGELOG/);
+  assert.match(workflow, /--notes-file \/tmp\/release-notes\.md/);
+  assert.doesNotMatch(workflow, /--generate-notes/);
 });
 
-test("Docker 镜像 tag 阶段只推版本，latest 走 latest_only", async () => {
+test("Docker 镜像 tag 阶段同时推版本与 latest", async () => {
   const workflow = await readRepoFile(".gitea/workflows/docker-image.yml");
+  // 先推版本 tag，成功后才移动 latest
+  assert.match(workflow, /if ! push_with_retry "\$ref"; then/);
+  assert.match(workflow, /echo "推送 \$\{latest_ref\}"/);
+  assert.match(workflow, /if push_with_retry "\$latest_ref"; then/);
+  // latest_only 仍保留为手动补救入口（只移动 latest，不重新构建）
   assert.match(workflow, /latest_only:/);
-  assert.match(workflow, /LATEST_ONLY="\$\{INPUT_LATEST_ONLY:-false\}"/);
   assert.match(workflow, /docker pull "\$ref"/);
-  assert.match(workflow, /只推版本 tag；latest 留到发布门禁通过后再移动/);
+  assert.doesNotMatch(workflow, /latest 留到发布门禁通过后再移动/);
 });
 
 test("Gitea dispatch 脚本只接受 workflow_dispatch 输入且不打印 token", async () => {

@@ -6,18 +6,20 @@ BaseForge 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI �
 
 ## 特点
 
-- **单文件、零依赖**：`dist/baseforge-mcp.mjs` 已把 `@modelcontextprotocol/sdk`、`zod` 全部打进文件，使用方无需 `npm install`。
+- **单文件、零依赖**：`dist/baseforge-mcp.mjs` 已把 `@modelcontextprotocol/sdk`、`zod` 全部打进文件，使用方无需 `npm install`；发版时以附件形式提供。
 - **只配两个环境变量**：`BASEFORGE_URL` + `BASEFORGE_API_TOKEN`。
 - **权限全部在服务端**：由 Personal API Token（scopes + 笔记本资源授权）决定，旧的本地笔记本白名单层已移除。
 
 ## 客户端配置
+
+前置：本机有 Node.js 20+，并已下载 `baseforge-mcp.mjs`（Release 附件，或仓库内 `packages/baseforge-mcp/dist/baseforge-mcp.mjs`）。
 
 ```json
 {
   "mcpServers": {
     "baseforge": {
       "command": "node",
-      "args": ["/absolute/path/to/Base-Notes/packages/baseforge-mcp/dist/baseforge-mcp.mjs"],
+      "args": ["/absolute/path/to/baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -26,6 +28,8 @@ BaseForge 的本地 stdio MCP Server，让支持 Model Context Protocol 的 AI �
   }
 }
 ```
+
+`args` 必须是该文件在你机器上的**绝对路径**（Windows 写成 `C:\\path\\to\\baseforge-mcp.mjs`）。
 
 ## 环境变量
 

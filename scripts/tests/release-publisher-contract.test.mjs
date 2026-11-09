@@ -24,7 +24,17 @@ test("tag 构建工作流不让 electron-builder 直接发布 GitHub Release", a
   const workflow = await readRepoFile(".github/workflows/release.yml");
   assert.match(workflow, /node-version:\s*["']22["']/);
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read\s*\n\s*actions:\s*read/);
-  assert.equal((workflow.match(/--publish never/g) || []).length, 5);
+  // 不固定次数：每多一个构建目标（如 Lite 的 mac / linux）都会多一次调用，
+  // 但每一次都必须显式关掉 electron-builder 的内置发布能力。
+  const builderCommands = workflow
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.includes("electron-builder") && line.includes("--config"));
+  assert.ok(builderCommands.length >= 5, `至少应有 5 条 electron-builder 构建命令，实际 ${builderCommands.length}`);
+  for (const command of builderCommands) {
+    assert.match(command, /--publish never/, `构建命令缺少 --publish never：${command}`);
+  }
+  assert.equal((workflow.match(/--publish never/g) || []).length, builderCommands.length);
   assert.doesNotMatch(workflow, /--publish always/);
   assert.doesNotMatch(workflow, /GH_TOKEN:/);
 });

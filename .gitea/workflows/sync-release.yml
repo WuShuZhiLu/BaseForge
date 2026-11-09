@@ -1,13 +1,17 @@
 # 发布资产同步与 Gitea 发布门禁（在 Gitea 上运行）
 #
+# 文件位置：必须放在 .gitea/workflows/。Gitea 的 [actions] WORKFLOW_DIRS 只保留
+# 该目录，因此 GitHub 侧不会执行本文件，Gitea 侧也不会去读 .github/workflows/。
+#
 # 链路（详见 docs/release-pipeline.md）：
 #   1. GitHub 构建 win/mac → 全部资产齐了才把 GitHub Release 转正式；
 #   2. GitHub 发布完成后 dispatch 本 workflow（tag + publish=true）；
 #   3. 本 workflow 同步 GitHub 资产到 Gitea（draft）→ 校验齐全 → Gitea 转正式；
-#   4. 转正后 dispatch docker-image.yml 的 latest_only 模式，把 latest 指向本次版本；
-#   5. 最后同步 Gitee（Gitee 没有 draft 语义，只能最后公开）。
+#   4. 最后同步 Gitee（Gitee 没有 draft 语义，只能最后公开）；
+#   5. Docker 镜像的 latest 不在这里移动：docker-image.yml 在 tag 阶段就直接推
+#      vX.Y.Z 与 latest 两个 tag，本门禁只负责桌面端资产与 Release 状态。
 #
-# 为什么把同步、转正、latest 移动放在同一个 workflow：
+# 为什么把同步与转正放在同一个 workflow：
 #   - 都在发布门禁之后，顺序明确，失败可原样重跑；
 #   - 凭据（读 GitHub、写 Gitea/Gitee）只出现在 Gitea Secrets；
 #     GitHub 侧只需要一个能触发 workflow 的窄 token。
@@ -50,7 +54,6 @@ jobs:
       GITEA_URL: ${{ github.server_url }}
       GITEA_TOKEN: ${{ secrets.RELEASE_SYNC_TOKEN }}
       GITEA_REPO: ${{ github.repository }}
-      GITEA_REF: ${{ vars.GITEA_DEFAULT_BRANCH || 'main' }}
       GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
       GITEE_REPO: ${{ vars.GITEE_REPO }}
       RELEASE_TAG: ${{ github.event.inputs.tag }}
@@ -71,22 +74,10 @@ jobs:
           if [ "${DRY_RUN:-false}" = "true" ]; then ARGS+=(--dry-run); fi
           node scripts/sync-release-assets.mjs "${ARGS[@]}"
 
-      - name: Promote docker latest after release gate
-        if: ${{ github.event.inputs.publish == 'true' && github.event.inputs.dry_run != 'true' }}
-        run: |
-          set -euo pipefail
-          TAG="${RELEASE_TAG:-}"
-          if [ -z "$TAG" ]; then
-            TAG="v$(node -p 'require("./package.json").version')"
-          fi
-          node scripts/dispatch-gitea-workflow.mjs \
-            --workflow docker-image.yml \
-            --ref "${GITEA_REF:-main}" \
-            --input "tag=${TAG}" \
-            --input "latest_only=true"
-
       - name: Sync Gitee last
         # Gitee 没有草稿语义：放在 Gitea 门禁之后，复用同一份已下载资产。
+        # 只有本次真的要求转正时才公开；publish=false 的演练绝不能把资产推到公开的 Gitee。
+        if: ${{ github.event.inputs.publish == 'true' || github.event.inputs.dry_run == 'true' }}
         run: |
           set -euo pipefail
           ARGS=(--targets gitee --asset-dir /tmp/baseforge-release-assets)

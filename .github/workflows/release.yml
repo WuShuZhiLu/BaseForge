@@ -4,7 +4,7 @@
 #   - push tag v*.*.* 构建全部平台；Windows Full/Lite 必须经 SignPath release-signing 后才能成为正式 artifact；
 #   - workflow_dispatch 只使用 test-signing 验证 Windows 签名链路，不会产出正式 Release 资产；
 #   - GitHub 是权威发布点：先建 draft Release → 构建并上传资产 → 校验齐全 → 转正式；
-#   - GitHub 转正式后 dispatch Gitea 的 Sync Release Assets（同步 → Gitea 转正式 → latest → Gitee）；
+#   - GitHub 转正式后 dispatch Gitea 的 Sync Release Assets（同步 → Gitea 转正式 → Gitee）；
 #   - electron-builder 始终关闭内置发布能力（--publish 统一为 never），避免多发布者并发写 Release。
 
 name: Build & Release
@@ -44,8 +44,28 @@ jobs:
             exit 1
           fi
 
+      # CHANGELOG.md 必须是唯一版本事实来源：Gitea 的 docker-image.yml 会取
+      # 首个 `## vX.Y.Z` 段落与 tag 比对，Release 正文也由它抽取。这里提前挡住
+      # 「打了 tag 但 CHANGELOG 还是上一个版本」的情况。
+      - name: Verify CHANGELOG has this version section
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "push" ]; then
+            echo "非 tag 触发，跳过 CHANGELOG 校验"
+            exit 0
+          fi
+          TAG="${GITHUB_REF_NAME}"
+          if ! grep -qE "^## ${TAG}([[:space:]]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md 缺少 \`## ${TAG} - 日期\` 段落；发版前需把 Unreleased 改名为该标题"
+            grep -nE "^## " CHANGELOG.md | head -5
+            exit 1
+          fi
+          echo "CHANGELOG.md 已包含 ${TAG} 段落"
+
   # 先建 draft Release：构建期间外网看不到半成品；资产齐全后由 publish job 转正式。
   # 只对 tag 触发生效；workflow_dispatch（test-signing 演练）不创建 Release。
+  # Release 正文的唯一来源是 CHANGELOG.md 的对应版本段落：Gitea / Gitee 复用同一份正文，
+  # 不再各自生成（这曾导致两个端的发布说明不一致，取决于谁先建 Release）。
   prepare-release:
     name: 创建 draft Release
     needs: version-guard
@@ -57,6 +77,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Extract release notes from CHANGELOG
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          awk -v head="## ${TAG}" '
+            $0 == head || index($0, head " ") == 1 { flag = 1; next }
+            flag && /^## / { exit }
+            flag { print }
+          ' CHANGELOG.md > /tmp/release-notes.md
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "::error::CHANGELOG.md 里没有 ${TAG} 段落，无法生成 Release 正文"
+            exit 1
+          fi
+          echo "正文取自 CHANGELOG.md 的 ${TAG} 段落（$(wc -l < /tmp/release-notes.md) 行）"
       - name: Create draft release if absent
         env:
           # gh 支持 GITHUB_TOKEN；不用 GH_TOKEN，避免 electron-builder 侧误用同名变量自动发布。
@@ -68,7 +103,7 @@ jobs:
             echo "Release ${TAG} 已存在，跳过创建（不会把已发布状态改回草稿）"
             exit 0
           fi
-          ARGS=(--draft --generate-notes --title "BaseForge ${TAG}")
+          ARGS=(--draft --notes-file /tmp/release-notes.md --title "BaseForge ${TAG}")
           case "$TAG" in
             *-*) ARGS+=(--prerelease) ;;
           esac
@@ -371,10 +406,26 @@ jobs:
           npx electron-builder --config electron/builder.config.js --mac --publish never
         shell: bash
 
+      # ========= macOS Lite =========
+      # Lite 不带 backend，也不含原生模块，因此不跑 rebuild:native；
+      # 两个架构在同一次调用里出（产物名带 ${arch}，不会互相覆盖）。
+      - name: Build Electron Lite (macOS x64 + arm64)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
+        run: npx electron-builder --config electron/builder.lite.config.js --mac --publish never
+        shell: bash
+
       # ========= Linux =========
       - name: Build Electron (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: npx electron-builder --config electron/builder.config.js --linux --publish never
+        shell: bash
+
+      # ========= Linux Lite =========
+      - name: Build Electron Lite (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --config electron/builder.lite.config.js --linux --publish never
         shell: bash
 
       # ========= 普通构建产物 =========
@@ -393,10 +444,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # Lite 的 mac / linux 产物单独成一个 artifact：
+      # Windows 的 Lite 走 SignPath 签名后再并进 signed-windows/release，
+      # 这里若也上传 exe 会与签名版同名冲突，故只在非 Windows 平台收集。
+      - name: Upload Lite platform artifacts (macOS / Linux)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-${{ matrix.name }}-lite
+          path: |
+            dist-electron-lite/*.dmg
+            dist-electron-lite/*.zip
+            dist-electron-lite/*.AppImage
+            dist-electron-lite/*.deb
+            dist-electron-lite/*.blockmap
+            dist-electron-lite/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
   # 资产齐全并校验通过后，把 draft 转正式（GitHub 是权威发布点 / 自动更新源）。
   # 只汇总「已签名 Windows + macOS + Linux」：baseforge-win 是签名前的候选，不能进 Release。
   publish:
-    needs: [version-guard, prepare-release, build]
+    needs: [version-guard, prepare-release, build, build-mcp]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -422,6 +491,30 @@ jobs:
           name: nowen-note-win-signed
           path: release-assets
 
+      - name: Download macOS Lite artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-mac-lite
+          path: release-assets
+
+      - name: Download Linux Lite artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-linux-lite
+          path: release-assets
+
+      - name: Download MCP single-file bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-mcp-bundle
+          path: release-assets
+
+      - name: Assert full + Lite asset matrix
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/assert-release-matrix.mjs --dir release-assets --version "$VERSION"
+
       - name: Verify updater assets before publishing
         run: |
           set -euo pipefail
@@ -438,7 +531,58 @@ jobs:
           files: release-assets/*
           fail_on_unmatched_files: true
 
-  # GitHub 发布完成后，触发 Gitea 的同步 / 转正 / latest / Gitee 链路。
+  # MCP Server 以单文件 .mjs 随 Release 分发（用户下载后配 node 路径 + url/token 即可）。
+  # 包内已把 @modelcontextprotocol/sdk、zod 打进 dist/baseforge-mcp.mjs，使用方无需 npm install。
+  build-mcp:
+    name: 构建 MCP 单文件
+    needs: [version-guard]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: packages/baseforge-mcp/package-lock.json
+
+      - name: Install MCP package deps
+        working-directory: packages/baseforge-mcp
+        run: npm ci --no-audit --no-fund
+
+      - name: Build single-file bundle
+        working-directory: packages/baseforge-mcp
+        run: npm run build
+
+      - name: Smoke test the bundle (requires token, expect startup error)
+        working-directory: packages/baseforge-mcp
+        run: |
+          set -euo pipefail
+          # 没有 BASEFORGE_API_TOKEN 时必须在启动阶段就报错退出，而不是静默运行。
+          if node dist/baseforge-mcp.mjs >/dev/null 2>mcp-smoke.log; then
+            echo "::error::缺少 BASEFORGE_API_TOKEN 时 MCP 仍然正常退出，校验缺失"
+            exit 1
+          fi
+          grep -qiE "token|BASEFORGE_API_TOKEN" mcp-smoke.log || {
+            echo "::error::MCP 启动失败但没有给出 token 相关提示"
+            cat mcp-smoke.log
+            exit 1
+          }
+
+      - name: Upload MCP single-file bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-mcp-bundle
+          path: packages/baseforge-mcp/dist/baseforge-mcp.mjs
+          if-no-files-found: error
+          retention-days: 14
+
+  # GitHub 发布完成后，触发 Gitea 的同步 / 转正 / Gitee 分发链路。
+  # （Docker 的 latest 由 Gitea 的 docker-image.yml 在 tag 阶段直接推送，不经过这里。）
   # 这里只传一个「能触发 workflow」的窄 token，Gitea/Gitee 写凭据仍只留在 Gitea Secrets。
   dispatch-gitea:
     name: 触发 Gitea 发布同步

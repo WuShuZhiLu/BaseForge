@@ -182,11 +182,15 @@ module.exports = {
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
-    notarize: false,
+    notarize: false, // 与 full 一致：交给 afterSign 钩子，本地缺 Apple 凭据时自动跳过
+    afterSign: "build/afterSign.js",
+    // 两个架构在同一台机器上一次构建，文件名必须带 ${arch}：
+    // 否则后一个架构会覆盖前一个，Release 看似有双架构、实际是同一份包。
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
     // bundleId 实际上由顶层 appId 决定，这里冗余不写
   },
   dmg: {
-    artifactName: "BaseForge-${version}-lite.${ext}",
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
 
   linux: {

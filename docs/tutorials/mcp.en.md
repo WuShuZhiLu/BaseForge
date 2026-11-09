@@ -6,7 +6,7 @@
 
 ## What you need to know
 
-- The MCP server is a **single file**: `packages/baseforge-mcp/dist/baseforge-mcp.mjs`, with all dependencies bundled in. No `npm install` is required to use it.
+- The MCP server is a **single file**, `baseforge-mcp.mjs`, published as a Release asset with all dependencies bundled in. No `npm install` is required.
 - Only two environment variables are needed: `BASEFORGE_URL` (BaseForge address) and `BASEFORGE_API_TOKEN` (Personal Access Token).
 - Replace every `/absolute/path/...` placeholder with the real absolute path on your computer.
 - When BaseForge runs on a NAS or another server, `BASEFORGE_URL` must be reachable from the computer running the AI client, for example `http://192.168.1.20:3001`.
@@ -43,7 +43,7 @@ Copy the Token, e.g. `nkn_xxxxxxxxxxxxxxxxx`. It is usually shown only once.
 
 ### 4. Configure the client
 
-All clients point to the single file `packages/baseforge-mcp/dist/baseforge-mcp.mjs`:
+All clients point at the downloaded `baseforge-mcp.mjs` (a Release asset; inside the repo it lives at `packages/baseforge-mcp/dist/baseforge-mcp.mjs`):
 
 #### Claude Code
 
@@ -51,7 +51,7 @@ All clients point to the single file `packages/baseforge-mcp/dist/baseforge-mcp.
 claude mcp add baseforge --scope user \
   --env BASEFORGE_URL=http://192.168.1.20:3001 \
   --env BASEFORGE_API_TOKEN=nkn_xxx \
-  -- node "C:\Users\YourName\Base-Notes\packages\baseforge-mcp\dist\baseforge-mcp.mjs"
+  -- node "C:\Users\YourName\Downloads\baseforge-mcp.mjs"
 ```
 
 #### Cursor (`.cursor/mcp.json`)
@@ -61,7 +61,7 @@ claude mcp add baseforge --scope user \
   "mcpServers": {
     "baseforge": {
       "command": "node",
-      "args": ["C:\\Users\\YourName\\Base-Notes\\packages\\baseforge-mcp\\dist\\baseforge-mcp.mjs"],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -81,7 +81,7 @@ The top-level key is `servers`, not `mcpServers`:
     "baseforge": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:\\Users\\YourName\\Base-Notes\\packages\\baseforge-mcp\\dist\\baseforge-mcp.mjs"],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
         "BASEFORGE_URL": "http://192.168.1.20:3001",
         "BASEFORGE_API_TOKEN": "nkn_xxx"
@@ -93,7 +93,7 @@ The top-level key is `servers`, not `mcpServers`:
 
 #### Other clients
 
-Any stdio-capable client uses the same structure: `command: node` + the absolute path of the single file + the two env vars. On Windows, `\` must be escaped as `\\`; on Linux/macOS, absolute paths must start with `/`.
+Any stdio-capable client uses the same structure: `command: node` + the absolute path of `baseforge-mcp.mjs` + the two env vars. On Windows, `\` must be escaped as `\\`; on Linux/macOS, absolute paths must start with `/`.
 
 Restart the client completely and confirm `baseforge` started in its MCP settings.
 
