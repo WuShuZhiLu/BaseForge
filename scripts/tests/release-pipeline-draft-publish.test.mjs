@@ -67,9 +67,12 @@ test("Release 正文只有单一来源（CHANGELOG），Gitea 不再单独维护
     "Gitea 侧不应再有独立的 Release 正文 workflow，否则两端正文取决于谁先建 Release",
   );
   const workflow = await readRepoFile(".github/workflows/release.yml");
-  assert.match(workflow, /Extract release notes from CHANGELOG/);
+  assert.match(workflow, /build-release-notes\.mjs/);
   assert.match(workflow, /--notes-file \/tmp\/release-notes\.md/);
   assert.doesNotMatch(workflow, /--generate-notes/);
+  // 正文最终由 publish 阶段按真实资产重生成（含下载表）后随 Release 发布
+  assert.match(workflow, /body_path:\s*release-notes\.md/);
+  assert.match(workflow, /--assets release-assets/);
 });
 
 test("Docker 镜像 tag 阶段同时推版本与 latest", async () => {
@@ -82,6 +85,24 @@ test("Docker 镜像 tag 阶段同时推版本与 latest", async () => {
   assert.match(workflow, /latest_only:/);
   assert.match(workflow, /docker pull "\$ref"/);
   assert.doesNotMatch(workflow, /latest 留到发布门禁通过后再移动/);
+});
+
+test("publish 阶段生成 SHA256SUMS 并随 Release 发布", async () => {
+  const workflow = await readRepoFile(".github/workflows/release.yml");
+  assert.match(workflow, /sha256sum > SHA256SUMS\.txt/);
+  // 校验和必须在发布步骤之前生成，否则不会进入 release-assets/*
+  const checksumAt = workflow.indexOf("Generate SHA256SUMS");
+  const publishAt = workflow.indexOf("Publish GitHub Release");
+  assert.ok(checksumAt > 0 && publishAt > checksumAt, "SHA256SUMS 必须在上传 Release 之前生成");
+});
+
+test("资产矩阵断言与 electron-builder 的 Lite 命名保持一致", async () => {
+  const script = await readRepoFile("scripts/assert-release-matrix.mjs");
+  // Lite 的真实产物名是 BaseForge-<version>-lite-*，不是 BaseForge-Lite-*
+  assert.doesNotMatch(script, /BaseForge-Lite-\$\{version\}/);
+  assert.match(script, /`BaseForge-\$\{version\}-lite-setup\.exe`/);
+  assert.match(script, /`BaseForge-\$\{version\}-lite-portable\.exe`/);
+  assert.match(script, /`BaseForge-\$\{version\}-lite-\$\{arch\}\.\$\{ext\}`/);
 });
 
 test("Gitea dispatch 脚本只接受 workflow_dispatch 输入且不打印 token", async () => {

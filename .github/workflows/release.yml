@@ -77,21 +77,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Extract release notes from CHANGELOG
+      - name: Build release notes from CHANGELOG
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          awk -v head="## ${TAG}" '
-            $0 == head || index($0, head " ") == 1 { flag = 1; next }
-            flag && /^## / { exit }
-            flag { print }
-          ' CHANGELOG.md > /tmp/release-notes.md
-          if [ ! -s /tmp/release-notes.md ]; then
-            echo "::error::CHANGELOG.md 里没有 ${TAG} 段落，无法生成 Release 正文"
-            exit 1
-          fi
-          echo "正文取自 CHANGELOG.md 的 ${TAG} 段落（$(wc -l < /tmp/release-notes.md) 行）"
+          # 正文 = 英文段落（主体）+ 中文段落（折叠）+ 下载表，由脚本统一生成。
+          # 此处还没有真实资产，下载表在 publish 阶段用真实资产重生成一次。
+          node scripts/build-release-notes.mjs \
+            --tag "$TAG" \
+            --repo "${{ github.repository }}" \
+            --out /tmp/release-notes.md
       - name: Create draft release if absent
         env:
           # gh 支持 GITHUB_TOKEN；不用 GH_TOKEN，避免 electron-builder 侧误用同名变量自动发布。
@@ -473,6 +469,9 @@ jobs:
       contents: write
       actions: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
@@ -521,11 +520,36 @@ jobs:
           VERSION="$(node -p "require('./package.json').version")"
           node scripts/verify-release-update-assets.mjs local --dir release-assets --version "$VERSION"
 
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd release-assets
+          # 只对文件做校验和，排除自身；下载方可用 sha256sum -c SHA256SUMS.txt 逐项校验。
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\n' \
+            | LC_ALL=C sort \
+            | xargs -r sha256sum > SHA256SUMS.txt
+          echo "校验和条目：$(wc -l < SHA256SUMS.txt)"
+
+      - name: Build release notes with real assets
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # 用真实资产清单重生成正文：下载表里的文件名与链接一定存在，
+          # 命名规则变了也不会指向 404。
+          node scripts/build-release-notes.mjs \
+            --tag "$TAG" \
+            --repo "${{ github.repository }}" \
+            --assets release-assets \
+            --docker-image "${{ vars.DOCKER_IMAGE }}" \
+            --out release-notes.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: BaseForge ${{ github.ref_name }}
+          body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           draft: false
           files: release-assets/*

@@ -42,6 +42,8 @@
     "mcp:build": "npm --prefix packages/baseforge-mcp run build",
     "mcp:test": "npm --prefix packages/baseforge-mcp test",
     "test:update-release": "node --test scripts/tests/update-metadata-validator.test.cjs scripts/tests/update-builder-config.test.cjs scripts/tests/updater-manual-download-policy.test.cjs scripts/tests/release-publisher-contract.test.mjs scripts/tests/signpath-release-config.test.cjs scripts/tests/signpath-artifact-config.test.cjs scripts/tests/windows-signature-validator.test.cjs",
+    "test:release-pipeline": "node --test scripts/tests/release-notes.test.mjs scripts/tests/release-pipeline-draft-publish.test.mjs",
+    "notes:release": "node scripts/build-release-notes.mjs",
     "verify:update-release": "node scripts/verify-release-update-assets.mjs",
     "migrate:attachments:object": "node scripts/migrate-attachments-to-object-storage.mjs",
     "test:object-storage": "node scripts/test-object-storage.mjs",

@@ -41,6 +41,17 @@ jobs:
         working-directory: backend
         run: npm test
 
+  # 发布链路自身的契约测试：纯 node:test，不依赖仓库依赖，秒级完成。
+  # 这些断言检查的是 workflow 文本与正文生成器，一旦改坏，问题只会在打 tag 当天暴露。
+  release-scripts:
+    name: release scripts (pipeline contracts)
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        run: npm run test:release-pipeline
+
   frontend:
     name: frontend (typecheck + tests)
     runs-on: ubuntu-latest
