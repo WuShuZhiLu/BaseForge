@@ -8,17 +8,20 @@
  *   - 全文中文，对外部协作者不友好。
  *
  * 数据来源固定为两个文件，不引入第三份真相：
- *   CHANGELOG.md     → 中文段落（折进 <details>）
- *   CHANGELOG.en.md  → 英文段落（正文主体）
+ *   CHANGELOG.md     → 中文段落（默认，排在前面）
+ *   CHANGELOG.en.md  → 英文段落（排在后面）
  *
- * 产物结构：
- *   英文概述 → 中文概述（引用块）→ Download 表（按真实资产生成）
- *   → What's changed（英文分组）→ 中文更新日志（折叠）→ Notes
+ * 产物结构（对齐 DeepSeek Harness 的 Release 写法）：
+ *   `[中文](#中文) | [English](#english)`
+ *   → `## 中文`（概述 + 分组 + 说明）→ `## English`（intro + groups + Notes）
+ *
+ * 注意：
+ *   - Release 页面底部已有 GitHub 自动生成的 Assets 列表，正文不再重复放下载表；
+ *   - Release 正文只有一个 body，无法像 README 那样跳转到另一个文件，
+ *     因此语言切换用页内锚点；两种语言都完整展开，不折叠。
  *
  * 用法：
  *   node scripts/build-release-notes.mjs --tag v0.2.0 --repo owner/repo --out notes.md
- *   node scripts/build-release-notes.mjs --tag v0.2.0 --repo owner/repo \
- *     --assets release-assets --docker-image repo/image --out notes.md
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -38,8 +41,6 @@ function parseArgs(argv) {
   const options = {
     tag: "",
     repo: process.env.GITHUB_REPOSITORY || "",
-    assets: "",
-    dockerImage: "",
     changelog: "CHANGELOG.md",
     changelogEn: "CHANGELOG.en.md",
     out: "",
@@ -48,14 +49,12 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--tag") options.tag = argv[++i];
     else if (arg === "--repo") options.repo = argv[++i];
-    else if (arg === "--assets") options.assets = argv[++i];
-    else if (arg === "--docker-image") options.dockerImage = argv[++i];
     else if (arg === "--changelog") options.changelog = argv[++i];
     else if (arg === "--changelog-en") options.changelogEn = argv[++i];
     else if (arg === "--out") options.out = argv[++i];
     else if (arg === "--help" || arg === "-h") {
       console.log(
-        "用法：node scripts/build-release-notes.mjs --tag vX.Y.Z [--repo owner/repo] [--assets 目录] [--docker-image 镜像] [--out 文件]",
+        "用法：node scripts/build-release-notes.mjs --tag vX.Y.Z [--repo owner/repo] [--out 文件]",
       );
       process.exit(0);
     } else {
@@ -116,123 +115,6 @@ export function linkify(text, repo) {
     .replace(/(^|[\s(（])#(\d+)\b/g, (match, prefix, number) => `${prefix}[#${number}](${issueBase}${number})`);
 }
 
-const SKIP_RE = /^(?:latest(?:-[a-z0-9._-]+)?\.ya?ml|.*\.blockmap|SHA256SUMS\.txt|builder-(?:debug|effective-config)\.ya?ml)$/i;
-
-/**
- * 资产分类：按真实文件名判断，不依赖 electron-builder 的命名常量，
- * 这样配置里改了 artifactName 也不会让下载表指向不存在的文件。
- */
-export function classifyAsset(name) {
-  if (SKIP_RE.test(name)) return null;
-
-  const lite = /-lite[-.]/i.test(name);
-  const lower = name.toLowerCase();
-
-  if (/\.mjs$/i.test(name)) return { kind: "mcp", lite: false };
-
-  if (lower.endsWith(".exe")) {
-    if (/portable/i.test(name)) return { kind: "win-portable", lite };
-    if (/setup/i.test(name)) return { kind: "win-setup", lite };
-    return null;
-  }
-  if (lower.endsWith(".dmg") || lower.endsWith(".zip")) {
-    const arch = /-arm64[-.]/i.test(name) ? "arm64" : /-x64[-.]/i.test(name) ? "x64" : "x64";
-    const kind = lower.endsWith(".dmg") ? "mac-dmg" : "mac-zip";
-    return { kind, lite, arch };
-  }
-  if (lower.endsWith(".appimage")) {
-    const arch = /x86_64|amd64/i.test(name) ? "x64" : "x64";
-    return { kind: "linux-appimage", lite, arch };
-  }
-  if (lower.endsWith(".deb")) {
-    const arch = /x86_64|amd64/i.test(name) ? "x64" : "x64";
-    return { kind: "linux-deb", lite, arch };
-  }
-  return null;
-}
-
-const ARCH_ORDER = { arm64: 0, x64: 1 };
-
-function formatArch(arch) {
-  return arch === "arm64" ? "arm64" : "x64";
-}
-
-/** 由资产目录生成下载表；同一格内按 安装版 → 免安装 → 各架构 排序。 */
-export function buildDownloadSection(files, { tag, repo, dockerImage }) {
-  const downloadBase = `https://github.com/${repo}/releases/download/${tag}`;
-  const link = (name, label) => `[${label}](${downloadBase}/${encodeURIComponent(name)})`;
-
-  const buckets = { full: new Map(), lite: new Map() };
-  const unclassified = [];
-
-  for (const name of files) {
-    const info = classifyAsset(name);
-    if (!info) {
-      if (!SKIP_RE.test(name)) unclassified.push(name);
-      continue;
-    }
-    if (info.kind === "mcp") continue;
-    const bucket = info.lite ? buckets.lite : buckets.full;
-    if (!bucket.has(info.kind)) bucket.set(info.kind, []);
-    bucket.get(info.kind).push({ name, arch: info.arch || "x64" });
-  }
-
-  const sortEntries = (entries = []) =>
-    entries
-      .slice()
-      .sort((a, b) => (ARCH_ORDER[a.arch] ?? 9) - (ARCH_ORDER[b.arch] ?? 9) || a.name.localeCompare(b.name));
-
-  const cell = (kind, labelFor) => {
-    const full = sortEntries(buckets.full.get(kind));
-    const lite = sortEntries(buckets.lite.get(kind));
-    const render = (entries) =>
-      entries.length === 0 ? "—" : entries.map((entry) => link(entry.name, labelFor(entry))).join(" · ");
-    return { full: render(full), lite: render(lite) };
-  };
-
-  const winSetup = cell("win-setup", (e) => `Setup .exe (${formatArch(e.arch)})`);
-  const winPortable = cell("win-portable", (e) => `Portable .exe`);
-  const macDmg = cell("mac-dmg", (e) => `${formatArch(e.arch)} .dmg`);
-  const macZip = cell("mac-zip", (e) => `${formatArch(e.arch)} .zip`);
-  const linuxAppImage = cell("linux-appimage", (e) => `.AppImage (${formatArch(e.arch)})`);
-  const linuxDeb = cell("linux-deb", (e) => `.deb (${formatArch(e.arch)})`);
-
-  const join = (a, b) => [a, b].filter((x) => x && x !== "—").join(" · ") || "—";
-
-  const rows = [
-    `| **Windows** <br><sub>10 / 11 · x64</sub> | ${join(winSetup.full, winPortable.full)} | ${join(winSetup.lite, winPortable.lite)} |`,
-    `| **macOS** <br><sub>Apple Silicon / Intel</sub> | ${join(macDmg.full, macZip.full)} | ${join(macDmg.lite, macZip.lite)} |`,
-    `| **Linux** <br><sub>x64</sub> | ${join(linuxAppImage.full, linuxDeb.full)} | ${join(linuxAppImage.lite, linuxDeb.lite)} |`,
-  ];
-
-  const mcp = files.find((name) => classifyAsset(name)?.kind === "mcp");
-  if (mcp) {
-    // MCP 是同一份单文件，不区分 full / Lite，只放在完整版一列，避免看起来像两份产物。
-    rows.push(`| **MCP server** <br><sub>single file · Node 20+</sub> | ${link(mcp, "baseforge-mcp.mjs")} | — |`);
-  }
-  if (dockerImage) {
-    // 镜像 tag 与 Release tag 一致（带 v 前缀），见 .gitea/workflows/docker-image.yml。
-    rows.push(`| **Docker** <br><sub>server only</sub> | \`docker pull ${dockerImage}:${tag}\` | — |`);
-  }
-
-  const lines = [
-    "## Download",
-    "",
-    "| Platform | Full（完整版） | Lite（仅远程） |",
-    "| --- | --- | --- |",
-    ...rows,
-    "",
-    "> **Lite** 不含本地数据库，只能连接远端 BaseForge 服务器使用；本地写作与本地库请用完整版。",
-    "> Lite ships without a local database and only works against a remote BaseForge server.",
-    "",
-  ];
-
-  if (unclassified.length > 0) {
-    lines.push(`<sub>其他附件：${unclassified.map((name) => link(name, name)).join(" · ")}</sub>`, "");
-  }
-  return lines.join("\n");
-}
-
 /** 英文分组正文：把中文的 ### 标题映射为英文（英文文件本身已是英文，直接输出）。 */
 function renderGroups(section, repo) {
   const output = [];
@@ -251,7 +133,7 @@ function firstParagraph(intro) {
 }
 
 export function buildReleaseNotes(options) {
-  const { tag, repo, assetsDir, dockerImage } = options;
+  const { tag, repo } = options;
   const version = tag.replace(/^v/, "");
   const prerelease = tag.includes("-");
 
@@ -273,53 +155,44 @@ export function buildReleaseNotes(options) {
   }
 
   const parts = [];
-  if (enIntro) parts.push(enIntro, "");
-  if (zhIntro) parts.push(`> ${zhIntro.replace(/\n/g, "\n> ")}`, "");
 
+  // DeepSeek Harness 风格：顶部一行等权语言链接，中文在前、英文在后
+  parts.push("[中文](#中文) | [English](#english)", "");
+
+  // ===== 中文 =====
+  parts.push("## 中文", "");
+  if (zhIntro) parts.push(zhIntro, "");
+  if (prerelease) {
+    parts.push("> ⚠️ 这是**预发布**版本，稳定版发布前仍可能有较大改动。", "");
+  }
+  const zhChanges = renderGroups(zh, repo);
+  if (zhChanges) parts.push(zhChanges, "");
+  parts.push("## 说明", "");
+  parts.push("- **校验下载** — `SHA256SUMS.txt` 随本 Release 一同发布，下载后执行 `sha256sum -c SHA256SUMS.txt`。");
+  parts.push(
+    `- **完整更新日志** — [\`CHANGELOG.md\`](https://github.com/${repo}/blob/${tag}/CHANGELOG.md)`,
+  );
+  parts.push(`- **源码** — [\`${tag}\`](https://github.com/${repo}/tree/${tag}) · 版本 ${version}`, "");
+
+  // ===== English =====
+  parts.push("## English", "");
+  if (enIntro) parts.push(enIntro, "");
   if (prerelease) {
     parts.push(
       "> ⚠️ This is a **pre-release** build. Expect rough edges and breaking changes before the stable release.",
       "",
     );
   }
-
-  if (assetsDir) {
-    const files = fs
-      .readdirSync(assetsDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => entry.name);
-    parts.push(buildDownloadSection(files, { tag, repo, dockerImage }), "");
-  }
-
   const enChanges = renderGroups(en, repo);
-  if (enChanges) parts.push("## What's changed", "", enChanges, "");
-
-  const zhChanges = renderGroups(zh, repo);
-  if (zhChanges) {
-    parts.push(
-      "<details>",
-      `<summary>中文更新日志 · ${tag}</summary>`,
-      "",
-      zhChanges,
-      "",
-      "</details>",
-      "",
-    );
-  }
-
+  if (enChanges) parts.push(enChanges, "");
   parts.push("## Notes", "");
   parts.push(
-    assetsDir
-      ? "- **Verifying downloads** — every asset is listed in `SHA256SUMS.txt`; run `sha256sum -c SHA256SUMS.txt` after downloading."
-      : "- **Verifying downloads** — `SHA256SUMS.txt` is attached to this release; run `sha256sum -c SHA256SUMS.txt` after downloading.",
+    "- **Verifying downloads** — `SHA256SUMS.txt` is attached to this release; run `sha256sum -c SHA256SUMS.txt` after downloading.",
   );
   parts.push(
-    `- **Full changelog** — [\`CHANGELOG.md\`](https://github.com/${repo}/blob/${tag}/CHANGELOG.md) · [English](https://github.com/${repo}/blob/${tag}/CHANGELOG.en.md)`,
+    `- **Full changelog** — [\`CHANGELOG.en.md\`](https://github.com/${repo}/blob/${tag}/CHANGELOG.en.md)`,
   );
-  parts.push(
-    `- **Source** — [\`${tag}\`](https://github.com/${repo}/tree/${tag}) · 版本 ${version}`,
-  );
-  parts.push("");
+  parts.push(`- **Source** — [\`${tag}\`](https://github.com/${repo}/tree/${tag}) · version ${version}`, "");
 
   return `${parts.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;
 }
@@ -329,8 +202,6 @@ function main() {
   const options = {
     tag: args.tag,
     repo: args.repo,
-    assetsDir: args.assets || "",
-    dockerImage: args.dockerImage,
     changelog: args.changelog,
     changelogEn: args.changelogEn,
   };
@@ -338,7 +209,7 @@ function main() {
   if (args.out) {
     fs.writeFileSync(args.out, notes, "utf8");
     console.log(
-      `[release-notes] ${args.tag} 正文已写入 ${args.out}（${notes.split("\n").length} 行，${args.assets ? "含下载表" : "无下载表"}）`,
+      `[release-notes] ${args.tag} 正文已写入 ${args.out}（${notes.split("\n").length} 行）`,
     );
   } else {
     process.stdout.write(notes);

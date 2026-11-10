@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Release 正文生成器回归：
- *   - 中英两段分别抽取，英文在前、中文折进 <details>；
+ *   - DeepSeek Harness 风格：顶部 `[中文](#中文) | [English](#english)`，中文在前、英文在后；
+ *   - 两种语言各自完整（概述 + 分组 + 说明），不折叠；
  *   - 下载表按真实资产分类，Lite 落在 Lite 列，MCP / Docker 不重复；
  *   - hash 与 #issue 变成链接，普通代码不被误伤。
  */
@@ -11,9 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  buildDownloadSection,
   buildReleaseNotes,
-  classifyAsset,
   extractSection,
   linkify,
 } from "../build-release-notes.mjs";
@@ -101,91 +100,41 @@ test("linkify 把 hash 与 issue 变成链接，普通代码保持原样", () =>
   assert.match(text, /\[#123\]\(https:\/\/github\.com\/wushuzhilu\/BaseForge\/issues\/123\)/);
 });
 
-test("assets 分类：Lite 与 full 分开，元数据不参与下载表", () => {
-  assert.deepEqual(classifyAsset("BaseForge-0.2.0-setup.exe"), { kind: "win-setup", lite: false });
-  assert.deepEqual(classifyAsset("BaseForge-0.2.0-lite-setup.exe"), {
-    kind: "win-setup",
-    lite: true,
-  });
-  assert.deepEqual(classifyAsset("BaseForge-0.2.0-arm64.dmg"), {
-    kind: "mac-dmg",
-    lite: false,
-    arch: "arm64",
-  });
-  assert.equal(classifyAsset("latest.yml"), null);
-  assert.equal(classifyAsset("BaseForge-0.2.0-setup.exe.blockmap"), null);
-  assert.equal(classifyAsset("SHA256SUMS.txt"), null);
-  assert.deepEqual(classifyAsset("baseforge-mcp.mjs"), { kind: "mcp", lite: false });
-});
-
-test("下载表：Lite 落 Lite 列，MCP 单行，Docker 用带 v 的 tag", () => {
-  const files = [
-    "BaseForge-0.2.0-setup.exe",
-    "BaseForge-0.2.0-portable.exe",
-    "BaseForge-0.2.0-lite-setup.exe",
-    "BaseForge-0.2.0-lite-portable.exe",
-    "BaseForge-0.2.0-arm64.dmg",
-    "BaseForge-0.2.0-lite-arm64.dmg",
-    "BaseForge-0.2.0-x86_64.AppImage",
-    "BaseForge-0.2.0-lite.AppImage",
-    "baseforge-mcp.mjs",
-    "latest.yml",
-    "SHA256SUMS.txt",
-  ];
-  const section = buildDownloadSection(files, {
-    tag: "v0.2.0",
-    repo: REPO,
-    dockerImage: "docker.example.com/baseforge",
-  });
-
-  const liteRow = section.split("\n").find((line) => line.startsWith("| **Windows**"));
-  assert.ok(liteRow);
-  const [fullCell, liteCell] = liteRow.split("|").slice(2, 4);
-  assert.match(fullCell, /BaseForge-0\.2\.0-setup\.exe/);
-  assert.doesNotMatch(fullCell, /-lite-/);
-  assert.match(liteCell, /BaseForge-0\.2\.0-lite-setup\.exe/);
-
-  // MCP 只出现一次（链接文本 + href 各一次，故按 Markdown 链接计数），避免看起来像两份产物
-  assert.equal(section.match(/\[baseforge-mcp\.mjs\]\(/g).length, 1);
-  // Docker tag 与 Release tag 一致（带 v）
-  assert.match(section, /docker pull docker\.example\.com\/baseforge:v0\.2\.0/);
-  // 元数据与校验和文件不得进入下载表
-  assert.doesNotMatch(section, /latest\.yml/);
-  assert.doesNotMatch(section, /SHA256SUMS/);
-});
-
-test("完整正文：英文在前，中文折进 details，结构齐全", () => {
-  const { dir, zh, en } = makeFixture();
-  const assets = path.join(dir, "assets");
-  fs.mkdirSync(assets);
-  for (const name of ["BaseForge-0.2.0-setup.exe", "BaseForge-0.2.0-lite-setup.exe", "baseforge-mcp.mjs"]) {
-    fs.writeFileSync(path.join(assets, name), "");
-  }
+test("完整正文：DeepSeek Harness 风格，中英各成一段且中文在前", () => {
+  const { zh, en } = makeFixture();
 
   const notes = buildReleaseNotes({
     tag: "v0.2.0",
     repo: REPO,
-    assetsDir: assets,
-    dockerImage: "",
     changelog: zh,
     changelogEn: en,
   });
 
-  // 英文概述在中文之前
-  const enIntro = notes.indexOf("Remote documents become core");
-  const zhIntro = notes.indexOf("远程文档内核化");
-  assert.ok(enIntro >= 0 && zhIntro > enIntro);
+  // 顶部等权语言链接
+  assert.match(notes, /^\[中文\]\(#中文\) \| \[English\]\(#english\)$/m);
 
-  for (const heading of ["## Download", "## What's changed", "## Notes"]) {
-    assert.ok(notes.includes(heading), `缺少 ${heading}`);
-  }
-  assert.match(notes, /<details>\n<summary>中文更新日志 · v0\.2\.0<\/summary>/);
-  assert.match(notes, /<\/details>/);
-  assert.match(notes, /### Added/);
-  // 中文分组标题不应出现在折叠块之外
-  assert.ok(notes.indexOf("### 新增") > notes.indexOf("<details>"));
-  // 英文段落的 hash 变成链接
+  // 两种语言都完整展开，不折叠
+  assert.doesNotMatch(notes, /<details/);
+
+  // 中文段在前、英文段在后；各自包含概述、分组与说明小节
+  const zhHeading = notes.indexOf("## 中文");
+  const enHeading = notes.indexOf("## English");
+  assert.ok(zhHeading >= 0 && enHeading > zhHeading);
+  assert.ok(notes.indexOf("远程文档内核化") < enHeading);
+  assert.ok(notes.indexOf("### 新增") < enHeading);
+  assert.ok(notes.indexOf("## 说明") < enHeading);
+
+  assert.ok(notes.indexOf("Remote documents become core") > enHeading);
+  assert.ok(notes.indexOf("### Added") > enHeading);
+  assert.ok(notes.indexOf("## Notes") > enHeading);
+
+  // 正文不再重复下载表：产物由 Release 页面底部的 Assets 列表展示
+  assert.doesNotMatch(notes, /## 下载/);
+  assert.doesNotMatch(notes, /releases\/download/);
+
+  // 中英文段落的 hash 都变成链接
   assert.match(notes, /\[`7b456c9cd`\]\(https:\/\/github\.com\/wushuzhilu\/BaseForge\/commit\/7b456c9cd\)/);
+  assert.equal(notes.match(/7b456c9cd/g).length >= 4, true);
 });
 
 test("缺 tag 段落时抛错，避免发出空正文", () => {

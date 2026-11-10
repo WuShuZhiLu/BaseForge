@@ -70,9 +70,9 @@ test("Release 正文只有单一来源（CHANGELOG），Gitea 不再单独维护
   assert.match(workflow, /build-release-notes\.mjs/);
   assert.match(workflow, /--notes-file \/tmp\/release-notes\.md/);
   assert.doesNotMatch(workflow, /--generate-notes/);
-  // 正文最终由 publish 阶段按真实资产重生成（含下载表）后随 Release 发布
+  // 正文由 publish 阶段生成后随 Release 发布；产物交给 Release 页面的 Assets 列表
   assert.match(workflow, /body_path:\s*release-notes\.md/);
-  assert.match(workflow, /--assets release-assets/);
+  assert.doesNotMatch(workflow, /--assets/);
 });
 
 test("Docker 镜像 tag 阶段同时推版本与 latest", async () => {

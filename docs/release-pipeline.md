@@ -81,28 +81,22 @@ Lite 与 Full 用不同 `appId`（`com.nowen.note` / `com.nowen.note.lite`）与
 ### 3.2 Release 正文
 
 正文由 `scripts/build-release-notes.mjs` 生成，不手写、也不用 `--generate-notes`
-（后者只会列出 PR，和手写分组口径对不上，且没有下载入口）。
+（后者只会列出 PR，和手写分组口径对不上）。
 
-自上而下的结构：
+自上而下的结构（对齐 DeepSeek Harness 的 Release 写法）：
 
-1. **英文概述** — `CHANGELOG.en.md` 该版本段落的第一段；
-2. **中文概述** — `CHANGELOG.md` 同段落第一段，以引用块呈现；
-3. prerelease 提示（tag 含 `-` 时自动加）；
-4. `## Download` — 按 `release-assets/` 里的**真实文件**生成，Full / Lite 两列，另附 MCP 单文件与 Docker；
-5. `## What's changed` — 英文分组（Added / Fixed / Improved / …）；
-6. **中文更新日志** — 折进 `<details>`，占位不占首屏；
-7. `## Notes` — 校验和、CHANGELOG 链接、源码 tag。
+1. `[中文](#中文) | [English](#english)` — 顶部等权语言链接，中文在前；
+2. `## 中文` — `CHANGELOG.md` 该版本段落（概述 + 分组）+ `## 说明`；
+3. `## English` — `CHANGELOG.en.md` 该版本段落（intro + groups）+ `## Notes`。
 
-英文在前的理由：GitHub 是主仓，外部协作者默认看到英文；中文完整内容折叠保留。
+正文不放下载表：GitHub Release 页面底部的 **Assets** 列表已经按真实文件自动生成，重复列一遍既冗余也容易过期。
+Release 正文只有一个 body，不能像 README 那样跳到另一个文件，所以语言切换用页内锚点。
+两种语言都完整展开、不折叠，中文排在前面。
 条目里的短 hash 与 `#123` 会被转成指向 GitHub 主仓的可点链接，正文不再出现裸 hash。
 
-生成分两阶段：
+`prepare-release` 与 `publish` 两个阶段用同一份正文（只依赖 CHANGELOG），产物由 `files: release-assets/*` 挂到 Release 上。
 
-- `prepare-release` 只生成**不含下载表**的基础版（此时产物还没构建），让 draft 一出现就有可读正文；
-- `publish` 在资产齐全后带 `--assets release-assets` **重新生成**并作为 `body_path` 上传，
-  因此下载表里的文件名与链接一定存在，`artifactName` 改了也不会指向 404。
-
-Gitea / Gitee 复用 GitHub Release 的 `body`，三端发布说明天然一致；表内链接指向 GitHub 是有意为之
+Gitea / Gitee 复用 GitHub Release 的 `body`，三端发布说明天然一致；正文里的 commit / issue 链接指向 GitHub 是有意为之
 ——GitHub 是主仓，Gitea / Gitee 只做镜像与分发。
 
 > 发版前请把版本段落的第一段改成正式概述。脚本检测到「开发中 / in development」会在 CI 日志里

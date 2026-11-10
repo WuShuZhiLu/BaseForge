@@ -528,18 +528,15 @@ jobs:
             | xargs -r sha256sum > SHA256SUMS.txt
           echo "校验和条目：$(wc -l < SHA256SUMS.txt)"
 
-      - name: Build release notes with real assets
+      - name: Build release notes
         env:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # 用真实资产清单重生成正文：下载表里的文件名与链接一定存在，
-          # 命名规则变了也不会指向 404。
+          # 正文只放更新内容；产物由 Release 页面底部的 Assets 列表自动展示。
           node scripts/build-release-notes.mjs \
             --tag "$TAG" \
             --repo "${{ github.repository }}" \
-            --assets release-assets \
-            --docker-image "${{ vars.DOCKER_IMAGE }}" \
             --out release-notes.md
 
       - name: Publish GitHub Release
