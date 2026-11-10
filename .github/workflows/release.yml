@@ -2,7 +2,7 @@
 #
 # 发布职责约束：
 #   - push tag v*.*.* 构建全部平台；Windows Full/Lite 必须经 SignPath release-signing 后才能成为正式 artifact；
-#   - workflow_dispatch 只使用 test-signing 验证 Windows 签名链路，不会产出正式 Release 资产；
+#   - workflow_dispatch 只做编译验证、不会创建 Release；勾选 signpath_test 才额外跑 Windows 测试签名；
 #   - GitHub 是权威发布点：先建 draft Release → 构建并上传资产 → 校验齐全 → 转正式；
 #   - GitHub 转正式后 dispatch Gitea 的 Sync Release Assets（同步 → Gitea 转正式 → Gitee）；
 #   - electron-builder 始终关闭内置发布能力（--publish 统一为 never），避免多发布者并发写 Release。
@@ -14,6 +14,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      signpath_test:
+        description: "运行 SignPath 测试签名链路（需要相关 secrets）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -213,7 +218,7 @@ jobs:
 
       # ========= 手动 test-signing：只验证 Full，不参与正式发布 =========
       - name: Stage Windows EXEs for SignPath test
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         shell: pwsh
         run: |
           $target = Join-Path $PWD "signpath-input"
@@ -227,7 +232,7 @@ jobs:
 
       - name: Upload unsigned Windows EXEs for SignPath test
         id: upload_signpath_test
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
           name: nowen-note-win-signpath-input-${{ github.run_id }}
@@ -236,7 +241,7 @@ jobs:
           retention-days: 1
 
       - name: Submit SignPath test signing request
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -252,7 +257,7 @@ jobs:
           output-artifact-directory: signpath-test-signed
 
       - name: Verify SignPath test result exists
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         shell: pwsh
         run: |
           $signed = @(Get-ChildItem -Path "signpath-test-signed" -Recurse -File -Filter "*.exe")
@@ -266,7 +271,7 @@ jobs:
           }
 
       - name: Upload SignPath test signed Windows EXEs
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
           name: nowen-note-win-signpath-test
