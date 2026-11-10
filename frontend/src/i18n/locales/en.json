@@ -3183,6 +3183,10 @@
       "close": "Close outline"
     }
   },
+  "shareCenter": {
+    "batchDisable": "Disable selected",
+    "batchCopyLinks": "Copy all links"
+  },
   "plugins": {
     "marketplace": {
       "install": "Install",

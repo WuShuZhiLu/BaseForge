@@ -21,6 +21,16 @@ import {
   shouldUseAndroidNativeHttp,
 } from "@/lib/androidNativeHttpBridge";
 
+// jsdom 的 Blob 没有实现 arrayBuffer()，用 FileReader 读同一份字节。
+function readBlobBytes(blob: Blob): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
 describe("androidNativeHttpBridge", () => {
   let cleanup: (() => void) | null = null;
   let browserFetch: ReturnType<typeof vi.fn>;
@@ -163,7 +173,7 @@ describe("androidNativeHttpBridge", () => {
       const blob = await response.blob();
 
       expect(blob.type).toBe("image/png");
-      expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual(bytes);
+      expect(Array.from(await readBlobBytes(blob))).toEqual(bytes);
       expect(capacitorState.request).toHaveBeenCalledWith(expect.objectContaining({
         url,
         method: "GET",

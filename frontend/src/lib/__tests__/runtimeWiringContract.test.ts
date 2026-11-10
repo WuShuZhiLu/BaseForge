@@ -307,9 +307,9 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(app).toContain("state.activeToolTab ? (");
     expect(app).toContain("<ToolPageHost tool={state.activeToolTab} />");
 
-    // 既有编辑器抬头：风格与页签/工具统一（py-1.5、hover pill、圆角图标组）
+    // 既有编辑器抬头：与知识库页签/工具统一 48px 基线（h-12、hover pill、圆角图标组）
     const editor = read("../../components/EditorPane.tsx");
-    expect(editor).toContain("px-4 py-1.5 border-b border-app-border bg-app-surface/30");
+    expect(editor).toContain("h-12 shrink-0 min-w-0 items-center justify-between gap-3 px-4 border-b border-app-border bg-app-surface/30");
     expect(editor).toContain("rounded-lg px-2 text-[12.5px] text-tx-secondary transition-colors hover:bg-app-hover");
     expect(editor).toContain("gap-0.5 bg-app-hover/50 rounded-lg px-1 py-0.5");
 

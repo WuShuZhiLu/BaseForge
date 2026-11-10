@@ -378,6 +378,10 @@
       "close": "关闭大纲"
     }
   },
+  "shareCenter": {
+    "batchDisable": "批量停用",
+    "batchCopyLinks": "批量复制全部链接"
+  },
   "editor": {
     "selectNote": "从左侧知识库选择一篇文档",
     "orCreateNew": "或按 Alt+N 在知识库中新建一篇",

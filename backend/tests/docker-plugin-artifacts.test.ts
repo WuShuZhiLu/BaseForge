@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-test("Docker-shaped tsc artifacts run both plugin runtimes without source fallbacks", { timeout: 120_000 }, () => {
+test("Docker-shaped tsc artifacts run both plugin runtimes without source fallbacks", { timeout: 240_000 }, () => {
   const backend = fs.existsSync(path.resolve("src/plugins/runner.ts")) ? process.cwd() : path.resolve("backend");
   const root = path.resolve(backend, "..");
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
@@ -16,8 +16,10 @@ test("Docker-shaped tsc artifacts run both plugin runtimes without source fallba
   const dist = path.join(artifactBackend, "dist");
   const smoke = path.join(backend, "scripts/smoke-plugin-artifacts.cjs");
   try {
+    // --noCheck：只做 emit 验证产物形态。类型检查由 CI 的独立 typecheck job 负责，
+    // 这里再跑一遍完整类型检查会把用例拖到 90s 上限附近。
     execFileSync(process.execPath, [path.join(backend, "node_modules/typescript/bin/tsc"),
-      "--outDir", dist, "--declaration", "false", "--pretty", "false"], { cwd: backend, timeout: 90_000 });
+      "--noCheck", "--outDir", dist, "--declaration", "false", "--pretty", "false"], { cwd: backend, timeout: 180_000 });
     fs.symlinkSync(path.join(backend, "node_modules"), path.join(artifactBackend, "node_modules"), "junction");
     assert.equal(fs.existsSync(path.join(artifactBackend, "src")), false);
     for (const source of copy[1].trim().split(/\s+/)) {
