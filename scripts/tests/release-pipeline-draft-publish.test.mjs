@@ -98,7 +98,7 @@ test("publish 阶段生成 SHA256SUMS 并随 Release 发布", async () => {
 
 test("资产矩阵断言与 electron-builder 的 Lite 命名保持一致", async () => {
   const script = await readRepoFile("scripts/assert-release-matrix.mjs");
-  // Lite 的真实产物名是 BaseForge-<version>-lite-*，不是 BaseForge-Lite-*
+  // Lite 产物统一为 BaseForge-<version>-lite-*，与 full 的版本在前规则一致
   assert.doesNotMatch(script, /BaseForge-Lite-\$\{version\}/);
   assert.match(script, /`BaseForge-\$\{version\}-lite-setup\.exe`/);
   assert.match(script, /`BaseForge-\$\{version\}-lite-portable\.exe`/);

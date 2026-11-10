@@ -12,8 +12,8 @@ function parseDate(value, label, fileName) {
 
 function channelForSetup(fileName) {
   const name = path.basename(String(fileName || ""));
-  if (/^BaseForge-Lite-.+-setup\.exe$/.test(name)) return "lite";
-  if (/^BaseForge-.+-setup\.exe$/.test(name) && !/^BaseForge-Lite-/.test(name)) return "full";
+  if (/^BaseForge-.+-lite-setup\.exe$/i.test(name)) return "lite";
+  if (/^BaseForge-.+-setup\.exe$/i.test(name) && !/-lite-setup\.exe$/i.test(name)) return "full";
   return null;
 }
 

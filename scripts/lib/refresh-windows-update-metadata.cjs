@@ -16,7 +16,7 @@ function normalizeVersion(value) {
 
 function stableSetupName(channel, version) {
   return channel === "lite"
-    ? `BaseForge-Lite-${version}-setup.exe`
+    ? `BaseForge-${version}-lite-setup.exe`
     : `BaseForge-${version}-setup.exe`;
 }
 
@@ -30,8 +30,8 @@ function listChannelSetupCandidates(assetDir, channel) {
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((name) => {
-      if (channel === "lite") return /^BaseForge-Lite-.+-setup\.exe$/.test(name);
-      return /^BaseForge-.+-setup\.exe$/.test(name) && !/^BaseForge-Lite-/.test(name);
+      if (channel === "lite") return /^BaseForge-.+-lite-setup\.exe$/.test(name);
+      return /^BaseForge-.+-setup\.exe$/.test(name) && !/-lite-setup\.exe$/.test(name);
     })
     .sort();
 }

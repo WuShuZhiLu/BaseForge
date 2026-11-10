@@ -77,8 +77,8 @@ function main() {
   };
 
   // ---------- Windows ----------
-  // Lite 的产物名来自 electron/builder.lite.base.config.js 的 artifactName：
-  // `BaseForge-${version}-lite-setup/-portable`，不是 `BaseForge-Lite-...`。
+  // Lite 与 full 共用 `<名称>-<版本>-...` 规则，只多一段 `-lite`：
+  // 版本在前，Release 资产列表里 full / Lite 会挨在一起排序。
   requireExact(`BaseForge-${version}-setup.exe`, "Windows 安装版（full）");
   requireExact(`BaseForge-${version}-portable.exe`, "Windows 免安装版（full）");
   requireExact(`BaseForge-${version}-lite-setup.exe`, "Windows 安装版（Lite）");
@@ -93,10 +93,11 @@ function main() {
   }
 
   // ---------- Linux ----------
-  requirePattern(new RegExp(`^BaseForge-${version.replace(/\./g, "\\.")}-[A-Za-z0-9_]+\\.AppImage$`), "Linux AppImage（full）");
-  requirePattern(new RegExp(`^BaseForge-${version.replace(/\./g, "\\.")}-[A-Za-z0-9_]+\\.deb$`), "Linux deb（full）");
-  requirePattern(new RegExp(`^BaseForge-${version.replace(/\./g, "\\.")}-lite\\.AppImage$`), "Linux AppImage（Lite）");
-  requirePattern(new RegExp(`^BaseForge-${version.replace(/\./g, "\\.")}-lite\\.deb$`), "Linux deb（Lite）");
+  const escapedVersion = version.replace(/\./g, "\\.");
+  requirePattern(new RegExp(`^BaseForge-${escapedVersion}-[A-Za-z0-9_]+\\.AppImage$`), "Linux AppImage（full）");
+  requirePattern(new RegExp(`^BaseForge-${escapedVersion}-[A-Za-z0-9_]+\\.deb$`), "Linux deb（full）");
+  requirePattern(new RegExp(`^BaseForge-${escapedVersion}-lite-[A-Za-z0-9_]+\\.AppImage$`), "Linux AppImage（Lite）");
+  requirePattern(new RegExp(`^BaseForge-${escapedVersion}-lite-[A-Za-z0-9_]+\\.deb$`), "Linux deb（Lite）");
 
   // ---------- MCP ----------
   requireExact("baseforge-mcp.mjs", "MCP 单文件");

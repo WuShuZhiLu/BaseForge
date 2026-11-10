@@ -22,8 +22,8 @@ test("full desktop updater uses stable no-space artifact names", () => {
 test("lite updater stays on an isolated latest-lite channel", () => {
   assert.ok(Array.isArray(lite.publish));
   assert.ok(lite.publish.every((provider) => provider.channel === "latest-lite"));
-  assert.equal(lite.nsis?.artifactName, "BaseForge-Lite-${version}-setup.${ext}");
-  assert.equal(lite.portable?.artifactName, "BaseForge-Lite-${version}-portable.${ext}");
+  assert.equal(lite.nsis?.artifactName, "BaseForge-${version}-lite-setup.${ext}");
+  assert.equal(lite.portable?.artifactName, "BaseForge-${version}-lite-portable.${ext}");
   assert.equal(lite.afterAllArtifactBuild, undefined);
   assert.match(
     fs.readFileSync(path.join(repoRoot, "scripts", "safe-build-legacy.mjs"), "utf8"),
