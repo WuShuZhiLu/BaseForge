@@ -303,16 +303,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # SignPath 的 artifact configuration 仍按 `BaseForge-Lite-<版本>-*` 匹配，
+      # 这里只在上传前临时改名；构建产物与最终发布名保持 `BaseForge-<版本>-lite-*`。
+      - name: Stage Lite EXEs with SignPath configuration names
+        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $target = Join-Path $PWD "signpath-lite-input"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $pairs = @(
+            @("dist-electron-lite/BaseForge-$version-lite-setup.exe", "BaseForge-Lite-$version-setup.exe"),
+            @("dist-electron-lite/BaseForge-$version-lite-portable.exe", "BaseForge-Lite-$version-portable.exe")
+          )
+          foreach ($pair in $pairs) {
+            if (-not (Test-Path $pair[0])) { throw "Missing Lite installer: $($pair[0])" }
+            Copy-Item $pair[0] (Join-Path $target $pair[1]) -Force
+          }
+
       - name: Upload unsigned Lite Windows artifact for SignPath
         id: upload_lite_unsigned
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: nowen-note-win-lite-unsigned-signpath
-          path: |
-            dist-electron-lite/*.exe
-            dist-electron-lite/*.blockmap
-            dist-electron-lite/latest-lite.yml
+          path: signpath-lite-input/*.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -347,6 +362,25 @@ jobs:
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: signed-windows/lite
+
+      # SignPath 回传的文件名仍是上传时的临时名，这里改回发布命名，
+      # 并把 electron-builder 生成的 Lite 更新元数据放回目录，供后面重算哈希与 blockmap。
+      - name: Restore Lite artifact filenames after signing
+        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $dir = "signed-windows/lite"
+          $pairs = @(
+            @("BaseForge-Lite-$version-setup.exe", "BaseForge-$version-lite-setup.exe"),
+            @("BaseForge-Lite-$version-portable.exe", "BaseForge-$version-lite-portable.exe")
+          )
+          foreach ($pair in $pairs) {
+            $from = Join-Path $dir $pair[0]
+            if (-not (Test-Path $from)) { throw "SignPath output missing: $($pair[0])" }
+            Move-Item $from (Join-Path $dir $pair[1]) -Force
+          }
+          Copy-Item "dist-electron-lite/latest-lite.yml" $dir -Force
 
       - name: Export signed Windows Authenticode records
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
