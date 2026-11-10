@@ -82,8 +82,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          # 正文 = 英文段落（主体）+ 中文段落（折叠）+ 下载表，由脚本统一生成。
-          # 此处还没有真实资产，下载表在 publish 阶段用真实资产重生成一次。
+          # 正文 = 中文段落（默认） + 英文段落（页内锚点切换），由脚本统一生成。
+          # 产物由 Release 页面底部的 Assets 列表展示，正文不重复放下载表。
           node scripts/build-release-notes.mjs \
             --tag "$TAG" \
             --repo "${{ github.repository }}" \
@@ -276,7 +276,7 @@ jobs:
 
       # ========= tag 正式发布：Full + Lite 分离签名 =========
       - name: Build Electron Lite (Windows)
-        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        if: matrix.os == 'windows-latest'
         env:
           NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
         run: npx electron-builder --config electron/builder.lite.config.js --win --publish never
@@ -451,6 +451,19 @@ jobs:
             dist-electron-lite/*.zip
             dist-electron-lite/*.AppImage
             dist-electron-lite/*.deb
+            dist-electron-lite/*.blockmap
+            dist-electron-lite/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      # 手动触发（不发版）时，Windows Lite 没有 SignPath 流程，单独上传未签名产物供本地验证。
+      - name: Upload Windows Lite build (manual test)
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-win-lite-unsigned
+          path: |
+            dist-electron-lite/*.exe
             dist-electron-lite/*.blockmap
             dist-electron-lite/latest*.yml
           if-no-files-found: error

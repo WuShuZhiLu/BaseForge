@@ -21,6 +21,7 @@ import AutomationCenter from "@/components/automation/AutomationCenter";
 import TaskDigestSettings from "@/components/automation/TaskDigestSettings";
 import MobileAccountSettings from "@/components/settings/MobileAccountSettings";
 import { isAndroidNativeRuntime, isMobileLocalMode } from "@/lib/mobileLocalMode";
+import { PROJECT_REPO_URL, UPSTREAM_PROJECT_URL } from "@/lib/projectLinks";
 import UserManagement from "@/components/UserManagement";
 import WorkspaceManagement from "@/components/WorkspaceManagement";
 import DownloadPanel from "@/components/DownloadPanel";
@@ -488,7 +489,7 @@ function AboutPanel() {
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             {t('about.basedOn')}{" "}
             <a
-              href="https://github.com/cropflre/nowen-note"
+              href={UPSTREAM_PROJECT_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-0.5 text-accent-primary underline underline-offset-2 decoration-accent-primary/40 hover:decoration-accent-primary"
@@ -499,7 +500,7 @@ function AboutPanel() {
           </p>
         </div>
         <a
-          href="https://github.com/cropflre/nowen-note"
+          href={PROJECT_REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-medium hover:opacity-80 transition-opacity shrink-0 ml-3"

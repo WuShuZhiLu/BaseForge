@@ -52,6 +52,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import {
+  PROJECT_DOCKER_RUN_COMMAND,
+  PROJECT_GITEE_REPO,
+  PROJECT_LATEST_RELEASE_URL,
+} from "@/lib/projectLinks";
 
 /**
  * 镜像源定义。
@@ -65,7 +70,7 @@ type MirrorSource =
 
 const MIRROR_SOURCES: MirrorSource[] = [
   // Gitee 镜像放第一位：国内用户最稳的兜底（自有仓库，速度可控）
-  { id: "gitee", label: "Gitee 镜像", kind: "gitee", owner: "cropflre", repo: "nowen-note" },
+  { id: "gitee", label: "Gitee 镜像", kind: "gitee", ...PROJECT_GITEE_REPO },
   { id: "ghproxy", label: "ghproxy.net", kind: "proxy", prefix: "https://ghproxy.net/" },
   { id: "llkk", label: "gh.llkk.cc", kind: "proxy", prefix: "https://gh.llkk.cc/" },
   { id: "mirror", label: "mirror.ghproxy.com", kind: "proxy", prefix: "https://mirror.ghproxy.com/" },
@@ -119,7 +124,7 @@ function categorize(name: string): AssetCategory {
   }
   if (lower.endsWith(".apk")) return "android";
   // clipper 浏览器扩展：发布脚本里包名形如 <品牌>-clipper-x.y.z.zip。
-  if (lower.startsWith("nowen-clipper") && lower.endsWith(".zip")) return "clipper";
+  if (/^(?:nowen|baseforge)-clipper/.test(lower) && lower.endsWith(".zip")) return "clipper";
   if (lower.endsWith(".ipa") || (lower.includes("ios") && lower.endsWith(".zip"))) return "ios";
   if (
     lower.endsWith(".dmg") ||
@@ -128,7 +133,7 @@ function categorize(name: string): AssetCategory {
       lower.includes("mac") ||
       lower.includes("darwin") ||
       lower.includes("osx") ||
-      (lower.startsWith("nowen-note") && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower))
+      /^(?:nowen-note|baseforge)/.test(lower) && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower)
     ) && lower.endsWith(".zip"))
   ) {
     if (/(?:arm64|aarch64|apple[._ -]?silicon)/.test(lower)) return "mac-arm64";
@@ -233,10 +238,9 @@ const PLATFORM_ORDER: Array<{
   { category: "other", icon: HardDrive },
 ];
 
-const GITHUB_RELEASE_URL = "https://github.com/cropflre/nowen-note/releases/latest";
+const GITHUB_RELEASE_URL = PROJECT_LATEST_RELEASE_URL;
 
-const DOCKER_RUN_COMMAND =
-  "docker run -d --name baseforge -p 3001:3001 -v ~/baseforge-data:/app/data cropflre/nowen-note:latest";
+const DOCKER_RUN_COMMAND = PROJECT_DOCKER_RUN_COMMAND;
 
 async function copyText(value: string): Promise<boolean> {
   try {

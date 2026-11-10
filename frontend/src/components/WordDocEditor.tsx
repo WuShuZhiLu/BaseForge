@@ -28,7 +28,8 @@ const WordDocEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(
   const outerContainerRef = useRef<HTMLDivElement | null>(null);
 
 
-    useImperativeHandle(ref, () => ({}), []);
+    // 只读预览：没有待落盘的编辑内容，flushSave 为 no-op 以满足编辑器统一句柄。
+    useImperativeHandle(ref, () => ({ flushSave: () => {} }), []);
 
     // 渲染：拉取 docx → docx-preview 解析绘制（分页 / 页眉页脚 / 图片 / 样式）
     useEffect(() => {

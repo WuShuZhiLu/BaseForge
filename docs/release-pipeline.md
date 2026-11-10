@@ -168,7 +168,7 @@ node scripts/sync-release-assets.mjs --tag <TAG> --dry-run            # 指定 t
 | `RELEASE_SYNC_TOKEN` | Secret | 写 Gitea Release（本仓 repo 写权限） |
 | `GITEE_TOKEN` | Secret | 写 Gitee Release |
 | `GH_MIRROR_REPO` | Variable | GitHub 主仓 `owner/repo`（资产来源） |
-| `GITEE_REPO` | Variable | Gitee 镜像仓 `owner/repo` |
+| `GITEE_REPO` | Variable | Gitee 镜像仓 `owner/repo`（当前：`wushuzhilu/base-forge`） |
 
 **Gitea 仓库**（镜像推送侧，`docker-image.yml`）
 | 名称 | 类型 | 用途 |

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Loader2, AlertCircle, AlertTriangle, HardDrive, RefreshCw, Save, ShieldAlert, Lock, Eye, EyeOff, X, Mail, Send, Settings as SettingsIcon, ChevronDown, ChevronRight, BookOpen, ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, withSudo, getServerUrl } from "@/lib/api";
+import { PROJECT_DOCS_BASE_URL } from "@/lib/projectLinks";
 import { isDesktop } from "@/lib/desktopBridge";
 import { isElectronFullLocalRuntime } from "@/lib/uploadRequest";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
@@ -1748,7 +1749,7 @@ function SmtpProviderGuide() {
         ? t("dataManager.smtp.guide.tlsOff")
         : t("dataManager.smtp.guide.tlsDepends");
 
-  const docUrl = "https://github.com/cropflre/nowen-note/blob/main/docs/backup-email-smtp.md";
+  const docUrl = `${PROJECT_DOCS_BASE_URL}/backup-email-smtp.md`;
 
   return (
     <div className="rounded-lg border border-sky-200/70 dark:border-sky-500/30 bg-sky-50/60 dark:bg-sky-500/5">

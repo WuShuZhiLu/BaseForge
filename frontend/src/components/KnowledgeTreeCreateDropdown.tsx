@@ -34,13 +34,15 @@ export interface KnowledgeTreeCreateMenuState {
   anchor: DOMRect;
 }
 
+type ImportKind = (typeof IMPORT_ITEMS)[number]["kind"];
+
 interface KnowledgeTreeCreateDropdownProps {
   menu: KnowledgeTreeCreateMenuState | null;
   onClose: () => void;
   onCreate: (parentId: string | null, kind: KnowledgeTreeInlineCreateKind) => void;
   onCreateFromTemplate: (parentId: string | null) => void;
   onCreateEncrypted?: (parentId: string | null) => void;
-  onImport: (parentId: string | null, kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat") => void;
+  onImport: (parentId: string | null, kind: ImportKind) => void;
 }
 
 function menuPosition(anchor: DOMRect, menuHeight: number): React.CSSProperties {

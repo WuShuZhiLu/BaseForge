@@ -48,7 +48,7 @@
 set -euo pipefail
 
 # -------------------- 配置 --------------------
-DEFAULT_IMAGE_NAME="cropflre/nowen-note"
+DEFAULT_IMAGE_NAME="wushuzhilu/baseforge"
 DEFAULT_BRANCH="main"
 GITHUB_REPO_URL="https://github.com/WuShuZhiLu/BaseForge"
 GITHUB_REPO_SLUG="WuShuZhiLu/BaseForge"   # gh release create 需要的 "owner/repo"
@@ -173,7 +173,7 @@ usage() {
                            - clipper  : 调 packages/nowen-clipper 出浏览器扩展 zip
                            - upk      : 调 scripts/upk/build-upk.mjs 出绿联 NAS .upk 安装包
       --fpk-dockerhub-repo USER/REPO
-                           飞牛 .fpk 引用的 dockerhub 镜像（默认取 cropflre/nowen-note）
+                           飞牛 .fpk 引用的 dockerhub 镜像（默认取 wushuzhilu/baseforge）
       --upk-image REPO:TAG
                            绿联 .upk 要打进包的镜像名（默认 同 fpk-dockerhub-repo : v版本号）
       --upk-build N        绿联 .upk 的构建号（默认 1，会拼成 X.Y.Z.N 写入包名）
@@ -933,7 +933,7 @@ else
     # 三端版本号严格单调递增，避免出现 "本地 tag 落后 Docker Hub" 或反之的错位。
     #   1) 本地 git tag
     #   2) GitHub 远端 tag（origin）
-    #   3) Docker Hub 镜像 tag（cropflre/nowen-note）
+    #   3) Docker Hub 镜像 tag（wushuzhilu/baseforge）
     # 网络不可用（ls-remote / curl 失败）时静默跳过该来源，不阻断发布。
 
     # 提取形如 vX.Y.Z / X.Y.Z（可带 -rc.N 等后缀）并归一化为裸 X.Y.Z(-suffix)

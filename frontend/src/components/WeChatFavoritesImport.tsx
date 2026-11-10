@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, getCurrentWorkspace } from "@/lib/api";
+import { PROJECT_DOCS_BASE_URL } from "@/lib/projectLinks";
 import { useAppActions } from "@/store/AppContext";
 import {
   importWeChatFavoritesPackage,
@@ -28,7 +29,7 @@ import {
 type Phase = "idle" | "scanning" | "ready" | "importing" | "done" | "error";
 
 const WECHAT_DATA_ANALYSIS_RELEASE_URL = "https://github.com/LifeArchiveProject/WeChatDataAnalysis/releases/latest";
-const WECHAT_FAVORITES_TUTORIAL_URL = "https://github.com/cropflre/nowen-note/blob/main/docs/tutorials/wechat-favorites-import.md";
+const WECHAT_FAVORITES_TUTORIAL_URL = `${PROJECT_DOCS_BASE_URL}/tutorials/wechat-favorites-import.md`;
 
 const TYPE_LABELS: Record<string, { zh: string; en: string }> = {
   text: { zh: "文本", en: "Text" },

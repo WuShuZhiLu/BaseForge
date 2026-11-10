@@ -40,6 +40,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { PROJECT_LATEST_RELEASE_URL } from "@/lib/projectLinks";
 import { RefreshCw, X, AlertTriangle, ExternalLink } from "lucide-react";
 
 // 编译期常量兜底：开发态走 HMR / 旧构建可能没注入，统一给"取不到"的哨兵值。
@@ -119,8 +120,12 @@ function writeDismissed(key: string) {
   try { localStorage.setItem(DISMISS_KEY, key); } catch { /* ignore */ }
 }
 
+// 移动端尚未跟随 0.2.0 发版，暂时关闭 APK 下载 / 强制升级入口；
+// 移动端恢复发版后把这里改回 true 即可。
+const MOBILE_RELEASES_ENABLED = false;
+
 // Android native 壳的 APK 下载页（落在 GitHub release 页，最稳）
-const APK_DOWNLOAD_URL = "https://github.com/cropflre/nowen-note/releases/latest";
+const APK_DOWNLOAD_URL = PROJECT_LATEST_RELEASE_URL;
 
 /**
  * 简单的 semver 比较：a < b 返回 -1；a > b 返回 1；相等返回 0。
@@ -203,6 +208,7 @@ export default function UpdateNotifier() {
     // WebView 里刷 JS 解决不了原生 plugin / 权限 / API 不兼容，必须重装 APK。
     // 不走 sessionStorage 关闭逻辑（hard 模式本就是阻断性的）。
     if (
+      MOBILE_RELEASES_ENABLED &&
       isAndroidNative() &&
       serverInfo.minClientVersion &&
       compareVersions(CLIENT_VERSION, serverInfo.minClientVersion) < 0

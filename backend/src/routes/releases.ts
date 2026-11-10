@@ -7,11 +7,11 @@
 import { Hono } from "hono";
 
 const router = new Hono();
-// 发布仓库必须由部署方显式配置。这里不再回退到上游仓库：
-// 一旦默认指向上游，关于页的「最新发布」就会把上游版本当成自身新版本，
+// 发布仓库默认指向本产品主仓，部署方可用环境变量覆盖。
+// 不要回退到上游 nowen-note：否则「最新发布」会把上游版本当成自身新版本，
 // 既显示错误的「可升级」，也把用户引到与本产品无关的下载页。
-const GITHUB_OWNER = (process.env.NOWEN_RELEASE_OWNER || "").trim();
-const GITHUB_REPO = (process.env.NOWEN_RELEASE_REPO || "").trim();
+const GITHUB_OWNER = (process.env.NOWEN_RELEASE_OWNER || "WuShuZhiLu").trim();
+const GITHUB_REPO = (process.env.NOWEN_RELEASE_REPO || "BaseForge").trim();
 const RELEASE_REPO_CONFIGURED = Boolean(GITHUB_OWNER && GITHUB_REPO);
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 const GITHUB_LATEST_RELEASE_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
