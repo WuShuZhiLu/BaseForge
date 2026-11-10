@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS } from "../src/db/migrations";
 
 test("notebook share links migration creates token-backed links", () => {
   const migration = MIGRATIONS.find((m) => m.name === "notebook-share-links");
   assert.ok(migration, "notebook-share-links migration should be registered");
 
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (

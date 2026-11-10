@@ -21,7 +21,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const U1 = "u-unref-1";
 const NB1 = "nb-unref-1";
@@ -32,7 +32,7 @@ const A_FRESH_2 = "att-unref-fresh2";
 const A_OLD = "att-unref-old";
 const A_USED = "att-unref-used";
 
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 

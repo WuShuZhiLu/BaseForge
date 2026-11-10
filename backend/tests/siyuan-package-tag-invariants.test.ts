@@ -15,7 +15,7 @@ const NOTEBOOK_ID = "siyuan-tag-notebook";
 const PERSONAL_TAG_ID = "existing-personal-tag";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 
 function paragraph(children: any[]) {

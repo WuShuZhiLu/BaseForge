@@ -15,7 +15,7 @@ const WORKSPACE_ID = "siyuan-import-workspace";
 const TARGET_NOTEBOOK_ID = "siyuan-target-notebook";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 let app: Hono;
 

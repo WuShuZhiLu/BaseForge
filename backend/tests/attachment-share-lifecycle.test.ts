@@ -18,7 +18,7 @@ const FILE_BYTES = new Uint8Array([1, 2, 3, 4, 5]);
 
 let publicApp: Hono;
 let manageApp: Hono;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let closeDb: () => void;
 
 test.before(async () => {

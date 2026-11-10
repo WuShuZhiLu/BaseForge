@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 import {
   newUserOnboardingMigration,
@@ -9,8 +9,8 @@ import {
 import { newUserOnboardingFirstLoginMigration } from "../src/db/newUserOnboardingFirstLoginMigration.js";
 import { disableOnboardingSeedMigration } from "../src/db/disableOnboardingSeedMigration.js";
 
-function createDb(): Database.Database {
-  const db = new Database(":memory:");
+function createDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (
@@ -51,12 +51,12 @@ function createDb(): Database.Database {
   return db;
 }
 
-function installOnboarding(db: Database.Database): void {
+function installOnboarding(db: DatabaseSync): void {
   newUserOnboardingMigration.up(db);
   newUserOnboardingFirstLoginMigration.up(db);
 }
 
-function confirmLogin(db: Database.Database, userId: string): void {
+function confirmLogin(db: DatabaseSync, userId: string): void {
   db.prepare("UPDATE users SET lastLoginAt = datetime('now') WHERE id = ?").run(userId);
 }
 

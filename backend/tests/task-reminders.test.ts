@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import crypto from "crypto";
 
 /**
@@ -10,7 +10,7 @@ import crypto from "crypto";
  */
 
 function createTestDb() {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (
@@ -41,11 +41,11 @@ function createTestDb() {
   return db;
 }
 
-function insertUser(db: Database.Database, id: string) {
+function insertUser(db: DatabaseSync, id: string) {
   db.prepare("INSERT INTO users (id, username) VALUES (?, ?)").run(id, id);
 }
 
-function insertTask(db: Database.Database, opts: {
+function insertTask(db: DatabaseSync, opts: {
   id: string; userId: string; title: string;
   isCompleted?: number; dueDate?: string | null; dueAt?: string | null;
   parentId?: string | null;
@@ -55,7 +55,7 @@ function insertTask(db: Database.Database, opts: {
   ).run(opts.id, opts.userId, opts.title, opts.isCompleted ?? 0, opts.dueDate ?? null, opts.dueAt ?? null, opts.parentId ?? null);
 }
 
-function insertReminder(db: Database.Database, opts: {
+function insertReminder(db: DatabaseSync, opts: {
   id: string; taskId: string; userId: string;
   offsetMinutes?: number; enabled?: number; lastNotifiedAt?: string | null;
 }) {
@@ -65,7 +65,7 @@ function insertReminder(db: Database.Database, opts: {
 }
 
 /** Replicate scanDueReminders logic against test DB */
-function scanDue(db: Database.Database) {
+function scanDue(db: DatabaseSync) {
   const rows = db.prepare(`
     SELECT r.id AS reminderId, r.taskId, r.userId, r.offsetMinutes, r.lastNotifiedAt,
            t.title AS taskTitle, t.dueAt, t.dueDate, t.isCompleted

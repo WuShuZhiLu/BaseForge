@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { after } from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import crypto from "crypto";
 
 /**
@@ -40,7 +40,7 @@ after(async () => {
 });
 
 function createTestDb() {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (
@@ -85,11 +85,11 @@ function createTestDb() {
   return db;
 }
 
-function insertUser(db: Database.Database, id: string) {
+function insertUser(db: DatabaseSync, id: string) {
   db.prepare("INSERT INTO users (id, username) VALUES (?, ?)").run(id, id);
 }
 
-function insertTask(db: Database.Database, opts: {
+function insertTask(db: DatabaseSync, opts: {
   id: string; userId: string; title: string; description?: string;
   isCompleted?: number; dueDate?: string | null; dueAt?: string | null;
 }) {
@@ -104,7 +104,7 @@ function insertTask(db: Database.Database, opts: {
   );
 }
 
-function insertReminder(db: Database.Database, opts: {
+function insertReminder(db: DatabaseSync, opts: {
   id: string; taskId: string; userId: string;
   offsetMinutes?: number; enabled?: number;
 }) {
@@ -117,7 +117,7 @@ function insertReminder(db: Database.Database, opts: {
   );
 }
 
-function insertFeed(db: Database.Database, opts: {
+function insertFeed(db: DatabaseSync, opts: {
   id: string; userId: string; token: string;
   enabled?: number; includeCompleted?: number;
   includeDescription?: number; defaultAlarmMinutes?: number;
@@ -297,30 +297,30 @@ test("真实 ICS 输出使用兼容的 DATE-TIME、DTEND，并且公开订阅与
 
   assert.ok(body.includes("DTSTART;VALUE=DATE:20261101"));
   assert.ok(body.includes("DTEND;VALUE=DATE:20261103"));
-  const startOnlyEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-start-only@nowen-note"));
+  const startOnlyEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-start-only@baseforge"));
   assert.ok(startOnlyEvent);
   assert.ok(startOnlyEvent.includes("DTSTART:20260703T090000"));
   assert.ok(!startOnlyEvent.includes("DTEND:"));
-  const dueDateRangeEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-due-date-range@nowen-note"));
+  const dueDateRangeEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-due-date-range@baseforge"));
   assert.ok(dueDateRangeEvent);
   assert.ok(dueDateRangeEvent.includes("DTSTART:20260704T140000"));
   assert.ok(dueDateRangeEvent.includes("DTEND:20260704T150000"));
 
-  const dualEndEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-dual-end@nowen-note"));
+  const dualEndEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-dual-end@baseforge"));
   assert.ok(dualEndEvent);
   assert.ok(dualEndEvent.includes("DTSTART:20260705T120000"));
   assert.ok(dualEndEvent.includes("DTEND:20260705T130000"));
   assert.ok(!dualEndEvent.includes("DTEND;VALUE=DATE"));
 
-  const millisEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-millis-z@nowen-note"));
+  const millisEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-millis-z@baseforge"));
   assert.ok(millisEvent);
   assert.ok(millisEvent.includes("DTSTART:20260706T091011Z"));
 
-  const offsetEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-offset@nowen-note"));
+  const offsetEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-offset@baseforge"));
   assert.ok(offsetEvent);
   assert.ok(offsetEvent.includes("DTSTART:20260706T091011Z"));
 
-  const zeroDurationEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-zero-duration@nowen-note"));
+  const zeroDurationEvent = body.split("BEGIN:VEVENT").find((event) => event.includes("UID:task-t-zero-duration@baseforge"));
   assert.ok(zeroDurationEvent);
   assert.ok(zeroDurationEvent.includes("DTSTART:20260707T100000"));
   assert.ok(!zeroDurationEvent.includes("DTEND:"));

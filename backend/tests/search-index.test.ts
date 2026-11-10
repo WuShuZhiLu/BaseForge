@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import {
   extractSearchableText,
   getSearchIndexRebuiltAt,
@@ -80,7 +80,7 @@ test("extractSearchableText does not duplicate nested table and list text", () =
 });
 
 test("repairLegacyMarkdownBlockMetadata upgrades historical Markdown and block index", () => {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE notes (
       id TEXT PRIMARY KEY,
@@ -118,7 +118,7 @@ test("repairLegacyMarkdownBlockMetadata upgrades historical Markdown and block i
 });
 
 test("repairSearchContentText fixes empty and stale historical rows without touching valid rows", () => {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE notes (
       id TEXT PRIMARY KEY,

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-icons-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
@@ -15,7 +15,7 @@ const NOTEBOOK_ID = "note-icon-notebook";
 const NOTE_ID = "note-icon-note";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 function db() {

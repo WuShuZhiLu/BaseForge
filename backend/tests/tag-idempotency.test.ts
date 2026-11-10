@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { ensureScopedTag } from "../src/services/tagScope";
 
-function createDb(): Database.Database {
-  const db = new Database(":memory:");
+function createDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE tags (
       id TEXT PRIMARY KEY,

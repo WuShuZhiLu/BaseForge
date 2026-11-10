@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const U1 = "u-guard-1";
 const U2 = "u-guard-2";
@@ -24,7 +24,7 @@ const A_PDF = "att-guard-pdf";
 const A_SHARED = "att-guard-shared";
 const A_RECENT = "att-guard-recent";
 
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 function db() {

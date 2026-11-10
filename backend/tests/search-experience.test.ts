@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-search-experience-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
@@ -24,7 +24,7 @@ const MINDMAP_ID = "11111111-2222-4333-8444-555555555555";
 const SHEET_ID = "search-sheet";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 function db() {

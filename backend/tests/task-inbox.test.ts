@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-inbox-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
@@ -13,7 +13,7 @@ const USER_A = "task-inbox-user-a";
 const USER_B = "task-inbox-user-b";
 const WORKSPACE_ID = "task-inbox-workspace";
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 async function requestJson(userId: string, method: string, url: string, body?: unknown) {

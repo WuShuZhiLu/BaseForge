@@ -4,12 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-recycle-bin-capability-"));
 process.env.DB_PATH = path.join(tempDir, "recycle-bin.db");
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 

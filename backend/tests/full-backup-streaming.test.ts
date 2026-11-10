@@ -10,7 +10,7 @@ import {
   hashFileSha256,
   scrubPluginStudioProjectsFromBackup,
 } from "../src/services/backup-archive";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 test("同一秒创建的备份仍使用不同文件名", () => {
   const now = new Date("2026-08-14T02:00:00.000Z");
@@ -75,7 +75,7 @@ test("完整备份创建时不会把附件或最终 ZIP 整包读入内存", asy
 test("普通数据库备份会移除 Plugin Studio 项目记录", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-studio-backup-scrub-"));
   const dbPath = path.join(root, "backup.db");
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   db.exec(`
     CREATE TABLE plugin_studio_projects (id TEXT PRIMARY KEY);
     CREATE TABLE plugin_studio_generations (id TEXT PRIMARY KEY, projectId TEXT);
@@ -88,7 +88,7 @@ test("普通数据库备份会移除 Plugin Studio 项目记录", () => {
 
   try {
     scrubPluginStudioProjectsFromBackup(dbPath);
-    const scrubbed = new Database(dbPath, { readonly: true });
+    const scrubbed = new DatabaseSync(dbPath, { readOnly: true });
     try {
       for (const table of ["plugin_studio_projects", "plugin_studio_generations", "plugin_studio_artifacts"]) {
         assert.equal((scrubbed.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count, 0);

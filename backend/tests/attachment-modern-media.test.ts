@@ -7,7 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
 import { Hono } from "hono";
 import { analyzeModernMedia } from "../src/lib/modern-media";
@@ -176,7 +176,7 @@ test.skip("Live Photo 自动关联同笔记 UUID，动态原件可下载，缺�
   schema.getDb().prepare("UPDATE notes SET content = ? WHERE id = ?").run(`/api/attachments/${still.id}`, "photo-note");
   assert.ok(!core.scanOrphanAttachments(0).contentOrphans.some((row) => row.id === companion.id));
   const backup = path.join(tmp, "snapshot.db"); await schema.getDb().backup(backup);
-  const restored = new Database(backup, { readonly: true });
+  const restored = new DatabaseSync(backup, { readOnly: true });
   assert.equal((restored.prepare("SELECT variantAttachmentId FROM attachment_media_variants WHERE sourceAttachmentId = ? AND kind = 'original-motion'").get(still.id) as { variantAttachmentId: string }).variantAttachmentId, companion.id); restored.close();
   await app.request(`/api/attachments/${companion.id}`, { method: "DELETE", headers: { "X-User-Id": owner } });
   assert.equal((await (await app.request(query(still.url, { media: "info" }))).json()).motionStatus, "missing-companion");

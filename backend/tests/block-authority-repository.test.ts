@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import type { DatabaseAdapter } from "../src/db/adapters/types";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-authority-repository-"));
@@ -134,7 +134,7 @@ test("replaceAuthorityState uses one ordered cross-database transaction and pres
 });
 
 test("reusing an operationId cannot overwrite a newer authority state", async () => {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE note_block_documents (
       noteId TEXT PRIMARY KEY, contentFormat TEXT, noteVersion INTEGER, blockVersion INTEGER,

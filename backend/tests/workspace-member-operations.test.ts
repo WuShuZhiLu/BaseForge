@@ -35,7 +35,7 @@ function request(
   });
 }
 
-let db: import("better-sqlite3").Database;
+let db: import("node:sqlite").DatabaseSync;
 let workspaces: (typeof import("../src/routes/workspaces.js"))["default"];
 
 test("setup: 初始化数据库与测试数据", async () => {

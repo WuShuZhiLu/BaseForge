@@ -3,13 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-embedding-discovery-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 let setUserAISettings: typeof import("../src/services/user-ai-settings").setUserAISettings;

@@ -20,7 +20,7 @@ const PNG_BYTES = Buffer.from(
 );
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 const originalFetch = globalThis.fetch;
 

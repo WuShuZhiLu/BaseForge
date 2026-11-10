@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-upload-limit-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
@@ -21,7 +21,7 @@ test.before(async () => {
   ]);
   app = new Hono();
   app.route("/export", exportModule.default);
-  closeDb = (schemaModule as { closeDb: () => void; getDb: () => Database.Database }).closeDb;
+  closeDb = (schemaModule as { closeDb: () => void; getDb: () => DatabaseSync }).closeDb;
 });
 
 test.after(async () => {

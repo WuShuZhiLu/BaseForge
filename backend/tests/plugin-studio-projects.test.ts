@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 import JSZip from "jszip";
 import { getDb } from "../src/db/schema";
@@ -15,7 +15,7 @@ import pluginStudioRouter from "../src/routes/plugin-studio";
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-studio-"));
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (

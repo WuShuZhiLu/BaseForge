@@ -16,7 +16,7 @@ process.env.SIYUAN_IMPORT_MAX_SINGLE_SY_BYTES = "20";
 process.env.SIYUAN_IMPORT_MAX_SINGLE_ASSET_BYTES = "4";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 let app: Hono;
 
