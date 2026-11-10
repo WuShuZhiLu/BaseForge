@@ -525,8 +525,9 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     >
       {/* 顶 Logo：与侧栏/编辑器头部同一 48px 线；用项目真实应用图标（原型的笔形 SVG 是占位） */}
       <div className="flex h-12 w-full shrink-0 items-center justify-center border-b border-app-border">
+        {/* 相对路径：桌面端用 file:// 加载，绝对路径 /xxx.svg 会指向磁盘根目录变成裂图 */}
         <img
-          src="/base-notes-icon.svg"
+          src="./base-notes-icon.svg"
           width={32}
           height={32}
           alt=""
