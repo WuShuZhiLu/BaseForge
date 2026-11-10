@@ -22,6 +22,7 @@ const {
   setCredentialsPath,
   registerCredentialsIpc,
   clear: clearCredentials,
+  load: loadCredentials,
 } = require("./credentials");
 const folderSync = require("./folder-sync");
 const {
@@ -2200,18 +2201,19 @@ app.whenReady().then(async () => {
     writeSettings({ mode: "lite", remoteUrl: currentRemoteUrl });
   }
 
-  // Lite-only 首启没有服务器地址：立刻弹 setup 窗口
+  // Lite-only 首启不再弹原生 setup 窗口：主窗口登录页本身就带服务器地址、
+  // 局域网发现与账号密码，在同一页完成「测试 + 登录」，避免选完服务器再登录两次。
+  // 若之前记住过服务器，这里先把地址恢复出来，主进程的菜单/恢复流程才有正确目标。
   if (liteOnly && currentMode === "lite" && !currentRemoteUrl) {
-    console.log("[Electron] lite-only first launch, opening setup window");
-    registerDiscoveryIpc(); // setup 依赖
-    const r = await openSetupWindow({ initialUrl: "" });
-    if (!r.ok) {
-      // 用户取消 → 直接退出
-      app.quit();
-      return;
+    try {
+      const saved = loadCredentials();
+      if (saved?.serverUrl) {
+        currentRemoteUrl = saved.serverUrl;
+        writeSettings({ mode: "lite", remoteUrl: currentRemoteUrl });
+      }
+    } catch (error) {
+      console.warn("[Electron] restore remembered serverUrl failed:", error?.message || error);
     }
-    currentRemoteUrl = r.url;
-    writeSettings({ mode: "lite", remoteUrl: r.url });
   }
 
   console.log(
@@ -2221,20 +2223,25 @@ app.whenReady().then(async () => {
 
   createSplash(
     currentMode === "lite"
-      ? `正在连接 ${safeHost(currentRemoteUrl)}`
+      ? currentRemoteUrl
+        ? `正在连接 ${safeHost(currentRemoteUrl)}`
+        : "正在启动"
       : getDevelopmentBackendUrl()
         ? `正在连接开发服务 ${safeHost(getDevelopmentBackendUrl())}`
       : "正在启动本地服务"
   );
 
-  // discovery IPC 必须先注册：setup 窗口（首启失败 / 切换模式时）依赖它做 mDNS 列表。
-  // 它本身不会启动 mDNS 浏览器，只有 renderer 调 discovery:start 才会启动，因此空跑无副作用。
+  // discovery IPC 必须先注册：菜单里的「切换/更换服务器」原生窗口依赖它做 mDNS 列表；
+  // 首启不再弹该窗口，直接进登录页。它本身不会启动 mDNS 浏览器，
+  // 只有 renderer 调 discovery:start 才会启动，因此空跑无副作用。
   registerDiscoveryIpc();
 
   try {
     if (currentMode === "lite") {
-      // Lite：探测远端可达后直接建窗口；不启 backend、不建 DB
-      await waitForRemoteReady(currentRemoteUrl, 15000);
+      // Lite：已配置远端时先探测可达；首启未配置则直接进登录页（页面内完成测试与登录）。
+      if (currentRemoteUrl) {
+        await waitForRemoteReady(currentRemoteUrl, 15000);
+      }
     } else if (getDevelopmentBackendUrl()) {
       // 开发模式：复用 npm run dev:backend 的数据库与登录会话，不再启动第二个 backend。
       await waitForRemoteReady(getDevelopmentBackendUrl(), 15000);
