@@ -5,7 +5,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { diagnoseTiptapContent, type TiptapContentDiagnosis } from "../src/lib/tiptap-note-format";
 
 const args = process.argv.slice(2);
@@ -17,15 +17,15 @@ if (!Number.isInteger(limit) || limit < 0 || limit > 500) {
 }
 const dbPath = path.resolve(dbArg || process.env.DB_PATH || path.join(process.cwd(), "data", "baseforge.db"));
 if (!fs.existsSync(dbPath)) throw new Error("Database file not found. Pass --db=<path>.");
-const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+const db = new DatabaseSync(dbPath, { readOnly: true });
 type Row = { id: string; content: string | null; version: number };
 const counts: Record<TiptapContentDiagnosis, number> = {
   valid: 0, "html-markup": 0, "invalid-json": 0, "invalid-doc": 0,
 };
 const examples: Array<{ noteId: string; version: number; reason: TiptapContentDiagnosis }> = [];
 try {
-  const rows = db.prepare("SELECT id, content, version FROM notes WHERE contentFormat = 'tiptap-json'");
-  for (const row of rows.iterate() as Iterable<Row>) {
+  const rows = db.prepare("SELECT id, content, version FROM notes WHERE contentFormat = 'tiptap-json'").all() as Row[];
+  for (const row of rows) {
     const reason = diagnoseTiptapContent(row.content || "");
     counts[reason] += 1;
     if (reason !== "valid" && examples.length < limit) examples.push({

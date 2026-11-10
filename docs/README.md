@@ -31,7 +31,6 @@
 | [server-profiles-and-nas-migration.md](./server-profiles-and-nas-migration.md) | NAS 迁移与服务器配置 |
 | [icp-beian-env.md](./icp-beian-env.md) | 备案环境变量 |
 | [CODE_SIGNING.md](./CODE_SIGNING.md) | 代码签名（Windows / macOS） |
-| [iOS-Release.md](./iOS-Release.md) | iOS 发布流程 |
 | [mac-install.md](./mac-install.md) | macOS 安装说明 |
 | [PRIVACY.md](./PRIVACY.md) | 隐私说明 |
 | [known-issues.md](./known-issues.md) | 已知问题 |

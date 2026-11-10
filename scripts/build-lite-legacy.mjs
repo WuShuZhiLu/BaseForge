@@ -3,7 +3,7 @@
  * Lite 发行版打包脚本。
  *
  * 与 scripts/safe-build.mjs 的差异：
- *   - **不**跑 `npm run rebuild:native`（lite 没 backend，也就不需要为 Electron ABI 重建 better-sqlite3）
+ *   - **不**跑 `npm run rebuild:native`（lite 没 backend，不需要原生模块）
  *   - **不**跑 `npm run build:backend`（lite 不打 backend/dist）
  *   - 使用 electron/builder.lite.config.js
  *   - 默认产物目录：dist-electron-lite/（或 %TEMP%/nowen-note-lite-build 当 --safe 启用）

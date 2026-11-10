@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -21,12 +21,13 @@ const scope = args.scope === "team" ? "team" : "personal";
 const withNotes = args.notes === "on";
 if (![10, 100, 500, 1000].includes(count)) throw new Error(`Unsupported count: ${count}`);
 
-const db = new Database(dbPath);
+const db = new DatabaseSync(dbPath);
 const user = db.prepare("SELECT id FROM users WHERE username = ?").get("phaseb");
 if (!user) throw new Error("Run seed-demo for the phaseb user first");
 
 const workspaceId = "phase-b-workspace";
-const reset = db.transaction(() => {
+db.exec("BEGIN");
+try {
   db.prepare("DELETE FROM notes WHERE userId = ?").run(user.id);
   db.prepare("DELETE FROM notebooks WHERE userId = ? OR workspaceId = ?").run(user.id, workspaceId);
   db.prepare(`INSERT INTO workspaces (id, name, icon, ownerId)
@@ -71,8 +72,11 @@ const reset = db.transaction(() => {
       );
     }
   }
-});
+  db.exec("COMMIT");
+} catch (error) {
+  db.exec("ROLLBACK");
+  throw error;
+}
 
-reset();
 db.close();
 console.log(JSON.stringify({ dbPath, count, shape, expansion, scope, withNotes }));

@@ -9,10 +9,7 @@ const {
   verifySyncNotificationUi,
 } = require("../scripts/verify-sync-notification-ui.cjs");
 
-// ===== 打包前校验：better-sqlite3 原生模块必须已 rebuild 为 Electron ABI + 目标平台 =====
-// 防止忘记 `npm run rebuild:native` 就打包，或在 Linux 上为 Win 目标编出 Linux .so，
-// 导致安装后 ERR_DLOPEN_FAILED / "is not a valid Win32 application"。
-//
+// ===== 目标平台 / 架构推断（用于定位内嵌 Node 二进制） =====
 // argv 中可能包含 --win / --mac / --linux（electron-builder 的平台开关）；
 // 没有则按 process.platform 推断。
 function inferTargetPlatformFromArgv() {
@@ -92,245 +89,6 @@ function checkEmbeddedNode() {
   console.log(`[builder] ✓ embedded node v${version} (${dirName})`);
 }
 
-/**
- * 通过文件魔数识别 .node 目标平台 + 架构，避免 stamp 被错误标注时假通过。
- *   Windows PE:   "MZ"（不解析 arch，Win 我们只发 x64）
- *   Linux ELF:    "\x7FELF"，第 19 字节 e_machine 区分 x86_64(0x3E)/aarch64(0xB7)
- *   macOS Mach-O: 0xFEEDFACE/0xCEFAEDFE/0xFEEDFACF/0xCFFAEDFE/0xCAFEBABE
- *                 magic 后紧跟 cputype（CPU_TYPE_X86_64=0x01000007 / CPU_TYPE_ARM64=0x0100000C）
- *                 0xCAFEBABE 是 fat binary，含 x64+arm64，arch 返回 "universal"
- *
- * 返回 { platform, arch }，识别不出来对应字段为 "unknown"。
- */
-function detectNodeFilePlatform(nodeFile) {
-  try {
-    const fd = fs.openSync(nodeFile, "r");
-    const buf = Buffer.alloc(20);
-    fs.readSync(fd, buf, 0, 20, 0);
-    fs.closeSync(fd);
-    // Windows PE
-    if (buf[0] === 0x4d && buf[1] === 0x5a) {
-      return { platform: "win32", arch: "x64" }; // 我们只发 x64，简化
-    }
-    // Linux ELF
-    if (
-      buf[0] === 0x7f &&
-      buf[1] === 0x45 &&
-      buf[2] === 0x4c &&
-      buf[3] === 0x46
-    ) {
-      // ELF e_machine 在 LE 下位于 offset 0x12
-      const eMachine = buf.readUInt16LE(0x12);
-      const arch =
-        eMachine === 0x3e ? "x64" : eMachine === 0xb7 ? "arm64" : "unknown";
-      return { platform: "linux", arch };
-    }
-    // macOS Mach-O
-    const m = buf.readUInt32BE(0);
-    if (m === 0xcafebabe) {
-      // fat binary，含多架构
-      return { platform: "darwin", arch: "universal" };
-    }
-    if (
-      m === 0xfeedface ||
-      m === 0xcefaedfe ||
-      m === 0xfeedfacf ||
-      m === 0xcffaedfe
-    ) {
-      // little-endian (CEFAEDFE/CFFAEDFE) 时 cputype 用 readUInt32LE，否则 BE
-      const isLE = m === 0xcefaedfe || m === 0xcffaedfe;
-      const cputype = isLE ? buf.readUInt32LE(4) : buf.readUInt32BE(4);
-      const arch =
-        cputype === 0x01000007
-          ? "x64"
-          : cputype === 0x0100000c
-            ? "arm64"
-            : "unknown";
-      return { platform: "darwin", arch };
-    }
-    return { platform: "unknown", arch: "unknown" };
-  } catch {
-    return { platform: "unknown", arch: "unknown" };
-  }
-}
-
-// ===== ABI 符号实测：扫描 .node 内 "node_register_module_v<N>" =====
-// 这是最可靠的 ABI 校验：编译器会把 NODE_MODULE_VERSION 直接拼进入口符号名。
-// 历史教训（2026-05-25）：prebuild-install 缓存命中错位，stamp 写 electron=33.0.0、
-// platform/arch 全对，但实际下载的是 Node ABI(115) 而非 Electron ABI(130) 的 .node，
-// 安装到用户机后必爆 "NODE_MODULE_VERSION 115 vs 130"。
-// 这里直接读文件字节串验证，杜绝任何中间环节的"假对齐"。
-const NODE_MODULE_VERSION_BY_ELECTRON_MAJOR = {
-  28: 119,
-  29: 121,
-  30: 123,
-  31: 125,
-  32: 128,
-  33: 130,
-  34: 133,
-  35: 136,
-};
-
-function detectNodeAbiVersion(nodeFile) {
-  // 读全文件然后正则——.node 通常 ~2MB，可以接受
-  const buf = fs.readFileSync(nodeFile);
-  const s = buf.toString("latin1");
-  const re = /node_register_module_v(\d+)/g;
-  const found = new Set();
-  let m;
-  while ((m = re.exec(s))) found.add(parseInt(m[1], 10));
-  return [...found];
-}
-
-function checkNativeModule() {
-  const nodeFile = path.resolve(
-    __dirname,
-    "..",
-    "backend",
-    "node_modules",
-    "better-sqlite3",
-    "build",
-    "Release",
-    "better_sqlite3.node"
-  );
-  if (!fs.existsSync(nodeFile)) {
-    // 后端已迁到内建 node:sqlite（Node 22.5+），不再 require better-sqlite3。
-    // 打包改用内嵌 Node 跑后端，所以这个 .node 存在与否都不影响运行；
-    // 只有残留时顺手校验一下，缺了直接跳过而不是阻断打包。
-    console.log("[builder] better-sqlite3 未安装（后端已改用 node:sqlite），跳过 ABI 校验");
-    return;
-  }
-  const stat = fs.statSync(nodeFile);
-  console.log(
-    `[builder] ✓ better-sqlite3.node found (${(stat.size / 1024 / 1024).toFixed(1)} MB, ` +
-      `mtime=${stat.mtime.toISOString()})`
-  );
-
-  const stampFile = path.resolve(path.dirname(nodeFile), ".electron-abi.json");
-  if (!fs.existsSync(stampFile)) {
-    console.warn(
-      `[builder] ⚠ 未找到 Electron ABI stamp（${stampFile}），跳过 ABI 校验。\n` +
-        `   后端用内建 node:sqlite，better-sqlite3 不再参与运行时。`
-    );
-    return;
-  }
-  let stamp;
-  try {
-    stamp = JSON.parse(fs.readFileSync(stampFile, "utf8"));
-  } catch (e) {
-    throw new Error(`[builder] stamp 文件解析失败：${e.message}`);
-  }
-  const rootPkg = JSON.parse(
-    fs.readFileSync(path.resolve(__dirname, "..", "package.json"), "utf8")
-  );
-  const electronDep =
-    rootPkg.devDependencies?.electron || rootPkg.dependencies?.electron;
-  const expectedElectron = (electronDep || "").replace(/^[^\d]*/, "");
-  if (stamp.electronVersion !== expectedElectron) {
-    throw new Error(
-      `[builder] better_sqlite3.node 是为 Electron ${stamp.electronVersion} 编译的，\n` +
-        `但当前 package.json 声明的 electron 版本是 ${expectedElectron}。\n` +
-        `请重新执行 npm run rebuild:native。`
-    );
-  }
-
-  // ===== 目标平台/架构强校验 =====
-  // 这是 2026-05 事故（Linux 上打 Win 包 → 装包后 "not a valid Win32 application"）
-  // 的根治修复：只看 electronVersion 不足，必须还要对齐 platform + arch。
-  const targetPlatform = inferTargetPlatformFromArgv();
-  const targetArch = inferTargetArch(targetPlatform);
-  const stampPlatform = stamp.platform;
-  const stampArch = stamp.arch;
-  if (!stampPlatform || !stampArch) {
-    throw new Error(
-      `[builder] stamp 缺少 platform/arch 字段（旧版 rebuild-native 产物）。\n` +
-        `请重新执行 npm run rebuild:native。`
-    );
-  }
-  if (stampPlatform !== targetPlatform || stampArch !== targetArch) {
-    throw new Error(
-      `[builder] ✗ better_sqlite3.node 的 platform/arch 与打包目标不匹配！\n` +
-        `   stamp  : ${stampPlatform}-${stampArch}\n` +
-        `   target : ${targetPlatform}-${targetArch}\n` +
-        `   修复：npm run rebuild:native -- --target-platform=${targetPlatform} --target-arch=${targetArch}`
-    );
-  }
-
-  // 文件魔数兜底校验（stamp 可能被手工改过 / rebuild-native 漏写 arch 字段）
-  // 历史教训（2026-05 mac Intel ERR_DLOPEN_FAILED）：mac 同时打 arm64+x64 时，
-  // 仅靠 stamp 校验，arm64 包里会塞着 x64 的 .node。所以这里 platform + arch 都要查。
-  const detected = detectNodeFilePlatform(nodeFile);
-  const expectPlatform =
-    targetPlatform === "win32"
-      ? "win32"
-      : targetPlatform === "darwin"
-        ? "darwin"
-        : "linux";
-  if (detected.platform !== expectPlatform) {
-    throw new Error(
-      `[builder] ✗ better_sqlite3.node 文件格式不匹配目标平台！\n` +
-        `   expected (by magic) : ${expectPlatform}\n` +
-        `   actual               : ${detected.platform}\n` +
-        `   这份 .node 打进安装包后会报 ERR_DLOPEN_FAILED / "not a valid Win32 application"。\n` +
-        `   修复：npm run rebuild:native -- --target-platform=${targetPlatform} --target-arch=${targetArch}`
-    );
-  }
-  // arch 校验：universal（fat binary）算兼容；其余必须严格相等
-  if (
-    detected.arch !== "universal" &&
-    detected.arch !== "unknown" &&
-    detected.arch !== targetArch
-  ) {
-    throw new Error(
-      `[builder] ✗ better_sqlite3.node 的 CPU 架构与打包目标不匹配！\n` +
-        `   expected (by magic) : ${targetPlatform}-${targetArch}\n` +
-        `   actual               : ${detected.platform}-${detected.arch}\n` +
-        `   这份 .node 打进 ${targetPlatform}-${targetArch} 安装包后会报 ERR_DLOPEN_FAILED。\n` +
-        `   修复：npm run rebuild:native -- --target-platform=${targetPlatform} --target-arch=${targetArch}`
-    );
-  }
-
-  if (stamp.nodeMtime && stamp.nodeMtime !== stat.mtime.toISOString()) {
-    console.warn(
-      `[builder] ⚠ stamp 中记录的 .node mtime 与当前文件不一致：\n` +
-        `   stamp: ${stamp.nodeMtime}\n` +
-        `   actual: ${stat.mtime.toISOString()}\n` +
-        `   建议重新执行 npm run rebuild:native。`
-    );
-  }
-  console.log(
-    `[builder] ✓ ABI stamp verified (electron=${stamp.electronVersion}, ` +
-      `platform=${stampPlatform}-${stampArch}, mode=${stamp.mode || "native-rebuild"}, ` +
-      `rebuiltAt=${stamp.rebuiltAt})`
-  );
-
-  // ===== 最终守门：ABI 符号实测 =====
-  const electronMajor = parseInt(expectedElectron.split(".")[0], 10);
-  const expectedAbi = NODE_MODULE_VERSION_BY_ELECTRON_MAJOR[electronMajor];
-  if (!expectedAbi) {
-    console.warn(
-      `[builder] ⚠ 未知 Electron major=${electronMajor}，跳过 ABI 符号实测。\n` +
-        `   请在 NODE_MODULE_VERSION_BY_ELECTRON_MAJOR 中补一行映射。`
-    );
-    return;
-  }
-  const detectedAbi = detectNodeAbiVersion(nodeFile);
-  if (!detectedAbi.includes(expectedAbi)) {
-    throw new Error(
-      `[builder] ✗ better_sqlite3.node ABI 符号实测失败！\n` +
-        `   expected NODE_MODULE_VERSION : ${expectedAbi}（Electron ${electronMajor}）\n` +
-        `   detected in .node            : [${detectedAbi.join(", ") || "none"}]\n` +
-        `   这份 .node 装到用户机会爆 "NODE_MODULE_VERSION X vs ${expectedAbi}"。\n` +
-        `   修复：先删 backend\\node_modules\\better-sqlite3\\build，\n` +
-        `         然后清 ~/.npm/_prebuilds 下的 better-sqlite3 缓存，\n` +
-        `         再执行 npm run rebuild:native。`
-    );
-  }
-  console.log(
-    `[builder] ✓ ABI symbol verified: node_register_module_v${expectedAbi}`
-  );
-}
-
 // 允许把输出目录放到工作区外，避免 IDE / Defender 对打包产物做文件监听锁
 // 用法：set NOWEN_BUILD_OUT=1 && npm run electron:build
 const OUT_DIR = process.env.NOWEN_BUILD_OUT
@@ -368,19 +126,12 @@ const LINUX_HOMEPAGE =
 // ===== 体积优化：精简后端 node_modules =====
 // 后端通过 esbuild bundle 成单文件（backend/dist/index.js），
 // 但仍有少量"必须保留为 external"的包：
-//   - better-sqlite3            原生 .node 模块
 //   - sqlite-vec / sqlite-vec-{platform}-{arch}  平台二进制 .so/.dll/.dylib
 //   - bonjour-service           涉及 multicast-dns 的动态行为，传递依赖较深
 // 其他业务依赖已全部 inline 进 bundle，运行时不再需要。
 //
 // 我们用"白名单顶层目录"的方式精准保留这些包及其运行时传递依赖。
-// 注意：prebuild-install 链（detect-libc / napi-build-utils / tar-fs 等）只在
-// npm install 阶段使用，运行时不会被 require，因此全部排除。
 const BACKEND_KEEP_PACKAGES = [
-  // better-sqlite3 + 运行时传递依赖
-  "better-sqlite3",
-  "bindings",
-  "file-uri-to-path",
   // sqlite-vec + 全平台二进制（让同一份 backend/node_modules 可跨平台打包）
   "sqlite-vec",
   "sqlite-vec-windows-x64",
@@ -418,23 +169,16 @@ function buildBackendNodeModulesFilter() {
   rules.push("!**/CHANGELOG*");
   rules.push("!**/LICENSE*");
   rules.push("!**/{AUTHORS,CONTRIBUTORS,HISTORY}*");
-  // better-sqlite3 自带源码（src/ 是 C++ 源码，deps/ 是 sqlite amalgamation；
-  // 只要 build/Release/*.node 就够 runtime 跑，src/deps 可以剥掉）
-  rules.push("!better-sqlite3/src/**");
-  rules.push("!better-sqlite3/deps/**");
-  rules.push("!better-sqlite3/docs/**");
-  rules.push("!better-sqlite3/benchmark/**");
   return rules;
 }
 
 module.exports = {
   appId: "com.nowen.note",
   productName: "BaseForge",
-  // 打包前自动校验原生模块，避免漏跑 rebuild:native 导致安装后崩溃
+  // 打包前校验内嵌 Node 与前端产物，避免装到用户机后才崩
   beforeBuild() {
     // 后端要跑在内嵌的 Node 22 上（node:sqlite），这是硬前提
     checkEmbeddedNode();
-    checkNativeModule();
     verifySyncNotificationUi();
     return true; // 返回 true 表示继续打包
   },
@@ -567,13 +311,8 @@ module.exports = {
   },
   mac: {
     // ==== mac 架构选择 ====
-    // 历史教训（2026-05 Intel Mac ERR_DLOPEN_FAILED）：
-    //   原配置 arch: ["arm64", "x64"]，electron-builder 一次构建会同时输出
-    //   两份 dmg/zip，但 backend/node_modules/better-sqlite3 只能 rebuild 出
-    //   一种架构的 .node；另一架构的安装包打开就 dlopen 失败。
-    // 修复：每次只打一个架构，由外层脚本 (release.sh) 跑两遍，每次先
-    //   `rebuild:native --target-arch=<arch>` 再 electron-builder。
-    // 通过环境变量 NOWEN_MAC_ARCH=x64|arm64 控制；默认 x64（覆盖 Intel + 走 Rosetta）。
+    // 每次只打一个架构，由外层脚本 (release.sh) 跑两遍，通过环境变量
+    // NOWEN_MAC_ARCH=x64|arm64 控制；默认 x64（覆盖 Intel + 走 Rosetta）。
     target: [
       {
         target: "dmg",

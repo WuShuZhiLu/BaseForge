@@ -22,7 +22,7 @@ nowen-note 是一款自托管的私有化笔记应用，采用现代前后端分
 | 样式 | Tailwind CSS 3.4 + Framer Motion |
 | 国际化 | i18next（中英文切换） |
 | 后端框架 | Hono 4 + @hono/node-server |
-| 数据库 | SQLite（better-sqlite3）+ FTS5 全文搜索 |
+| 数据库 | SQLite（`node:sqlite`）+ FTS5 全文搜索 |
 | 数据校验 | Zod |
 | AI 引擎 | OpenAI / 通义千问 / DeepSeek / Gemini / 豆包 / Ollama |
 
@@ -169,7 +169,7 @@ nowen-note is a self-hosted private note-taking application with a modern fronte
 | Styling | Tailwind CSS 3.4 + Framer Motion |
 | i18n | i18next (Chinese/English) |
 | Backend | Hono 4 + @hono/node-server |
-| Database | SQLite (better-sqlite3) + FTS5 full-text search |
+| Database | SQLite (`node:sqlite`) + FTS5 full-text search |
 | Validation | Zod |
 | AI Engine | OpenAI / Qwen / DeepSeek / Gemini / Doubao / Ollama |
 

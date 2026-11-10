@@ -116,7 +116,7 @@ docker compose up -d
 | Linux 内核 | ≥ 4.x；板子自带的 Armbian/OES 一般满足 |
 | Docker Engine | ≥ 20.10；`apt install docker.io` 即可 |
 | 磁盘 | ≥ 500 MB（镜像 ~350 MB + 笔记数据卷） |
-| 内存 | ≥ 512 MB 空闲（better-sqlite3 + Node 运行时） |
+| 内存 | ≥ 512 MB 空闲（Node 运行时） |
 
 ---
 
@@ -126,7 +126,7 @@ docker compose up -d
 已在新版 `Dockerfile` 修复：按 `TARGETARCH` 动态安装对应 rollup 原生包。
 如果你仍在用旧 Dockerfile，请 `git pull` 拉最新。
 
-### Q2. better-sqlite3 编译非常慢 / 卡住不动
+### Q2. 原生模块编译非常慢 / 卡住不动
 这是 QEMU 模拟 arm64 的预期表现（单次构建耗时 3–8 分钟）。建议：
 - 用一次性 `--arch multi` 构建并 push 到私有 registry，后续板子只拉镜像；
 - 或在板子原生构建一次，打成 tar 复用。
@@ -153,7 +153,7 @@ docker build -t nowen-note:arm64 .
 > 这一节只针对桌面端 AppImage / deb，不影响上面的 Docker ARM64 部署。
 
 当前正式 Release 仍默认发布 Linux x64 桌面包。Linux ARM64 桌面包需要额外验证
-Electron、`better-sqlite3`、`sqlite-vec` 等原生模块在 `linux/arm64` 下的打包和运行稳定性，
+Electron、`sqlite-vec` 等原生模块在 `linux/arm64` 下的打包和运行稳定性，
 因此暂不直接加入正式发布矩阵。
 
 如需在本地或 ARM64 Linux 设备上试打桌面端安装包，可以使用实验性入口：
@@ -183,7 +183,6 @@ bash scripts/release.sh \
 脚本会对每个 Linux 架构分开执行：
 
 ```bash
-npm run rebuild:native -- --target-platform=linux --target-arch=<arch>
 npx electron-builder --config electron/builder.config.js --linux --<arch>
 ```
 
@@ -194,6 +193,6 @@ npx electron-builder --config electron/builder.config.js --linux --<arch>
 1. AppImage 能启动。
 2. deb 能安装并启动。
 3. 后端启动时没有 `ERR_DLOPEN_FAILED`。
-4. `better-sqlite3` 可以正常读写数据库。
+4. `node:sqlite` 可以正常读写数据库。
 5. `sqlite-vec` 可用时不影响知识库 / 向量相关功能。
 6. 创建笔记、编辑保存、全文搜索、附件上传等核心功能正常。

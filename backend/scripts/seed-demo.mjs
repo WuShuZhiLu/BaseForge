@@ -14,7 +14,7 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 
@@ -35,7 +35,7 @@ const password = process.env.DEMO_PASS || "demo123456";
 console.log(`[seed-demo] 数据库: ${DB_PATH}`);
 console.log(`[seed-demo] 账号: ${username} / ${password}`);
 
-const db = new Database(DB_PATH);
+const db = new DatabaseSync(DB_PATH);
 
 // 先确认 isDemo 列存在（即 v15 迁移已跑过）
 const cols = db.prepare("PRAGMA table_info(users)").all();

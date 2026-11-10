@@ -88,12 +88,12 @@ DO_TAR=0               # --tar，仅在 build-only + arm64 下
 TAR_OUT="$DEFAULT_TAR_OUT"
 DO_PUSH_CUSTOM=0       # --push，仅在 build-only + 自定义 image 下
 
-# ===== 多端发版（PC / Linux 安装包 / Android / Docker / GitHub Releases / 飞牛 .fpk / 绿联 .upk / Lite / Clipper） =====
-# TARGETS 用逗号分隔的集合：docker / pc / linux-app / android / fpk / upk / lite / clipper / all
-# 默认 docker（向后兼容旧行为）；all = docker,pc,android,fpk,upk,lite,clipper
+# ===== 多端发版（PC / Linux 安装包 / Docker / GitHub Releases / 飞牛 .fpk / 绿联 .upk / Lite / Clipper） =====
+# TARGETS 用逗号分隔的集合：docker / pc / linux-app / fpk / upk / lite / clipper / all
+# 默认 docker（向后兼容旧行为）；all = docker,pc,fpk,upk,lite,clipper
 TARGETS="docker"
 TARGETS_EXPLICIT=0     # 用户是否通过 --target 显式指定了
-DO_GITHUB_RELEASE=0    # --github-release：把 PC/Android 产物上传到 GitHub Release（自动打 tag）
+DO_GITHUB_RELEASE=0    # --github-release：把 PC 产物上传到 GitHub Release（自动打 tag）
 NO_GITHUB_RELEASE_EXPLICIT=0  # --no-github-release：显式关闭自动推断
 RELEASE_NOTES=""       # --notes "xxx" 或 --notes-file path
 RELEASE_NOTES_FILE=""
@@ -115,32 +115,16 @@ LINUX_ARCHES=""        # --linux-arch x64,arm64
 
 # ===== mac 架构选择（仅 PC_HAS_MAC=1 时生效）=====
 # 逗号分隔，可选 x64 / arm64；默认 "x64,arm64"·两架构都打。
-# 脱离必要性：electron-builder mac.target 已改为单架构读 env NOWEN_MAC_ARCH，
-# 这里负责循环：每个 arch 先 rebuild:native，再 electron-builder。
-# 历史教训（2026-05 Intel Mac ERR_DLOPEN_FAILED）：
-#   原来一次 build 打 arm64+x64 dmg，但 better-sqlite3.node 只能 rebuild 一种架构、
-#   另一份装包内是错架构的 .node，用户一打开就 dlopen 失败。
+# electron-builder mac.target 单架构读 env NOWEN_MAC_ARCH，这里负责循环。
 MAC_ARCHES=""          # --mac-arch x64,arm64
 
-# ===== Android 端 Docker 构建支持 =====
-# 主机没装 JDK/Android SDK 时，用 docker 镜像挂载仓库跑 gradle。
-ANDROID_USE_DOCKER=0                                     # --android-docker
-ANDROID_DOCKER_IMAGE="cimg/android:2024.01.1-node"       # --android-docker-image NAME:TAG
-ANDROID_DOCKER_SYNC=0                                    # --android-docker-sync：把 frontend build + cap sync 也挪进 Docker
-
-# ===== PC 端打包后恢复 backend better-sqlite3 的 Node ABI =====
-# rebuild:native 会把 backend/better-sqlite3 编成 Electron ABI，
-# 这之后本机直接 `npm run dev:backend`（tsx 纯 Node）会报 ABI 不匹配。
-# 加这个开关后：PC 打包完自动 `cd backend && npm rebuild better-sqlite3`，恢复 Node ABI。
-RESTORE_BACKEND_ABI=0                                    # --restore-backend-abi
-
 # ===== 原子发布（all-or-nothing） =====
-# 当设为 1 时：先把三端（Docker / PC / Android）全部构建成功，最后统一执行所有
+# 当设为 1 时：先把两端（Docker / PC）全部构建成功，最后统一执行所有
 #   "对外可见的推送动作"：docker push / git tag push / gh release。
 # 任何一端构建失败，则 Docker Hub / GitHub 都不会留下任何此次版本的痕迹（本地会保留产物用于排查）。
 # 场景：
-#   - 多端组合（docker+pc / docker+android / 三端）或"一键全量发布"时默认自动开启
-#   - 单目标（只 docker 或只 pc 或只 android）时默认关闭（没有意义，也不需要额外 buildx 验证）
+#   - 多端组合（docker+pc）或"一键全量发布"时默认自动开启
+#   - 单目标（只 docker 或只 pc）时默认关闭（没有意义，也不需要额外 buildx 验证）
 #   - --atomic / --no-atomic 可显式覆盖
 ATOMIC_RELEASE=-1              # -1=未指定（由目标组合自动推断）；0=关；1=开
 ATOMIC_RELEASE_EXPLICIT=0      # 用户通过 --atomic/--no-atomic 显式设置
@@ -182,8 +166,8 @@ usage() {
       --no-git-tag         不打 git tag / 不推送到 GitHub
 
 多端发版选项（可组合）:
-      --target TARGETS     逗号分隔：docker / pc / linux-app / android / fpk / upk / lite / clipper / all
-                           默认 docker；示例：--target pc,android,fpk,upk,lite,clipper
+      --target TARGETS     逗号分隔：docker / pc / linux-app / fpk / upk / lite / clipper / all
+                           默认 docker；示例：--target pc,fpk,upk,lite,clipper
                            - linux-app: 等价于 --target pc --pc-platform linux，输出 AppImage + deb
                            - lite     : 调 scripts/build-lite.mjs 出 "无后端" 的 PC 安装包
                            - clipper  : 调 packages/nowen-clipper 出浏览器扩展 zip
@@ -201,24 +185,15 @@ usage() {
       --mac-arch LIST      mac 要打的 CPU 架构，逗号分隔：x64 / arm64（默认 x64）
                            x64 包 Apple Silicon 也可走 Rosetta 跑；想出原生 arm64 包传 arm64 或 x64,arm64
                            （注意：同时打两架构时 latest-mac.yml 仅最后一次构建的架构能走自动更新）
-      --android-docker     Android 用 Docker 镜像跑 gradle（主机无需装 JDK/Android SDK）
-      --android-docker-image NAME:TAG
-                           指定 Android 构建镜像（默认 cimg/android:2024.01.1-node）
-      --android-docker-sync
-                           连同 frontend build + npx cap sync android 也放进 Docker 里跑
-                           （主机连 node 都不装也能打 APK，代价是首次镜像下载多走一遍）
-      --restore-backend-abi
-                           PC 打包完自动 rebuild backend 的 better-sqlite3 回 Node ABI
-                           （避免一边打包一边 npm run dev:backend 时 ABI 不匹配）
-      --github-release     把 pc/android 产物以 gh release create 上传到 GitHub Releases
+      --github-release     把 pc 产物以 gh release create 上传到 GitHub Releases
                            需要 gh CLI 已登录（gh auth login），或设了 GH_TOKEN 环境变量
-                           注意：当 --target 包含 pc 或 android 时会自动启用，无需手动加
+                           注意：当 --target 包含 pc 时会自动启用，无需手动加
       --no-github-release  显式关闭 GitHub Release 上传（覆盖自动推断）
       --notes "TEXT"       Release 发布说明（简短文本）
       --notes-file PATH    Release 发布说明（从文件读，优先级高于 --notes）
       --draft              Release 作为草稿（可在网页上再发布）
       --prerelease         标记为 Pre-release（版本号带 -rc / -alpha 等后缀会自动置位）
-      --atomic             原子发布：三端全部构建成功后，再统一执行 docker push / git tag / GitHub Release
+      --atomic             原子发布：多端全部构建成功后，再统一执行 docker push / git tag / GitHub Release
                            （多端组合或"一键全量发布"时默认开启）
       --no-atomic          关闭原子发布：保持旧行为（边构建边推送）
 
@@ -233,38 +208,19 @@ usage() {
   # 只打 PC 端（Windows exe + portable），发到 GitHub Releases
   $0 -v 1.3.0 -y --target pc --github-release --no-latest
 
-  # 在 Debian 上同时打 Win + Linux PC 产物 + Android APK（通过 Docker 构建 Android）
-  $0 -v 1.3.0 -y --target pc,android --pc-platform win,linux \
-      --android-docker --github-release
-
-  # 极简 Debian：宿主仅装 wine+mono+docker（连 Android node_modules 都可以省）
-  $0 -v 1.3.0 -y --target pc,android \
-      --pc-platform win,linux \
-      --android-docker --android-docker-sync \
-      --restore-backend-abi \
-      --github-release
-
   # 实验性构建 Linux ARM64 桌面端 AppImage/deb（不进入正式 Release 矩阵）
   $0 -v 1.3.0 -y --target pc --pc-platform linux --linux-arch arm64 --no-github-release
 
   # 只打 Linux 桌面安装包（AppImage + deb）
   $0 -v 1.3.0 -y --target linux-app --no-github-release
 
-  # 只打 Android APK，发到 GitHub Releases
-  $0 -v 1.3.0 -y --target android --github-release
-
-  # 三端同时发：Docker Hub + PC + Android + GitHub Release
+  # Docker Hub + PC 同时发
   $0 -v 1.3.0 -y --target all --github-release --notes "修复若干 bug"
 
   # 预发布（自动置 prerelease）
   $0 -v 1.3.0-rc.1 -y --target all --github-release
 
 环境变量（可选，供 CI 使用）:
-  NOWEN_ANDROID_KEYSTORE_B64      Android keystore 的 base64；脚本会还原为文件并生成
-                                  frontend/android/keystore.properties，构建后自动清理
-  NOWEN_ANDROID_KEYSTORE_PASSWORD store 密码
-  NOWEN_ANDROID_KEY_ALIAS         key alias（默认 nowen-release）
-  NOWEN_ANDROID_KEY_PASSWORD      key 密码（未设则等同于 store 密码）
   NOWEN_SKIP_RCEDIT=1             跳过 electron-builder 的 rcedit（Windows exe 图标/版本注入）
                                   和代码签名；适合 Debian 首次打 Win 包时，避免等 winCodeSign
                                   约 60MB 从 GitHub 下载（国内网络容易卡）
@@ -298,10 +254,6 @@ while [ $# -gt 0 ]; do
         --pc-platform)  PC_PLATFORMS="${2:-}"; shift 2 ;;
         --linux-arch)   LINUX_ARCHES="${2:-}"; shift 2 ;;
         --mac-arch)     MAC_ARCHES="${2:-}"; shift 2 ;;
-        --android-docker) ANDROID_USE_DOCKER=1; shift ;;
-        --android-docker-image) ANDROID_DOCKER_IMAGE="${2:-}"; shift 2 ;;
-        --android-docker-sync) ANDROID_DOCKER_SYNC=1; ANDROID_USE_DOCKER=1; shift ;;
-        --restore-backend-abi) RESTORE_BACKEND_ABI=1; shift ;;
         --github-release) DO_GITHUB_RELEASE=1; shift ;;
         --no-github-release) DO_GITHUB_RELEASE=0; NO_GITHUB_RELEASE_EXPLICIT=1; shift ;;
         --notes)        RELEASE_NOTES="${2:-}"; shift 2 ;;
@@ -333,31 +285,27 @@ if [ "$TARGETS_EXPLICIT" = "0" ] && [ "$BUILD_ONLY" = "0" ] && [ "$ASSUME_YES" =
     echo
     echo "  ${C_CYAN}1${C_RESET})  Docker 镜像               仅发布 Docker Hub 镜像"
     echo "  ${C_CYAN}2${C_RESET})  PC 客户端                 打包 exe / AppImage / deb / dmg"
-    echo "  ${C_CYAN}3${C_RESET})  Android APK               打包 Android 安装包"
-    echo "  ${C_CYAN}4${C_RESET})  PC + Android              同时打 PC 和 Android"
-    echo "  ${C_BOLD}${C_GREEN}5${C_RESET})  ${C_BOLD}🚀 一键全量发布${C_RESET}          git tag + Docker(amd64+arm64) + PC/Linux 安装包 + APK + .fpk + lite + clipper + GitHub Releases（不含 .upk，单独走选项 10）"
-    echo "  ${C_CYAN}6${C_RESET})  自定义组合                手动输入 docker,pc,linux-app,android,fpk,upk,lite,clipper 组合"
-    echo "  ${C_CYAN}7${C_RESET})  飞牛 .fpk                 仅打包飞牛 NAS 安装包（要求镜像已发到 Docker Hub）"
-    echo "  ${C_CYAN}8${C_RESET})  Lite 版（无后端）          仅打 PC 端 lite 安装包（builder.lite.config.js）"
-    echo "  ${C_CYAN}9${C_RESET})  浏览器扩展 (clipper)        仅打 nowen-clipper 浏览器扩展 zip"
-    echo "  ${C_CYAN}10${C_RESET}) 绿联 .upk                 仅打包绿联 NAS 安装包（镜像 tar 打进包，本机需 docker）"
+    echo "  ${C_BOLD}${C_GREEN}3${C_RESET})  ${C_BOLD}🚀 一键全量发布${C_RESET}          git tag + Docker(amd64+arm64) + PC/Linux 安装包 + .fpk + lite + clipper + GitHub Releases（不含 .upk，单独走选项 8）"
+    echo "  ${C_CYAN}4${C_RESET})  自定义组合                手动输入 docker,pc,linux-app,fpk,upk,lite,clipper 组合"
+    echo "  ${C_CYAN}5${C_RESET})  飞牛 .fpk                 仅打包飞牛 NAS 安装包（要求镜像已发到 Docker Hub）"
+    echo "  ${C_CYAN}6${C_RESET})  Lite 版（无后端）          仅打 PC 端 lite 安装包（builder.lite.config.js）"
+    echo "  ${C_CYAN}7${C_RESET})  浏览器扩展 (clipper)        仅打 nowen-clipper 浏览器扩展 zip"
+    echo "  ${C_CYAN}8${C_RESET})  绿联 .upk                 仅打包绿联 NAS 安装包（镜像 tar 打进包，本机需 docker）"
     echo
-    read -r -p "请输入序号 [1-10]（默认 1）: " _mode_choice
+    read -r -p "请输入序号 [1-8]（默认 1）: " _mode_choice
     _mode_choice="${_mode_choice:-1}"
 
-    # _ONE_SHOT=1 表示"一键全量发布"模式：后续 Docker 架构 / PC 平台 / Android 方式 /
+    # _ONE_SHOT=1 表示"一键全量发布"模式：后续 Docker 架构 / PC 平台 /
     # GitHub Release / 其他选项 全部跳过交互，采用最合理的默认值，实现真正"一次性全发"。
     _ONE_SHOT=0
 
     case "$_mode_choice" in
         1) TARGETS="docker" ;;
         2) TARGETS="pc" ;;
-        3) TARGETS="android" ;;
-        4) TARGETS="pc,android" ;;
-        5)
+        3)
             # 注意：一键全量"不含"绿联 .upk —— upk 依赖 ugcli check，
-            # 经常因为 ugcli/绿联模板自身原因卡住主流程，故独立到选项 10。
-            TARGETS="docker,pc,linux-app,android,fpk,lite,clipper"
+            # 经常因为 ugcli/绿联模板自身原因卡住主流程，故独立到选项 8。
+            TARGETS="docker,pc,linux-app,fpk,lite,clipper"
             _ONE_SHOT=1
             # ---- 一键全量：Docker 多架构 ----
             ARCH="multi"
@@ -369,17 +317,6 @@ if [ "$TARGETS_EXPLICIT" = "0" ] && [ "$BUILD_ONLY" = "0" ] && [ "$ASSUME_YES" =
                     Darwin) PC_PLATFORMS="mac,linux" ;;
                     *)      PC_PLATFORMS="win" ;;
                 esac
-            fi
-            # ---- 一键全量：Android 按本机 SDK 是否可用自动选 ----
-            if { [ -n "${JAVA_HOME:-}" ] || command -v javac >/dev/null 2>&1; } \
-               && { [ -n "${ANDROID_HOME:-}" ] || [ -n "${ANDROID_SDK_ROOT:-}" ]; }; then
-                ANDROID_USE_DOCKER=0
-            elif command -v docker >/dev/null 2>&1; then
-                ANDROID_USE_DOCKER=1
-                ANDROID_DOCKER_SYNC=0
-            else
-                ANDROID_USE_DOCKER=0
-                warn "一键模式：未检测到 JDK/Android SDK 也未检测到 Docker，Android 构建很可能失败"
             fi
             # ---- 一键全量：必然打 git tag + 推 GitHub Release + git pull ----
             DO_GIT_TAG=1
@@ -396,51 +333,45 @@ if [ "$TARGETS_EXPLICIT" = "0" ] && [ "$BUILD_ONLY" = "0" ] && [ "$ASSUME_YES" =
             info "   - Docker 架构: ${C_GREEN}multi (amd64+arm64)${C_RESET}"
             info "   - PC 平台:     ${C_GREEN}${PC_PLATFORMS}${C_RESET}"
             info "   - Linux 安装包:${C_GREEN}是${C_RESET}（AppImage + deb）"
-            if [ "$ANDROID_USE_DOCKER" = "1" ]; then
-                info "   - Android:     ${C_GREEN}Docker 构建${C_RESET}"
-            else
-                info "   - Android:     ${C_GREEN}本机 gradlew${C_RESET}"
-            fi
             info "   - git tag:     ${C_GREEN}是${C_RESET}"
             info "   - GitHub 发布: ${C_GREEN}是${C_RESET}"
             info "   - git pull:    ${C_GREEN}是${C_RESET}"
 info "   - 飞牛 .fpk:   ${C_GREEN}是${C_RESET}（在 Docker push 后构建）"
-            info "   - 绿联 .upk:   ${C_YELLOW}否${C_RESET}（独立选项 10，避免 ugcli 问题阻断主流程）"
+            info "   - 绿联 .upk:   ${C_YELLOW}否${C_RESET}（独立选项 8，避免 ugcli 问题阻断主流程）"
             info "   - Lite 版:     ${C_GREEN}是${C_RESET}（无后端 PC 安装包）"
             info "   - 浏览器扩展:  ${C_GREEN}是${C_RESET}（nowen-clipper zip）"
-            info "   - 原子发布:    ${C_GREEN}是${C_RESET}（三端全部构建成功才推送）"
+            info "   - 原子发布:    ${C_GREEN}是${C_RESET}（多端全部构建成功才推送）"
             ;;
-        6)
+        4)
             echo
-            echo "  可选值：${C_GREEN}docker${C_RESET}, ${C_GREEN}pc${C_RESET}, ${C_GREEN}linux-app${C_RESET}, ${C_GREEN}android${C_RESET}, ${C_GREEN}fpk${C_RESET}, ${C_GREEN}upk${C_RESET}, ${C_GREEN}lite${C_RESET}, ${C_GREEN}clipper${C_RESET}（逗号分隔）"
+            echo "  可选值：${C_GREEN}docker${C_RESET}, ${C_GREEN}pc${C_RESET}, ${C_GREEN}linux-app${C_RESET}, ${C_GREEN}fpk${C_RESET}, ${C_GREEN}upk${C_RESET}, ${C_GREEN}lite${C_RESET}, ${C_GREEN}clipper${C_RESET}（逗号分隔）"
             read -r -p "  请输入组合: " _custom_targets
             [ -z "$_custom_targets" ] && die "未输入任何目标"
             TARGETS="$_custom_targets"
             ;;
-        7) TARGETS="fpk" ;;
-        8) TARGETS="lite" ;;
-        9) TARGETS="clipper" ;;
-        10)
-            # 选项 10：单独补一个 .upk，挂到已存在的 GitHub Release 上。
+        5) TARGETS="fpk" ;;
+        6) TARGETS="lite" ;;
+        7) TARGETS="clipper" ;;
+        8)
+            # 选项 8：单独补一个 .upk，挂到已存在的 GitHub Release 上。
             # 语义：不打新 tag、不升版本号、复用远端最新版本。
             TARGETS="upk"
             _UPK_ONLY_MODE=1
             DO_GIT_TAG=0
             DO_GITHUB_RELEASE=1
-            NO_GITHUB_RELEASE_EXPLICIT=1   # 护住 不被 631 行的自动推断洗掉
+            NO_GITHUB_RELEASE_EXPLICIT=1   # 护住，不被上面的自动推断洗掉
             ;;
         *) die "无效选择: $_mode_choice" ;;
     esac
     [ "$_ONE_SHOT" = "0" ] && info "已选择发布目标: ${C_GREEN}${TARGETS}${C_RESET}"
 
     # 提前解析一下 TARGETS，以便后续步骤做条件判断
-    _W_HAS_DOCKER=0; _W_HAS_PC=0; _W_HAS_LINUX_APP=0; _W_HAS_ANDROID=0; _W_HAS_FPK=0; _W_HAS_UPK=0; _W_HAS_LITE=0; _W_HAS_CLIPPER=0
+    _W_HAS_DOCKER=0; _W_HAS_PC=0; _W_HAS_LINUX_APP=0; _W_HAS_FPK=0; _W_HAS_UPK=0; _W_HAS_LITE=0; _W_HAS_CLIPPER=0
     for _wt in $(echo "$TARGETS" | tr ',' ' '); do
         case "$_wt" in
             docker)  _W_HAS_DOCKER=1 ;;
             pc)      _W_HAS_PC=1 ;;
             linux-app) _W_HAS_PC=1; _W_HAS_LINUX_APP=1; [ -z "$PC_PLATFORMS" ] && PC_PLATFORMS="linux" ;;
-            android) _W_HAS_ANDROID=1 ;;
             fpk)     _W_HAS_FPK=1 ;;
             upk)     _W_HAS_UPK=1 ;;
             lite)    _W_HAS_LITE=1 ;;
@@ -504,67 +435,13 @@ info "   - 飞牛 .fpk:   ${C_GREEN}是${C_RESET}（在 Docker push 后构建）
         info "PC 平台: ${C_GREEN}${PC_PLATFORMS}${C_RESET}"
     fi
 
-    # ======== 第 4 步：Android 构建方式（仅当目标包含 android 时） ========
-    if [ "$_ONE_SHOT" = "0" ] && [ "$_W_HAS_ANDROID" = "1" ]; then
+    # ======== 第 4 步：GitHub Release ========
+    # _UPK_ONLY_MODE=1 （选项 8）跳过询问，默认上传到已有 Release。
+    if [ "$_ONE_SHOT" = "0" ] && [ "${_UPK_ONLY_MODE:-0}" = "0" ] && { [ "$_W_HAS_PC" = "1" ] || [ "$_W_HAS_FPK" = "1" ] || [ "$_W_HAS_UPK" = "1" ] || [ "$_W_HAS_LITE" = "1" ] || [ "$_W_HAS_CLIPPER" = "1" ]; }; then
         echo
-        echo "${C_BOLD}📱 第 4 步：Android 构建方式${C_RESET}"
+        echo "${C_BOLD}🚀 第 4 步：是否上传产物到 GitHub Releases？${C_RESET}"
         echo
-        # 探测本机是否有 JDK / Android SDK
-        _has_local_android=0
-        if { [ -n "${JAVA_HOME:-}" ] || command -v javac >/dev/null 2>&1; } \
-           && { [ -n "${ANDROID_HOME:-}" ] || [ -n "${ANDROID_SDK_ROOT:-}" ]; }; then
-            _has_local_android=1
-        fi
-        if [ "$_has_local_android" = "1" ]; then
-            echo "  ${C_CYAN}1${C_RESET})  本机 gradlew       使用本机 JDK + Android SDK（已检测到）"
-            echo "  ${C_CYAN}2${C_RESET})  Docker 构建         使用 Docker 镜像跑 gradle（无需本机装 SDK）"
-            echo
-            read -r -p "请选择 [1-2]（默认 1）: " _android_choice
-            _android_choice="${_android_choice:-1}"
-        else
-            if command -v docker >/dev/null 2>&1; then
-                echo "  ${C_YELLOW}未检测到本机 JDK / Android SDK${C_RESET}"
-                echo
-                echo "  ${C_CYAN}1${C_RESET})  Docker 构建         使用 Docker 镜像（推荐，无需装 SDK）"
-                echo "  ${C_CYAN}2${C_RESET})  本机 gradlew       强制用本机（需先手动安装 JDK + SDK）"
-                echo
-                read -r -p "请选择 [1-2]（默认 1）: " _android_choice
-                _android_choice="${_android_choice:-1}"
-                # 映射选项（无本机 SDK 时默认选项为 docker）
-                case "$_android_choice" in
-                    1) _android_choice=2 ;;
-                    2) _android_choice=1 ;;
-                esac
-            else
-                echo "  ${C_YELLOW}未检测到 JDK/SDK 且未安装 Docker${C_RESET}"
-                echo "  将使用本机 gradlew，请确保已安装 JDK + Android SDK"
-                _android_choice=1
-            fi
-        fi
-        case "$_android_choice" in
-            1) ANDROID_USE_DOCKER=0; info "Android 构建: ${C_GREEN}本机 gradlew${C_RESET}" ;;
-            2)
-                ANDROID_USE_DOCKER=1
-                echo
-                echo "  是否把 frontend build + cap sync 也放进 Docker？"
-                echo "  （宿主连 node 都不装也能打 APK，但首次会多下载依赖）"
-                read -r -p "  [y/N]（默认 N）: " _sync_choice
-                case "$_sync_choice" in
-                    [yY]|[yY][eE][sS]) ANDROID_DOCKER_SYNC=1; info "Android 构建: ${C_GREEN}Docker（含前端 sync）${C_RESET}" ;;
-                    *) ANDROID_DOCKER_SYNC=0; info "Android 构建: ${C_GREEN}Docker（仅 gradle）${C_RESET}" ;;
-                esac
-                ;;
-            *) die "无效选择: $_android_choice" ;;
-        esac
-    fi
-
-    # ======== 第 5 步：GitHub Release ========
-    # _UPK_ONLY_MODE=1 （选项 10）跳过询问，默认上传到已有 Release。
-    if [ "$_ONE_SHOT" = "0" ] && [ "${_UPK_ONLY_MODE:-0}" = "0" ] && { [ "$_W_HAS_PC" = "1" ] || [ "$_W_HAS_ANDROID" = "1" ] || [ "$_W_HAS_FPK" = "1" ] || [ "$_W_HAS_UPK" = "1" ] || [ "$_W_HAS_LITE" = "1" ] || [ "$_W_HAS_CLIPPER" = "1" ]; }; then
-        echo
-        echo "${C_BOLD}🚀 第 5 步：是否上传产物到 GitHub Releases？${C_RESET}"
-        echo
-        echo "  ${C_CYAN}1${C_RESET})  是（推荐）    PC/Android 安装包上传到 GitHub，用户可直接下载"
+        echo "  ${C_CYAN}1${C_RESET})  是（推荐）    PC 安装包上传到 GitHub，用户可直接下载"
         echo "  ${C_CYAN}2${C_RESET})  否            只打包到本地，不上传"
         echo
         read -r -p "请选择 [1-2]（默认 1）: " _gh_choice
@@ -583,10 +460,10 @@ info "   - 飞牛 .fpk:   ${C_GREEN}是${C_RESET}（在 Docker push 后构建）
         fi
     fi
 
-    # ======== 第 6 步：其他选项 ========
+    # ======== 第 5 步：其他选项 ========
     if [ "$_ONE_SHOT" = "0" ]; then
         echo
-        echo "${C_BOLD}⚙️  第 6 步：其他选项${C_RESET}"
+        echo "${C_BOLD}⚙️  第 5 步：其他选项${C_RESET}"
         echo
 
         # 是否 git pull
@@ -596,18 +473,6 @@ info "   - 飞牛 .fpk:   ${C_GREEN}是${C_RESET}（在 Docker push 后构建）
             [nN]|[nN][oO]) DO_PULL=0; info "Git pull: ${C_GREEN}跳过${C_RESET}" ;;
             *) DO_PULL=1; info "Git pull: ${C_GREEN}是${C_RESET}" ;;
         esac
-
-        # PC 端打完后是否恢复 backend ABI
-        if [ "$_W_HAS_PC" = "1" ]; then
-            echo
-            echo "  PC 打包后是否自动恢复 backend better-sqlite3 到 Node ABI？"
-            echo "  （方便打包后继续 npm run dev:backend）"
-            read -r -p "  [y/N]（默认 N）: " _abi_choice
-            case "$_abi_choice" in
-                [yY]|[yY][eE][sS]) RESTORE_BACKEND_ABI=1; info "恢复 ABI: ${C_GREEN}是${C_RESET}" ;;
-                *) RESTORE_BACKEND_ABI=0 ;;
-            esac
-        fi
     else
         # 一键全量发布：仍给一次输 release notes 的机会（可选，回车跳过自动生成）
         if [ -z "$RELEASE_NOTES" ] && [ -z "$RELEASE_NOTES_FILE" ]; then
@@ -625,48 +490,47 @@ info "   - 飞牛 .fpk:   ${C_GREEN}是${C_RESET}（在 Docker push 后构建）
 fi
 
 # 展开 TARGETS
-# - all -> docker,pc,android,fpk,upk,lite,clipper
+# - all -> docker,pc,fpk,upk,lite,clipper
 # - 去重 / 校验
 TARGETS="$(echo "$TARGETS" | tr ',' '\n' | awk 'NF{print}' | sort -u | tr '\n' ',' | sed 's/,$//')"
 if echo ",$TARGETS," | grep -q ',all,'; then
-    TARGETS="docker,pc,android,fpk,upk,lite,clipper"
+    TARGETS="docker,pc,fpk,upk,lite,clipper"
 fi
-HAS_DOCKER=0; HAS_PC=0; HAS_LINUX_APP=0; HAS_ANDROID=0; HAS_FPK=0; HAS_UPK=0; HAS_LITE=0; HAS_CLIPPER=0
+HAS_DOCKER=0; HAS_PC=0; HAS_LINUX_APP=0; HAS_FPK=0; HAS_UPK=0; HAS_LITE=0; HAS_CLIPPER=0
 for t in $(echo "$TARGETS" | tr ',' ' '); do
     case "$t" in
         docker)  HAS_DOCKER=1 ;;
         pc)      HAS_PC=1 ;;
         linux-app) HAS_PC=1; HAS_LINUX_APP=1; [ -z "$PC_PLATFORMS" ] && PC_PLATFORMS="linux" ;;
-        android) HAS_ANDROID=1 ;;
         fpk)     HAS_FPK=1 ;;
         upk)     HAS_UPK=1 ;;
         lite)    HAS_LITE=1 ;;
         clipper) HAS_CLIPPER=1 ;;
-        *)       die "--target 未知值: $t （合法: docker / pc / linux-app / android / fpk / upk / lite / clipper / all）" ;;
+        *)       die "--target 未知值: $t （合法: docker / pc / linux-app / fpk / upk / lite / clipper / all）" ;;
     esac
 done
-[ "$HAS_DOCKER" = "0" ] && [ "$HAS_PC" = "0" ] && [ "$HAS_ANDROID" = "0" ] && [ "$HAS_FPK" = "0" ] \
+[ "$HAS_DOCKER" = "0" ] && [ "$HAS_PC" = "0" ] && [ "$HAS_FPK" = "0" ] \
     && [ "$HAS_UPK" = "0" ] && [ "$HAS_LITE" = "0" ] && [ "$HAS_CLIPPER" = "0" ] \
     && die "--target 至少包含一个目标"
 
 # ===== 自动推断 --github-release =====
-# 当 target 包含 pc/android/fpk/lite/clipper 时，自动启用 GitHub Release 上传
+# 当 target 包含 pc/fpk/lite/clipper 时，自动启用 GitHub Release 上传
 # 因为这些产物的主要分发渠道就是 GitHub Releases
 # 若用户显式传了 --no-github-release 则跳过自动推断
 if [ "$DO_GITHUB_RELEASE" = "0" ] && [ "$NO_GITHUB_RELEASE_EXPLICIT" = "0" ] \
-   && { [ "$HAS_PC" = "1" ] || [ "$HAS_ANDROID" = "1" ] || [ "$HAS_FPK" = "1" ] || [ "$HAS_UPK" = "1" ] || [ "$HAS_LITE" = "1" ] || [ "$HAS_CLIPPER" = "1" ]; }; then
-    info "检测到 target 包含 pc/linux-app/android/fpk/upk/lite/clipper，自动启用 --github-release（可用 --no-github-release 关闭）"
+   && { [ "$HAS_PC" = "1" ] || [ "$HAS_FPK" = "1" ] || [ "$HAS_UPK" = "1" ] || [ "$HAS_LITE" = "1" ] || [ "$HAS_CLIPPER" = "1" ]; }; then
+    info "检测到 target 包含 pc/linux-app/fpk/upk/lite/clipper，自动启用 --github-release（可用 --no-github-release 关闭）"
     DO_GITHUB_RELEASE=1
 fi
 
 # ===== 自动推断 --atomic（原子发布） =====
 # 多端组合（任意 ≥2 个 target）时自动开启：
 # 先把所有构建完成，最后统一执行 docker push / git tag / GitHub Release，
-# 避免"Docker 镜像已推送，但 PC/Android 构建失败"的半成品状态。
+# 避免"Docker 镜像已推送，但 PC 构建失败"的半成品状态。
 # 单目标时没有跨端一致性需求，保持关闭以免 multi 模式需要额外构建开销。
 # 用户显式传了 --atomic / --no-atomic 时不再自动推断。
 if [ "$ATOMIC_RELEASE" = "-1" ]; then
-    _TARGET_COUNT=$((HAS_DOCKER + HAS_PC + HAS_ANDROID + HAS_FPK + HAS_UPK + HAS_LITE + HAS_CLIPPER))
+    _TARGET_COUNT=$((HAS_DOCKER + HAS_PC + HAS_FPK + HAS_UPK + HAS_LITE + HAS_CLIPPER))
     if [ "$_TARGET_COUNT" -ge 2 ]; then
         ATOMIC_RELEASE=1
         info "检测到多端组合（${TARGETS}），自动启用 ${C_GREEN}原子发布${C_RESET}（可用 --no-atomic 关闭）"
@@ -695,8 +559,8 @@ if [ "$BUILD_ONLY" = "1" ]; then
         DO_PUSH_CUSTOM=1
     fi
     # build-only 仅对 docker 构建有意义
-    if [ "$HAS_PC" = "1" ] || [ "$HAS_ANDROID" = "1" ] || [ "$HAS_FPK" = "1" ] || [ "$HAS_UPK" = "1" ] || [ "$HAS_LITE" = "1" ] || [ "$HAS_CLIPPER" = "1" ]; then
-        die "--build-only 模式不支持 --target pc/linux-app/android/fpk/upk/lite/clipper（仅限 docker）"
+    if [ "$HAS_PC" = "1" ] || [ "$HAS_FPK" = "1" ] || [ "$HAS_UPK" = "1" ] || [ "$HAS_LITE" = "1" ] || [ "$HAS_CLIPPER" = "1" ]; then
+        die "--build-only 模式不支持 --target pc/linux-app/fpk/upk/lite/clipper（仅限 docker）"
     fi
     if [ "$DO_GITHUB_RELEASE" = "1" ]; then
         die "--build-only 模式不支持 --github-release"
@@ -864,80 +728,6 @@ if [ "$HAS_PC" = "1" ]; then
     fi
 fi
 
-# Android target 前置检查
-if [ "$HAS_ANDROID" = "1" ]; then
-    [ -d "frontend/android" ] || die "未找到 frontend/android 目录"
-    [ -f "frontend/android/app/build.gradle" ] || die "未找到 frontend/android/app/build.gradle"
-
-    # ---- 自动探测 JAVA_HOME（Capacitor Android 要求 JDK 21+）----
-    if [ -z "${JAVA_HOME:-}" ]; then
-        _detected_java_home=""
-        # Linux: 尝试常见 JDK 21 路径
-        for _jdir in \
-            /usr/lib/jvm/java-21-openjdk-amd64 \
-            /usr/lib/jvm/java-21-openjdk \
-            /usr/lib/jvm/java-21 \
-            /usr/lib/jvm/temurin-21-jdk-amd64 \
-            /usr/lib/jvm/zulu-21-amd64 \
-        ; do
-            if [ -x "${_jdir}/bin/javac" ]; then
-                _detected_java_home="$_jdir"; break
-            fi
-        done
-        # macOS: 使用 java_home 工具
-        if [ -z "$_detected_java_home" ] && command -v /usr/libexec/java_home >/dev/null 2>&1; then
-            _detected_java_home="$(/usr/libexec/java_home -v 21 2>/dev/null || true)"
-        fi
-        # 通用 fallback: 从 javac 反推
-        if [ -z "$_detected_java_home" ] && command -v javac >/dev/null 2>&1; then
-            _javac_real="$(readlink -f "$(command -v javac)" 2>/dev/null || true)"
-            if [ -n "$_javac_real" ]; then
-                # /usr/lib/jvm/java-21-xxx/bin/javac -> /usr/lib/jvm/java-21-xxx
-                _detected_java_home="$(dirname "$(dirname "$_javac_real")")"
-            fi
-        fi
-
-        if [ -n "$_detected_java_home" ]; then
-            export JAVA_HOME="$_detected_java_home"
-            info "自动探测 JAVA_HOME=${JAVA_HOME}"
-        fi
-    fi
-
-    # ---- 自动切换到 Docker 构建（主机没装 JDK/SDK 时） ----
-    # 如果用户显式传了 --android-docker，直接走 docker；
-    # 否则当主机既缺 JAVA_HOME 又缺 ANDROID_HOME/ANDROID_SDK_ROOT 时，也自动切到 docker。
-    if [ "$ANDROID_USE_DOCKER" != "1" ]; then
-        if [ -z "${JAVA_HOME:-}" ] && [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-            if command -v docker >/dev/null 2>&1; then
-                warn "未检测到本地 JDK / Android SDK，自动切换到 Docker 构建（镜像: ${ANDROID_DOCKER_IMAGE}）"
-                ANDROID_USE_DOCKER=1
-            else
-                die "本地无 JDK/Android SDK 且未安装 docker，无法构建 Android。请装 JDK17 + Android SDK，或装 docker 后加 --android-docker"
-            fi
-        fi
-    fi
-
-    if [ "$ANDROID_USE_DOCKER" = "1" ]; then
-        command -v docker >/dev/null 2>&1 || die "--android-docker 需要 docker"
-        docker info >/dev/null 2>&1 || die "docker daemon 不可用（请启动 docker）"
-        info "Android 构建模式: Docker（${ANDROID_DOCKER_IMAGE}）"
-    else
-        info "Android 构建模式: 本机 gradlew"
-    fi
-
-    if [ ! -f "frontend/android/keystore.properties" ] && [ -z "${NOWEN_ANDROID_KEYSTORE_B64:-}" ]; then
-        # 一键全量发布（_ONE_SHOT=1）或原子发布模式下，未签名 APK 等于不可用产物
-        # （Android 同包名不同签名 = 用户必须卸载老版才能装新版，等于发了个废包）
-        # 直接 die，不让它走到 GitHub Release 给用户造成升级灾难
-        if [ "${_ONE_SHOT:-0}" = "1" ] || [ "$ATOMIC_RELEASE" = "1" ]; then
-            die "未找到 frontend/android/keystore.properties 且未设 NOWEN_ANDROID_KEYSTORE_B64：原子/一键全量发布要求签名 APK，请配置后重试（参考 docs/android-signing.md）"
-        else
-            warn "未找到 frontend/android/keystore.properties 且未设 NOWEN_ANDROID_KEYSTORE_B64，APK 将不会被签名（只能用于调试）"
-        fi
-    fi
-    command -v node >/dev/null 2>&1 || die "未安装 node（Android 端打包需要先跑 vite build + cap sync）"
-fi
-
 # fpk target 前置检查
 if [ "$HAS_FPK" = "1" ]; then
     [ -f "scripts/fpk/build-fpk.mjs" ] || die "未找到 scripts/fpk/build-fpk.mjs（飞牛 .fpk 打包脚本）"
@@ -1007,7 +797,7 @@ if [ "$HAS_UPK" = "1" ]; then
 fi
 
 # Lite 版完全复用 PC 端的 electron-builder 链路，但走 builder.lite.config.js，
-# 不打 backend，因此无需 wine + better-sqlite3 等 PC target 的重型依赖。
+# 不打 backend，因此无需 wine 等 PC target 的重型依赖。
 if [ "$HAS_LITE" = "1" ]; then
     [ -f "scripts/build-lite.mjs" ]                  || die "未找到 scripts/build-lite.mjs（lite 打包脚本）"
     [ -f "electron/builder.lite.config.js" ]         || die "未找到 electron/builder.lite.config.js"
@@ -1221,7 +1011,7 @@ EOF
     info "  Docker Hub 最新: ${_DH_MAX:-(无/不可达)}"
     info "  建议下一版本   : ${C_GREEN}${SUGGEST}${C_RESET}"
 
-    # 选项 10（补 upk）：复用 GitHub 最新版本号，不升版本不打新 tag。
+    # 选项 8（补 upk）：复用 GitHub 最新版本号，不升版本不打新 tag。
     # 这里把"建议值"切换成 GitHub 最新版本，让回车直接复用。
     if [ "${_UPK_ONLY_MODE:-0}" = "1" ]; then
         if [ -n "$_GH_MAX" ]; then
@@ -1255,7 +1045,7 @@ EOF
         die "git tag ${VERSION_TAG} 已存在（本地）"
     fi
     # 检查 GitHub / Docker Hub 是否已存在（三端任何一处已占用都禁止覆盖）
-    # 例外：选项 10（_UPK_ONLY_MODE=1）补 upk 时，"已存在"恰恰是必要前提（要复用版本），跳过这条 die。
+    # 例外：选项 8（_UPK_ONLY_MODE=1）补 upk 时，"已存在"恰恰是必要前提（要复用版本），跳过这条 die。
     if [ "${_UPK_ONLY_MODE:-0}" != "1" ] && version_exists_anywhere "$VERSION"; then
         die "版本 ${VERSION_TAG} 在 本地 / GitHub / Docker Hub 中已存在，拒绝覆盖"
     fi
@@ -1348,55 +1138,6 @@ fi
 # README 的 <!-- CHANGELOG:BEGIN/END --> 区块与 frontend/public/changelog.json 也已停止生成。
 # 发布说明改为直接引用 CHANGELOG.md 中对应版本的段落（见下方 RELEASE NOTES）。
 
-# -------------------- Android versionCode / versionName 同步 --------------------
-# frontend/android/app/build.gradle 里有硬编码的 `versionCode N` / `versionName "X"`，
-# 发版前必须改成本次 VERSION。versionCode 用 MAJOR*10000 + MINOR*100 + PATCH 生成
-# （单调递增、不受预发布后缀影响），versionName 直接等于 VERSION。
-android_version_code_of() {
-    # 入参: X.Y.Z[-suffix]  ->  整数
-    local v="$1"
-    local base="${v%%-*}"   # 去掉 -rc.1 之类的后缀
-    local major minor patch
-    IFS='.' read -r major minor patch <<EOF
-$base
-EOF
-    printf '%d\n' "$(( (major * 10000) + (minor * 100) + patch ))"
-}
-
-sync_android_version() {
-    local target_version="$1"
-    local gradle_file="${REPO_ROOT}/frontend/android/app/build.gradle"
-    [ -f "$gradle_file" ] || {
-        warn "未找到 $gradle_file，跳过 Android 版本号同步"
-        return 0
-    }
-
-    local new_code cur_name cur_code
-    new_code="$(android_version_code_of "$target_version")"
-    cur_name="$(grep -oE 'versionName[[:space:]]+"[^"]+"' "$gradle_file" | head -1 | sed -E 's/.*"([^"]+)"/\1/')"
-    cur_code="$(grep -oE 'versionCode[[:space:]]+[0-9]+' "$gradle_file" | head -1 | awk '{print $2}')"
-
-    if [ "$cur_name" = "$target_version" ] && [ "$cur_code" = "$new_code" ]; then
-        info "Android build.gradle 版本已是 ${target_version}/${new_code}，无需改写"
-        return 0
-    fi
-
-    info "更新 Android build.gradle: versionName ${cur_name:-?} -> ${target_version}, versionCode ${cur_code:-?} -> ${new_code}"
-
-    # sed 原地替换（兼容 GNU / BSD）
-    if sed --version >/dev/null 2>&1; then
-        sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode ${new_code}/" "$gradle_file"
-        sed -i -E "s/versionName[[:space:]]+\"[^\"]+\"/versionName \"${target_version}\"/" "$gradle_file"
-    else
-        sed -i '' -E "s/versionCode[[:space:]]+[0-9]+/versionCode ${new_code}/" "$gradle_file"
-        sed -i '' -E "s/versionName[[:space:]]+\"[^\"]+\"/versionName \"${target_version}\"/" "$gradle_file"
-    fi
-}
-
-if [ "$BUILD_ONLY" != "1" ] && [ "$HAS_ANDROID" = "1" ]; then
-    sync_android_version "$VERSION"
-fi
-
 # -------------------- 发布 / 构建 摘要 --------------------
 case "$ARCH" in
     amd64) PLATFORM_DESC="linux/amd64（原生 docker build）" ;;
@@ -1434,21 +1175,6 @@ else
         else
             echo "  PC 打包       : electron-builder（平台: ${PC_PLATFORMS}）"
         fi
-        if [ "$RESTORE_BACKEND_ABI" = "1" ]; then
-            echo "                  (打包后自动恢复 backend better-sqlite3 到 Node ABI)"
-        fi
-    fi
-    if [ "$HAS_ANDROID" = "1" ]; then
-        if [ "$ANDROID_USE_DOCKER" = "1" ]; then
-            if [ "$ANDROID_DOCKER_SYNC" = "1" ]; then
-                echo "  Android 打包  : Docker（镜像: ${ANDROID_DOCKER_IMAGE}，前端 + gradle 全在容器内）"
-            else
-                echo "  Android 打包  : Docker + Capacitor + gradlew assembleRelease（镜像: ${ANDROID_DOCKER_IMAGE}）"
-            fi
-        else
-            echo "  Android 打包  : Capacitor + gradlew assembleRelease（本机）"
-        fi
-        echo "  Android 版本  : versionName=${VERSION}, versionCode=$(android_version_code_of "$VERSION")"
     fi
     if [ "$HAS_FPK" = "1" ]; then
         echo "  飞牛 .fpk     : scripts/fpk/build-fpk.mjs（镜像: ${FPK_DOCKERHUB_REPO}:${VERSION_TAG}）"
@@ -1470,7 +1196,7 @@ else
     fi
     echo "  同步 git tag  : $([ "$DO_GIT_TAG" = "1" ] && echo yes || echo no)"
     echo "  GitHub Release: $([ "$DO_GITHUB_RELEASE" = "1" ] && echo yes || echo no)"
-    echo "  原子发布      : $([ "$ATOMIC_RELEASE" = "1" ] && echo "yes（三端全部构建成功才推送）" || echo no)"
+    echo "  原子发布      : $([ "$ATOMIC_RELEASE" = "1" ] && echo "yes（多端全部构建成功才推送）" || echo no)"
     echo "  git commit    : ${GIT_COMMIT}"
     echo "  构建时间      : ${BUILD_DATE}"
     if [ "$HAS_DOCKER" = "1" ] && [ "$ARCH" = "multi" ]; then
@@ -1492,7 +1218,7 @@ fi
 # -------------------- 构建 tags 与 labels --------------------
 START_TS=$(date +%s)
 
-# 各个 target 实际是否"被执行"，发布模式下由 HAS_DOCKER/HAS_PC/HAS_ANDROID 决定；
+# 各个 target 实际是否"被执行"，发布模式下由 HAS_DOCKER/HAS_PC 决定；
 # 构建模式 (BUILD_ONLY=1) 强制只跑 docker，前面参数校验已保证这点。
 SHOULD_BUILD_DOCKER=$( [ "$BUILD_ONLY" = "1" ] && echo 1 || echo "$HAS_DOCKER" )
 
@@ -1556,13 +1282,13 @@ if [ "$SHOULD_BUILD_DOCKER" = "1" ]; then
     else
         # 发布模式：
         #   - 非原子发布：沿用旧行为，arm64 --load（稍后 docker push），multi --push（边建边推）
-        #   - 原子发布：multi 先不 push（只验证构建并把层写入 buildx 缓存），待 PC/Android 全部
+        #   - 原子发布：multi 先不 push（只验证构建并把层写入 buildx 缓存），待 PC 全部
         #     成功后再跑第二次 buildx --push（有完整缓存，基本秒推）；arm64 仍 --load
         if [ "$ARCH" = "multi" ]; then
             if [ "$ATOMIC_RELEASE" = "1" ]; then
                 # 不 --push 也不 --load（多架构无法 load），只验证构建；产物留在 buildx 缓存里
                 BUILDX_OUTPUT=()
-                info "原子发布：multi 先构建验证，待 PC/Android 成功后再统一推送"
+                info "原子发布：multi 先构建验证，待 PC 成功后再统一推送"
             else
                 BUILDX_OUTPUT=( --push )
             fi
@@ -1599,7 +1325,7 @@ if [ "$SHOULD_BUILD_DOCKER" = "1" ]; then
             # 多架构 manifest 不能 --load 也不能导成单 tar：
             #   - 旧行为 / 非原子发布：BUILDX_OUTPUT=( --push )，边建边推
             #   - 原子发布：BUILDX_OUTPUT=()，先只构建验证（层写入 buildx 缓存），
-            #     待 PC/Android 全部成功后，末尾统一再跑一次 buildx --push 推送
+            #     待 PC 全部成功后，末尾统一再跑一次 buildx --push 推送
             BUILD_CMD=(
                 docker buildx build
                 --platform linux/amd64,linux/arm64
@@ -1654,7 +1380,7 @@ fi
 if [ "$BUILD_ONLY" != "1" ] && [ "$SHOULD_BUILD_DOCKER" = "1" ] && [ "$ATOMIC_RELEASE" != "1" ]; then
     verify_release_remote_baseline
 fi
-# 原子发布模式下，这一步整体延迟到"统一推送阶段"，等 PC/Android 全部成功后再做。
+# 原子发布模式下，这一步整体延迟到"统一推送阶段"，等 PC 全部成功后再做。
 # 非原子发布模式保持原行为：Docker 构建后立即 push（旧版用户习惯）。
 PUSH_DURATION=0
 if [ "$SHOULD_BUILD_DOCKER" = "1" ] && [ "$ATOMIC_RELEASE" != "1" ]; then
@@ -1703,12 +1429,11 @@ if [ "$HAS_PC" = "1" ]; then
     UNAME_S_PC="$(uname -s 2>/dev/null || echo unknown)"
 
     # ---- 前置：确保 backend 依赖齐全 ----
-    # 背景：rebuild:native 只负责把原生模块从 Node ABI 切到 Electron ABI，
-    #   不会补装缺失的 npm 包；一旦 backend/node_modules 不完整（新机器 / 切过分支 /
+    # 背景：一旦 backend/node_modules 不完整（新机器 / 切过分支 /
     #   手动删过 node_modules / lockfile 漂移），接下来 `npm run build:backend`
     #   的 tsc 会直接 TS2307 "Cannot find module 'xxx'" 报错。
     # 策略：检查几个关键依赖是否都存在；缺任何一个就在 backend/ 下跑一次 npm install。
-    # 覆盖：sqlite-vec（曾经因此失败过）、better-sqlite3、hono、jsonwebtoken。
+    # 覆盖：sqlite-vec（曾经因此失败过）、hono、jsonwebtoken。
     if [ "$DRY_RUN" = "1" ]; then
         echo "  (dry-run) 检查 backend/node_modules 关键依赖"
     else
@@ -1730,7 +1455,7 @@ if [ "$HAS_PC" = "1" ]; then
                 _BACKEND_DEPS_OK=0
             fi
             # 兜底 2：白名单逐项 check（覆盖一些历史掉过坑的代表性依赖）
-            for _dep in sqlite-vec better-sqlite3 hono jsonwebtoken; do
+            for _dep in sqlite-vec hono jsonwebtoken; do
                 if [ ! -d "${REPO_ROOT}/backend/node_modules/${_dep}" ]; then
                     warn "backend 依赖缺失: ${_dep}"
                     _BACKEND_DEPS_OK=0
@@ -1805,7 +1530,7 @@ if [ "$HAS_PC" = "1" ]; then
         fi
     fi
 
-    # 统一先跑 rebuild:native + build:all（safe-build.mjs 内部也是这三步，这里拆开以便非 Windows 分支复用）
+    # 统一先跑 build:all（safe-build.mjs 内部也是这两步，这里拆开以便非 Windows 分支复用）
     if [ "$UNAME_S_PC" = "Linux" ] || [ "$UNAME_S_PC" = "Darwin" ]; then
         # 输出目录：在 Linux/macOS 上不做 tmpdir 切换，默认 dist-electron/
         # （NOWEN_BUILD_OUT 主要是 Windows 下避免 IDE 监听，Linux/macOS 不需要）
@@ -1816,18 +1541,6 @@ if [ "$HAS_PC" = "1" ]; then
             ( cd "$REPO_ROOT" && run_argv npm run build:all )
         fi
 
-        # ---- rebuild:native 按平台各打一遍 ----
-        # 历史教训（2026-05）：原先一次 rebuild:native + 多平台 electron-builder，
-        # 在 Linux 宿主上会把 better-sqlite3 编成 Linux .so 塞进 Win 安装包，
-        # 用户启动时 LoadLibrary 报 "is not a valid Win32 application"。
-        # 修复：每跑一个平台目标前，按 target-platform 重新准备 better-sqlite3.node：
-        #   - host == target：调 @electron/rebuild 真编
-        #   - host != target：跨平台分支，用 prebuild-install 下官方 prebuilt
-        # 然后 electron-builder 只打这一个平台。
-        #
-        # HOST_PLATFORM：Linux -> linux, Darwin -> darwin（macOS）
-        if [ "$UNAME_S_PC" = "Linux" ]; then HOST_PLATFORM="linux"; else HOST_PLATFORM="darwin"; fi
-
         _build_one_pc_target() {
             local _eb_flag="$1"     # --win / --linux / --mac
             local _target_plat="$2" # win32 / linux / darwin
@@ -1836,15 +1549,11 @@ if [ "$HAS_PC" = "1" ]; then
             if [ "$_eb_flag" = "--linux" ]; then
                 _eb_args+=( "--${_target_arch}" )
             fi
-            info "rebuild:native for ${_target_plat}-${_target_arch} (host=${HOST_PLATFORM})"
             if [ "$DRY_RUN" = "1" ]; then
-                echo "  (dry-run) npm run rebuild:native -- --target-platform=${_target_plat} --target-arch=${_target_arch}"
                 echo "  (dry-run) npx electron-builder --config electron/builder.config.js --publish never ${_eb_args[*]}"
                 return 0
             fi
-            ( cd "$REPO_ROOT" && run_argv npm run rebuild:native -- \
-                --target-platform="${_target_plat}" --target-arch="${_target_arch}" )
-            info "electron-builder ${_eb_flag}"
+            info "electron-builder ${_eb_flag} (${_target_plat}-${_target_arch})"
             set +e
             ( cd "$REPO_ROOT" && run_argv env \
                 TARGET_PLATFORM="${_target_plat}" \
@@ -1864,7 +1573,6 @@ if [ "$HAS_PC" = "1" ]; then
                     warn "  1) wine 跑 rcedit 被 OOM-kill (signal: killed) → 给 WSL2 加内存：%UserProfile%\\.wslconfig 设 memory=12GB swap=8GB，再 wsl --shutdown"
                     warn "  2) wine 32 位子系统未装 → sudo dpkg --add-architecture i386 && sudo apt install -y wine32:i386 && wineboot -i"
                     warn "  3) winCodeSign 下载被墙 → 设 NOWEN_SKIP_RCEDIT=1 跳过 rcedit/签名"
-                    warn "  4) prebuild-install 拉 win32 better-sqlite3 超时 → 设 HTTPS_PROXY"
                 fi
                 die "PC 端打包失败（原子发布：未推送任何东西）"
             fi
@@ -1875,7 +1583,6 @@ if [ "$HAS_PC" = "1" ]; then
         fi
         if [ "$PC_HAS_LINUX" = "1" ]; then
             for _la in $(echo "$LINUX_ARCHES" | tr ',' ' '); do
-                info "linux arch=${_la}: 先 rebuild:native，再 electron-builder（experimental）"
                 _build_one_pc_target --linux linux "$_la"
             done
             if [ "$(echo "$LINUX_ARCHES" | tr ',' '\n' | wc -l | tr -d ' ')" -gt 1 ]; then
@@ -1883,17 +1590,13 @@ if [ "$HAS_PC" = "1" ]; then
             fi
         fi
         if [ "$PC_HAS_MAC" = "1" ]; then
-            # mac 按架构循环：每个 arch 都要单独 rebuild:native + electron-builder
-            # 通过 NOWEN_MAC_ARCH 让 builder.config.js 的 mac.target 只产出该架构 dmg/zip
+            # mac 按架构循环：通过 NOWEN_MAC_ARCH 让 builder.config.js 的 mac.target
+            # 只产出该架构 dmg/zip。
             #
             # 默认只打 x64：
             #   - Intel Mac 原生跑
-            #   - Apple Silicon 走 Rosetta 也能跑（性能略损，但避免双架构错位 .node 翻车）
+            #   - Apple Silicon 走 Rosetta 也能跑
             #   - 想出原生 arm64 包可显式 --mac-arch arm64 或 --mac-arch x64,arm64
-            #
-            # 历史教训（2026-05 Intel Mac ERR_DLOPEN_FAILED）：
-            #   原 builder.config 一次 build 同时输出 arm64+x64 dmg/zip，但
-            #   backend/better_sqlite3.node 只能 rebuild 出一个架构 → 另一架构包打开崩。
             #
             # 注意：若同时打两个架构，electron-updater 的 latest-mac.yml 会被第二次
             #   覆盖；目前自动更新仅按最后一次构建的架构发布。如需双架构都自动更新，
@@ -1906,7 +1609,6 @@ if [ "$HAS_PC" = "1" ]; then
                 if [ "$_ma" != "x64" ] && [ "$_ma" != "arm64" ]; then
                     die "--mac-arch 未知值: $_ma （合法: x64 / arm64）"
                 fi
-                info "mac arch=${_ma}: 先 rebuild:native，再 electron-builder（NOWEN_MAC_ARCH=${_ma}）"
                 NOWEN_MAC_ARCH="$_ma" _build_one_pc_target --mac darwin "$_ma"
             done
             if [ "${#_MAC_ARCH_ARR[@]}" -gt 1 ]; then
@@ -1920,10 +1622,8 @@ if [ "$HAS_PC" = "1" ]; then
         [ "$PC_HAS_LINUX" = "1" ] && EB_PLATFORM_ARGS+=( --linux )
         [ "$PC_HAS_MAC" = "1" ]   && EB_PLATFORM_ARGS+=( --mac )
 
-        # 注：每个平台目标已经在上面的 _build_one_pc_target 中独立打过了
-        # （每打一个平台前都会重新 rebuild:native 为对应平台准备 better-sqlite3.node）
-        # 这里不能再 `electron-builder ${EB_PLATFORM_ARGS[*]}`，否则最后一个 rebuild 的
-        # 目标会把之前平台的 .node 覆盖，产物再次错位。
+        # 注：每个平台目标已经在上面的 _build_one_pc_target 中独立打过了，
+        # 这里不能再 `electron-builder ${EB_PLATFORM_ARGS[*]}`，否则会重复构建。
     else
         # Windows 宿主：沿用 safe-build.mjs（只会出 win 目标，这里忽略用户 --pc-platform 里的 linux/mac）
         if [ "$PC_HAS_LINUX" = "1" ] || [ "$PC_HAS_MAC" = "1" ]; then
@@ -1991,230 +1691,8 @@ if [ "$HAS_PC" = "1" ]; then
     PC_END=$(date +%s)
     PC_BUILD_DURATION=$((PC_END - PC_START))
     ok "PC 打包完成，用时 ${PC_BUILD_DURATION}s"
-
-    # ---- 恢复 backend better-sqlite3 的 Node ABI（可选） ----
-    # rebuild:native 把 backend/better-sqlite3 编成 Electron ABI，纯 Node 的 tsx 就跑不动了。
-    # 加 --restore-backend-abi 后，这里把它再 rebuild 回当前 Node 的 ABI。
-    if [ "$RESTORE_BACKEND_ABI" = "1" ]; then
-        step "恢复 backend better-sqlite3 到 Node ABI（--restore-backend-abi）"
-        if [ ! -d "${REPO_ROOT}/backend/node_modules/better-sqlite3" ]; then
-            warn "backend/node_modules/better-sqlite3 不存在，跳过"
-        elif [ "$DRY_RUN" = "1" ]; then
-            echo "  (dry-run) cd backend && npm rebuild better-sqlite3"
-        else
-            ( cd "$REPO_ROOT/backend" && run_argv npm rebuild better-sqlite3 ) \
-                || warn "rebuild better-sqlite3 (Node ABI) 失败；后续 npm run dev:backend 可能会报 ABI 不匹配，可手动 cd backend && npm rebuild better-sqlite3"
-            ok "backend ABI 已恢复为 Node（dev:backend 可直接跑）"
-        fi
-    fi
 fi
 
-# -------------------- Android 端打包（Capacitor + Gradle） --------------------
-#
-# Keystore 注入（CI 场景常用）：
-#   若设置了 NOWEN_ANDROID_KEYSTORE_B64，会把它 base64 -d 还原为 keystore 文件，
-#   并自动生成 frontend/android/keystore.properties。
-#   环境变量（全部可选，仅在传入 NOWEN_ANDROID_KEYSTORE_B64 时才读）：
-#     NOWEN_ANDROID_KEYSTORE_B64        keystore 文件 base64
-#     NOWEN_ANDROID_KEYSTORE_PASSWORD   store 密码
-#     NOWEN_ANDROID_KEY_ALIAS           key alias（默认 nowen-release）
-#     NOWEN_ANDROID_KEY_PASSWORD        key 密码（未设则沿用 store 密码）
-#
-# trap 机制：
-#   成功或失败退出时都会清理临时生成的 keystore / keystore.properties，
-#   避免把敏感文件遗留在工作区。（若 keystore.properties 原本就存在，不做任何事）
-ANDROID_ARTIFACTS=()
-ANDROID_BUILD_DURATION=0
-ANDROID_KEYSTORE_TEMP_CREATED=0
-ANDROID_KEYSTORE_PROPS_TEMP_CREATED=0
-
-cleanup_android_keystore() {
-    # 只清理脚本自己创建的；原本就存在的文件不动
-    if [ "$ANDROID_KEYSTORE_TEMP_CREATED" = "1" ]; then
-        rm -f "${REPO_ROOT}/frontend/android/app/nowen-release.keystore" 2>/dev/null || true
-    fi
-    if [ "$ANDROID_KEYSTORE_PROPS_TEMP_CREATED" = "1" ]; then
-        rm -f "${REPO_ROOT}/frontend/android/keystore.properties" 2>/dev/null || true
-    fi
-}
-
-prepare_android_keystore() {
-    # 幂等：外部已有 keystore.properties 时不覆盖，仅在用户提供了 B64 环境变量时才自动生成
-    local props_file="${REPO_ROOT}/frontend/android/keystore.properties"
-    local keystore_path="${REPO_ROOT}/frontend/android/app/nowen-release.keystore"
-
-    if [ -z "${NOWEN_ANDROID_KEYSTORE_B64:-}" ]; then
-        return 0
-    fi
-
-    if [ -f "$props_file" ]; then
-        warn "检测到已有 keystore.properties，忽略 NOWEN_ANDROID_KEYSTORE_B64（不覆盖）"
-        return 0
-    fi
-
-    command -v base64 >/dev/null 2>&1 || die "需要 base64 命令来还原 keystore"
-
-    local store_pwd="${NOWEN_ANDROID_KEYSTORE_PASSWORD:-}"
-    local key_alias="${NOWEN_ANDROID_KEY_ALIAS:-nowen-release}"
-    local key_pwd="${NOWEN_ANDROID_KEY_PASSWORD:-$store_pwd}"
-
-    [ -n "$store_pwd" ] || die "设置了 NOWEN_ANDROID_KEYSTORE_B64 但未设 NOWEN_ANDROID_KEYSTORE_PASSWORD"
-
-    info "从环境变量还原 Android keystore -> $keystore_path"
-    if [ "$DRY_RUN" = "1" ]; then
-        echo "  (dry-run) 解码 keystore 并写入 keystore.properties"
-    else
-        # macOS 与 Linux 的 base64 兼容：-d 在两者上都支持
-        printf '%s' "$NOWEN_ANDROID_KEYSTORE_B64" | base64 -d > "$keystore_path" \
-            || die "NOWEN_ANDROID_KEYSTORE_B64 解码失败（是否正确的 base64？）"
-        ANDROID_KEYSTORE_TEMP_CREATED=1
-
-        # keystore.properties 中的 storeFile 是相对于 rootProject.projectDir（即 frontend/android/）
-        # 所以这里写 "app/nowen-release.keystore"
-        cat > "$props_file" <<EOF
-storeFile=app/nowen-release.keystore
-storePassword=${store_pwd}
-keyAlias=${key_alias}
-keyPassword=${key_pwd}
-EOF
-        chmod 600 "$props_file" 2>/dev/null || true
-        ANDROID_KEYSTORE_PROPS_TEMP_CREATED=1
-        ok "keystore.properties 已生成（将于脚本退出时清理）"
-    fi
-}
-
-if [ "$HAS_ANDROID" = "1" ]; then
-    # 注册清理 trap（幂等：多次调用 trap 会覆盖前一次）
-    trap cleanup_android_keystore EXIT
-
-    step "Android 端打包（Capacitor + gradlew assembleRelease）"
-    ANDROID_START=$(date +%s)
-
-    # 0. 先从环境变量还原 keystore（如有）
-    prepare_android_keystore
-
-    # 1. 前端 + capacitor sync
-    # 默认：在宿主 node 上跑 `npm run build` + `npx cap sync android`
-    # --android-docker-sync：连同这两步也放进 Docker（镜像里自带 node，宿主可完全不装 node）
-    if [ "$ANDROID_DOCKER_SYNC" = "1" ]; then
-        info "frontend build + npx cap sync android（Docker 内）"
-        GRADLE_CACHE_VOL="${HOME}/.gradle-docker-nowen-note"
-        mkdir -p "$GRADLE_CACHE_VOL"
-        # 同步用一个 npm 缓存卷，避免每次都重新下载依赖
-        NPM_CACHE_VOL="${HOME}/.npm-docker-nowen-note"
-        mkdir -p "$NPM_CACHE_VOL"
-        DOCKER_UID="$(id -u 2>/dev/null || echo 1000)"
-        DOCKER_GID="$(id -g 2>/dev/null || echo 1000)"
-
-        if [ "$DRY_RUN" = "1" ]; then
-            echo "  (dry-run) docker run ... ${ANDROID_DOCKER_IMAGE} bash -lc 'cd frontend && npm ci && npm run build && npx cap sync android'"
-        else
-            # frontend 的依赖若没装，这里 npm ci 一把；已装则 cap sync 会直接复用
-            run_argv docker run --rm \
-                -u "${DOCKER_UID}:${DOCKER_GID}" \
-                -v "${REPO_ROOT}:/workspace" \
-                -v "${NPM_CACHE_VOL}:/home/circleci/.npm" \
-                -w /workspace \
-                -e npm_config_cache=/home/circleci/.npm \
-                "${ANDROID_DOCKER_IMAGE}" \
-                bash -lc '
-                    set -e
-                    cd frontend
-                    if [ ! -d node_modules ]; then
-                        echo "[docker] frontend/node_modules 不存在，执行 npm ci"
-                        npm ci --no-audit --no-fund
-                    fi
-                    npm run build
-                    npx cap sync android
-                '
-        fi
-    else
-        info "frontend build + npx cap sync android（宿主 node）"
-        if [ "$DRY_RUN" = "1" ]; then
-            echo "  (dry-run) cd frontend && npm run build && npx cap sync android"
-        else
-            ( cd "$REPO_ROOT/frontend" && run_argv npm run build )
-            ( cd "$REPO_ROOT/frontend" && run_argv npx cap sync android )
-        fi
-    fi
-
-    # 2. gradle assembleRelease —— 本机 or Docker
-    if [ "$ANDROID_USE_DOCKER" = "1" ]; then
-        # Docker 模式：把仓库挂进容器里跑 gradlew。
-        # cimg/android:2024.01.1-node 自带 JDK 17 + Android SDK + Node，国内机器首次拉会慢些。
-        # - 用 host 的 UID/GID 避免产物文件变成 root
-        # - 挂载 ~/.gradle 作为缓存，避免每次重跑都下载依赖
-        GRADLE_CACHE_VOL="${HOME}/.gradle-docker-nowen-note"
-        mkdir -p "$GRADLE_CACHE_VOL"
-
-        # 构造 docker 命令
-        # --network host：gradle 拉依赖更快；如环境受限可删
-        DOCKER_UID="$(id -u 2>/dev/null || echo 1000)"
-        DOCKER_GID="$(id -g 2>/dev/null || echo 1000)"
-
-        info "docker run ${ANDROID_DOCKER_IMAGE} -> gradlew assembleRelease"
-        if [ "$DRY_RUN" = "1" ]; then
-            echo "  (dry-run) docker run --rm -v ${REPO_ROOT}:/workspace -w /workspace/frontend/android ${ANDROID_DOCKER_IMAGE} ./gradlew assembleRelease"
-        else
-            # 注意：镜像里需要有 Android SDK 和 JDK 17；cimg/android 已经满足。
-            # 如果你换用更精简的镜像（如 openjdk:17 + SDK 手动装），记得在镜像里配好 ANDROID_HOME。
-            run_argv docker run --rm \
-                -u "${DOCKER_UID}:${DOCKER_GID}" \
-                -v "${REPO_ROOT}:/workspace" \
-                -v "${GRADLE_CACHE_VOL}:/home/circleci/.gradle" \
-                -w /workspace/frontend/android \
-                -e GRADLE_USER_HOME=/home/circleci/.gradle \
-                "${ANDROID_DOCKER_IMAGE}" \
-                bash -lc "chmod +x ./gradlew && ./gradlew assembleRelease --no-daemon"
-        fi
-    else
-        # 本机 gradlew
-        UNAME_S_AND="$(uname -s 2>/dev/null || echo unknown)"
-        case "$UNAME_S_AND" in
-            MINGW*|MSYS*|CYGWIN*) GRADLEW="gradlew.bat" ;;
-            *)                    GRADLEW="./gradlew" ;;
-        esac
-
-        info "gradlew assembleRelease（本机）"
-        # 确保 gradlew 有可执行权限（git clone 到 WSL/Linux 后可能丢失 +x）
-        chmod +x "$REPO_ROOT/frontend/android/gradlew" 2>/dev/null || true
-        if [ "$DRY_RUN" = "1" ]; then
-            echo "  (dry-run) cd frontend/android && $GRADLEW assembleRelease"
-        else
-            ( cd "$REPO_ROOT/frontend/android" && run_argv $GRADLEW assembleRelease )
-        fi
-    fi
-
-    # 3. 收集 APK 产物并重命名（加上 version 后缀，避免覆盖）
-    if [ "$DRY_RUN" != "1" ]; then
-        APK_SRC="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/app-release.apk"
-        if [ -f "$APK_SRC" ]; then
-            APK_OUT="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/Base-Notes-${VERSION}.apk"
-            cp -f "$APK_SRC" "$APK_OUT"
-            ANDROID_ARTIFACTS+=( "$APK_OUT" )
-            info "APK: $APK_OUT"
-        else
-            # 未签名 APK
-            APK_UNSIGNED="${REPO_ROOT}/frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-            if [ -f "$APK_UNSIGNED" ]; then
-                # 原子/一键全量发布：未签名 APK = 不可发布（同包名换签名会让所有老用户必须卸载重装）
-                # 必须 die，不能让未签名包混进 GitHub Release
-                if [ "${_ONE_SHOT:-0}" = "1" ] || [ "$ATOMIC_RELEASE" = "1" ]; then
-                    die "Android 打包产出的是未签名 APK ($APK_UNSIGNED)：原子/一键全量发布要求签名 APK，请检查 frontend/android/keystore.properties 或 NOWEN_ANDROID_KEYSTORE_B64 配置"
-                fi
-                warn "只找到未签名 APK: $APK_UNSIGNED"
-                warn "检查 frontend/android/keystore.properties 或 NOWEN_ANDROID_KEYSTORE_B64 是否配置正确"
-                ANDROID_ARTIFACTS+=( "$APK_UNSIGNED" )
-            else
-                die "Android 打包成功但找不到 APK 产物"
-            fi
-        fi
-    fi
-
-    ANDROID_END=$(date +%s)
-    ANDROID_BUILD_DURATION=$((ANDROID_END - ANDROID_START))
-    ok "Android 打包完成，用时 ${ANDROID_BUILD_DURATION}s"
-fi
 
 # -------------------- 飞牛 .fpk 打包（原子发布：在 docker push 之前） --------------------
 # 设计要点：fpk 本地打包仅生成 compose.yml 引用 DockerHub 镜像名，
@@ -2529,7 +2007,7 @@ if [ "$HAS_CLIPPER" = "1" ]; then
 fi
 
 # -------------------- 原子发布：统一推送 Docker 镜像 --------------------
-# 走到这里意味着所选目标（docker/pc/android/fpk/lite/clipper）全部构建成功。
+# 走到这里意味着所选目标（docker/pc/fpk/lite/clipper）全部构建成功。
 # 现在才是真正"把东西发出去"的时候：先 docker push，再 git tag push，再 gh release。
 # 任何一步失败 set -e 会立即 die，后续不再继续。
 if [ "$SHOULD_BUILD_DOCKER" = "1" ] && [ "$ATOMIC_RELEASE" = "1" ]; then
@@ -2581,8 +2059,8 @@ if [ "$DO_GIT_TAG" = "1" ]; then
     verify_release_remote_baseline
     step "打 git tag 并推送到 GitHub"
 
-    # 若前面 sync_root_pkg_version / sync_backend_pkg_version / sync_android_version
-    # 修改了 package.json 或 android/build.gradle，一并 commit，这样 git tag 会落在
+    # 若前面 sync_root_pkg_version / sync_backend_pkg_version
+    # 修改了 package.json，一并 commit，这样 git tag 会落在
     # "版本号已更新"的 commit 上。
     CHANGED_FILES=()
     if [ -n "$(git status --porcelain -- package.json 2>/dev/null)" ]; then
@@ -2590,9 +2068,6 @@ if [ "$DO_GIT_TAG" = "1" ]; then
     fi
     if [ -n "$(git status --porcelain -- backend/package.json 2>/dev/null)" ]; then
         CHANGED_FILES+=( "backend/package.json" )
-    fi
-    if [ -n "$(git status --porcelain -- frontend/android/app/build.gradle 2>/dev/null)" ]; then
-        CHANGED_FILES+=( "frontend/android/app/build.gradle" )
     fi
     # CHANGELOG.md 由维护者手写，若有改动一并进 commit（不再有自动生成的文件）
     for f in CHANGELOG.md; do
@@ -2649,13 +2124,13 @@ fi
 # 要求：
 #   1. 环境已装 gh 且 gh auth status 通过，或设 GH_TOKEN 环境变量
 #   2. DO_GIT_TAG=1（tag 必须先推到远端，gh release create 才能找到）
-#   3. 收集到至少一个产物（PC_ARTIFACTS / ANDROID_ARTIFACTS 非空）
+#   3. 收集到至少一个产物（PC_ARTIFACTS 非空）
 RELEASE_URL=""
 if [ "$DO_GITHUB_RELEASE" = "1" ]; then
     step "发布到 GitHub Releases"
 
     # 通常 release 必须依附在 git tag 上，所以 --github-release 默认要求 DO_GIT_TAG=1。
-    # 但有一种合法例外：选项 10（补 upk）—— tag 已经在远端 + Release 也已创建，
+    # 但有一种合法例外：选项 8（补 upk）—— tag 已经在远端 + Release 也已创建，
     # 这次只是想把 .upk 作为 asset 追加上去。此时 DO_GIT_TAG=0 是正确的，
     # 但必须先确认远端 tag 真的存在，否则后面 gh release upload 会失败。
     if [ "$DO_GIT_TAG" != "1" ]; then
@@ -2747,7 +2222,6 @@ if [ "$DO_GITHUB_RELEASE" = "1" ]; then
     # 合并所有产物
     ALL_ASSETS=()
     [ "${#PC_ARTIFACTS[@]}" -gt 0 ]      && ALL_ASSETS+=( "${PC_ARTIFACTS[@]}" )
-    [ "${#ANDROID_ARTIFACTS[@]}" -gt 0 ] && ALL_ASSETS+=( "${ANDROID_ARTIFACTS[@]}" )
     [ "${#FPK_ARTIFACTS[@]}" -gt 0 ]     && ALL_ASSETS+=( "${FPK_ARTIFACTS[@]}" )
     [ "${#UPK_ARTIFACTS[@]}" -gt 0 ]     && ALL_ASSETS+=( "${UPK_ARTIFACTS[@]}" )
     [ "${#LITE_ARTIFACTS[@]}" -gt 0 ]    && ALL_ASSETS+=( "${LITE_ARTIFACTS[@]}" )
@@ -2807,12 +2281,6 @@ if [ "$HAS_PC" = "1" ] && [ "${#PC_ARTIFACTS[@]}" -gt 0 ]; then
         echo "    - $(basename "$f")"
     done
 fi
-if [ "$HAS_ANDROID" = "1" ] && [ "${#ANDROID_ARTIFACTS[@]}" -gt 0 ]; then
-    echo "  ${C_GREEN}Android 产物${C_RESET}："
-    for f in "${ANDROID_ARTIFACTS[@]}"; do
-        echo "    - $(basename "$f")"
-    done
-fi
 if [ "$HAS_FPK" = "1" ] && [ "${#FPK_ARTIFACTS[@]}" -gt 0 ]; then
     echo "  ${C_GREEN}飞牛 .fpk 产物${C_RESET}："
     for f in "${FPK_ARTIFACTS[@]}"; do
@@ -2840,7 +2308,7 @@ fi
 [ "$DO_GIT_TAG" = "1" ] && echo "  ${C_GREEN}git tag ${VERSION_TAG}${C_RESET}  ←  已推送到 GitHub"
 [ -n "$RELEASE_URL" ]   && echo "  ${C_GREEN}GitHub Release${C_RESET}  ←  ${RELEASE_URL}"
 
-echo "  总耗时        : ${TOTAL}s  (docker:${BUILD_DURATION}s push:${PUSH_DURATION}s pc:${PC_BUILD_DURATION}s android:${ANDROID_BUILD_DURATION}s fpk:${FPK_BUILD_DURATION}s upk:${UPK_BUILD_DURATION}s lite:${LITE_BUILD_DURATION}s clipper:${CLIPPER_BUILD_DURATION}s)"
+echo "  总耗时        : ${TOTAL}s  (docker:${BUILD_DURATION}s push:${PUSH_DURATION}s pc:${PC_BUILD_DURATION}s fpk:${FPK_BUILD_DURATION}s upk:${UPK_BUILD_DURATION}s lite:${LITE_BUILD_DURATION}s clipper:${CLIPPER_BUILD_DURATION}s)"
 [ -n "$DIGEST" ] && echo "  docker digest : ${DIGEST}"
 
 echo

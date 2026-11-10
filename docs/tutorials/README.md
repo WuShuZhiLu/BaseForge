@@ -113,7 +113,6 @@ BaseForge 还支持把笔记本发布为公开知识空间，并按目录继承�
 | **Web** | [Web 端指南](./web.md)，无需安装客户端 |
 | **Windows / macOS / Linux** | [桌面端指南](./desktop.md)，安装包以 [Releases](https://github.com/cropflre/nowen-note/releases) 为准 |
 | **Android** | [Android 指南](./android.md)，正式维护的移动端 |
-| **iOS** | Capacitor 工程与 TestFlight 流程，参见 [iOS 发布指南](../iOS-Release.md) |
 | **HarmonyOS** | [鸿蒙端指南](./harmony.md)，ArkTS + ArkWeb 客户端仍在逐步完善原生能力 |
 
 ## 8. 部署、升级与数据安全

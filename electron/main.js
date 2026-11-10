@@ -334,7 +334,7 @@ function findNodeExecutable() {
     }
 
     // 兜底：用 Electron 二进制自身以 "node 模式" 运行子进程（ELECTRON_RUN_AS_NODE=1）
-    // 这样即使没有打进 node.exe 也能跑，缺点是需要 better-sqlite3 的 .node ABI 与 Electron 的 node 版本一致
+    // 这样即使没有打进 node.exe 也能跑，前提是 Electron 内置的 Node 版本满足 node:sqlite 的要求
     console.warn(
       "[Electron] No embedded node found, fallback to Electron-as-node (set ELECTRON_RUN_AS_NODE=1)"
     );

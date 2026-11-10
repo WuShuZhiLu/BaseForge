@@ -2,11 +2,10 @@
 /**
  * 后端生产构建：用 esbuild 把整个后端打成单文件 dist/index.js
  *
- * 目的：把 100MB+ 的 backend/node_modules 砍成只剩 4 个真正必须保留为 external 的包，
+ * 目的：把 100MB+ 的 backend/node_modules 砍成只剩少数真正必须保留为 external 的包，
  * 显著减少 electron 安装包体积（实测 -55MB 解压 / -25MB 压缩）。
  *
  * external 名单（必须保留为 external 的原因）：
- *   - better-sqlite3            含原生 .node，必须 require 真实文件
  *   - sqlite-vec / sqlite-vec-windows-x64 / sqlite-vec-darwin-* / sqlite-vec-linux-*
  *                               平台相关二进制 .so/.dylib/.dll，runtime 探测路径
  *   - bonjour-service           含 multicast-dns 等动态加载的 native-ish 行为

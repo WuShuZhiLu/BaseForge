@@ -5,10 +5,10 @@ const path = require("node:path");
 
 const backend = path.resolve(process.argv[2] || path.join(__dirname, ".."));
 const requireBackend = createRequire(path.join(backend, "package.json"));
-const Database = requireBackend("better-sqlite3");
+const Database = requireBackend("node:sqlite").DatabaseSync;
 const sqliteVec = requireBackend("sqlite-vec");
 const { version } = requireBackend(path.join(path.dirname(requireBackend.resolve("sqlite-vec")), "package.json"));
-const db = new Database(":memory:");
+const db = new Database(":memory:", { allowExtension: true });
 try {
   try {
     sqliteVec.load(db);

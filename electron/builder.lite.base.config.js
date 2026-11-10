@@ -3,7 +3,7 @@
  *
  * 适用场景：只想连接远端/局域网 Nowen 服务器的用户，不需要本机自带 SQLite 后端。
  * 相较 full 版：
- *   - 不打包 backend/dist + backend/node_modules + 不校验 better-sqlite3 的原生 ABI
+ *   - 不打包 backend/dist + backend/node_modules
  *   - 安装体积大幅缩小（~70MB → ~25MB 量级，实际以产物为准）
  *   - 启动时直接打开"选择服务器"流程，没有 full 模式可切
  *
@@ -45,7 +45,7 @@ module.exports = {
   productName: "BaseForge Lite",
 
   /**
-   * 没有 backend 就不跑 better-sqlite3 的 ABI 校验。留一个 beforeBuild 只做前端产物存在性检查。
+   * lite 没有 backend，beforeBuild 只做前端产物存在性检查。
    */
   beforeBuild() {
     const fs = require("fs");

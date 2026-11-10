@@ -37,10 +37,10 @@
 
 ```bash
 # Docker 环境
-docker-compose exec backend npx tsx -e "
-const Database = require('better-sqlite3');
+docker-compose exec backend node --experimental-sqlite -e "
+const { DatabaseSync } = require('node:sqlite');
 const bcrypt = require('bcryptjs');
-const db = new Database('data/baseforge.db');
+const db = new DatabaseSync('data/baseforge.db');
 const hash = bcrypt.hashSync('新密码', 10);
 db.prepare('UPDATE users SET passwordHash = ? WHERE username = ?').run(hash, 'admin');
 console.log('密码已重置');
