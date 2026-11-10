@@ -85,7 +85,7 @@ test("本地 Release 在公开前必须用同 tag 的 SignPath Windows artifact 
 
 test("本地发布守卫在正式校验前汇总完整 CI macOS 产物", async () => {
   const releaseGuard = await readRepoFile("scripts/release.sh");
-  assert.match(releaseGuard, /nowen-note-mac/);
+  assert.match(releaseGuard, /baseforge-mac/);
   assert.match(releaseGuard, /gh run download/);
   assert.match(releaseGuard, /gh release upload/);
   assert.match(releaseGuard, /--clobber/);

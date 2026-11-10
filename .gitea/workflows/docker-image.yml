@@ -59,6 +59,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resolve npm source (cn mirror by default)
+        # Gitea runner 在国内，默认切国内镜像；GitHub 侧走官方源。
+        # 脚本是唯一真相：镜像地址和 replace-registry-host 都在 scripts/npm-sources.mjs。
+        shell: bash
+        run: |
+          set -eu
+          eval "$(node scripts/npm-source.mjs env "${NPM_SOURCE_PROFILE:-cn}" --export)"
+          echo "NPM_REGISTRY=${npm_config_registry}" >> "$GITHUB_ENV"
+          echo "npm registry: ${npm_config_registry}"
+
       - name: Build image
         # 脚本用了函数与 local 等 bash 特性，显式指定以免落回 sh
         shell: bash
@@ -164,6 +174,7 @@ jobs:
             BUILD_REF="baseforge-build:${TAG}"
             docker build -f Dockerfile -t "$BUILD_REF" \
               --build-arg APP_VERSION="$VER" \
+              --build-arg NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org/}" \
               --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               --build-arg VCS_REF="${GITHUB_SHA:-}" .
           fi

@@ -144,23 +144,23 @@ TAG="v${VERSION}"
 
 required_mac_asset_names() {
   cat <<EOF
-Base-Notes-${VERSION}-x64.dmg
-Base-Notes-${VERSION}-arm64.dmg
-Base-Notes-${VERSION}-x64.zip
-Base-Notes-${VERSION}-arm64.zip
+BaseForge-${VERSION}-x64.dmg
+BaseForge-${VERSION}-arm64.dmg
+BaseForge-${VERSION}-x64.zip
+BaseForge-${VERSION}-arm64.zip
 latest-mac.yml
 EOF
 }
 
 required_windows_asset_names() {
   cat <<EOF
-Base-Notes-${VERSION}-setup.exe
-Base-Notes-${VERSION}-portable.exe
-Base-Notes-${VERSION}-setup.exe.blockmap
+BaseForge-${VERSION}-setup.exe
+BaseForge-${VERSION}-portable.exe
+BaseForge-${VERSION}-setup.exe.blockmap
 latest.yml
-Base-Notes-Lite-${VERSION}-setup.exe
-Base-Notes-Lite-${VERSION}-portable.exe
-Base-Notes-Lite-${VERSION}-setup.exe.blockmap
+BaseForge-${VERSION}-lite-setup.exe
+BaseForge-${VERSION}-lite-portable.exe
+BaseForge-${VERSION}-lite-setup.exe.blockmap
 latest-lite.yml
 EOF
 }
@@ -178,7 +178,7 @@ release_has_complete_mac_assets() {
 
 release_contains_windows_candidates() {
   gh release view "$TAG" --repo "$GITHUB_REPO_SLUG" --json assets --jq '.assets[].name' 2>/dev/null \
-    | grep -Eq "^Base-Notes(-Lite)?-${VERSION}-(setup|portable)\\.exe$"
+    | grep -Eq "^BaseForge-${VERSION}-(lite-)?(setup|portable)\\.exe$"
 }
 
 ensure_desktop_platform_notes() {
@@ -278,10 +278,8 @@ collect_ci_signed_windows_assets() {
   local windows_assets=()
   while IFS= read -r file; do windows_assets+=("$file"); done < <(
     find "$temp_dir" -type f \( \
-      -name "Base-Notes-${VERSION}-*.exe" -o \
-      -name "Base-Notes-${VERSION}-*.exe.blockmap" -o \
-      -name "Base-Notes-Lite-${VERSION}-*.exe" -o \
-      -name "Base-Notes-Lite-${VERSION}-*.exe.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.exe" -o \
+      -name "BaseForge-${VERSION}-*.exe.blockmap" -o \
       -name "latest.yml" -o \
       -name "latest-lite.yml" \
     \) -print | sort
@@ -308,28 +306,28 @@ collect_ci_mac_assets() {
   fi
   echo "[release-guard] workflow run: ${run_id}"
 
-  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "nowen-note-mac" "$deadline")"; then
-    echo "[release-guard] timed out or failed waiting for nowen-note-mac artifact" >&2
+  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "baseforge-mac" "$deadline")"; then
+    echo "[release-guard] timed out or failed waiting for baseforge-mac artifact" >&2
     return 1
   fi
   [ -n "$artifact_id" ] || return 1
 
   CI_ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nowen-release-mac.XXXXXX")"
-  gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name nowen-note-mac --dir "$CI_ARTIFACT_DIR"
+  gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name baseforge-mac --dir "$CI_ARTIFACT_DIR"
 
   local mac_assets=()
   while IFS= read -r file; do mac_assets+=("$file"); done < <(
     find "$CI_ARTIFACT_DIR" -type f \( \
-      -name "Base-Notes-${VERSION}-*.dmg" -o \
-      -name "Base-Notes-${VERSION}-*.dmg.blockmap" -o \
-      -name "Base-Notes-${VERSION}-*.zip" -o \
-      -name "Base-Notes-${VERSION}-*.zip.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.dmg" -o \
+      -name "BaseForge-${VERSION}-*.dmg.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.zip" -o \
+      -name "BaseForge-${VERSION}-*.zip.blockmap" -o \
       -name "latest-mac.yml" \
     \) -print | sort
   )
 
   if [ "${#mac_assets[@]}" -eq 0 ]; then
-    echo "[release-guard] nowen-note-mac artifact contains no release assets for ${VERSION}" >&2
+    echo "[release-guard] baseforge-mac artifact contains no release assets for ${VERSION}" >&2
     return 1
   fi
 
@@ -337,7 +335,7 @@ collect_ci_mac_assets() {
   while IFS= read -r required; do
     [ -n "$required" ] || continue
     if ! find "$CI_ARTIFACT_DIR" -type f -name "$required" -print -quit | grep -q .; then
-      echo "[release-guard] nowen-note-mac artifact is incomplete; missing ${required}" >&2
+      echo "[release-guard] baseforge-mac artifact is incomplete; missing ${required}" >&2
       return 1
     fi
   done < <(required_mac_asset_names)

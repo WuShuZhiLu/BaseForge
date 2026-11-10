@@ -14,12 +14,13 @@
 |---|---|---|
 | Windows 安装包（含签名） | Windows 进程 + SignPath/codesign | GitHub 托管 `windows-latest` |
 | macOS 安装包（含公证） | macOS + Xcode + 公证凭据 | GitHub 托管 `macos-*` |
-| iOS（TestFlight） | macOS + Xcode | GitHub 托管 `macos-*` |
-| Linux AppImage/deb | Linux | GitHub 托管 `ubuntu-latest`（`release.yml` 矩阵内一并构建）；另有 `linux-desktop-native-ci.yml` 做可移植性校验 |
+| Linux AppImage/deb | Linux | GitHub 托管 `ubuntu-latest`（`release.yml` 矩阵内一并构建） |
 | Docker 多架构镜像 | Linux + Docker + buildx | Gitea act_runner（`docker-image.yml`）；NAS 包（fpk、upk）暂无 CI |
 
+> 0.2.0 只发桌面端（Windows / macOS / Linux）。移动端尚未完成设计，不产出 iOS / Android 包。
+
 关键约束：Gitea 的 act_runner 是「Linux 主机 + Docker 容器」模型，**无法执行 Windows/macOS 构建**
-（Docker 跑不了 Windows 容器与 macOS）。GitHub 能提供这几类托管 runner，所以桌面端与 iOS 必须在 GitHub 构建。
+（Docker 跑不了 Windows 容器与 macOS）。GitHub 能提供这几类托管 runner，所以桌面端必须在 GitHub 构建。
 Linux 与 Docker 两边都能跑，目前 **Linux 桌面产物走 GitHub、Docker 镜像走 Gitea**，以各自依赖的凭据位置为准。
 
 ## 2. 代码与 tag 流向
@@ -43,12 +44,13 @@ GitHub（主仓，唯一真相；issue / PR / review 都在这里）
 | 平台 | workflow | 触发 | 产出 |
 |---|---|---|---|
 | GitHub | `release.yml`（矩阵 win/mac/linux） | tag `v*.*.*` / 手动 | 建 draft Release（正文由 `build-release-notes.mjs` 合成）→ 构建 → `--publish never` 后由 `publish` 生成校验和、重生成正文并**在 GitHub 转正式** |
-| GitHub | `ios-release.yml` | tag / 手动 | TestFlight 上传（不产出 Release 资产） |
 | GitHub | `ci-gate.yml` | PR、`main`、`develop`、`release/**`、手动 | 日常门禁：backend/frontend 类型检查 + 全量测试，外加发布脚本契约测试（不产出资产） |
-| GitHub | `linux-desktop-native-ci.yml` | tag / 手动 | Linux 原生可移植性校验（不产出资产） |
 | Gitea | `docker-image.yml` | tag `v*` / 手动（`latest_only` 补救） | Docker 多架构镜像；tag 触发**同时推 `vX.Y.Z` 与 `latest`** |
 | Gitea | `sync-release.yml` | GitHub 发布后 dispatch / 手动 | 拉 GitHub 资产 → 校验 → Gitea 转正式 → 最后同步 Gitee |
 | GitHub | `release.yml` 的 `build-mcp` | tag `v*.*.*` | 构建 MCP 单文件 `baseforge-mcp.mjs`，随 Release 附件分发 |
+
+> 0.2.0 只有桌面端：移动端（iOS / Android）尚未完成设计，`ios-release.yml` 与
+> `linux-desktop-native-ci.yml` 已移除；桌面端的构建与校验全部由 `release.yml` 承担。
 
 ### 3.1 0.2.0 产物矩阵
 
@@ -113,7 +115,7 @@ Gitea / Gitee 复用 GitHub Release 的 `body`，三端发布说明天然一致�
 > ⛔ **Gitea 侧必须把 `[actions] WORKFLOW_DIRS` 收窄成 `.gitea/workflows`。**
 > Gitea 默认**同时**读取 `.gitea/workflows` 与 `.github/workflows`（官方文档：
 > `WORKFLOW_DIRS` 默认为这两个目录），不收窄就会把 GitHub 专用的
-> `release.yml` / `ios-release.yml` / `linux-desktop-native-ci.yml` / `ci-gate.yml`
+> `release.yml` / `ci-gate.yml`
 > 在 Gitea 上再跑一遍：Windows / macOS 任务因没有对应 runner 永久等待，Linux 任务白耗 40+ 分钟。
 > 配置后 `.github/workflows/` 在 Gitea 侧完全不参与，两边才真正按目录隔离。
 >

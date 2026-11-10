@@ -152,6 +152,12 @@ jobs:
       # ---------------------------------------------------------------
       # 依赖安装
       # ---------------------------------------------------------------
+      - name: Resolve npm source (official registry)
+        # 锁文件里存过镜像 resolved 地址；脚本注入官方 registry +
+        # replace-registry-host=always，npm ci 就不会再去 npmmirror 拉包。
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
+        shell: bash
+
       - name: Install root deps
         run: npm ci
         shell: bash
@@ -218,8 +224,8 @@ jobs:
           $target = Join-Path $PWD "signpath-input"
           New-Item -ItemType Directory -Force -Path $target | Out-Null
           $files = @(
-            Get-ChildItem -Path "dist-electron" -File -Filter "Nowen-Note-*-setup.exe"
-            Get-ChildItem -Path "dist-electron" -File -Filter "Nowen-Note-*-portable.exe"
+            Get-ChildItem -Path "dist-electron" -File -Filter "BaseForge-*-setup.exe"
+            Get-ChildItem -Path "dist-electron" -File -Filter "BaseForge-*-portable.exe"
           ) | Sort-Object FullName -Unique
           if ($files.Count -ne 2) { throw "SignPath test requires exactly setup.exe and portable.exe; found $($files.Count)." }
           foreach ($file in $files) { Copy-Item $file.FullName (Join-Path $target $file.Name) -Force }
@@ -573,6 +579,9 @@ jobs:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: packages/baseforge-mcp/package-lock.json
+
+      - name: Resolve npm source (official registry)
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
 
       - name: Install MCP package deps
         working-directory: packages/baseforge-mcp
