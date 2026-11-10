@@ -182,8 +182,7 @@ module.exports = {
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
-    notarize: false, // 与 full 一致：交给 afterSign 钩子，本地缺 Apple 凭据时自动跳过
-    afterSign: "build/afterSign.js",
+    notarize: false, // 与 full 一致：交给顶层 afterSign 钩子，本地缺 Apple 凭据时自动跳过
     // 两个架构在同一台机器上一次构建，文件名必须带 ${arch}：
     // 否则后一个架构会覆盖前一个，Release 看似有双架构、实际是同一份包。
     artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
@@ -192,6 +191,9 @@ module.exports = {
   dmg: {
     artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
+  // macOS 公证钩子。electron-builder 25 起不再接受 mac.afterSign，必须放顶层；
+  // 钩子内部只在 darwin 且存在 Apple 凭据时执行，其它平台自动跳过。
+  afterSign: "build/afterSign.js",
 
   linux: {
     target: ["AppImage", "deb"],
