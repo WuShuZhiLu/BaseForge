@@ -73,7 +73,6 @@
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.1",
     "bonjour-service": "^1.2.1",
-    "docx-preview": "^0.4.1",
     "electron-updater": "^6.3.9"
   }
 }

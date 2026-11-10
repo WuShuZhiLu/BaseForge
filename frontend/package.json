@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && NODE_OPTIONS=--max-old-space-size=6144 vite build && node ../scripts/verify-sync-notification-ui.cjs",
+    "build": "tsc -b && node --max-old-space-size=6144 node_modules/vite/bin/vite.js build && node ../scripts/verify-sync-notification-ui.cjs",
     "build:web": "npm run build && node ../scripts/precompress-frontend.mjs",
     "analyze:bundle": "node ../scripts/analyze-frontend-bundle.mjs",
     "verify:bundle": "node ../scripts/analyze-frontend-bundle.mjs --enforce",
@@ -81,6 +81,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "docx-preview": "^0.4.1",
     "dompurify": "^3.4.1",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.34.0",
