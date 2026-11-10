@@ -112,7 +112,7 @@ const HTML = String.raw`
   }
   .wrap { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; height: 100%; }
   h1 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
-  .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
+  .sub { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 6px; }
   .field { display: flex; gap: 8px; align-items: center; }
   input[type="text"] {
     flex: 1; background: var(--panel); color: var(--text);
