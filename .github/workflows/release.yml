@@ -131,6 +131,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check lockfile registry addresses
+        run: node scripts/normalize-lockfile-registry.mjs
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -579,6 +582,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check lockfile registry addresses
+        run: node scripts/normalize-lockfile-registry.mjs
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

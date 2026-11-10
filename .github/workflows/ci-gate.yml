@@ -25,6 +25,15 @@ defaults:
     shell: bash
 
 jobs:
+  lockfile:
+    name: lockfile registry addresses
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check resolved URLs are official registry
+        run: node scripts/normalize-lockfile-registry.mjs
+
   backend:
     name: backend (typecheck + tests)
     runs-on: ubuntu-latest

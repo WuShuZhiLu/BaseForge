@@ -16,6 +16,11 @@
  * 选择结果写在仓库根目录的 `.npm-source.json`（已 gitignore）：只记录档位名，
  * 具体镜像地址固定在本文件里维护，避免本地配置和代码各写一份 URL。
  * CI 不读这个文件，用 `node scripts/npm-source.mjs env <profile>` 现取环境变量。
+ *
+ * 注意：cn 档位固定使用 registry.npmmirror.com（包路径与官方一致）。
+ * 不要换成带 `/npm/` 路径前缀的腾讯镜像——`replace-registry-host` 只换 host，
+ * 会把 `mirrors.tencent.com/npm/<pkg>` 拼成 `registry.npmjs.org/npm/<pkg>` 导致 404。
+ * 提交前可执行 `npm run lockfile:check` 校验三个 lockfile 是否仍指向官方 registry。
  */
 import fs from "node:fs"
 import path from "node:path"
