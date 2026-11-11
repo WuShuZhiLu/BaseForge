@@ -1,8 +1,8 @@
 import { Extension } from "@tiptap/core";
 
-const TABLE_ALIGNS_ATTR = "data-nowen-table-aligns";
-const TABLE_COLGROUP_ATTR = "data-nowen-table-colgroup";
-const CELL_ALIGN_ATTR = "data-nowen-cell-align";
+const TABLE_ALIGNS_ATTR = "data-baseforge-table-aligns";
+const TABLE_COLGROUP_ATTR = "data-baseforge-table-colgroup";
+const CELL_ALIGN_ATTR = "data-baseforge-cell-align";
 const MAX_METADATA_DEPTH = 4;
 const MAX_METADATA_ITEMS = 128;
 const MAX_METADATA_STRING = 256;

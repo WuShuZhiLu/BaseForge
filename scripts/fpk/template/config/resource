@@ -4,7 +4,7 @@
         "projects":
         [
             {
-                "name": "nowen-note",
+                "name": "baseforge",
                 "path": "docker"
             }
         ]
@@ -14,22 +14,22 @@
         "shares":
         [
             {
-                "name": "nowen-note",
+                "name": "baseforge",
                 "permission":
                 {
                     "rw":
                     [
-                        "docker-nowen-note"
+                        "docker-baseforge"
                     ]
                 }
             },
             {
-                "name": "nowen-note/data",
+                "name": "baseforge/data",
                 "permission":
                 {
                     "rw":
                     [
-                        "docker-nowen-note"
+                        "docker-baseforge"
                     ]
                 }
             }

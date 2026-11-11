@@ -3,8 +3,8 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 
-const NORMALIZED_INPUT_FLAG = "nowenSiyuanPackageNormalized";
-const PROGRESS_HOST_ATTRIBUTE = "data-nowen-siyuan-import-progress-host";
+const NORMALIZED_INPUT_FLAG = "baseforgeSiyuanPackageNormalized";
+const PROGRESS_HOST_ATTRIBUTE = "data-baseforge-siyuan-import-progress-host";
 
 export interface SiyuanZipInspection {
   isSiyuanWorkspace: boolean;

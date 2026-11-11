@@ -5,7 +5,7 @@ import path from "node:path";
 import test, { after } from "node:test";
 import JSZip from "jszip";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-routes-test-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-routes-test-"));
 process.env.NODE_ENV = "test";
 process.env.DB_PATH = path.join(root, "plugin-routes.test.db");
 process.env.ELECTRON_USER_DATA = path.join(root, "data");
@@ -17,7 +17,7 @@ async function createPackage(version = "1.0.0"): Promise<File> {
   const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify({
     id: "com.example.route-test", name: "Route Test", description: "route e2e", version,
-    apiVersion: 1, engines: { nowen: ">=1.5.0 <2.0.0" }, runtime: "node-action", main: "dist/index.mjs",
+    apiVersion: 1, engines: { baseforge: ">=1.5.0 <2.0.0" }, runtime: "node-action", main: "dist/index.mjs",
     permissions: ["notes:write", "mindmaps:write"], actions: [
       { id: "hello", name: "Hello", input: { name: { type: "string", required: true } } },
       { id: "create-note", name: "Create Note", input: { notebookId: { type: "string", required: true }, title: { type: "string", required: true } } },
@@ -27,11 +27,11 @@ async function createPackage(version = "1.0.0"): Promise<File> {
   }));
   zip.file("dist/index.mjs", `export default {actions:{
     hello:async({input})=>({text:\`Hello \${input.name}\`}),
-    'create-note':async({input,nowen})=>nowen.notes.create(input),
-    'create-mindmap':async({input,nowen})=>nowen.mindmaps.create(input),
-    progress:async({nowen})=>{nowen.progress({current:73,total:100,message:'Working'});return {text:'done'}},
+    'create-note':async({input,baseforge})=>baseforge.notes.create(input),
+    'create-mindmap':async({input,baseforge})=>baseforge.mindmaps.create(input),
+    progress:async({baseforge})=>{baseforge.progress({current:73,total:100,message:'Working'});return {text:'done'}},
   }}`);
-  return new File([await zip.generateAsync({ type: "uint8array" })], "route-test.nowen-plugin", { type: "application/zip" });
+  return new File([await zip.generateAsync({ type: "uint8array" })], "route-test.baseforge-plugin", { type: "application/zip" });
 }
 
 test("admin lifecycle and ordinary-user boundaries work end to end", async () => {
@@ -74,10 +74,10 @@ test("admin lifecycle and ordinary-user boundaries work end to end", async () =>
 
   const actions = await app.request("/plugins/actions", { headers: { "X-User-Id": USER } });
   assert.equal((await actions.json() as any[]).length, 4);
-  const execute = await app.request("/plugins/com.example.route-test/actions/hello/execute", { method: "POST", headers: { "X-User-Id": USER, "Content-Type": "application/json" }, body: JSON.stringify({ input: { name: "Nowen" } }) });
+  const execute = await app.request("/plugins/com.example.route-test/actions/hello/execute", { method: "POST", headers: { "X-User-Id": USER, "Content-Type": "application/json" }, body: JSON.stringify({ input: { name: "BaseForge" } }) });
   if (execute.status !== 200) assert.fail(await execute.text());
   const result = await execute.json() as any;
-  assert.equal(result.data.text, "Hello Nowen");
+  assert.equal(result.data.text, "Hello BaseForge");
   assert.ok(result.executionId);
 
   const viewerWrite = await app.request("/plugins/com.example.route-test/actions/create-note/execute", { method: "POST", headers: { "X-User-Id": USER, "Content-Type": "application/json" }, body: JSON.stringify({ input: { notebookId: "plugin-notebook", title: "Denied" } }) });

@@ -1,7 +1,7 @@
-const STORAGE_KEY = "nowen.noteList.titleOnly";
-const CHANGE_EVENT = "nowen:note-list-title-only-change";
+const STORAGE_KEY = "baseforge.noteList.titleOnly";
+const CHANGE_EVENT = "baseforge:note-list-title-only-change";
 const BODY_CLASS = "note-list-title-only";
-const STYLE_ID = "nowen-note-list-title-only-style";
+const STYLE_ID = "baseforge-list-title-only-style";
 const BUTTON_ATTR = "data-note-list-title-only-toggle";
 
 const VIRTUAL_ITEM_HEIGHT = 90;

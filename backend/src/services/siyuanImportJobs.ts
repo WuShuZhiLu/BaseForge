@@ -64,9 +64,9 @@ type RuntimeState = {
 };
 
 const runtimeGlobals = globalThis as typeof globalThis & {
-  __nowenSiyuanImportJobs?: RuntimeState;
+  __baseforgeSiyuanImportJobs?: RuntimeState;
 };
-const runtime = runtimeGlobals.__nowenSiyuanImportJobs ||= {
+const runtime = runtimeGlobals.__baseforgeSiyuanImportJobs ||= {
   runningJobs: new Set<string>(),
   scheduledJobs: new Set<string>(),
   schemaReady: false,

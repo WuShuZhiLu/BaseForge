@@ -6,7 +6,7 @@ import type { EncryptedAttachmentManifest, EncryptedHistoryV2, EncryptedUploadDe
 import type { SessionV2Io } from "./sessionV2Protocol";
 
 export class EncryptedContentV2Session {
-  private readonly transport = new SessionTransport(() => new Worker(new URL("./sessionV2.worker.ts", import.meta.url), { type: "module", name: "nowen-encrypted-session-v2" }));
+  private readonly transport = new SessionTransport(() => new Worker(new URL("./sessionV2.worker.ts", import.meta.url), { type: "module", name: "baseforge-encrypted-session-v2" }));
   async open(envelope: ContentEnvelopeV2, passphrase: string, expected: ContentIdentityV2, signal?: AbortSignal): Promise<EncryptedDocumentV2> {
     try { return await this.transport.call({ operation: "open", input: { envelope, passphrase, expected } }, { signal, kdf: true }) as EncryptedDocumentV2; }
     catch (error) { this.close(); throw error; }

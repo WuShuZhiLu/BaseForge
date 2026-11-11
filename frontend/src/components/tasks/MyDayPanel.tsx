@@ -54,7 +54,7 @@ export function MyDayPanel({ onTaskMutated, initiallyExpanded = false, standalon
   const [expanded, setExpanded] = useState(() => {
     if (initiallyExpanded || standalone) return true;
     try {
-      return localStorage.getItem("nowen-my-day-expanded") !== "false";
+      return localStorage.getItem("baseforge-my-day-expanded") !== "false";
     } catch {
       return true;
     }
@@ -148,7 +148,7 @@ export function MyDayPanel({ onTaskMutated, initiallyExpanded = false, standalon
 
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-my-day-expanded", String(expanded));
+      localStorage.setItem("baseforge-my-day-expanded", String(expanded));
     } catch {
       // Storage can be unavailable in privacy mode; expansion remains session-local.
     }

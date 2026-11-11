@@ -46,12 +46,12 @@ export const DEFAULT_SIDEBAR_LAYOUT: SidebarLayoutState = {
   badges: { extra: ["tasks"], extraCollapsed: true },
 };
 
-export const SIDEBAR_LAYOUT_EVENT = "nowen:sidebar-layout-changed";
+export const SIDEBAR_LAYOUT_EVENT = "baseforge:sidebar-layout-changed";
 
-const STORAGE_PREFIX = "nowen.sidebar.layout.v2";
+const STORAGE_PREFIX = "baseforge.sidebar.layout.v2";
 /** v1（旧）：顺序为「文档树在上、打开的在下」——v2 起改为原型口径（打开的在上）。
  *  迁移时只保留用户的可见性/折叠偏好，**顺序一律采用新默认**，避免旧数据把顺序盖回去。 */
-const LEGACY_STORAGE_PREFIX = "nowen.sidebar.layout.v1";
+const LEGACY_STORAGE_PREFIX = "baseforge.sidebar.layout.v1";
 
 function legacyStorageKey(workspaceId: string | null): string {
   return `${LEGACY_STORAGE_PREFIX}:${workspaceId || "local"}`;

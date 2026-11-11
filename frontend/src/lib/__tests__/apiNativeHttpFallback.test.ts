@@ -31,8 +31,8 @@ describe("api native HTTP fallback", () => {
   });
 
   it("uses CapacitorHttp for Android native GET requests when fetch fails", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
-    localStorage.setItem("nowen-token", "token-1");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-token", "token-1");
     (window as any).Capacitor = { isNativePlatform: () => true };
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("Failed to fetch");
@@ -58,7 +58,7 @@ describe("api native HTTP fallback", () => {
   });
 
   it("does not use CapacitorHttp outside native Capacitor", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("Failed to fetch");
     }));
@@ -69,7 +69,7 @@ describe("api native HTTP fallback", () => {
   });
 
   it("does not use CapacitorHttp for failed POST requests", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
     (window as any).Capacitor = { isNativePlatform: () => true };
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("Failed to fetch");
@@ -91,8 +91,8 @@ describe("api native HTTP fallback with IPv6 server", () => {
   });
 
   it("passes a bracketed IPv6 API URL to CapacitorHttp", async () => {
-    localStorage.setItem("nowen-server-url", "240e:35c:41f:4c00::1d0/128");
-    localStorage.setItem("nowen-token", "token-ipv6");
+    localStorage.setItem("baseforge-server-url", "240e:35c:41f:4c00::1d0/128");
+    localStorage.setItem("baseforge-token", "token-ipv6");
     (window as any).Capacitor = { isNativePlatform: () => true };
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("Failed to fetch");

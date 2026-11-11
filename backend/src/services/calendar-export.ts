@@ -87,12 +87,12 @@ function getEncryptionKeySource(): { key: string; source: string } {
     "[calendar-export] Neither CALENDAR_EXPORT_ENCRYPTION_KEY nor JWT_SECRET is set. " +
     "Using development fallback key. This is NOT safe for production."
   );
-  return { key: "nowen-note-dev-fallback-key-not-for-production", source: "development-fallback" };
+  return { key: "baseforge-dev-fallback-key-not-for-production", source: "development-fallback" };
 }
 
 function deriveCipherKey(): Buffer {
   const { key } = getEncryptionKeySource();
-  return crypto.scryptSync(key, "nowen-calendar-export-v1", 32);
+  return crypto.scryptSync(key, "baseforge-calendar-export-v1", 32);
 }
 
 function encryptSecret(plain: string): string {
@@ -395,7 +395,7 @@ export async function testExportTarget(
 
   try {
     // 上传一个测试文件
-    const testContent = Buffer.from("nowen-note calendar export probe");
+    const testContent = Buffer.from("baseforge calendar export probe");
     const testKey = buildObjectKey(cfg, row.userId, row.feedId, true);
     const { url, headers } = buildS3SignedRequest("PUT", testKey, cfg, testContent, "text/plain");
 
@@ -511,7 +511,7 @@ function buildObjectKey(
   feedId: string,
   isTest: boolean,
 ): string {
-  const prefix = cfg.pathPrefix || "nowen-calendar";
+  const prefix = cfg.pathPrefix || "baseforge-calendar";
   if (isTest) {
     return `${prefix}/.probe/${Date.now()}-${crypto.randomBytes(4).toString("hex")}.txt`;
   }

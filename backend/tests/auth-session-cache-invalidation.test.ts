@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-auth-session-cache-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-auth-session-cache-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.JWT_SECRET = "test-jwt-secret-for-auth-session-cache";
 

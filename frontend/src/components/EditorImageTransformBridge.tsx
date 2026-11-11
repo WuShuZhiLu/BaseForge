@@ -69,7 +69,7 @@ function findDesktopImageToolbar(): HTMLElement | null {
 }
 
 function findCompactMobileSheet(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[data-nowen-image-transform-slot="true"]');
+  return document.querySelector<HTMLElement>('[data-baseforge-image-transform-slot="true"]');
 }
 
 export function findImageTransformWrapper(dom: HTMLElement | null): HTMLElement | null {
@@ -156,11 +156,11 @@ export function applyImageTransformLayout(
 
   const attributeWidth = positive(image.getAttribute("width"));
   let requestedWidth = attributeWidth
-    || positive(image.dataset.nowenRequestedImageWidth)
+    || positive(image.dataset.baseforgeRequestedImageWidth)
     || measuredWidth
     || naturalWidth;
-  if (!attributeWidth && !image.dataset.nowenRequestedImageWidth) {
-    image.dataset.nowenRequestedImageWidth = String(requestedWidth);
+  if (!attributeWidth && !image.dataset.baseforgeRequestedImageWidth) {
+    image.dataset.baseforgeRequestedImageWidth = String(requestedWidth);
   }
 
   const layout = computeEditorImageTransformLayout({
@@ -174,7 +174,7 @@ export function applyImageTransformLayout(
 
   wrapper.dataset.imageRotation = String(rotation);
   wrapper.dataset.imageFlipX = flipX ? "true" : "false";
-  wrapper.dataset.nowenRotationLayout = "frame";
+  wrapper.dataset.baseforgeRotationLayout = "frame";
 
   // React's NodeView historically wrote the transform on this wrapper. Explicitly neutralize
   // it because wrapper children include the selection outline, four handles and size tooltip.
@@ -197,7 +197,7 @@ export function applyImageTransformLayout(
 
   const persistentTransform = getPersistentImageTransform(rotation, flipX);
   const visualTransform = `translate(-50%, -50%)${persistentTransform ? ` ${persistentTransform}` : ""}`;
-  image.dataset.nowenImageVisual = "true";
+  image.dataset.baseforgeImageVisual = "true";
   setStyle(image, "position", "absolute");
   setStyle(image, "left", "50%");
   setStyle(image, "top", "50%");
@@ -240,18 +240,18 @@ export function allowImageResizeThroughMobileBackdrop(root: ParentNode = documen
     if (!originalBackdropPointerEvents.has(button)) {
       originalBackdropPointerEvents.set(button, button.style.pointerEvents || "");
     }
-    button.dataset.nowenImageBackdropPassthrough = "true";
+    button.dataset.baseforgeImageBackdropPassthrough = "true";
     if (button.style.pointerEvents !== "none") button.style.pointerEvents = "none";
   });
   return backdrops.length;
 }
 
 function restoreMobileBackdropPointerCapture(root: ParentNode = document): void {
-  root.querySelectorAll<HTMLButtonElement>('[data-nowen-image-backdrop-passthrough="true"]').forEach((button) => {
+  root.querySelectorAll<HTMLButtonElement>('[data-baseforge-image-backdrop-passthrough="true"]').forEach((button) => {
     const original = originalBackdropPointerEvents.get(button) ?? "";
     if (original) button.style.pointerEvents = original;
     else button.style.removeProperty("pointer-events");
-    delete button.dataset.nowenImageBackdropPassthrough;
+    delete button.dataset.baseforgeImageBackdropPassthrough;
     originalBackdropPointerEvents.delete(button);
   });
 }
@@ -392,7 +392,7 @@ export default function EditorImageTransformBridge() {
       const handle = event.target instanceof HTMLElement ? event.target : null;
       if (!handle?.style.cursor.includes("resize")) return;
       const wrapper = handle.closest<HTMLElement>(".resizable-image-wrapper");
-      const image = wrapper?.querySelector<HTMLImageElement>('img[data-nowen-image-visual="true"]');
+      const image = wrapper?.querySelector<HTMLImageElement>('img[data-baseforge-image-visual="true"]');
       const transform = image?.style.transform || "";
       if (!image || !transform) return;
       const transition = image.style.transition;
@@ -480,7 +480,7 @@ export default function EditorImageTransformBridge() {
   ) : null;
 
   const mobilePortal = target.mobileSheet ? createPortal(
-    <div className="mt-2" data-nowen-editor-image-transforms="true" role="group" aria-label={labels.group}>
+    <div className="mt-2" data-baseforge-editor-image-transforms="true" role="group" aria-label={labels.group}>
       <div className="grid grid-cols-4 gap-1.5">
         <TransformButton mobile label={labels.left} onClick={() => rotate(-90)}><RotateCcw size={14} />{isEnglishUi() ? "Left" : "左转"}</TransformButton>
         <TransformButton mobile label={labels.right} onClick={() => rotate(90)}><RotateCw size={14} />{isEnglishUi() ? "Right" : "右转"}</TransformButton>

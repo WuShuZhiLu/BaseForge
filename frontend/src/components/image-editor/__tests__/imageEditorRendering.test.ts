@@ -67,7 +67,7 @@ describe("renderImageEditorOperations", () => {
       { kind: "arrow", start: { x: 8, y: 9 }, end: { x: 80, y: 90 }, color: "#0f0", lineWidth: 6 },
       { kind: "rectangle", start: { x: 10, y: 20 }, end: { x: 110, y: 120 }, color: "#00f", lineWidth: 4 },
       { kind: "ellipse", start: { x: 12, y: 22 }, end: { x: 90, y: 100 }, color: "#fff", lineWidth: 4 },
-      { kind: "text", point: { x: 16, y: 26 }, text: "Nowen\n笔记", color: "#fff", fontSize: 32 },
+      { kind: "text", point: { x: 16, y: 26 }, text: "BaseForge\n笔记", color: "#fff", fontSize: 32 },
     ];
 
     renderImageEditorOperations({ image: sourceImage(320, 240), operations });
@@ -79,7 +79,7 @@ describe("renderImageEditorOperations", () => {
     }>;
     expect(allContexts.some((context) => context.strokeRect.mock.calls.length > 0)).toBe(true);
     expect(allContexts.some((context) => context.ellipse.mock.calls.length > 0)).toBe(true);
-    expect(allContexts.flatMap((context) => context.fillText.mock.calls).map((call) => call[0])).toEqual(["Nowen", "笔记"]);
+    expect(allContexts.flatMap((context) => context.fillText.mock.calls).map((call) => call[0])).toEqual(["BaseForge", "笔记"]);
   });
 
   it("renders mosaic through a pixelated copy clipped to the stroke", () => {

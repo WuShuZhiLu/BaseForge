@@ -1,12 +1,12 @@
 import crypto from "node:crypto";
 import { getDb } from "../db/schema.js";
-import { nowenVersionSatisfies } from "./manifest.js";
+import { baseforgeVersionSatisfies } from "./manifest.js";
 import { PACKAGE_LIMITS } from "./packageValidator.js";
 import { secureRegistryFetch } from "./secureRegistryFetch.js";
 import type { PluginTrustLevel } from "./types.js";
 
 export interface RegistrySource { id: string; name: string; url: string; official?: boolean }
-export interface RegistryVersion { version: string; download: string; sha256: string; nowen: string }
+export interface RegistryVersion { version: string; download: string; sha256: string; baseforge: string }
 export interface RegistryPlugin {
   id: string; name: string; description?: string; category?: string; keywords?: string[];
   latestVersion: string; trustLevel?: PluginTrustLevel; repository?: string; homepage?: string;
@@ -16,7 +16,7 @@ export interface RegistryPlugin {
 const DEFAULT_SOURCE: RegistrySource = {
   id: "official",
   name: "Official Registry",
-  url: "https://raw.githubusercontent.com/cropflre/nowen-plugin-registry/main/registry.json",
+  url: "https://raw.githubusercontent.com/cropflre/baseforge-plugin-registry/main/registry.json",
   official: true,
 };
 const SETTINGS_KEY = "plugins:registrySources";
@@ -32,7 +32,7 @@ export function validateRegistryCatalog(value: unknown): RegistryPlugin[] {
     const plugin = raw as RegistryPlugin;
     if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/.test(plugin.id || "") || !plugin.name || !Array.isArray(plugin.versions)) throw new Error("Registry 插件条目无效");
     for (const version of plugin.versions) {
-      if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version.version || "") || !/^[a-f0-9]{64}$/i.test(version.sha256 || "") || !version.download || !version.nowen) {
+      if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version.version || "") || !/^[a-f0-9]{64}$/i.test(version.sha256 || "") || !version.download || !version.baseforge) {
         throw new Error(`Registry 版本条目无效: ${plugin.id}`);
       }
     }
@@ -80,7 +80,7 @@ export class CommunityRegistry {
     if (!plugin) throw Object.assign(new Error("Registry 中不存在该插件"), { code: "REGISTRY_PLUGIN_NOT_FOUND" });
     const version = plugin.versions.find((item) => item.version === (requestedVersion || plugin.latestVersion));
     if (!version) throw Object.assign(new Error("Registry 中不存在该版本"), { code: "PLUGIN_VERSION_NOT_FOUND" });
-    if (!nowenVersionSatisfies(version.nowen)) throw Object.assign(new Error(`插件版本与当前 BaseForge 不兼容: ${version.nowen}`), { code: "PLUGIN_INCOMPATIBLE" });
+    if (!baseforgeVersionSatisfies(version.baseforge)) throw Object.assign(new Error(`插件版本与当前 BaseForge 不兼容: ${version.baseforge}`), { code: "PLUGIN_INCOMPATIBLE" });
     const bytes = await safeRegistryFetch(version.download, PACKAGE_LIMITS.compressedBytes);
     verifyRegistryChecksum(bytes, version.sha256);
     return { bytes, plugin, version };

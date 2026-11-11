@@ -38,11 +38,11 @@ describe("mind map deep links", () => {
 
   it("keeps Electron file entry parameters while storing the deep link as app path", () => {
     const href =
-      "file:///C:/Program%20Files/Nowen/frontend/index.html?serverUrl=http%3A%2F%2F127.0.0.1%3A3001";
+      "file:///C:/Program%20Files/BaseForge/frontend/index.html?serverUrl=http%3A%2F%2F127.0.0.1%3A3001";
     const deepLink = new URL(buildMindMapDeepLinkUrl(ID, href));
     expect(deepLink.protocol).toBe("file:");
     expect(deepLink.searchParams.get("serverUrl")).toBe("http://127.0.0.1:3001");
-    expect(deepLink.searchParams.get("nowenAppPath")).toBe(`/mindmaps/${ID}`);
+    expect(deepLink.searchParams.get("baseforgeAppPath")).toBe(`/mindmaps/${ID}`);
   });
 
   it("notifies tree selection on in-app navigation and browser history changes", () => {
@@ -51,7 +51,7 @@ describe("mind map deep links", () => {
     const unsubscribe = subscribeMindMapAppPath(listener);
     try {
       window.history.pushState(null, "", `/mindmaps/${ID}`);
-      window.dispatchEvent(new Event("nowen:app-path-changed"));
+      window.dispatchEvent(new Event("baseforge:app-path-changed"));
       expect(getCurrentMindMapAppId()).toBe(ID);
       expect(listener).toHaveBeenCalledTimes(1);
 

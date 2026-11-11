@@ -13,7 +13,7 @@ const zhSource = readFileSync(path.resolve(__dirname, "../../i18n/locales/zh-CN.
 describe("desktop knowledge tree browsing mode", () => {
   it("defaults desktop to the recursive tree and persists independently from mobile", () => {
     expect(modeSource).toContain('export type DesktopKnowledgeTreeViewMode = "quick" | "tree"');
-    expect(modeSource).toContain('DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "nowen.desktopKnowledgeTree.viewMode.v1"');
+    expect(modeSource).toContain('DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "baseforge.desktopKnowledgeTree.viewMode.v1"');
     expect(modeSource).toContain('return value && DESKTOP_VALID_MODES.has(value) ? value : "tree"');
     expect(modeSource).toContain("DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT");
   });
@@ -35,7 +35,7 @@ describe("desktop knowledge tree browsing mode", () => {
     expect(sidebarSource).toContain("<TreePanelContent");
     expect(sidebarSource).toContain('mode={desktopKnowledgeTreeMode === "quick" ? "quick" : "full"}');
     expect(quickPanelSource).toContain('variant = "mobile"');
-    expect(quickPanelSource).toContain('data-nowen-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}');
+    expect(quickPanelSource).toContain('data-baseforge-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}');
   });
 
   it("keeps user expansion state authoritative across refreshes and remounts", () => {

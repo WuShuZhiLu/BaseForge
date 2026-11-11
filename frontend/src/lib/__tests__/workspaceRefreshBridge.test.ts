@@ -35,22 +35,22 @@ describe("workspace refresh button placement", () => {
     localStorage.clear();
     document.body.innerHTML = `
       <div>
-        <button data-nowen-notebook-sort type="button">sort</button>
+        <button data-baseforgebook-sort type="button">sort</button>
         <button type="button"><svg class="lucide-panel-left-close"></svg></button>
       </div>`;
   });
 
   afterEach(() => {
-    (window as Window & { __NOWEN_WORKSPACE_REFRESH_BRIDGE__?: () => void })
-      .__NOWEN_WORKSPACE_REFRESH_BRIDGE__?.();
+    (window as Window & { __BASEFORGE_WORKSPACE_REFRESH_BRIDGE__?: () => void })
+      .__BASEFORGE_WORKSPACE_REFRESH_BRIDGE__?.();
     document.body.innerHTML = "";
   });
 
   it("mounts immediately before the notebook sort button", async () => {
     await import("@/lib/workspaceRefreshBridge");
 
-    const refresh = document.querySelector<HTMLButtonElement>("button[data-nowen-workspace-refresh]");
-    const sort = document.querySelector<HTMLButtonElement>("button[data-nowen-notebook-sort]");
+    const refresh = document.querySelector<HTMLButtonElement>("button[data-baseforge-workspace-refresh]");
+    const sort = document.querySelector<HTMLButtonElement>("button[data-baseforgebook-sort]");
 
     expect(refresh).not.toBeNull();
     expect(refresh?.nextElementSibling).toBe(sort);
@@ -58,7 +58,7 @@ describe("workspace refresh button placement", () => {
 
   it("refreshes the knowledge tree when an import broadcasts notes:imported", async () => {
     const changed = vi.fn();
-    window.addEventListener("nowen:knowledge-tree-changed", changed, { once: true });
+    window.addEventListener("baseforge:knowledge-tree-changed", changed, { once: true });
     await import("@/lib/workspaceRefreshBridge");
 
     realtimeHarness.listeners.get("notes:imported")?.({ reason: "siyuan-import" });
@@ -70,10 +70,10 @@ describe("workspace refresh button placement", () => {
 
   it("does not refresh the knowledge tree when a poll applies a sync snapshot", async () => {
     const changed = vi.fn();
-    window.addEventListener("nowen:knowledge-tree-changed", changed);
-    localStorage.setItem("nowen-token", "test-token");
+    window.addEventListener("baseforge:knowledge-tree-changed", changed);
+    localStorage.setItem("baseforge-token", "test-token");
     syncHarness.syncNow.mockImplementation(async () => {
-      expect(document.querySelector("button[data-nowen-workspace-refresh]")?.getAttribute("aria-busy"))
+      expect(document.querySelector("button[data-baseforge-workspace-refresh]")?.getAttribute("aria-busy"))
         .not.toBe("true");
       window.dispatchEvent(new CustomEvent("sync-snapshot-applied"));
       return { ok: true };
@@ -83,6 +83,6 @@ describe("workspace refresh button placement", () => {
     await refreshWorkspaceCollections("poll", { force: true });
 
     expect(changed).not.toHaveBeenCalled();
-    window.removeEventListener("nowen:knowledge-tree-changed", changed);
+    window.removeEventListener("baseforge:knowledge-tree-changed", changed);
   });
 });

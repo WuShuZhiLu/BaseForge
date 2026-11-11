@@ -32,7 +32,7 @@ describe.skip("Android immersive editor contract", () => {
     expect(source).toContain('useKeyboardVisible');
     expect(source).toContain('data-mobile-editor-compact');
     expect(source).toContain('compactMobileEditing && "hidden"');
-    expect(source).toContain("nowen:open-search");
+    expect(source).toContain("baseforge:open-search");
   });
 
   it("keeps note management out of a duplicate mobile title toolbar", () => {
@@ -65,7 +65,7 @@ describe.skip("Android immersive editor contract", () => {
     expect(source).toContain('data-mobile-editor-toolbar="expanded"');
     expect(source).toContain('mobileToolbarExpanded');
     expect(source).toContain('data-mobile-editing-compact');
-    expect(source).toContain('nowen:close-search');
+    expect(source).toContain('baseforge:close-search');
     expect(expanded).not.toContain("max-md:absolute");
     expect(expanded).not.toContain("bg-app-elevated/98");
     expect(expanded).not.toContain("py-2 backdrop-blur");
@@ -127,7 +127,7 @@ describe.skip("Android immersive editor contract", () => {
     expect(expanded).not.toContain("bg-app-elevated/98");
     expect(expanded).not.toContain("py-2 backdrop-blur");
     expect(source).toContain('<span className="hidden md:inline-flex">');
-    expect(source).toContain('nowen:close-search');
+    expect(source).toContain('baseforge:close-search');
   });
 
   it("matches the Tiptap image, local video and more order in the Markdown compact toolbar", () => {

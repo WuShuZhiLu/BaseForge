@@ -103,7 +103,7 @@ export default function BoardEmbedCard({ href }: { href: string }) {
       setNote(updated);
       setPromoting(false);
       toast.success("已转为独立文档，可在知识树中找到");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "anonymous-doc-promoted", noteId: note.id },
       }));
     } catch (error) {
@@ -115,7 +115,7 @@ export default function BoardEmbedCard({ href }: { href: string }) {
 
   return (
     <div
-      data-nowen-board-embed={boardId}
+      data-baseforge-board-embed={boardId}
       className="embed-block-wrapper min-w-0 max-w-full"
     >
       <div className="embed-block-toolbar" contentEditable={false}>

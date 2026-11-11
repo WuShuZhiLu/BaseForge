@@ -60,7 +60,7 @@ export function buildPublicAttachmentUrl(
   try {
     const source = new URL(
       resolvedAttachmentUrl,
-      typeof window !== "undefined" ? window.location.origin : "https://nowen.invalid",
+      typeof window !== "undefined" ? window.location.origin : "https://baseforge.invalid",
     );
     const publicBase = new URL(resolution.origin);
     const pathname = joinPublicBasePath(publicBase.pathname, source.pathname);

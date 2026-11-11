@@ -7,8 +7,8 @@
  * - installed：已安装社区插件（GET /plugins），管理员启停/回滚/卸载；
  * - catalog：市场目录（GET /plugins/ecosystem/catalog），管理员安装。
  * 分组（管理/市场/配置）由侧栏插件视图驱动：侧栏点「市场」「管理」「配置」→
- * nowen:plugin-group 切到对应分组，主区不再重复一排分组 Tab；
- * 侧栏点击内置插件 → nowen:plugin-selected 直达详情。
+ * baseforge:plugin-group 切到对应分组，主区不再重复一排分组 Tab；
+ * 侧栏点击内置插件 → baseforge:plugin-selected 直达详情。
  *
  * 管理分组自上而下：社区插件区（列表 + 区头部的「检查更新」「安装插件包」，管理员可见）
  * → 内置插件区（默认折叠的次级分区，展开后启停）。更新与安装从属于社区插件区，
@@ -16,8 +16,8 @@
  * 配置分组（仅管理员）保留 Registry 来源、执行边界、开发者模式；单插件配置在详情页
  * 「设置与运行」分区。
  *
- * 选中状态经 nowen:plugin-selected 事件与侧栏共享（仅内置插件）；
- * 启停复用 builtin registry，变更广播 nowen:builtin-plugins-changed。
+ * 选中状态经 baseforge:plugin-selected 事件与侧栏共享（仅内置插件）；
+ * 启停复用 builtin registry，变更广播 baseforge:builtin-plugins-changed。
  * README/Changelog/Dependencies 区块在 Registry V2 索引提供数据前隐藏。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -65,10 +65,10 @@ import {
   type BuiltinPluginId,
 } from "@/plugins/builtin/registry";
 
-const PLUGIN_SELECTED_EVENT = "nowen:plugin-selected";
+const PLUGIN_SELECTED_EVENT = "baseforge:plugin-selected";
 /** 侧栏插件视图点「市场」→ 工作区切到对应分组 */
-const PLUGIN_GROUP_EVENT = "nowen:plugin-group";
-const BUILTIN_CHANGED_EVENT = "nowen:builtin-plugins-changed";
+const PLUGIN_GROUP_EVENT = "baseforge:plugin-group";
+const BUILTIN_CHANGED_EVENT = "baseforge:builtin-plugins-changed";
 /** 市场目录默认源（Registry V2 官方源） */
 const MARKET_SOURCE_ID = "official-v2";
 

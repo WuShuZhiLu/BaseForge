@@ -1,6 +1,6 @@
 import { isAndroidNativeRuntime } from "./androidNativeHttpBridge";
 
-const INSTALL_FLAG = "__nowenMobileStartupBridgeInstalled";
+const INSTALL_FLAG = "__baseforgeMobileStartupBridgeInstalled";
 const STARTUP_CACHE_MS = 20_000;
 const SHARE_STATUS_CACHE_MS = 5 * 60_000;
 const FAILURE_COOLDOWN_MS = 8_000;
@@ -219,7 +219,7 @@ function responseFromJson(data: unknown): Response {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "private, no-store",
-      "X-Nowen-Mobile-Bootstrap": "hit",
+      "X-BaseForge-Mobile-Bootstrap": "hit",
     },
   });
 }

@@ -16,7 +16,7 @@ type LookupFunction = (
   callback: (error: NodeJS.ErrnoException | null, addresses: LookupAddress[]) => void,
 ) => void;
 
-const INSTALL_MARKER = "__nowenSystemDnsLookupCompat";
+const INSTALL_MARKER = "__baseforgeSystemDnsLookupCompat";
 
 function noDataError(hostname: string, family: DnsFamily): NodeJS.ErrnoException {
   const error = new Error(`No IPv${family} addresses found for ${hostname}`) as NodeJS.ErrnoException;

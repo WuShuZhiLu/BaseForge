@@ -14,8 +14,8 @@ export default function VoiceTranscription({ attachmentId, src, onInsert }: { at
   useEffect(() => {
     let mounted = true;
     const refresh = () => { void voiceApi.settings().then((settings) => { if (mounted) setConfigured(settings.configured); }).catch(() => { if (mounted) setConfigured(false); }); };
-    refresh(); window.addEventListener("nowen:speech-settings-changed", refresh);
-    return () => { mounted = false; window.removeEventListener("nowen:speech-settings-changed", refresh); };
+    refresh(); window.addEventListener("baseforge:speech-settings-changed", refresh);
+    return () => { mounted = false; window.removeEventListener("baseforge:speech-settings-changed", refresh); };
   }, []);
   const transcribe = async () => {
     if (!id) return;

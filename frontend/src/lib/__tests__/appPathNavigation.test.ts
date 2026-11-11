@@ -6,47 +6,47 @@ import {
 
 describe("app path navigation", () => {
   it.each([
-    ["/notes/note-two", "https://note.example.com/nowen/notes/note-one", "/nowen/notes/note-two"],
-    ["/sheets/sheet-one", "https://note.example.com/nowen/notes/note-one", "/nowen/sheets/sheet-one"],
-    ["/", "https://note.example.com/nowen/notes/note-one", "/nowen/"],
+    ["/notes/note-two", "https://note.example.com/baseforge/notes/note-one", "/baseforge/notes/note-two"],
+    ["/sheets/sheet-one", "https://note.example.com/baseforge/notes/note-one", "/baseforge/sheets/sheet-one"],
+    ["/", "https://note.example.com/baseforge/notes/note-one", "/baseforge/"],
     ["/notes/note-two", "https://note.example.com/notes/note-one", "/notes/note-two"],
   ])("应用导航 %s 保留部署前缀", (appPath, currentHref, expected) => {
     expect(buildAppPathUrl(appPath, currentHref, false)).toBe(expected);
   });
 
   it.each([
-    ["https://note.example.com/nowen/notes/note-one", "/notes/note-one"],
-    ["https://note.example.com/nowen/mindmaps/map-one", "/mindmaps/map-one"],
-    ["https://note.example.com/nowen/sheets/sheet-one", "/sheets/sheet-one"],
-    ["https://note.example.com/nowen/trash", "/trash"],
+    ["https://note.example.com/baseforge/notes/note-one", "/notes/note-one"],
+    ["https://note.example.com/baseforge/mindmaps/map-one", "/mindmaps/map-one"],
+    ["https://note.example.com/baseforge/sheets/sheet-one", "/sheets/sheet-one"],
+    ["https://note.example.com/baseforge/trash", "/trash"],
   ])("子路径 URL %s 解析为应用路由", (href, expected) => {
     expect(resolveCurrentAppPathname(href, false)).toBe(expected);
   });
 
   it.each([
-    ["/issues", "https://note.example.com/nowen/", "/nowen/issues"],
-    ["/issues/issue-one", "https://note.example.com/nowen/issues", "/nowen/issues/issue-one"],
-    ["/", "https://note.example.com/nowen/issues/issue-one", "/nowen/"],
+    ["/issues", "https://note.example.com/baseforge/", "/baseforge/issues"],
+    ["/issues/issue-one", "https://note.example.com/baseforge/issues", "/baseforge/issues/issue-one"],
+    ["/", "https://note.example.com/baseforge/issues/issue-one", "/baseforge/"],
     ["/issues", "https://note.example.com/mindmaps/demo", "/issues"],
-    ["/issues", "https://note.example.com/nowen/mindmaps/demo", "/nowen/issues"],
+    ["/issues", "https://note.example.com/baseforge/mindmaps/demo", "/baseforge/issues"],
   ])("议题导航 %s 保留部署前缀", (appPath, currentHref, expected) => {
     expect(buildAppPathUrl(appPath, currentHref, false)).toBe(expected);
   });
 
   it.each([
-    ["https://note.example.com/nowen/issues", "/issues"],
-    ["https://note.example.com/nowen/issues/issue-one/", "/issues/issue-one/"],
+    ["https://note.example.com/baseforge/issues", "/issues"],
+    ["https://note.example.com/baseforge/issues/issue-one/", "/issues/issue-one/"],
     ["https://note.example.com/issues/issue-one", "/issues/issue-one"],
   ])("议题 URL %s 解析为应用路由", (href, expected) => {
     expect(resolveCurrentAppPathname(href, false)).toBe(expected);
   });
 
   it.each([
-    ["file:///C:/Nowen/frontend/index.html?serverUrl=https%3A%2F%2Fnote.example.com%2Fnowen", false],
-    ["https://localhost/?serverUrl=https%3A%2F%2Fnote.example.com%2Fnowen", true],
+    ["file:///C:/BaseForge/frontend/index.html?serverUrl=https%3A%2F%2Fnote.example.com%2Fbaseforge", false],
+    ["https://localhost/?serverUrl=https%3A%2F%2Fnote.example.com%2Fbaseforge", true],
   ])("原生议题导航保留服务器参数 %s", (href, native) => {
     const url = buildAppPathUrl("/issues/issue-one", String(href), Boolean(native));
-    expect(new URL(url).searchParams.get("serverUrl")).toBe("https://note.example.com/nowen");
+    expect(new URL(url).searchParams.get("serverUrl")).toBe("https://note.example.com/baseforge");
     expect(resolveCurrentAppPathname(url, Boolean(native))).toBe("/issues/issue-one");
   });
 
@@ -58,14 +58,14 @@ describe("app path navigation", () => {
   it("stores desktop public routes on the existing file entry URL", () => {
     const nextUrl = buildAppPathUrl(
       "/public/demo-token",
-      "file:///C:/Program%20Files/Nowen/frontend/index.html?serverUrl=http%3A%2F%2F127.0.0.1%3A3001",
+      "file:///C:/Program%20Files/BaseForge/frontend/index.html?serverUrl=http%3A%2F%2F127.0.0.1%3A3001",
       false,
     );
     const parsed = new URL(nextUrl);
 
-    expect(parsed.pathname).toBe("/C:/Program%20Files/Nowen/frontend/index.html");
+    expect(parsed.pathname).toBe("/C:/Program%20Files/BaseForge/frontend/index.html");
     expect(parsed.searchParams.get("serverUrl")).toBe("http://127.0.0.1:3001");
-    expect(parsed.searchParams.get("nowenAppPath")).toBe("/public/demo-token");
+    expect(parsed.searchParams.get("baseforgeAppPath")).toBe("/public/demo-token");
     expect(resolveCurrentAppPathname(nextUrl, false)).toBe("/public/demo-token");
   });
 
@@ -80,21 +80,21 @@ describe("app path navigation", () => {
     expect(parsed.origin).toBe("https://localhost");
     expect(parsed.pathname).toBe("/");
     expect(parsed.searchParams.get("serverUrl")).toBe("http://note.example.com");
-    expect(parsed.searchParams.get("nowenAppPath")).toBe("/public/demo-token");
+    expect(parsed.searchParams.get("baseforgeAppPath")).toBe("/public/demo-token");
     expect(resolveCurrentAppPathname(nextUrl, true)).toBe("/public/demo-token");
   });
 
   it("returns to the workspace without dropping the desktop server address", () => {
     const nextUrl = buildAppPathUrl(
       "/",
-      "file:///opt/nowen/frontend/index.html?serverUrl=https%3A%2F%2Fnote.example.com&nowenAppPath=%2Fpublic",
+      "file:///opt/baseforge/frontend/index.html?serverUrl=https%3A%2F%2Fnote.example.com&baseforgeAppPath=%2Fpublic",
       false,
     );
     const parsed = new URL(nextUrl);
 
-    expect(parsed.pathname).toBe("/opt/nowen/frontend/index.html");
+    expect(parsed.pathname).toBe("/opt/baseforge/frontend/index.html");
     expect(parsed.searchParams.get("serverUrl")).toBe("https://note.example.com");
-    expect(parsed.searchParams.has("nowenAppPath")).toBe(false);
+    expect(parsed.searchParams.has("baseforgeAppPath")).toBe(false);
     expect(resolveCurrentAppPathname(nextUrl, false)).toBe("/");
   });
 });

@@ -1,7 +1,7 @@
-const INSTALL_KEY = Symbol.for("nowen.inline-comment-tooltip-mount");
+const INSTALL_KEY = Symbol.for("baseforge.inline-comment-tooltip-mount");
 const PROXY_ATTR = "data-inline-comment-tooltip-proxy";
 const FALLBACK_ATTR = "data-inline-comment-tooltip-fallback";
-const STYLE_ID = "nowen-inline-comment-tooltip-style";
+const STYLE_ID = "baseforge-inline-comment-tooltip-style";
 
 const PROXY_ICON = `
 <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"

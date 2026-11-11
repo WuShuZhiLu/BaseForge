@@ -20,13 +20,13 @@ async function invokeCanonicalRoute(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-User-Id": userId,
-    "X-Nowen-Command-Source": metadata.source === "workflow" ? "workflow-plugin-host-api" : "plugin-host-api",
+    "X-BaseForge-Command-Source": metadata.source === "workflow" ? "workflow-plugin-host-api" : "plugin-host-api",
   };
-  if (metadata.sourceId) headers["X-Nowen-Source-Id"] = metadata.sourceId;
-  if (metadata.correlationId) headers["X-Nowen-Correlation-Id"] = metadata.correlationId;
-  if (metadata.causationId) headers["X-Nowen-Causation-Id"] = metadata.causationId;
-  if (metadata.depth !== undefined) headers["X-Nowen-Event-Depth"] = String(metadata.depth);
-  const response = await router.request(`http://nowen.internal${path}`, {
+  if (metadata.sourceId) headers["X-BaseForge-Source-Id"] = metadata.sourceId;
+  if (metadata.correlationId) headers["X-BaseForge-Correlation-Id"] = metadata.correlationId;
+  if (metadata.causationId) headers["X-BaseForge-Causation-Id"] = metadata.causationId;
+  if (metadata.depth !== undefined) headers["X-BaseForge-Event-Depth"] = String(metadata.depth);
+  const response = await router.request(`http://baseforge.internal${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),

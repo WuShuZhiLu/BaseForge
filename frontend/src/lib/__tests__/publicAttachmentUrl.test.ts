@@ -39,16 +39,16 @@ describe("publicAttachmentUrl", () => {
 
   it("supports a reverse-proxy path prefix without duplicating it", () => {
     expect(buildPublicAttachmentUrl(signed, {
-      filePublicOrigin: "https://example.com/nowen",
+      filePublicOrigin: "https://example.com/baseforge",
     })).toBe(
-      "https://example.com/nowen/api/attachments/abc-123?exp=2000000000&sig=deadbeef&scope=v2.scope&w=240",
+      "https://example.com/baseforge/api/attachments/abc-123?exp=2000000000&sig=deadbeef&scope=v2.scope&w=240",
     );
 
     expect(buildPublicAttachmentUrl(
-      "http://lan.local/nowen/api/attachments/abc?exp=1&sig=x&scope=y",
-      { filePublicOrigin: "https://example.com/nowen" },
+      "http://lan.local/baseforge/api/attachments/abc?exp=1&sig=x&scope=y",
+      { filePublicOrigin: "https://example.com/baseforge" },
     )).toBe(
-      "https://example.com/nowen/api/attachments/abc?exp=1&sig=x&scope=y",
+      "https://example.com/baseforge/api/attachments/abc?exp=1&sig=x&scope=y",
     );
   });
 

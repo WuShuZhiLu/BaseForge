@@ -39,7 +39,7 @@ let state: SyncState = "idle";
 let lastError: string | null = null;
 const stateListeners = new Set<(state: SyncState) => void>();
 
-export const SYNC_SNAPSHOT_APPLIED_EVENT = "nowen:sync-snapshot-applied";
+export const SYNC_SNAPSHOT_APPLIED_EVENT = "baseforge:sync-snapshot-applied";
 
 export interface SyncSummary {
   state: SyncState;

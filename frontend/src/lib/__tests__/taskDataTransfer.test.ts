@@ -18,10 +18,10 @@ function fixture(): TaskBackupPackage {
     format: TASK_BACKUP_FORMAT,
     version: TASK_BACKUP_VERSION,
     exportedAt: "2026-07-11T00:00:00.000Z",
-    source: { workspace: "personal", app: "nowen-note" },
+    source: { workspace: "personal", app: "baseforge" },
     data: {
       projects: [
-        { sourceId: "project-1", name: "Nowen", icon: "📁", color: "#6366f1", sortOrder: 0 },
+        { sourceId: "project-1", name: "BaseForge", icon: "📁", color: "#6366f1", sortOrder: 0 },
       ],
       tasks: [
         {
@@ -82,7 +82,7 @@ function fixture(): TaskBackupPackage {
 describe("taskDataTransfer", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("nowen-current-workspace", "personal");
+    localStorage.setItem("baseforge-current-workspace", "personal");
   });
 
   it("round-trips CSV fields with commas, quotes, newlines and task hierarchy", () => {
@@ -93,7 +93,7 @@ describe("taskDataTransfer", () => {
 
     const restored = taskBackupFromCsv(csv);
     expect(restored.data.tasks).toHaveLength(2);
-    expect(restored.data.projects[0]?.name).toBe("Nowen");
+    expect(restored.data.projects[0]?.name).toBe("BaseForge");
     expect(restored.data.tasks.find((task) => task.sourceId === "task-child")?.parentSourceId).toBe("task-parent");
     expect(restored.data.tasks.find((task) => task.sourceId === "task-parent")?.description).toBe("检查构建,\n然后发布");
   });
@@ -162,7 +162,7 @@ describe("taskDataTransfer", () => {
       description: "说明",
       status: "todo",
       priority: 2,
-      projectName: "Nowen",
+      projectName: "BaseForge",
       parentPath: "发布 / Android",
     });
     expect(createTaskImportSignature({
@@ -170,7 +170,7 @@ describe("taskDataTransfer", () => {
       description: "说明",
       status: "todo",
       priority: 2,
-      projectName: "nowen",
+      projectName: "baseforge",
       parentPath: "发布 / Android",
     })).toBe(base);
     expect(createTaskImportSignature({
@@ -178,7 +178,7 @@ describe("taskDataTransfer", () => {
       description: "说明",
       status: "todo",
       priority: 2,
-      projectName: "Nowen",
+      projectName: "BaseForge",
       parentPath: "发布 / Desktop",
     })).not.toBe(base);
   });

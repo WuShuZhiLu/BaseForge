@@ -98,7 +98,7 @@ export function HeadingLevelBadge({ editor }: { editor: Editor }) {
 
   return createPortal(
     <div
-      className="nowen-heading-level-badge"
+      className="baseforge-heading-level-badge"
       style={{
         position: "absolute",
         top: state.top,

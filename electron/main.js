@@ -36,11 +36,9 @@ const {
 } = require("./security");
 const {
   DB_FILE_NAME,
+  adoptLegacyDatabase,
   getDefaultDataPath,
   getUserDataPathFromRoot,
-  migrateLegacyDataDir,
-  migrateLegacyDatabase,
-  migrateLegacyUserDataRoot,
   readCustomDataDir,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,
@@ -49,17 +47,14 @@ const {
   verifyCopiedDataDir,
 } = require("./dataDir");
 
-// ---------- 用户数据目录改名迁移 ----------
-// 必须先于 initLogger 等任何 userData 使用：旧版根目录叫 nowen-note，
-// 这里原样搬到 baseforge，再把 Electron 的 userData 指向新目录。
-const migratedUserDataRoot = migrateLegacyUserDataRoot(app.getPath("appData"));
-app.setPath("userData", migratedUserDataRoot);
-migrateLegacyDataDir(migratedUserDataRoot);
+// ---------- 用户数据目录 ----------
+// 必须先于 initLogger 等任何 userData 使用。
+app.setPath("userData", path.join(app.getPath("appData"), "baseforge"));
 
 // 日志 & 崩溃上报需尽早初始化（crashReporter.start 建议在 ready 之前）
 initLogger({
   // 如需接入外部崩溃上报服务（如 Sentry/Bugsnag/自建 collector），填入 URL 并设置 uploadCrashes=true
-  // crashSubmitURL: process.env.NOWEN_CRASH_URL,
+  // crashSubmitURL: process.env.BASEFORGE_CRASH_URL,
   // uploadCrashes: true,
 });
 
@@ -79,7 +74,7 @@ let ugreenWorkspaceWindow = null;
 // 仅 full 模式有意义；lite 模式（连远端）保持原有手动登录流程。
 let localAuthCache = null;  // { token: string, user: object } | null
 
-const MAIN_WINDOW_RELOAD_URL = "nowen-reload://main";
+const MAIN_WINDOW_RELOAD_URL = "baseforge-reload://main";
 
 // ---------- 单实例锁（防止多开损坏 SQLite） ----------
 const gotTheLock = app.requestSingleInstanceLock();
@@ -145,7 +140,7 @@ function migrateRendererStorage(sourceDir, targetDir) {
     migratedEntries.push(source);
   }
   fs.writeFileSync(
-    path.join(targetDir, ".nowen-offline-cache"),
+    path.join(targetDir, ".baseforge-offline-cache"),
     JSON.stringify({ migratedAt: new Date().toISOString() }, null, 2),
     "utf8"
   );
@@ -269,12 +264,12 @@ function getBackendEntry() {
  * 当前是否为"Lite-only 发行版"：打包产物内不含 backend。
  *
  * 判断依据：
- *   1. 环境变量 NOWEN_LITE_ONLY=1（CI / 调试可强制声明）
+ *   1. 环境变量 BASEFORGE_LITE_ONLY=1（CI / 调试可强制声明）
  *   2. 已 packaged 但 backend/dist/index.js 不存在（lite builder.config 剥掉了 backend）
  * 开发环境下始终返回 false，避免误切。
  */
 function isLiteOnlyBuild() {
-  if (process.env.NOWEN_LITE_ONLY === "1") return true;
+  if (process.env.BASEFORGE_LITE_ONLY === "1") return true;
   if (!app.isPackaged) return false;
   try {
     return !fs.existsSync(getBackendEntry());
@@ -294,14 +289,14 @@ function getFrontendDist() {
 // 临时 SQLite 数据库，导致桌面端与 localhost:5173 登录同一账号却看到不同数据。
 function getDevelopmentBackendUrl() {
   if (app.isPackaged) return "";
-  const raw = String(process.env.NOWEN_DEV_BACKEND_URL || "").trim();
+  const raw = String(process.env.BASEFORGE_DEV_BACKEND_URL || "").trim();
   if (!raw) return "";
   try {
     const parsed = new URL(raw);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
     return parsed.toString().replace(/\/$/, "");
   } catch {
-    console.warn("[Electron] Ignoring invalid NOWEN_DEV_BACKEND_URL");
+    console.warn("[Electron] Ignoring invalid BASEFORGE_DEV_BACKEND_URL");
     return "";
   }
 }
@@ -519,8 +514,8 @@ async function startBackend() {
   // 确保 userData 目录存在（第一次运行时 db 文件所在目录可能不存在）
   try {
     fs.mkdirSync(userDataPath, { recursive: true });
-    // 旧版数据库文件名为 nowen-note.db，原样改成新名后再启动后端
-    migrateLegacyDatabase(userDataPath);
+    // 旧版本主库文件名为 nowen-note.db，新库不存在时接管改名后再启动后端
+    adoptLegacyDatabase(userDataPath);
   } catch (e) {
     console.error("[Electron] mkdir userData failed:", e?.message || e);
   }
@@ -749,7 +744,7 @@ async function resetLocalAccountAuth() {
     const r = await localApiRequest(
       "/auth/desktop/reset-local",
       { username: "desktop", password },
-      { "X-Nowen-Desktop-Secret": password },
+      { "X-BaseForge-Desktop-Secret": password },
     );
     if (r.status === 200 && r.data?.token) {
       localAuthCache = { token: r.data.token, refreshToken: r.data.refreshToken, user: r.data.user };
@@ -953,7 +948,7 @@ function createWindow() {
       session: currentRendererSession || session.defaultSession,
       // sandbox 不能开：preload 使用 require("electron")，sandbox 下 require 不可用
       preload: preloadPath,
-      additionalArguments: isLiteOnlyBuild() ? ["--nowen-lite-only"] : [],
+      additionalArguments: isLiteOnlyBuild() ? ["--baseforge-lite-only"] : [],
     },
   });
 
@@ -1851,7 +1846,7 @@ function registerAppIpc() {
         const response = await localApiRequest(
           "/auth/desktop/attachment-open-metadata",
           { attachmentId: id },
-          { "X-Nowen-Desktop-Secret": getLocalAccountSecret() },
+          { "X-BaseForge-Desktop-Secret": getLocalAccountSecret() },
         );
         if (response.status !== 200 || !response.data?.ok) {
           return {

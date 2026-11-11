@@ -1,5 +1,5 @@
 -- #376 / SQLite migration v53 parity
--- Stable source-to-target resource mappings for safe Nowen package incremental sync.
+-- Stable source-to-target resource mappings for safe BaseForge package incremental sync.
 
 CREATE TABLE IF NOT EXISTS roundtrip_import_links (
     id TEXT PRIMARY KEY,

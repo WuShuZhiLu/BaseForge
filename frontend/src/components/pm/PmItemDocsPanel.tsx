@@ -55,7 +55,7 @@ export default function PmItemDocsPanel({ item, onRefresh }: { item: PmWorkItem;
   }, [query]);
 
   const openNote = (noteId: string) => {
-    window.dispatchEvent(new CustomEvent("nowen:open-note-by-id", { detail: { noteId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:open-note-by-id", { detail: { noteId } }));
   };
 
   const unlink = async (noteId: string) => {

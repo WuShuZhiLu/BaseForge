@@ -11,7 +11,7 @@ export interface SheetDocument {
 }
 
 async function request<T>(noteId: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   const headers = new Headers(init?.headers || {});
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init?.body !== undefined) headers.set("Content-Type", "application/json");

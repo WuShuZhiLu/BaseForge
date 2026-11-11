@@ -221,7 +221,7 @@ export default function LanDiscoveryPanel({
               {services.map((svc) => {
                 const host = preferredHost(svc);
                 const label = host ? `${host}:${svc.port}` : `:${svc.port}`;
-                const friendly = (svc.name || svc.txt?.name || host).replace(/nowen-note/gi, "BaseForge");
+                const friendly = (svc.name || svc.txt?.name || host).replace(/baseforge/gi, "BaseForge");
                 return (
                   <button
                     key={svc.name || `${host}:${svc.port}`}

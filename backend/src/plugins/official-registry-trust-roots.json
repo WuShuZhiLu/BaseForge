@@ -2,8 +2,8 @@
   {
     "sourceId": "official-v2",
     "sourceName": "BaseForge Official Registry",
-    "indexUrl": "https://cropflre.github.io/nowen-plugin-registry/v2/index.json",
-    "keyId": "nowen-registry-root-2026",
+    "indexUrl": "https://cropflre.github.io/baseforge-plugin-registry/v2/index.json",
+    "keyId": "baseforge-registry-root-2026",
     "algorithm": "Ed25519",
     "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA2WT3TlHX2HcXNbxHP8uaWOVrIV4pb+yMBO7RIeCWSnU=\n-----END PUBLIC KEY-----\n",
     "sequence": 1,

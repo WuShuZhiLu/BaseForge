@@ -43,12 +43,12 @@ interface OutlineItem {
 }
 
 function publicationAccessKey(token: string): string {
-  return `nowen-public-notebook:${token}`;
+  return `baseforge-public-notebook:${token}`;
 }
 
 function hasLoginToken(): boolean {
   try {
-    return !!localStorage.getItem("nowen-token");
+    return !!localStorage.getItem("baseforge-token");
   } catch {
     return false;
   }
@@ -162,7 +162,7 @@ function PublicNotebookReader({ token }: { token: string }) {
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [comments, setComments] = useState<PublicComment[]>([]);
   const [nickname, setNickname] = useState(() => {
-    try { return localStorage.getItem("nowen-public-nickname") || ""; } catch { return ""; }
+    try { return localStorage.getItem("baseforge-public-nickname") || ""; } catch { return ""; }
   });
   const [commentText, setCommentText] = useState("");
   const [commentWebsite, setCommentWebsite] = useState("");
@@ -315,7 +315,7 @@ function PublicNotebookReader({ token }: { token: string }) {
       );
       setComments((current) => [...current, created]);
       setCommentText("");
-      try { localStorage.setItem("nowen-public-nickname", nickname.trim()); } catch { /* ignore */ }
+      try { localStorage.setItem("baseforge-public-nickname", nickname.trim()); } catch { /* ignore */ }
     } catch (err: any) {
       toast.error(err?.message || "评论失败");
     } finally {

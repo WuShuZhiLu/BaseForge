@@ -35,8 +35,8 @@ afterEach(() => {
 describe("document mind map export snapshots", () => {
   it("extracts unique embedded ids and hydrates every occurrence with one fetch", async () => {
     const html = [
-      `<p>before</p><div data-nowen-block-embed="mindmap:${ID}">思维导图</div>`,
-      `<div class="x" data-nowen-block-embed='mindmap:${ID}'>思维导图</div><p>after</p>`,
+      `<p>before</p><div data-baseforge-block-embed="mindmap:${ID}">思维导图</div>`,
+      `<div class="x" data-baseforge-block-embed='mindmap:${ID}'>思维导图</div><p>after</p>`,
     ].join("");
 
     expect(extractMindMapEmbedIdsFromHtml(html)).toEqual([ID]);
@@ -45,21 +45,21 @@ describe("document mind map export snapshots", () => {
     const rendered = await hydrateMindMapEmbedsForExport(html, loader);
 
     expect(loader).toHaveBeenCalledTimes(1);
-    expect(rendered.match(/data-nowen-mindmap-export=/g)?.length).toBe(2);
+    expect(rendered.match(/data-baseforge-mindmap-export=/g)?.length).toBe(2);
     expect(rendered.match(/<svg/g)?.length).toBe(2);
-    expect(rendered).not.toContain("data-nowen-block-embed");
+    expect(rendered).not.toContain("data-baseforge-block-embed");
     expect(rendered).not.toContain("/api/mindmaps/");
     expect(rendered).not.toContain("<script>alert(1)</script>");
     expect(rendered).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
   });
 
   it("fails closed to a readable placeholder when the source cannot be loaded", async () => {
-    const html = `<div data-nowen-block-embed="mindmap:${ID}">思维导图</div>`;
+    const html = `<div data-baseforge-block-embed="mindmap:${ID}">思维导图</div>`;
     const rendered = await hydrateMindMapEmbedsForExport(html, async () => {
       throw new Error("forbidden");
     });
 
-    expect(rendered).toContain('data-nowen-mindmap-export-unavailable="1"');
+    expect(rendered).toContain('data-baseforge-mindmap-export-unavailable="1"');
     expect(rendered).toContain("导图已删除、无权访问或暂时无法生成静态快照");
     expect(rendered).not.toContain(ID + "/api");
   });
@@ -67,7 +67,7 @@ describe("document mind map export snapshots", () => {
   it("renders a self-contained static SVG card", () => {
     const rendered = renderMindMapExportSnapshot(snapshotMap as unknown as Pick<import("@/types/index").MindMap, "id" | "title" | "updatedAt" | "data">);
     expect(rendered).toContain("思维导图静态快照");
-    expect(rendered).toContain("data-nowen-mindmap-snapshot");
+    expect(rendered).toContain("data-baseforge-mindmap-snapshot");
     expect(rendered).toContain("<svg");
     expect(rendered).not.toContain("mindmap:" + ID);
   });
@@ -82,7 +82,7 @@ describe("document mind map export snapshots", () => {
     });
 
     const html = noteContentToExportHtml(content, "", "tiptap-json");
-    expect(html).toContain(`data-nowen-block-embed="mindmap:${ID}"`);
+    expect(html).toContain(`data-baseforge-block-embed="mindmap:${ID}"`);
   });
 
   it("freezes Markdown mind maps into printable HTML without private API links", async () => {
@@ -98,8 +98,8 @@ describe("document mind map export snapshots", () => {
     });
 
     expect(api.getMindMap).toHaveBeenCalledTimes(1);
-    expect(html).toContain("data-nowen-mindmap-export");
-    expect(html).toContain("data-nowen-mindmap-snapshot");
+    expect(html).toContain("data-baseforge-mindmap-export");
+    expect(html).toContain("data-baseforge-mindmap-snapshot");
     expect(html).toContain("<svg");
     expect(html).not.toContain(`mindmap:${ID}`);
     expect(html).not.toContain("/api/mindmaps/");

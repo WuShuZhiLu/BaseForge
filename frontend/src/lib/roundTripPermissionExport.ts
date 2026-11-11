@@ -20,7 +20,7 @@ function emit(): void {
 }
 
 function readToken(): string | null {
-  try { return localStorage.getItem("nowen-token"); }
+  try { return localStorage.getItem("baseforge-token"); }
   catch { return null; }
 }
 
@@ -105,8 +105,8 @@ export function subscribeRoundTripPermissionExports(listener: Listener): () => v
 export function installRoundTripPermissionExportBridge(): void {
   if (installed) return;
   installed = true;
-  const nativeDownload = api.downloadNowenPackage.bind(api);
-  api.downloadNowenPackage = (async (...args: any[]) => {
+  const nativeDownload = api.downloadBaseForgePackage.bind(api);
+  api.downloadBaseForgePackage = (async (...args: any[]) => {
     const workspace = resolveRoundTripExportWorkspaceFromUi();
     if (!workspace || workspace === "personal") {
       try { return await downloadRoundTripPermissionPackage({}); }
@@ -114,7 +114,7 @@ export function installRoundTripPermissionExportBridge(): void {
     }
     const includePermissions = await requestRoundTripPermissionExport(workspace);
     return downloadRoundTripPermissionPackage({ workspaceId: workspace, includePermissions });
-  }) as typeof api.downloadNowenPackage;
+  }) as typeof api.downloadBaseForgePackage;
 }
 
 export const roundTripPermissionExportTestUtils = {

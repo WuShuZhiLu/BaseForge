@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-export const MOBILE_RAIL_HIDDEN_STORAGE_KEY = "nowen-mobile-rail-hidden";
-export const MOBILE_RAIL_HIDDEN_CHANGED_EVENT = "nowen:mobile-rail-hidden-changed";
+export const MOBILE_RAIL_HIDDEN_STORAGE_KEY = "baseforge-mobile-rail-hidden";
+export const MOBILE_RAIL_HIDDEN_CHANGED_EVENT = "baseforge:mobile-rail-hidden-changed";
 
 export function loadMobileRailHidden(): boolean {
   try {

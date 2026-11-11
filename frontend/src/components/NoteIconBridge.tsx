@@ -27,7 +27,7 @@ const IMAGE_ICON_SKIP_SELECTOR = [
   ".ProseMirror",
   ".cm-editor",
   ".markdown-body",
-  "[data-nowen-imported-image-icon]",
+  "[data-baseforge-imported-image-icon]",
 ].join(",");
 
 type SnapshotNote = {
@@ -110,14 +110,14 @@ function createImageIconElement(src: string): HTMLImageElement {
   image.alt = "";
   image.draggable = false;
   image.setAttribute("aria-hidden", "true");
-  image.setAttribute("data-nowen-imported-image-icon", "1");
+  image.setAttribute("data-baseforge-imported-image-icon", "1");
   image.className = "inline-block h-[1em] w-[1em] shrink-0 object-contain align-[-0.125em]";
   return image;
 }
 
 function renderIconBadge(badge: HTMLElement, icon: string): void {
   if (isImageIcon(icon)) {
-    const existingImage = badge.querySelector<HTMLImageElement>(":scope > img[data-nowen-imported-image-icon]");
+    const existingImage = badge.querySelector<HTMLImageElement>(":scope > img[data-baseforge-imported-image-icon]");
     if (existingImage && badge.childNodes.length === 1 && existingImage.src === icon) return;
     badge.replaceChildren(createImageIconElement(icon));
     return;
@@ -248,16 +248,16 @@ export default function NoteIconBridge() {
       titleElements.forEach((titleElement, index) => {
         const row = titleElement.parentElement;
         if (!row) return;
-        const existingBadge = row.querySelector<HTMLElement>("[data-nowen-note-icon-badge]");
+        const existingBadge = row.querySelector<HTMLElement>("[data-baseforge-icon-badge]");
         const note = visibleNotes[index];
 
         if (!note) {
           if (existingBadge) existingBadge.remove();
-          row.removeAttribute("data-nowen-note-id");
+          row.removeAttribute("data-baseforge-id");
           return;
         }
 
-        row.setAttribute("data-nowen-note-id", note.id);
+        row.setAttribute("data-baseforge-id", note.id);
         const icon = getCachedNoteIcon(note.id);
         if (!icon) {
           if (existingBadge) existingBadge.remove();
@@ -270,7 +270,7 @@ export default function NoteIconBridge() {
         }
 
         const badge = document.createElement("span");
-        badge.setAttribute("data-nowen-note-icon-badge", "1");
+        badge.setAttribute("data-baseforge-icon-badge", "1");
         badge.setAttribute("role", "img");
         badge.setAttribute("aria-label", copy.menu);
         badge.className = "shrink-0 text-base leading-none select-none";
@@ -291,17 +291,17 @@ export default function NoteIconBridge() {
 
       const knownNote = resolveKnownNote(menuState.targetId);
       if (knownNote?.isTrashed === 1) {
-        menuRoot.querySelector<HTMLElement>("[data-nowen-note-icon-menu-host]")?.remove();
+        menuRoot.querySelector<HTMLElement>("[data-baseforge-icon-menu-host]")?.remove();
         setMenuHost(null);
         setMenuNoteId(null);
         setMenuLocked(false);
         return;
       }
 
-      let host = menuRoot.querySelector<HTMLElement>("[data-nowen-note-icon-menu-host]");
+      let host = menuRoot.querySelector<HTMLElement>("[data-baseforge-icon-menu-host]");
       if (!host) {
         host = document.createElement("div");
-        host.setAttribute("data-nowen-note-icon-menu-host", "1");
+        host.setAttribute("data-baseforge-icon-menu-host", "1");
         const header = menuRoot.firstElementChild as HTMLElement | null;
         if (header?.className.includes("border-b")) header.after(host);
         else menuRoot.prepend(host);
@@ -346,8 +346,8 @@ export default function NoteIconBridge() {
 
   useEffect(() => {
     const handleFocus = () => {
-      const visibleIds = Array.from(document.querySelectorAll<HTMLElement>("[data-nowen-note-id]"))
-        .map((element) => element.dataset.nowenNoteId || "")
+      const visibleIds = Array.from(document.querySelectorAll<HTMLElement>("[data-baseforge-id]"))
+        .map((element) => element.dataset.baseforgeNoteId || "")
         .filter(Boolean);
       if (visibleIds.length > 0) void refreshNoteIcons(visibleIds);
     };

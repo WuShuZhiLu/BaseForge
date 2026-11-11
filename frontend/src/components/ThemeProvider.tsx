@@ -14,7 +14,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       // 会连续重绘大面积背景并出现明显闪白/抖动。主题切换期间临时禁用 CSS
       // transition，切换完成后 next-themes 会自动恢复，不影响普通交互动效。
       disableTransitionOnChange
-      storageKey="nowen-note-theme"
+      storageKey="baseforge-theme"
     >
       {children}
     </NextThemesProvider>

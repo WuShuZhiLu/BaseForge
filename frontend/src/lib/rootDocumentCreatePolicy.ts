@@ -1,4 +1,4 @@
-export const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__nowen_root_documents__:";
+export const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__baseforge_root_documents__:";
 
 export type RootDocumentCreateInput = {
   notebookId?: string | null;

@@ -81,7 +81,7 @@ export function TaskTimePlanner({ onTaskMutated, initiallyExpanded = false, stan
   const [expanded, setExpanded] = useState(() => {
     if (initiallyExpanded || standalone) return true;
     try {
-      return localStorage.getItem("nowen-task-time-planner-expanded") === "true";
+      return localStorage.getItem("baseforge-task-time-planner-expanded") === "true";
     } catch {
       return false;
     }
@@ -185,7 +185,7 @@ export function TaskTimePlanner({ onTaskMutated, initiallyExpanded = false, stan
 
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-task-time-planner-expanded", String(expanded));
+      localStorage.setItem("baseforge-task-time-planner-expanded", String(expanded));
     } catch {
       // Keep the state in memory when storage is unavailable.
     }

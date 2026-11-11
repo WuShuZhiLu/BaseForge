@@ -8,9 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { loadSqliteVec } from "../src/db/sqlite-vec-extension.js";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-large-restore-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-large-restore-"));
 const backupDir = path.join(tmpDir, "backups");
-const dbPath = path.join(tmpDir, "nowen-note.db");
+const dbPath = path.join(tmpDir, "baseforge.db");
 const markerKey = "backup-large-restore:marker";
 const userId = "large-restore-user";
 
@@ -232,7 +232,7 @@ test("post-restore attachment storage probe failure rolls database and files bac
 
   const originalWriteFileSync = fs.writeFileSync;
   fs.writeFileSync = ((file: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: fs.WriteFileOptions) => {
-    if (String(file).includes(".nowen-storage-probe-")) {
+    if (String(file).includes(".baseforge-storage-probe-")) {
       const error = new Error("simulated read-only attachment mount") as NodeJS.ErrnoException;
       error.code = "EACCES";
       throw error;

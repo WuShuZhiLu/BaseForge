@@ -85,7 +85,7 @@ describe("note sync safety", () => {
         localPayload: expect.objectContaining({ content: "刚输入的正文" }),
       }),
     ]);
-    expect(localStorage.getItem("nowen-draft-note-1")).toContain("刚输入的正文");
+    expect(localStorage.getItem("baseforge-draft-note-1")).toContain("刚输入的正文");
     expect(listNoteSyncConflicts()).toEqual([
       expect.objectContaining({
         noteId: "note-1",

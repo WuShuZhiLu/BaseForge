@@ -5,7 +5,7 @@ export type ParsedHttpRange =
 /**
  * Parse one RFC 7233 byte range.
  *
- * Nowen intentionally serves a single range only. Browser video elements request one range at
+ * BaseForge intentionally serves a single range only. Browser video elements request one range at
  * a time; rejecting multipart ranges keeps the response path small and prevents accidental large
  * allocations from attacker-controlled range lists.
  */

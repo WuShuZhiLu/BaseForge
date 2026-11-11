@@ -6,7 +6,7 @@ import test from "node:test";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-recycle-bin-capability-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-recycle-bin-capability-"));
 process.env.DB_PATH = path.join(tempDir, "recycle-bin.db");
 
 let db: DatabaseSync;

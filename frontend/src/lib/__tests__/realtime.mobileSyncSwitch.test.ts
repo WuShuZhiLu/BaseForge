@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.useFakeTimers(); realtime.disconnect();
   Object.assign(window, { Capacitor: { isNativePlatform: () => true, getPlatform: () => "android" } });
   setMobileSyncEnabled(false); localStorage.clear(); sockets.length = 0;
-  localStorage.setItem("nowen-token", "token"); localStorage.setItem("nowen-server-url", "https://notes.example.com");
+  localStorage.setItem("baseforge-token", "token"); localStorage.setItem("baseforge-server-url", "https://notes.example.com");
   vi.stubGlobal("WebSocket", Socket);
 });
 afterEach(() => { realtime.disconnect(); vi.useRealTimers(); vi.unstubAllGlobals(); Reflect.deleteProperty(window, "Capacitor"); });

@@ -147,13 +147,13 @@ export default function EmbeddingIndexTaskCopyBridge() {
       childList: true,
       subtree: true,
     });
-    window.addEventListener("nowen:ai-settings-changed", schedule);
+    window.addEventListener("baseforge:ai-settings-changed", schedule);
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       rootObserver.disconnect();
       sectionObserver?.disconnect();
-      window.removeEventListener("nowen:ai-settings-changed", schedule);
+      window.removeEventListener("baseforge:ai-settings-changed", schedule);
     };
   }, []);
 

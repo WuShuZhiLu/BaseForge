@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Migration } from "./migrations.impl.js";
 
 export const KNOWLEDGE_TREE_MINDMAP_FOLDER_SCHEMA_VERSION = 105;
-export const MINDMAP_LEGACY_NOTEBOOK_PREFIX = "__nowen_mindmap_folder__:";
+export const MINDMAP_LEGACY_NOTEBOOK_PREFIX = "__baseforge_mindmap_folder__:";
 
 type LegacyFolder = {
   id: string;

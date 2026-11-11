@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { Hono } from "hono";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-search-exclusions-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-search-exclusions-"));
 process.env.DB_PATH = path.join(tempDir, "search-exclusions.db");
 let closeDatabase: (() => void) | null = null;
 

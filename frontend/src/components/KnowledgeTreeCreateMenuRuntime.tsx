@@ -29,7 +29,7 @@ import { useApp, useAppActions } from "@/store/AppContext";
 export { FOCUS_KNOWLEDGE_TREE_EVENT, KNOWLEDGE_TREE_CHANGED_EVENT };
 export type { KnowledgeTreePanelProps };
 
-const CREATE_SCOPE_ATTR = "data-nowen-create-scope";
+const CREATE_SCOPE_ATTR = "data-baseforge-create-scope";
 const ALL_NOTES_HOST_ATTR = "data-knowledge-tree-all-notes-host";
 const CREATE_MENU_WIDTH = 232;
 
@@ -81,14 +81,14 @@ function markCreateButtons(root: HTMLElement): void {
     button.setAttribute(CREATE_SCOPE_ATTR, "node");
     button.title = "新建";
     const row = button.closest<HTMLElement>("[data-knowledge-tree-node-id]");
-    const title = row?.querySelector<HTMLButtonElement>('button[title]:not([data-nowen-create-scope])')?.title;
+    const title = row?.querySelector<HTMLButtonElement>('button[title]:not([data-baseforge-create-scope])')?.title;
     button.setAttribute("aria-label", title ? `在“${title}”下新建` : "在当前节点下新建");
     button.setAttribute("aria-haspopup", "menu");
   }
 }
 
 function ensureAllNotesHost(root: HTMLElement): HTMLElement | null {
-  const panel = root.querySelector<HTMLElement>('[data-nowen-knowledge-tree="embedded"]');
+  const panel = root.querySelector<HTMLElement>('[data-baseforge-knowledge-tree="embedded"]');
   if (!panel) return null;
   const scroll = panel.querySelector<HTMLElement>('[data-swipe-blocker="knowledge-tree-scroll"]');
   if (!scroll || scroll.parentElement !== panel) return null;

@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-share-comments-migration-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-share-comments-migration-"));
 const dbPath = path.join(tmpDir, "legacy.db");
 
 process.env.DB_PATH = dbPath;

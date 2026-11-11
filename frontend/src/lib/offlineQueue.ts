@@ -51,10 +51,10 @@ export type FlushResult = {
   remaining: number;
 };
 
-const LEGACY_STORAGE_KEY = "nowen-offline-queue";
-const STORAGE_KEY_PREFIX = "nowen-offline-queue:v2";
-const LEGACY_LOCAL_ID_MAP_KEY = "nowen-offline-id-map";
-const LOCAL_ID_MAP_KEY_PREFIX = "nowen-offline-id-map:v2";
+const LEGACY_STORAGE_KEY = "baseforge-offline-queue";
+const STORAGE_KEY_PREFIX = "baseforge-offline-queue:v2";
+const LEGACY_LOCAL_ID_MAP_KEY = "baseforge-offline-id-map";
+const LOCAL_ID_MAP_KEY_PREFIX = "baseforge-offline-id-map:v2";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_RETRY = 10;
 
@@ -99,11 +99,11 @@ function isLoopbackUrl(url: string): boolean {
 
 function getServerScope(): string {
   let server = "";
-  try { server = localStorage.getItem("nowen-server-url") || ""; } catch { /* ignore */ }
+  try { server = localStorage.getItem("baseforge-server-url") || ""; } catch { /* ignore */ }
   const origin = typeof window !== "undefined" && window.location.origin.startsWith("http")
     ? window.location.origin
     : "";
-  const isDesktop = typeof window !== "undefined" && !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktop = typeof window !== "undefined" && !!(window as any).baseforgeDesktop?.isDesktop;
 
   if (isDesktop && ((server && isLoopbackUrl(server)) || (!server && origin && isLoopbackUrl(origin)))) {
     return "local-desktop";
@@ -115,7 +115,7 @@ function getServerScope(): string {
 
 export function getOfflineQueueStorageKey(): string {
   let token: string | null = null;
-  try { token = localStorage.getItem("nowen-token"); } catch { /* ignore */ }
+  try { token = localStorage.getItem("baseforge-token"); } catch { /* ignore */ }
   return `${STORAGE_KEY_PREFIX}:${normalizeScopePart(getServerScope())}:${normalizeScopePart(decodeUserIdFromToken(token))}`;
 }
 

@@ -7,7 +7,7 @@ import {
 } from "../embeddingModelDiscovery";
 
 vi.mock("@/lib/api", () => ({
-  getBaseUrl: () => "https://nowen.test/api",
+  getBaseUrl: () => "https://baseforge.test/api",
 }));
 
 describe("embedding model discovery client", () => {
@@ -71,7 +71,7 @@ describe("embedding model discovery client", () => {
   });
 
   it("calls discovery and test endpoints with auth and exposes errors", async () => {
-    localStorage.setItem("nowen-token", "token-1");
+    localStorage.setItem("baseforge-token", "token-1");
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify({
         models: [{ id: "bge-m3", name: "bge-m3", recommended: true }],
@@ -105,7 +105,7 @@ describe("embedding model discovery client", () => {
     const tested = await testEmbeddingModel(draft);
     expect(models.models[0].id).toBe("bge-m3");
     expect(tested.dimension).toBe(1024);
-    expect(fetchMock.mock.calls[0][0]).toBe("https://nowen.test/api/ai/embeddings/models");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://baseforge.test/api/ai/embeddings/models");
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get("authorization")).toBe("Bearer token-1");
 
     await expect(testEmbeddingModel(draft)).rejects.toMatchObject({

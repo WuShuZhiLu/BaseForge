@@ -1,4 +1,4 @@
--- PostgreSQL Schema for nowen-note
+-- PostgreSQL Schema for baseforge
 -- Generated from SQLite schema (PG-SCHEMA-02)
 --
 -- 注意事项：

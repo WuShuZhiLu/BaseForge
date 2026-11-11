@@ -45,7 +45,7 @@ function readPassword(params: URLSearchParams): string | null {
 export function extractEmbedPassword(rawUrl: string, baseUrl?: string): string | null {
   if (!rawUrl.trim()) return null;
   try {
-    const parsed = new URL(rawUrl, baseUrl || (typeof window !== "undefined" ? window.location.href : "https://nowen.local/"));
+    const parsed = new URL(rawUrl, baseUrl || (typeof window !== "undefined" ? window.location.href : "https://baseforge.local/"));
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
 
     const queryPassword = readPassword(parsed.searchParams);

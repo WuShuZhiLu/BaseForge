@@ -6,7 +6,7 @@ import { duplicateKnowledgeTreeNoteAsChild, resolveDuplicableKnowledgeTreeNote }
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
 import { toast } from "@/lib/toast";
 
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 const CREATE_MENU_WIDTH = 232;
 

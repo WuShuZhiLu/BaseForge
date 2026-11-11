@@ -6,10 +6,10 @@ import path from "node:path";
 import { Hono } from "hono";
 import * as Y from "yjs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-y-subdocument-route-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-y-subdocument-route-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
-process.env.NOWEN_YJS_SUBDOCUMENTS = "1";
+process.env.BASEFORGE_YJS_SUBDOCUMENTS = "1";
 
 let closeDb: () => void;
 
@@ -63,7 +63,7 @@ test("通过 ACL 提供章节清单、按需快照和原子章节更新", async 
   });
   assert.equal(manifestResponse.status, 200);
   const manifest = await manifestResponse.json() as any;
-  assert.equal(manifest.rootGuid, `nowen-root-${noteId}`);
+  assert.equal(manifest.rootGuid, `baseforge-root-${noteId}`);
   assert.equal(manifest.generation, 1);
   assert.equal(manifest.structureVersion, 1);
   assert.deepEqual(manifest.sections.map((section: any) => section.id), [
@@ -154,13 +154,13 @@ test("Subdocument 路由在功能关闭和非法更新时 fail closed", async ()
   assert.equal(invalid.status, 400);
   assert.equal((await invalid.json() as any).code, "INVALID_SUBDOCUMENT_UPDATE");
 
-  process.env.NOWEN_YJS_SUBDOCUMENTS = "0";
+  process.env.BASEFORGE_YJS_SUBDOCUMENTS = "0";
   const disabled = await app.request(`/notes/${noteId}/yjs/subdocuments`, {
     headers: { "X-User-Id": ownerId },
   });
   assert.equal(disabled.status, 409);
   assert.equal((await disabled.json() as any).code, "SUBDOCUMENTS_DISABLED");
-  process.env.NOWEN_YJS_SUBDOCUMENTS = "1";
+  process.env.BASEFORGE_YJS_SUBDOCUMENTS = "1";
 
   assert.equal((db.prepare("SELECT COUNT(*) AS count FROM notes WHERE id = ?").get(noteId) as any).count, 1);
 });
@@ -173,7 +173,7 @@ test("旧版 Y room 活跃时拒绝协议切换且保留持久化历史", async 
   const db = getDb();
   const noteId = "17171717-1717-4717-8717-171717171717";
   const ownerId = "subdocument-route-owner";
-  process.env.NOWEN_YJS_SUBDOCUMENTS = "0";
+  process.env.BASEFORGE_YJS_SUBDOCUMENTS = "0";
   const joined = yjs.yJoin(noteId, ownerId);
   const legacyDoc = new Y.Doc();
   Y.applyUpdate(legacyDoc, new Uint8Array(Buffer.from(joined.stateBase64, "base64")));
@@ -186,7 +186,7 @@ test("旧版 Y room 活跃时拒绝协议切换且保留持久化历史", async 
     .get(noteId) as any).count as number;
   assert.ok(historyCount > 0);
 
-  process.env.NOWEN_YJS_SUBDOCUMENTS = "1";
+  process.env.BASEFORGE_YJS_SUBDOCUMENTS = "1";
   const manifest = yjs.yPrepareSubdocuments(noteId)!;
   assert.throws(
     () => yjs.yApplySubdocumentUpdate(

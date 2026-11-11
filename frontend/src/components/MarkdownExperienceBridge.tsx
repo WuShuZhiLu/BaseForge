@@ -6,7 +6,7 @@ import { markdownFencedCodeAuthoringExtension } from "@/lib/markdownFenceAuthori
 import { markdownCodeBlockFormattingExtension } from "@/lib/markdownCodeBlockFormatting";
 import { attachMarkdownSplitScrollSync } from "@/lib/markdownScrollSync";
 
-const LIVE_MODE_KEY = "nowen.markdown.live-preview.v1";
+const LIVE_MODE_KEY = "baseforge.markdown.live-preview.v1";
 const ACTIVE_CLASSES = ["bg-accent-primary/10", "text-accent-primary"];
 const INACTIVE_CLASSES = ["text-tx-tertiary", "hover:text-tx-secondary", "hover:bg-app-hover"];
 
@@ -98,7 +98,7 @@ export function findMarkdownModeGroup(editorRoot: HTMLElement): HTMLElement | nu
 function createLiveButton(sourceButton: HTMLButtonElement): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.dataset.nowenMarkdownLive = "1";
+  button.dataset.baseforgeMarkdownLive = "1";
   button.className = sourceButton.className;
   button.title = document.documentElement.lang?.toLowerCase().startsWith("en") ? "Live preview" : "实时预览";
   button.innerHTML = [
@@ -111,8 +111,8 @@ function createLiveButton(sourceButton: HTMLButtonElement): HTMLButtonElement {
 
 function bindModeButtons(group: HTMLElement, state: EditorBridgeState): void {
   const allButtons = Array.from(group.querySelectorAll<HTMLButtonElement>(":scope > button"));
-  let liveButton = allButtons.find((button) => button.dataset.nowenMarkdownLive === "1") || null;
-  const nativeButtons = allButtons.filter((button) => button.dataset.nowenMarkdownLive !== "1");
+  let liveButton = allButtons.find((button) => button.dataset.baseforgeMarkdownLive === "1") || null;
+  const nativeButtons = allButtons.filter((button) => button.dataset.baseforgeMarkdownLive !== "1");
   const sourceButton = nativeButtons[0];
   const previewButton = nativeButtons[1];
   const splitButton = nativeButtons[2];
@@ -123,8 +123,8 @@ function bindModeButtons(group: HTMLElement, state: EditorBridgeState): void {
     group.insertBefore(liveButton, previewButton);
   }
 
-  if (!liveButton.dataset.nowenMarkdownBound) {
-    liveButton.dataset.nowenMarkdownBound = "1";
+  if (!liveButton.dataset.baseforgeMarkdownBound) {
+    liveButton.dataset.baseforgeMarkdownBound = "1";
     liveButton.addEventListener("click", () => {
       // Keep React in source layout, then replace only inactive Markdown blocks.
       sourceButton.click();
@@ -140,8 +140,8 @@ function bindModeButtons(group: HTMLElement, state: EditorBridgeState): void {
   }
 
   for (const button of nativeButtons) {
-    if (button.dataset.nowenMarkdownBridgeBound) continue;
-    button.dataset.nowenMarkdownBridgeBound = "1";
+    if (button.dataset.baseforgeMarkdownBridgeBound) continue;
+    button.dataset.baseforgeMarkdownBridgeBound = "1";
     button.addEventListener("click", () => {
       setLivePreview(state, false);
       localStorage.removeItem(LIVE_MODE_KEY);
@@ -185,7 +185,7 @@ function clearSplitBinding(state: EditorBridgeState): void {
 }
 
 function bindSplitScroll(host: HTMLElement, editorRoot: HTMLElement, state: EditorBridgeState): void {
-  const previewRoot = editorRoot.querySelector<HTMLElement>(".nowen-md-preview");
+  const previewRoot = editorRoot.querySelector<HTMLElement>(".baseforge-md-preview");
   const sourcePane = host.parentElement;
   const previewPane = previewRoot?.parentElement || null;
   const isSplit = !!(
@@ -216,7 +216,7 @@ function bindSplitScroll(host: HTMLElement, editorRoot: HTMLElement, state: Edit
 }
 
 function reconcileMarkdownEditors(): void {
-  for (const host of document.querySelectorAll<HTMLElement>(".nowen-md-editor")) {
+  for (const host of document.querySelectorAll<HTMLElement>(".baseforge-md-editor")) {
     const view = getEditorView(host);
     if (!view) continue;
     const editorRoot = host.closest<HTMLElement>(".flex.flex-col.h-full.overflow-hidden");

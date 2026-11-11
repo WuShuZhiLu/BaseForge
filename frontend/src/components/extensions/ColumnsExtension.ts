@@ -117,7 +117,7 @@ export function backspaceFromAfterColumn(state: any, dispatch?: any): boolean {
 
 const columnsKeymap = keymap({
   // 注意：Tiptap 的插件顺序是扩展数组的反序，本 keymap 的 Enter 会先于
-  // nowenKeyboard / 列表扩展执行。因此这里【绝不能】以 splitBlock 兜底——
+  // baseforgeKeyboard / 列表扩展执行。因此这里【绝不能】以 splitBlock 兜底——
   // 否则列表项内回车会走 splitBlock 把段落拆在 li 内部（新行没有圆点/复选框）。
   // 只处理分栏特例，其余一律 return false 交给下层 keymap（列表 splitListItem 等）。
   Enter: chainCommands(

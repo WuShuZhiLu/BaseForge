@@ -6,10 +6,10 @@ import fs from "node:fs";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-settings-icp-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-settings-icp-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
-process.env.NOWEN_ICP_BEIAN = "粤ICP备12345678号-1";
+process.env.BASEFORGE_ICP_BEIAN = "粤ICP备12345678号-1";
 
 let app: Hono;
 let getDb: () => DatabaseSync;
@@ -52,7 +52,7 @@ test.beforeEach(() => {
 
 test.after(async () => {
   closeDb();
-  delete process.env.NOWEN_ICP_BEIAN;
+  delete process.env.BASEFORGE_ICP_BEIAN;
   for (let i = 0; i < 5; i++) {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -65,7 +65,7 @@ test.after(async () => {
   }
 });
 
-test("Docker env NOWEN_ICP_BEIAN is synced into public settings", async () => {
+test("Docker env BASEFORGE_ICP_BEIAN is synced into public settings", async () => {
   seedDatabase();
 
   const get = await requestJson("GET", "/settings");

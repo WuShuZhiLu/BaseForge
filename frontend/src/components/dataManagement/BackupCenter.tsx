@@ -123,8 +123,8 @@ export default function BackupCenter({ migration, advanced }: { migration?: Reac
 
   useEffect(() => {
     const refresh = () => { void backupWebDavApi.config().then(setWebdav).catch(() => setWebdav(null)); };
-    window.addEventListener("nowen-backup-webdav-config-changed", refresh);
-    return () => window.removeEventListener("nowen-backup-webdav-config-changed", refresh);
+    window.addEventListener("baseforge-backup-webdav-config-changed", refresh);
+    return () => window.removeEventListener("baseforge-backup-webdav-config-changed", refresh);
   }, []);
 
   useEffect(() => {
@@ -708,7 +708,7 @@ export default function BackupCenter({ migration, advanced }: { migration?: Reac
             )}
           </button>
         </div>
-        <div data-nowen-backup-webdav-host="true" />
+        <div data-baseforge-backup-webdav-host="true" />
         {isAdmin && <SmtpConfigSection askPassword={askPassword} sudoTokenRef={sudoTokenRef} />}
         {advanced}
       </AdvancedDataManagement>
@@ -2150,7 +2150,7 @@ function SmtpConfigSection(props: {
                     type="text"
                     value={fromName}
                     onChange={(e) => setFromName(e.target.value)}
-                    placeholder="nowen-note"
+                    placeholder="baseforge"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-900 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500"
                   />
                 </div>

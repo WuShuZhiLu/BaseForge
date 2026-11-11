@@ -39,9 +39,9 @@ describe("markdownVideoSyntax", () => {
     });
   });
 
-  it("converts valid syntax into a nowen video image placeholder", () => {
+  it("converts valid syntax into a baseforge video image placeholder", () => {
     expect(preprocessMarkdownVideos('@[video](/api/attachments/abc "clip.mp4")')).toBe(
-      "![nowen-video:clip.mp4](/api/attachments/abc?inline=1)",
+      "![baseforge-video:clip.mp4](/api/attachments/abc?inline=1)",
     );
   });
 

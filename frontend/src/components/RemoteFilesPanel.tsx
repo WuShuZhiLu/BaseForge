@@ -1343,8 +1343,8 @@ export default function RemoteFilesPanel() {
   // 侧栏「存储」里的「＋ 添加存储」/「管理」广播这里打开配置对话框
   useEffect(() => {
     const open = () => setManagerOpen(true);
-    window.addEventListener("nowen:remote-open-manager", open);
-    return () => window.removeEventListener("nowen:remote-open-manager", open);
+    window.addEventListener("baseforge:remote-open-manager", open);
+    return () => window.removeEventListener("baseforge:remote-open-manager", open);
   }, []);
 
   const loadList = useCallback(async (sourceId: string, path: string, opts?: { force?: boolean; revalidate?: boolean }) => {
@@ -2163,7 +2163,7 @@ export default function RemoteFilesPanel() {
           onChanged={() => {
             void reloadSources();
             // 侧栏「存储」列表读的是自己的快照，广播让它跟着重载
-            window.dispatchEvent(new Event("nowen:remote-sources-changed"));
+            window.dispatchEvent(new Event("baseforge:remote-sources-changed"));
           }}
         />
       ) : null}

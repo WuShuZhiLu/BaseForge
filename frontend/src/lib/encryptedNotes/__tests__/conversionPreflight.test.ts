@@ -8,19 +8,19 @@ vi.mock("../../localStore", () => ({ inspectCachedNotePresence: vi.fn() }));
 vi.mock("../../yjsProvider", () => ({ getYjsPersistenceName: vi.fn((note, user) => `y-${user}-${note}`) }));
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
   vi.mocked(inspectCachedNotePresence).mockResolvedValue(false);
   vi.stubGlobal("indexedDB", { databases: vi.fn(async () => []) });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it("reads counts and presence without pruning drafts/queues or opening IndexedDB", async () => {
-  localStorage.setItem("nowen-draft-note", "private-source");
+  localStorage.setItem("baseforge-draft-note", "private-source");
   localStorage.setItem(getOfflineQueueStorageKey(), JSON.stringify([
     { noteId: "note", body: { content: "private-source" }, enqueuedAt: 0 },
     { noteId: "other", body: { content: "private-source" } },
   ]));
-  localStorage.setItem("nowen-offline-queue", '[{"noteId":"note"}]');
+  localStorage.setItem("baseforge-offline-queue", '[{"noteId":"note"}]');
   vi.mocked(inspectCachedNotePresence).mockResolvedValue(true);
   vi.mocked(indexedDB.databases).mockResolvedValue([{ name: "y-owner-note" }, { name: "y-other-note" }]);
   const before = { ...localStorage };
@@ -35,7 +35,7 @@ it("reads counts and presence without pruning drafts/queues or opening IndexedDB
 it("counts only the current account queue and scoped collaboration database", async () => {
   const oldKey = getOfflineQueueStorageKey();
   localStorage.setItem(oldKey, '[{"noteId":"note"}]');
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
   vi.mocked(indexedDB.databases).mockResolvedValue([{ name: "y-owner-note" }]);
   expect(await inspectBrowserConversionCopies("note", "other")).toEqual({ draft: false, queue: 0, cache: false, collaboration: false });
   expect(localStorage.getItem(oldKey)).toBe('[{"noteId":"note"}]');

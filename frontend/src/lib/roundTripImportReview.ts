@@ -134,7 +134,7 @@ export interface RoundTripImportReviewRequest {
   id: number;
   fileName: string;
   targetLabel?: string;
-  source: "nowen-panel" | "shared-import";
+  source: "baseforge-panel" | "shared-import";
   preview: RoundTripPackagePreview;
   initialStrategy: RoundTripImportStrategy;
   loadPreview?: (strategy: RoundTripImportStrategy) => Promise<RoundTripPackagePreview>;
@@ -174,7 +174,7 @@ function emit(): void {
 
 function readToken(): string | null {
   try {
-    return localStorage.getItem("nowen-token");
+    return localStorage.getItem("baseforge-token");
   } catch {
     return null;
   }
@@ -300,16 +300,16 @@ function currentWorkspaceId(): string | undefined {
 }
 
 /**
- * Enhance the legacy Nowen-package panel without coupling it to the review dialogs.
+ * Enhance the legacy BaseForge-package panel without coupling it to the review dialogs.
  * All strategies and permission mapping use the same workspace-aware package endpoint.
  */
 export function installRoundTripImportReviewBridge(): void {
   if (bridgeInstalled) return;
   bridgeInstalled = true;
 
-  const nativeImport = api.importNowenPackage.bind(api);
+  const nativeImport = api.importBaseForgePackage.bind(api);
 
-  api.dryRunNowenPackage = (async (file: File, opts?: { fallbackNotebookName?: string }) => {
+  api.dryRunBaseForgePackage = (async (file: File, opts?: { fallbackNotebookName?: string }) => {
     const workspaceId = currentWorkspaceId();
     const preview = await submitRoundTripPackage(file, {
       dryRun: true,
@@ -321,7 +321,7 @@ export function installRoundTripImportReviewBridge(): void {
     const decision = await requestRoundTripImportReview(preview, {
       fileName: file.name,
       targetLabel: workspaceId ? "所选工作区" : "个人空间",
-      source: "nowen-panel",
+      source: "baseforge-panel",
       initialStrategy: "copy",
       loadPreview: (strategy) => submitRoundTripPackage(file, {
         dryRun: true,
@@ -344,9 +344,9 @@ export function installRoundTripImportReviewBridge(): void {
     }
     armLegacyConfirmResult(decision.accepted);
     return preview;
-  }) as typeof api.dryRunNowenPackage;
+  }) as typeof api.dryRunBaseForgePackage;
 
-  api.importNowenPackage = (async (file: File, opts?: any) => {
+  api.importBaseForgePackage = (async (file: File, opts?: any) => {
     const remembered = selectedDecisionByFile.get(file);
     selectedDecisionByFile.delete(file);
     if (!remembered) {
@@ -363,7 +363,7 @@ export function installRoundTripImportReviewBridge(): void {
       permissionMappings: remembered.permissionMappings,
       fallbackNotebookName: opts?.fallbackNotebookName ?? remembered.fallbackNotebookName,
     });
-  }) as typeof api.importNowenPackage;
+  }) as typeof api.importBaseForgePackage;
 }
 
 export const roundTripImportReviewTestUtils = {

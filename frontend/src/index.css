@@ -309,32 +309,32 @@ body {
   padding-left: 1.6em;
   margin: 0.75rem 0;
   list-style: none !important;
-  --nowen-ul-marker: "•";
-  --nowen-ul-marker-size: 1.1em;
-  --nowen-ul-marker-top: 0;
+  --baseforge-ul-marker: "•";
+  --baseforge-ul-marker-size: 1.1em;
+  --baseforge-ul-marker-top: 0;
 }
 
 /* 无序列表符号显式覆盖 1～9 层；更深层级沿用第 9 层样式。 */
-.ProseMirror ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.ProseMirror ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-.ProseMirror ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.ProseMirror ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.ProseMirror ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-.ProseMirror ul ul ul ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.ProseMirror ul ul ul ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.ProseMirror ul ul ul ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
+.ProseMirror ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.ProseMirror ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+.ProseMirror ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.ProseMirror ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.ProseMirror ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+.ProseMirror ul ul ul ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.ProseMirror ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.ProseMirror ul ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
 
 .ProseMirror ul > li:not([data-type="taskItem"]):not(.task-list-item) {
   position: relative;
 }
 
 .ProseMirror ul > li:not([data-type="taskItem"]):not(.task-list-item)::before {
-  content: var(--nowen-ul-marker);
+  content: var(--baseforge-ul-marker);
   position: absolute;
   left: -1.2em;
-  top: var(--nowen-ul-marker-top);
+  top: var(--baseforge-ul-marker-top);
   color: var(--pm-text);
-  font-size: var(--nowen-ul-marker-size);
+  font-size: var(--baseforge-ul-marker-size);
   line-height: 1;
 }
 
@@ -1723,30 +1723,30 @@ body.density-compact {
 }
 .shared-note-content ul {
   list-style: none !important;
-  --nowen-ul-marker: "•";
-  --nowen-ul-marker-size: 1.1em;
-  --nowen-ul-marker-top: 0;
+  --baseforge-ul-marker: "•";
+  --baseforge-ul-marker-size: 1.1em;
+  --baseforge-ul-marker-top: 0;
 }
 .shared-note-content ol { list-style: decimal; }
-.shared-note-content ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.shared-note-content ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-.shared-note-content ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.shared-note-content ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.shared-note-content ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-.shared-note-content ul ul ul ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.shared-note-content ul ul ul ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-.shared-note-content ul ul ul ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
+.shared-note-content ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.shared-note-content ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+.shared-note-content ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.shared-note-content ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.shared-note-content ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+.shared-note-content ul ul ul ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.shared-note-content ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+.shared-note-content ul ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
 
 .shared-note-content ul > li:not([data-type="taskItem"]):not(.task-list-item) {
   position: relative;
 }
 
 .shared-note-content ul > li:not([data-type="taskItem"]):not(.task-list-item)::before {
-  content: var(--nowen-ul-marker);
+  content: var(--baseforge-ul-marker);
   position: absolute;
   left: -1.2em;
-  top: var(--nowen-ul-marker-top);
-  font-size: var(--nowen-ul-marker-size);
+  top: var(--baseforge-ul-marker-top);
+  font-size: var(--baseforge-ul-marker-size);
   line-height: 1;
 }
 
@@ -2056,7 +2056,7 @@ body.density-compact {
  *   1) 缂栬緫鍣ㄥ唴鐨?MathInline / MathBlock NodeView锛坄.math-node-*`銆乣.math-view-*`锛?
  *   2) 缂栬緫鍣ㄥ唴缂栬緫鎬佺殑婧愮爜 + 瀹炴椂棰勮锛坄.math-edit-*`锛?
  *   3) 鍒嗕韩椤?MD / PM 璺緞鐨勫崰浣嶄笌寮傛娉ㄥ叆锛坄.shared-math-*`锛?
- * KaTeX 鑷甫鐨?CSS 鍦?lib 閲屾寜闇€ inject锛岃繖閲屽彧琛?nowen 鑷畾涔夌殑瀹瑰櫒銆?
+ * KaTeX 鑷甫鐨?CSS 鍦?lib 閲屾寜闇€ inject锛岃繖閲屽彧琛?baseforge 鑷畾涔夌殑瀹瑰櫒銆?
  * ========================================================================= */
 
 /* 鈥斺€?缂栬緫鍣ㄥ唴锛歮ath 鑺傜偣瑙嗚 鈥斺€?*/
@@ -2870,7 +2870,7 @@ html[data-electron="darwin"][data-fullscreen="1"] main::before {
 .dark .author-story-content strong {
   color: #a5b4fc; /* indigo-300锛屾繁鑹叉ā寮忎笅鍔犱寒涓€妗?*/
 }
-/* 鍐呰仈浠ｇ爜锛氳 nowen-note / 缇ゅ悕 QQ 鍙蜂竴绫荤殑鏍囪瘑鏇存樉鐪?*/
+/* 鍐呰仈浠ｇ爜锛氳 baseforge / 缇ゅ悕 QQ 鍙蜂竴绫荤殑鏍囪瘑鏇存樉鐪?*/
 .author-story-content :not(pre) > code {
   background: rgb(244 244 245); /* zinc-100 */
   color: rgb(99 102 241);

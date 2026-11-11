@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import {
-  NowenYjsProvider,
+  BaseForgeYjsProvider,
   type ProviderDurabilityState,
   type ProviderStatus,
   type ProviderUser,
@@ -34,7 +34,7 @@ const IDLE_DURABILITY: ProviderDurabilityState = {
 
 export interface UseYDocResult {
   doc: Y.Doc | null;
-  provider: NowenYjsProvider | null;
+  provider: BaseForgeYjsProvider | null;
   status: ProviderStatus | "idle";
   /** 是否已完成初次 sync（可开始绑定编辑器） */
   synced: boolean;
@@ -55,7 +55,7 @@ export function useYDoc({ noteId, user, enabled }: UseYDocOptions): UseYDocResul
     durability: IDLE_DURABILITY,
   });
 
-  const currentRef = useRef<{ doc: Y.Doc; provider: NowenYjsProvider } | null>(null);
+  const currentRef = useRef<{ doc: Y.Doc; provider: BaseForgeYjsProvider } | null>(null);
   const largeDocumentBlocked = isLargeDocumentCollaborationBlocked(noteId);
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export function useYDoc({ noteId, user, enabled }: UseYDocOptions): UseYDocResul
     realtime.connect();
 
     const doc = new Y.Doc();
-    const provider = new NowenYjsProvider(noteId, user, doc);
+    const provider = new BaseForgeYjsProvider(noteId, user, doc);
     currentRef.current = { doc, provider };
 
     const currentStatus = provider.getStatus();

@@ -35,7 +35,7 @@ import {
  */
 
 // 常用语言列表（超集由 lowlight.common 决定）
-// 注：mermaid 不在 lowlight 注册，是 nowen 自己识别的特殊语言（用于流程图渲染），
+// 注：mermaid 不在 lowlight 注册，是 baseforge 自己识别的特殊语言（用于流程图渲染），
 // 把它放进常用列表是为了在语言下拉里可以一键切换到 mermaid，触发 MermaidView。
 const POPULAR_LANGUAGES = [
   "auto", "plaintext",
@@ -228,8 +228,8 @@ function OrdinaryCodeBlockView(props: NodeViewProps) {
       const detail = (e as CustomEvent<CodeBlockThemeId>).detail;
       if (detail) setActiveTheme(detail);
     };
-    window.addEventListener("nowen:codeblock-theme-change", handler);
-    return () => window.removeEventListener("nowen:codeblock-theme-change", handler);
+    window.addEventListener("baseforge:codeblock-theme-change", handler);
+    return () => window.removeEventListener("baseforge:codeblock-theme-change", handler);
   }, []);
 
   // 构造可选语言列表：lowlight 已注册 ∪ 常用语言（去重并排序）

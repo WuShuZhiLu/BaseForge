@@ -1,14 +1,14 @@
 import { Capacitor } from "@capacitor/core";
 
-const PROFILE_INDEX_KEY = "nowen-profile-credential-index-v1";
+const PROFILE_INDEX_KEY = "baseforge-profile-credential-index-v1";
 const PROFILE_STORAGE_KEYS = [
-  "nowen-server-profiles-v2",
-  "nowen-active-server-profile-v2",
-  "nowen-server-profiles-v1",
-  "nowen-active-server-profile-v1",
-  "nowen-cloud-login-records-v1",
+  "baseforge-server-profiles-v2",
+  "baseforge-active-server-profile-v2",
+  "baseforge-server-profiles-v1",
+  "baseforge-active-server-profile-v1",
+  "baseforge-cloud-login-records-v1",
 ];
-const PENDING_REAUTH_KEY = "nowen-pending-profile-reauth-v1";
+const PENDING_REAUTH_KEY = "baseforge-pending-profile-reauth-v1";
 
 interface CleanupDependencies {
   isNativePlatform?: () => boolean;
@@ -28,7 +28,7 @@ function readProfileIds(): string[] {
 async function removeNativeSecureItem(key: string): Promise<void> {
   const { SecureStorage } = await import("@aparajita/capacitor-secure-storage");
   try {
-    await SecureStorage.setKeyPrefix("nowen_");
+    await SecureStorage.setKeyPrefix("baseforge_");
   } catch {
     // 已有安装可能已经设置相同前缀，可以继续删除。
   }

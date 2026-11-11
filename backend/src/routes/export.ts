@@ -28,7 +28,7 @@ import {
 const Busboy = require("busboy");
 
 const app = new Hono();
-const SIYUAN_IMPORT_TMP_PREFIX = "nowen-siyuan-import-";
+const SIYUAN_IMPORT_TMP_PREFIX = "baseforge-siyuan-import-";
 const SIYUAN_IMPORT_TMP_CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
 const SIYUAN_IMPORT_TMP_STALE_AGE_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SIYUAN_IMPORT_MAX_BYTES = 2 * 1024 * 1024 * 1024;
@@ -878,9 +878,9 @@ app.post("/import/siyuan-package", async (c) => {
   }
 });
 
-// ====== Nowen 数据包导出 ======
+// ====== BaseForge 数据包导出 ======
 
-app.get("/nowen-package", async (c) => {
+app.get("/baseforge-package", async (c) => {
   const db = getDb();
   const userId = c.req.header("X-User-Id")!;
   const wsRaw = c.req.query("workspaceId") ?? undefined;
@@ -894,8 +894,8 @@ app.get("/nowen-package", async (c) => {
   if (denied) return c.json(denied, 403);
 
   try {
-    const { createStableNowenPackageExport } = await import("../services/nowenPackageExportStable");
-    const result = await createStableNowenPackageExport({
+    const { createStableBaseForgePackageExport } = await import("../services/baseforgePackageExportStable");
+    const result = await createStableBaseForgePackageExport({
       userId,
       workspaceId: wsParam,
       notebookId,
@@ -915,15 +915,15 @@ app.get("/nowen-package", async (c) => {
       },
     });
   } catch (err: any) {
-    console.error("[export/nowen-package] Error:", err);
+    console.error("[export/baseforge-package] Error:", err);
     const status = Number.isInteger(err?.status) ? err.status : 500;
     return c.json({ error: err.message || "Export failed", code: err?.code || "EXPORT_FAILED" }, status as any);
   }
 });
 
-// ====== Nowen 数据包导入 ======
+// ====== BaseForge 数据包导入 ======
 
-app.post("/import/nowen-package", async (c) => {
+app.post("/import/baseforge-package", async (c) => {
   const userId = c.req.header("X-User-Id")!;
   const dryRun = c.req.query("dryRun") === "1" || c.req.query("dryRun") === "true";
   const importMode = (c.req.query("importMode") as "new-root" | "into-target" | "merge" | "sync") || "new-root";
@@ -953,8 +953,8 @@ app.post("/import/nowen-package", async (c) => {
     const zipBuffer = Buffer.from(arrayBuffer);
 
     // 调用导入服务
-    const { importNowenPackage } = await import("../services/nowenPackageImport");
-    const result = await importNowenPackage(zipBuffer, {
+    const { importBaseForgePackage } = await import("../services/baseforgePackageImport");
+    const result = await importBaseForgePackage(zipBuffer, {
       userId,
       workspaceId: wsParam,
       targetNotebookId,
@@ -983,7 +983,7 @@ app.post("/import/nowen-package", async (c) => {
 
     return c.json(result, 200);
   } catch (err: any) {
-    console.error("[import/nowen-package] Error:", err);
+    console.error("[import/baseforge-package] Error:", err);
     return c.json({ error: err.message || "Import failed", code: "IMPORT_FAILED" }, 500);
   }
 });

@@ -7,9 +7,9 @@ import crypto from "node:crypto";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-folder-sync-policy-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-folder-sync-policy-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
-process.env.NOWEN_DATA_DIR = path.join(tmpDir, "data");
+process.env.BASEFORGE_DATA_DIR = path.join(tmpDir, "data");
 
 let app: Hono;
 let getDb: () => DatabaseSync;
@@ -71,7 +71,7 @@ test.after(() => {
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* Windows may release handles later */ }
 });
 
-test("protect blocks silent overwrite and copy preserves the edited Nowen note", async () => {
+test("protect blocks silent overwrite and copy preserves the edited BaseForge note", async () => {
   const sourcePathHash = "a".repeat(64);
   const created = await postJson(
     "/folder-sync/import-file",
@@ -82,15 +82,15 @@ test("protect blocks silent overwrite and copy preserves the edited Nowen note",
   const trackedNoteId = created.json.noteId as string;
   const initial = db().prepare("SELECT content FROM notes WHERE id = ?").get(trackedNoteId) as { content: string };
   const manuallyEdited = initial.content.replace(
-    "<!-- nowen-folder-sync:",
-    "manual Nowen edit\n\n<!-- nowen-folder-sync:",
+    "<!-- baseforge-folder-sync:",
+    "manual BaseForge edit\n\n<!-- baseforge-folder-sync:",
   );
 
   db().prepare(`
     UPDATE notes
        SET content = ?, contentText = ?, updatedAt = datetime('now')
      WHERE id = ?
-  `).run(manuallyEdited, "source version one\nmanual Nowen edit", trackedNoteId);
+  `).run(manuallyEdited, "source version one\nmanual BaseForge edit", trackedNoteId);
 
   const protectedResult = await postJson(
     "/folder-sync/import-file",
@@ -99,7 +99,7 @@ test("protect blocks silent overwrite and copy preserves the edited Nowen note",
   assert.equal(protectedResult.status, 409);
   assert.equal(protectedResult.json.code, "SYNC_CONFLICT");
   const protectedNote = db().prepare("SELECT content FROM notes WHERE id = ?").get(trackedNoteId) as { content: string };
-  assert.match(protectedNote.content, /manual Nowen edit/);
+  assert.match(protectedNote.content, /manual BaseForge edit/);
 
   const copiedResult = await postJson(
     "/folder-sync/import-file",
@@ -114,8 +114,8 @@ test("protect blocks silent overwrite and copy preserves the edited Nowen note",
   assert.match(tracked.content, /contentHash=/);
 
   const copy = db().prepare("SELECT content FROM notes WHERE id = ?").get(copiedResult.json.conflictCopyNoteId) as { content: string };
-  assert.match(copy.content, /manual Nowen edit/);
-  assert.doesNotMatch(copy.content, /nowen-folder-sync:/);
+  assert.match(copy.content, /manual BaseForge edit/);
+  assert.doesNotMatch(copy.content, /baseforge-folder-sync:/);
 });
 
 test("rename with unchanged bytes updates the mapping and reuses the same note", async () => {
@@ -167,7 +167,7 @@ test("detach keeps note content but removes tracking metadata and mapping", asyn
 
   const note = db().prepare("SELECT content, isTrashed FROM notes WHERE id = ?").get(created.json.noteId) as { content: string; isTrashed: number };
   assert.match(note.content, /keep this content/);
-  assert.doesNotMatch(note.content, /nowen-folder-sync:/);
+  assert.doesNotMatch(note.content, /baseforge-folder-sync:/);
   assert.equal(note.isTrashed, 0);
   const mapping = db().prepare("SELECT COUNT(*) AS count FROM folder_sync_files WHERE sourcePathHash = ?").get(sourcePathHash) as { count: number };
   assert.equal(mapping.count, 0);

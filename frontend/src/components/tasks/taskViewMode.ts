@@ -1,6 +1,6 @@
 export type TaskViewMode = "list" | "board" | "calendar" | "timeline";
 
-export const TASK_VIEW_MODE_KEY = "nowen.taskCenter.viewMode.v1";
+export const TASK_VIEW_MODE_KEY = "baseforge.taskCenter.viewMode.v1";
 
 export function loadTaskViewMode(): TaskViewMode {
   try {

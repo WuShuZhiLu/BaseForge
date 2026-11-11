@@ -95,7 +95,7 @@ export function validateEnvelope(value: unknown): EncryptedContentEnvelope {
 export function contentAad(identity: EncryptedContentIdentity, purpose: "key" | "content"): Uint8Array {
   // Fixed positional UTF-8 JSON; independent of property insertion order and DB/workspace IDs.
   return new TextEncoder().encode(JSON.stringify([
-    "nowen-encrypted-content", 1, "AES-256-GCM", purpose,
+    "baseforge-encrypted-content", 1, "AES-256-GCM", purpose,
     identity.objectId, identity.kind, identity.originalFormat,
   ]));
 }

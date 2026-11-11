@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-attachment-signature-window-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-attachment-signature-window-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_SIGNING_SECRET = "test-attachment-window-secret-2026";

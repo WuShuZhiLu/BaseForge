@@ -96,7 +96,7 @@ describe("editor performance executable harness", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete window.__NOWEN_EDITOR_PERF__;
+    delete window.__BASEFORGE_EDITOR_PERF__;
   });
 
   it("orchestrates a regular scenario without defaulting required metrics", async () => {
@@ -231,7 +231,7 @@ describe("editor performance executable harness", () => {
       .resolves.toEqual({ heapBytes: 123 });
 
     const electronTarget = {
-      nowenDesktop: { async getEditorPerformanceMetrics() { return { heapBytes: 456 }; } },
+      baseforgeDesktop: { async getEditorPerformanceMetrics() { return { heapBytes: 456 }; } },
     };
     await expect(createEditorPerformancePlatformAdapter("electron", electronTarget).getMemoryMetrics())
       .resolves.toEqual({ heapBytes: 456 });
@@ -245,20 +245,20 @@ describe("editor performance executable harness", () => {
     await expect(createEditorPerformancePlatformAdapter("web", { performance: {} }).getMemoryMetrics())
       .rejects.toThrow("performance.memory.usedJSHeapSize is unavailable");
     await expect(createEditorPerformancePlatformAdapter("electron", {}).getMemoryMetrics())
-      .rejects.toThrow("nowenDesktop.getEditorPerformanceMetrics is unavailable");
+      .rejects.toThrow("baseforgeDesktop.getEditorPerformanceMetrics is unavailable");
     await expect(createEditorPerformancePlatformAdapter("android", {}).getMemoryMetrics())
       .rejects.toThrow("Capacitor.Plugins.EditorPerformance.getMemoryMetrics is unavailable");
   });
 
   it("installs an explicit global entry without running a scenario automatically", async () => {
-    delete window.__NOWEN_EDITOR_PERF__;
+    delete window.__BASEFORGE_EDITOR_PERF__;
     const now = { value: 0 };
     const { driver, calls } = createDriver({ now });
     installEditorPerformanceGlobal(window);
-    expect(window.__NOWEN_EDITOR_PERF__).toBeTypeOf("function");
+    expect(window.__BASEFORGE_EDITOR_PERF__).toBeTypeOf("function");
     expect(calls).toEqual([]);
 
-    const run = await window.__NOWEN_EDITOR_PERF__!({
+    const run = await window.__BASEFORGE_EDITOR_PERF__!({
       platform: "web",
       scenario: "tiptap-20000",
       driver,

@@ -2,7 +2,7 @@ import { getBaseUrl } from "@/lib/api.impl";
 import { fetchWithAuthRefresh, getAccessToken } from "@/lib/authSession";
 import { isStoredNoteThemeId } from "@/lib/pluginNoteThemeRegistry";
 
-export const NOTE_APPEARANCE_CHANGED_EVENT = "nowen:note-appearance-changed";
+export const NOTE_APPEARANCE_CHANGED_EVENT = "baseforge:note-appearance-changed";
 
 export interface NoteAppearanceState {
   noteId: string;

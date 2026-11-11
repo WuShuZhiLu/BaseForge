@@ -6,10 +6,10 @@ import path from "node:path";
 import { Hono } from "hono";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-team-root-export-test-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-team-root-export-test-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
-process.env.NOWEN_INSTANCE_ID = "team-root-export-test";
+process.env.BASEFORGE_INSTANCE_ID = "team-root-export-test";
 
 let closeDb: typeof import("../src/db/schema").closeDb;
 
@@ -35,12 +35,12 @@ test("team root document can export Markdown + attachments from its hidden root 
   db.prepare("INSERT INTO workspace_members (workspaceId, userId, role) VALUES (?, ?, ?)")
     .run("team-export", "team-member", "editor");
 
-  const hiddenNotebookId = "__nowen_root_documents__:workspace:team-export";
+  const hiddenNotebookId = "__baseforge_root_documents__:workspace:team-export";
   db.prepare(`
     INSERT INTO notebooks (
       id, userId, workspaceId, parentId, name, sortOrder, isExpanded, isDeleted
     ) VALUES (?, ?, ?, NULL, ?, ?, 0, 1)
-  `).run(hiddenNotebookId, "team-owner", "team-export", "__NOWEN_ROOT_DOCUMENTS__", -2147483648);
+  `).run(hiddenNotebookId, "team-owner", "team-export", "__BASEFORGE_ROOT_DOCUMENTS__", -2147483648);
 
   db.prepare(`
     INSERT INTO notes (
@@ -116,7 +116,7 @@ test("team root document can export Markdown + attachments from its hidden root 
     await zip.file("团队根文档.md")!.async("string"),
     /\[附件\]\(\.\/assets\/att-team-root-attachment-团队附件\.txt\)/,
   );
-  assert.equal(zip.file("__NOWEN_ROOT_DOCUMENTS__/团队根文档.md"), null);
+  assert.equal(zip.file("__BASEFORGE_ROOT_DOCUMENTS__/团队根文档.md"), null);
 
   const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
   assert.equal(manifest.scope.workspaceId, "team-export");

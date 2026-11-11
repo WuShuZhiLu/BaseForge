@@ -10,7 +10,7 @@ import { ExecutionLogTail } from "../src/plugins/logs";
 import { PluginRunner } from "../src/plugins/runner";
 import type { PluginRegistryRecord } from "../src/plugins/types";
 
-const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-platform-test-"));
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-platform-test-"));
 process.env.NODE_ENV = "test";
 process.env.DB_PATH = path.join(databaseDirectory, "plugin-platform.test.db");
 
@@ -20,7 +20,7 @@ const manifest = {
   description: "test",
   version: "1.0.0",
   apiVersion: 1 as const,
-  engines: { nowen: ">=1.5.0 <2.0.0" },
+  engines: { baseforge: ">=1.5.0 <2.0.0" },
   runtime: "node-action" as const,
   main: "dist/index.mjs",
   permissions: [],
@@ -44,7 +44,7 @@ test("community registry validates metadata and rejects checksum mismatch", asyn
   const { validateRegistryCatalog, verifyRegistryChecksum } = await import("../src/plugins/communityRegistry");
   const catalog = validateRegistryCatalog({ plugins: [{
     id: "com.example.hello", name: "Hello", latestVersion: "1.0.0", versions: [{
-      version: "1.0.0", download: "https://example.com/hello.nowen-plugin", sha256: "a".repeat(64), nowen: ">=1.5.0 <2.0.0",
+      version: "1.0.0", download: "https://example.com/hello.baseforge-plugin", sha256: "a".repeat(64), baseforge: ">=1.5.0 <2.0.0",
     }],
   }] });
   assert.equal(catalog[0].trustLevel, "community");
@@ -78,7 +78,7 @@ test("streaming validation rejects a ZIP bomb before JSZip extraction", async ()
 });
 
 test("preflight rejects Manifest actions missing from runtime", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-preflight-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-preflight-"));
   fs.writeFileSync(path.join(directory, "index.mjs"), "export default {actions:{hello(){return {text:'ok'}}}};");
   const mismatchManifest = { ...manifest, main: "index.mjs", actions: [...manifest.actions, { id: "missing", name: "Missing", input: {} }] };
   const record: PluginRegistryRecord = {
@@ -92,7 +92,7 @@ test("preflight rejects Manifest actions missing from runtime", async () => {
 });
 
 test("runner isolates execution and kills a timed-out worker", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-runner-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-runner-"));
   const mainPath = path.join(directory, "index.mjs");
   fs.writeFileSync(mainPath, `export default { actions: { hello: async ({input}) => ({text:'Hello '+input.name}), hang: async () => new Promise(()=>{}) } };`);
   const record: PluginRegistryRecord = {
@@ -103,8 +103,8 @@ test("runner isolates execution and kills a timed-out worker", async () => {
   };
   const runner = new PluginRunner(record, async () => null);
   try {
-    const result = await runner.execute({ executionId: "one", pluginId: record.id, actionId: "hello", userId: "u", workspaceId: null }, { name: "Nowen" }, 2000, new ExecutionLogTail());
-    assert.deepEqual(result, { text: "Hello Nowen" });
+    const result = await runner.execute({ executionId: "one", pluginId: record.id, actionId: "hello", userId: "u", workspaceId: null }, { name: "BaseForge" }, 2000, new ExecutionLogTail());
+    assert.deepEqual(result, { text: "Hello BaseForge" });
     await assert.rejects(() => runner.execute({ executionId: "two", pluginId: record.id, actionId: "hang", userId: "u", workspaceId: null }, {}, 100, new ExecutionLogTail()), /执行超时/);
     const recovered = await runner.execute({ executionId: "three", pluginId: record.id, actionId: "hello", userId: "u", workspaceId: null }, { name: "Again" }, 2000, new ExecutionLogTail());
     assert.deepEqual(recovered, { text: "Hello Again" });

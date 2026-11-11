@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 test("repairs task migrations recorded as versions 71 through 73 without replaying unrelated migrations", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-migration-compat-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-migration-compat-"));
   const previousDbPath = process.env.DB_PATH;
   process.env.DB_PATH = path.join(tempDir, "test.db");
   const [{ getDb, closeDb }, { runMigrations, CURRENT_SCHEMA_VERSION }, { taskMetadataMigration }, { taskTimePlanningMigration }, { taskInboxMigration }] = await Promise.all([

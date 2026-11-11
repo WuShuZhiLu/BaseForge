@@ -9,7 +9,7 @@ export function HabitRow(props: {
   onDelete: (habit: Habit) => Promise<void> | void;
 }) {
   return (
-    <div data-nowen-habit-row="true">
+    <div data-baseforge-habit-row="true">
       <HabitRowImpl {...props} />
     </div>
   );

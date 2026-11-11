@@ -51,7 +51,7 @@ export interface TiptapSubdocumentRestSyncController {
   destroy(preservePending?: boolean): void;
 }
 
-const SUBDOCUMENT_PENDING_STORAGE_PREFIX = "nowen:yjs-subdocument-pending:";
+const SUBDOCUMENT_PENDING_STORAGE_PREFIX = "baseforge:yjs-subdocument-pending:";
 
 function encodePendingUpdate(update: Uint8Array): string {
   let binary = "";
@@ -82,7 +82,7 @@ function stablePart(value: unknown): string {
 function sectionIdentity(noteId: string, nodes: any[], index: number): { id: string; guid: string } {
   const blockId = nodes.find((node) => typeof node?.attrs?.blockId === "string")?.attrs?.blockId;
   const id = blockId ? `section-${stablePart(blockId)}` : `section-${index}`;
-  return { id, guid: `nowen-subdoc-${stablePart(noteId)}-${id}` };
+  return { id, guid: `baseforge-subdoc-${stablePart(noteId)}-${id}` };
 }
 
 /** 一级/二级标题优先分章；无标题长文按顶层 Block 数上限切分。 */
@@ -117,7 +117,7 @@ export function splitTiptapSubdocumentSections(
     used.add(id);
     return {
       id,
-      guid: id === identity.id ? identity.guid : `nowen-subdoc-${stablePart(noteId)}-${id}`,
+      guid: id === identity.id ? identity.guid : `baseforge-subdoc-${stablePart(noteId)}-${id}`,
       startBlock: range.start,
       endBlock: range.end,
       content: JSON.stringify({ type: "doc", content: nodes }),
@@ -133,7 +133,7 @@ export function createTiptapSubdocumentBundle(
 ): TiptapSubdocumentBundle | null {
   const sections = splitTiptapSubdocumentSections(noteId, content, maxBlocks);
   if (!sections) return null;
-  const rootDoc = new Y.Doc({ guid: `nowen-root-${stablePart(noteId)}` });
+  const rootDoc = new Y.Doc({ guid: `baseforge-root-${stablePart(noteId)}` });
   const order = rootDoc.getArray<string>("sectionOrder");
   const sectionMap = rootDoc.getMap<Y.Doc>("sections");
   const metadata = rootDoc.getMap<unknown>("metadata");

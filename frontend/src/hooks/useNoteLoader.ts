@@ -95,8 +95,8 @@ export function useNoteLoader() {
       ...options,
       sink,
       request: async () => {
-        const fetchStart = `nowen:note-fetch:start:${options.noteId}`;
-        const fetchEnd = `nowen:note-fetch:end:${options.noteId}`;
+        const fetchStart = `baseforge:note-fetch:start:${options.noteId}`;
+        const fetchEnd = `baseforge:note-fetch:end:${options.noteId}`;
         markStage(fetchStart);
         const loaded = await loadNoteCacheFirst({
           noteId: options.noteId,
@@ -112,12 +112,12 @@ export function useNoteLoader() {
               pendingNoteId: currentState.noteLoadingState.pendingNoteId,
             })) return;
 
-            const policyStart = `nowen:editor-policy:start:${remote.id}`;
-            const policyEnd = `nowen:editor-policy:end:${remote.id}`;
+            const policyStart = `baseforge:editor-policy:start:${remote.id}`;
+            const policyEnd = `baseforge:editor-policy:end:${remote.id}`;
             markStage(policyStart);
             const displayNote = prepareLargeRichTextNoteForDisplay(remote);
             markStage(policyEnd);
-            measureStage("nowen:editor-policy", policyStart, policyEnd);
+            measureStage("baseforge:editor-policy", policyStart, policyEnd);
             logRuntimeDecision(displayNote);
             actions.setActiveNote(displayNote);
             actions.updateNoteInList({
@@ -139,14 +139,14 @@ export function useNoteLoader() {
           },
         });
         markStage(fetchEnd);
-        measureStage("nowen:note-fetch", fetchStart, fetchEnd);
+        measureStage("baseforge:note-fetch", fetchStart, fetchEnd);
 
-        const policyStart = `nowen:editor-policy:start:${loaded.id}`;
-        const policyEnd = `nowen:editor-policy:end:${loaded.id}`;
+        const policyStart = `baseforge:editor-policy:start:${loaded.id}`;
+        const policyEnd = `baseforge:editor-policy:end:${loaded.id}`;
         markStage(policyStart);
         const prepared = prepareLargeRichTextNoteForDisplay(loaded);
         markStage(policyEnd);
-        measureStage("nowen:editor-policy", policyStart, policyEnd);
+        measureStage("baseforge:editor-policy", policyStart, policyEnd);
         logRuntimeDecision(prepared);
         return prepared;
       },

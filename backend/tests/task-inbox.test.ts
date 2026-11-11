@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-inbox-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-inbox-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 const USER_A = "task-inbox-user-a";

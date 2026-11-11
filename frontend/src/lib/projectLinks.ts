@@ -19,4 +19,4 @@ export const PROJECT_DOCKER_RUN_COMMAND =
 export const PROJECT_GITEE_REPO = { owner: "wushuzhilu", repo: "base-forge" } as const;
 
 /** 上游项目地址：仅用于 GPL 归属声明，不是本产品的下载入口。 */
-export const UPSTREAM_PROJECT_URL = "https://github.com/cropflre/nowen-note";
+export const UPSTREAM_PROJECT_URL = "https://github.com/cropflre/baseforge";

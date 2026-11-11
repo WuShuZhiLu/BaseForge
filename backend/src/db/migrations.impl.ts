@@ -1201,7 +1201,7 @@ export const MIGRATIONS: Migration[] = [
   // --------------------------------------------------------------------------
   // v15: users 增加 isDemo 体验账号标记
   // --------------------------------------------------------------------------
-  // 背景：体验站点（note.nowen.cn）需要一个对外开放的 demo 账号，但这个账号
+  // 背景：体验站点（note.baseforge.cn）需要一个对外开放的 demo 账号，但这个账号
   //   不能让用户改密码 / 改用户名 / 启停 2FA，否则下一个访客就进不来了。
   //
   // 设计：
@@ -1549,7 +1549,7 @@ export const MIGRATIONS: Migration[] = [
       db.prepare("ALTER TABLE notes ADD COLUMN contentFormat TEXT NOT NULL DEFAULT 'tiptap-json'").run();
     },
   },
-  // v32: folder_sync_files 映射表，跟踪"本地文件 → Nowen 笔记"的同步关系。
+  // v32: folder_sync_files 映射表，跟踪"本地文件 → BaseForge 笔记"的同步关系。
   //   sourcePathHash = sha256(relativePath)，用于去重和增量更新。
   //   sha256 = 文件内容 hash，用于判断内容是否变化。
   {

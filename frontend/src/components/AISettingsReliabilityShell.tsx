@@ -28,11 +28,11 @@ export default function AISettingsReliabilityShell() {
   useEffect(() => {
     void refresh();
     const handleSettingsChanged = () => void refresh();
-    window.addEventListener("nowen:ai-settings-changed", handleSettingsChanged);
-    window.addEventListener("nowen:ai-profiles-changed", handleSettingsChanged);
+    window.addEventListener("baseforge:ai-settings-changed", handleSettingsChanged);
+    window.addEventListener("baseforge:ai-profiles-changed", handleSettingsChanged);
     return () => {
-      window.removeEventListener("nowen:ai-settings-changed", handleSettingsChanged);
-      window.removeEventListener("nowen:ai-profiles-changed", handleSettingsChanged);
+      window.removeEventListener("baseforge:ai-settings-changed", handleSettingsChanged);
+      window.removeEventListener("baseforge:ai-profiles-changed", handleSettingsChanged);
     };
   }, [refresh]);
 
@@ -69,7 +69,7 @@ export default function AISettingsReliabilityShell() {
     try {
       const next = await setReliableAIEnabled(!status.enabled);
       setStatus(next);
-      window.dispatchEvent(new CustomEvent("nowen:ai-manual-enabled-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:ai-manual-enabled-changed", {
         detail: { enabled: next.enabled },
       }));
     } catch (reason) {
@@ -175,8 +175,8 @@ export default function AISettingsReliabilityShell() {
         <OriginalAISettingsPanel />
       </div>
 
-      <div className={cn("nowen-embedding-settings", !status?.enabled && "rounded-2xl ring-1 ring-zinc-200 opacity-80 dark:ring-zinc-800")}>
-        <style>{`.nowen-embedding-settings > section > div.mt-5.grid > div:nth-child(4) { display: none; }`}</style>
+      <div className={cn("baseforge-embedding-settings", !status?.enabled && "rounded-2xl ring-1 ring-zinc-200 opacity-80 dark:ring-zinc-800")}>
+        <style>{`.baseforge-embedding-settings > section > div.mt-5.grid > div:nth-child(4) { display: none; }`}</style>
         {status?.index.configured && !status.index.vectorAvailable && queuedJobs > 0 && (
           <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-5 text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
             向量索引正在初始化，任务完成后会自动切换为“可用”。服务重启时中断的任务会自动恢复，无需重复点击重建。

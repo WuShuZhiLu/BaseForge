@@ -10,7 +10,7 @@ vi.mock("@/lib/toast", () => ({
 
 import { installTaskAttachmentExportFallback } from "@/lib/taskAttachmentExportFallback";
 
-const INSTALL_MARKER = "__nowenTaskAttachmentExportFallbackInstalled";
+const INSTALL_MARKER = "__baseforgeTaskAttachmentExportFallbackInstalled";
 let originalFetch: typeof window.fetch;
 
 describe("taskAttachmentExportFallback", () => {
@@ -36,7 +36,7 @@ describe("taskAttachmentExportFallback", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
-    expect(response.headers.get("X-Nowen-Task-Attachment-Placeholder")).toBe("missing");
+    expect(response.headers.get("X-BaseForge-Task-Attachment-Placeholder")).toBe("missing");
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect([...bytes.slice(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
 

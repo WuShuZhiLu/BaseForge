@@ -3,7 +3,7 @@
  *
  * 用于 MarkdownEditor 的预览模式和分屏模式。
  * 使用 react-markdown + remark-gfm 渲染标准 Markdown。
- * 不依赖 @tailwindcss/typography，直接为元素提供 nowen-note 风格样式。
+ * 不依赖 @tailwindcss/typography，直接为元素提供 baseforge 风格样式。
  */
 
 import React, { useMemo, useState } from "react";
@@ -71,11 +71,11 @@ function PreviewLink({ href, children }: { href?: string; children?: React.React
 
 function PreviewMediaImage({ src, alt }: { src?: string; alt?: string }) {
   const normalizedAlt = alt || "";
-  if (normalizedAlt.startsWith("nowen-video:")) {
+  if (normalizedAlt.startsWith("baseforge-video:")) {
     return (
       <MarkdownVideoPreview
         src={src || ""}
-        title={normalizedAlt.slice("nowen-video:".length)}
+        title={normalizedAlt.slice("baseforge-video:".length)}
       />
     );
   }
@@ -261,7 +261,7 @@ function createComponents(onTaskCheckboxChange?: (taskIndex: number, checked: bo
           checked={!!checked}
           readOnly={!onTaskCheckboxChange}
           onChange={(event) => {
-            const previewRoot = event.currentTarget.closest(".nowen-md-preview");
+            const previewRoot = event.currentTarget.closest(".baseforge-md-preview");
             const taskInputs = Array.from(previewRoot?.querySelectorAll<HTMLInputElement>("input[type='checkbox']") || []);
             const currentTaskIndex = taskInputs.indexOf(event.currentTarget);
             if (currentTaskIndex >= 0) {
@@ -304,7 +304,7 @@ export function MarkdownPreview({ markdown, className, compact, containerRef, on
     <div
       ref={containerRef}
       className={cn(
-        "nowen-md-preview leading-7 text-tx-primary overflow-y-auto",
+        "baseforge-md-preview leading-7 text-tx-primary overflow-y-auto",
         compact ? "p-4 md:p-6" : "p-4 md:p-6 max-w-[860px] mx-auto",
         className,
       )}

@@ -29,7 +29,7 @@ export interface OfflineNoteSnapshot {
   contentFingerprint?: string;
 }
 
-export const OFFLINE_NOTE_SNAPSHOT_EVENT = "nowen:offline-note-snapshot";
+export const OFFLINE_NOTE_SNAPSHOT_EVENT = "baseforge:offline-note-snapshot";
 
 let offlineHit = false;
 const offlineListeners = new Set<(value: boolean) => void>();
@@ -144,7 +144,7 @@ async function withFallback<T>(
 
 function activeWorkspaceId(): string | null {
   try {
-    const workspace = localStorage.getItem("nowen-current-workspace") || "personal";
+    const workspace = localStorage.getItem("baseforge-current-workspace") || "personal";
     return workspace === "personal" ? null : workspace;
   } catch {
     return null;

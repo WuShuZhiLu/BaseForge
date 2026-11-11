@@ -18,7 +18,7 @@ import { toast } from "@/lib/toast";
 import { runFullBackupJob } from "@/lib/fullBackupJobClient";
 
 const MAX_ARCHIVE_BYTES = 500 * 1024 * 1024;
-const HOST_ATTR = "data-nowen-full-data-transfer-host";
+const HOST_ATTR = "data-baseforge-full-data-transfer-host";
 
 type Operation = "export" | "import" | null;
 type Notice = { type: "success" | "error" | "info"; text: string } | null;
@@ -78,7 +78,7 @@ async function downloadBackup(
     return { filename, size: knownSize || 0, completed: false };
   }
 
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}/backups/${encodeURIComponent(filename)}/download`, {
     method: "GET",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -133,11 +133,11 @@ function findLegacyTransferSections(): {
   const parent = importSection?.parentElement;
   if (!importSection || !exportSection || !parent) return null;
 
-  if (!exportSection.id) exportSection.id = `nowen-legacy-data-export-${Date.now()}`;
-  if (!importSection.id) importSection.id = `nowen-legacy-data-import-${Date.now()}`;
+  if (!exportSection.id) exportSection.id = `baseforge-legacy-data-export-${Date.now()}`;
+  if (!importSection.id) importSection.id = `baseforge-legacy-data-import-${Date.now()}`;
 
-  exportSection.dataset.nowenOriginalDisplay = exportSection.style.display;
-  importSection.dataset.nowenOriginalDisplay = importSection.style.display;
+  exportSection.dataset.baseforgeOriginalDisplay = exportSection.style.display;
+  importSection.dataset.baseforgeOriginalDisplay = importSection.style.display;
   exportSection.style.display = "none";
   importSection.style.display = "none";
 
@@ -151,10 +151,10 @@ function findLegacyTransferSections(): {
 
 function restoreLegacySections(binding: ReturnType<typeof findLegacyTransferSections>): void {
   if (!binding) return;
-  binding.exportSection.style.display = binding.exportSection.dataset.nowenOriginalDisplay || "";
-  binding.importSection.style.display = binding.importSection.dataset.nowenOriginalDisplay || "";
-  delete binding.exportSection.dataset.nowenOriginalDisplay;
-  delete binding.importSection.dataset.nowenOriginalDisplay;
+  binding.exportSection.style.display = binding.exportSection.dataset.baseforgeOriginalDisplay || "";
+  binding.importSection.style.display = binding.importSection.dataset.baseforgeOriginalDisplay || "";
+  delete binding.exportSection.dataset.baseforgeOriginalDisplay;
+  delete binding.importSection.dataset.baseforgeOriginalDisplay;
   binding.host.remove();
 }
 

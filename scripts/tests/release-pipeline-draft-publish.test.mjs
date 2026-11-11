@@ -27,7 +27,7 @@ test("GitHub Release 先建 draft、校验资产后才转正", async () => {
 
 test("GitHub Release 只汇总已签名 Windows，不带签名前候选", async () => {
   const workflow = await readRepoFile(".github/workflows/release.yml");
-  assert.match(workflow, /name:\s*nowen-note-win-signed/);
+  assert.match(workflow, /name:\s*baseforge-win-signed/);
   assert.match(workflow, /name:\s*baseforge-mac/);
   assert.match(workflow, /name:\s*baseforge-linux/);
   assert.doesNotMatch(workflow, /pattern:\s*baseforge-\*/);

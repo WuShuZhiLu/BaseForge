@@ -24,8 +24,8 @@ function inferTargetPlatformFromArgv() {
 function inferTargetArch(targetPlatform) {
   const explicit = process.env.npm_config_target_arch || process.env.TARGET_ARCH;
   if (explicit) return explicit;
-  if (targetPlatform === "darwin" && process.env.NOWEN_MAC_ARCH) {
-    return process.env.NOWEN_MAC_ARCH === "arm64" ? "arm64" : "x64";
+  if (targetPlatform === "darwin" && process.env.BASEFORGE_MAC_ARCH) {
+    return process.env.BASEFORGE_MAC_ARCH === "arm64" ? "arm64" : "x64";
   }
   return process.arch;
 }
@@ -92,9 +92,9 @@ function checkEmbeddedNode() {
 }
 
 // 允许把输出目录放到工作区外，避免 IDE / Defender 对打包产物做文件监听锁
-// 用法：set NOWEN_BUILD_OUT=1 && npm run electron:build
-const OUT_DIR = process.env.NOWEN_BUILD_OUT
-  ? path.join(os.tmpdir(), "nowen-note-build")
+// 用法：set BASEFORGE_BUILD_OUT=1 && npm run electron:build
+const OUT_DIR = process.env.BASEFORGE_BUILD_OUT
+  ? path.join(os.tmpdir(), "baseforge-build")
   : "dist-electron";
 
 // ===== 跨平台打 Windows 目标时的 rcedit / 代码签名处理 =====
@@ -107,23 +107,23 @@ const OUT_DIR = process.env.NOWEN_BUILD_OUT
 //   国内网络可能卡很久甚至失败。
 //
 // 环境变量：
-//   NOWEN_SKIP_RCEDIT=1         完全跳过 rcedit（exe 图标/版本信息用 electron 默认）
+//   BASEFORGE_SKIP_RCEDIT=1         完全跳过 rcedit（exe 图标/版本信息用 electron 默认）
 //                               （适合没配 CSC、且首次 debian 打包想快速出包时）
 //   CSC_LINK / CSC_KEY_PASSWORD 有则正常签名；没配则 electron-builder 自动跳过
 //
 // 判定策略：
-//   - 显式 NOWEN_SKIP_RCEDIT=1  -> 强制 false
+//   - 显式 BASEFORGE_SKIP_RCEDIT=1  -> 强制 false
 //   - 否则默认 true（保持原行为：注入图标、版本元信息、走签名流程）
-const SKIP_RCEDIT = process.env.NOWEN_SKIP_RCEDIT === "1";
+const SKIP_RCEDIT = process.env.BASEFORGE_SKIP_RCEDIT === "1";
 const SIGN_AND_EDIT_EXECUTABLE = !SKIP_RCEDIT;
 
 // ===== Linux 包元信息（deb 必填，否则 electron-builder 会 warn）=====
 // 这些字段同时被 AppImage 和 deb 使用
 const LINUX_MAINTAINER =
-  process.env.NOWEN_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
-const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "BaseForge";
+  process.env.BASEFORGE_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
+const LINUX_VENDOR = process.env.BASEFORGE_LINUX_VENDOR || "BaseForge";
 const LINUX_HOMEPAGE =
-  process.env.NOWEN_LINUX_HOMEPAGE || "https://github.com/cropflre/nowen-note";
+  process.env.BASEFORGE_LINUX_HOMEPAGE || "https://github.com/cropflre/baseforge";
 
 // ===== 体积优化：精简后端 node_modules =====
 // 后端通过 esbuild bundle 成单文件（backend/dist/index.js），
@@ -175,7 +175,7 @@ function buildBackendNodeModulesFilter() {
 }
 
 module.exports = {
-  appId: "com.nowen.note",
+  appId: "com.baseforge.note",
   productName: "BaseForge",
   // 打包前校验内嵌 Node 与前端产物，避免装到用户机后才崩
   beforeBuild() {
@@ -291,7 +291,7 @@ module.exports = {
     //
     // signAndEditExecutable：
     //   默认 true -> 通过 rcedit 修改 exe 图标/版本号，并在有证书时签名
-    //   设 NOWEN_SKIP_RCEDIT=1 则跳过（跨平台首次打 Win 不想等 winCodeSign 下载时可用）
+    //   设 BASEFORGE_SKIP_RCEDIT=1 则跳过（跨平台首次打 Win 不想等 winCodeSign 下载时可用）
     signAndEditExecutable: SIGN_AND_EDIT_EXECUTABLE,
     signDlls: false,
     // 若使用 Azure Code Signing / Cloud HSM，可改用 signingHashAlgorithms + signtoolOptions
@@ -314,15 +314,15 @@ module.exports = {
   mac: {
     // ==== mac 架构选择 ====
     // 每次只打一个架构，由外层脚本 (release.sh) 跑两遍，通过环境变量
-    // NOWEN_MAC_ARCH=x64|arm64 控制；默认 x64（覆盖 Intel + 走 Rosetta）。
+    // BASEFORGE_MAC_ARCH=x64|arm64 控制；默认 x64（覆盖 Intel + 走 Rosetta）。
     target: [
       {
         target: "dmg",
-        arch: [process.env.NOWEN_MAC_ARCH === "arm64" ? "arm64" : "x64"],
+        arch: [process.env.BASEFORGE_MAC_ARCH === "arm64" ? "arm64" : "x64"],
       },
       {
         target: "zip",
-        arch: [process.env.NOWEN_MAC_ARCH === "arm64" ? "arm64" : "x64"],
+        arch: [process.env.BASEFORGE_MAC_ARCH === "arm64" ? "arm64" : "x64"],
       },
     ],
     // 两个 mac 架构分两次构建，文件名必须带 ${arch}，否则后一次会覆盖前一次，
@@ -352,7 +352,7 @@ module.exports = {
     // Linux mimeType 绑定：系统双击 .md 时会优先提示用 BaseForge 打开
     mimeTypes: ["text/markdown", "text/plain"],
     // deb 需要 maintainer；AppImage 也会读 vendor 写进 metadata
-    // 可通过环境变量 NOWEN_LINUX_MAINTAINER / NOWEN_LINUX_VENDOR / NOWEN_LINUX_HOMEPAGE 覆盖
+    // 可通过环境变量 BASEFORGE_LINUX_MAINTAINER / BASEFORGE_LINUX_VENDOR / BASEFORGE_LINUX_HOMEPAGE 覆盖
     maintainer: LINUX_MAINTAINER,
     vendor: LINUX_VENDOR,
     synopsis: "Modern note-taking application",
@@ -362,7 +362,7 @@ module.exports = {
     desktop: {
       entry: {
         StartupWMClass: "BaseForge",
-        Keywords: "note;markdown;editor;nowen;",
+        Keywords: "note;markdown;editor;baseforge;",
       },
     },
     // Linux x64 / arm64 会分两次构建；文件名必须带架构，避免互相覆盖。

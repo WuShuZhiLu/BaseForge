@@ -38,7 +38,7 @@ const originalFetch = window.fetch;
 afterEach(() => {
   clearMobileWebStartupCache();
   window.fetch = originalFetch;
-  delete (window as typeof window & Record<string, unknown>).__nowenMobileWebStartupBridgeInstalled;
+  delete (window as typeof window & Record<string, unknown>).__baseforgeMobileWebStartupBridgeInstalled;
   vi.restoreAllMocks();
 });
 
@@ -110,7 +110,7 @@ describe("mobile web startup fetch coalescing", () => {
     expect(await tagsResponse.json()).toEqual(payload.tags);
     expect(await sharesResponse.json()).toEqual(payload.sharedNoteIds);
     expect(await preferencesResponse.json()).toEqual(payload.preferences);
-    expect(notesResponse.headers.get("X-Nowen-Mobile-Bootstrap")).toBe("web-hit");
+    expect(notesResponse.headers.get("X-BaseForge-Mobile-Bootstrap")).toBe("web-hit");
 
     cleanup?.();
   });

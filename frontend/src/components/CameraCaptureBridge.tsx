@@ -228,7 +228,7 @@ export default function CameraCaptureBridge() {
     setCapturedFile(null);
     setState("idle");
     setError(null);
-    input.dataset.nowenCameraFallback = "1";
+    input.dataset.baseforgeCameraFallback = "1";
     input.removeAttribute("capture");
     pendingInputRef.current = null;
     try {
@@ -236,7 +236,7 @@ export default function CameraCaptureBridge() {
       // is still valid and the native file chooser is not blocked.
       input.click();
     } finally {
-      delete input.dataset.nowenCameraFallback;
+      delete input.dataset.baseforgeCameraFallback;
     }
   }, [releaseStream, resetCapture, revokeCapturedUrl]);
 

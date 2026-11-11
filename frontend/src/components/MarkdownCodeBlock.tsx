@@ -123,7 +123,7 @@ function OrdinaryMarkdownCodeBlock({ className, children, onFormat }: MarkdownCo
           className="code-block-pre max-w-full overflow-x-auto p-4 text-sm leading-6 [tab-size:2]"
           style={collapsed ? { maxHeight: "120px", overflow: "hidden" } : undefined}
         >
-          <code className={cn("code-block-content nowen-code-highlight font-mono text-tx-primary", className)}>{highlighted}</code>
+          <code className={cn("code-block-content baseforge-code-highlight font-mono text-tx-primary", className)}>{highlighted}</code>
         </pre>
         {collapsed && (
           <div

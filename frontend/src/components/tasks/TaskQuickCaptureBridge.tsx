@@ -167,7 +167,7 @@ export default function TaskQuickCaptureBridge() {
     };
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "a") {
-        if (!localStorage.getItem("nowen-token")) return;
+        if (!localStorage.getItem("baseforge-token")) return;
         event.preventDefault();
         openDialog();
       } else if (open && event.key === "Escape") {
@@ -175,10 +175,10 @@ export default function TaskQuickCaptureBridge() {
         setOpen(false);
       }
     };
-    window.addEventListener("nowen:open-task-capture", handleOpen);
+    window.addEventListener("baseforge:open-task-capture", handleOpen);
     window.addEventListener("keydown", handleShortcut);
     return () => {
-      window.removeEventListener("nowen:open-task-capture", handleOpen);
+      window.removeEventListener("baseforge:open-task-capture", handleOpen);
       window.removeEventListener("keydown", handleShortcut);
     };
   }, [open, openDialog]);

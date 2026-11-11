@@ -7,7 +7,7 @@ import { eventPublisher } from "../automation/eventPublisher.js";
 import { ApplicationCommandGateway } from "./applicationCommandGateway.js";
 import { secureExternalFetch } from "../plugins/secureExternalFetch.js";
 
-export const WECHAT_PLUGIN_ID = "nowenlab.wechat-capture";
+export const WECHAT_PLUGIN_ID = "baseforgelab.wechat-capture";
 const CONFIG_KEY = "wechat-assistant";
 const digest = (value: string) => crypto.createHash("sha256").update(value).digest("hex");
 function fail(message: string, status = 400): never { throw Object.assign(new Error(message), { status }); }

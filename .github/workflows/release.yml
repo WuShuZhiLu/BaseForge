@@ -149,8 +149,8 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
@@ -232,8 +232,8 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
@@ -260,7 +260,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signpath-input-${{ github.run_id }}
+          name: baseforge-win-signpath-input-${{ github.run_id }}
           path: signpath-input/*.exe
           if-no-files-found: error
           retention-days: 1
@@ -270,13 +270,11 @@ jobs:
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: "test-signing"
           artifact-configuration-slug: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_signpath_test.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 1800
           output-artifact-directory: signpath-test-signed
@@ -299,7 +297,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signpath-test
+          name: baseforge-win-signpath-test
           path: signpath-test-signed/**/*.exe
           if-no-files-found: error
           retention-days: 14
@@ -317,7 +315,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-full-unsigned-signpath
+          name: baseforge-win-full-unsigned-signpath
           path: |
             dist-electron/*.exe
             dist-electron/*.blockmap
@@ -348,7 +346,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-lite-unsigned-signpath
+          name: baseforge-win-lite-unsigned-signpath
           path: signpath-lite-input/*.exe
           if-no-files-found: error
           retention-days: 14
@@ -358,13 +356,11 @@ jobs:
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_full_unsigned.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: signed-windows/full
@@ -374,13 +370,11 @@ jobs:
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_lite_unsigned.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: signed-windows/lite
@@ -437,7 +431,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signed
+          name: baseforge-win-signed
           path: signed-windows/release/*
           if-no-files-found: error
           retention-days: 14
@@ -447,7 +441,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
-          NOWEN_MAC_ARCH: x64
+          BASEFORGE_MAC_ARCH: x64
           TARGET_ARCH: x64
           npm_config_target_arch: x64
         run: |
@@ -458,7 +452,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
-          NOWEN_MAC_ARCH: arm64
+          BASEFORGE_MAC_ARCH: arm64
           TARGET_ARCH: arm64
           npm_config_target_arch: arm64
         run: |
@@ -562,7 +556,7 @@ jobs:
       - name: Download SignPath-signed Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: nowen-note-win-signed
+          name: baseforge-win-signed
           path: release-assets
 
       - name: Download macOS Lite artifacts

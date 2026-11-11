@@ -22,7 +22,7 @@ type RuntimeClipboard = ImageClipboardPayload & {
   editor: TiptapEditorLike;
 };
 
-const CLIPBOARD_HOST_ATTR = "data-nowen-image-clipboard-slot";
+const CLIPBOARD_HOST_ATTR = "data-baseforge-image-clipboard-slot";
 
 function editorFromDom(dom: HTMLElement | null): TiptapEditorLike | null {
   return (dom as (HTMLElement & { editor?: TiptapEditorLike }) | null)?.editor || null;
@@ -39,7 +39,7 @@ function selectedImageEditor(): TiptapEditorLike | null {
 }
 
 function ensureClipboardHost(): HTMLElement | null {
-  const transformSlot = document.querySelector<HTMLElement>('[data-nowen-image-transform-slot="true"]');
+  const transformSlot = document.querySelector<HTMLElement>('[data-baseforge-image-transform-slot="true"]');
   const panel = transformSlot?.parentElement;
   if (!transformSlot || !panel) return null;
 
@@ -160,12 +160,12 @@ export default function ImageClipboardBridge() {
     const previousOpacity = wrapper.style.opacity;
     const previousOutline = wrapper.style.outline;
     const previousOutlineOffset = wrapper.style.outlineOffset;
-    wrapper.dataset.nowenImageCutPending = "true";
+    wrapper.dataset.baseforgeImageCutPending = "true";
     wrapper.style.opacity = "0.55";
     wrapper.style.outline = "2px dashed var(--color-accent-primary, #3b82f6)";
     wrapper.style.outlineOffset = "3px";
     return () => {
-      delete wrapper.dataset.nowenImageCutPending;
+      delete wrapper.dataset.baseforgeImageCutPending;
       wrapper.style.opacity = previousOpacity;
       wrapper.style.outline = previousOutline;
       wrapper.style.outlineOffset = previousOutlineOffset;
@@ -237,7 +237,7 @@ export default function ImageClipboardBridge() {
     ? createPortal(
         <div
           className="mt-2 grid grid-cols-2 gap-1.5"
-          data-nowen-image-clipboard-actions="true"
+          data-baseforge-image-clipboard-actions="true"
           onMouseDown={(event) => event.preventDefault()}
         >
           <button
@@ -264,7 +264,7 @@ export default function ImageClipboardBridge() {
         <div
           className="fixed left-3 right-3 z-[80] mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-app-border bg-app-elevated px-3 py-2.5 shadow-2xl"
           style={{ bottom: Math.max(12, bottomInset + 12) }}
-          data-nowen-image-clipboard-bar="true"
+          data-baseforge-image-clipboard-bar="true"
           onMouseDown={(event) => event.preventDefault()}
         >
           <div className="min-w-0 flex-1">

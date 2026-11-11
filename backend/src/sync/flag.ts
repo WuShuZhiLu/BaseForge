@@ -29,7 +29,7 @@
  *   - **本地数据一个字都不动** —— 关闭同步不等于删除数据。
  */
 export function isLocalFirstSyncV2Enabled(
-  value = process.env.NOWEN_LOCAL_FIRST_SYNC_V2,
+  value = process.env.BASEFORGE_LOCAL_FIRST_SYNC_V2,
 ): boolean {
   // 严格匹配停用值：避免 "no" / "off" / "disabled" 这类拼写被误判为开启，
   // 也避免空字符串（例如 docker-compose 里写了 KEY= 但没给值）意外关闭。
@@ -44,7 +44,7 @@ export function isLocalFirstSyncV2Enabled(
  * 便于用户反馈时判断是不是配置问题。
  */
 export function isLocalFirstSyncV2ExplicitlyDisabled(
-  value = process.env.NOWEN_LOCAL_FIRST_SYNC_V2,
+  value = process.env.BASEFORGE_LOCAL_FIRST_SYNC_V2,
 ): boolean {
   return value === "0" || value === "false";
 }

@@ -137,7 +137,7 @@ export default function ShortcutSettingsPanel() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `nowen-shortcuts-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `baseforge-shortcuts-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };

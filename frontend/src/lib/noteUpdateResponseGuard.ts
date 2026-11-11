@@ -2,7 +2,7 @@ import type { Note } from "@/types";
 import { api } from "@/lib/api";
 import { NOTE_SYNC_PENDING_EVENT } from "@/lib/noteSyncSafety";
 
-const INSTALL_KEY = "__NOWEN_NOTE_UPDATE_RESPONSE_GUARD_V1__" as const;
+const INSTALL_KEY = "__BASEFORGE_NOTE_UPDATE_RESPONSE_GUARD_V1__" as const;
 
 type GuardedWindow = Window & typeof globalThis & {
   [INSTALL_KEY]?: () => void;

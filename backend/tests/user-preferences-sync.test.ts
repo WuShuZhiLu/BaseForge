@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-user-prefs-sync-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-user-prefs-sync-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 const USER_ID = "prefs-sync-user";

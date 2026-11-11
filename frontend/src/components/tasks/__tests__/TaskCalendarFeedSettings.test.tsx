@@ -33,7 +33,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@/lib/api", () => ({
-  getBaseUrl: () => "http://note.nowen.cn/api",
+  getBaseUrl: () => "http://note.baseforge.cn/api",
   api: {
     taskCalendarFeed: {
       get: vi.fn(),

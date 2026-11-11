@@ -148,7 +148,7 @@ function apiBase(): string {
 
 function loginToken(): string {
   try {
-    return localStorage.getItem("nowen-token") || "";
+    return localStorage.getItem("baseforge-token") || "";
   } catch {
     return "";
   }

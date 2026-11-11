@@ -60,29 +60,29 @@ function preprocessMarkdownMath(markdown: string): string {
   const fencedCode: string[] = [];
   let text = markdown.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, (match) => {
     const index = fencedCode.push(match) - 1;
-    return `\u0000NOWEN_MATH_CODE_${index}\u0000`;
+    return `\u0000BASEFORGE_MATH_CODE_${index}\u0000`;
   });
 
   text = text.replace(/\$\$([\s\S]+?)\$\$/g, (_match, source) => {
     const encoded = encodeURIComponent(String(source).trim());
-    return `\n\n<div data-nowen-math-source="${encoded}" data-nowen-math-display="1"></div>\n\n`;
+    return `\n\n<div data-baseforge-math-source="${encoded}" data-baseforge-math-display="1"></div>\n\n`;
   });
 
   text = text.replace(
     /(^|[^\\$\w])\$([^\s$][^$\n]*?[^\s$]|[^\s$])\$(?=$|[^\w$])/g,
     (_match, prefix, source) => {
       const encoded = encodeURIComponent(String(source));
-      return `${prefix}<span data-nowen-math-source="${encoded}" data-nowen-math-display="0"></span>`;
+      return `${prefix}<span data-baseforge-math-source="${encoded}" data-baseforge-math-display="0"></span>`;
     },
   );
 
-  return text.replace(/\u0000NOWEN_MATH_CODE_(\d+)\u0000/g, (_match, index) => {
+  return text.replace(/\u0000BASEFORGE_MATH_CODE_(\d+)\u0000/g, (_match, index) => {
     return fencedCode[Number(index)] || "";
   });
 }
 
 function getMathSource(props: Record<string, unknown>): string | null {
-  const encoded = props["data-nowen-math-source"] ?? props.dataNowenMathSource;
+  const encoded = props["data-baseforge-math-source"] ?? props.dataBaseForgeMathSource;
   if (typeof encoded !== "string") return null;
   try {
     return decodeURIComponent(encoded);
@@ -111,10 +111,10 @@ export const safeHtmlSchema = {
     ...(defaultSchema.attributes || {}),
     "*": [
       ...((defaultSchema.attributes || {})["*"] || []),
-      "dataNowenMathSource",
-      "dataNowenMathDisplay",
-      "dataNowenTitleMode",
-      "dataNowenBlockEmbed",
+      "dataBaseForgeMathSource",
+      "dataBaseForgeMathDisplay",
+      "dataBaseForgeTitleMode",
+      "dataBaseForgeBlockEmbed",
       "dataCalloutType",
       "dataCalloutTitle",
       "dataCalloutFold",
@@ -229,7 +229,7 @@ function PreviewImage({ src, alt }: { src?: string; alt?: string }) {
   }, [resolvedSrc]);
 
   const openViewer = (image: HTMLImageElement) => {
-    const root = image.closest(".nowen-md-preview");
+    const root = image.closest(".baseforge-md-preview");
     const elements = Array.from(root?.querySelectorAll<HTMLImageElement>("img") || []);
     const images = elements
       .map<FullscreenImageItem>((item) => ({
@@ -274,8 +274,8 @@ function PreviewImage({ src, alt }: { src?: string; alt?: string }) {
 
 function PreviewMediaImage({ src, alt }: { src?: string; alt?: string }) {
   const normalizedAlt = alt || "";
-  if (normalizedAlt.startsWith("nowen-video:")) {
-    return <MarkdownVideoPreview src={src || ""} title={normalizedAlt.slice("nowen-video:".length)} />;
+  if (normalizedAlt.startsWith("baseforge-video:")) {
+    return <MarkdownVideoPreview src={src || ""} title={normalizedAlt.slice("baseforge-video:".length)} />;
   }
   return <PreviewImage src={src} alt={alt} />;
 }
@@ -287,7 +287,7 @@ function PreviewLink({ href, children, onInternalAnchorClick, ...props }: {
   [key: string]: any;
 }) {
   if (href?.startsWith("note:")) {
-    const mode = props["data-nowen-title-mode"] || props.dataNowenTitleMode;
+    const mode = props["data-baseforge-title-mode"] || props.dataBaseForgeTitleMode;
     return <NoteLinkPreviewAnchor href={href} titleMode={mode === "alias" ? "alias" : "auto"}>{children}</NoteLinkPreviewAnchor>;
   }
   if (href?.startsWith("#")) {
@@ -357,7 +357,7 @@ function createComponents(
       // Isolate task text from the checkbox, including when the paragraph is flex.
       return (
         <p {...attrs(node)} className="my-3 leading-7 text-tx-primary">
-          {parts ? <>{parts[0]}<span className="nowen-task-item-text min-w-0 flex-1">{parts.slice(1)}</span></> : children}
+          {parts ? <>{parts[0]}<span className="baseforge-task-item-text min-w-0 flex-1">{parts.slice(1)}</span></> : children}
         </p>
       );
     },
@@ -423,7 +423,7 @@ function createComponents(
     },
     div: ({ children, ...props }) => {
       const source = getMathSource(props);
-      const embedHref = props["data-nowen-block-embed"] ?? props.dataNowenBlockEmbed;
+      const embedHref = props["data-baseforge-block-embed"] ?? props.dataBaseForgeBlockEmbed;
       if (typeof embedHref === "string" && parseMindMapEmbedHref(embedHref)) {
         return <div className="my-4"><MindMapEmbedCard href={embedHref} /></div>;
       }
@@ -466,7 +466,7 @@ function createComponents(
           checked={!!checked}
           readOnly={!onTaskCheckboxChange}
           onChange={(event) => {
-            const root = event.currentTarget.closest("[data-markdown-segment]") || event.currentTarget.closest(".nowen-md-preview");
+            const root = event.currentTarget.closest("[data-markdown-segment]") || event.currentTarget.closest(".baseforge-md-preview");
             const inputs = Array.from(root?.querySelectorAll<HTMLInputElement>("input[type='checkbox']") || []);
             const index = inputs.indexOf(event.currentTarget);
             if (index >= 0) onTaskCheckboxChange?.(taskOffset + index, event.currentTarget.checked);
@@ -597,7 +597,7 @@ export function MarkdownPreview({ markdown, className, compact, containerRef, on
     <div
       ref={setContainerRef}
       className={cn(
-        "nowen-md-preview overflow-y-auto leading-7 text-tx-primary",
+        "baseforge-md-preview overflow-y-auto leading-7 text-tx-primary",
         compact ? "p-4 md:p-6" : "mx-auto max-w-[860px] p-4 md:p-6",
         className,
       )}

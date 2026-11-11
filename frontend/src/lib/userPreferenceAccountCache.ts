@@ -96,13 +96,13 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   showNoteListDividers: false,
 };
 
-export const LEGACY_USER_PREFERENCES_KEY = "nowen.user-prefs.v1";
-export const LEGACY_USER_PREFERENCES_OWNER_KEY = "nowen.user-prefs.v1.migrated-user";
-export const LEGACY_EDITOR_MODE_KEY = "nowen.editor_mode";
-export const LEGACY_CODE_BLOCK_THEME_KEY = "nowen.codeBlockTheme";
-export const LEGACY_NOTE_LIST_TITLE_ONLY_KEY = "nowen.noteList.titleOnly";
-const ACCOUNT_CACHE_PREFIX = "nowen.user-prefs.v2:";
-const LEGACY_SHOW_TIME_KEY = "nowen.noteList.showTime";
+export const LEGACY_USER_PREFERENCES_KEY = "baseforge.user-prefs.v1";
+export const LEGACY_USER_PREFERENCES_OWNER_KEY = "baseforge.user-prefs.v1.migrated-user";
+export const LEGACY_EDITOR_MODE_KEY = "baseforge.editor_mode";
+export const LEGACY_CODE_BLOCK_THEME_KEY = "baseforge.codeBlockTheme";
+export const LEGACY_NOTE_LIST_TITLE_ONLY_KEY = "baseforge.noteList.titleOnly";
+const ACCOUNT_CACHE_PREFIX = "baseforge.user-prefs.v2:";
+const LEGACY_SHOW_TIME_KEY = "baseforge.noteList.showTime";
 
 const PREFERENCE_KEYS = Object.keys(DEFAULT_USER_PREFERENCES) as Array<keyof UserPreferences>;
 const CODE_BLOCK_THEMES = new Set<CodeBlockThemeId>([

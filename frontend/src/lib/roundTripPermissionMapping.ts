@@ -12,7 +12,7 @@ export interface RoundTripPermissionMember {
 }
 
 export interface RoundTripPermissionsManifest {
-  format: "nowen-workspace-permissions";
+  format: "baseforge-workspace-permissions";
   version: 1;
   exportedAt: string;
   sourceWorkspace: { id: string; name: string };
@@ -32,7 +32,7 @@ export interface PermissionMappingSuggestion {
 }
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -48,7 +48,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return payload;
 }
 
-export async function downloadNowenPackageWithPermissions(workspaceId: string): Promise<{ blob: Blob; filename: string }> {
+export async function downloadBaseForgePackageWithPermissions(workspaceId: string): Promise<{ blob: Blob; filename: string }> {
   const params = new URLSearchParams({ workspaceId });
   const response = await fetch(`${getBaseUrl()}/settings/roundtrip-permissions/package?${params}`, {
     credentials: "include",
@@ -56,7 +56,7 @@ export async function downloadNowenPackageWithPermissions(workspaceId: string): 
   });
   if (!response.ok) await parseResponse(response);
   const disposition = response.headers.get("content-disposition") || "";
-  const encoded = /filename="([^"]+)"/.exec(disposition)?.[1] || "nowen-workspace-with-permissions.zip";
+  const encoded = /filename="([^"]+)"/.exec(disposition)?.[1] || "baseforge-workspace-with-permissions.zip";
   let filename = encoded;
   try { filename = decodeURIComponent(encoded); } catch { /* keep encoded fallback */ }
   return { blob: await response.blob(), filename };

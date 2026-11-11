@@ -18,14 +18,14 @@ const outputPath = resolve(
 
 const lines = [
   "# CodeBuddy Chat Conversation",
-  "_Generated privacy-safe performance fixture for nowen-note._",
+  "_Generated privacy-safe performance fixture for baseforge._",
   "",
   "**User**",
   "",
   "<user_info>",
   "OS Version: win32",
   "Shell: PowerShell",
-  "Workspace Folder: c:/UGit/nowen-note",
+  "Workspace Folder: c:/UGit/baseforge",
   "</user_info>",
   "",
 ];
@@ -43,7 +43,7 @@ for (let index = 0; index < TOOL_CALLS; index += 1) {
   }
   lines.push("🔧 **Tool Call**: replace_in_file");
   lines.push(
-    `Arguments: {"filePath":"c:/UGit/nowen-note/frontend/src/components/Fixture${index % 37}.tsx","old_str":"${"old-value-".repeat(16)}","new_str":"${"new-value-".repeat(18)}"}`,
+    `Arguments: {"filePath":"c:/UGit/baseforge/frontend/src/components/Fixture${index % 37}.tsx","old_str":"${"old-value-".repeat(16)}","new_str":"${"new-value-".repeat(18)}"}`,
   );
   lines.push(`<tool_result id="${index}">ok</tool_result>`);
   htmlTags += 2;

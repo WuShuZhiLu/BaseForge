@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-knowledge-tree-registry-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-knowledge-tree-registry-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 

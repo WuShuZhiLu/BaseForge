@@ -28,7 +28,7 @@ const allowedChannels = new Set([
   "ugreen:auth-cancelled",
 ]);
 
-contextBridge.exposeInMainWorld("nowenDesktop", {
+contextBridge.exposeInMainWorld("baseforgeDesktop", {
   /**
    * 订阅主进程事件。返回反注册函数。
    * @param {string} channel 频道名（必须在 allowedChannels 白名单中）
@@ -214,7 +214,7 @@ contextBridge.exposeInMainWorld("nowenDesktop", {
    * true 表示这份安装包里没有打包 backend，无法切回 full 模式，前端应隐藏
    * "切回本地模式"等入口，登录页默认强制客户端模式。
    */
-  isLiteOnly: (process.argv || []).includes("--nowen-lite-only"),
+  isLiteOnly: (process.argv || []).includes("--baseforge-lite-only"),
 
   /**
    * 发布渠道标识（AboutPanel 展示用）：
@@ -223,7 +223,7 @@ contextBridge.exposeInMainWorld("nowenDesktop", {
    * 与 builder.config.js / builder.lite.config.js 里的 publish.channel 对齐。
    * 前端可以据此在 "关于" 页展示 "发布渠道：lite"，方便排查"为什么我升不上 full"。
    */
-  releaseChannel: (process.argv || []).includes("--nowen-lite-only") ? "lite" : "latest",
+  releaseChannel: (process.argv || []).includes("--baseforge-lite-only") ? "lite" : "latest",
 
   /**
    * 是否运行在 portable / 免安装版下。
@@ -307,7 +307,7 @@ contextBridge.exposeInMainWorld("nowenDesktop", {
 
   /**
    * 局域网服务发现（mDNS）：
-   *   - start():  启动扫描 _nowen-note._tcp.local.；返回 { ok, available }
+   *   - start():  启动扫描 _baseforge._tcp.local.；返回 { ok, available }
    *                available=false 表示主进程缺 bonjour-service 依赖（不会报错，前端
    *                仅显示"未发现"）
    *   - stop():   停止扫描并取消订阅
@@ -369,7 +369,7 @@ contextBridge.exposeInMainWorld("nowenDesktop", {
    * Phase A: 桌面零登录入口。
    *
    *   getLocalAuth():   { token, user } | null
-   *     启动后 renderer 第一时间调它；非 null 则直接写入 localStorage("nowen-token")
+   *     启动后 renderer 第一时间调它；非 null 则直接写入 localStorage("baseforge-token")
    *     并跳过登录页。lite 模式 / 失败时返回 null。
    *
    *   clearLocalAuth(): 用户在 App 内切换到云账号时调；仅清掉主进程里的内存缓存，

@@ -118,7 +118,7 @@ describe("resolveNoteConflict", () => {
   });
 
   it("局部密文队列不能自动解决，服务器新增区域也不能被自动覆盖", async () => {
-    const content = `\`\`\`nowen-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
+    const content = `\`\`\`baseforge-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
     const item = conflictItem({ body: { content, contentFormat: "markdown" }, localPayload: null });
     expect((await resolveQueuedNoteConflicts([item])).attempted).toBe(0);
     expect(apiMock.getNote).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe("resolveNoteConflict", () => {
   });
 
   it("明确保留本机区域时使用完整密文，忽略普通草稿缓存", async () => {
-    const content = `\`\`\`nowen-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
+    const content = `\`\`\`baseforge-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
     const remote = remoteNote({ content, contentText: "" });
     apiMock.getNote.mockResolvedValue(remote);
     loadDraft.mockReturnValue({ content: "stale public draft", contentText: "stale public draft" });
@@ -228,7 +228,7 @@ describe("resolveNoteConflict", () => {
     });
     apiMock.createNoteConfirmed.mockResolvedValue(copy);
     const resolvedEvents = vi.fn();
-    window.addEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.addEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
 
     await expect(resolveQueuedNoteConflicts([older, newer])).resolves.toEqual({
       attempted: 1,
@@ -253,7 +253,7 @@ describe("resolveNoteConflict", () => {
         }),
       }),
     }));
-    window.removeEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.removeEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
   });
 
   it("emits the exact draft payload copied before conflict cleanup", async () => {
@@ -270,7 +270,7 @@ describe("resolveNoteConflict", () => {
     clearDraft.mockImplementationOnce(() => loadDraft.mockReturnValue(null));
     apiMock.createNoteConfirmed.mockResolvedValue(remoteNote({ id: "copy-1", version: 1 }));
     const resolvedEvents = vi.fn();
-    window.addEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.addEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
 
     await resolveQueuedNoteConflicts([conflictItem()]);
 
@@ -283,7 +283,7 @@ describe("resolveNoteConflict", () => {
         resolvedLocal: expect.objectContaining({ content: "防抖草稿正文" }),
       }),
     }));
-    window.removeEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.removeEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
   });
 
   it("creates a recoverable conflict copy with a stable id before accepting the server version", async () => {
@@ -436,15 +436,15 @@ describe("resolveNoteConflict", () => {
     const item = conflictItem();
     getQueue.mockReturnValue([item]);
     const queuedEvents = vi.fn();
-    window.addEventListener("nowen:offline-queued", queuedEvents);
+    window.addEventListener("baseforge:offline-queued", queuedEvents);
 
-    window.dispatchEvent(new CustomEvent("nowen:note-sync-pending", {
+    window.dispatchEvent(new CustomEvent("baseforge:note-sync-pending", {
       detail: { noteId: "note-1", queued: true },
     }));
     vi.runAllTimers();
 
     expect(queuedEvents).toHaveBeenCalledTimes(2);
-    window.removeEventListener("nowen:offline-queued", queuedEvents);
+    window.removeEventListener("baseforge:offline-queued", queuedEvents);
     vi.useRealTimers();
   });
 });

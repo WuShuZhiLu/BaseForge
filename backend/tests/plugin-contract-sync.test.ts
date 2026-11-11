@@ -15,7 +15,7 @@ import { EXTENSION_CAPABILITY_CATALOG } from "../src/plugins/capabilityCatalog.g
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
 const contract = JSON.parse(
-  readFileSync(path.join(rootDir, "packages", "nowen-plugin-sdk", "contribution-contract.json"), "utf8"),
+  readFileSync(path.join(rootDir, "packages", "baseforge-plugin-sdk", "contribution-contract.json"), "utf8"),
 ) as {
   contractVersion: number
   namespaceTemplate: string

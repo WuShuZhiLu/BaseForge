@@ -11,7 +11,7 @@ describe("aiProfiles client", () => {
 
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("nowen-token", "token-1");
+    localStorage.setItem("baseforge-token", "token-1");
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
   });

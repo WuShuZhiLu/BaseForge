@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-content-view-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-content-view-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -70,7 +70,7 @@ test("ordinary Note REST responses are clean while the trusted media type retain
   const internalGet = await app.request(`/api/notes/${publicCreated.id}`, {
     headers: {
       "X-User-Id": owner,
-      "Accept": "application/vnd.nowen.internal-note+json",
+      "Accept": "application/vnd.baseforge.internal-note+json",
     },
   });
   assert.equal(internalGet.status, 200);

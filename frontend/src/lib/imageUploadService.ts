@@ -45,7 +45,7 @@ function isDesktopFullLocalRuntime(): boolean {
   if (typeof window === "undefined") return false;
   return isElectronFullLocalRuntime(
     getServerUrl(),
-    Boolean((window as any).nowenDesktop?.isDesktop),
+    Boolean((window as any).baseforgeDesktop?.isDesktop),
   );
 }
 

@@ -153,7 +153,7 @@ describe("useAttachmentImageRenderSource", () => {
   });
 
   it("holds unsigned images until access arrives and shares one request across the note", async () => {
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     let finish!: (response: Response) => void;
     const fetch = vi.fn((_url: RequestInfo | URL) => new Promise<Response>((resolve) => { finish = resolve; }));
     vi.stubGlobal("fetch", fetch);
@@ -169,7 +169,7 @@ describe("useAttachmentImageRenderSource", () => {
   });
 
   it("recovers a transient first authorization failure without a page refresh", async () => {
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     const fetch = vi.fn().mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ urls: { [ATTACHMENT_ID]: `/api/attachments/${ATTACHMENT_ID}?exp=2000000000&sig=recovered&scope=v2.scope` } }), { status: 200 }));
     vi.stubGlobal("fetch", fetch);
@@ -179,7 +179,7 @@ describe("useAttachmentImageRenderSource", () => {
   });
 
   it.each([403, 404])("does not retry authorization denial (%s) or issue an unsigned image request", async (status) => {
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     const fetch = vi.fn().mockResolvedValue(new Response("denied", { status }));
     vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(<AttachmentNoteContext.Provider value="note-1"><Probe src={`/api/attachments/${ATTACHMENT_ID}`}/></AttachmentNoteContext.Provider>));
@@ -190,7 +190,7 @@ describe("useAttachmentImageRenderSource", () => {
   });
 
   it("stops after one retry when authorization remains unavailable", async () => {
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     const fetch = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
     vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(<AttachmentNoteContext.Provider value="note-1"><Probe src={`/api/attachments/${ATTACHMENT_ID}`}/></AttachmentNoteContext.Provider>));
@@ -201,7 +201,7 @@ describe("useAttachmentImageRenderSource", () => {
   });
 
   it("keeps authorization scoped to each editor when two notes are open", async () => {
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     const fetch = vi.fn(async (url: string) => {
       const note = new URL(url).searchParams.get("noteId")!;
       return new Response(JSON.stringify({ urls: { [ATTACHMENT_ID]: `/api/attachments/${ATTACHMENT_ID}?exp=2000000000&sig=${note}&scope=v2.scope` } }), { status: 200 });

@@ -43,7 +43,7 @@ function currentWorkspaceId(): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
@@ -109,7 +109,7 @@ export async function removeTaskFromInbox(
 }
 
 export function publishTaskInboxChanged(detail?: { taskId?: string; count?: number }): void {
-  window.dispatchEvent(new CustomEvent("nowen:task-inbox-changed", { detail }));
+  window.dispatchEvent(new CustomEvent("baseforge:task-inbox-changed", { detail }));
 }
 
 export function openTaskQuickCapture(detail?: {
@@ -119,5 +119,5 @@ export function openTaskQuickCapture(detail?: {
   sourceTitle?: string | null;
   noteId?: string | null;
 }): void {
-  window.dispatchEvent(new CustomEvent("nowen:open-task-capture", { detail }));
+  window.dispatchEvent(new CustomEvent("baseforge:open-task-capture", { detail }));
 }

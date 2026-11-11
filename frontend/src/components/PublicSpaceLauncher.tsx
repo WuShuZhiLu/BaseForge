@@ -12,7 +12,7 @@ import { useKeyboardVisible } from "@/hooks/useKeyboardVisible";
 import { navigateToAppPath } from "@/lib/appPathNavigation";
 
 const LEGACY_TRANSFER_TRIGGER = 'button[aria-label="跨空间转移笔记"]';
-const RAIL_MOUNT_ATTRIBUTE = "data-nowen-space-actions-mount";
+const RAIL_MOUNT_ATTRIBUTE = "data-baseforge-space-actions-mount";
 const RAIL_ICON_SIZE = 18;
 
 type RailMount = {
@@ -209,7 +209,7 @@ export default function PublicSpaceLauncher() {
         return;
       }
 
-      window.dispatchEvent(new CustomEvent("nowen:open-note-transfer"));
+      window.dispatchEvent(new CustomEvent("baseforge:open-note-transfer"));
     });
   };
 

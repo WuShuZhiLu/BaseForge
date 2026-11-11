@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-shared-attachment-access-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-shared-attachment-access-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_LEGACY_PUBLIC_URL = "false";

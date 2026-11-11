@@ -14,7 +14,7 @@ afterEach(() => {
 describe("mobile local mind map module bridge", () => {
   it("hides trashed maps without removing their source rows", async () => {
     (window as Window & { Capacitor?: unknown }).Capacitor = { platform: "android" };
-    localStorage.setItem("nowen-mobile-force-local-mode", "1");
+    localStorage.setItem("baseforge-mobile-force-local-mode", "1");
     let map: {
       id: string; userId: string; workspaceId: null; title: string; data: string; starred: number;
       folderId: null; createdAt: string; updatedAt: string;

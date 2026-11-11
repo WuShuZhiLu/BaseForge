@@ -10,7 +10,7 @@ import { ensureNormalizedSearchFts } from "../lib/searchIndex.js";
 import { requireSqliteVecForStoredTables } from "./sqlite-vec-extension.js";
 
 const DB_FILE_NAME = "baseforge.db";
-/** 旧版本的主库文件名；首次以新名启动时原样改名，避免看起来丢数据 */
+/** 旧版本主库文件名：仅在新库不存在时接管，避免看起来丢数据 */
 const LEGACY_DB_FILE_NAME = "nowen-note.db";
 
 function resolveDefaultDbPath(): string {
@@ -33,11 +33,12 @@ function adoptLegacyDatabaseFile(dbPath: string): void {
   }
 }
 
+
 const DB_PATH = process.env.DB_PATH || resolveDefaultDbPath();
 adoptLegacyDatabaseFile(DB_PATH);
 assertSafeTestDatabasePath(DB_PATH);
 
-const DB_REGISTRY_KEY = Symbol.for("nowen-note.sqlite-database-registry");
+const DB_REGISTRY_KEY = Symbol.for("baseforge.sqlite-database-registry");
 const globalState = globalThis as typeof globalThis & {
   [DB_REGISTRY_KEY]?: Map<string, DatabaseSync>;
 };

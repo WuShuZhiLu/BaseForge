@@ -1,4 +1,4 @@
-[data-nowen-knowledge-tree="embedded"] .knowledge-tree-markdown-drop-target {
+[data-baseforge-knowledge-tree="embedded"] .knowledge-tree-markdown-drop-target {
   background: rgba(99, 102, 241, 0.12) !important;
   background: color-mix(in srgb, var(--accent-primary, #6366f1) 14%, transparent) !important;
   box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.75);
@@ -6,7 +6,7 @@
   color: var(--tx-primary, inherit);
 }
 
-[data-nowen-knowledge-tree="embedded"] .knowledge-tree-markdown-drop-target::after {
+[data-baseforge-knowledge-tree="embedded"] .knowledge-tree-markdown-drop-target::after {
   content: "拖放 Markdown 到这里";
   position: absolute;
   right: 6px;

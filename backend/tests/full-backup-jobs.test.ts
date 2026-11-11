@@ -44,7 +44,7 @@ test("完整备份任务立即返回任务 ID，并复用尚未完成的任务",
 
   result.resolve({
     id: "backup-id",
-    filename: "nowen-backup-full-test.zip",
+    filename: "baseforge-backup-full-test.zip",
     size: 123,
     type: "full",
     createdAt: "2026-08-14T00:00:00.000Z",
@@ -55,7 +55,7 @@ test("完整备份任务立即返回任务 ID，并复用尚未完成的任务",
   await waitForState(jobs, first.id, "ready");
 
   const completed = jobs.get(first.id);
-  assert.equal(completed?.backup?.filename, "nowen-backup-full-test.zip");
+  assert.equal(completed?.backup?.filename, "baseforge-backup-full-test.zip");
   assert.equal(completed?.message, "完整备份已生成");
   assert.match(completed?.downloadToken || "", /^[a-f0-9]{64}$/);
   assert.equal(jobs.getByDownloadToken(completed?.downloadToken || "")?.id, first.id);
@@ -82,7 +82,7 @@ test("完整备份后台失败时保留可读错误", async () => {
 
 test("unrecognized backend exception is redacted from backup job snapshot", async () => {
   const jobs = new FullBackupJobStore(async () => {
-    throw new Error("password=secret /srv/private/nowen-note.db");
+    throw new Error("password=secret /srv/private/baseforge.db");
   });
   const job = jobs.start();
   await waitForState(jobs, job.id, "error");

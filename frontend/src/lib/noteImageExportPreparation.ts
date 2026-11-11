@@ -223,7 +223,7 @@ export async function refreshNoteImageAttachmentAccess(
     return 0;
   }
 
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   if (!token) return 0;
 
   const requestUrl = `${getBaseUrl()}/attachments/access/urls?noteId=${encodeURIComponent(noteId)}`;

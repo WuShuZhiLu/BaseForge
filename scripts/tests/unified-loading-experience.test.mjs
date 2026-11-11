@@ -15,7 +15,7 @@ test("cold start has one delayed branded loading surface", async () => {
   const html = await readRepoFile("frontend/index.html")
 
   assert.equal((html.match(/id="app-boot-splash"/g) || []).length, 1)
-  assert.match(html, /__NOWEN_BOOT_REVEAL_TIMER__\s*=\s*window\.setTimeout/)
+  assert.match(html, /__BASEFORGE_BOOT_REVEAL_TIMER__\s*=\s*window\.setTimeout/)
   assert.match(html, /},\s*260\);/)
   assert.match(html, /正在恢复你的工作区…/)
   assert.doesNotMatch(html, /正在加载你的笔记/)
@@ -51,10 +51,10 @@ test("workspace and note loading use structural local feedback", async () => {
     readRepoFile("frontend/src/components/NoteLoadingSkeleton.tsx"),
   ])
 
-  assert.match(css, /data-nowen-knowledge-tree/)
-  assert.match(css, /nowen-tree-skeleton-pulse/)
+  assert.match(css, /data-baseforge-knowledge-tree/)
+  assert.match(css, /baseforge-tree-skeleton-pulse/)
   assert.match(css, /data-note-loading-state="loading"/)
-  assert.match(css, /nowen-note-progress/)
+  assert.match(css, /baseforge-progress/)
   assert.match(treePanel, /className="flex justify-center py-14"/)
   assert.match(noteSkeleton, /data-note-loading-state=/)
 })

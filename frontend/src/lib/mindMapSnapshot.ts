@@ -295,7 +295,7 @@ export function mindMapSnapshotToSvg(
 ): string {
   const byId = new Map(snapshot.nodes.map((node) => [node.id, node]));
   const background = options.background ? safeColor(options.background, "#ffffff") : "";
-  const className = escapeXml(options.className || "nowen-mindmap-snapshot");
+  const className = escapeXml(options.className || "baseforge-mindmap-snapshot");
   const title = escapeXml(options.title || "思维导图");
 
   const boundaries = snapshot.boundaries.map((boundary) => {
@@ -340,7 +340,7 @@ export function mindMapSnapshotToSvg(
     return `<g data-mindmap-node-id="${escapeXml(node.id)}"><title>${escapeXml(node.text)}</title><rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="11" fill="${color.bg}" stroke="${color.border}" stroke-width="1"/><text x="${textX}" y="${textY}" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="${fontSize}" font-weight="${fontWeight}" fill="${color.text}">${escapeXml(displayText(node))}</text></g>`;
   }).join("");
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" class="${className}" data-nowen-mindmap-snapshot="1" role="img" aria-label="${title}" viewBox="${snapshot.viewBox}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">${background ? `<rect x="${snapshot.bounds.minX}" y="${snapshot.bounds.minY}" width="${snapshot.bounds.width}" height="${snapshot.bounds.height}" fill="${background}"/>` : ""}<title>${title}</title>${boundaries}${edges}${relations}${nodes}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="${className}" data-baseforge-mindmap-snapshot="1" role="img" aria-label="${title}" viewBox="${snapshot.viewBox}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%">${background ? `<rect x="${snapshot.bounds.minX}" y="${snapshot.bounds.minY}" width="${snapshot.bounds.width}" height="${snapshot.bounds.height}" fill="${background}"/>` : ""}<title>${title}</title>${boundaries}${edges}${relations}${nodes}</svg>`;
 }
 
 export function parseMindMapSnapshotData(raw: string): MindMapData | null {

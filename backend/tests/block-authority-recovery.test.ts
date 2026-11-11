@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-authority-recovery-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-authority-recovery-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -76,7 +76,7 @@ test("recovery synchronizes healthy notes and preserves invalid note snapshots",
 });
 
 test("legacy notes declaring tiptap-json but holding HTML recover without mismatch", async () => {
-  // nowen 早期版本把 HTML 直接写进 notes.content，contentFormat 走了列默认值
+  // baseforge 早期版本把 HTML 直接写进 notes.content，contentFormat 走了列默认值
   // 'tiptap-json'（真实整库导出包里 56 篇有 52 篇如此）。这类笔记若按声明格式
   // JSON.parse 必然失败，导入后每篇都被标成 block 权威 mismatch，且 contentText
   // 为空导致搜索不到。恢复流程必须按内容形态判定，并派生文本写回。

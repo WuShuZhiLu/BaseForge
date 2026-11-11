@@ -11,7 +11,7 @@ const packageWithCompletion = {
   format: TASK_BACKUP_FORMAT,
   version: 1,
   exportedAt: "2026-07-13T00:00:00.000Z",
-  source: { workspace: "personal", app: "nowen-note" },
+  source: { workspace: "personal", app: "baseforge" },
   data: {
     projects: [],
     tasks: [{

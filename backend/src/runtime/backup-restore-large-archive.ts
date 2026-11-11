@@ -24,7 +24,7 @@ import { mergeRootDocumentsIntoNotebook } from "../services/knowledgeTreeRootDoc
 
 const unzipper = require("unzipper");
 
-const PATCH_FLAG = Symbol.for("nowen.backupLargeArchiveRestore.patched");
+const PATCH_FLAG = Symbol.for("baseforge.backupLargeArchiveRestore.patched");
 // backup.ts 当前格式版本。运行时补丁只接管 v2+ ZIP，不改变旧 JSON/db-only 语义。
 const BACKUP_FORMAT_VERSION = 2;
 const MAX_META_BYTES = 2 * 1024 * 1024;
@@ -253,15 +253,15 @@ function verifyCurrentDbUsable(curDbPath: string): void {
   // Use a SAVEPOINT-backed write probe so permissions/read-only mounts fail before restore
   // is committed, while the probe leaves no persistent row behind.
   try {
-    current.exec("SAVEPOINT nowen_restore_write_probe");
+    current.exec("SAVEPOINT baseforge_restore_write_probe");
     current.prepare(
       `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)`,
     ).run("backup:restore-write-probe", String(Date.now()));
-    current.exec("ROLLBACK TO nowen_restore_write_probe");
-    current.exec("RELEASE nowen_restore_write_probe");
+    current.exec("ROLLBACK TO baseforge_restore_write_probe");
+    current.exec("RELEASE baseforge_restore_write_probe");
   } catch (error) {
-    try { current.exec("ROLLBACK TO nowen_restore_write_probe"); } catch { /* ignore */ }
-    try { current.exec("RELEASE nowen_restore_write_probe"); } catch { /* ignore */ }
+    try { current.exec("ROLLBACK TO baseforge_restore_write_probe"); } catch { /* ignore */ }
+    try { current.exec("RELEASE baseforge_restore_write_probe"); } catch { /* ignore */ }
     throw new Error(
       "恢复后数据库写入检查失败: " + (error instanceof Error ? error.message : String(error)),
     );
@@ -346,7 +346,7 @@ async function buildDryRun(
 ): Promise<RestoreResult> {
   const tmpDb = path.join(
     manager.backupDir,
-    `.nowen-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
+    `.baseforge-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
   );
 
   try {
@@ -411,8 +411,8 @@ async function restoreZipStreaming(
   }
 
   const restoreId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-  const tmpDb = path.join(manager.backupDir, `.nowen-restore-${restoreId}.db`);
-  const stagingRoot = path.join(manager.dataDir, `.nowen-restore-staging-${restoreId}`);
+  const tmpDb = path.join(manager.backupDir, `.baseforge-restore-${restoreId}.db`);
+  const stagingRoot = path.join(manager.dataDir, `.baseforge-restore-staging-${restoreId}`);
   const stagedAttachments = path.join(stagingRoot, "attachments");
   const stagedFonts = path.join(stagingRoot, "fonts");
   const hasInstalledLayout = directory.files.some((entry) => normalizeZipPath(entry.path).startsWith("plugins/installed/"));

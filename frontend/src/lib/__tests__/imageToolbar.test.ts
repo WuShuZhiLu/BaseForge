@@ -82,7 +82,7 @@ describe("imageToolbar", () => {
     expect(getImageDownloadFilename({ alt: "  替代文本  " })).toBe("替代文本");
 
     vi.setSystemTime(new Date("2026-07-08T00:00:00Z"));
-    expect(getImageDownloadFilename({})).toBe("nowen-image-1783468800000");
+    expect(getImageDownloadFilename({})).toBe("baseforge-image-1783468800000");
     vi.useRealTimers();
   });
 

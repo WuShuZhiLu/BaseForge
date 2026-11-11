@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  *
  * 明细功能：切换 / 关闭页签、右键关闭其他/全部、图标态（置顶/锁定/Markdown/收藏）。
  * 打开笔记统一走 useTabNoteOpener（加载协调器链路，与深链/列表一致）。
- * 监听 nowen:sidebar-panel-refresh 以响应壳头 ⟳。
+ * 监听 baseforge:sidebar-panel-refresh 以响应壳头 ⟳。
  */
 
 export default function OpenEditorsPanel() {
@@ -27,8 +27,8 @@ export default function OpenEditorsPanel() {
       if (detail?.panelId && detail.panelId !== "openEditors") return;
       setRefreshToken((n) => n + 1);
     };
-    window.addEventListener("nowen:sidebar-panel-refresh", onRefresh);
-    return () => window.removeEventListener("nowen:sidebar-panel-refresh", onRefresh);
+    window.addEventListener("baseforge:sidebar-panel-refresh", onRefresh);
+    return () => window.removeEventListener("baseforge:sidebar-panel-refresh", onRefresh);
   }, []);
 
   useEffect(() => {

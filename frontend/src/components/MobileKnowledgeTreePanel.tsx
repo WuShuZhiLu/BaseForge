@@ -112,8 +112,8 @@ import { cn } from "@/lib/utils";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { NodeIcon } from "@/lib/nodeIcons";
 
-const FOCUS_KNOWLEDGE_TREE_EVENT = "nowen:focus-knowledge-tree";
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const FOCUS_KNOWLEDGE_TREE_EVENT = "baseforge:focus-knowledge-tree";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 type MobileView = "recent" | "browse";
 type QuickTreeVisibleDepth = 1 | 2 | 3 | "all";
@@ -375,10 +375,10 @@ export default function MobileKnowledgeTreePanel({
 
   useEffect(() => {
     const refresh = () => void reload();
-    window.addEventListener("nowen:workspace-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
     window.addEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
       window.removeEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     };
   }, [reload]);
@@ -1205,8 +1205,8 @@ rememberOpened(created.id);
     <section
       ref={rootRef}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col"
-      data-nowen-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}
-      data-nowen-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}
+      data-baseforge-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}
+      data-baseforge-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}
       data-knowledge-tree-compact-toolbar={compactToolbar ? "true" : "false"}
     >
       <div className={cn("px-2 pb-2", variant === "mobile" && "pt-2")}>

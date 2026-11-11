@@ -17,18 +17,18 @@ test("同一秒创建的备份仍使用不同文件名", () => {
   const first = createBackupFilename("full", "11111111-1111-4111-8111-111111111111", now);
   const second = createBackupFilename("full", "22222222-2222-4222-8222-222222222222", now);
   assert.notEqual(first, second);
-  assert.match(first, /^nowen-backup-full-2026-08-14T02-00-00-[a-f0-9]{8}\.zip$/);
+  assert.match(first, /^baseforge-backup-full-2026-08-14T02-00-00-[a-f0-9]{8}\.zip$/);
 });
 
 test("完整备份创建时不会把附件或最终 ZIP 整包读入内存", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-full-backup-streaming-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-full-backup-streaming-"));
   const dataDir = path.join(root, "data");
   const backupDir = path.join(root, "backups");
   const attachmentDir = path.join(dataDir, "attachments");
   const attachmentPath = path.join(attachmentDir, "sample.bin");
   const studioProjectPath = path.join(dataDir, "plugin-projects", "draft-project", "src", "index.ts");
   const dbPath = path.join(root, "db.sqlite");
-  const zipPath = path.join(backupDir, "nowen-backup-full-test.zip");
+  const zipPath = path.join(backupDir, "baseforge-backup-full-test.zip");
   fs.mkdirSync(attachmentDir, { recursive: true });
   fs.mkdirSync(backupDir, { recursive: true });
   fs.writeFileSync(attachmentPath, Buffer.alloc(256 * 1024, 0x5a));
@@ -73,7 +73,7 @@ test("完整备份创建时不会把附件或最终 ZIP 整包读入内存", asy
 });
 
 test("普通数据库备份会移除 Plugin Studio 项目记录", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-studio-backup-scrub-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-studio-backup-scrub-"));
   const dbPath = path.join(root, "backup.db");
   const db = new DatabaseSync(dbPath);
   db.exec(`

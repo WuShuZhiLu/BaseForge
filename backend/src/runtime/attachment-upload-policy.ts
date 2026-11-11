@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.attachmentUploadPolicy.routePatch");
-const APP_INSTALLED_FLAG = Symbol.for("nowen.attachmentUploadPolicy.appInstalled");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.attachmentUploadPolicy.routePatch");
+const APP_INSTALLED_FLAG = Symbol.for("baseforge.attachmentUploadPolicy.appInstalled");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 export const DEFAULT_MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024;

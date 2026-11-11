@@ -152,7 +152,7 @@ describe("loadNoteCacheFirst", () => {
 
   it("does not show Android IDB content before the Native folder password check succeeds", async () => {
     Object.assign(window, { Capacitor: { isNativePlatform: () => true, getPlatform: () => "android" } });
-    localStorage.setItem("nowen-token", "signed-in");
+    localStorage.setItem("baseforge-token", "signed-in");
     localStore.getNote.mockResolvedValue(makeNote());
     const denied = Object.assign(new Error("folder locked"), { code: "FOLDER_UNLOCK_REQUIRED", status: 403 });
     const fetchRemote = vi.fn().mockRejectedValue(denied);
@@ -163,7 +163,7 @@ describe("loadNoteCacheFirst", () => {
 
   it("does not let a pending encrypted-note mutation bypass Android folder access", async () => {
     Object.assign(window, { Capacitor: { isNativePlatform: () => true, getPlatform: () => "android" } });
-    localStorage.setItem("nowen-token", "signed-in");
+    localStorage.setItem("baseforge-token", "signed-in");
     const pending = makeNote({ content: JSON.stringify(encryptedFixture.envelope), contentFormat: "encrypted-note-v1" });
     enqueue({ type: "updateNote", noteId: pending.id, method: "PUT", url: "/notes/note-1", body: { ...pending } });
     const denied = new Error("folder locked");

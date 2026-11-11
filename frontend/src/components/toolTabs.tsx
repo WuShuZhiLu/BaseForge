@@ -47,7 +47,7 @@ export function useToolPageNavigation() {
  * 工具页作为页签挂载时不得调用 actions.setViewMode（会顶掉主区），
  * 需要「打开某篇笔记」「关闭自己」「切回笔记工作区」时派发本事件，由 ToolPageHost 翻译。
  */
-export const TOOL_PAGE_NAVIGATE_EVENT = "nowen:tool-page-navigate";
+export const TOOL_PAGE_NAVIGATE_EVENT = "baseforge:tool-page-navigate";
 
 export type ToolPageNavigateDetail =
   | { kind: "note"; noteId: string }

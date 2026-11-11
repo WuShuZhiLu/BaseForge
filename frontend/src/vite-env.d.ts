@@ -20,5 +20,5 @@ interface ImportMeta {
 }
 
 interface Window {
-  __NOWEN_EDITOR_PERF__?: import("./lib/editorPerformanceHarness").EditorPerformanceGlobalEntry;
+  __BASEFORGE_EDITOR_PERF__?: import("./lib/editorPerformanceHarness").EditorPerformanceGlobalEntry;
 }

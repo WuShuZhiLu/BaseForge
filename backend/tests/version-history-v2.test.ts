@@ -6,7 +6,7 @@ import fs from "node:fs";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-versions-v2-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-versions-v2-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.VERSION_SNAPSHOT_TIMER_DISABLED = "1";
 

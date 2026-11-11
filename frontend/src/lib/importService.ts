@@ -40,9 +40,9 @@ export type {
 } from "./importService.base";
 
 type RoundTripImportFile = ImportFileInfo & {
-  __nowenRoundTripPackage?: File;
-  __nowenPackageVersion?: number;
-  __nowenPackageKind?: string;
+  __baseforgeRoundTripPackage?: File;
+  __baseforgePackageVersion?: number;
+  __baseforgePackageKind?: string;
 };
 
 export interface PackageManifestPreview {
@@ -67,7 +67,8 @@ export function parseRoundTripPackageManifest(source: string): PackageManifestPr
   } catch {
     return null;
   }
-  if (manifest?.format !== "nowen-package") return null;
+  // 兼容 Nowen 时代导出的历史数据包；新导出始终使用 baseforge-package。
+  if (manifest?.format !== "baseforge-package" && manifest?.format !== "nowen-package") return null;
   if (![1, 2].includes(Number(manifest.formatVersion))) {
     throw new Error(`不支持的 BaseForge 数据包版本：${String(manifest.formatVersion ?? "未知")}`);
   }
@@ -92,17 +93,17 @@ export function createRoundTripPackageImportFile(
   file: File,
   manifest: PackageManifestPreview,
 ): ImportFileInfo {
-  const title = file.name.replace(/(?:\.nowen)?\.zip$/i, "") || "BaseForge 数据包";
+  const title = file.name.replace(/(?:\.baseforge)?\.zip$/i, "") || "BaseForge 数据包";
   return {
     name: file.name,
     title,
     content: "",
     size: file.size,
     selected: true,
-    source: "nowen-package",
-    __nowenRoundTripPackage: file,
-    __nowenPackageVersion: Number(manifest.formatVersion),
-    __nowenPackageKind: manifest.packageKind || "nowen",
+    source: "baseforge-package",
+    __baseforgeRoundTripPackage: file,
+    __baseforgePackageVersion: Number(manifest.formatVersion),
+    __baseforgePackageKind: manifest.packageKind || "baseforge",
   } as RoundTripImportFile;
 }
 
@@ -136,7 +137,7 @@ export async function readMarkdownFromZipWithMeta(
   const packageEntry = createRoundTripPackageImportFile(file, manifest);
   const meta = {
     version: String(manifest.formatVersion || ""),
-    app: "nowen-note",
+    app: "baseforge",
     exportedAt: manifest.exportedAt,
     totalNotes: manifest.counts?.notes,
     notebooks: [],
@@ -164,18 +165,18 @@ export async function importNotes(
   options?: ImportOptions,
 ): Promise<{ success: boolean; count: number }> {
   const selected = fileInfos.filter((item) => item.selected) as RoundTripImportFile[];
-  const packageItems = selected.filter((item) => item.__nowenRoundTripPackage instanceof File);
+  const packageItems = selected.filter((item) => item.__baseforgeRoundTripPackage instanceof File);
   if (!packageItems.length) return importNotesBase(fileInfos, notebookId, onProgress, options);
   if (packageItems.length !== 1 || selected.length !== 1) {
     onProgress?.({ phase: "error", current: 0, total: selected.length, message: "BaseForge 数据包必须单独导入" });
     return { success: false, count: 0 };
   }
 
-  const file = packageItems[0].__nowenRoundTripPackage!;
+  const file = packageItems[0].__baseforgeRoundTripPackage!;
   const submitOptionsFor = (strategy: RoundTripImportStrategy) => ({
     workspaceId: options?.workspaceId,
     targetNotebookId: strategy === "sync" ? undefined : notebookId || undefined,
-    fallbackNotebookName: strategy === "sync" ? undefined : i18n.t("note.nowenFallbackNotebookName"),
+    fallbackNotebookName: strategy === "sync" ? undefined : i18n.t("note.baseforgeFallbackNotebookName"),
   });
   try {
     onProgress?.({ phase: "reading", current: 0, total: 1, message: "正在校验目录、附件和来源映射…" });

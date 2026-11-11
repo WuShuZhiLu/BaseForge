@@ -1,4 +1,4 @@
-const BRIDGE_FLAG = "__nowenDesktopNativeHttpBridgeInstalled";
+const BRIDGE_FLAG = "__baseforgeDesktopNativeHttpBridgeInstalled";
 const DEFAULT_NATIVE_TIMEOUT_MS = 30_000;
 
 type FetchInput = Parameters<typeof fetch>[0];
@@ -26,7 +26,7 @@ interface DesktopHttpBridge {
 
 function getDesktopHttpBridge(): DesktopHttpBridge | null {
   if (typeof window === "undefined") return null;
-  const desktop = (window as any).nowenDesktop;
+  const desktop = (window as any).baseforgeDesktop;
   return desktop?.isDesktop && typeof desktop.http?.requestJson === "function"
     ? desktop.http as DesktopHttpBridge
     : null;

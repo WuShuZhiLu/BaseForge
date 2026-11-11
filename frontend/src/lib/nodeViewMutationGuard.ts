@@ -8,7 +8,7 @@ export interface NodeViewMutationTarget {
   editor?: MutableEditorState | null;
 }
 
-const NODE_VIEW_MUTATION_GUARD = Symbol.for("nowen.tiptap.nodeViewMutationGuard");
+const NODE_VIEW_MUTATION_GUARD = Symbol.for("baseforge.tiptap.nodeViewMutationGuard");
 
 /**
  * Re-read the live editor state at mutation time.

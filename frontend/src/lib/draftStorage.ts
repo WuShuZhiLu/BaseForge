@@ -4,8 +4,8 @@ import {
 } from "@/lib/noteContentPersistence";
 import { assertConversionAttachments, convertedNoteVersion } from "./encryptedNotes/conversionBarrier";
 
-const DRAFT_KEY_PREFIX = "nowen-draft-";
-const DRAFT_INDEX_KEY = "nowen-draft-index";
+const DRAFT_KEY_PREFIX = "baseforge-draft-";
+const DRAFT_INDEX_KEY = "baseforge-draft-index";
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * A successful request may resolve while the editor already contains a newer debounce generation.

@@ -16,10 +16,10 @@ export type BuiltinPluginId = "tasks" | "pm";
 
 /**
  * 内置插件来源：用于在 UI 上如实标注，而不是笼统写成"官方内置"。
- * - nowen：沿用 nowen note（上游）的实现，随本仓库一起发布
+ * - baseforge：沿用 baseforge note（上游）的实现，随本仓库一起发布
  * - builtin：本仓库自研的内置插件（不经市场分发，代码在仓库内）
  */
-export type BuiltinPluginOrigin = "nowen" | "builtin";
+export type BuiltinPluginOrigin = "baseforge" | "builtin";
 
 export interface BuiltinPluginDef {
   id: BuiltinPluginId;
@@ -31,7 +31,7 @@ export interface BuiltinPluginDef {
   viewMode: "tasks" | "projects";
   /** 主区入口所需的 WorkspaceFeatures 键 */
   workspaceFeature: "tasks" | "notes";
-  /** 来源：nowen = 沿用上游实现；builtin = 本仓库自研内置 */
+  /** 来源：baseforge = 沿用上游实现；builtin = 本仓库自研内置 */
   origin: BuiltinPluginOrigin;
   /** 首次安装时的默认启停；false 的插件需用户手动开启 */
   defaultEnabled: boolean;
@@ -53,7 +53,7 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
     icon: "tasks",
     viewMode: "tasks",
     workspaceFeature: "tasks",
-    origin: "nowen",
+    origin: "baseforge",
     defaultEnabled: false,
     entryHint: "导航栏徽章「待办」",
     sidebarPanel: { id: "tasks-panel", title: "待办" },
@@ -73,7 +73,7 @@ export const BUILTIN_PLUGINS: BuiltinPluginDef[] = [
   },
 ];
 
-const STORAGE_KEY = "nowen-builtin-plugins-disabled";
+const STORAGE_KEY = "baseforge-builtin-plugins-disabled";
 
 /** 已停用的内置插件 id 集合（启用 = 不在集合中） */
 export function getDisabledBuiltinPlugins(): Set<BuiltinPluginId> {
@@ -93,7 +93,7 @@ export function setBuiltinPluginDisabled(id: BuiltinPluginId, disabled: boolean)
     if (disabled) disabledSet.add(id);
     else disabledSet.delete(id);
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...disabledSet]));
-    window.dispatchEvent(new CustomEvent("nowen:builtin-plugins-changed"));
+    window.dispatchEvent(new CustomEvent("baseforge:builtin-plugins-changed"));
   } catch {
     // storage failures are non-fatal
   }
@@ -104,9 +104,9 @@ export function isBuiltinPluginEnabled(id: BuiltinPluginId): boolean {
 }
 
 /** 首次加载时把 defaultEnabled=false 的插件写入停用集合（只做一次，之后完全尊重用户选择）。
- *  v2：从 nowen 继承的内置插件一律默认关闭——用户明确表示暂时不需要，重新播种一次
+ *  v2：从 baseforge 继承的内置插件一律默认关闭——用户明确表示暂时不需要，重新播种一次
  *  把老 profile 里残留的启用状态也关掉。 */
-const DEFAULTS_SEEDED_KEY = "nowen-builtin-plugins-defaults-seeded-v2";
+const DEFAULTS_SEEDED_KEY = "baseforge-builtin-plugins-defaults-seeded-v2";
 
 export function seedBuiltinPluginDefaults(): void {
   try {
@@ -117,7 +117,7 @@ export function seedBuiltinPluginDefaults(): void {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...disabled]));
     localStorage.setItem(DEFAULTS_SEEDED_KEY, "1");
-    window.dispatchEvent(new CustomEvent("nowen:builtin-plugins-changed"));
+    window.dispatchEvent(new CustomEvent("baseforge:builtin-plugins-changed"));
   } catch {
     // storage failures are non-fatal
   }
@@ -125,7 +125,7 @@ export function seedBuiltinPluginDefaults(): void {
 
 /** 来源徽标文案（内置插件没有"官方内置"这种含糊说法，按实际来源标注） */
 export const BUILTIN_ORIGIN_LABEL: Record<BuiltinPluginOrigin, string> = {
-  nowen: "来自 nowen note",
+  baseforge: "来自 baseforge note",
   builtin: "内置插件",
 };
 

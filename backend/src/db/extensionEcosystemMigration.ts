@@ -6,7 +6,7 @@ function hasColumn(db: any, table: string, column: string): boolean {
 
 export const extensionEcosystemMigration: Migration = {
   version: 96,
-  name: "nowen-extension-platform-v2-ecosystem",
+  name: "baseforge-extension-platform-v2-ecosystem",
   up: (db) => {
     for (const [column, definition] of [
       ["publisher", "TEXT"], ["signatureState", "TEXT NOT NULL DEFAULT 'unsigned'"], ["advisoryState", "TEXT NOT NULL DEFAULT 'unknown'"],

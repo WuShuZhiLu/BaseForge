@@ -30,7 +30,7 @@ import {
 } from "../services/realtime.js";
 import { yFlush, yReplaceContentAsUpdate } from "../services/yjs.js";
 
-const NOTE_SPLIT_INSTALLED = Symbol.for("nowen.noteSplit.routesInstalled");
+const NOTE_SPLIT_INSTALLED = Symbol.for("baseforge.noteSplit.routesInstalled");
 
 type SplitAttachmentKind = "moved" | "copy";
 

@@ -30,16 +30,16 @@ function EditorLease({ noteId, scope, children }: { noteId: string | null; scope
       release(); setReady(false); setFailed(true);
     };
     const storage = (event: StorageEvent) => {
-      if (event.key === null || event.key === "nowen-token" || event.key === "nowen-server-url") invalidate();
+      if (event.key === null || event.key === "baseforge-token" || event.key === "baseforge-server-url") invalidate();
     };
-    window.addEventListener("nowen:token-changed", invalidate);
-    window.addEventListener("nowen:server-url-changed", invalidate);
+    window.addEventListener("baseforge:token-changed", invalidate);
+    window.addEventListener("baseforge:server-url-changed", invalidate);
     window.addEventListener("storage", storage);
     invalidate();
     return () => {
       release();
-      window.removeEventListener("nowen:token-changed", invalidate);
-      window.removeEventListener("nowen:server-url-changed", invalidate);
+      window.removeEventListener("baseforge:token-changed", invalidate);
+      window.removeEventListener("baseforge:server-url-changed", invalidate);
       window.removeEventListener("storage", storage);
     };
   }, [noteId, scope, supported, retry]);

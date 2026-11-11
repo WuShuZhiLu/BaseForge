@@ -36,7 +36,7 @@ import type { Notebook } from "@/types";
 const LAST_TARGET_KEY = "baseforge:remote-link:last-notebook";
 
 /** 知识树的重建事件（同 KnowledgeTreePanel 里的常量，这里用字面量避免循环依赖） */
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 export function readLastRemoteLinkNotebook(): string | null {
   try {

@@ -48,10 +48,11 @@ test("手动 workflow 只使用 SignPath test-signing 且使用 Full Artifact Co
   assert.match(testBlock, /workflow_dispatch/);
   assert.match(testBlock, /signing-policy-slug:\s*["']test-signing["']/);
   assert.match(testBlock, /artifact-configuration-slug:\s*\$\{\{ vars\.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG \}\}/);
-  assert.match(testBlock, /version:\s*\$\{\{ toJSON\(steps\.package_version\.outputs\.version\) \}\}/);
+  // 参数化 artifact configuration 是 SignPath 付费能力，免费订阅下不能传 parameters。
+  assert.doesNotMatch(testBlock, /parameters:/);
   assert.match(testBlock, /SIGNPATH_ORGANIZATION_ID/);
   assert.match(testBlock, /SIGNPATH_PROJECT_SLUG/);
-  assert.match(testBlock, /nowen-note-win-signpath-test/);
+  assert.match(testBlock, /baseforge-win-signpath-test/);
   assert.doesNotMatch(testBlock, /release-signing/);
   assert.doesNotMatch(testBlock, /SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG/);
   assert.doesNotMatch(testBlock, /refs\/tags/);
@@ -69,13 +70,13 @@ test("tag Windows 正式发布必须经过 Full Lite 独立 SignPath 配置和�
   assert.match(workflow, /verify-windows-signatures\.mjs/);
   assert.match(workflow, /--require full,lite/);
   assert.match(workflow, /refresh-windows-update-metadata\.mjs/);
-  assert.match(workflow, /nowen-note-win-signed/);
+  assert.match(workflow, /baseforge-win-signed/);
 });
 
 test("本地 Release 在公开前必须用同 tag 的 SignPath Windows artifact 覆盖候选 EXE", async () => {
   const releaseGuard = await readRepoFile("scripts/release.sh");
   assert.match(releaseGuard, /collect_ci_signed_windows_assets/);
-  assert.match(releaseGuard, /nowen-note-win-signed/);
+  assert.match(releaseGuard, /baseforge-win-signed/);
   assert.match(releaseGuard, /replacing local Windows candidates/);
   assert.match(releaseGuard, /failed to collect SignPath-signed Windows assets; keeping \$\{TAG\} as draft/);
   const winIndex = releaseGuard.indexOf("if release_contains_windows_candidates");

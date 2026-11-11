@@ -41,5 +41,5 @@ function Find-Locker($p) {
   } }
 }
 
-Find-Locker 'C:\UGit\nowen-note\dist-electron\win-unpacked\Base Notes.exe'
-Find-Locker 'C:\UGit\nowen-note\release\win-unpacked\resources\app.asar'
+Find-Locker 'C:\UGit\baseforge\dist-electron\win-unpacked\Base Notes.exe'
+Find-Locker 'C:\UGit\baseforge\release\win-unpacked\resources\app.asar'

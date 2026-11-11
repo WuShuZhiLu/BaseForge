@@ -2,7 +2,7 @@ import { toast } from "@/lib/toast";
 import { getShareSessionId } from "@/lib/shareSession";
 import { getOfflineAttachmentsByNote, markOfflineAttachmentsAccessed } from "@/lib/localStore";
 
-const INSTALL_KEY = "__NOWEN_NOTE_ATTACHMENT_ACCESS_BRIDGE_V1__";
+const INSTALL_KEY = "__BASEFORGE_NOTE_ATTACHMENT_ACCESS_BRIDGE_V1__";
 const ATTACHMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ACCESS_QUERY_KEYS = new Set(["exp", "sig", "scope"]);
 const accessUrls = new Map<string, string>();
@@ -39,7 +39,7 @@ export function getAttachmentAccessSnapshot(): number {
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("nowen:offline-attachments-removed", (event) => {
+  window.addEventListener("baseforge:offline-attachments-removed", (event) => {
     const ids = (event as CustomEvent<{ ids?: string[] }>).detail?.ids || [];
     for (const id of ids) retireOfflineObjectUrl(id);
     if (ids.length > 0) {
@@ -50,10 +50,10 @@ if (typeof window !== "undefined") {
   window.addEventListener("pagehide", () => {
     forceRevokeAllOfflineObjectUrls();
   });
-  window.addEventListener("nowen:server-url-changed", () => {
+  window.addEventListener("baseforge:server-url-changed", () => {
     resetAttachmentAccessForSessionChange();
   });
-  window.addEventListener("nowen:token-changed", (event) => {
+  window.addEventListener("baseforge:token-changed", (event) => {
     const authenticated = (event as CustomEvent<{ authenticated?: boolean }>).detail?.authenticated;
     if (authenticated === false) resetAttachmentAccessForSessionChange();
   });
@@ -89,7 +89,7 @@ function isLoopbackHostname(hostname: string): boolean {
     || value.startsWith("127.");
 }
 
-function isKnownNowenApiUrl(url: URL): boolean {
+function isKnownBaseForgeApiUrl(url: URL): boolean {
   return /\/(?:api|publicapi)\/(?:notes|attachments|files|shared)(?:\/|$)/.test(url.pathname);
 }
 
@@ -112,7 +112,7 @@ function currentWindowHttpOrigin(): string {
  */
 export function rememberAttachmentApiOrigin(value: string | URL): string {
   const parsed = value instanceof URL ? value : asAbsoluteUrl(value);
-  if (!isHttpUrl(parsed) || !isKnownNowenApiUrl(parsed)) return attachmentApiOrigin;
+  if (!isHttpUrl(parsed) || !isKnownBaseForgeApiUrl(parsed)) return attachmentApiOrigin;
 
   if (isLoopbackHostname(parsed.hostname)) {
     const remembered = asAbsoluteUrl(attachmentApiOrigin);
@@ -459,14 +459,14 @@ function isEditableDocumentElement(element: Element): boolean {
 function rewriteElementAttribute(element: Element, attribute: string): void {
   const raw = element.getAttribute(attribute);
   if (!raw) return;
-  const rememberedId = element.getAttribute("data-nowen-attachment-id");
+  const rememberedId = element.getAttribute("data-baseforge-attachment-id");
   const rawId = extractAttachmentId(raw);
   const attachmentId = rawId || (rememberedId && ATTACHMENT_ID_RE.test(rememberedId) ? rememberedId : null);
   const source = attachmentId && raw.startsWith("blob:")
     ? `/api/attachments/${attachmentId}`
     : raw;
   const resolved = resolveAttachmentAccessUrl(source);
-  if (attachmentId) element.setAttribute("data-nowen-attachment-id", attachmentId);
+  if (attachmentId) element.setAttribute("data-baseforge-attachment-id", attachmentId);
   if (resolved !== raw) element.setAttribute(attribute, resolved);
 }
 
@@ -650,7 +650,7 @@ export function installNoteAttachmentAccessBridge(): void {
     const url = requestUrl(input);
     const method = requestMethod(input, init);
     if (!url) return originalFetch(input, init);
-    if (isKnownNowenApiUrl(url)) rememberAttachmentApiOrigin(url);
+    if (isKnownBaseForgeApiUrl(url)) rememberAttachmentApiOrigin(url);
 
     // fetch 下载、Android blob 图片、音视频预览等请求统一换成当前有效签名。
     if (method === "GET" && extractAttachmentId(url.toString())) {

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-att-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-att-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { taskAttachmentsRepository } from "../src/repositories/taskAttachmentsRepository";

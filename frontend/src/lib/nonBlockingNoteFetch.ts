@@ -6,7 +6,7 @@ import { clearFolderUnlockTokens, folderUnlockRequestHeaders } from "@/lib/knowl
 import { isMobileLocalMode } from "@/lib/mobileLocalMode";
 import { readNote } from "@/lib/offlineRead";
 
-const INSTALL_KEY = "__NOWEN_NON_BLOCKING_NOTE_FETCH_V1__";
+const INSTALL_KEY = "__BASEFORGE_NON_BLOCKING_NOTE_FETCH_V1__";
 
 type ApiError = Error & {
   code?: string;
@@ -48,7 +48,7 @@ async function fetchNoteDetailWithoutAttachmentBarrier(id: string): Promise<Note
       method: "GET",
       credentials: "include",
       headers: {
-        "Accept": "application/vnd.nowen.internal-note+json",
+        "Accept": "application/vnd.baseforge.internal-note+json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...folderUnlockRequestHeaders(),
       },

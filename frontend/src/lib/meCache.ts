@@ -10,7 +10,7 @@
  *    并发调用共享同一个 in-flight 请求。
  *  - getCachedMe()：同步读缓存（可能为 null），用于 useState 惰性初始化，
  *    让首次渲染就拿到正确身份。
- *  - 缓存失效：监听 authSession 的 "nowen:token-changed"（登录/登出/换号都会
+ *  - 缓存失效：监听 authSession 的 "baseforge:token-changed"（登录/登出/换号都会
  *    派发），失效后下一次 fetchMe 重新拉取，避免切换账号后残留旧身份。
  */
 import { api } from "@/lib/api";
@@ -53,7 +53,7 @@ export function invalidateMe(): void {
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("nowen:token-changed", () => {
+  window.addEventListener("baseforge:token-changed", () => {
     cached = null;
   });
 }

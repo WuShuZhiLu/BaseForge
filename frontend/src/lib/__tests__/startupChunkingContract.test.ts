@@ -74,7 +74,7 @@ describe("startup chunking contract", () => {
       expect(main).not.toContain(staticImport);
     }
     expect(deferredMount).toContain('import("./DeferredGlobalFeatureCenters")');
-    expect(deferredMount).toContain("nowen:token-changed");
+    expect(deferredMount).toContain("baseforge:token-changed");
     for (const deferredImport of [
       'import MarkdownExperienceBridge from "./MarkdownExperienceBridge"',
       'import MindMapAppearanceBridge from "./MindMapAppearanceBridge"',

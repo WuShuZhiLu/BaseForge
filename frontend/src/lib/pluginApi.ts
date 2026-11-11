@@ -9,8 +9,8 @@ export interface ExtensionPlatformFeatureFlags {
   sandboxedPluginUi: boolean;
   fileProcessingExtensions: boolean;
   experimentalDocumentTypes: boolean;
-  currentNowenVersion: string;
-  targetNowenVersion: string;
+  currentBaseForgeVersion: string;
+  targetBaseForgeVersion: string;
 }
 
 export interface PluginPermissionRow {
@@ -43,7 +43,7 @@ export interface PluginNoteThemeTokens {
   selection?: string; contentMaxWidth?: string; lineHeight?: string;
 }
 export interface PluginNoteThemeContribution {
-  id: string; name: string; description?: string; base?: "nowen.default";
+  id: string; name: string; description?: string; base?: "baseforge.default";
   modes: { light: PluginNoteThemeTokens; dark?: PluginNoteThemeTokens };
 }
 export interface PluginStaticInputField { id: string; label?: string; type: "string" | "number" | "boolean"; required?: boolean; default?: string | number | boolean }
@@ -190,7 +190,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return payload as T;
 }
 
-export const PLUGIN_CONTRIBUTIONS_CHANGED_EVENT = "nowen:plugin-contributions-changed";
+export const PLUGIN_CONTRIBUTIONS_CHANGED_EVENT = "baseforge:plugin-contributions-changed";
 
 async function contributionMutation<T>(operation: Promise<T>): Promise<T> {
   const result = await operation;

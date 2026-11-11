@@ -100,8 +100,8 @@ function protectNoteMutationPayload<T extends Partial<Note>>(
 }
 
 // 服务器地址管理
-const SERVER_URL_KEY = "nowen-server-url";
-export const SERVER_URL_CHANGED_EVENT = "nowen:server-url-changed";
+const SERVER_URL_KEY = "baseforge-server-url";
+export const SERVER_URL_CHANGED_EVENT = "baseforge:server-url-changed";
 
 function dispatchTaskReminderScheduleChanged(): void {
   if (typeof window === "undefined") return;
@@ -109,7 +109,7 @@ function dispatchTaskReminderScheduleChanged(): void {
 }
 
 // ========== 当前工作区（Phase 1 协作） ==========
-const WORKSPACE_KEY = "nowen-current-workspace";
+const WORKSPACE_KEY = "baseforge-current-workspace";
 
 /**
  * 获取当前激活的工作区 ID
@@ -146,7 +146,7 @@ function readServerUrlFromQuery(): string {
   if (typeof window === "undefined") return "";
   try {
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get("serverUrl") || params.get("nowen-server-url") || "";
+    const raw = params.get("serverUrl") || params.get("baseforge-server-url") || "";
     return _normalizeBase(raw);
   } catch {
     return "";
@@ -672,7 +672,7 @@ function getToken(): string | null {
  * L10: 退出登录的统一入口。
  *
  * 设计要点：
- *   - 移除本 tab 的 token，同时通过 `nowen-logout-broadcast` 触发 storage 事件，
+ *   - 移除本 tab 的 token，同时通过 `baseforge-logout-broadcast` 触发 storage 事件，
  *     让其他 tab 的 AuthGate 也一起退出；
  *   - broadcast 的 value 仅用来触发 storage 事件（不能连续写相同值，否则浏览器会
  *     合并掉不派发事件），因此写 Date.now()；
@@ -681,7 +681,7 @@ function getToken(): string | null {
  */
 async function clearDesktopLocalAuthCache(): Promise<void> {
   if (typeof window === "undefined") return;
-  const desktopApi = (window as { nowenDesktop?: { isDesktop?: boolean; clearLocalAuth?: () => Promise<{ ok: boolean }> } }).nowenDesktop;
+  const desktopApi = (window as { baseforgeDesktop?: { isDesktop?: boolean; clearLocalAuth?: () => Promise<{ ok: boolean }> } }).baseforgeDesktop;
   if (!desktopApi?.isDesktop || typeof desktopApi.clearLocalAuth !== "function") return;
   try {
     await desktopApi.clearLocalAuth();
@@ -712,21 +712,21 @@ export function broadcastLogout(reason?: string): Promise<void> {
   }
   try {
     clearAuthTokens();
-    // 清理所有用户缓存（nowen-auth-user:*），防止切换账号后旧缓存被复用
+    // 清理所有用户缓存（baseforge-auth-user:*），防止切换账号后旧缓存被复用
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("nowen-auth-user:")) {
+      if (key && key.startsWith("baseforge-auth-user:")) {
         keysToRemove.push(key);
       }
     }
     keysToRemove.forEach((k) => localStorage.removeItem(k));
-    // 其他 tab 监听到该 key 的 storage 事件后会自己 removeItem("nowen-token") 并回登录页
-    localStorage.setItem("nowen-logout-broadcast", `${Date.now()}|${reason || ""}`);
+    // 其他 tab 监听到该 key 的 storage 事件后会自己 removeItem("baseforge-token") 并回登录页
+    localStorage.setItem("baseforge-logout-broadcast", `${Date.now()}|${reason || ""}`);
     // 立即删除，这样下次登出也能再次触发（避免 value 相同被合并）
-    localStorage.removeItem("nowen-logout-broadcast");
+    localStorage.removeItem("baseforge-logout-broadcast");
     // 通知同 tab 内的组件（如 SecuritySettings）token 已变化
-    try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent("baseforge:token-changed")); } catch { /* ignore */ }
   } catch {
     /* 隐私模式下 localStorage 可能不可用，忽略 */
   }
@@ -749,8 +749,8 @@ export function broadcastLogout(reason?: string): Promise<void> {
  */
 export function broadcastAuthChanged(reason?: string) {
   try {
-    localStorage.setItem("nowen-auth-changed", `${Date.now()}|${reason || ""}`);
-    localStorage.removeItem("nowen-auth-changed");
+    localStorage.setItem("baseforge-auth-changed", `${Date.now()}|${reason || ""}`);
+    localStorage.removeItem("baseforge-auth-changed");
   } catch {
     /* ignore */
   }
@@ -857,14 +857,14 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
     // selfUserId 守卫兜底。
     let connId: string | null = null;
     try {
-      const fn = (window as { __nowenGetConnectionId?: () => string | null })?.__nowenGetConnectionId;
+      const fn = (window as { __baseforgeGetConnectionId?: () => string | null })?.__baseforgeGetConnectionId;
       if (typeof fn === "function") connId = fn();
     } catch {
       /* SSR / window 不可用时静默 */
     }
     const buildHeaders = (includeConnId: boolean): HeadersInit => ({
       "Content-Type": "application/json",
-      "Accept": "application/vnd.nowen.internal-note+json",
+      "Accept": "application/vnd.baseforge.internal-note+json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(sudoToken ? { "X-Sudo-Token": sudoToken } : {}),
       ...(includeConnId && connId ? { "X-Connection-Id": connId } : {}),
@@ -925,7 +925,7 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
             "[api] retry without X-Connection-Id succeeded — backend CORS likely missing this header in allowHeaders. Disabling injection for this session.",
           );
           // 关闭后续注入。注意只关一个会话内的注入，不写 storage（升级后端后下次重启即恢复）。
-          try { (window as { __nowenGetConnectionId?: () => string | null }).__nowenGetConnectionId = () => null; } catch { /* ignore */ }
+          try { (window as { __baseforgeGetConnectionId?: () => string | null }).__baseforgeGetConnectionId = () => null; } catch { /* ignore */ }
         } catch (retryErr) {
           // 用户主动 abort（非超时） → 原样抛
           if ((retryErr as ErrLike)?.name === "AbortError" && userSignal?.aborted) throw retryErr;
@@ -1070,7 +1070,7 @@ function handleOfflineEnqueue<T>(url: string, method: string, bodyStr: string | 
   });
 
   // 派发自定义事件通知 UI（syncStatus = offline）
-  window.dispatchEvent(new CustomEvent("nowen:offline-queued"));
+  window.dispatchEvent(new CustomEvent("baseforge:offline-queued"));
 
   // Phase D: 离线写也要立刻反映到 localStore，否则用户离线创建的笔记
   //   在重启后会消失（offlineQueue 在 localStorage、笔记本身却没在 IDB 中）。
@@ -1183,7 +1183,7 @@ type SiyuanImportRecovery = {
   contentFormat: "tiptap-json" | "markdown";
 };
 
-const SIYUAN_IMPORT_RECOVERY_KEY = "nowen-siyuan-import-recovery";
+const SIYUAN_IMPORT_RECOVERY_KEY = "baseforge-siyuan-import-recovery";
 const SIYUAN_IMPORT_CREATE_RECOVERY_MS = 2 * 60_000;
 const SIYUAN_IMPORT_STATUS_SILENCE_MS = 2 * 60_000;
 const SIYUAN_IMPORT_MAX_WAIT_MS = 2 * 60 * 60_000;
@@ -2498,7 +2498,7 @@ export const api = {
   downloadMarkdownExport: (downloadToken: string, filename?: string) => {
     const a = document.createElement("a");
     a.href = `${getBaseUrl()}/export/download/${encodeURIComponent(downloadToken)}`;
-    a.download = filename || "nowen-note.zip";
+    a.download = filename || "baseforge.zip";
     a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
@@ -2522,8 +2522,8 @@ export const api = {
     }
     return res.json() as Promise<{ downloadToken: string; filename: string; size: number }>;
   },
-  /** 导出 BaseForge 数据包（.zip，兼容旧 .nowen.zip） */
-  downloadNowenPackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
+  /** 导出 BaseForge 数据包（.zip，兼容旧 .baseforge.zip） */
+  downloadBaseForgePackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
     const ws = opts?.workspaceId ?? getCurrentWorkspace();
     const params = new URLSearchParams();
     if (ws && ws !== "personal") params.set("workspaceId", ws);
@@ -2532,7 +2532,7 @@ export const api = {
     if (opts?.includeTrashed) params.set("includeTrashed", "true");
     const qs = params.toString() ? `?${params.toString()}` : "";
     const token = getToken();
-    const res = await fetch(`${getBaseUrl()}/export/nowen-package${qs}`, {
+    const res = await fetch(`${getBaseUrl()}/export/baseforge-package${qs}`, {
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...folderUnlockRequestHeaders() },
     });
@@ -2814,14 +2814,14 @@ export const api = {
     }
   },
   /** BaseForge 数据包 dry-run 预检 */
-  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
+  dryRunBaseForgePackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
     const params = new URLSearchParams({ dryRun: "1" });
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
     if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
-    const res = await fetch(`${getBaseUrl()}/export/import/nowen-package?${params}`, {
+    const res = await fetch(`${getBaseUrl()}/export/import/baseforge-package?${params}`, {
       method: "POST",
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -2832,7 +2832,7 @@ export const api = {
     return data;
   },
   /** BaseForge 数据包正式导入 */
-  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
+  importBaseForgePackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
@@ -2842,7 +2842,7 @@ export const api = {
     if (opts?.targetNotebookId) params.set("targetNotebookId", opts.targetNotebookId);
     if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/export/import/nowen-package${qs}`, {
+    const res = await fetch(`${getBaseUrl()}/export/import/baseforge-package${qs}`, {
       method: "POST",
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -4070,7 +4070,7 @@ export const api = {
      * 不走 request()，因为 request 只处理 JSON。
      */
     downloadExport: async () => {
-      const token = localStorage.getItem("nowen-token");
+      const token = localStorage.getItem("baseforge-token");
       const res = await fetch(`${getBaseUrl()}/data-file/export`, {
         method: "GET",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -4083,7 +4083,7 @@ export const api = {
       const cd = res.headers.get("Content-Disposition") || "";
       const m = cd.match(/filename="?([^";]+)"?/);
       const fallbackTs = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      const filename = m?.[1] || `nowen-note-${fallbackTs}.data`;
+      const filename = m?.[1] || `baseforge-${fallbackTs}.data`;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -4102,7 +4102,7 @@ export const api = {
      * 成功后 requireRestart=true —— 调用方必须明确提示用户重启后端。
      */
     uploadImport: async (file: File, sudoToken: string) => {
-      const token = localStorage.getItem("nowen-token");
+      const token = localStorage.getItem("baseforge-token");
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${getBaseUrl()}/data-file/import`, {
@@ -4270,7 +4270,7 @@ export const api = {
      *
      * 典型场景：
      *   - 管理员收到「发送到邮箱」的 .bak 附件，想在别的实例接上；
-     *   - 从 U盘 / 异机拷贝 nowen-backup-*.zip 过来。
+     *   - 从 U盘 / 异机拷贝 baseforge-backup-*.zip 过来。
      *
      * 导入本身不触及现网数据——文件只是被放进 backupDir 并补齐 meta.json。要真
      * 正应用它，管理员还需要在列表里点「恢复」，走 dryRun 预览 + sudo 二次确认
@@ -4879,13 +4879,13 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
     if (
       !payload
       || payload.status !== "ok"
-      || (payload.service !== "nowen-note" && typeof payload.version !== "string")
+      || (payload.service !== "baseforge" && typeof payload.version !== "string")
     ) {
       return { ok: false, error: "JSON 响应不符合 BaseForge 健康检查格式" };
     }
     return {
       ok: true,
-      proxyRewrittenApiPath: res.headers.get("x-nowen-proxy-compatibility-path") || undefined,
+      proxyRewrittenApiPath: res.headers.get("x-baseforge-proxy-compatibility-path") || undefined,
     };
   } catch (caughtError: unknown) {
       const error = caughtError as Error & { code?: string };
@@ -4918,7 +4918,7 @@ async function probeWebSocketCandidate(websocketUrl: string): Promise<string | n
           finish(
             payload?.type === "probe"
               && payload?.status === "ok"
-              && payload?.service === "nowen-note"
+              && payload?.service === "baseforge"
               && ["/ws", "/public/ws", "/publicws"].includes(acceptedPath)
               ? acceptedPath
               : null,

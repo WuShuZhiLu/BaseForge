@@ -5,11 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-permission-transfer-v2-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-permission-transfer-v2-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ROUNDTRIP_IMPORT_UNDO_TTL_HOURS = "24";
-process.env.NOWEN_INSTANCE_ID = "permission-transfer-v2-instance";
+process.env.BASEFORGE_INSTANCE_ID = "permission-transfer-v2-instance";
 
 let closeDb: typeof import("../src/db/schema").closeDb;
 
@@ -17,8 +17,8 @@ async function modules() {
   const schema = await import("../src/db/schema");
   closeDb = schema.closeDb;
   const permission = await import("../src/services/roundTripPermissionTransfer");
-  const exporter = await import("../src/services/nowenPackageExportStable");
-  const importer = await import("../src/services/nowenPackageImport");
+  const exporter = await import("../src/services/baseforgePackageExportStable");
+  const importer = await import("../src/services/baseforgePackageImport");
   const undo = await import("../src/services/roundTripImportPermissionUndo");
   return { ...schema, permission, exporter, importer, undo };
 }
@@ -103,23 +103,23 @@ test.after(() => {
 
 test("permission export is opt-in and v2 includes direct notebook grants", async () => {
   const { exporter } = await modules();
-  const defaultPackage = await exporter.createStableNowenPackageExport({
+  const defaultPackage = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
   const defaultZip = await JSZip.loadAsync(defaultPackage.buffer);
   assert.equal(defaultZip.file("permissions.json"), null);
 
-  const permissionPackage = await exporter.createStableNowenPackageExport({
+  const permissionPackage = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
     includePermissions: true,
   });
   const zip = await JSZip.loadAsync(permissionPackage.buffer);
   const permissions = JSON.parse(await zip.file("permissions.json")!.async("string"));
-  assert.equal(permissions.format, "nowen-workspace-permissions");
+  assert.equal(permissions.format, "baseforge-workspace-permissions");
   assert.equal(permissions.version, 2);
   assert.equal(permissions.sourceWorkspace.id, "source-workspace");
   assert.equal(permissions.workspaceMembers.length, 2);
@@ -130,14 +130,14 @@ test("permission export is opt-in and v2 includes direct notebook grants", async
 test("explicit mapping upgrades without downgrade and can be safely undone", async () => {
   const db = await resetAndSeed();
   const { exporter, importer, undo } = await modules();
-  const permissionPackage = await exporter.createStableNowenPackageExport({
+  const permissionPackage = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
     includePermissions: true,
   });
 
-  const preview = await importer.importNowenPackage(permissionPackage.buffer, {
+  const preview = await importer.importBaseForgePackage(permissionPackage.buffer, {
     userId: "operator",
     workspaceId: "target-workspace",
     importMode: "new-root",
@@ -150,7 +150,7 @@ test("explicit mapping upgrades without downgrade and can be safely undone", asy
   assert.equal(preview.package?.permissions?.counts?.notebookMembers, 1);
   assert.equal(preview.package?.permissions?.principals?.find((item: any) => item.sourceUserId === "source-member")?.match, "email");
 
-  const imported = await importer.importNowenPackage(permissionPackage.buffer, {
+  const imported = await importer.importBaseForgePackage(permissionPackage.buffer, {
     userId: "operator",
     workspaceId: "target-workspace",
     importMode: "new-root",
@@ -206,13 +206,13 @@ test("explicit mapping upgrades without downgrade and can be safely undone", asy
 test("permission undo refuses to overwrite later membership changes", async () => {
   const db = await resetAndSeed();
   const { exporter, importer, undo } = await modules();
-  const permissionPackage = await exporter.createStableNowenPackageExport({
+  const permissionPackage = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
     includePermissions: true,
   });
-  const imported = await importer.importNowenPackage(permissionPackage.buffer, {
+  const imported = await importer.importBaseForgePackage(permissionPackage.buffer, {
     userId: "operator",
     workspaceId: "target-workspace",
     importMode: "new-root",
@@ -235,14 +235,14 @@ test("permission undo refuses to overwrite later membership changes", async () =
 
 test("legacy v1 manifests remain readable", async () => {
   const { exporter, importer } = await modules();
-  const result = await exporter.createStableNowenPackageExport({
+  const result = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
   const zip = await JSZip.loadAsync(result.buffer);
   zip.file("permissions.json", JSON.stringify({
-    format: "nowen-workspace-permissions",
+    format: "baseforge-workspace-permissions",
     version: 1,
     exportedAt: new Date().toISOString(),
     sourceWorkspace: { id: "source-workspace", name: "来源工作区" },
@@ -255,7 +255,7 @@ test("legacy v1 manifests remain readable", async () => {
     }],
   }));
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
-  const preview = await importer.importNowenPackage(buffer, {
+  const preview = await importer.importBaseForgePackage(buffer, {
     userId: "operator",
     workspaceId: "target-workspace",
     importMode: "new-root",
@@ -269,15 +269,15 @@ test("legacy v1 manifests remain readable", async () => {
 
 test("malformed permissions.json is reported instead of treated as absent", async () => {
   const { exporter, importer } = await modules();
-  const result = await exporter.createStableNowenPackageExport({
+  const result = await exporter.createStableBaseForgePackageExport({
     userId: "operator",
     workspaceId: "source-workspace",
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
   const zip = await JSZip.loadAsync(result.buffer);
   zip.file("permissions.json", "{broken");
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
-  const preview = await importer.importNowenPackage(buffer, {
+  const preview = await importer.importBaseForgePackage(buffer, {
     userId: "operator",
     workspaceId: "target-workspace",
     importMode: "new-root",

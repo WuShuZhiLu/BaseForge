@@ -39,7 +39,7 @@ export function prepareKnowledgeTreeSnapshot(
            sortOrder, isDeleted, deletedAt, createdAt, updatedAt
     FROM knowledge_tree_nodes
     WHERE workspaceId IS ? AND (? IS NOT NULL OR userId = ?)
-      AND id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND id NOT GLOB 'notebook:__baseforge_root_documents__:*'
   `).all(workspaceId, workspaceId, userId) as unknown as TreeRow[];
   const byId = new Map(rows.map((row) => [row.id, row]));
   const visible = new Map<string, boolean>();

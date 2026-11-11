@@ -18,7 +18,7 @@ describe("board document embeds", () => {
 
   it("preprocesses to a block embed placeholder without leaking API paths", () => {
     const rendered = preprocessInternalNoteLinks(source);
-    expect(rendered).toContain(`data-nowen-block-embed="board:${ID}"`);
+    expect(rendered).toContain(`data-baseforge-block-embed="board:${ID}"`);
     expect(rendered).not.toContain("/api/");
   });
 

@@ -87,7 +87,7 @@ async function authenticatedJson<T>(path: string, init?: RequestInit): Promise<T
     ...init,
     headers: {
       "Content-Type": "application/json",
-      "Accept": "application/vnd.nowen.internal-note+json",
+      "Accept": "application/vnd.baseforge.internal-note+json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
@@ -142,7 +142,7 @@ function isDesktopFullLocalUploadRuntime(): boolean {
   if (typeof window === "undefined") return false;
   return isElectronFullLocalRuntime(
     getServerUrl(),
-    Boolean((window as any).nowenDesktop?.isDesktop),
+    Boolean((window as any).baseforgeDesktop?.isDesktop),
   );
 }
 
@@ -262,7 +262,7 @@ api.attachments.upload = (async (noteId: string, file: File) => {
   if (isExplicitlyOffline() && !isDesktopFullLocalUploadRuntime()) {
     throw offlineUploadError("当前处于离线状态，图片尚未上传；请恢复网络后重试");
   }
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const form = new FormData();
   form.append("file", file);
   form.append("noteId", noteId);
@@ -321,7 +321,7 @@ api.updateNote = (async (...args: Parameters<typeof baseApi.updateNote>) => {
   const updated = await nativeUpdateNote(...args);
   const patch = args[1] as Record<string, unknown> | undefined;
   if (patch && Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
-    window.dispatchEvent(new CustomEvent("nowen:notes-changed", { detail: { noteId: args[0] } }));
+    window.dispatchEvent(new CustomEvent("baseforge:notes-changed", { detail: { noteId: args[0] } }));
   }
   return updated;
 }) as typeof baseApi.updateNote;

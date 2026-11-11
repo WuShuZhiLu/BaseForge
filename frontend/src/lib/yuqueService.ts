@@ -30,8 +30,8 @@ export interface YuqueImportResult {
   errors: string[];
 }
 
-const COOKIE_STORAGE_KEY = "nowen-yuque-cookie";
-const CSRF_STORAGE_KEY = "nowen-yuque-csrf";
+const COOKIE_STORAGE_KEY = "baseforge-yuque-cookie";
+const CSRF_STORAGE_KEY = "baseforge-yuque-csrf";
 
 export function getYuqueCookie(): string {
   if (typeof window === "undefined") return "";
@@ -68,7 +68,7 @@ export function clearYuqueCreds(): void {
 
 function readAuthToken(): string | null {
   try {
-    return localStorage.getItem("nowen-token");
+    return localStorage.getItem("baseforge-token");
   } catch {
     return null;
   }

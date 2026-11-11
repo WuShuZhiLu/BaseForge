@@ -522,7 +522,7 @@ export function runMigrations(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   validateMigrationRegistry();
 
-  // 存量库里 notes 上的 FTS 同步触发器引用 nowen_search_normalize；只要迁移里
+  // 存量库里 notes 上的 FTS 同步触发器引用 baseforge_search_normalize；只要迁移里
   // 碰一下 notes（如 v139 把 note_type='journal' 改回 normal），语句 prepare 时
   // 就要解析这个函数，而此时 ensureNormalizedSearchFts() 还没跑。先注册再迁移。
   registerSearchNormalizeFunction(db);

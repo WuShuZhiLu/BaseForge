@@ -12,24 +12,24 @@ button[aria-label="跨空间转移笔记"] {
  * DOM 残留可能让同一个 mount 短暂存在两个入口：一个持有展开态，另一个仍是默认态。
  * 同一个 mount 始终只展示一个按钮；有展开态时优先展示展开态，否则展示第一个。
  */
-[data-nowen-space-actions-mount] > button[aria-label="空间"],
-[data-nowen-space-actions-mount] > button[aria-label="Spaces"] {
+[data-baseforge-space-actions-mount] > button[aria-label="空间"],
+[data-baseforge-space-actions-mount] > button[aria-label="Spaces"] {
   display: none !important;
 }
 
-[data-nowen-space-actions-mount] > button[aria-label="空间"]:first-of-type,
-[data-nowen-space-actions-mount] > button[aria-label="Spaces"]:first-of-type,
-[data-nowen-space-actions-mount] > button[aria-expanded="true"] {
+[data-baseforge-space-actions-mount] > button[aria-label="空间"]:first-of-type,
+[data-baseforge-space-actions-mount] > button[aria-label="Spaces"]:first-of-type,
+[data-baseforge-space-actions-mount] > button[aria-expanded="true"] {
   display: flex !important;
 }
 
-[data-nowen-space-actions-mount]:has(> button[aria-expanded="true"])
+[data-baseforge-space-actions-mount]:has(> button[aria-expanded="true"])
   > button[aria-expanded="false"] {
   display: none !important;
 }
 
 /* HMR 遗留多个 mount 时，只保留导航容器中的第一个。 */
-.nav-rail [data-nowen-space-actions-mount]
-  ~ [data-nowen-space-actions-mount] {
+.nav-rail [data-baseforge-space-actions-mount]
+  ~ [data-baseforge-space-actions-mount] {
   display: none !important;
 }

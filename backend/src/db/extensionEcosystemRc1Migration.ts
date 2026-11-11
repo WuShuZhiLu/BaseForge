@@ -60,7 +60,7 @@ function backfillLifecycleState(db: any): void {
 
 export const extensionEcosystemRc1Migration: Migration = {
   version: 97,
-  name: "nowen-extension-platform-v2-rc1-lifecycle",
+  name: "baseforge-extension-platform-v2-rc1-lifecycle",
   up: (db) => {
     const lifecycleStateAdded = addColumnIfMissing(
       db,

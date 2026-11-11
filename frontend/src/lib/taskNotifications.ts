@@ -12,9 +12,9 @@ import {
 } from "@/lib/taskNotificationSchedule";
 
 const TASK_REMINDER_CHANNEL_ID = "task-reminders";
-const TASK_REMINDER_SOURCE = "nowen-task-reminder";
-const PENDING_TASK_ID_KEY = "nowen-pending-notification-task-id";
-const NATIVE_SCHEDULE_HISTORY_KEY = "nowen-native-task-reminder-schedule-history";
+const TASK_REMINDER_SOURCE = "baseforge-task-reminder";
+const PENDING_TASK_ID_KEY = "baseforge-pending-notification-task-id";
+const NATIVE_SCHEDULE_HISTORY_KEY = "baseforge-native-task-reminder-schedule-history";
 let channelReady = false;
 
 export type TaskNotificationPermission = "granted" | "denied" | "prompt" | "unsupported";
@@ -22,7 +22,7 @@ export type TaskNotificationSurface = "native" | "electron" | "web" | "unsupport
 
 export function getTaskNotificationSurface(): TaskNotificationSurface {
   if (typeof window === "undefined") return "unsupported";
-  if ((window as any).nowenDesktop?.taskNotify) return "electron";
+  if ((window as any).baseforgeDesktop?.taskNotify) return "electron";
   if (Capacitor.isNativePlatform()) return "native";
   if (typeof Notification !== "undefined") return "web";
   return "unsupported";
@@ -156,7 +156,7 @@ export async function showImmediateTaskNotification(
 
   if (surface === "electron") {
     try {
-      await (window as any).nowenDesktop.taskNotify(title, body);
+      await (window as any).baseforgeDesktop.taskNotify(title, body);
       return true;
     } catch {
       return false;

@@ -7,7 +7,7 @@
  * deviceId 存储在 localStorage，永久有效（除非用户清除浏览器数据）。
  */
 
-const DEVICE_ID_KEY = "nowen-device-id";
+const DEVICE_ID_KEY = "baseforge-device-id";
 
 /**
  * 获取当前设备的 deviceId。

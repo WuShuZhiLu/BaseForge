@@ -1,7 +1,7 @@
 import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 
-export const KNOWLEDGE_TREE_SORT_STORAGE_KEY = "nowen.knowledgeTree.sort";
-export const KNOWLEDGE_TREE_SORT_CHANGED_EVENT = "nowen:knowledge-tree-sort-changed";
+export const KNOWLEDGE_TREE_SORT_STORAGE_KEY = "baseforge.knowledgeTree.sort";
+export const KNOWLEDGE_TREE_SORT_CHANGED_EVENT = "baseforge:knowledge-tree-sort-changed";
 
 export type KnowledgeTreeSortMode =
   | "manual"
@@ -43,7 +43,7 @@ export function saveKnowledgeTreeSortMode(mode: KnowledgeTreeSortMode): void {
     // Current-session sorting still works when storage is unavailable.
   }
   window.dispatchEvent(new CustomEvent(KNOWLEDGE_TREE_SORT_CHANGED_EVENT, { detail: { mode } }));
-  window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "sort-mode-changed" } }));
+  window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "sort-mode-changed" } }));
 }
 
 function compareText(a: KnowledgeTreeNode, b: KnowledgeTreeNode): number {

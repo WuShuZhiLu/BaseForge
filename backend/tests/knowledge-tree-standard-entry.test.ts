@@ -19,7 +19,7 @@ test("standard backend entry installs the knowledge tree routes", () => {
 });
 
 test("standard backend entry serves both knowledge tree listings", async () => {
-  const tempDir = mkdtempSync(path.join(os.tmpdir(), "nowen-knowledge-tree-entry-"));
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "baseforge-knowledge-tree-entry-"));
   const probe = createServer();
   await new Promise<void>((resolve, reject) => {
     probe.once("error", reject);

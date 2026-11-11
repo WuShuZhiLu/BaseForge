@@ -111,7 +111,7 @@ describe("Tiptap Block Patch V2 planner", () => {
       { type: "hardBreak" },
       {
         type: "text",
-        text: "Nowen",
+        text: "BaseForge",
         marks: [{
           type: "link",
           attrs: {

@@ -28,7 +28,7 @@ describe("knowledge tree sidebar contract", () => {
   it("keeps loading recovery inside one embedded panel without a legacy fallback", () => {
     const panel = source("../../components/KnowledgeTreePanel.tsx");
     const mobilePanel = source("../../components/MobileKnowledgeTreePanel.tsx");
-    expect(panel).toContain('data-nowen-knowledge-tree="embedded"');
+    expect(panel).toContain('data-baseforge-knowledge-tree="embedded"');
     expect(panel).toContain("loadKnowledgeTreeOnEntry(load)");
     expect(mobilePanel).toContain("loadKnowledgeTreeOnEntry(load)");
     expect(panel).toContain("内容暂时未加载");
@@ -122,19 +122,19 @@ describe("knowledge tree sidebar contract", () => {
     expect(main).toContain('import "./mobile-knowledge-tree-compact.css"');
     expect(main).not.toContain('import "./desktop-knowledge-tree-compact.css"');
     expect(bridge).toContain('variant="mobile"');
-    expect(bridge).toContain('className={compact ? "nowen-mobile-tree-density" : undefined}');
-    expect(compactCss).toContain(".nowen-mobile-tree-density");
+    expect(bridge).toContain('className={compact ? "baseforge-mobile-tree-density" : undefined}');
+    expect(compactCss).toContain(".baseforge-mobile-tree-density");
 
     // Compact rows keep the fixed font while preserving touch-safe targets.
-    expect(compactCss).toContain("--nowen-mobile-tree-root-folder-row-height: 32px");
-    expect(compactCss).toContain("--nowen-mobile-tree-folder-row-height: 30px");
-    expect(compactCss).toContain("--nowen-mobile-tree-note-row-height: 28px");
+    expect(compactCss).toContain("--baseforge-mobile-tree-root-folder-row-height: 32px");
+    expect(compactCss).toContain("--baseforge-mobile-tree-folder-row-height: 30px");
+    expect(compactCss).toContain("--baseforge-mobile-tree-note-row-height: 28px");
     expect(compactCss).toContain("font-size: 11px !important");
     expect(compactCss).toContain("line-height: 14px !important");
     expect(compactCss).toContain("padding: 0 !important");
 
     // Browsers without :has() still receive the compact baseline.
-    expect(compactCss).toMatch(/\[data-knowledge-tree-node-id\]\s*\{[\s\S]*min-height:\s*var\(--nowen-mobile-tree-note-row-height\)\s*!important/);
+    expect(compactCss).toMatch(/\[data-knowledge-tree-node-id\]\s*\{[\s\S]*min-height:\s*var\(--baseforge-mobile-tree-note-row-height\)\s*!important/);
     expect(compactCss).toContain("svg.lucide-folder");
     expect(compactCss).toContain("[data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has");
     expect(compactCss).toContain("[data-knowledge-tree-section-heading]");

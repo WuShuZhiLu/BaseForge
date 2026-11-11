@@ -1,7 +1,7 @@
 import "@/lib/rootDocumentCreateBridge";
 import { getCurrentWorkspace } from "@/lib/api.impl";
 
-const INSTALL_KEY = "__NOWEN_NOTE_TRANSFER_REFRESH_BRIDGE__" as const;
+const INSTALL_KEY = "__BASEFORGE_NOTE_TRANSFER_REFRESH_BRIDGE__" as const;
 
 type BridgeWindow = Window & typeof globalThis & {
   [INSTALL_KEY]?: () => void;
@@ -25,15 +25,15 @@ export function installNoteTransferRefreshBridge(): void {
   const onComplete = () => {
     const workspaceId = getCurrentWorkspace();
     window.requestAnimationFrame(() => {
-      window.dispatchEvent(new CustomEvent("nowen:workspace-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", {
         detail: { workspaceId, reason: "note-transfer" },
       }));
     });
   };
 
-  window.addEventListener("nowen:note-transfer-complete", onComplete);
+  window.addEventListener("baseforge:note-transfer-complete", onComplete);
   bridgeWindow[INSTALL_KEY] = () => {
-    window.removeEventListener("nowen:note-transfer-complete", onComplete);
+    window.removeEventListener("baseforge:note-transfer-complete", onComplete);
     delete bridgeWindow[INSTALL_KEY];
   };
 }

@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "../db/schema.js";
-import { nowenVersionSatisfies } from "./manifest.js";
+import { baseforgeVersionSatisfies } from "./manifest.js";
 import {
   OFFICIAL_REGISTRY_TRUST_ROOTS,
   officialTrustRootsFor,
@@ -15,7 +15,7 @@ import { isEd25519PublicKey, verifyArtifactSignature } from "./signatures.js";
 import type { PluginTrustLevel } from "./types.js";
 
 export interface EcosystemSource { id: string; name: string; indexUrl: string; official: boolean; enabled: boolean; registryKeyId: string | null; registryPublicKey: string | null }
-export interface EcosystemVersion { version: string; apiVersion: 2; runtime: "sandbox-js" | "node-action" | "declarative"; artifactUrl: string; sha256: string; publisherKeyId: string; signature: string; nowen: string; permissions: string[]; permissionConfig?: { externalFetchHosts?: string[] }; platforms?: string[]; runtimePlatform?: string[]; uiPlatform?: string[]; channel?: string; publishedAt?: string }
+export interface EcosystemVersion { version: string; apiVersion: 2; runtime: "sandbox-js" | "node-action" | "declarative"; artifactUrl: string; sha256: string; publisherKeyId: string; signature: string; baseforge: string; permissions: string[]; permissionConfig?: { externalFetchHosts?: string[] }; platforms?: string[]; runtimePlatform?: string[]; uiPlatform?: string[]; channel?: string; publishedAt?: string }
 export interface EcosystemExtension { id: string; publisher: string; name: string; description?: string; trustLevel?: PluginTrustLevel; versions: EcosystemVersion[] }
 export interface EcosystemIndex extends GuardedRegistryDocument {
   protocolVersion: 2;
@@ -159,7 +159,7 @@ export class EcosystemRegistry {
     this.advisories.assertInstallAllowed(extensionId, version.version);
     const platform = process.env.ELECTRON_USER_DATA ? "desktop-full" : "server";
     const runtimePlatforms = version.runtimePlatform || version.platforms;
-    if (!nowenVersionSatisfies(version.nowen) || runtimePlatforms?.length && !runtimePlatforms.includes(platform)) throw Object.assign(new Error("插件与当前 BaseForge/Runtime 平台不兼容"), { code: "PLUGIN_INCOMPATIBLE" });
+    if (!baseforgeVersionSatisfies(version.baseforge) || runtimePlatforms?.length && !runtimePlatforms.includes(platform)) throw Object.assign(new Error("插件与当前 BaseForge/Runtime 平台不兼容"), { code: "PLUGIN_INCOMPATIBLE" });
     const key = index.publishers.find((item) => item.publisher === extension.publisher && item.keyId === version.publisherKeyId);
     const time = Date.now();
     if (!key || key.state !== "active" || key.validFrom && Date.parse(key.validFrom) > time || key.validUntil && Date.parse(key.validUntil) < time) throw Object.assign(new Error("Publisher 签名密钥不可用或已撤销"), { code: "PUBLISHER_KEY_REVOKED" });

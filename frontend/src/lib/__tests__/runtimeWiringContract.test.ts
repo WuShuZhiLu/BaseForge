@@ -248,7 +248,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     const shared = read("../../components/sidebar/panels/shared.tsx");
     expect(shared).toContain("export function usePanelRefresh");
     expect(shared).toContain("export function PanelRow");
-    expect(shared).toContain("nowen:sidebar-panel-refresh");
+    expect(shared).toContain("baseforge:sidebar-panel-refresh");
     // 打开笔记统一走 useTabNoteOpener（加载协调器链路）；裸 api.getNote + setActiveNote 已废除
     expect(read("../../hooks/useTabNoteOpener.ts")).toContain("useNoteLoader");
     expect(read("../../components/sidebar/panels/OpenEditorsPanel.tsx")).not.toContain("api.getNote");
@@ -260,7 +260,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(store).toContain("export function updateSidebarBadges");
     expect(store).toContain("export function subscribeSidebarLayout");
     expect(store).toContain("SIDEBAR_LAYOUT_EVENT");
-    expect(store).toContain("nowen.sidebar.layout.v1");
+    expect(store).toContain("baseforge.sidebar.layout.v1");
     // 文档树固定：不可隐藏
     expect(store).toContain('next.panels.tree.visible = true');
 

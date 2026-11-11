@@ -75,7 +75,7 @@ pluginStudioRouter.post("/projects/import", bodyLimit({
     if (!(upload instanceof File)) {
       return c.json({ success: false, error: "请上传 file 字段中的 ZIP 文件", code: "PLUGIN_STUDIO_IMPORT_INVALID" }, 400);
     }
-    const fallbackName = upload.name.replace(/\.(?:zip|nowen-studio)$/i, "") || "Imported Plugin";
+    const fallbackName = upload.name.replace(/\.(?:zip|baseforge-studio)$/i, "") || "Imported Plugin";
     const project = await getPluginStudioProjectService().importProject(actor(c), {
       name: String(body.name || fallbackName),
       archive: Buffer.from(await upload.arrayBuffer()),
@@ -119,7 +119,7 @@ pluginStudioRouter.get("/projects/:id/export", async (c) => {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${project.slug}.nowen-studio.zip"`,
+        "Content-Disposition": `attachment; filename="${project.slug}.baseforge-studio.zip"`,
         "Cache-Control": "no-store",
       },
     });

@@ -12,7 +12,7 @@ import crypto from "crypto";
  * Tests the SQL queries and ICS generation against in-memory SQLite.
  */
 
-const realCalendarTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-calendar-"));
+const realCalendarTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-calendar-"));
 process.env.DB_PATH = path.join(realCalendarTmpDir, "test.db");
 process.env.NODE_ENV = "test";
 

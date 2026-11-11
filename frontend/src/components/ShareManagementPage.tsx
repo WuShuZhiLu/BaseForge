@@ -342,8 +342,8 @@ export default function ShareManagementPage() {
       setPage(1);
       void load(true);
     };
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
-    return () => window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
   }, [load]);
 
   const counts: ShareCenterCounts = data?.counts || {
@@ -487,7 +487,7 @@ export default function ShareManagementPage() {
     }
     void (async () => {
       try {
-        // 页签契约（P3）：不调 actions.setViewMode，改派发 nowen:tool-page-navigate
+        // 页签契约（P3）：不调 actions.setViewMode，改派发 baseforge:tool-page-navigate
         // 由 ToolPageHost 翻译为「关闭工具页签 + 打开笔记」。
         await api.getNote(item.objectId);
         navigateToolPage({ kind: "note", noteId: item.objectId });

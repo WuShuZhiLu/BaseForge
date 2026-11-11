@@ -6,7 +6,7 @@ import test, { after, before } from "node:test";
 import { Hono } from "hono";
 import * as Y from "yjs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-format-yjs-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-format-yjs-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let db: any;

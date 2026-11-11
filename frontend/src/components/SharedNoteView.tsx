@@ -25,7 +25,7 @@ import FullscreenImageViewer, { type FullscreenImageItem } from "@/components/Fu
 const sharedLowlight = createLowlight(common);
 
 /** 访客昵称本地存储 key，用户在同一浏览器上只需要填写一次 */
-const GUEST_NAME_KEY = "nowen-guest-name";
+const GUEST_NAME_KEY = "baseforge-guest-name";
 const SHARE_HEADER_OFFSET_PX = 72;
 
 interface SharedOutlineHeading {
@@ -193,7 +193,7 @@ export default function SharedNoteView({ shareToken }: SharedNoteViewProps) {
   useEffect(() => { latestVersionRef.current = currentVersion; }, [currentVersion]);
 
   /**
-   * 当前登录用户 id（仅当浏览器有 nowen-token 时尝试获取）。
+   * 当前登录用户 id（仅当浏览器有 baseforge-token 时尝试获取）。
    *
    * 用途：判断访问者是否就是这条笔记的作者本人。如果是，则：
    *   - 跳过"请填写访客昵称"弹窗
@@ -209,7 +209,7 @@ export default function SharedNoteView({ shareToken }: SharedNoteViewProps) {
   useEffect(() => {
     let cancelled = false;
     let hasToken = false;
-    try { hasToken = !!localStorage.getItem("nowen-token"); } catch { /* ignore */ }
+    try { hasToken = !!localStorage.getItem("baseforge-token"); } catch { /* ignore */ }
     if (!hasToken) return;
     api.getMe()
       .then((u) => {
@@ -502,12 +502,12 @@ export default function SharedNoteView({ shareToken }: SharedNoteViewProps) {
       setSaveStatus("error");
       return;
     }
-    // edit_auth 前置门禁：检查浏览器是否已有 nowen-token；没有就直接跳登录页，
+    // edit_auth 前置门禁：检查浏览器是否已有 baseforge-token；没有就直接跳登录页，
     // 不要让用户输完昵称再被服务端 401 弹回——体验会很差。
     // 真正的合法性校验在后端 PUT /shared/:token/content 里二次确认（防绕过）。
     if (content.permission === "edit_auth") {
       let hasToken = false;
-      try { hasToken = !!localStorage.getItem("nowen-token"); } catch { /* ignore */ }
+      try { hasToken = !!localStorage.getItem("baseforge-token"); } catch { /* ignore */ }
       if (!hasToken) {
         const redirect = encodeURIComponent(`/share/${shareToken}`);
         window.location.assign(`/login?redirect=${redirect}`);

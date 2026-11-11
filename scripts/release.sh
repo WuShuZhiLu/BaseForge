@@ -67,11 +67,11 @@ if [ "$HELP_ONLY" = "0" ] && [ "$DRY_RUN" = "0" ] && [ "$BUILD_ONLY" = "0" ]; th
   TEMP_ROOT="$(node -e 'process.stdout.write(require("os").tmpdir())')"
   if [ "$CLEAN_FULL" = "1" ]; then
     clean_directory "${REPO_ROOT}/dist-electron"
-    clean_directory "${TEMP_ROOT}/nowen-note-build"
+    clean_directory "${TEMP_ROOT}/baseforge-build"
   fi
   if [ "$CLEAN_LITE" = "1" ]; then
     clean_directory "${REPO_ROOT}/dist-electron-lite"
-    clean_directory "${TEMP_ROOT}/nowen-note-lite-build"
+    clean_directory "${TEMP_ROOT}/baseforge-lite-build"
   fi
 fi
 
@@ -84,7 +84,7 @@ if [ "$HELP_ONLY" = "1" ] || [ "$DRY_RUN" = "1" ] || [ "$BUILD_ONLY" = "1" ]; th
   exec bash "$LEGACY_SCRIPT" "${LEGACY_ARGS[@]}"
 fi
 
-LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/nowen-release-guard.XXXXXX.log")"
+LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/baseforge-release-guard.XXXXXX.log")"
 CI_ARTIFACT_DIR=""
 cleanup() {
   rm -f -- "$LOG_FILE"
@@ -202,7 +202,7 @@ wait_for_workflow_artifact() {
 }
 
 collect_ci_signed_windows_assets() {
-  local timeout_seconds="${NOWEN_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
+  local timeout_seconds="${BASEFORGE_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
   local deadline=$((SECONDS + timeout_seconds))
   local tag_sha run_id artifact_id temp_dir
   tag_sha="$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG" 2>/dev/null || true)"
@@ -216,14 +216,14 @@ collect_ci_signed_windows_assets() {
   fi
   echo "[release-guard] workflow run: ${run_id}"
 
-  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "nowen-note-win-signed" "$deadline")"; then
+  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "baseforge-win-signed" "$deadline")"; then
     echo "[release-guard] timed out or failed waiting for SignPath-signed Windows artifact" >&2
     return 1
   fi
   [ -n "$artifact_id" ] || return 1
 
-  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/nowen-release-win-signed.XXXXXX")"
-  if ! gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name nowen-note-win-signed --dir "$temp_dir"; then
+  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/baseforge-release-win-signed.XXXXXX")"
+  if ! gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name baseforge-win-signed --dir "$temp_dir"; then
     rm -rf -- "$temp_dir"
     return 1
   fi
@@ -254,7 +254,7 @@ collect_ci_signed_windows_assets() {
 }
 
 collect_ci_mac_assets() {
-  local timeout_seconds="${NOWEN_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
+  local timeout_seconds="${BASEFORGE_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
   local deadline=$((SECONDS + timeout_seconds))
   local tag_sha run_id artifact_id
 
@@ -275,7 +275,7 @@ collect_ci_mac_assets() {
   fi
   [ -n "$artifact_id" ] || return 1
 
-  CI_ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nowen-release-mac.XXXXXX")"
+  CI_ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/baseforge-release-mac.XXXXXX")"
   gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name baseforge-mac --dir "$CI_ARTIFACT_DIR"
 
   local mac_assets=()

@@ -55,7 +55,7 @@ it("a late response from a previously selected note is discarded", async () => {
   await act(async () => resolve(report()));
   expect(container.textContent).toContain("服务器版本：9"); expect(container.textContent).not.toContain("服务器版本：7");
 });
-it.each(["nowen:token-changed", "nowen:server-url-changed"])("%s closes the dialog and discards pending responses", async (event) => {
+it.each(["baseforge:token-changed", "baseforge:server-url-changed"])("%s closes the dialog and discards pending responses", async (event) => {
   let resolve!: (value: EncryptionConversionPreflight) => void;
   vi.mocked(api.getEncryptionConversionPreflight).mockImplementation(() => new Promise((done) => { resolve = done; }));
   await render();
@@ -76,6 +76,6 @@ it("cross-window auth changes close the dialog while unrelated settings keep it 
   await render();
   act(() => window.dispatchEvent(new StorageEvent("storage", { key: "i18nextLng" })));
   expect(close).not.toHaveBeenCalled();
-  act(() => window.dispatchEvent(new StorageEvent("storage", { key: "nowen-token" })));
+  act(() => window.dispatchEvent(new StorageEvent("storage", { key: "baseforge-token" })));
   expect(close).toHaveBeenCalledTimes(1); expect(container.textContent).not.toContain("服务器版本");
 });

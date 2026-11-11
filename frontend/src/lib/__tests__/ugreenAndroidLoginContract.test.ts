@@ -24,7 +24,7 @@ describe("Android UGREEN external-browser fallback contract", () => {
 
   it("opens native UGREEN access in the system browser instead of claiming in-app login", () => {
     const nativeStart = remoteAccessSource.indexOf("if (Capacitor.isNativePlatform())");
-    const desktopStart = remoteAccessSource.indexOf("if ((window as any).nowenDesktop?.isDesktop)", nativeStart);
+    const desktopStart = remoteAccessSource.indexOf("if ((window as any).baseforgeDesktop?.isDesktop)", nativeStart);
     const nativeBranch = remoteAccessSource.slice(nativeStart, desktopStart);
 
     expect(nativeBranch).toContain("await Browser.open({ url })");

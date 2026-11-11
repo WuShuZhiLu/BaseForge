@@ -85,7 +85,7 @@ export function ensureWorkspaceDependencies(workspaceDir, label, options = {}) {
 
   const installCommand = process.platform === "win32" ? "npm.cmd" : "npm"
   const installHint = `cd ${JSON.stringify(workspaceDir)} && npm install`
-  if (process.env.NOWEN_DEV_AUTO_INSTALL === "0") {
+  if (process.env.BASEFORGE_DEV_AUTO_INSTALL === "0") {
     throw new Error(
       `${label}依赖未同步（${formatDependencyList(initial)}）。请执行：${installHint}`,
     )

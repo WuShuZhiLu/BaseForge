@@ -9,7 +9,7 @@ export function withEncryptedBlockWrite<T>(
   return db.transaction(() => {
     const current = db.prepare("SELECT content, contentFormat FROM notes WHERE id = ?").get(noteId) as
       { content: string; contentFormat: string } | undefined;
-    if (!/nowen-encrypted/i.test(content) && !/nowen-encrypted/i.test(current?.content || "")) return write();
+    if (!/baseforge-encrypted/i.test(content) && !/baseforge-encrypted/i.test(current?.content || "")) return write();
     guardEncryptedNoteMutation({ content, contentFormat }, current);
     if (encryptedBlocksVersion !== 1) {
       const signatures = (body: string, format: string) => encryptedBlocksInContent(body, format).map((block) => block.serialized).sort();
@@ -32,7 +32,7 @@ export function withEncryptedBlockWrite<T>(
 export function assertEncryptedBlockCollaborationAllowed(db: DatabaseSync, noteId: string): void {
   const note = db.prepare("SELECT content, contentFormat FROM notes WHERE id = ?").get(noteId) as
     { content: string; contentFormat: string } | undefined;
-  if (note && (note.contentFormat.startsWith("encrypted-") || /nowen-encrypted/i.test(note.content))) {
+  if (note && (note.contentFormat.startsWith("encrypted-") || /baseforge-encrypted/i.test(note.content))) {
     throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   }
 }

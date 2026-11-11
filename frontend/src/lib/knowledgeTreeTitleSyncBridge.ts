@@ -1,8 +1,8 @@
 import { api } from "@/lib/api";
 
-export const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+export const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
-const INSTALL_FLAG = "__nowenKnowledgeTreeTitleSyncBridgeInstalled";
+const INSTALL_FLAG = "__baseforgeKnowledgeTreeTitleSyncBridgeInstalled";
 
 type AsyncApiMethod = (...args: any[]) => Promise<any>;
 
@@ -74,7 +74,7 @@ function wrapTitleRead(
  * Keeps the knowledge tree title in sync with successful note title saves.
  *
  * The tree owns an independent node cache and already listens for
- * `nowen:knowledge-tree-changed`. This bridge only emits that event when the
+ * `baseforge:knowledge-tree-changed`. This bridge only emits that event when the
  * server-confirmed title actually changes, so normal content autosaves do not
  * reload the tree.
  */

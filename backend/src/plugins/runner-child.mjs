@@ -21,7 +21,7 @@ function namespace(prefix, methods) {
   return Object.fromEntries(methods.map((method) => [method, (args = {}) => hostCall(`${prefix}.${method}`, args)]));
 }
 
-const nowen = {
+const baseforge = {
   notes: namespace("notes", ["get", "list", "create", "update"]),
   notebooks: namespace("notebooks", ["get", "list", "create"]),
   tags: namespace("tags", ["list", "create", "addToNote", "removeFromNote"]),
@@ -62,7 +62,7 @@ async function loadPlugin(mainPath) {
   if (!plugin || (typeof plugin.actions !== "object" && typeof plugin.execute !== "function")) {
     throw new Error("插件必须导出 actions 或 legacy execute 函数");
   }
-  if (typeof plugin.activate === "function") await plugin.activate({ nowen });
+  if (typeof plugin.activate === "function") await plugin.activate({ baseforge });
 }
 
 function validateActions(expectedActions) {
@@ -106,7 +106,7 @@ process.on("message", async (message) => {
     const result = typeof action === "function"
       ? await action({
           input: message.input,
-          nowen,
+          baseforge,
           execution: {
             id: message.executionId,
             idempotencyKey: message.idempotencyKey,

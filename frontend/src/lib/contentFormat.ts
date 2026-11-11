@@ -479,7 +479,7 @@ function getTurndown(): TurndownService {
   });
 
   // Persist universal block identity in Markdown using the compatible `^blk_xxx` suffix.
-  td.addRule("nowenBlockId", {
+  td.addRule("baseforgeBlockId", {
     filter: (node) => {
       if (!(node instanceof Element)) return false;
       if (!node.getAttribute("data-block-id")) return false;
@@ -514,21 +514,21 @@ function getTurndown(): TurndownService {
     },
   });
 
-  td.addRule("nowenNoteLink", {
+  td.addRule("baseforgeNoteLink", {
     filter: (node) => node.nodeName === "A" && ((node as Element).getAttribute("href") || "").startsWith("note:"),
     replacement: (content, node) => {
       const el = node as Element;
       const href = el.getAttribute("href") || "";
       const rel = el.getAttribute("rel") || "";
-      const alias = /\bnowen-title-alias\b/.test(rel) ? content.replace(/^\s+|\s+$/g, "") : "";
+      const alias = /\bbaseforge-title-alias\b/.test(rel) ? content.replace(/^\s+|\s+$/g, "") : "";
       return alias ? `[[${href}|${alias.replace(/\]/g, "\\]")}]]` : `[[${href}]]`;
     },
   });
 
-  td.addRule("nowenBlockEmbed", {
-    filter: (node) => node.nodeName === "DIV" && (node as Element).getAttribute("data-nowen-block-embed") != null,
+  td.addRule("baseforgeBlockEmbed", {
+    filter: (node) => node.nodeName === "DIV" && (node as Element).getAttribute("data-baseforge-block-embed") != null,
     replacement: (_content, node) => {
-      const href = (node as Element).getAttribute("data-nowen-block-embed") || "";
+      const href = (node as Element).getAttribute("data-baseforge-block-embed") || "";
       return href ? `\n\n![[${href}]]\n\n` : "";
     },
   });
@@ -1354,7 +1354,7 @@ function extractMarkdownBlockIdPlaceholders(md: string): MarkdownBlockIdPlacehol
   const ids: string[] = [];
   const text = md.replace(/(?:\s+|^)\^(blk_[A-Za-z0-9_-]{6,})\s*$/gm, (_match, id) => {
     const index = ids.push(id) - 1;
-    return ` NOWENBLOCKIDTOKEN${index}END`;
+    return ` BASEFORGEBLOCKIDTOKEN${index}END`;
   });
   return { text, ids };
 }
@@ -1362,7 +1362,7 @@ function extractMarkdownBlockIdPlaceholders(md: string): MarkdownBlockIdPlacehol
 function restoreMarkdownBlockIdPlaceholders(html: string, ids: string[]): string {
   let out = html;
   ids.forEach((id, index) => {
-    const token = `NOWENBLOCKIDTOKEN${index}END`;
+    const token = `BASEFORGEBLOCKIDTOKEN${index}END`;
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(`<([a-zA-Z0-9]+)([^>]*)>([\\s\\S]*?)${escaped}([\\s\\S]*?)<\\/\\1>`, "i");
     out = out.replace(pattern, (_match, tag, attrs, before, after) => {

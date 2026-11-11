@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-permission-undo-auth-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-permission-undo-auth-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -51,7 +51,7 @@ test("permission undo rechecks that the importer is still workspace owner/admin"
     "target-workspace",
     "target-workspace",
     "new-root",
-    "nowen",
+    "baseforge",
     undoStateJson,
   );
 

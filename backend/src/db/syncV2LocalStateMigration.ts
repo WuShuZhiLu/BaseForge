@@ -8,7 +8,7 @@ import type { Migration } from "./migrations.impl.js";
  * 「笔记已改但 mutation 没入队」的窗口，等价于静默丢失用户修改。
  *
  * 本迁移只建表，不写入任何数据、不改动任何既有表，也不安装触发器。
- * Sync V2 默认关闭（NOWEN_LOCAL_FIRST_SYNC_V2），因此对现有用户完全无感：
+ * Sync V2 默认关闭（BASEFORGE_LOCAL_FIRST_SYNC_V2），因此对现有用户完全无感：
  * 升级后这些表存在但恒为空，Offline Sync V1 行为不变。
  *
  * 外键取舍（重要）：

@@ -17,7 +17,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { realtime } from "@/lib/realtime";
 import { api } from "@/lib/api";
 
-const SELF_USERID_CACHE_KEY = "nowen-self-userid";
+const SELF_USERID_CACHE_KEY = "baseforge-self-userid";
 
 /**
  * 取当前登录用户 id（带缓存），用于从 presence 中过滤自己。

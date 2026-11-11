@@ -31,12 +31,12 @@ export default function EncryptedNoteCreateDialog({ parentId, onClose }: { paren
     mounted.current = true;
     const scope = getOfflineQueueStorageKey();
     const close = () => { if (getOfflineQueueStorageKey() !== scope) { operation.current?.abort(); onClose(); } };
-    window.addEventListener("nowen:token-changed", close);
-    window.addEventListener("nowen:server-url-changed", close);
+    window.addEventListener("baseforge:token-changed", close);
+    window.addEventListener("baseforge:server-url-changed", close);
     return () => {
       mounted.current = false; operation.current?.abort();
-      window.removeEventListener("nowen:token-changed", close);
-      window.removeEventListener("nowen:server-url-changed", close);
+      window.removeEventListener("baseforge:token-changed", close);
+      window.removeEventListener("baseforge:server-url-changed", close);
     };
   }, []);
   async function create() {
@@ -57,7 +57,7 @@ export default function EncryptedNoteCreateDialog({ parentId, onClose }: { paren
       actions.refreshNotes(); actions.refreshNotebooks(); actions.setActiveNote(note);
       actions.openNoteTab({ id: note.id, title: note.title, notebookId: note.notebookId, contentFormat: note.contentFormat, isLocked: note.isLocked, isTrashed: note.isTrashed, updatedAt: note.updatedAt });
       actions.setMobileView("editor");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "encrypted-note-created", parentId } }));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "encrypted-note-created", parentId } }));
       onClose();
     } catch {
       if (mounted.current && !controller.signal.aborted) setError(t("encryptedCreate.failure"));

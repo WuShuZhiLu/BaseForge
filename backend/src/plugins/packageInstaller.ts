@@ -29,20 +29,25 @@ function assertInside(root: string, target: string): void {
 function normalizeCompatibilityValidationError(error: unknown): never {
   const coded = error as Error & { code?: string; issues?: Array<{ path?: Array<string | number> }> };
   if (coded.code) throw coded;
-  if (coded.message?.startsWith("插件要求 BaseForge ") || coded.message?.includes("engines.nowen")) throw Object.assign(coded, { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
+  if (coded.message?.startsWith("插件要求 BaseForge ") || coded.message?.includes("engines.baseforge")) throw Object.assign(coded, { code: "PLUGIN_BASEFORGE_INCOMPATIBLE" });
   if (coded.message?.startsWith("不支持 Plugin API V")) throw Object.assign(coded, { code: "PLUGIN_API_VERSION_UNSUPPORTED" });
   if (coded.issues?.some((issue) => issue.path?.[0] === "runtime" || issue.path?.[0] === "apiVersion")) throw Object.assign(coded, { code: "PLUGIN_API_RUNTIME_INCOMPATIBLE" });
   throw coded;
 }
 
-const PACKAGE_INTEGRITY_FILE = ".nowen-package.json";
+const PACKAGE_INTEGRITY_FILE = ".baseforge-package.json";
+/** 旧版本插件目录里的完整性文件名，仅用于读取兼容 */
+const LEGACY_PACKAGE_INTEGRITY_FILE = ".nowen-package.json";
 
 function readPackageIntegrity(directory: string): { id?: string; version?: string; checksum?: string } | null {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(directory, PACKAGE_INTEGRITY_FILE), "utf8")) as { id?: string; version?: string; checksum?: string };
-  } catch {
-    return null;
+  for (const name of [PACKAGE_INTEGRITY_FILE, LEGACY_PACKAGE_INTEGRITY_FILE]) {
+    try {
+      return JSON.parse(fs.readFileSync(path.join(directory, name), "utf8")) as { id?: string; version?: string; checksum?: string };
+    } catch {
+      // 尝试下一个文件名
+    }
   }
+  return null;
 }
 
 async function extract(zip: Awaited<ReturnType<typeof validatePluginPackage>>["zip"], destination: string): Promise<void> {

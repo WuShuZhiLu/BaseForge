@@ -1,6 +1,6 @@
 {
     ".url": {
-        "nowen-note.Application": {
+        "baseforge.Application": {
             "title": "弄文笔记",
             "icon": "images/icon_{0}.png",
             "type": "url",

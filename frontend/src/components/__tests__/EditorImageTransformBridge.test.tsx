@@ -119,7 +119,7 @@ describe("EditorImageTransformBridge", () => {
     expect(allowImageResizeThroughMobileBackdrop()).toBe(2);
     document.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
       expect(button.style.pointerEvents).toBe("none");
-      expect(button.dataset.nowenImageBackdropPassthrough).toBe("true");
+      expect(button.dataset.baseforgeImageBackdropPassthrough).toBe("true");
     });
   });
 

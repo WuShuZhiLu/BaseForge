@@ -86,7 +86,7 @@ function detectClientBuildId(): string | null {
 const CLIENT_BUILD_ID: string | null = detectClientBuildId();
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
-const DISMISS_KEY = "nowen-update-dismissed-version";
+const DISMISS_KEY = "baseforge-update-dismissed-version";
 
 /**
  * dismiss 的读写。

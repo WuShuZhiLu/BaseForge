@@ -272,15 +272,15 @@ async function renderMermaidCodeBlocks(root: ParentNode): Promise<void> {
     }
 
     const figure = document.createElement("figure");
-    figure.className = "nowen-note-image-export-mermaid";
-    figure.setAttribute("data-nowen-mermaid-export", "rendered");
+    figure.className = "baseforge-image-export-mermaid";
+    figure.setAttribute("data-baseforge-mermaid-export", "rendered");
 
     const image = document.createElement("img");
     image.src = raster.dataUri;
     image.alt = "Mermaid diagram";
     image.width = Math.max(1, Math.round(raster.width));
     image.height = Math.max(1, Math.round(raster.height));
-    image.setAttribute("data-nowen-mermaid-export-image", "true");
+    image.setAttribute("data-baseforge-mermaid-export-image", "true");
     figure.appendChild(image);
 
     pre.replaceWith(figure);
@@ -328,72 +328,72 @@ function buildStyle(theme: "light" | "dark", fontFamily: string, lineHeight: str
   const codeBg = dark ? "#0b0e14" : "#0d1117";
 
   return `
-    .nowen-note-image-export-host, .nowen-note-image-export-host * { box-sizing: border-box; }
-    .nowen-note-image-export-host { width: ${EXPORT_WIDTH}px; background: ${bg}; color: ${fg}; }
-    .nowen-note-image-export-page {
+    .baseforge-image-export-host, .baseforge-image-export-host * { box-sizing: border-box; }
+    .baseforge-image-export-host { width: ${EXPORT_WIDTH}px; background: ${bg}; color: ${fg}; }
+    .baseforge-image-export-page {
       width: ${EXPORT_WIDTH}px; min-height: 120px; padding: 48px 56px 56px;
       background: ${bg}; color: ${fg}; font-family: ${fontFamily};
       font-size: 15px; line-height: ${lineHeight}; overflow-wrap: anywhere;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
-    .nowen-note-image-export-title { margin: 0 0 8px; font-size: 30px; line-height: 1.28; font-weight: 750; letter-spacing: -0.02em; color: ${fg}; }
-    .nowen-note-image-export-meta { margin: 0 0 30px; color: ${muted}; font-size: 12px; line-height: 1.5; }
-    .nowen-note-image-export-body { color: ${fg}; }
-    .nowen-note-image-export-body > :first-child { margin-top: 0 !important; }
-    .nowen-note-image-export-body > :last-child { margin-bottom: 0 !important; }
-    .nowen-note-image-export-body h1 { margin: 30px 0 12px; font-size: 25px; line-height: 1.35; font-weight: 720; }
-    .nowen-note-image-export-body h2 { margin: 26px 0 10px; font-size: 21px; line-height: 1.4; font-weight: 700; }
-    .nowen-note-image-export-body h3 { margin: 22px 0 8px; font-size: 18px; line-height: 1.45; font-weight: 680; }
-    .nowen-note-image-export-body p { margin: 9px 0; white-space: normal; }
-    .nowen-note-image-export-body a { color: ${dark ? "#79b8ff" : "#0969da"}; text-decoration: none; }
-    .nowen-note-image-export-body strong { font-weight: 700; }
-    .nowen-note-image-export-body ul, .nowen-note-image-export-body ol { margin: 10px 0; padding-left: 1.6em; }
-    .nowen-note-image-export-body ul { list-style: none !important; --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-    .nowen-note-image-export-body ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-    .nowen-note-image-export-body ul ul ul ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul ul ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .nowen-note-image-export-body ul ul ul ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-    .nowen-note-image-export-body ul > li:not([data-type="taskItem"]):not(.task-list-item) { position: relative; }
-    .nowen-note-image-export-body ul > li:not([data-type="taskItem"]):not(.task-list-item)::before { content: var(--nowen-ul-marker); position: absolute; left: -1.2em; top: var(--nowen-ul-marker-top); font-size: var(--nowen-ul-marker-size); line-height: 1; }
-    .nowen-note-image-export-body ul.contains-task-list > li.task-list-item::before,
-    .nowen-note-image-export-body ul[data-type="taskList"] > li[data-type="taskItem"]::before { content: none !important; }
-    .nowen-note-image-export-body li { margin: 4px 0; }
-    .nowen-note-image-export-body li > p { margin: 2px 0; }
-    .nowen-note-image-export-body ul[data-type="taskList"], .nowen-note-image-export-body ul.contains-task-list { padding-left: 0.5em; list-style: none; }
-    .nowen-note-image-export-body li[data-type="taskItem"], .nowen-note-image-export-body li.task-list-item, .nowen-note-image-export-body ul[data-type="taskList"] > li { display: flex; gap: 9px; align-items: flex-start; list-style: none; }
-    .nowen-note-image-export-body input[type="checkbox"] { width: 15px; height: 15px; margin: 5px 0 0; accent-color: #4f7cff; }
-    .nowen-note-image-export-body blockquote { margin: 14px 0; padding: 10px 16px; color: ${muted}; background: ${soft}; border-left: 4px solid ${border}; border-radius: 0 8px 8px 0; }
-    .nowen-note-image-export-body hr { margin: 24px 0; border: 0; border-top: 1px solid ${border}; }
-    .nowen-note-image-export-body table { width: 100% !important; max-width: 100% !important; min-width: 0 !important; margin: 16px 0; border-collapse: collapse; table-layout: fixed; font-size: 14px; overflow-wrap: anywhere; }
-    .nowen-note-image-export-body col { min-width: 0 !important; max-width: none !important; }
-    .nowen-note-image-export-body th, .nowen-note-image-export-body td { width: auto; min-width: 0 !important; max-width: none !important; border: 1px solid ${border}; padding: 8px 10px; vertical-align: top; white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word; }
-    .nowen-note-image-export-body th > *, .nowen-note-image-export-body td > * { max-width: 100% !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
-    .nowen-note-image-export-body th { background: ${soft}; font-weight: 650; }
-    .nowen-note-image-export-body img { display: block; max-width: 100%; height: auto; margin: 14px auto; border-radius: 8px; object-fit: contain; }
-    .nowen-note-image-export-body img[align="left"], .nowen-note-image-export-body img[data-align="left"] { margin-left: 0; margin-right: auto; }
-    .nowen-note-image-export-body img[align="right"], .nowen-note-image-export-body img[data-align="right"] { margin-left: auto; margin-right: 0; }
-    .nowen-note-image-export-body figure { margin: 16px 0; }
-    .nowen-note-image-export-body figcaption { margin-top: 6px; color: ${muted}; font-size: 12px; text-align: center; }
-    .nowen-note-image-export-body .nowen-note-image-export-mermaid { margin: 18px 0; break-inside: avoid; page-break-inside: avoid; }
-    .nowen-note-image-export-body .nowen-note-image-export-mermaid img { width: auto; max-width: 100%; margin: 0 auto; border-radius: 0; }
-    .nowen-note-image-export-body code { padding: 2px 5px; border-radius: 4px; background: ${soft}; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .91em; }
-    .nowen-note-image-export-body pre { position: relative; margin: 16px 0; padding: 18px 18px 16px; overflow: hidden; border-radius: 10px; background: ${codeBg}; color: #e6edf3; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .nowen-note-image-export-body pre[data-language] { padding-top: 32px; }
-    .nowen-note-image-export-body pre[data-language]::before { content: attr(data-language); position: absolute; top: 9px; right: 13px; color: #8b949e; font: 600 10px/1.2 ui-monospace, monospace; letter-spacing: .08em; }
-    .nowen-note-image-export-body pre code { padding: 0; border-radius: 0; background: transparent; color: inherit; font-size: 12.5px; line-height: 1.6; }
-    .nowen-note-image-export-body mark { padding: 0 2px; border-radius: 3px; background: ${dark ? "#5c4b14" : "#fff3a3"}; color: inherit; }
-    .nowen-note-image-export-body .hljs-comment, .nowen-note-image-export-body .hljs-quote { color: #8b949e; }
-    .nowen-note-image-export-body .hljs-keyword, .nowen-note-image-export-body .hljs-selector-tag, .nowen-note-image-export-body .hljs-type { color: #ff7b72; }
-    .nowen-note-image-export-body .hljs-string, .nowen-note-image-export-body .hljs-attr, .nowen-note-image-export-body .hljs-template-tag { color: #a5d6ff; }
-    .nowen-note-image-export-body .hljs-number, .nowen-note-image-export-body .hljs-literal { color: #79c0ff; }
-    .nowen-note-image-export-body .hljs-title, .nowen-note-image-export-body .hljs-section, .nowen-note-image-export-body .hljs-function { color: #d2a8ff; }
-    .nowen-note-image-export-body .hljs-variable, .nowen-note-image-export-body .hljs-params, .nowen-note-image-export-body .hljs-property { color: #ffa657; }
-    .nowen-note-image-export-body .hljs-built_in, .nowen-note-image-export-body .hljs-symbol { color: #f2cc60; }
-    .nowen-note-image-export-body .katex-display { overflow: hidden; margin: 16px 0; }
+    .baseforge-image-export-title { margin: 0 0 8px; font-size: 30px; line-height: 1.28; font-weight: 750; letter-spacing: -0.02em; color: ${fg}; }
+    .baseforge-image-export-meta { margin: 0 0 30px; color: ${muted}; font-size: 12px; line-height: 1.5; }
+    .baseforge-image-export-body { color: ${fg}; }
+    .baseforge-image-export-body > :first-child { margin-top: 0 !important; }
+    .baseforge-image-export-body > :last-child { margin-bottom: 0 !important; }
+    .baseforge-image-export-body h1 { margin: 30px 0 12px; font-size: 25px; line-height: 1.35; font-weight: 720; }
+    .baseforge-image-export-body h2 { margin: 26px 0 10px; font-size: 21px; line-height: 1.4; font-weight: 700; }
+    .baseforge-image-export-body h3 { margin: 22px 0 8px; font-size: 18px; line-height: 1.45; font-weight: 680; }
+    .baseforge-image-export-body p { margin: 9px 0; white-space: normal; }
+    .baseforge-image-export-body a { color: ${dark ? "#79b8ff" : "#0969da"}; text-decoration: none; }
+    .baseforge-image-export-body strong { font-weight: 700; }
+    .baseforge-image-export-body ul, .baseforge-image-export-body ol { margin: 10px 0; padding-left: 1.6em; }
+    .baseforge-image-export-body ul { list-style: none !important; --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+    .baseforge-image-export-body ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+    .baseforge-image-export-body ul ul ul ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .baseforge-image-export-body ul ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+    .baseforge-image-export-body ul > li:not([data-type="taskItem"]):not(.task-list-item) { position: relative; }
+    .baseforge-image-export-body ul > li:not([data-type="taskItem"]):not(.task-list-item)::before { content: var(--baseforge-ul-marker); position: absolute; left: -1.2em; top: var(--baseforge-ul-marker-top); font-size: var(--baseforge-ul-marker-size); line-height: 1; }
+    .baseforge-image-export-body ul.contains-task-list > li.task-list-item::before,
+    .baseforge-image-export-body ul[data-type="taskList"] > li[data-type="taskItem"]::before { content: none !important; }
+    .baseforge-image-export-body li { margin: 4px 0; }
+    .baseforge-image-export-body li > p { margin: 2px 0; }
+    .baseforge-image-export-body ul[data-type="taskList"], .baseforge-image-export-body ul.contains-task-list { padding-left: 0.5em; list-style: none; }
+    .baseforge-image-export-body li[data-type="taskItem"], .baseforge-image-export-body li.task-list-item, .baseforge-image-export-body ul[data-type="taskList"] > li { display: flex; gap: 9px; align-items: flex-start; list-style: none; }
+    .baseforge-image-export-body input[type="checkbox"] { width: 15px; height: 15px; margin: 5px 0 0; accent-color: #4f7cff; }
+    .baseforge-image-export-body blockquote { margin: 14px 0; padding: 10px 16px; color: ${muted}; background: ${soft}; border-left: 4px solid ${border}; border-radius: 0 8px 8px 0; }
+    .baseforge-image-export-body hr { margin: 24px 0; border: 0; border-top: 1px solid ${border}; }
+    .baseforge-image-export-body table { width: 100% !important; max-width: 100% !important; min-width: 0 !important; margin: 16px 0; border-collapse: collapse; table-layout: fixed; font-size: 14px; overflow-wrap: anywhere; }
+    .baseforge-image-export-body col { min-width: 0 !important; max-width: none !important; }
+    .baseforge-image-export-body th, .baseforge-image-export-body td { width: auto; min-width: 0 !important; max-width: none !important; border: 1px solid ${border}; padding: 8px 10px; vertical-align: top; white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word; }
+    .baseforge-image-export-body th > *, .baseforge-image-export-body td > * { max-width: 100% !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
+    .baseforge-image-export-body th { background: ${soft}; font-weight: 650; }
+    .baseforge-image-export-body img { display: block; max-width: 100%; height: auto; margin: 14px auto; border-radius: 8px; object-fit: contain; }
+    .baseforge-image-export-body img[align="left"], .baseforge-image-export-body img[data-align="left"] { margin-left: 0; margin-right: auto; }
+    .baseforge-image-export-body img[align="right"], .baseforge-image-export-body img[data-align="right"] { margin-left: auto; margin-right: 0; }
+    .baseforge-image-export-body figure { margin: 16px 0; }
+    .baseforge-image-export-body figcaption { margin-top: 6px; color: ${muted}; font-size: 12px; text-align: center; }
+    .baseforge-image-export-body .baseforge-image-export-mermaid { margin: 18px 0; break-inside: avoid; page-break-inside: avoid; }
+    .baseforge-image-export-body .baseforge-image-export-mermaid img { width: auto; max-width: 100%; margin: 0 auto; border-radius: 0; }
+    .baseforge-image-export-body code { padding: 2px 5px; border-radius: 4px; background: ${soft}; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: .91em; }
+    .baseforge-image-export-body pre { position: relative; margin: 16px 0; padding: 18px 18px 16px; overflow: hidden; border-radius: 10px; background: ${codeBg}; color: #e6edf3; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .baseforge-image-export-body pre[data-language] { padding-top: 32px; }
+    .baseforge-image-export-body pre[data-language]::before { content: attr(data-language); position: absolute; top: 9px; right: 13px; color: #8b949e; font: 600 10px/1.2 ui-monospace, monospace; letter-spacing: .08em; }
+    .baseforge-image-export-body pre code { padding: 0; border-radius: 0; background: transparent; color: inherit; font-size: 12.5px; line-height: 1.6; }
+    .baseforge-image-export-body mark { padding: 0 2px; border-radius: 3px; background: ${dark ? "#5c4b14" : "#fff3a3"}; color: inherit; }
+    .baseforge-image-export-body .hljs-comment, .baseforge-image-export-body .hljs-quote { color: #8b949e; }
+    .baseforge-image-export-body .hljs-keyword, .baseforge-image-export-body .hljs-selector-tag, .baseforge-image-export-body .hljs-type { color: #ff7b72; }
+    .baseforge-image-export-body .hljs-string, .baseforge-image-export-body .hljs-attr, .baseforge-image-export-body .hljs-template-tag { color: #a5d6ff; }
+    .baseforge-image-export-body .hljs-number, .baseforge-image-export-body .hljs-literal { color: #79c0ff; }
+    .baseforge-image-export-body .hljs-title, .baseforge-image-export-body .hljs-section, .baseforge-image-export-body .hljs-function { color: #d2a8ff; }
+    .baseforge-image-export-body .hljs-variable, .baseforge-image-export-body .hljs-params, .baseforge-image-export-body .hljs-property { color: #ffa657; }
+    .baseforge-image-export-body .hljs-built_in, .baseforge-image-export-body .hljs-symbol { color: #f2cc60; }
+    .baseforge-image-export-body .katex-display { overflow: hidden; margin: 16px 0; }
   `;
 }
 
@@ -466,7 +466,7 @@ async function prepareHost(
   const background = theme === "dark" ? "#111318" : "#ffffff";
 
   const host = document.createElement("div");
-  host.className = "nowen-note-image-export-host";
+  host.className = "baseforge-image-export-host";
   Object.assign(host.style, {
     position: "fixed",
     left: "-100000px",
@@ -482,16 +482,16 @@ async function prepareHost(
   host.appendChild(style);
 
   const article = document.createElement("article");
-  article.className = "nowen-note-image-export-page";
+  article.className = "baseforge-image-export-page";
 
   const title = document.createElement("h1");
-  title.className = "nowen-note-image-export-title";
+  title.className = "baseforge-image-export-title";
   title.textContent = note.title || "无标题笔记";
   article.appendChild(title);
 
   if (note.createdAt || note.updatedAt) {
     const meta = document.createElement("div");
-    meta.className = "nowen-note-image-export-meta";
+    meta.className = "baseforge-image-export-meta";
     const parts: string[] = [];
     if (note.createdAt) parts.push(`创建：${new Date(note.createdAt).toLocaleString()}`);
     if (note.updatedAt) parts.push(`更新：${new Date(note.updatedAt).toLocaleString()}`);
@@ -500,7 +500,7 @@ async function prepareHost(
   }
 
   const body = document.createElement("div");
-  body.className = "nowen-note-image-export-body";
+  body.className = "baseforge-image-export-body";
   body.innerHTML = bodyHtml || "";
   normalizeExportTables(body, EXPORT_CONTENT_WIDTH);
   await renderMermaidCodeBlocks(body);
@@ -535,7 +535,7 @@ function collectBlockBottoms(article: HTMLElement): number[] {
   const articleRect = article.getBoundingClientRect();
   const selector = [
     ":scope > *", "h1", "h2", "h3", "p", "li", "pre", "table", "blockquote", "figure", "img", "hr",
-    ".nowen-note-image-export-mermaid",
+    ".baseforge-image-export-mermaid",
   ].join(",");
   return Array.from(article.querySelectorAll(selector))
     .map((element) => Math.ceil((element as HTMLElement).getBoundingClientRect().bottom - articleRect.top))
@@ -625,7 +625,7 @@ async function renderSlice(
   clone.style.height = `${slice.height}px`;
   clone.style.overflow = "hidden";
   clone.style.zIndex = "-1";
-  const article = clone.querySelector(".nowen-note-image-export-page") as HTMLElement | null;
+  const article = clone.querySelector(".baseforge-image-export-page") as HTMLElement | null;
   if (!article) throw new Error("EXPORT_ARTICLE_MISSING");
   article.style.transform = `translateY(-${slice.offset}px)`;
   article.style.transformOrigin = "top left";

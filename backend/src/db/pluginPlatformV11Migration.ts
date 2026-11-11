@@ -6,7 +6,7 @@ function hasColumn(db: any, table: string, column: string): boolean {
 
 export const pluginPlatformV11Migration: Migration = {
   version: 94,
-  name: "nowen-extension-platform-v1-1-community-ready",
+  name: "baseforge-extension-platform-v1-1-community-ready",
   up: (db) => {
     if (!hasColumn(db, "plugin_registry", "previousVersion")) {
       db.exec("ALTER TABLE plugin_registry ADD COLUMN previousVersion TEXT");

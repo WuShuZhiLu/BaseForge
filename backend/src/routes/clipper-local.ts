@@ -15,7 +15,7 @@ import type { ClipperScope } from "../services/clipper-credential";
  *
  * 目标：没有 NAS、没有服务器，也能用浏览器扩展剪藏。
  *
- *   Browser Extension → Nowen Desktop → Local Backend → Local SQLite
+ *   Browser Extension → BaseForge Desktop → Local Backend → Local SQLite
  *   （开启同步后再由 Outbox → Server，Clipper 完全不关心这一层）
  *
  * 安全约束：

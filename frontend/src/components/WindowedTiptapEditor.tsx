@@ -22,7 +22,7 @@ import {
 } from "@/lib/yjsSubdocumentModel";
 import BaseTiptapEditor from "./TiptapEditor";
 
-export const TIPTAP_SUBDOCUMENT_WINDOWING_KEY = "nowen:tiptap-subdocuments";
+export const TIPTAP_SUBDOCUMENT_WINDOWING_KEY = "baseforge:tiptap-subdocuments";
 
 export function isTiptapSubdocumentWindowingEnabled(): boolean {
   try { return localStorage.getItem(TIPTAP_SUBDOCUMENT_WINDOWING_KEY) === "1"; } catch { return false; }

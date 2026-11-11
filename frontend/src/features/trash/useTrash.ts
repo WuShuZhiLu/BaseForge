@@ -27,13 +27,13 @@ export function useTrash(workspaceId: string, refreshToken: number) {
   useEffect(() => {
     void reload();
     const refresh = () => { void reload(); };
-    window.addEventListener("nowen:knowledge-tree-changed", refresh);
-    window.addEventListener("nowen:workspace-refresh-applied", refresh);
+    window.addEventListener("baseforge:knowledge-tree-changed", refresh);
+    window.addEventListener("baseforge:workspace-refresh-applied", refresh);
     const offs = ["note:deleted", "notes:deleted", "note:updated"].map((event) => realtime.on(event, refresh));
     return () => {
       generation.current++;
-      window.removeEventListener("nowen:knowledge-tree-changed", refresh);
-      window.removeEventListener("nowen:workspace-refresh-applied", refresh);
+      window.removeEventListener("baseforge:knowledge-tree-changed", refresh);
+      window.removeEventListener("baseforge:workspace-refresh-applied", refresh);
       offs.forEach((off) => off());
     };
   }, [reload, refreshToken]);

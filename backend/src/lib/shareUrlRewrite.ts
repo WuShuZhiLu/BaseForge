@@ -50,7 +50,7 @@ function normalizeForwardedPrefix(value: string | undefined | null): string {
  * 即使它来自 X-Forwarded-Host，也不能把回环地址签发给外部客户端。调用方此时应返回
  * 相对 URL，由客户端以真实 API 请求 origin 解析。
  *
- * 返回形如 "https://notes.example.com" 或 "https://example.com/nowen-note"，不带末尾斜杠。
+ * 返回形如 "https://notes.example.com" 或 "https://example.com/baseforge"，不带末尾斜杠。
  * 解析失败返回 null，调用方应放弃改写并保持相对路径。
  */
 export function resolvePublicOrigin(getHeader: (name: string) => string | undefined | null): string | null {

@@ -29,7 +29,7 @@ describe("editor runtime notice", () => {
     setActiveEditorRuntimeDecision("viewport-note", decision);
 
     expect(getActiveEditorRuntimeState().decision.mode).toBe("viewport-optimized");
-    expect(document.getElementById("nowen-editor-runtime-notice")).toBeNull();
+    expect(document.getElementById("baseforge-editor-runtime-notice")).toBeNull();
   });
 
   it("does not show a notice for lightweight-edit mode", () => {
@@ -40,7 +40,7 @@ describe("editor runtime notice", () => {
     setActiveEditorRuntimeDecision("notice-note", decision);
 
     expect(getActiveEditorRuntimeState().decision.mode).toBe("lightweight-edit");
-    expect(document.getElementById("nowen-editor-runtime-notice")).toBeNull();
+    expect(document.getElementById("baseforge-editor-runtime-notice")).toBeNull();
   });
 
   it("does not allow the session restore API to bypass emergency readonly", () => {
@@ -53,6 +53,6 @@ describe("editor runtime notice", () => {
     requestActiveEditorRuntimeMode("normal");
 
     expect(getActiveEditorRuntimeState().decision.mode).toBe("emergency-readonly");
-    expect(document.getElementById("nowen-editor-runtime-notice")).toBeNull();
+    expect(document.getElementById("baseforge-editor-runtime-notice")).toBeNull();
   });
 });

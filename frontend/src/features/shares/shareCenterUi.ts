@@ -20,11 +20,11 @@ export type ShareCenterQuick = "all" | "view" | "comment" | "edit" | "password" 
 export type ShareCenterSortKey = NonNullable<ShareCenterQuery["sort"]>;
 
 const KEYS = {
-  group: "nowen.shareCenter.group",
-  objectKind: "nowen.shareCenter.objectKind",
-  risk: "nowen.shareCenter.risk",
-  quick: "nowen.shareCenter.quick",
-  sort: "nowen.shareCenter.sort",
+  group: "baseforge.shareCenter.group",
+  objectKind: "baseforge.shareCenter.objectKind",
+  risk: "baseforge.shareCenter.risk",
+  quick: "baseforge.shareCenter.quick",
+  sort: "baseforge.shareCenter.sort",
 } as const;
 
 let uiVersion = 0;

@@ -5,7 +5,7 @@ import { getDb } from "../db/schema.js";
 import { blockExists, resolveSplitBlockTarget } from "../lib/noteBlockRedirects.js";
 import { hasPermission, resolveNotePermission } from "../middleware/acl.js";
 
-const BLOCK_LINK_REDIRECT_PATCH = Symbol.for("nowen.blockLinks.redirectRoutePatch");
+const BLOCK_LINK_REDIRECT_PATCH = Symbol.for("baseforge.blockLinks.redirectRoutePatch");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

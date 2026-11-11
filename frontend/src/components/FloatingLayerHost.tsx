@@ -142,7 +142,7 @@ export default function FloatingLayerHost() {
     const destination = resolveUiNavigation(component.action.target);
     if (!destination) return;
     if (destination.kind === "settings") {
-      window.dispatchEvent(new Event("nowen:open-settings"));
+      window.dispatchEvent(new Event("baseforge:open-settings"));
     } else {
       actions.setViewMode(destination.view);
       actions.setMobileSidebar(false);

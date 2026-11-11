@@ -5,7 +5,7 @@ import { getPluginService } from "../plugins/pluginService.js";
 import { evaluateCondition } from "./conditionEvaluator.js";
 import { rowToEvent } from "./eventPublisher.js";
 import { resolveTemplates } from "./templateResolver.js";
-import type { ExecutionVariables, NowenEvent, WorkflowDefinition, WorkflowRecord, WorkflowRunRecord, WorkflowStep } from "./types.js";
+import type { ExecutionVariables, BaseForgeEvent, WorkflowDefinition, WorkflowRecord, WorkflowRunRecord, WorkflowStep } from "./types.js";
 import { WorkflowRepository } from "./workflowRepository.js";
 import { assertAssistantWorkflowOwner } from "../services/wechatAssistant.js";
 import { assertInboundWorkflowOwner } from "../plugins/inboundWebhooks.js";
@@ -135,7 +135,7 @@ export class WorkflowRunner {
     throw lastError;
   }
 
-  private loadEvent(run: WorkflowRunRecord, workflow: WorkflowRecord): NowenEvent {
+  private loadEvent(run: WorkflowRunRecord, workflow: WorkflowRecord): BaseForgeEvent {
     if (run.eventId) {
       const row = getDb().prepare("SELECT * FROM automation_events WHERE id=?").get(run.eventId) as Record<string, unknown> | undefined;
       if (row) return rowToEvent(row);

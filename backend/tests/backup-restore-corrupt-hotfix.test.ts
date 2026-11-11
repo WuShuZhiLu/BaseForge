@@ -8,9 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { loadSqliteVec } from "../src/db/sqlite-vec-extension.js";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-backup-restore-hotfix-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-backup-restore-hotfix-"));
 const backupDir = path.join(tmpDir, "backups");
-const dbPath = path.join(tmpDir, "nowen-note.db");
+const dbPath = path.join(tmpDir, "baseforge.db");
 const markerKey = "backup-restore-hotfix:marker";
 const userId = "restore-user";
 
@@ -70,8 +70,8 @@ function assertLoginSessionWritable(id: string) {
 }
 
 function assertNoWalShm() {
-  assert.equal(fs.existsSync(dbPath + "-wal"), false, "nowen-note.db-wal should not remain after failed restore");
-  assert.equal(fs.existsSync(dbPath + "-shm"), false, "nowen-note.db-shm should not remain after failed restore");
+  assert.equal(fs.existsSync(dbPath + "-wal"), false, "baseforge.db-wal should not remain after failed restore");
+  assert.equal(fs.existsSync(dbPath + "-shm"), false, "baseforge.db-shm should not remain after failed restore");
 }
 
 async function createBackupDb(marker: string) {
@@ -191,7 +191,7 @@ test("zip file-stage failure rolls back database and does not update jwt secret"
   fs.renameSync = ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
     const oldText = String(oldPath);
     const newText = String(newPath);
-    if (!simulated && oldText.includes(".nowen-restore-staging") && newText.endsWith(`${path.sep}fonts`)) {
+    if (!simulated && oldText.includes(".baseforge-restore-staging") && newText.endsWith(`${path.sep}fonts`)) {
       simulated = true;
       const err = new Error("simulated unrecoverable fonts restore failure") as NodeJS.ErrnoException;
       // EACCES/EPERM/EBUSY/EXDEV are intentionally recoverable now: Docker/NAS mount roots

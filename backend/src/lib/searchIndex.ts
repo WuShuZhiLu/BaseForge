@@ -169,18 +169,18 @@ export function repairLegacyMarkdownBlockMetadata(db: DatabaseSync): number {
 }
 
 /**
- * 把 `nowen_search_normalize` 注册到这条连接上（幂等）。
+ * 把 `baseforge_search_normalize` 注册到这条连接上（幂等）。
  *
  * 它被 notes 上的 FTS 同步触发器引用，而触发器一旦存在，任何触碰 notes 的语句
  * 都会在 **prepare 阶段**解析它 —— 哪怕 WHEN 条件最后不成立。迁移跑在
  * ensureNormalizedSearchFts() 之前，所以迁移里只要 UPDATE/DELETE notes，
- * 就必须先注册，否则老库升级会以 `no such function: nowen_search_normalize`
+ * 就必须先注册，否则老库升级会以 `no such function: baseforge_search_normalize`
  * 直接打断启动（新库没有触发器，所以只有存量库会炸，测试若只建新库会漏掉）。
  */
 export function registerSearchNormalizeFunction(db: DatabaseSync): void {
   if (normalizedSearchFunctionDatabases.has(db as object)) return;
   db.function(
-    "nowen_search_normalize",
+    "baseforge_search_normalize",
     { deterministic: true },
     (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
   );
@@ -202,8 +202,8 @@ function createNormalizedSearchFts(db: DatabaseSync): void {
       INSERT INTO notes_search_fts(rowid, title, contentText)
       VALUES (
         new.rowid,
-        nowen_search_normalize(COALESCE(new.title, '')),
-        nowen_search_normalize(COALESCE(new.contentText, ''))
+        baseforge_search_normalize(COALESCE(new.title, '')),
+        baseforge_search_normalize(COALESCE(new.contentText, ''))
       );
     END;
 
@@ -213,8 +213,8 @@ function createNormalizedSearchFts(db: DatabaseSync): void {
       VALUES (
         'delete',
         old.rowid,
-        nowen_search_normalize(COALESCE(old.title, '')),
-        nowen_search_normalize(COALESCE(old.contentText, ''))
+        baseforge_search_normalize(COALESCE(old.title, '')),
+        baseforge_search_normalize(COALESCE(old.contentText, ''))
       );
     END;
 
@@ -226,14 +226,14 @@ function createNormalizedSearchFts(db: DatabaseSync): void {
       VALUES (
         'delete',
         old.rowid,
-        nowen_search_normalize(COALESCE(old.title, '')),
-        nowen_search_normalize(COALESCE(old.contentText, ''))
+        baseforge_search_normalize(COALESCE(old.title, '')),
+        baseforge_search_normalize(COALESCE(old.contentText, ''))
       );
       INSERT INTO notes_search_fts(rowid, title, contentText)
       VALUES (
         new.rowid,
-        nowen_search_normalize(COALESCE(new.title, '')),
-        nowen_search_normalize(COALESCE(new.contentText, ''))
+        baseforge_search_normalize(COALESCE(new.title, '')),
+        baseforge_search_normalize(COALESCE(new.contentText, ''))
       );
     END;
   `);
@@ -250,8 +250,8 @@ export function rebuildNormalizedSearchFts(db: DatabaseSync): void {
   db.prepare(`
     INSERT INTO notes_search_fts(rowid, title, contentText)
     SELECT rowid,
-           nowen_search_normalize(COALESCE(title, '')),
-           nowen_search_normalize(COALESCE(contentText, ''))
+           baseforge_search_normalize(COALESCE(title, '')),
+           baseforge_search_normalize(COALESCE(contentText, ''))
     FROM notes
   `).run();
 }

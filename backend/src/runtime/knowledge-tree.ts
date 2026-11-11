@@ -25,8 +25,8 @@ import searchRouter from "../routes/search.js";
 import exportRouter from "../routes/export.js";
 import filesRouter from "../routes/files.js";
 
-const INSTALL_KEY = Symbol.for("nowen.knowledgeTree.runtimeInstalled");
-const GUARDED_PATHS_KEY = Symbol.for("nowen.knowledgeTree.guardedPaths");
+const INSTALL_KEY = Symbol.for("baseforge.knowledgeTree.runtimeInstalled");
+const GUARDED_PATHS_KEY = Symbol.for("baseforge.knowledgeTree.guardedPaths");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 const MAX_OFFLINE_COMPACTION_PAGES = 200;
 

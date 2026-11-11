@@ -128,8 +128,8 @@ import {
 import { useApp, useAppActions } from "@/store/AppContext";
 import { NodeIcon, NodeKindIcon } from "@/lib/nodeIcons";
 
-export const FOCUS_KNOWLEDGE_TREE_EVENT = "nowen:focus-knowledge-tree";
-export const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+export const FOCUS_KNOWLEDGE_TREE_EVENT = "baseforge:focus-knowledge-tree";
+export const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 const DESKTOP_COMPACT_TOOLBAR_WIDTH = 280;
 
 function buildChildren(nodes: KnowledgeTreeNode[]) {
@@ -448,10 +448,10 @@ export function KnowledgeTreePanel({
   useEffect(() => {
     if (!surfaceActive) return;
     const refresh = () => void reload();
-    window.addEventListener("nowen:workspace-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
     window.addEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
       window.removeEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     };
   }, [reload, surfaceActive]);
@@ -775,7 +775,7 @@ export function KnowledgeTreePanel({
   }, [closeMenu, setNodeExpanded, unlockedFolderIds]);
 
   /**
-   * 面板框架（A 侧）：侧栏面板头的 ＋ → 派发 nowen:sidebar-panel-action { panelId:"tree", action:"new" }。
+   * 面板框架（A 侧）：侧栏面板头的 ＋ → 派发 baseforge:sidebar-panel-action { panelId:"tree", action:"new" }。
    * 这里监听并复用本面板既有的「新建根文件夹」入口（startInlineCreate(null,"folder")），
    * 与树自身工具栏的 ＋ 行为完全一致——不新增创建 UI。
    */
@@ -786,17 +786,17 @@ export function KnowledgeTreePanel({
       if (detail?.panelId !== "tree" || detail?.action !== "new") return;
       startInlineCreate(null, "folder");
     };
-    window.addEventListener("nowen:sidebar-panel-action", onPanelAction);
+    window.addEventListener("baseforge:sidebar-panel-action", onPanelAction);
     // 面板框架刷新协议：面板头 ⋯ → 刷新
     const onPanelRefresh = (event: Event) => {
       const detail = (event as CustomEvent<{ panelId?: string }>).detail;
       if (detail?.panelId !== "tree") return;
       void reload();
     };
-    window.addEventListener("nowen:sidebar-panel-refresh", onPanelRefresh);
+    window.addEventListener("baseforge:sidebar-panel-refresh", onPanelRefresh);
     return () => {
-      window.removeEventListener("nowen:sidebar-panel-action", onPanelAction);
-      window.removeEventListener("nowen:sidebar-panel-refresh", onPanelRefresh);
+      window.removeEventListener("baseforge:sidebar-panel-action", onPanelAction);
+      window.removeEventListener("baseforge:sidebar-panel-refresh", onPanelRefresh);
     };
   }, [startInlineCreate, variant, reload]);
 
@@ -1300,13 +1300,13 @@ export function KnowledgeTreePanel({
           onDragStart={(event) => {
             draggedTreeNodeIdRef.current = node.id;
             event.dataTransfer.effectAllowed = "move";
-            event.dataTransfer.setData("application/x-nowen-tree-node", node.id);
+            event.dataTransfer.setData("application/x-baseforge-tree-node", node.id);
           }}
           onDragOver={(event) => {
-            if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+            if (!event.dataTransfer.types.includes("application/x-baseforge-tree-node")) return;
             event.preventDefault();
             event.stopPropagation();
-            const sourceId = event.dataTransfer.getData("application/x-nowen-tree-node") || draggedTreeNodeIdRef.current || "";
+            const sourceId = event.dataTransfer.getData("application/x-baseforge-tree-node") || draggedTreeNodeIdRef.current || "";
             const rect = event.currentTarget.getBoundingClientRect();
             const placement = resolveKnowledgeTreeDropPlacement(event.clientY, rect.top, rect.height);
             if (!canDropWithTarget(sourceId, node, placement)) {
@@ -1323,10 +1323,10 @@ export function KnowledgeTreePanel({
           }}
           onDragLeave={() => setTreeDropTarget((current) => (current?.nodeId === node.id ? null : current))}
           onDrop={(event) => {
-            if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+            if (!event.dataTransfer.types.includes("application/x-baseforge-tree-node")) return;
             event.preventDefault();
             event.stopPropagation();
-            const sourceId = event.dataTransfer.getData("application/x-nowen-tree-node") || draggedTreeNodeIdRef.current || "";
+            const sourceId = event.dataTransfer.getData("application/x-baseforge-tree-node") || draggedTreeNodeIdRef.current || "";
             const rect = event.currentTarget.getBoundingClientRect();
             const placement = resolveKnowledgeTreeDropPlacement(event.clientY, rect.top, rect.height);
             setTreeDropTarget(null);
@@ -1537,7 +1537,7 @@ export function KnowledgeTreePanel({
     <section
       ref={rootRef}
       className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}
-      data-nowen-knowledge-tree="embedded"
+      data-baseforge-knowledge-tree="embedded"
       data-knowledge-tree-variant={variant}
       data-knowledge-tree-compact-toolbar={compactToolbar ? "true" : "false"}
       data-sidebar-surface-active={surfaceActive ? "true" : "false"}
@@ -1684,7 +1684,7 @@ export function KnowledgeTreePanel({
         onDragOver={(event) => {
           // 行内 dragover 已 preventDefault/stopPropagation；只有空白区才走到这里作根层落点。
           if (event.defaultPrevented) return;
-          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
+          if (!event.dataTransfer.types.includes("application/x-baseforge-tree-node")) return;
           const sourceId = draggedTreeNodeIdRef.current || "";
           if (!sourceId || !canDropIntoRoot(sourceId)) return;
           event.preventDefault();
@@ -1692,8 +1692,8 @@ export function KnowledgeTreePanel({
         }}
         onDrop={(event) => {
           if (event.defaultPrevented) return;
-          if (!event.dataTransfer.types.includes("application/x-nowen-tree-node")) return;
-          const sourceId = event.dataTransfer.getData("application/x-nowen-tree-node") || draggedTreeNodeIdRef.current || "";
+          if (!event.dataTransfer.types.includes("application/x-baseforge-tree-node")) return;
+          const sourceId = event.dataTransfer.getData("application/x-baseforge-tree-node") || draggedTreeNodeIdRef.current || "";
           if (!sourceId || !canDropIntoRoot(sourceId)) return;
           event.preventDefault();
           setTreeDropTarget(null);

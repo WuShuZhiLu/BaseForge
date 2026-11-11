@@ -16,7 +16,7 @@ import fs from "fs";
 import path from "path";
 
 /** v1（历史）用盐；v2 直接用密钥文件，不再派生 */
-const LEGACY_SALT = "nowen-remote-files-v1";
+const LEGACY_SALT = "baseforge-remote-files-v1";
 
 function dataDir(): string {
   return process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
@@ -50,7 +50,7 @@ function remoteKey(): Buffer {
 /** 仅用于解密历史 v1 密文；新密文不再走这里。 */
 function legacyKey(): Buffer {
   const secret = process.env.JWT_SECRET || "";
-  const source = secret.length >= 16 ? secret : "nowen-note-remote-files-development-key";
+  const source = secret.length >= 16 ? secret : "baseforge-remote-files-development-key";
   return crypto.scryptSync(source, LEGACY_SALT, 32);
 }
 

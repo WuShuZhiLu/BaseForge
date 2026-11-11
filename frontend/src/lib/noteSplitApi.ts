@@ -32,7 +32,7 @@ export class NoteSplitRequestError extends Error {
 async function splitJson<T>(path: string, body: unknown): Promise<T> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), 60_000);
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   try {
     const response = await fetch(`${getBaseUrl()}${path}`, {
       method: "POST",

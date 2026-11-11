@@ -11,14 +11,14 @@ import {
 import { dequeue, enqueue, getQueue, updateItem } from "@/lib/offlineQueue";
 import { saveDraft } from "@/lib/draftStorage";
 
-const INSTALL_KEY = "__NOWEN_NOTE_SYNC_SAFETY_V1__" as const;
-const CONFLICT_STORAGE_KEY = "nowen-note-sync-conflicts:v1";
+const INSTALL_KEY = "__BASEFORGE_NOTE_SYNC_SAFETY_V1__" as const;
+const CONFLICT_STORAGE_KEY = "baseforge-sync-conflicts:v1";
 const MAX_CONFLICTS = 20;
 const MAX_SNAPSHOT_CHARS = 500_000;
 const resolvingNoteIds = new Set<string>();
 const confirmedNotes = new Map<string, Note>();
 
-export const NOTE_SYNC_PENDING_EVENT = "nowen:note-sync-pending";
+export const NOTE_SYNC_PENDING_EVENT = "baseforge:note-sync-pending";
 
 export interface NoteSyncConflictRecord {
   noteId: string;

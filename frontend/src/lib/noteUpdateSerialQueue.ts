@@ -4,7 +4,7 @@ import { markDraftAcknowledged } from "@/lib/draftStorage";
 import { hasPendingNoteSyncConflict } from "@/lib/noteSyncSafety";
 import { LatestOnlyVersionedSaveQueue } from "@/lib/latestOnlyVersionedSaveQueue";
 
-const INSTALL_KEY = "__NOWEN_NOTE_UPDATE_SERIAL_QUEUE_V1__" as const;
+const INSTALL_KEY = "__BASEFORGE_NOTE_UPDATE_SERIAL_QUEUE_V1__" as const;
 const VERSIONED_FIELDS = ["title", "content", "contentText", "contentFormat"] as const;
 
 type GuardedWindow = Window & typeof globalThis & {

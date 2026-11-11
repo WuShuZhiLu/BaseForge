@@ -95,7 +95,7 @@ export function PmMiniPanel() {
             <button
               key={p.id}
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("nowen:pm-focus-project", { detail: { projectId: p.id } }))}
+              onClick={() => window.dispatchEvent(new CustomEvent("baseforge:pm-focus-project", { detail: { projectId: p.id } }))}
               className="sbx-row w-full text-left flex items-center gap-2"
             >
               <ListTodo size={11} className="shrink-0 text-accent-primary" />
@@ -113,8 +113,8 @@ export function PmMiniPanel() {
  * 待办迷你面板（统一规格）：侧栏待办导航层。
  *
  * 主区（TaskWorkspaceImpl）左栏已移除，本面板是唯一导航层：
- * - 「视图」分区行点击 dispatch `nowen:task-filter-select`（key 与主区 FILTERS 一致）；
- * - 「清单」分区行点击 dispatch `nowen:task-focus-project`；
+ * - 「视图」分区行点击 dispatch `baseforge:task-filter-select`（key 与主区 FILTERS 一致）；
+ * - 「清单」分区行点击 dispatch `baseforge:task-focus-project`；
  * - 选中态为本地记录（主区暂无回传事件）。
  */
 const TASK_PANEL_VIEWS: { key: TaskFilter; labelKey: string; icon: React.ReactNode }[] = [
@@ -164,12 +164,12 @@ export function TasksMiniPanel() {
   const selectView = useCallback((key: TaskFilter) => {
     setSelectedView(key);
     setSelectedProjectId(null);
-    window.dispatchEvent(new CustomEvent("nowen:task-filter-select", { detail: { key } }));
+    window.dispatchEvent(new CustomEvent("baseforge:task-filter-select", { detail: { key } }));
   }, []);
 
   const selectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
-    window.dispatchEvent(new CustomEvent("nowen:task-focus-project", { detail: { projectId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:task-focus-project", { detail: { projectId } }));
   }, []);
 
   // 行规格：12px / h32 / 无边框 / hover 变色 / 选中 #e8efff

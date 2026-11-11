@@ -11,10 +11,10 @@ import "../src/db/sqlite-ext.js";
  * 回归：存量库升级时 v139 会 `UPDATE notes SET note_type='normal'`。
  *
  * notes 上的 FTS 同步触发器（notes_search_ai/ad/au）引用自定义函数
- * nowen_search_normalize，只要触发器存在，任何触碰 notes 的语句在 prepare 阶段
+ * baseforge_search_normalize，只要触发器存在，任何触碰 notes 的语句在 prepare 阶段
  * 就要解析它 —— 哪怕 AU 的 WHEN 条件最终不成立。而迁移跑在
  * ensureNormalizedSearchFts() 之前，函数还没注册到这条连接上，
- * 于是老库升级直接 `no such function: nowen_search_normalize` 打断启动。
+ * 于是老库升级直接 `no such function: baseforge_search_normalize` 打断启动。
  *
  * 新库没有触发器，所以只建新库的迁移测试永远发现不了这个坑 —— 这里必须
  * 先让触发器存在，再在一个「新连接」上重跑 v139。

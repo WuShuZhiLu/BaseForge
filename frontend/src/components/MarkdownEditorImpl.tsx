@@ -275,7 +275,7 @@ function ToolbarDivider() {
  * ��ɫ���ⲻд�����̳е�ǰ���� CSS ������--tx-primary / accent-primary �ȣ���
  * ������� EditorView.theme �ӹ��Ӿ�ϸ�ڣ����ֺ���Ŀ������һ�¡�
  */
-const nowenMdHighlight = HighlightStyle.define([
+const baseforgeMdHighlight = HighlightStyle.define([
   { tag: t.heading1, fontSize: "1.6em", fontWeight: "700", lineHeight: "1.4" },
   { tag: t.heading2, fontSize: "1.35em", fontWeight: "700", lineHeight: "1.4" },
   { tag: t.heading3, fontSize: "1.15em", fontWeight: "600", lineHeight: "1.4" },
@@ -1148,7 +1148,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       onHeadingsChangeRef.current?.(extractHeadings(update.view));
       // 协同态下不 REST 保存（避免与 CRDT 重复写）；但含密文标记的笔记必须走 REST——
       // 这类笔记的 CRDT 已被禁用，若继续跳过保存，密文改动会丢。
-      if (!collabEnabledRef.current || /nowen-encrypted/i.test(text)) {
+      if (!collabEnabledRef.current || /baseforge-encrypted/i.test(text)) {
         // 只有用户真正在编辑器里输入（有焦点）才算"待保存"；打开文档时的程序化/协同回放
         // 不标记改动，否则重开文档会莫名显示待保存。
         if (update.view.hasFocus) scheduleSave();
@@ -1270,7 +1270,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
           codeLanguages: languages,
           addKeymap: true,
         }),
-        syntaxHighlighting(nowenMdHighlight),
+        syntaxHighlighting(baseforgeMdHighlight),
 
         // ���� + �ɱ༭���أ��� Compartment ��̬�л���
         baseTheme,
@@ -1649,7 +1649,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
   /**
    * ����˸�ʽ�˵��ţ�macOS ԭ���˵� / ��ݼ� �� CodeMirror��
    * ----------------------------------------------------------------
-   * �� TiptapEditor ����ͬһ�� "nowen:format" �¼���Լ���� useDesktopMenuBridge
+   * �� TiptapEditor ����ͬһ�� "baseforge:format" �¼���Լ���� useDesktopMenuBridge
    * ���յ� Electron ������ "menu:format" IPC ʱ�ɷ�����
    *
    * Markdown ? ����ӳ�䣺
@@ -1699,8 +1699,8 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
         view.focus();
       }
     };
-    window.addEventListener("nowen:format", handler as EventListener);
-    return () => window.removeEventListener("nowen:format", handler as EventListener);
+    window.addEventListener("baseforge:format", handler as EventListener);
+    return () => window.removeEventListener("baseforge:format", handler as EventListener);
   }, [editable]);
 
   // ---------- ����仯�������� ----------
@@ -1820,11 +1820,11 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
   }, []);
 
   useEffect(() => {
-    window.addEventListener("nowen:open-search", openMarkdownSearch);
-    window.addEventListener("nowen:close-search", closeMarkdownSearch);
+    window.addEventListener("baseforge:open-search", openMarkdownSearch);
+    window.addEventListener("baseforge:close-search", closeMarkdownSearch);
     return () => {
-      window.removeEventListener("nowen:open-search", openMarkdownSearch);
-      window.removeEventListener("nowen:close-search", closeMarkdownSearch);
+      window.removeEventListener("baseforge:open-search", openMarkdownSearch);
+      window.removeEventListener("baseforge:close-search", closeMarkdownSearch);
     };
   }, [closeMarkdownSearch, openMarkdownSearch]);
 
@@ -2264,7 +2264,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
           viewMode === "split" ? "min-h-0 overflow-auto px-4 md:px-8 shrink-0" : "h-full",
           viewMode === "preview" && "hidden"
         )} style={viewMode === "split" ? { width: `${sourcePaneWidthPercent}%` } : undefined}>
-          <div ref={hostRef} className="nowen-md-editor h-full" style={{ minHeight: "100%" }} />
+          <div ref={hostRef} className="baseforge-md-editor h-full" style={{ minHeight: "100%" }} />
         </div>
         {/* Split divider */}
         {viewMode === "split" && (

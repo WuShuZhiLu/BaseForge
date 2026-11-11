@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-share-management-route-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-share-management-route-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.JWT_SECRET = "test-share-management-route-secret";

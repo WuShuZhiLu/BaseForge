@@ -16,7 +16,7 @@ const router = new Hono();
 const UPDATER_URL = (brandEnv("UPDATER_URL") || "http://baseforge-updater:3002").replace(/\/+$/, "");
 const UPDATER_TOKEN = (brandEnv("UPDATER_TOKEN") || "").trim();
 const PREFLIGHT_TTL_MS = Math.max(5 * 60_000, Number(brandEnv("UPDATE_PREFLIGHT_TTL_MS")) || 30 * 60_000);
-const INTERACTIVE_HEADER = "Nowen-System-Update";
+const INTERACTIVE_HEADER = "BaseForge-System-Update";
 const PREFLIGHT_PREFIX = "system-update:preflight:";
 
 interface StoredPreflight {
@@ -281,7 +281,7 @@ async function buildStatus() {
       code: "LATEST_RELEASE_UNAVAILABLE",
       message:
         reason === "release_repo_not_configured"
-          ? "未配置发布仓库，无法确定最新稳定版本（需设置 NOWEN_RELEASE_OWNER / NOWEN_RELEASE_REPO）"
+          ? "未配置发布仓库，无法确定最新稳定版本（需设置 BASEFORGE_RELEASE_OWNER / BASEFORGE_RELEASE_REPO）"
           : "无法确定最新稳定版本",
     });
   } else if (!updateAvailable) warnings.push({ code: "ALREADY_LATEST", message: "当前已经是最新稳定版本" });

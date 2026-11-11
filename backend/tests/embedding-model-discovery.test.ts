@@ -6,7 +6,7 @@ import test from "node:test";
 import type { DatabaseSync } from "node:sqlite";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-embedding-discovery-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-embedding-discovery-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let db: DatabaseSync;

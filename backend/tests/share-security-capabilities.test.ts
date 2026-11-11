@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-share-security-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-share-security-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.JWT_SECRET = "test-share-security-secret-308";

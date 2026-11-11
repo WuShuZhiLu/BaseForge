@@ -31,7 +31,7 @@ function isDarkMode(): boolean {
 /**
  * 懒加载 mermaid 模块。多次调用复用同一 Promise。
  * - 首次失败：清掉 promise 以便下次重试
- * - 主题切换：通过监听 nowen 主题事件主动重新 initialize
+ * - 主题切换：通过监听 baseforge 主题事件主动重新 initialize
  */
 async function loadMermaid() {
   if (!mermaidPromise) {

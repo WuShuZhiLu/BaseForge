@@ -11,7 +11,7 @@
  *   node scripts/generate-plugin-contracts.mjs --check    # 只校验是否最新（CI 用，落后则退出码 1）
  *
  * 产出：
- *   1) packages/nowen-plugin-sdk/src/contributions.generated.ts
+ *   1) packages/baseforge-plugin-sdk/src/contributions.generated.ts
  *   2) backend/src/plugins/capabilityCatalog.generated.ts 的 contributions 段 + 摘要
  */
 import { createHash } from "node:crypto"
@@ -20,8 +20,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const contractPath = path.join(rootDir, "packages", "nowen-plugin-sdk", "contribution-contract.json")
-const sdkOutPath = path.join(rootDir, "packages", "nowen-plugin-sdk", "src", "contributions.generated.ts")
+const contractPath = path.join(rootDir, "packages", "baseforge-plugin-sdk", "contribution-contract.json")
+const sdkOutPath = path.join(rootDir, "packages", "baseforge-plugin-sdk", "src", "contributions.generated.ts")
 const catalogPath = path.join(rootDir, "backend", "src", "plugins", "capabilityCatalog.generated.ts")
 
 const checkOnly = process.argv.includes("--check")
@@ -50,7 +50,7 @@ function buildSdkFile() {
     .map(([key, name]) => `export const ${name} = deepFreeze(${json(contract[key])} as const);`)
     .join("\n")
 
-  return `// 此文件由 scripts/generate-plugin-contracts.mjs 根据 packages/nowen-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
+  return `// 此文件由 scripts/generate-plugin-contracts.mjs 根据 packages/baseforge-plugin-sdk/contribution-contract.json 生成，请勿手动修改。
 // 重新生成：node scripts/generate-plugin-contracts.mjs
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -160,7 +160,7 @@ const catalogStale = currentCatalog !== catalogText
 if (checkOnly) {
   if (sdkStale || catalogStale) {
     console.error(`[generate-plugin-contracts] 生成物落后于契约（contractVersion=${contract.contractVersion}）：`)
-    if (sdkStale) console.error("  - packages/nowen-plugin-sdk/src/contributions.generated.ts")
+    if (sdkStale) console.error("  - packages/baseforge-plugin-sdk/src/contributions.generated.ts")
     if (catalogStale) console.error("  - backend/src/plugins/capabilityCatalog.generated.ts")
     console.error("  运行 node scripts/generate-plugin-contracts.mjs 重新生成后提交。")
     process.exit(1)

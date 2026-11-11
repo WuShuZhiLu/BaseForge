@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-sys-set-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-sys-set-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { systemSettingsRepository } from "../src/repositories/systemSettingsRepository";

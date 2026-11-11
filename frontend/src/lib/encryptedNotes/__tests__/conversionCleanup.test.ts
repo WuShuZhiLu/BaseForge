@@ -13,10 +13,10 @@ const committed = () => ({ id: input.noteId, userId: input.userId, version: inpu
 const load = vi.fn();
 beforeEach(() => {
   vi.resetAllMocks(); localStorage.clear();
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
-  localStorage.setItem("nowen-draft-note", "private-source");
-  localStorage.setItem("nowen-draft-other", "other-source");
-  localStorage.setItem("nowen-draft-index", '["note","other"]');
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
+  localStorage.setItem("baseforge-draft-note", "private-source");
+  localStorage.setItem("baseforge-draft-other", "other-source");
+  localStorage.setItem("baseforge-draft-index", '["note","other"]');
   vi.mocked(getCurrentUserId).mockReturnValue("owner");
   vi.mocked(inspectCachedNotePresence).mockResolvedValueOnce(true).mockResolvedValue(false);
   vi.mocked(isOfflineQueueFlushing).mockReturnValue(false);
@@ -33,9 +33,9 @@ it("clears only the confirmed note, preserves unrelated drafts/queues, and expos
   const result = await cleanupConvertedNoteCopies(input, load);
   expect(result).toEqual({ noteId: "note", localCleanup: true, physicalErasure: "not_verified" });
   expect(JSON.stringify(result)).not.toContain("private-source");
-  expect(localStorage.getItem("nowen-draft-note")).toBeNull();
-  expect(localStorage.getItem("nowen-draft-other")).toBe("other-source");
-  expect(localStorage.getItem("nowen-draft-index")).toBe('["other"]');
+  expect(localStorage.getItem("baseforge-draft-note")).toBeNull();
+  expect(localStorage.getItem("baseforge-draft-other")).toBe("other-source");
+  expect(localStorage.getItem("baseforge-draft-index")).toBe('["other"]');
   expect(localStorage.getItem(getOfflineQueueStorageKey())).toBe(unrelated);
   expect(indexedDB.deleteDatabase).not.toHaveBeenCalled();
   expect(clearCachedNoteForEncryptionConversion).toHaveBeenCalledWith("note", "owner", expect.any(Function));
@@ -44,14 +44,14 @@ it.each(["id", "userId", "version", "content", "contentText", "contentFormat"])(
   load.mockResolvedValue({ ...committed(), [field]: "different" });
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "not_committed" });
   expect(clearCachedNoteForEncryptionConversion).not.toHaveBeenCalled();
-  expect(localStorage.getItem("nowen-draft-note")).toBe("private-source");
+  expect(localStorage.getItem("baseforge-draft-note")).toBe("private-source");
 });
 it("requires explicit discard consent", async () => {
   await expect(cleanupConvertedNoteCopies({ ...input, discardLocalCopies: false } as unknown as ConversionCleanupInput, load)).rejects.toMatchObject({ code: "invalid_consent" });
   expect(load).not.toHaveBeenCalled();
 });
 it.each(["scoped", "legacy"])("refuses %s pending writes instead of silently dropping newer text", async (scope) => {
-  const key = scope === "scoped" ? getOfflineQueueStorageKey() : "nowen-offline-queue";
+  const key = scope === "scoped" ? getOfflineQueueStorageKey() : "baseforge-offline-queue";
   localStorage.setItem(key, '[{"noteId":"note","body":{"content":"newer-source"}}]');
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "pending_writes" });
   expect(load).not.toHaveBeenCalled(); expect(localStorage.getItem(key)).toContain("newer-source");
@@ -66,11 +66,11 @@ it("corrupt storage fails closed without revealing its payload", async () => {
   expect(load).not.toHaveBeenCalled();
 });
 it("a corrupt draft index refuses cleanup without overwriting unrelated index entries", async () => {
-  localStorage.setItem("nowen-draft-index", "private-index");
+  localStorage.setItem("baseforge-draft-index", "private-index");
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "storage_failed" });
   expect(load).not.toHaveBeenCalled(); expect(clearCachedNoteForEncryptionConversion).not.toHaveBeenCalled();
-  expect(localStorage.getItem("nowen-draft-note")).toBe("private-source");
-  expect(localStorage.getItem("nowen-draft-index")).toBe("private-index");
+  expect(localStorage.getItem("baseforge-draft-note")).toBe("private-source");
+  expect(localStorage.getItem("baseforge-draft-index")).toBe("private-index");
 });
 it("an uninitialized or other-account cache is unknown, never silently skipped", async () => {
   vi.mocked(inspectCachedNotePresence).mockReset().mockResolvedValue(null);
@@ -86,7 +86,7 @@ it("busy or unavailable coordination performs no server read or deletion", async
 });
 it("a cross-window logout discards a late confirmation without deleting anything", async () => {
   load.mockImplementation(async () => {
-    window.dispatchEvent(new StorageEvent("storage", { key: "nowen-token" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: "baseforge-token" }));
     return committed();
   });
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "scope_changed" });
@@ -95,7 +95,7 @@ it("a cross-window logout discards a late confirmation without deleting anything
 it("failed IndexedDB cleanup preserves the draft for retry and does not claim success", async () => {
   vi.mocked(clearCachedNoteForEncryptionConversion).mockRejectedValue(new Error("private-db-error"));
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "storage_failed", message: "storage_failed" });
-  expect(localStorage.getItem("nowen-draft-note")).toBe("private-source");
+  expect(localStorage.getItem("baseforge-draft-note")).toBe("private-source");
   expect(convertedNoteVersion("note")).toBe(2);
   expect(() => assertConversionNote({ id: "note", version: 1, contentFormat: "markdown", content: "private-source" })).toThrow("converted_note");
 });
@@ -121,7 +121,7 @@ it("a failed Yjs delete keeps cache and draft and reveals no browser error", asy
   });
   await expect(cleanupConvertedNoteCopies(input, load)).rejects.toMatchObject({ code: "storage_failed" });
   expect(clearCachedNoteForEncryptionConversion).not.toHaveBeenCalled();
-  expect(localStorage.getItem("nowen-draft-note")).toBe("private-source");
+  expect(localStorage.getItem("baseforge-draft-note")).toBe("private-source");
 });
 it("a recreated collaboration database fails final verification", async () => {
   vi.mocked(indexedDB.databases).mockReset().mockResolvedValueOnce([]).mockResolvedValue([{ name: "target-yjs" }]);

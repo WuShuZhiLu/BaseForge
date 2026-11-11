@@ -71,7 +71,7 @@ export default function AppRouteSync() {
   const lastNotebookPathRef = useRef<string | null>(null);
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`nowen:last-kb-path:${getCurrentWorkspace()}`);
+      const saved = localStorage.getItem(`baseforge:last-kb-path:${getCurrentWorkspace()}`);
       if (saved && saved.startsWith("/kb/")) lastNotebookPathRef.current = saved;
     } catch { /* ignore */ }
     // 只在挂载时读一次（后续由路由变化写入）
@@ -87,7 +87,7 @@ export default function AppRouteSync() {
 
     // 记忆的唯一写入口：ref 与 localStorage 必须同步，否则刷新恢复的位置与本会话
     // 内的 ref 会分叉。按空间分别存（空间不进 URL，但记忆按空间隔离）。
-    const lastNotebookPathKey = () => `nowen:last-kb-path:${getCurrentWorkspace()}`;
+    const lastNotebookPathKey = () => `baseforge:last-kb-path:${getCurrentWorkspace()}`;
     const rememberKbPath = (target: string) => {
       lastNotebookPathRef.current = target;
       try { localStorage.setItem(lastNotebookPathKey(), target); } catch { /* ignore */ }
@@ -235,7 +235,7 @@ export default function AppRouteSync() {
       if (routeSpace && !routeSpace.startsWith("notebook:") && routeSpace !== getCurrentWorkspace()) {
         setCurrentWorkspace(routeSpace);
         try {
-          window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId: routeSpace } }));
+          window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId: routeSpace } }));
         } catch {}
       }
       // route 镜像始终更新（视图层据其渲染），回声只跳过状态回灌。

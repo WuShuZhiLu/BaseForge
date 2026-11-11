@@ -22,7 +22,7 @@ export type { PreparedMarkdownAsset, PreparedMarkdownNote };
 export type MarkdownExportJobSnapshot = ReliableExportJobSnapshot;
 export const markdownExportTestUtils = reliableExportTestUtils;
 
-const REQUEST_JSON_PATCH_FLAG = Symbol.for("nowen.reliableExport.requestJsonPatched");
+const REQUEST_JSON_PATCH_FLAG = Symbol.for("baseforge.reliableExport.requestJsonPatched");
 const globalFlags = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 async function readRequestJsonWithLimit(request: Request, maxBytes: number): Promise<unknown> {

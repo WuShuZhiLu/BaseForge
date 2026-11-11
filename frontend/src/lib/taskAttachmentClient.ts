@@ -27,7 +27,7 @@ export interface TaskAttachmentUploadResult {
   size: number;
 }
 
-export const TASK_ATTACHMENTS_CHANGED_EVENT = "nowen:task-attachments-changed";
+export const TASK_ATTACHMENTS_CHANGED_EVENT = "baseforge:task-attachments-changed";
 const TASK_ATTACHMENT_STABLE_PREFIX = "/api/task-attachments/";
 
 function authHeaders(): Record<string, string> {

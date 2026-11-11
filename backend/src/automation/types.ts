@@ -1,6 +1,6 @@
 export type AutomationSource = "user" | "plugin" | "workflow" | "sync" | "system";
 
-export interface NowenEvent<T = Record<string, unknown>> {
+export interface BaseForgeEvent<T = Record<string, unknown>> {
   id: string;
   type: string;
   apiVersion: 1;
@@ -75,7 +75,7 @@ export interface WorkflowRunRecord {
 }
 
 export interface ExecutionVariables {
-  event: NowenEvent;
+  event: BaseForgeEvent;
   steps: Record<string, { output: unknown }>;
   workflow: { id: string; name: string };
   user: { id: string };

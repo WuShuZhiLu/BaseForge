@@ -1,4 +1,4 @@
-export const NOTEBOOKS_INVALIDATED_EVENT = "nowen:notebooks-invalidated";
+export const NOTEBOOKS_INVALIDATED_EVENT = "baseforge:notebooks-invalidated";
 
 export type NotebookInvalidationReason =
   | "move"

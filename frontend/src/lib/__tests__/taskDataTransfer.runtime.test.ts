@@ -97,7 +97,7 @@ function backup(tasks: TaskBackupTask[]): TaskBackupPackage {
     format: TASK_BACKUP_FORMAT,
     version: TASK_BACKUP_VERSION,
     exportedAt: "2026-07-11T00:00:00.000Z",
-    source: { workspace: "personal", app: "nowen-note" },
+    source: { workspace: "personal", app: "baseforge" },
     data: { projects: [], tasks, dependencies: [], reminders: [] },
   };
 }

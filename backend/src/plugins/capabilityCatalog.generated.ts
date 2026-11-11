@@ -1,4 +1,4 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/host-api-contract.json, packages/nowen-plugin-sdk/contribution-contract.json, packages/nowen-plugin-sdk/error-code-contract.json 生成，请勿手动修改。
+// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/baseforge-plugin-sdk/host-api-contract.json, packages/baseforge-plugin-sdk/contribution-contract.json, packages/baseforge-plugin-sdk/error-code-contract.json 生成，请勿手动修改。
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const nested of Object.values(value)) deepFreeze(nested);

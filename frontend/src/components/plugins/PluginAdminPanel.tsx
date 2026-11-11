@@ -176,7 +176,7 @@ export function PluginPackageInstallSection({ onInstalled }: {
         <input
           ref={inputRef}
           type="file"
-          accept=".nowen-plugin"
+          accept=".baseforge-plugin"
           className="hidden"
           onChange={(event) => void choosePackage(event.target.files?.[0])}
         />

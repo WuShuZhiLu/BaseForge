@@ -37,7 +37,7 @@ type Listener = (payload: any) => void;
 const MAX_UPDATE_BYTES = 1 * 1024 * 1024;
 const MAX_PENDING_UPDATES = 500;
 const ACK_TIMEOUT_MS = 12_000;
-const YJS_IDB_PREFIX = "nowen-y-v2";
+const YJS_IDB_PREFIX = "baseforge-y-v2";
 
 function normalizeScopePart(value: string): string {
   return (value || "unknown").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
@@ -61,11 +61,11 @@ function isLoopbackUrl(url: string): boolean {
 
 function getServerScope(): string {
   let server = "";
-  try { server = localStorage.getItem("nowen-server-url") || ""; } catch { /* ignore */ }
+  try { server = localStorage.getItem("baseforge-server-url") || ""; } catch { /* ignore */ }
   const origin = typeof window !== "undefined" && window.location.origin.startsWith("http")
     ? window.location.origin
     : "";
-  const isDesktop = typeof window !== "undefined" && !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktop = typeof window !== "undefined" && !!(window as any).baseforgeDesktop?.isDesktop;
 
   if (isDesktop && ((server && isLoopbackUrl(server)) || (!server && origin && isLoopbackUrl(origin)))) {
     return "local-desktop";
@@ -84,7 +84,7 @@ export function getYjsPersistenceName(noteId: string, userId: string): string {
   ].join("-");
 }
 
-export class NowenYjsProvider {
+export class BaseForgeYjsProvider {
   readonly noteId: string;
   readonly doc: Y.Doc;
   readonly awareness: Awareness;
@@ -523,7 +523,7 @@ export class NowenYjsProvider {
     if (this.status === next) return;
     const prev = this.status;
     this.status = next;
-    if (typeof window !== "undefined" && (window as any).__NOWEN_DEBUG_Y__) {
+    if (typeof window !== "undefined" && (window as any).__BASEFORGE_DEBUG_Y__) {
       console.debug(`[yjs-provider] status ${prev} → ${next} for ${this.noteId}`);
     }
     const set = this.listeners.get("status");

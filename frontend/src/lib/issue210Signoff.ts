@@ -65,8 +65,8 @@ export interface Issue210SignoffApi {
 
 declare global {
   interface Window {
-    __NOWEN_ISSUE_210_SIGNOFF__?: Issue210SignoffApi;
-    __NOWEN_ISSUE_210_SIGNOFF_INSTALLED__?: boolean;
+    __BASEFORGE_ISSUE_210_SIGNOFF__?: Issue210SignoffApi;
+    __BASEFORGE_ISSUE_210_SIGNOFF_INSTALLED__?: boolean;
   }
 }
 
@@ -79,7 +79,7 @@ function isEnabled(): boolean {
   try {
     const query = new URLSearchParams(window.location.search);
     if (query.get("issue210Perf") === "1") return true;
-    return localStorage.getItem("nowen.issue210.signoff") === "1";
+    return localStorage.getItem("baseforge.issue210.signoff") === "1";
   } catch {
     return false;
   }
@@ -87,7 +87,7 @@ function isEnabled(): boolean {
 
 function resolvePlatform(): Issue210Platform {
   try {
-    const desktop = (window as unknown as { nowenDesktop?: { isDesktop?: boolean } }).nowenDesktop;
+    const desktop = (window as unknown as { baseforgeDesktop?: { isDesktop?: boolean } }).baseforgeDesktop;
     return desktop?.isDesktop ? "electron" : "web";
   } catch {
     return "web";
@@ -213,10 +213,10 @@ function normalizeRun(run: EditorPerformanceRun): EditorPerformanceRun {
 
 export function installIssue210SignoffRuntime(): Issue210SignoffApi | null {
   if (!isEnabled()) return null;
-  if (window.__NOWEN_ISSUE_210_SIGNOFF_INSTALLED__) {
-    return window.__NOWEN_ISSUE_210_SIGNOFF__ || null;
+  if (window.__BASEFORGE_ISSUE_210_SIGNOFF_INSTALLED__) {
+    return window.__BASEFORGE_ISSUE_210_SIGNOFF__ || null;
   }
-  window.__NOWEN_ISSUE_210_SIGNOFF_INSTALLED__ = true;
+  window.__BASEFORGE_ISSUE_210_SIGNOFF_INSTALLED__ = true;
 
   const platform = resolvePlatform();
   let mediaPhase: Issue210MediaPhase = "unmarked";
@@ -382,7 +382,7 @@ export function installIssue210SignoffRuntime(): Issue210SignoffApi | null {
     },
   };
 
-  window.__NOWEN_ISSUE_210_SIGNOFF__ = api;
+  window.__BASEFORGE_ISSUE_210_SIGNOFF__ = api;
   window.addEventListener("beforeunload", () => {
     layoutObserver?.disconnect();
     resourceObserver?.disconnect();

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-reminders-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-reminders-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { taskRemindersRepository } from "../src/repositories/taskRemindersRepository";

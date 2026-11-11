@@ -4,8 +4,8 @@ const LazyDeferredGlobalFeatureCenters = React.lazy(
   () => import("./DeferredGlobalFeatureCenters"),
 );
 
-const TOKEN_KEY = "nowen-token";
-const TOKEN_CHANGED_EVENT = "nowen:token-changed";
+const TOKEN_KEY = "baseforge-token";
+const TOKEN_CHANGED_EVENT = "baseforge:token-changed";
 const IDLE_TIMEOUT_MS = 2_000;
 
 type IdleWindow = Window & {

@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 import { isMobileLocalMode, MobileLocalModeRemoteRequestError } from "./mobileLocalMode";
 
-const BRIDGE_FLAG = "__nowenAndroidNativeHttpBridgeInstalled";
+const BRIDGE_FLAG = "__baseforgeAndroidNativeHttpBridgeInstalled";
 const DEFAULT_NATIVE_TIMEOUT_MS = 30_000;
 
 type FetchInput = Parameters<typeof fetch>[0];

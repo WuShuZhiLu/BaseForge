@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-embedding-queue-hardening-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-embedding-queue-hardening-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.NODE_ENV = "test";
 

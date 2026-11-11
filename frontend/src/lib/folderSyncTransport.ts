@@ -34,7 +34,7 @@ type ApiError = Error & { code?: string; status?: number; detail?: unknown };
 function authHeaders(extra?: HeadersInit): Headers {
   const headers = new Headers(extra);
   try {
-    const token = localStorage.getItem("nowen-token");
+    const token = localStorage.getItem("baseforge-token");
     if (token) headers.set("Authorization", `Bearer ${token}`);
   } catch {
     // request will receive the normal 401 response

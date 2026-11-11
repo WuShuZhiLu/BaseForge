@@ -6,7 +6,7 @@ import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import type { DatabaseAdapter } from "../src/db/adapters/types";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-authority-repository-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-authority-repository-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 

@@ -288,7 +288,7 @@ function normalizeNode(node: TiptapJsonNode): TiptapJsonNode {
 }
 
 /**
- * Convert a SiYuan AST to Tiptap JSON and enforce Nowen's schema/security
+ * Convert a SiYuan AST to Tiptap JSON and enforce BaseForge's schema/security
  * invariants before the document reaches storage or the editor.
  */
 export function siyuanSyToTiptapJson(

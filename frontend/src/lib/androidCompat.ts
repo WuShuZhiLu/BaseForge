@@ -28,9 +28,9 @@ if (typeof crypto !== "undefined" && typeof crypto.randomUUID !== "function") {
 
 const EDITOR_SELECTOR =
   '.ProseMirror[contenteditable="true"], .cm-content[contenteditable="true"]';
-const SELECTION_ACTIONS_ID = "nowen-android-selection-actions";
-const SELECTION_STYLE_ID = "nowen-android-selection-style";
-const INSTALL_KEY = "__NOWEN_ANDROID_EDITOR_SELECTION_COMPAT__" as const;
+const SELECTION_ACTIONS_ID = "baseforge-android-selection-actions";
+const SELECTION_STYLE_ID = "baseforge-android-selection-style";
+const INSTALL_KEY = "__BASEFORGE_ANDROID_EDITOR_SELECTION_COMPAT__" as const;
 const COPY_ACTION_RE = /(?:复制.*(?:选中|选区|文本)|copy\s+(?:selected\s+text|selection))/i;
 
 type CompatWindow = Window & typeof globalThis & {

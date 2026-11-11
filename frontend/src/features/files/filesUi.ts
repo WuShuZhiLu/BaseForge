@@ -24,24 +24,24 @@ export type FilesGroupMode = "flat" | "notebook" | "folder";
 export type FilesTypeFilter = MimeCategory | "all";
 
 const KEYS = {
-  source: "nowen.filesUi.source",
-  type: "nowen.filesUi.unifiedType",
-  types: "nowen.filesUi.unifiedTypes",
-  category: "nowen.filesUi.category",
-  share: "nowen.filesUi.share",
-  time: "nowen.filesUi.time",
-  sort: "nowen.filesUi.sort",
-  view: "nowen.filesUi.view",
-  group: "nowen.filesUi.group",
-  remoteTypes: "nowen.filesUi.remoteTypes",
-  remoteTime: "nowen.filesUi.remoteTime",
-  remoteSort: "nowen.filesUi.remoteSort",
-  remoteSource: "nowen.filesUi.remoteSource",
+  source: "baseforge.filesUi.source",
+  type: "baseforge.filesUi.unifiedType",
+  types: "baseforge.filesUi.unifiedTypes",
+  category: "baseforge.filesUi.category",
+  share: "baseforge.filesUi.share",
+  time: "baseforge.filesUi.time",
+  sort: "baseforge.filesUi.sort",
+  view: "baseforge.filesUi.view",
+  group: "baseforge.filesUi.group",
+  remoteTypes: "baseforge.filesUi.remoteTypes",
+  remoteTime: "baseforge.filesUi.remoteTime",
+  remoteSort: "baseforge.filesUi.remoteSort",
+  remoteSource: "baseforge.filesUi.remoteSource",
 } as const;
 
 /** 三来源时代的遗留键：只在首次读取时用于迁移，不再写入。 */
 const LEGACY_KEYS = {
-  ihCategory: "nowen.filesUi.ihCategory",
+  ihCategory: "baseforge.filesUi.ihCategory",
 } as const;
 
 // ===== useSyncExternalStore 接口：版本号 + 订阅 =====
@@ -119,7 +119,7 @@ export function getFilesViewMode(): FilesViewMode {
 
 export function getFilesGroupMode(): FilesGroupMode {
   // 兼容旧键：用户此前的分组偏好迁移过来
-  const legacy = (() => { try { return localStorage.getItem("nowen-file-group"); } catch { return null; } })();
+  const legacy = (() => { try { return localStorage.getItem("baseforge-file-group"); } catch { return null; } })();
   return (localStorage.getItem(KEYS.group) as FilesGroupMode) || (legacy as FilesGroupMode) || "flat";
 }
 

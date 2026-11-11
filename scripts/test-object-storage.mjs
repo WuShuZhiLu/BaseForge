@@ -90,7 +90,7 @@ function createMockS3() {
 }
 
 function createTempFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-object-storage-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-object-storage-"));
   const dbPath = path.join(root, "baseforge.db");
   const attachmentsDir = path.join(root, "attachments");
   fs.mkdirSync(attachmentsDir, { recursive: true });
@@ -143,7 +143,7 @@ async function main() {
     ATTACHMENT_STORAGE: "s3",
     S3_ENDPOINT: mock.endpoint,
     S3_REGION: "auto",
-    S3_BUCKET: "nowen-test",
+    S3_BUCKET: "baseforge-test",
     S3_ACCESS_KEY_ID: "test-access-key",
     S3_SECRET_ACCESS_KEY: "test-secret-key",
     S3_PREFIX: "attachments",
@@ -160,7 +160,7 @@ async function main() {
     assert(mock.objects.size === 3, "mock bucket should contain three objects");
 
     for (const [name, data] of Object.entries(fixture.files)) {
-      const key = `nowen-test/attachments/${name}`;
+      const key = `baseforge-test/attachments/${name}`;
       assert(mock.objects.has(key), `missing uploaded object ${key}`);
       assert(Buffer.compare(mock.objects.get(key), data) === 0, `object bytes mismatch for ${key}`);
     }

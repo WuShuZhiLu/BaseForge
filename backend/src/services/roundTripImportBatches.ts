@@ -17,9 +17,9 @@ import {
   writeAttachmentObject,
 } from "./attachment-storage";
 import {
-  importNowenPackageWithSync,
+  importBaseForgePackageWithSync,
   type RoundTripImportParams,
-} from "./nowenRoundTripSync";
+} from "./baseforgeRoundTripSync";
 
 const DATA_DIR = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
 const UNDO_ROOT = path.join(DATA_DIR, "import-undo");
@@ -489,14 +489,14 @@ function markBatchFailed(batchId: string, result: any, message?: string): void {
   removeUndoDir(batchId);
 }
 
-export async function executeNowenPackageImportWithBatch(
+export async function executeBaseForgePackageImportWithBatch(
   zipBuffer: Buffer,
   params: RoundTripImportParams,
 ): Promise<any> {
   cleanupExpiredRoundTripImportUndo();
   const workspaceId = params.workspaceId || null;
   const importMode = params.importMode || "new-root";
-  const preview = await importNowenPackageWithSync(zipBuffer, { ...params, dryRun: true });
+  const preview = await importBaseForgePackageWithSync(zipBuffer, { ...params, dryRun: true });
   if (!preview?.success) return preview;
 
   const batchId = uuid();
@@ -505,7 +505,7 @@ export async function executeNowenPackageImportWithBatch(
   createBatchRow({ id: batchId, userId: params.userId, workspaceId, importMode, identity, preview, undo });
 
   try {
-    const result = await importNowenPackageWithSync(zipBuffer, { ...params, dryRun: false });
+    const result = await importBaseForgePackageWithSync(zipBuffer, { ...params, dryRun: false });
     if (!result?.success) {
       markBatchFailed(batchId, result);
       return { ...result, importBatch: { id: batchId, undoAvailable: false, reason: "导入失败" } };

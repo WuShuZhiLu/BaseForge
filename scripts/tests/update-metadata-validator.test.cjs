@@ -10,7 +10,7 @@ const {
 } = require("../lib/update-metadata-validator.cjs");
 
 function createFixture(options = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-update-metadata-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-update-metadata-"));
   const version = options.version || "1.4.2";
   const assetName = options.assetName || "BaseForge-1.4.2-setup.exe";
   const metadataName = options.metadataName || "latest.yml";

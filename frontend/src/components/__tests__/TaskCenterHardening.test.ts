@@ -4,7 +4,7 @@ import { shouldConfirmHabitDelete } from "../tasks/taskCenterHardening";
 describe("TaskWorkspace hardening", () => {
   it("recognizes the destructive habit delete control", () => {
     const row = document.createElement("div");
-    row.dataset.nowenHabitRow = "true";
+    row.dataset.baseforgeHabitRow = "true";
     const button = document.createElement("button");
     const icon = document.createElement("svg");
     icon.classList.add("lucide-trash-2");

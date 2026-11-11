@@ -60,7 +60,7 @@ describe("LoginPage + SiteSettingsProvider ICP 备案号", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (String(url) === "/api/settings") {
         return new Response(JSON.stringify({
-          site_title: "nowen-note",
+          site_title: "baseforge",
           site_favicon: "",
           site_icp_beian: "粤ICP备12345678号-1",
           editor_font_family: "",

@@ -36,7 +36,7 @@ interface RecentReminder {
   type?: string;
 }
 
-const globalKey = "__nowen_notified_set__";
+const globalKey = "__baseforge_notified_set__";
 const deliveredSet: Set<string> = typeof window === "undefined"
   ? new Set()
   : ((window as any)[globalKey] || ((window as any)[globalKey] = new Set()));
@@ -226,9 +226,9 @@ export function useReminderNotifier(onOpenTask?: (taskId: string) => void) {
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener(TASK_REMINDER_SYNC_EVENT, onScheduleChanged);
-    window.addEventListener("nowen:server-url-changed", onServerChanged);
-    window.addEventListener("nowen:workspace-changed", onScheduleChanged);
-    window.addEventListener("nowen:token-changed", resetNativeSchedules);
+    window.addEventListener("baseforge:server-url-changed", onServerChanged);
+    window.addEventListener("baseforge:workspace-changed", onScheduleChanged);
+    window.addEventListener("baseforge:token-changed", resetNativeSchedules);
 
     void syncNativeSchedules();
     const initialTimeout = setTimeout(() => { void scan(); }, 3_000);
@@ -242,9 +242,9 @@ export function useReminderNotifier(onOpenTask?: (taskId: string) => void) {
       if (appStateHandle) void appStateHandle.remove();
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener(TASK_REMINDER_SYNC_EVENT, onScheduleChanged);
-      window.removeEventListener("nowen:server-url-changed", onServerChanged);
-      window.removeEventListener("nowen:workspace-changed", onScheduleChanged);
-      window.removeEventListener("nowen:token-changed", resetNativeSchedules);
+      window.removeEventListener("baseforge:server-url-changed", onServerChanged);
+      window.removeEventListener("baseforge:workspace-changed", onScheduleChanged);
+      window.removeEventListener("baseforge:token-changed", resetNativeSchedules);
     };
   }, []);
 }

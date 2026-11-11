@@ -5,8 +5,8 @@ import SharedNoteView from "./SharedNoteView";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 
-const GUEST_NAME_KEY = "nowen-guest-name";
-const COMMENT_IDENTITY_STATE_KEY = "__nowenSharedCommentIdentityRuntime__" as const;
+const GUEST_NAME_KEY = "baseforge-guest-name";
+const COMMENT_IDENTITY_STATE_KEY = "__baseforgeSharedCommentIdentityRuntime__" as const;
 
 type AddSharedComment = typeof api.addSharedComment;
 type AddSharedCommentArgs = Parameters<AddSharedComment>;
@@ -20,7 +20,7 @@ interface CommentIdentityRuntimeState {
 
 function getCommentIdentityRuntimeState(): CommentIdentityRuntimeState {
   const globalStore = globalThis as typeof globalThis & {
-    __nowenSharedCommentIdentityRuntime__?: CommentIdentityRuntimeState;
+    __baseforgeSharedCommentIdentityRuntime__?: CommentIdentityRuntimeState;
   };
   if (!globalStore[COMMENT_IDENTITY_STATE_KEY]) {
     globalStore[COMMENT_IDENTITY_STATE_KEY] = {
@@ -42,7 +42,7 @@ function readStoredGuestName(): string {
 
 function hasAuthToken(): boolean {
   try {
-    return Boolean(localStorage.getItem("nowen-token"));
+    return Boolean(localStorage.getItem("baseforge-token"));
   } catch {
     return false;
   }

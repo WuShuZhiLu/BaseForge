@@ -23,7 +23,7 @@ export function hasPersistentNoteAttachmentReference(content: string | null | un
 function readStoredToken(): string | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    return localStorage.getItem("nowen-token");
+    return localStorage.getItem("baseforge-token");
   } catch {
     return null;
   }

@@ -58,11 +58,11 @@ describe("downloadAttachment", () => {
 
     const downloadUrl = new URL(resolveAttachmentDownloadUrl(
       `/api/attachments/${ATTACHMENT_ID}?w=720`,
-      "https://notes.example.com/nowen-note",
+      "https://notes.example.com/baseforge",
     ));
 
     expect(downloadUrl.origin).toBe("https://notes.example.com");
-    expect(downloadUrl.pathname).toBe(`/nowen-note/api/attachments/${ATTACHMENT_ID}`);
+    expect(downloadUrl.pathname).toBe(`/baseforge/api/attachments/${ATTACHMENT_ID}`);
     expect(downloadUrl.searchParams.get("download")).toBe("1");
     expect(downloadUrl.searchParams.get("w")).toBe("720");
     expect(downloadUrl.searchParams.get("sig")).toBe("lan-signed");

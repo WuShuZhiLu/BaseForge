@@ -1,6 +1,6 @@
-export const LEGACY_NOTE_LIST_COLLAPSED_KEY = "nowen-notelist-collapsed";
-export const LEGACY_NOTEBOOK_TREE_SORT_KEY = "nowen.notebookTree.sort";
-export const NOTE_WORKSPACE_LAYOUT_KEY = "nowen-note-workspace-layout";
+export const LEGACY_NOTE_LIST_COLLAPSED_KEY = "baseforgelist-collapsed";
+export const LEGACY_NOTEBOOK_TREE_SORT_KEY = "baseforge.notebookTree.sort";
+export const NOTE_WORKSPACE_LAYOUT_KEY = "baseforge-workspace-layout";
 
 const FUNCTIONAL_NOTE_LIST_VIEWS = new Set([
   "favorites",

@@ -12,7 +12,7 @@ interface Props {
   onOpenAttachmentDirectory: () => void;
 }
 
-const FOLDER_SYNC_COMMENT_RE = /<!--\s*nowen-folder-sync:\s*([\s\S]*?)-->/i;
+const FOLDER_SYNC_COMMENT_RE = /<!--\s*baseforge-folder-sync:\s*([\s\S]*?)-->/i;
 const RELATIVE_PATH_RE = /(?:^|\s)relativePath=([^\s]+)/i;
 
 /** 仅识别由文件夹同步生成的 PDF / DOCX 占位笔记。 */

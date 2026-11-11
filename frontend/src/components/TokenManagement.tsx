@@ -58,7 +58,7 @@ interface TokenFormValue {
 }
 
 async function tokenJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     credentials: "include",

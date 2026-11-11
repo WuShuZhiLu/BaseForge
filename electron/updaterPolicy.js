@@ -1,4 +1,4 @@
-const RELEASES_BASE_URL = "https://github.com/cropflre/nowen-note/releases";
+const RELEASES_BASE_URL = "https://github.com/cropflre/baseforge/releases";
 const MANUAL_DOWNLOAD_NOTICE =
   "Windows 和 macOS 暂不支持客户端内自动安装。点击“立即更新”后将打开浏览器，请下载与当前系统和芯片匹配的安装包并手动安装。";
 

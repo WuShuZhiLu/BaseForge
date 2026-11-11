@@ -35,7 +35,7 @@ export function useTabNoteOpener() {
       }
       return;
     }
-    try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent("baseforge:before-note-switch")); } catch { /* ignore */ }
     const tab = state.openNoteTabs?.find((item) => item.id === noteId);
     const result = await loadNote({
       noteId,

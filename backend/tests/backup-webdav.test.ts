@@ -89,14 +89,14 @@ test("WebDAV credentials are encrypted at rest and never returned by the public 
     endpoint: "https://dav.example.test/root/",
     username: "backup-user",
     password: "very-secret-password",
-    remotePath: "/nowen-note//backups/",
+    remotePath: "/baseforge//backups/",
     uploadOnAutoBackup: true,
   });
 
   assert.equal(publicConfig.endpoint, "https://dav.example.test/root");
   assert.equal(publicConfig.username, "backup-user");
   assert.equal(publicConfig.passwordSet, true);
-  assert.equal(publicConfig.remotePath, "nowen-note/backups");
+  assert.equal(publicConfig.remotePath, "baseforge/backups");
   assert.equal(publicConfig.uploadOnAutoBackup, true);
   assert.equal("password" in publicConfig, false);
 
@@ -144,7 +144,7 @@ test("WebDAV connection test probes the root and creates each missing directory 
     endpoint: "https://dav.example.test/root",
     username: "u",
     password: "p",
-    remotePath: "nowen-note/backups",
+    remotePath: "baseforge/backups",
   });
 
   const originalFetch = globalThis.fetch;
@@ -168,8 +168,8 @@ test("WebDAV connection test probes the root and creates each missing directory 
 
   assert.deepEqual(calls.map((call) => call.method), ["PROPFIND", "MKCOL", "MKCOL", "PROPFIND"]);
   assert.equal(calls[0].url, "https://dav.example.test/root/");
-  assert.equal(calls[1].url, "https://dav.example.test/root/nowen-note/");
-  assert.equal(calls[2].url, "https://dav.example.test/root/nowen-note/backups/");
+  assert.equal(calls[1].url, "https://dav.example.test/root/baseforge/");
+  assert.equal(calls[2].url, "https://dav.example.test/root/baseforge/backups/");
   assert.match(calls[0].authorization || "", /^Basic /);
 
   const config = getBackupWebDavConfig();

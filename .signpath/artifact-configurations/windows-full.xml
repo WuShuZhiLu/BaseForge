@@ -1,20 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
-  <parameters>
-    <parameter name="version" required="true" />
-  </parameters>
   <zip-file>
-    <pe-file
-      path="BaseForge-${version}-setup.exe"
-      product-name="BaseForge"
-      product-version="${version}">
-      <authenticode-sign hash-algorithm="sha256" />
-    </pe-file>
-    <pe-file
-      path="BaseForge-${version}-portable.exe"
-      product-name="BaseForge"
-      product-version="${version}">
-      <authenticode-sign hash-algorithm="sha256" />
-    </pe-file>
+    <pe-file-set>
+      <include path="BaseForge-*-setup.exe" />
+      <include path="BaseForge-*-portable.exe" />
+      <for-each>
+        <authenticode-sign hash-algorithm="sha256" />
+      </for-each>
+    </pe-file-set>
   </zip-file>
 </artifact-configuration>

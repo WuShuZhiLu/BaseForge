@@ -17,8 +17,8 @@ export type PhaseBPerfEvent = {
 };
 
 declare global {
-  var __NOWEN_PHASE_B_PERF_EVENTS__: PhaseBPerfEvent[] | undefined;
-  var __NOWEN_PHASE_B_PERF_SINK__: ((event: PhaseBPerfEvent) => void) | undefined;
+  var __BASEFORGE_PHASE_B_PERF_EVENTS__: PhaseBPerfEvent[] | undefined;
+  var __BASEFORGE_PHASE_B_PERF_SINK__: ((event: PhaseBPerfEvent) => void) | undefined;
 }
 
 export const PHASE_B_PERF_ENABLED = import.meta.env.MODE === "test"
@@ -50,10 +50,10 @@ function exposeBrowserEvents(): void {
   if (import.meta.env.VITE_PHASE_B_PERF !== "1" || typeof document === "undefined" || exposeTimer !== null) return;
   exposeTimer = window.setTimeout(() => {
     exposeTimer = null;
-    let output = document.getElementById("nowen-phase-b-perf-data");
+    let output = document.getElementById("baseforge-phase-b-perf-data");
     if (!output) {
       output = document.createElement("script");
-      output.id = "nowen-phase-b-perf-data";
+      output.id = "baseforge-phase-b-perf-data";
       output.setAttribute("type", "application/json");
       document.head.appendChild(output);
     }
@@ -64,11 +64,11 @@ function exposeBrowserEvents(): void {
 export function recordPhaseBPerfEvent(event: PhaseBPerfEvent): void {
   if (!PHASE_B_PERF_ENABLED) return;
   const timestamped = { ...event, timestamp: event.timestamp ?? performance.now() };
-  globalThis.__NOWEN_PHASE_B_PERF_SINK__?.(timestamped);
+  globalThis.__BASEFORGE_PHASE_B_PERF_SINK__?.(timestamped);
   if (import.meta.env.VITE_PHASE_B_PERF !== "1") return;
   browserEvents.push(timestamped);
   if (browserEvents.length > MAX_BROWSER_EVENTS) browserEvents.splice(0, 20_000);
-  globalThis.__NOWEN_PHASE_B_PERF_EVENTS__ = browserEvents;
+  globalThis.__BASEFORGE_PHASE_B_PERF_EVENTS__ = browserEvents;
   exposeBrowserEvents();
 }
 

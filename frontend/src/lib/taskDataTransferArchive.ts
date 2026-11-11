@@ -16,7 +16,7 @@ import {
   type TaskTransferProgress,
 } from "@/lib/taskDataTransfer";
 
-export const TASK_ARCHIVE_FORMAT = "nowen-task-archive";
+export const TASK_ARCHIVE_FORMAT = "baseforge-task-archive";
 export const TASK_ARCHIVE_VERSION = 1;
 export const TASK_ARCHIVE_MAX_FILE_BYTES = 250 * 1024 * 1024;
 export const TASK_ARCHIVE_MAX_ATTACHMENT_BYTES = 200 * 1024 * 1024;
@@ -590,5 +590,5 @@ export function taskArchiveFilename(date = new Date()): string {
     String(date.getHours()).padStart(2, "0"),
     String(date.getMinutes()).padStart(2, "0"),
   ].join("");
-  return `nowen-tasks-full-${stamp}.zip`;
+  return `baseforge-tasks-full-${stamp}.zip`;
 }

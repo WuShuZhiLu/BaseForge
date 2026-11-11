@@ -31,7 +31,7 @@ describe("移动端账号登录历史", () => {
     secureValues.clear();
     localStorage.clear();
     sessionStorage.clear();
-    delete (window as any).nowenDesktop;
+    delete (window as any).baseforgeDesktop;
   });
 
   it("在系统安全存储中保存全部账号并按最近使用排序", async () => {
@@ -53,8 +53,8 @@ describe("移动端账号登录历史", () => {
     const history = await listAccountLoginHistory();
     expect(history.map((item) => item.username)).toEqual(["bob", "alice"]);
     expect(await loadAccountLoginToken(alice.id!)).toEqual({ ok: true, token: "token-alice" });
-    expect(localStorage.getItem("nowen.accountHistory.records")).toBeNull();
-    expect(localStorage.getItem("nowen-account-history-current-id")).toBe(bob.id);
+    expect(localStorage.getItem("baseforge.accountHistory.records")).toBeNull();
+    expect(localStorage.getItem("baseforge-account-history-current-id")).toBe(bob.id);
   });
 
   it("更新同一服务器同一用户并保留其它账号", async () => {
@@ -91,7 +91,7 @@ describe("移动端账号登录历史", () => {
 
     await markAccountLoginRequiresReauth(saved.id!);
     expect((await listAccountLoginHistory())[0].requiresReauth).toBe(true);
-    expect(localStorage.getItem("nowen-account-history-current-id")).toBeNull();
+    expect(localStorage.getItem("baseforge-account-history-current-id")).toBeNull();
     expect(await loadAccountLoginToken(saved.id!)).toEqual({ ok: false, error: "TOKEN_UNAVAILABLE" });
     await removeAccountLoginHistory(saved.id!);
     expect(await listAccountLoginHistory()).toEqual([]);

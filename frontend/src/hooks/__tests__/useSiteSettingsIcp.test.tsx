@@ -28,20 +28,20 @@ describe("SiteSettingsProvider ICP 备案号", () => {
 
   beforeEach(() => {
     localStorage.clear();
-    Object.assign(window, { nowenDesktop: { isDesktop: true } });
+    Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
     document.body.innerHTML = '<div id="root"></div>';
     host = document.getElementById("root")!;
     root = createRoot(host);
     fetchMock = vi.fn(async (url: string) => {
       const body = String(url).startsWith("https://notes.example.com/api/settings")
         ? {
-            site_title: "nowen-note",
+            site_title: "baseforge",
             site_favicon: "",
             site_icp_beian: "粤ICP备12345678号-1",
             editor_font_family: "",
           }
         : {
-            site_title: "nowen-note",
+            site_title: "baseforge",
             site_favicon: "",
             site_icp_beian: "",
             editor_font_family: "",
@@ -59,7 +59,7 @@ describe("SiteSettingsProvider ICP 备案号", () => {
     act(() => root.unmount());
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    Reflect.deleteProperty(window, "nowenDesktop");
+    Reflect.deleteProperty(window, "baseforgeDesktop");
     localStorage.clear();
     document.body.innerHTML = "";
   });
@@ -96,7 +96,7 @@ describe("SiteSettingsProvider ICP 备案号", () => {
 
   it("公开读取分享标识，保存和清空后更新上下文", async () => {
     fetchMock.mockImplementation(async () => new Response(JSON.stringify({
-      site_title: "nowen-note", site_favicon: "", editor_font_family: "",
+      site_title: "baseforge", site_favicon: "", editor_font_family: "",
       site_share_footer_text: "团队知识库",
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     const updateMock = vi.spyOn(api, "updateSiteSettings").mockImplementation(async (data) => ({

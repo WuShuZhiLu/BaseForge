@@ -224,7 +224,7 @@ usage() {
   NOWEN_SKIP_RCEDIT=1             跳过 electron-builder 的 rcedit（Windows exe 图标/版本注入）
                                   和代码签名；适合 Debian 首次打 Win 包时，避免等 winCodeSign
                                   约 60MB 从 GitHub 下载（国内网络容易卡）
-  NOWEN_LINUX_MAINTAINER          Linux 包 maintainer 字段（默认 "Nowen <noreply@nowen.local>"）
+  NOWEN_LINUX_MAINTAINER          Linux 包 maintainer 字段（默认 "Nowen <noreply@baseforge.local>"）
   NOWEN_LINUX_VENDOR              Linux 包 vendor（默认 "Nowen"）
   NOWEN_LINUX_HOMEPAGE            homepage URL（默认项目 GitHub 仓库）
 

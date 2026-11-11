@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { getDb } from "../db/schema";
 import { getUserWorkspaceRole, hasRole, isSystemAdmin } from "../middleware/acl";
-import { createStableNowenPackageExport } from "./nowenPackageExportStable";
+import { createStableBaseForgePackageExport } from "./baseforgePackageExportStable";
 
 export const ROUND_TRIP_PERMISSIONS_VERSION = 1;
 
@@ -16,7 +16,7 @@ export interface RoundTripPermissionMember {
 }
 
 export interface RoundTripPermissionsManifest {
-  format: "nowen-workspace-permissions";
+  format: "baseforge-workspace-permissions";
   version: 1;
   exportedAt: string;
   sourceWorkspace: {
@@ -103,7 +103,7 @@ export function buildRoundTripPermissionsManifest(userId: string, workspaceId: s
   }>;
 
   return {
-    format: "nowen-workspace-permissions",
+    format: "baseforge-workspace-permissions",
     version: ROUND_TRIP_PERMISSIONS_VERSION,
     exportedAt: new Date().toISOString(),
     sourceWorkspace: workspace,
@@ -119,7 +119,9 @@ export function buildRoundTripPermissionsManifest(userId: string, workspaceId: s
 
 export function validateRoundTripPermissionsManifest(value: unknown): RoundTripPermissionsManifest {
   const manifest = value as Partial<RoundTripPermissionsManifest> | null;
-  if (!manifest || manifest.format !== "nowen-workspace-permissions" || manifest.version !== 1) {
+  // 兼容 Nowen 时代的历史权限映射文件；新导出始终写 baseforge-workspace-permissions。
+  const supportedFormats = ["baseforge-workspace-permissions", "nowen-workspace-permissions"];
+  if (!manifest || typeof manifest.format !== "string" || !supportedFormats.includes(manifest.format) || manifest.version !== 1) {
     const error = new Error("权限清单格式或版本不受支持");
     (error as Error & { code?: string; status?: number }).code = "INVALID_PERMISSION_MANIFEST";
     (error as Error & { code?: string; status?: number }).status = 400;
@@ -149,7 +151,7 @@ export function validateRoundTripPermissionsManifest(value: unknown): RoundTripP
     };
   });
   return {
-    format: "nowen-workspace-permissions",
+    format: "baseforge-workspace-permissions",
     version: 1,
     exportedAt: String(manifest.exportedAt || ""),
     sourceWorkspace: {
@@ -160,16 +162,16 @@ export function validateRoundTripPermissionsManifest(value: unknown): RoundTripP
   };
 }
 
-export async function createNowenPackageWithPermissions(params: {
+export async function createBaseForgePackageWithPermissions(params: {
   userId: string;
   workspaceId: string;
   notebookId?: string;
   includeSubNotebooks?: boolean;
   includeTrashed?: boolean;
   folderUnlockTokens?: string[];
-}): Promise<Awaited<ReturnType<typeof createStableNowenPackageExport>>> {
+}): Promise<Awaited<ReturnType<typeof createStableBaseForgePackageExport>>> {
   const manifest = buildRoundTripPermissionsManifest(params.userId, params.workspaceId);
-  const result = await createStableNowenPackageExport(params);
+  const result = await createStableBaseForgePackageExport(params);
   const zip = await JSZip.loadAsync(result.buffer);
   zip.file("permissions.json", JSON.stringify(manifest, null, 2));
   const mainManifest = zip.file("manifest.json");

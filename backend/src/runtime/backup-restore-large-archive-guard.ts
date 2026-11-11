@@ -1,6 +1,6 @@
 import { BackupManager } from "../services/backup.js";
 
-const PATCH_FLAG = Symbol.for("nowen.backupLargeArchiveRestore.patched");
+const PATCH_FLAG = Symbol.for("baseforge.backupLargeArchiveRestore.patched");
 
 const prototype = BackupManager.prototype as unknown as Record<PropertyKey, unknown>;
 

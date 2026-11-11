@@ -85,8 +85,8 @@ type SubTab = "export" | "import" | "backup" | "database" | "danger";
 type MobileMemoMethod = "xiaomi" | "oppo" | "iphone";
 
 const IMPORT_FORMAT_STORAGE = {
-  siyuan: "nowen-import-format:siyuan",
-  generic: "nowen-import-format:generic-markdown",
+  siyuan: "baseforge-import-format:siyuan",
+  generic: "baseforge-import-format:generic-markdown",
 } as const;
 
 function readImportFormat(
@@ -528,7 +528,7 @@ export default function DataManager() {
   // Export state
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingNowen, setIsExportingNowen] = useState(false);
+  const [isExportingBaseForge, setIsExportingBaseForge] = useState(false);
 
   // Import state
   const [importFiles, setImportFiles] = useState<ImportFileInfo[]>([]);
@@ -590,7 +590,7 @@ export default function DataManager() {
   const [duplicateStrategy, setDuplicateStrategy] = useState<"merge" | "unique">("merge");
   // 当前导入批次是否包含 zip（zip 本身按目录派生笔记本，不需要 perFile 开关）
   const [hasZip, setHasZip] = useState(false);
-  // P1-2：nanowen-note 自家导出 zip 在 metadata.json 中会携带 rootNotebookId；
+  // P1-2：nabaseforge 自家导出 zip 在 metadata.json 中会携带 rootNotebookId；
   // 如果当前工作区中仍有同 id 的笔记本，则自动预选，避免用户手动找一遍。
   // 未命中时也给个提示（例如“该备份来自另一个实例/工作区，仍会导入但不会自动选目标本”）。
   const [zipMetaHint, setZipMetaHint] = useState<
@@ -632,10 +632,10 @@ export default function DataManager() {
   };
 
   // BaseForge 数据包导出
-  const handleExportNowenPackage = async () => {
-    setIsExportingNowen(true);
+  const handleExportBaseForgePackage = async () => {
+    setIsExportingBaseForge(true);
     try {
-      const { blob, filename } = await api.downloadNowenPackage();
+      const { blob, filename } = await api.downloadBaseForgePackage();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -644,12 +644,12 @@ export default function DataManager() {
       a.click();
       document.body.removeChild(a);
       scheduleObjectUrlRevocation(url);
-      toast.success(t('note.nowenPackageSuccess'));
+      toast.success(t('note.baseforgePackageSuccess'));
     } catch (err: any) {
-      console.error("[NowenPackageExport] Failed:", err);
-      toast.error(t('note.nowenPackageFailed'));
+      console.error("[BaseForgePackageExport] Failed:", err);
+      toast.error(t('note.baseforgePackageFailed'));
     } finally {
-      setIsExportingNowen(false);
+      setIsExportingBaseForge(false);
     }
   };
 
@@ -984,7 +984,7 @@ export default function DataManager() {
       // 成功态对应的是目标空间中的真实持久化结果，因此完成后直接切到目标空间展示。
       if (!scopeMatchesGlobal) {
         setCurrentWorkspace(effectiveWorkspaceId);
-        window.dispatchEvent(new CustomEvent("nowen:workspace-changed", {
+        window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", {
           detail: { workspaceId: effectiveWorkspaceId },
         }));
       }
@@ -1007,14 +1007,14 @@ export default function DataManager() {
     if (!lastImportTarget) return;
     setCurrentWorkspace(lastImportTarget.workspaceId);
     window.dispatchEvent(
-      new CustomEvent("nowen:workspace-changed", {
+      new CustomEvent("baseforge:workspace-changed", {
         detail: { workspaceId: lastImportTarget.workspaceId },
       }),
     );
     setLastImportTarget(null);
     // 通过自定义事件请求关闭 SettingsModal（由父组件决定是否监听）。
     // 即便父组件未处理，工作区切换本身也会触发 App 顶层的"重置流程"。
-    window.dispatchEvent(new CustomEvent("nowen:close-settings"));
+    window.dispatchEvent(new CustomEvent("baseforge:close-settings"));
   };
 
   const clearImportList = () => {
@@ -1149,11 +1149,11 @@ export default function DataManager() {
       tag: t("dataManager.importMethodYuqueTag"),
       iconClass: "text-sky-600 dark:text-sky-400",
     },
-    nowen: {
+    baseforge: {
       icon: Package,
-      label: t("dataManager.importMethodNowen"),
-      desc: t("dataManager.importMethodNowenDesc"),
-      tag: t("dataManager.importMethodNowenTag"),
+      label: t("dataManager.importMethodBaseForge"),
+      desc: t("dataManager.importMethodBaseForgeDesc"),
+      tag: t("dataManager.importMethodBaseForgeTag"),
       iconClass: "text-violet-600 dark:text-violet-400",
     },
   };
@@ -1524,29 +1524,29 @@ export default function DataManager() {
               <div className="flex items-center gap-2 mb-2">
                 <Package size={16} className="text-violet-500" />
                 <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                  {t('note.nowenPackage')}
+                  {t('note.baseforgePackage')}
                 </span>
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                {t('note.nowenPackageDesc')}
+                {t('note.baseforgePackageDesc')}
               </p>
               <button
-                onClick={handleExportNowenPackage}
-                disabled={isExportingNowen || personalExportLocked}
-                className={`flex items-center justify-center w-full py-2 px-4 rounded-lg font-medium text-sm transition-all ${isExportingNowen || personalExportLocked
+                onClick={handleExportBaseForgePackage}
+                disabled={isExportingBaseForge || personalExportLocked}
+                className={`flex items-center justify-center w-full py-2 px-4 rounded-lg font-medium text-sm transition-all ${isExportingBaseForge || personalExportLocked
                   ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-600 cursor-not-allowed"
                   : "bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg"
                   }`}
               >
-                {isExportingNowen ? (
+                {isExportingBaseForge ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {t('note.nowenPackageExporting')}
+                    {t('note.baseforgePackageExporting')}
                   </>
                 ) : (
                   <>
                     <Package className="w-4 h-4 mr-2" />
-                    {t('note.nowenPackage')}
+                    {t('note.baseforgePackage')}
                   </>
                 )}
               </button>
@@ -2153,75 +2153,75 @@ export default function DataManager() {
                 </>
               )}
 
-              {!personalImportLocked && activeImportMethod === "nowen" && (
+              {!personalImportLocked && activeImportMethod === "baseforge" && (
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Package size={16} className="text-violet-500" />
                     <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                      {t('note.nowenPackageImport')}
+                      {t('note.baseforgePackageImport')}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-3">
-                    {t('note.nowenPackageImportDesc')}
+                    {t('note.baseforgePackageImportDesc')}
                   </p>
                   <input
                     type="file"
                     accept=".zip,application/zip"
                     className="hidden"
-                    id="nowen-package-import-input"
+                    id="baseforge-package-import-input"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       e.target.value = "";
 
                       try {
-                        toast.info(t('note.nowenPackageImportDryRun'));
-                        const dryResult = await api.dryRunNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
+                        toast.info(t('note.baseforgePackageImportDryRun'));
+                        const dryResult = await api.dryRunBaseForgePackage(file, { fallbackNotebookName: t('note.baseforgeFallbackNotebookName') });
 
                         if (!dryResult.success) {
-                          toast.error(dryResult.errors?.[0] || t('note.nowenPackageImportFailed'));
+                          toast.error(dryResult.errors?.[0] || t('note.baseforgePackageImportFailed'));
                           return;
                         }
 
                         const pkg = dryResult.package;
                         const ok = await confirm({
-                          title: t('note.nowenPackageImportConfirmTitle'),
-                          description: t('note.nowenPackageImportConfirmDesc', {
+                          title: t('note.baseforgePackageImportConfirmTitle'),
+                          description: t('note.baseforgePackageImportConfirmDesc', {
                             notes: pkg?.counts?.notes || 0,
                             attachments: pkg?.counts?.attachments || 0,
                           }),
-                          confirmText: t('note.nowenPackageImport'),
+                          confirmText: t('note.baseforgePackageImport'),
                         });
 
                         if (!ok) return;
 
-                        toast.info(t('note.nowenPackageImportDryRun'));
-                        const result = await api.importNowenPackage(file, { fallbackNotebookName: t('note.nowenFallbackNotebookName') });
+                        toast.info(t('note.baseforgePackageImportDryRun'));
+                        const result = await api.importBaseForgePackage(file, { fallbackNotebookName: t('note.baseforgeFallbackNotebookName') });
 
                         if (result.success) {
                           const counts = result.counts;
                           toast.success(
-                            t('note.nowenPackageImportSuccess') +
+                            t('note.baseforgePackageImportSuccess') +
                             (counts ? ` (${counts.notes} notes, ${counts.attachments} attachments)` : "")
                           );
                           actions.refreshNotebooks();
                           actions.refreshNotes();
                         } else {
-                          toast.error(result.errors?.[0] || t('note.nowenPackageImportFailed'));
+                          toast.error(result.errors?.[0] || t('note.baseforgePackageImportFailed'));
                         }
                       } catch (err: any) {
-                        console.error("[NowenPackageImport] Failed:", err);
-                        toast.error(err.message || t('note.nowenPackageImportFailed'));
+                        console.error("[BaseForgePackageImport] Failed:", err);
+                        toast.error(err.message || t('note.baseforgePackageImportFailed'));
                       }
                     }}
                   />
                   <button
                     type="button"
-                    onClick={() => document.getElementById('nowen-package-import-input')?.click()}
+                    onClick={() => document.getElementById('baseforge-package-import-input')?.click()}
                     className="flex items-center justify-center w-full py-2 px-4 rounded-lg font-medium text-sm bg-violet-600 hover:bg-violet-700 text-white shadow-md hover:shadow-lg transition-all"
                   >
                     <Upload className="w-4 h-4 mr-2" />
-                    {t('note.nowenPackageImport')}
+                    {t('note.baseforgePackageImport')}
                   </button>
                 </div>
               )}

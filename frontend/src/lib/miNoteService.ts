@@ -115,7 +115,7 @@ export async function fetchMiNotes(cookie: string): Promise<{
 
 function readAuthToken(): string | null {
   try {
-    return localStorage.getItem("nowen-token");
+    return localStorage.getItem("baseforge-token");
   } catch {
     return null;
   }

@@ -288,7 +288,7 @@ export class NativeLocalRepository implements LocalRepository {
 
   async exportWorkspaceScope(scopeKey:string):Promise<Record<string,unknown>> {
     return {
-      format:"nowen-native-workspace-recovery-v1",scopeKey,exportedAt:now(),
+      format:"baseforge-native-workspace-recovery-v1",scopeKey,exportedAt:now(),
       notebooks:await this.db.query("SELECT * FROM notebooks WHERE scopeKey=?",[scopeKey]),
       notes:await this.db.query("SELECT * FROM notes WHERE scopeKey=?",[scopeKey]),
       tags:await this.db.query("SELECT * FROM tags WHERE scopeKey=?",[scopeKey]),

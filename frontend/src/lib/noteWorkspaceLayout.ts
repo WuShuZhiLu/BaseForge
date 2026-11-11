@@ -3,8 +3,8 @@ import { EXPANDED_WINDOW_MIN_WIDTH } from "@/lib/adaptiveWindowLayout";
 export type NoteWorkspaceLayoutMode = "standard" | "three-column";
 export type NoteWorkspaceSurface = "web" | "desktop" | "native-mobile";
 
-export const NOTE_WORKSPACE_LAYOUT_STORAGE_KEY = "nowen-note-workspace-layout";
-export const NOTE_WORKSPACE_LAYOUT_CHANGED_EVENT = "nowen-note-workspace-layout-changed";
+export const NOTE_WORKSPACE_LAYOUT_STORAGE_KEY = "baseforge-workspace-layout";
+export const NOTE_WORKSPACE_LAYOUT_CHANGED_EVENT = "baseforge-workspace-layout-changed";
 export const THREE_COLUMN_MIN_VIEWPORT_WIDTH = 1120;
 
 export type NoteWorkspaceAutoCollapseReason = "viewport" | "right-split" | "focus" | null;
@@ -33,7 +33,7 @@ export function detectNoteWorkspaceSurface(
   if (!runtimeWindow) return "web";
 
   const runtime = runtimeWindow as Window & {
-    nowenDesktop?: { isDesktop?: boolean };
+    baseforgeDesktop?: { isDesktop?: boolean };
     Capacitor?: {
       isNativePlatform?: () => boolean;
       platform?: string;
@@ -47,7 +47,7 @@ export function detectNoteWorkspaceSurface(
     || (!!capacitorPlatform && capacitorPlatform !== "web");
 
   if (nativeMobile) return "native-mobile";
-  if (runtime.nowenDesktop?.isDesktop) return "desktop";
+  if (runtime.baseforgeDesktop?.isDesktop) return "desktop";
   return "web";
 }
 

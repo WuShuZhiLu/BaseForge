@@ -28,7 +28,7 @@ export function normalizePublicWebOrigin(value: unknown): string {
 
 export function readPublicWebOriginEnv(env: NodeJS.ProcessEnv = process.env): string {
   return normalizePublicWebOrigin(
-    env.PUBLIC_WEB_ORIGIN || env.NOWEN_PUBLIC_WEB_ORIGIN || "",
+    env.PUBLIC_WEB_ORIGIN || env.BASEFORGE_PUBLIC_WEB_ORIGIN || "",
   );
 }
 
@@ -90,7 +90,7 @@ export function syncRuntimePublicWebOriginSetting(
 ): RuntimePublicWebOriginResolution {
   const storedOrigin = readSetting(PUBLIC_WEB_ORIGIN_KEY);
   const storedSource = readSetting(PUBLIC_WEB_ORIGIN_SOURCE_KEY);
-  const rawEnv = env.PUBLIC_WEB_ORIGIN || env.NOWEN_PUBLIC_WEB_ORIGIN || "";
+  const rawEnv = env.PUBLIC_WEB_ORIGIN || env.BASEFORGE_PUBLIC_WEB_ORIGIN || "";
   const envOrigin = normalizePublicWebOrigin(rawEnv);
 
   if (String(rawEnv).trim() && !envOrigin) {

@@ -10,7 +10,7 @@ import {
   normalizeWorkspaceIcon,
 } from "../src/lib/workspace-icon";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-workspace-icon-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-workspace-icon-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let app: Hono;

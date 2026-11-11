@@ -5,7 +5,7 @@ import path from "node:path";
 import test, { before, beforeEach } from "node:test";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-token-scope-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-token-scope-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let db: any;

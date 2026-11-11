@@ -4,7 +4,7 @@ import crypto from "crypto";
 
 function syncIcpBeianFromEnv() {
   const db = getDb();
-  const raw = process.env.NOWEN_ICP_BEIAN ?? process.env.ICP_BEIAN ?? "";
+  const raw = process.env.BASEFORGE_ICP_BEIAN ?? process.env.ICP_BEIAN ?? "";
   const value = String(raw).trim().slice(0, 80);
   db.prepare(`
     INSERT INTO system_settings (key, value, updatedAt)

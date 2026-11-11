@@ -1,6 +1,6 @@
 import { toast } from "@/lib/toast";
 
-const INSTALL_MARKER = "__nowenTaskAttachmentExportFallbackInstalled";
+const INSTALL_MARKER = "__baseforgeTaskAttachmentExportFallbackInstalled";
 const TASK_ATTACHMENT_PATH_RE = /^\/api\/task-attachments\/([A-Za-z0-9_-]+)$/;
 
 // Static PNG rather than SVG: task attachment downloads force high-risk SVG MIME types to
@@ -91,8 +91,8 @@ export function installTaskAttachmentExportFallback(): void {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
-        "X-Nowen-Task-Attachment-Placeholder": "missing",
-        "X-Nowen-Original-Status": String(response.status),
+        "X-BaseForge-Task-Attachment-Placeholder": "missing",
+        "X-BaseForge-Original-Status": String(response.status),
       },
     });
   };

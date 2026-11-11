@@ -1,9 +1,9 @@
 import { getBaseUrl } from "@/lib/api.impl";
 import { parseInternalNoteHref } from "@/lib/noteLinkSyntax";
 
-const STORAGE_KEY = "nowen.pendingBlockNavigation";
-const EVENT_NAME = "nowen:block-navigation";
-const OPEN_EVENT = "nowen:open-note-link";
+const STORAGE_KEY = "baseforge.pendingBlockNavigation";
+const EVENT_NAME = "baseforge:block-navigation";
+const OPEN_EVENT = "baseforge:open-note-link";
 let openSequence = 0;
 
 export interface BlockNavigationRequest {
@@ -60,7 +60,7 @@ async function resolveBlockLink(
 ): Promise<{ noteId: string; blockId: string | null; redirected: boolean }> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), 10_000);
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   try {
     const response = await fetch(
       `${getBaseUrl()}/blocks/resolve?link=${encodeURIComponent(href)}`,

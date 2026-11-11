@@ -9,7 +9,7 @@
  * 三种运行环境分别用不同实现，但对外暴露同一个接口：
  *
  *   - Electron 桌面端：复用 main 进程已有的 bonjour-service 浏览器，
- *     通过 `window.nowenDesktop.discovery` 桥接（preload 注入）
+ *     通过 `window.baseforgeDesktop.discovery` 桥接（preload 注入）
  *
  *   - Capacitor 原生（Android / iOS）：调用社区插件
  *     `@capacitor-community/zeroconf`，Android 内部走 NsdManager，
@@ -97,7 +97,7 @@ interface ElectronDiscoveryBridge {
 
 function getElectronBridge(): ElectronDiscoveryBridge | null {
   if (typeof window === "undefined") return null;
-  const desktop: any = (window as any).nowenDesktop;
+  const desktop: any = (window as any).baseforgeDesktop;
   return desktop && desktop.discovery ? (desktop.discovery as ElectronDiscoveryBridge) : null;
 }
 

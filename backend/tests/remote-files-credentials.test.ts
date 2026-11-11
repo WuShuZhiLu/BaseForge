@@ -15,7 +15,7 @@ let dataDir = "";
 let credentials: typeof import("../src/services/remote-files/credentials");
 
 before(async () => {
-  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-remote-cred-"));
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-remote-cred-"));
   process.env.ELECTRON_USER_DATA = dataDir;
   delete process.env.JWT_SECRET;
   credentials = await import("../src/services/remote-files/credentials");
@@ -55,10 +55,10 @@ describe("remote-files credentials", () => {
   });
 
   it("历史 v1 密文仍可解密，并可升级为 v2", () => {
-    // 构造一条按老方案（scrypt(JWT_SECRET, "nowen-remote-files-v1")）加密的密文
+    // 构造一条按老方案（scrypt(JWT_SECRET, "baseforge-remote-files-v1")）加密的密文
     const legacyKey = crypto.scryptSync(
-      "nowen-note-remote-files-development-key",
-      "nowen-remote-files-v1",
+      "baseforge-remote-files-development-key",
+      "baseforge-remote-files-v1",
       32,
     );
     const iv = crypto.randomBytes(12);

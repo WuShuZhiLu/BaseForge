@@ -67,7 +67,7 @@ const UserPreferencesContext = createContext<UserPreferencesContextValue>({
 
 function currentIdentity(): { token: string; userId: string } | null {
   try {
-    const token = localStorage.getItem("nowen-token") || "";
+    const token = localStorage.getItem("baseforge-token") || "";
     const userId = decodeUserIdFromToken(token);
     return token && userId ? { token, userId } : null;
   } catch {
@@ -82,13 +82,13 @@ function applyLegacyPreferenceBridges(prefs: UserPreferences, notify = true): vo
     localStorage.setItem(LEGACY_NOTE_LIST_TITLE_ONLY_KEY, String(prefs.noteListTitleOnly));
     document.documentElement.setAttribute("data-code-theme", prefs.codeBlockTheme);
     if (!notify) return;
-    window.dispatchEvent(new CustomEvent<EditorMode>("nowen:editor-mode-change", {
+    window.dispatchEvent(new CustomEvent<EditorMode>("baseforge:editor-mode-change", {
       detail: prefs.defaultEditorMode,
     }));
-    window.dispatchEvent(new CustomEvent<CodeBlockThemeId>("nowen:codeblock-theme-change", {
+    window.dispatchEvent(new CustomEvent<CodeBlockThemeId>("baseforge:codeblock-theme-change", {
       detail: prefs.codeBlockTheme,
     }));
-    window.dispatchEvent(new CustomEvent<boolean>("nowen:note-list-title-only-change", {
+    window.dispatchEvent(new CustomEvent<boolean>("baseforge:note-list-title-only-change", {
       detail: prefs.noteListTitleOnly,
     }));
   } catch {
@@ -299,10 +299,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
   useEffect(() => {
     void syncFromServer();
-    window.addEventListener("nowen:token-changed", syncFromServer);
+    window.addEventListener("baseforge:token-changed", syncFromServer);
     window.addEventListener("focus", syncFromServer);
     return () => {
-      window.removeEventListener("nowen:token-changed", syncFromServer);
+      window.removeEventListener("baseforge:token-changed", syncFromServer);
       window.removeEventListener("focus", syncFromServer);
     };
   }, [syncFromServer]);
@@ -351,13 +351,13 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
       const enabled = (event as CustomEvent<boolean>).detail;
       if (typeof enabled === "boolean") setPref("noteListTitleOnly", enabled);
     };
-    window.addEventListener("nowen:editor-mode-change", onEditorMode);
-    window.addEventListener("nowen:codeblock-theme-change", onCodeTheme);
-    window.addEventListener("nowen:note-list-title-only-change", onTitleOnly);
+    window.addEventListener("baseforge:editor-mode-change", onEditorMode);
+    window.addEventListener("baseforge:codeblock-theme-change", onCodeTheme);
+    window.addEventListener("baseforge:note-list-title-only-change", onTitleOnly);
     return () => {
-      window.removeEventListener("nowen:editor-mode-change", onEditorMode);
-      window.removeEventListener("nowen:codeblock-theme-change", onCodeTheme);
-      window.removeEventListener("nowen:note-list-title-only-change", onTitleOnly);
+      window.removeEventListener("baseforge:editor-mode-change", onEditorMode);
+      window.removeEventListener("baseforge:codeblock-theme-change", onCodeTheme);
+      window.removeEventListener("baseforge:note-list-title-only-change", onTitleOnly);
     };
   }, [setPref]);
 

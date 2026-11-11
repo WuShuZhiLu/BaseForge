@@ -62,7 +62,7 @@ const EMPTY_FORM: FormData = {
   bucket: "",
   accessKeyId: "",
   secretAccessKey: "",
-  pathPrefix: "nowen-calendar",
+  pathPrefix: "baseforge-calendar",
   publicBaseUrl: "",
   usePathStyle: true,
   enabled: true,
@@ -657,7 +657,7 @@ function TargetForm({
             type="text"
             value={form.bucket}
             onChange={(e) => update("bucket", e.target.value)}
-            placeholder="nowen"
+            placeholder="baseforge"
             className="w-full px-2.5 py-1.5 text-xs bg-app-bg rounded-lg border border-app-border text-tx-primary focus:ring-2 focus:ring-accent-primary/30 outline-none"
           />
         </div>
@@ -695,7 +695,7 @@ function TargetForm({
             type="text"
             value={form.pathPrefix}
             onChange={(e) => update("pathPrefix", e.target.value)}
-            placeholder="nowen-calendar"
+            placeholder="baseforge-calendar"
             className="w-full px-2.5 py-1.5 text-xs bg-app-bg rounded-lg border border-app-border text-tx-primary focus:ring-2 focus:ring-accent-primary/30 outline-none"
           />
         </div>
@@ -707,7 +707,7 @@ function TargetForm({
             type="text"
             value={form.publicBaseUrl}
             onChange={(e) => update("publicBaseUrl", e.target.value)}
-            placeholder="https://cdn.example.com/nowen"
+            placeholder="https://cdn.example.com/baseforge"
             className="w-full px-2.5 py-1.5 text-xs bg-app-bg rounded-lg border border-app-border text-tx-primary focus:ring-2 focus:ring-accent-primary/30 outline-none"
           />
         </div>

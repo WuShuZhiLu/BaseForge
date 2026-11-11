@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-ver-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-ver-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { noteVersionsRepository } from "../src/repositories/noteVersionsRepository";

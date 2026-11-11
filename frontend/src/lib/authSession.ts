@@ -1,5 +1,5 @@
-const ACCESS_TOKEN_KEY = "nowen-token";
-const REFRESH_TOKEN_KEY = "nowen-refresh-token";
+const ACCESS_TOKEN_KEY = "baseforge-token";
+const REFRESH_TOKEN_KEY = "baseforge-refresh-token";
 
 const refreshInFlight = new Map<string, Promise<string>>();
 
@@ -16,7 +16,7 @@ export function storeAuthTokens(tokens: { token: string; refreshToken?: string |
     localStorage.setItem(ACCESS_TOKEN_KEY, tokens.token);
     if (tokens.refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     else if (tokens.refreshToken === null) localStorage.removeItem(REFRESH_TOKEN_KEY);
-    window.dispatchEvent(new CustomEvent("nowen:token-changed", {
+    window.dispatchEvent(new CustomEvent("baseforge:token-changed", {
       detail: { authenticated: true },
     }));
   } catch {
@@ -32,7 +32,7 @@ export function clearAuthTokens(): void {
     // ignore
   }
   try {
-    window.dispatchEvent(new CustomEvent("nowen:token-changed", {
+    window.dispatchEvent(new CustomEvent("baseforge:token-changed", {
       detail: { authenticated: false },
     }));
   } catch {

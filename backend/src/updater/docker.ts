@@ -269,10 +269,10 @@ export async function inspectContainer(id: string): Promise<DockerContainerInspe
 
 export async function findManagedContainer(): Promise<DockerContainerInspect> {
   const labels = [
-    "com.nowen-note.managed=true",
-    "com.nowen-note.role=app",
-    "com.nowen-note.project=nowen-note",
-    `com.nowen-note.instance=${MANAGED_INSTANCE}`,
+    "com.baseforge.managed=true",
+    "com.baseforge.role=app",
+    "com.baseforge.project=baseforge",
+    `com.baseforge.instance=${MANAGED_INSTANCE}`,
   ];
   const filters = encodeURIComponent(JSON.stringify({ label: labels }));
   const list = await dockerRequest<DockerContainerSummary[]>("GET", `/containers/json?all=1&filters=${filters}`);
@@ -297,10 +297,10 @@ export async function findManagedContainer(): Promise<DockerContainerInspect> {
 export function assertManagedContainer(container: DockerContainerInspect): void {
   const labels = container.Config.Labels || {};
   const valid =
-    labels["com.nowen-note.managed"] === "true" &&
-    labels["com.nowen-note.role"] === "app" &&
-    labels["com.nowen-note.project"] === "nowen-note" &&
-    labels["com.nowen-note.instance"] === MANAGED_INSTANCE;
+    labels["com.baseforge.managed"] === "true" &&
+    labels["com.baseforge.role"] === "app" &&
+    labels["com.baseforge.project"] === "baseforge" &&
+    labels["com.baseforge.instance"] === MANAGED_INSTANCE;
   if (!valid) throw new Error("目标容器缺少 BaseForge 受管标签，已拒绝操作");
 
   const configuredImage = container.Config.Image || "";
@@ -399,9 +399,9 @@ function resolveEnvironmentOverrides(
   const current = envMap(currentEnv);
   const defaults = envMap(oldImageEnv);
   const immutableBuildKeys = new Set([
-    "NOWEN_APP_VERSION",
-    "NOWEN_BUILD_TIME",
-    "NOWEN_FRONTEND_BUILD_ID",
+    "BASEFORGE_APP_VERSION",
+    "BASEFORGE_BUILD_TIME",
+    "BASEFORGE_FRONTEND_BUILD_ID",
   ]);
   const overrides: string[] = [];
   for (const [key, value] of current) {

@@ -201,7 +201,7 @@ export function SyncSettingsPanel() {
         <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
           <input
             type="radio"
-            name="nowen-sync-mode"
+            name="baseforge-sync-mode"
             className="mt-1"
             checked={mode === "device-only"}
             onChange={() => { void handleDisable(); }}
@@ -221,7 +221,7 @@ export function SyncSettingsPanel() {
         <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3">
           <input
             type="radio"
-            name="nowen-sync-mode"
+            name="baseforge-sync-mode"
             className="mt-1"
             checked={mode === "server"}
             onChange={() => { /* 由下方按钮确认，避免误触即连接 */ }}

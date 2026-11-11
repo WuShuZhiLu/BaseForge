@@ -14,7 +14,7 @@ import { PluginStudioError } from "../src/plugins/studio/types";
 import pluginStudioRouter from "../src/routes/plugin-studio";
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-studio-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-studio-"));
   const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
@@ -49,10 +49,10 @@ function assertStudioCode(run: () => unknown, code: string): void {
 }
 
 test("Plugin Studio feature gate is fail-closed at the route boundary", async () => {
-  const previousParent = process.env.NOWEN_EXTENSIONS_V21;
-  const previousStudio = process.env.NOWEN_PLUGIN_STUDIO;
-  delete process.env.NOWEN_EXTENSIONS_V21;
-  delete process.env.NOWEN_PLUGIN_STUDIO;
+  const previousParent = process.env.BASEFORGE_EXTENSIONS_V21;
+  const previousStudio = process.env.BASEFORGE_PLUGIN_STUDIO;
+  delete process.env.BASEFORGE_EXTENSIONS_V21;
+  delete process.env.BASEFORGE_PLUGIN_STUDIO;
   try {
     const app = new Hono();
     app.route("/api/plugins/studio", pluginStudioRouter);
@@ -60,18 +60,18 @@ test("Plugin Studio feature gate is fail-closed at the route boundary", async ()
     assert.equal(response.status, 404);
     assert.equal((await response.json() as any).code, "PLUGIN_STUDIO_FEATURE_DISABLED");
   } finally {
-    if (previousParent === undefined) delete process.env.NOWEN_EXTENSIONS_V21;
-    else process.env.NOWEN_EXTENSIONS_V21 = previousParent;
-    if (previousStudio === undefined) delete process.env.NOWEN_PLUGIN_STUDIO;
-    else process.env.NOWEN_PLUGIN_STUDIO = previousStudio;
+    if (previousParent === undefined) delete process.env.BASEFORGE_EXTENSIONS_V21;
+    else process.env.BASEFORGE_EXTENSIONS_V21 = previousParent;
+    if (previousStudio === undefined) delete process.env.BASEFORGE_PLUGIN_STUDIO;
+    else process.env.BASEFORGE_PLUGIN_STUDIO = previousStudio;
   }
 });
 
 test("enabled Studio routes create projects and persist files for the owner", async () => {
-  const previousParent = process.env.NOWEN_EXTENSIONS_V21;
-  const previousStudio = process.env.NOWEN_PLUGIN_STUDIO;
-  process.env.NOWEN_EXTENSIONS_V21 = "1";
-  process.env.NOWEN_PLUGIN_STUDIO = "1";
+  const previousParent = process.env.BASEFORGE_EXTENSIONS_V21;
+  const previousStudio = process.env.BASEFORGE_PLUGIN_STUDIO;
+  process.env.BASEFORGE_EXTENSIONS_V21 = "1";
+  process.env.BASEFORGE_PLUGIN_STUDIO = "1";
   try {
     const db = getDb();
     db.prepare("INSERT OR IGNORE INTO users (id, username, passwordHash) VALUES (?, ?, 'hash')")
@@ -112,10 +112,10 @@ test("enabled Studio routes create projects and persist files for the owner", as
     assert.equal(written.project.revision, 2);
     assert.equal(written.file.mimeType, "application/json");
   } finally {
-    if (previousParent === undefined) delete process.env.NOWEN_EXTENSIONS_V21;
-    else process.env.NOWEN_EXTENSIONS_V21 = previousParent;
-    if (previousStudio === undefined) delete process.env.NOWEN_PLUGIN_STUDIO;
-    else process.env.NOWEN_PLUGIN_STUDIO = previousStudio;
+    if (previousParent === undefined) delete process.env.BASEFORGE_EXTENSIONS_V21;
+    else process.env.BASEFORGE_EXTENSIONS_V21 = previousParent;
+    if (previousStudio === undefined) delete process.env.BASEFORGE_PLUGIN_STUDIO;
+    else process.env.BASEFORGE_PLUGIN_STUDIO = previousStudio;
   }
 });
 

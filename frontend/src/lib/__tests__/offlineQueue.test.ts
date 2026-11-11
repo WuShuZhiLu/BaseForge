@@ -14,8 +14,8 @@ import {
 } from "@/lib/offlineQueue";
 
 function seedIdentity() {
-  localStorage.setItem("nowen-server-url", "http://sync-test.local");
-  localStorage.setItem("nowen-token", "test.token.value");
+  localStorage.setItem("baseforge-server-url", "http://sync-test.local");
+  localStorage.setItem("baseforge-token", "test.token.value");
 }
 
 function enqueueUpdate(noteId = "note-1", version = 1) {

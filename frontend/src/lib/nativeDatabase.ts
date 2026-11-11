@@ -28,11 +28,11 @@ interface NativeDatabaseGlobalState {
 }
 
 type NativeDatabaseGlobal = typeof globalThis & {
-  __nowenNoteNativeDatabaseState?: NativeDatabaseGlobalState;
+  __baseforgeNoteNativeDatabaseState?: NativeDatabaseGlobalState;
 };
 
 const SCHEMA_VERSION = 5;
-const DATABASE_PREFIX = "nowen_local_";
+const DATABASE_PREFIX = "baseforge_local_";
 
 const ENTITY_TYPE_CHECK = `
   'notebook', 'note', 'tag', 'note_tag', 'favorite', 'attachment',
@@ -588,18 +588,18 @@ async function upgradeSchemaV2ToV3(raw: SQLiteDBConnection): Promise<void> {
 
 function getGlobalState(): NativeDatabaseGlobalState {
   const root = globalThis as NativeDatabaseGlobal;
-  if (!root.__nowenNoteNativeDatabaseState) {
-    root.__nowenNoteNativeDatabaseState = {
+  if (!root.__baseforgeNoteNativeDatabaseState) {
+    root.__baseforgeNoteNativeDatabaseState = {
       connection: new SQLiteConnection(CapacitorSQLite),
       databases: new Map(),
       lifecycleQueue: Promise.resolve(),
     };
-  } else if (!root.__nowenNoteNativeDatabaseState.lifecycleQueue) {
+  } else if (!root.__baseforgeNoteNativeDatabaseState.lifecycleQueue) {
     // HMR 可能保留旧版全局对象；清掉旧适配器缓存后复用插件连接字典。
-    root.__nowenNoteNativeDatabaseState.databases.clear();
-    root.__nowenNoteNativeDatabaseState.lifecycleQueue = Promise.resolve();
+    root.__baseforgeNoteNativeDatabaseState.databases.clear();
+    root.__baseforgeNoteNativeDatabaseState.lifecycleQueue = Promise.resolve();
   }
-  return root.__nowenNoteNativeDatabaseState;
+  return root.__baseforgeNoteNativeDatabaseState;
 }
 
 function runConnectionLifecycle<T>(

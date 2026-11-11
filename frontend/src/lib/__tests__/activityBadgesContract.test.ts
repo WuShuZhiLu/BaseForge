@@ -33,7 +33,7 @@ const NAV_RAIL = source("../../components/NavRailMobile.tsx");
 const STORE = source("../../lib/sidebarPanels.ts");
 
 function layoutStorageKey(): string {
-  return `nowen.sidebar.layout.v2:${getCurrentWorkspace() || "local"}`;
+  return `baseforge.sidebar.layout.v2:${getCurrentWorkspace() || "local"}`;
 }
 
 beforeEach(() => {

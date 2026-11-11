@@ -43,7 +43,7 @@ describe("SiyuanRichTextCalloutBridge", () => {
     const blockquote = editorRoot?.querySelector("blockquote");
     expect(editorRoot).not.toBeNull();
     expect(editorRoot?.classList.contains("ProseMirror")).toBe(false);
-    expect(blockquote?.classList.contains("nowen-siyuan-callout")).toBe(true);
+    expect(blockquote?.classList.contains("baseforge-siyuan-callout")).toBe(true);
     expect(blockquote?.getAttribute("data-callout-type")).toBe("tip");
     expect(blockquote?.querySelector("p")?.getAttribute("data-callout-title")).toBe("Tip");
 

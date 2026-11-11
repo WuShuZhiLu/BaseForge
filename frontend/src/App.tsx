@@ -81,7 +81,7 @@ import {
   storeAuthTokens,
 } from "@/lib/authSession";
 
-const AUTH_USER_CACHE_PREFIX = "nowen-auth-user:";
+const AUTH_USER_CACHE_PREFIX = "baseforge-auth-user:";
 
 function normalizeAuthUrl(url: string): string {
   return url.replace(/\/+$/, "").toLowerCase();
@@ -100,7 +100,7 @@ function getAuthCacheScope(serverUrl: string): string {
   const origin = typeof window !== "undefined" && window.location.origin.startsWith("http")
     ? window.location.origin
     : "";
-  const isDesktop = typeof window !== "undefined" && !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktop = typeof window !== "undefined" && !!(window as any).baseforgeDesktop?.isDesktop;
   if (isDesktop && ((serverUrl && isLoopbackAuthUrl(serverUrl)) || (!serverUrl && origin && isLoopbackAuthUrl(origin)))) {
     return "local-desktop";
   }
@@ -179,7 +179,7 @@ function getTokenExpiresAt(token: string): number | null {
 }
 
 function isNativeClientRuntime(): boolean {
-  return !!(window as any).nowenDesktop?.isDesktop
+  return !!(window as any).baseforgeDesktop?.isDesktop
     || !!(window as any).Capacitor?.isNativePlatform?.()
     || (!!(window as any).Capacitor?.platform && (window as any).Capacitor.platform !== "web");
 }
@@ -496,7 +496,7 @@ function AppLayout() {
    * Cmd-K 全局搜索面板开关
    * ----------------------------------------------------------------
    * 三种来源：
-   *   1) 组件内部 Cmd-K 键盘事件自己派发 "nowen:open-command-palette"；
+   *   1) 组件内部 Cmd-K 键盘事件自己派发 "baseforge:open-command-palette"；
    *   2) macOS 原生菜单 "搜索笔记…" / Dock 右键 → useDesktopMenuBridge.onOpenSearch；
    *   3) 未来若需要业务代码编程式打开，同样 dispatch 上述事件即可。
    * 统一从外部事件驱动 setOpen(true)，组件只负责展示 + Esc 关闭。
@@ -516,8 +516,8 @@ function AppLayout() {
   );
   useEffect(() => {
     const onOpen = () => setCommandPaletteOpen(true);
-    window.addEventListener("nowen:open-command-palette", onOpen);
-    return () => window.removeEventListener("nowen:open-command-palette", onOpen);
+    window.addEventListener("baseforge:open-command-palette", onOpen);
+    return () => window.removeEventListener("baseforge:open-command-palette", onOpen);
   }, []);
 
   // 离线队列入队事件 → 把 syncStatus 切到 "queued"（让 UI 展示"已暂存"而非"已同步"）
@@ -525,8 +525,8 @@ function AppLayout() {
     const onQueued = () => {
       actions.setSyncStatus("queued");
     };
-    window.addEventListener("nowen:offline-queued", onQueued);
-    return () => window.removeEventListener("nowen:offline-queued", onQueued);
+    window.addEventListener("baseforge:offline-queued", onQueued);
+    return () => window.removeEventListener("baseforge:offline-queued", onQueued);
   }, [actions]);
 
   useEffect(() => {
@@ -692,7 +692,7 @@ function AppLayout() {
 
   // ── 工作区切换：清空当前会话态，回到空态页 ──────────────────────────
   //
-  // WorkspaceSwitcher 切换后会广播 "nowen:workspace-changed"。之前只有 SidebarMobile /
+  // WorkspaceSwitcher 切换后会广播 "baseforge:workspace-changed"。之前只有 SidebarMobile /
   // TaskWorkspace / FileManager / MindMap 自己监听并各自重拉，但
   // App 顶层并没有清理"正在编辑的笔记 + 笔记列表 + 选择/筛选状态"——于是会
   // 出现两类问题：
@@ -726,8 +726,8 @@ function AppLayout() {
       actions.refreshNotes();
       actions.refreshNotebooks();
     };
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
-    return () => window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
   }, [actions]);
 
   // Electron 桌面端：菜单 / 托盘动作 IPC 桥
@@ -1082,12 +1082,12 @@ function AuthGate() {
   // 判断是否为客户端模式（Electron / Android / 曾配置过服务器地址）
   //
   // Electron 打包后窗口加载的是 http://127.0.0.1:<port>/，protocol 是 "http:" 而非 "file:"，
-  // 所以不能只靠 protocol 判断。preload 会注入 window.nowenDesktop.isDesktop=true，
+  // 所以不能只靠 protocol 判断。preload 会注入 window.baseforgeDesktop.isDesktop=true，
   // 用它精确识别 Electron 桌面端 —— 同一个 Electron 窗口既能连"内置 backend"（localhost）
   // 也能连"远程服务器"（填 IP + 端口），登录页会展示服务器地址输入框。
   const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.()
     || !!(window as any).Capacitor?.platform && (window as any).Capacitor.platform !== "web";
-  const isElectron = !!(window as any).nowenDesktop?.isDesktop;
+  const isElectron = !!(window as any).baseforgeDesktop?.isDesktop;
   const isClientMode = window.location.protocol === "file:"
     || window.location.protocol === "capacitor:"
     || isCapacitor
@@ -1172,7 +1172,7 @@ function AuthGate() {
             // 云端降级：保留 token + serverUrl，使用上次用户信息进入主界面。
             // 后续读请求会走 offlineRead，本地缓存可用；写请求失败会进 offlineQueue。
             try {
-              window.dispatchEvent(new CustomEvent("nowen:cloud-degraded", {
+              window.dispatchEvent(new CustomEvent("baseforge:cloud-degraded", {
                 detail: {
                   reason: "verify_network_failure",
                   serverUrl,
@@ -1196,23 +1196,23 @@ function AuthGate() {
     // Phase A: Electron 桌面端零登录优先 —— 在任何"客户端模式 + 无 serverUrl 即回登录页"
     // 的判断之前先问主进程要本地账号 token。
     //   - 如果 localStorage 里已有 token（用户已显式登录过），优先尊重之，不覆盖；
-    //   - 仅当未登录且 nowenDesktop.isDesktop+getLocalAuth 可用时才走零登录路径；
+    //   - 仅当未登录且 baseforgeDesktop.isDesktop+getLocalAuth 可用时才走零登录路径；
     //   - lite 模式（连远端）下主进程会返回 null，自动回落到原有登录流程；
     //   - 拿到 token 时同时把 window.location.origin（http://127.0.0.1:<port>）
-    //     写入 nowen-server-url，让后续 API 调用照常走 ${serverUrl}/api，
+    //     写入 baseforge-server-url，让后续 API 调用照常走 ${serverUrl}/api，
     //     避免 verify / fetch 落空。
     //   - 整体放到最前面是因为：桌面端首启 localStorage 一片空白，
     //     原先 "isClientMode && !getServerUrl()" 会直接 return，零登录代码永远走不到。
-    const desktopApi = (window as any).nowenDesktop;
+    const desktopApi = (window as any).baseforgeDesktop;
     const existingToken = (() => {
       return getAccessToken();
     })();
     // D-1：桌面端"切换到云端"开关。
-    //   用户在 NavRailMobile 点击云端入口后会写 nowen-prefer-cloud=1，
+    //   用户在 NavRailMobile 点击云端入口后会写 baseforge-prefer-cloud=1，
     //   此时强制跳过零登录，直接进登录页（让用户输入 fnos 服务器地址）。
     //   返回本地模式时 LoginPage 会清除该标记 + reload，零登录恢复。
     const preferCloud = (() => {
-      try { return localStorage.getItem("nowen-prefer-cloud") === "1"; } catch { return false; }
+      try { return localStorage.getItem("baseforge-prefer-cloud") === "1"; } catch { return false; }
     })();
     if (!existingToken && !preferCloud && desktopApi?.isDesktop && desktopApi?.getLocalAuth) {
       let cancelled = false;
@@ -1320,14 +1320,14 @@ function AuthGate() {
   //
   //   storage 事件只在"其他"tab 修改 localStorage 时触发（不会在自己这 tab 触发），
   //   所以 handler 里调 window.location.reload() 不会导致死循环。
-  //   仅监听我们自己的 key：nowen-token / nowen-server-url / nowen-logout-broadcast。
+  //   仅监听我们自己的 key：baseforge-token / baseforge-server-url / baseforge-logout-broadcast。
   //
-  //   另外单独用一个 "nowen-logout-broadcast" key 作为广播通道：
+  //   另外单独用一个 "baseforge-logout-broadcast" key 作为广播通道：
   //   当某 tab 主动登出时 setItem(..., Date.now()) 即可通知所有其他 tab。
   useEffect(() => {
     const onStorage = (ev: StorageEvent) => {
       if (!ev.key) return;
-      if (ev.key === "nowen-token") {
+      if (ev.key === "baseforge-token") {
         const oldHad = !!ev.oldValue;
         const nowHas = !!ev.newValue;
         if (oldHad && !nowHas) {
@@ -1341,17 +1341,17 @@ function AuthGate() {
           // 其他 tab 刚登录成功 → 本 tab 去走一遍 verify，无感进入已登录态
           checkAuth();
         }
-      } else if (ev.key === "nowen-logout-broadcast") {
+      } else if (ev.key === "baseforge-logout-broadcast") {
         // 其他 tab 主动登出 → 本 tab 也清本地 token 并回登录页
         clearAuthTokens();
         setIsAuthenticated(false);
         setUser(null);
-      } else if (ev.key === "nowen-auth-changed") {
+      } else if (ev.key === "baseforge-auth-changed") {
         // 其他 tab 改密/改用户名成功 → 本 tab 也清 token 回登录页重新验证
         clearAuthTokens();
         setIsAuthenticated(false);
         setUser(null);
-      } else if (ev.key === "nowen-server-url") {
+      } else if (ev.key === "baseforge-server-url") {
         // 服务器地址改了，接下来的 API 调用需要刷新页面才能命中新 base URL
         // 只有已登录（或正在展示列表）才需要 reload，未登录状态本身就在输服务器地址那一步，不用动
         if (isAuthenticated) {
@@ -1416,7 +1416,7 @@ function AuthGate() {
     setActiveToken(token);
     setIsAuthenticated(true);
     // 通知同 tab 内的组件（如 SecuritySettings）token 已变化，需要重新拉取用户信息
-    try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch {}
+    try { window.dispatchEvent(new CustomEvent("baseforge:token-changed")); } catch {}
 
     // 登录引导回跳：支持来自分享页（edit_auth 权限）的 `/login?redirect=/share/<token>`。
     //

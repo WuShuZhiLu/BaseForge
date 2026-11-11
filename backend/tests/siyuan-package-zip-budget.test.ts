@@ -6,7 +6,7 @@ import fs from "node:fs";
 import JSZip from "jszip";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-zip-budget-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-zip-budget-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.SIYUAN_IMPORT_MAX_ZIP_ENTRIES = "3";

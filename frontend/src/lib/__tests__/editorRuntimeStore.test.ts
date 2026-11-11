@@ -26,9 +26,9 @@ describe("editor runtime store", () => {
     setActiveEditorRuntimeDecision("note-1", decision);
 
     expect(getActiveEditorRuntimeState().decision.mode).toBe("viewport-optimized");
-    expect(document.documentElement.dataset.nowenEditorRuntimeMode).toBe("viewport-optimized");
-    expect(document.documentElement.dataset.nowenEditorRuntimeNote).toBe("note-1");
-    expect(document.documentElement.dataset.nowenEditorRuntimeReasons).not.toContain("xxxxx");
+    expect(document.documentElement.dataset.baseforgeEditorRuntimeMode).toBe("viewport-optimized");
+    expect(document.documentElement.dataset.baseforgeEditorRuntimeNote).toBe("note-1");
+    expect(document.documentElement.dataset.baseforgeEditorRuntimeReasons).not.toContain("xxxxx");
   });
 
   it("escalates only toward safer modes", () => {

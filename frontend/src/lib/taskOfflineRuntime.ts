@@ -51,10 +51,10 @@ type NativeApi = {
   checkInHabit: (id: string, data: { status: HabitCheckinStatus; note?: string; checkinDate?: string }) => Promise<HabitCheckin>;
 };
 
-const PREFIX = "nowen-task-offline:v2";
-const LEGACY_PREFIX = "nowen-task-offline:v1";
-const EVENT = "nowen:task-offline-state-changed";
-const FLAG = Symbol.for("nowen.taskOfflineApi.v2.installed");
+const PREFIX = "baseforge-task-offline:v2";
+const LEGACY_PREFIX = "baseforge-task-offline:v1";
+const EVENT = "baseforge:task-offline-state-changed";
+const FLAG = Symbol.for("baseforge.taskOfflineApi.v2.installed");
 const MAX_RETRY = 10;
 
 const blank = (): State => ({
@@ -67,7 +67,7 @@ function storage(): Storage | null {
 }
 
 function userId(): string {
-  const token = storage()?.getItem("nowen-token");
+  const token = storage()?.getItem("baseforge-token");
   if (!token) return "anonymous";
   try {
     const raw = token.split(".")[1];

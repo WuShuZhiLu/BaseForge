@@ -40,8 +40,8 @@ vi.mock("@/hooks/useNoteLoader", () => ({
 vi.mock("@/lib/api", () => ({
   api: { getNote: vi.fn() },
   // 空间段来源：jsdom 无 localStorage 值时按 personal 处理（与真实实现一致的默认）。
-  getCurrentWorkspace: () => localStorage.getItem("nowen-current-workspace") || "personal",
-  setCurrentWorkspace: (workspaceId: string) => localStorage.setItem("nowen-current-workspace", workspaceId),
+  getCurrentWorkspace: () => localStorage.getItem("baseforge-current-workspace") || "personal",
+  setCurrentWorkspace: (workspaceId: string) => localStorage.setItem("baseforge-current-workspace", workspaceId),
 }));
 
 vi.mock("react-i18next", () => ({

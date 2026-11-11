@@ -45,7 +45,7 @@ export interface EditorPerformanceHarnessRequest {
 
 interface EditorPerformancePlatformTarget {
   performance?: { memory?: { usedJSHeapSize?: number } };
-  nowenDesktop?: {
+  baseforgeDesktop?: {
     getEditorPerformanceMetrics?: () => Promise<EditorPerformanceMemoryMetrics>;
   };
   Capacitor?: {
@@ -58,7 +58,7 @@ interface EditorPerformancePlatformTarget {
 }
 
 export interface EditorPerformanceGlobalTarget {
-  __NOWEN_EDITOR_PERF__?: EditorPerformanceGlobalEntry;
+  __BASEFORGE_EDITOR_PERF__?: EditorPerformanceGlobalEntry;
 }
 
 export type EditorPerformanceGlobalEntry = (
@@ -140,11 +140,11 @@ export function createEditorPerformancePlatformAdapter(
   if (platform === "electron") {
     return {
       async getMemoryMetrics() {
-        const getMetrics = target.nowenDesktop?.getEditorPerformanceMetrics;
+        const getMetrics = target.baseforgeDesktop?.getEditorPerformanceMetrics;
         if (typeof getMetrics !== "function") {
-          throw new Error("nowenDesktop.getEditorPerformanceMetrics is unavailable");
+          throw new Error("baseforgeDesktop.getEditorPerformanceMetrics is unavailable");
         }
-        return getMetrics.call(target.nowenDesktop);
+        return getMetrics.call(target.baseforgeDesktop);
       },
     };
   }
@@ -284,6 +284,6 @@ export function installEditorPerformanceGlobal(
   target: EditorPerformanceGlobalTarget = window as unknown as EditorPerformanceGlobalTarget,
 ): EditorPerformanceGlobalEntry {
   const entry: EditorPerformanceGlobalEntry = (request) => runEditorPerformanceScenario(request);
-  target.__NOWEN_EDITOR_PERF__ = entry;
+  target.__BASEFORGE_EDITOR_PERF__ = entry;
   return entry;
 }

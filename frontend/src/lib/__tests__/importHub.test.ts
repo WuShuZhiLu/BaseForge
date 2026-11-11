@@ -38,7 +38,7 @@ describe("import hub information architecture", () => {
       "yuque",
       "generic",
       "url",
-      "nowen",
+      "baseforge",
     ]);
     expect(new Set(methods).size).toBe(methods.length);
   });

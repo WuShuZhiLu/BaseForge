@@ -26,8 +26,8 @@ export interface ResolvedServerConnection extends ServerPathCandidate {
   resolvedAt: number;
 }
 
-const RESOLVED_SERVER_CONNECTION_KEY = "nowen-resolved-server-connections-v2";
-const LEGACY_RESOLVED_SERVER_CONNECTION_KEY = "nowen-resolved-server-connection-v1";
+const RESOLVED_SERVER_CONNECTION_KEY = "baseforge-resolved-server-connections-v2";
+const LEGACY_RESOLVED_SERVER_CONNECTION_KEY = "baseforge-resolved-server-connection-v1";
 const MAX_RESOLVED_SERVER_CONNECTIONS = 20;
 
 interface ResolvedServerConnectionCache {
@@ -106,7 +106,7 @@ export function isLanServerHostname(hostname: string): boolean {
     return /^f[cd][0-9a-f]{2}:/.test(normalized) || /^fe[89ab][0-9a-f]:/.test(normalized);
   }
 
-  // 无点的单标签主机名通常由局域网 DNS/hosts 解析，例如 nas、nowen-note。
+  // 无点的单标签主机名通常由局域网 DNS/hosts 解析，例如 nas、baseforge。
   return !normalized.includes(".");
 }
 
@@ -209,10 +209,10 @@ export function normalizeServerBaseUrl(input: string | null | undefined): string
 /** 客户端身份由运行环境决定，不受服务器配置或当前页面路径影响。 */
 export function isNativeClientRuntime(): boolean {
   if (typeof window === "undefined") return false;
-  const runtime = window as Window & { nowenDesktop?: { isDesktop?: boolean }; Capacitor?: { isNativePlatform?: () => boolean; platform?: string } };
+  const runtime = window as Window & { baseforgeDesktop?: { isDesktop?: boolean }; Capacitor?: { isNativePlatform?: () => boolean; platform?: string } };
   return window.location.protocol === "file:"
     || window.location.protocol === "capacitor:"
-    || !!runtime.nowenDesktop?.isDesktop
+    || !!runtime.baseforgeDesktop?.isDesktop
     || !!runtime.Capacitor?.isNativePlatform?.()
     || (!!runtime.Capacitor?.platform && runtime.Capacitor.platform !== "web");
 }

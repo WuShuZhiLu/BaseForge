@@ -12,7 +12,7 @@ import sharp from "sharp";
 import { Hono } from "hono";
 import { analyzeModernMedia } from "../src/lib/modern-media";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-modern-media-"));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-modern-media-"));
 process.env.DB_PATH = path.join(tmp, "test.db");
 process.env.ELECTRON_USER_DATA = tmp;
 process.env.NODE_ENV = "test";

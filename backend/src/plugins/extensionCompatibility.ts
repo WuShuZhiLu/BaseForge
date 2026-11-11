@@ -1,5 +1,5 @@
 import { getDb } from "../db/schema.js";
-import { nowenVersionSatisfies } from "./manifest.js";
+import { baseforgeVersionSatisfies } from "./manifest.js";
 import type { ExtensionPolicyDocument } from "./extensionPolicy.js";
 import type { PluginManifest, PluginRegistryRecord, PluginSource, PluginTrustLevel } from "./types.js";
 
@@ -44,7 +44,7 @@ export function resolveExtensionCompatibility(input: ExtensionCompatibilityInput
   if (!validTrustSource) return denied("PLUGIN_TRUST_SOURCE_INVALID", "插件来源与信任等级不匹配");
   if (INVALID_SIGNATURE_STATES.has(signatureState)) return denied("PLUGIN_SIGNATURE_INVALID", "插件签名无效或已被撤销");
   if (BLOCKED_ADVISORY_STATES.has(advisoryState)) return denied("PLUGIN_ADVISORY_BLOCKED", "插件版本存在严重安全公告，已拒绝运行");
-  if (!nowenVersionSatisfies(manifest.engines.nowen)) return denied("PLUGIN_NOWEN_INCOMPATIBLE", `插件要求 BaseForge ${manifest.engines.nowen}`);
+  if (!baseforgeVersionSatisfies(manifest.engines.baseforge)) return denied("PLUGIN_BASEFORGE_INCOMPATIBLE", `插件要求 BaseForge ${manifest.engines.baseforge}`);
 
   if (manifest.apiVersion === 2 && manifest.runtime !== "declarative") {
     const runtimePlatforms = manifest.runtimePlatform || manifest.platforms;

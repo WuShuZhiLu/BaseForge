@@ -203,9 +203,9 @@ const FILTER_SCOPE_OPTIONS: Array<{ value: FilterScope; label: string }> = [
 
 /** 区段顺序（可拖拽排序，持久化到 localStorage）。收藏作为知识库面板的一个区段（功能太少，不设独立面板） */
 type SectionId = "kb" | "tags" | "editors" | "star";
-const SECTION_ORDER_KEY = "nowen-next-sidebar-sections";
+const SECTION_ORDER_KEY = "baseforge-next-sidebar-sections";
 /** 区段排序拖拽专用 dataTransfer 类型：与知识树行拖拽（text/plain）区分，互不误触。 */
-const SECTION_DRAG_TYPE = "application/x-nowen-sidebar-section";
+const SECTION_DRAG_TYPE = "application/x-baseforge-sidebar-section";
 /** 区段全集（同时也是缺失区段的补位顺序）。 */
 const SECTION_IDS: SectionId[] = ["kb", "tags", "editors", "star"];
 
@@ -509,7 +509,7 @@ export default function SidebarDesktop() {
   const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string; isNew?: boolean } | null>(null);
 
   // 区段折叠 + 排序（折叠状态持久化）
-  const SECTION_COLLAPSED_KEY = "nowen-next-sidebar-sections-collapsed";
+  const SECTION_COLLAPSED_KEY = "baseforge-next-sidebar-sections-collapsed";
   const [collapsedSections, setCollapsedSections] = useState<Set<SectionId>>(() => {
     try {
       const saved = localStorage.getItem(SECTION_COLLAPSED_KEY);
@@ -521,7 +521,7 @@ export default function SidebarDesktop() {
     try { localStorage.setItem(SECTION_COLLAPSED_KEY, Array.from(collapsedSections).join(",")); } catch { /* ignore */ }
   }, [collapsedSections]);
   // 模块侧栏面板折叠状态（projects/files/shares 等单块面板，同样持久化）
-  const SIDEBAR_PANEL_COLLAPSED_KEY = "nowen-next-sidebar-panel-collapsed";
+  const SIDEBAR_PANEL_COLLAPSED_KEY = "baseforge-next-sidebar-panel-collapsed";
   // 文件管理面板的来源/筛选状态（filesUi）：订阅保证侧栏 chips 即时反映选择
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
   void filesUiVersion;
@@ -552,7 +552,7 @@ export default function SidebarDesktop() {
 
   // 侧栏宽度（批次 C）
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem("nowen-next-sidebar-width"));
+    const saved = Number(localStorage.getItem("baseforge-next-sidebar-width"));
     return Number.isFinite(saved) && saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH
       ? saved
       : SIDEBAR_DEFAULT_WIDTH;
@@ -563,7 +563,7 @@ export default function SidebarDesktop() {
   const [currentWs, setCurrentWs] = useState<string>(() => getCurrentWorkspace());
 
   // ===== 侧栏活动栏视图（FR-IA-02）：kb / star / trash / files / plugins =====
-  // Rail 点击经 nowen:sidebar-view 事件切换；主区视图不变（语雀式）
+  // Rail 点击经 baseforge:sidebar-view 事件切换；主区视图不变（语雀式）
   type SidebarView = "kb" | "trash" | "files" | "plugins" | "projects" | "shares";
   const [sidebarView, setSidebarView] = useState<SidebarView>(() => {
     // 刷新/深链首次挂载：与 App 从 URL 恢复的主区 viewMode 对齐一次（如 /plugins → 插件侧栏）。
@@ -624,13 +624,13 @@ export default function SidebarDesktop() {
   useEffect(() => {
     if (sidebarView !== "trash") return;
     const reload = () => { api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined); };
-    window.addEventListener("nowen:storage-changed", reload);
-    window.addEventListener("nowen:knowledge-tree-changed", reload);
-    window.addEventListener("nowen:notes-changed", reload);
+    window.addEventListener("baseforge:storage-changed", reload);
+    window.addEventListener("baseforge:knowledge-tree-changed", reload);
+    window.addEventListener("baseforge:notes-changed", reload);
     return () => {
-      window.removeEventListener("nowen:storage-changed", reload);
-      window.removeEventListener("nowen:knowledge-tree-changed", reload);
-      window.removeEventListener("nowen:notes-changed", reload);
+      window.removeEventListener("baseforge:storage-changed", reload);
+      window.removeEventListener("baseforge:knowledge-tree-changed", reload);
+      window.removeEventListener("baseforge:notes-changed", reload);
     };
   }, [sidebarView]);
   // 文件管理视图激活时：上传/删除/清理后即时刷新计数（stats + 文件列表）
@@ -640,23 +640,23 @@ export default function SidebarDesktop() {
       api.files.stats().then((s) => setFileStats(s)).catch(() => undefined);
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
     };
-    window.addEventListener("nowen:storage-changed", reload);
-    window.addEventListener("nowen:knowledge-tree-changed", reload);
-    window.addEventListener("nowen:notes-changed", reload);
+    window.addEventListener("baseforge:storage-changed", reload);
+    window.addEventListener("baseforge:knowledge-tree-changed", reload);
+    window.addEventListener("baseforge:notes-changed", reload);
     return () => {
-      window.removeEventListener("nowen:storage-changed", reload);
-      window.removeEventListener("nowen:knowledge-tree-changed", reload);
-      window.removeEventListener("nowen:notes-changed", reload);
+      window.removeEventListener("baseforge:storage-changed", reload);
+      window.removeEventListener("baseforge:knowledge-tree-changed", reload);
+      window.removeEventListener("baseforge:notes-changed", reload);
     };
   }, [sidebarView]);
   useEffect(() => {
     const onFilter = () => { setTrashFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); }
     const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };
-    window.addEventListener("nowen:trash-filter", onFilter);
-    window.addEventListener("nowen:trash-settings", onSettings);
+    window.addEventListener("baseforge:trash-filter", onFilter);
+    window.addEventListener("baseforge:trash-settings", onSettings);
     return () => {
-      window.removeEventListener("nowen:trash-filter", onFilter);
-      window.removeEventListener("nowen:trash-settings", onSettings);
+      window.removeEventListener("baseforge:trash-filter", onFilter);
+      window.removeEventListener("baseforge:trash-settings", onSettings);
     };
   }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
@@ -708,7 +708,7 @@ export default function SidebarDesktop() {
   // 知识树统一选中系统：单选/ctrl 多选/shift 范围选；点空白清空
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem("nowen-next-sidebar-selection");
+      const saved = localStorage.getItem("baseforge-next-sidebar-selection");
       const parsed = saved ? (JSON.parse(saved) as string[]) : [];
       return new Set(Array.isArray(parsed) ? parsed : []);
     } catch {
@@ -753,8 +753,8 @@ export default function SidebarDesktop() {
       // Rail 事件视图名（ViewMode 语义）→ 侧栏视图 id（收藏已并入知识库面板区段）
       applySidebarView(raw === "notebook" || raw === "favorites" ? "kb" : raw ?? "");
     };
-    window.addEventListener("nowen:sidebar-view", onSwitch);
-    return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
+    window.addEventListener("baseforge:sidebar-view", onSwitch);
+    return () => window.removeEventListener("baseforge:sidebar-view", onSwitch);
   }, [applySidebarView]);
 
   // 远程存储增删后侧栏「存储」列表跟着刷新（主面板保存成功时广播）
@@ -763,8 +763,8 @@ export default function SidebarDesktop() {
       if (sidebarView !== "files") return;
       loadRemoteSources();
     };
-    window.addEventListener("nowen:remote-sources-changed", reload);
-    return () => window.removeEventListener("nowen:remote-sources-changed", reload);
+    window.addEventListener("baseforge:remote-sources-changed", reload);
+    return () => window.removeEventListener("baseforge:remote-sources-changed", reload);
   }, [sidebarView, loadRemoteSources]);
 
   // 页面隐藏时进行中的请求会被 abort；回到前台补拉一次，避免侧栏一直停在空态
@@ -788,8 +788,8 @@ export default function SidebarDesktop() {
       setOpenPluginPanel(id);
       setSidebarView("kb");
     };
-    window.addEventListener("nowen:open-plugin-panel", onOpenPanel);
-    return () => window.removeEventListener("nowen:open-plugin-panel", onOpenPanel);
+    window.addEventListener("baseforge:open-plugin-panel", onOpenPanel);
+    return () => window.removeEventListener("baseforge:open-plugin-panel", onOpenPanel);
   }, []);
 
   // 插件面板入口的计数：进入插件视图时取一次（带 5 分钟缓存），并跟随刷新事件更新
@@ -837,20 +837,20 @@ export default function SidebarDesktop() {
   useEffect(() => {
     reloadStar();
     const onKbChanged = () => reloadStar();
-    // nowen:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
+    // baseforge:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
     const onNotesChanged = () => reloadStar();
-    window.addEventListener("nowen:knowledge-tree-changed", onKbChanged);
-    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    window.addEventListener("baseforge:knowledge-tree-changed", onKbChanged);
+    window.addEventListener("baseforge:notes-changed", onNotesChanged);
     return () => {
-      window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
-      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+      window.removeEventListener("baseforge:knowledge-tree-changed", onKbChanged);
+      window.removeEventListener("baseforge:notes-changed", onNotesChanged);
     };
   }, [reloadStar]);
 
   useEffect(() => {
     const onChanged = () => setBuiltinDisabled(getDisabledBuiltinPlugins());
-    window.addEventListener("nowen:builtin-plugins-changed", onChanged);
-    return () => window.removeEventListener("nowen:builtin-plugins-changed", onChanged);
+    window.addEventListener("baseforge:builtin-plugins-changed", onChanged);
+    return () => window.removeEventListener("baseforge:builtin-plugins-changed", onChanged);
   }, []);
 
   // 主区工作区切分组（如安装后跳「已安装」）时，侧栏分类跟着高亮，两边只有一套分组
@@ -859,8 +859,8 @@ export default function SidebarDesktop() {
       const next = (event as CustomEvent<{ group?: typeof plugCat }>).detail?.group;
       if (next) setPlugCat(next);
     };
-    window.addEventListener("nowen:plugin-group", onGroup);
-    return () => window.removeEventListener("nowen:plugin-group", onGroup);
+    window.addEventListener("baseforge:plugin-group", onGroup);
+    return () => window.removeEventListener("baseforge:plugin-group", onGroup);
   }, []);
 
   const reloadFiles = useCallback(() => {
@@ -893,7 +893,7 @@ export default function SidebarDesktop() {
       // 根级新建的 folder 即知识库（新建菜单根级只有「新建知识库」一项），默认名不能是「新建文件夹」
       const title = kind === "folder" && parentId === null ? "新建知识库" : titles[kind];
       const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致。
       // isNew 标记让"取消/清空名字"能真正撤销这次创建。
@@ -936,7 +936,7 @@ export default function SidebarDesktop() {
                 : await importWeChatArticleIntoKnowledgeTree(options);
       if (!imported) return;
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       // sheet 笔记走深链打开；excel 导入后直接打开生成的表格
       if (importKind === "excel") pushSheetAppPath(imported.id);
       else void openNoteFromTab(imported.id);
@@ -958,7 +958,7 @@ export default function SidebarDesktop() {
 
   // ---- 数据加载 ----
   // 并发 reload 的序号：只认最新一次请求的结果，避免早发出的旧响应后到、
-  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 nowen:knowledge-tree-changed 会同时触发 reload）。
+  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 baseforge:knowledge-tree-changed 会同时触发 reload）。
   const reloadSeqRef = useRef(0);
   const reload = useCallback(async () => {
     const seq = ++reloadSeqRef.current;
@@ -1003,15 +1003,15 @@ export default function SidebarDesktop() {
     const onChange = () => void reload();
     const onTagChange = () => void reloadTags();
     const onWsChange = () => setCurrentWs(getCurrentWorkspace());
-    window.addEventListener("nowen:knowledge-tree-changed", onChange);
-    window.addEventListener("nowen:workspace-changed", onChange);
-    window.addEventListener("nowen:workspace-changed", onWsChange);
-    window.addEventListener("nowen:tags-changed", onTagChange);
+    window.addEventListener("baseforge:knowledge-tree-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onWsChange);
+    window.addEventListener("baseforge:tags-changed", onTagChange);
     return () => {
-      window.removeEventListener("nowen:knowledge-tree-changed", onChange);
-      window.removeEventListener("nowen:workspace-changed", onChange);
-      window.removeEventListener("nowen:workspace-changed", onWsChange);
-      window.removeEventListener("nowen:tags-changed", onTagChange);
+      window.removeEventListener("baseforge:knowledge-tree-changed", onChange);
+      window.removeEventListener("baseforge:workspace-changed", onChange);
+      window.removeEventListener("baseforge:workspace-changed", onWsChange);
+      window.removeEventListener("baseforge:tags-changed", onTagChange);
     };
   }, [reload, reloadTags]);
 
@@ -1022,7 +1022,7 @@ export default function SidebarDesktop() {
   const switchSpace = useCallback((workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
     setCurrentWs(workspaceId);
-    window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId } }));
     // 旧空间的文档不属于新空间：切空间即收起，避免笔记路径被写进新空间的 URL。
     actions.setActiveNote(null);
     actions.setMobileView("list");
@@ -1447,8 +1447,8 @@ export default function SidebarDesktop() {
       const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
       if (nodeId) revealNodeFromOverview(nodeId);
     };
-    window.addEventListener("nowen:kb-reveal-node", onReveal);
-    return () => window.removeEventListener("nowen:kb-reveal-node", onReveal);
+    window.addEventListener("baseforge:kb-reveal-node", onReveal);
+    return () => window.removeEventListener("baseforge:kb-reveal-node", onReveal);
   }, [revealNodeFromOverview]);
 
   const searching = query.trim().length > 0;
@@ -1635,7 +1635,7 @@ export default function SidebarDesktop() {
   // 选中态持久化：刷新后恢复（避免回退到旧版 isActive 视觉）
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-next-sidebar-selection", JSON.stringify([...selectedNodeIds]));
+      localStorage.setItem("baseforge-next-sidebar-selection", JSON.stringify([...selectedNodeIds]));
     } catch { /* storage failures are non-fatal */ }
   }, [selectedNodeIds]);
 
@@ -1738,14 +1738,14 @@ export default function SidebarDesktop() {
   // ---- 面板高度：交给 SplitView（尺寸和恒等于容器高度，折叠份额按比例分给其它组）----
   const [sectionHeights, setSectionHeights] = useState<Partial<Record<SectionId, number>>>(() => {
     try {
-      const saved = localStorage.getItem("nowen-next-sidebar-section-heights");
+      const saved = localStorage.getItem("baseforge-next-sidebar-section-heights");
       if (saved) return JSON.parse(saved) as Partial<Record<SectionId, number>>;
     } catch { /* ignore */ }
     return {};
   });
 
   useEffect(() => {
-    try { localStorage.setItem("nowen-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
+    try { localStorage.setItem("baseforge-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
   }, [sectionHeights]);
 
   // ---- kb 树拖拽：拿起 / 落点判定 / 落点视觉统一交给 useSortableDrag ----
@@ -1797,7 +1797,7 @@ export default function SidebarDesktop() {
             reloadSeqRef.current += 1;
             setNodes((cur) => applyOptimisticMove(cur, sourceId, null, null));
           }
-          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+          window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
         } catch (error) {
           console.error("[SidebarDesktop] drop move failed:", error);
         }
@@ -1809,7 +1809,7 @@ export default function SidebarDesktop() {
   const startCreateFolder = useCallback(async (parentId: string | null) => {
     try {
       const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: parentId === null ? "新建知识库" : "新建文件夹" });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) {
         // 父折叠则展开
         const parent = nodes.find((n) => n.id === parentId);
@@ -1824,7 +1824,7 @@ export default function SidebarDesktop() {
   const startCreateNote = useCallback(async (parentId: string | null) => {
     try {
       const created = await knowledgeTreeApi.create({ parentId, nodeType: "note", title: "新建文档" });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       setRenaming({ kind: "kb", id: created.id, value: created.title });
     } catch (error) {
@@ -1842,7 +1842,7 @@ export default function SidebarDesktop() {
       if (isNew) {
         try {
           await knowledgeTreeApi.remove(id, "subtree");
-          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+          window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
         } catch (error) {
           console.error("[SidebarDesktop] discard new node failed:", error);
         }
@@ -1852,7 +1852,7 @@ export default function SidebarDesktop() {
     try {
       if (kind === "kb") {
         await knowledgeTreeApi.update(id, { title: trimmed });
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       } else {
         await api.updateTag(id, { name: trimmed });
         void reloadTags();
@@ -1868,14 +1868,14 @@ export default function SidebarDesktop() {
     setRenaming(null);
     if (!current?.isNew) return;
     void knowledgeTreeApi.remove(current.id, "subtree")
-      .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+      .then(() => window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed")))
       .catch((error) => console.error("[SidebarDesktop] discard new node failed:", error));
   }, [renaming]);
 
   const deleteNode = useCallback(async (nodeId: string) => {
     try {
       await knowledgeTreeApi.remove(nodeId, "subtree");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (focusRootId === nodeId) exitKb();
     } catch (error) {
       console.error("[SidebarDesktop] delete node failed:", error);
@@ -2703,7 +2703,7 @@ export default function SidebarDesktop() {
                   ])
                     .then(() => {
                       reloadStar();
-                      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+                      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
                     })
                     .catch(() => undefined);
                 }}
@@ -2738,7 +2738,7 @@ export default function SidebarDesktop() {
                         onClick={(e) => {
                           e.stopPropagation();
                           knowledgeTreeApi.update(kb.id, { isFavorite: 0 })
-                            .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+                            .then(() => window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed")))
                             .catch(() => undefined);
                         }}
                         className="sbx-btn"
@@ -3173,7 +3173,7 @@ export default function SidebarDesktop() {
                 try {
                   await knowledgeTreeApi.batchRemove(ids);
                   clearSelection();
-                  window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+                  window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
                 } catch (error) {
                   console.error("[SidebarDesktop] batch remove failed:", error);
                 }
@@ -3492,7 +3492,7 @@ export default function SidebarDesktop() {
                 <button
                   type="button"
                   className="text-[11px] text-accent-primary hover:underline"
-                  onClick={() => window.dispatchEvent(new Event("nowen:remote-open-manager"))}
+                  onClick={() => window.dispatchEvent(new Event("baseforge:remote-open-manager"))}
                 >
                   管理
                 </button>
@@ -3524,7 +3524,7 @@ export default function SidebarDesktop() {
                 })}
                 <button
                   type="button"
-                  onClick={() => window.dispatchEvent(new Event("nowen:remote-open-manager"))}
+                  onClick={() => window.dispatchEvent(new Event("baseforge:remote-open-manager"))}
                   className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] text-tx-tertiary hover:bg-app-hover hover:text-accent-primary"
                 >
                   <Plus size={14} className="shrink-0 opacity-80" />
@@ -3598,7 +3598,7 @@ export default function SidebarDesktop() {
                       title={entry.label}
                       onClick={() => {
                         setPlugCat(entry.key);
-                        window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
+                        window.dispatchEvent(new CustomEvent("baseforge:plugin-group", { detail: { group: entry.key } }));
                         if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                       }}
                     >
@@ -3635,14 +3635,14 @@ export default function SidebarDesktop() {
           const onUp = () => {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
-            try { localStorage.setItem("nowen-next-sidebar-width", String(sidebarWidth)); } catch { /* ignore */ }
+            try { localStorage.setItem("baseforge-next-sidebar-width", String(sidebarWidth)); } catch { /* ignore */ }
           };
           window.addEventListener("pointermove", onMove);
           window.addEventListener("pointerup", onUp);
         }}
         onDoubleClick={() => {
           setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
-          try { localStorage.setItem("nowen-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
+          try { localStorage.setItem("baseforge-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
         }}
       />
 
@@ -3969,7 +3969,7 @@ export default function SidebarDesktop() {
 }
 
 /** 侧栏开关：保留导出兼容既有引用（当前无调用方）。 */
-export const NEXT_SIDEBAR_ENABLED_KEY = "nowen-next-sidebar-enabled";
+export const NEXT_SIDEBAR_ENABLED_KEY = "baseforge-next-sidebar-enabled";
 
 export function isNextSidebarEnabled(): boolean {
   try {
@@ -4172,7 +4172,7 @@ function ProjectsSidePanel() {
           type="button"
           className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] font-medium text-accent-primary hover:bg-app-hover"
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("nowen:pm-new-item"));
+            window.dispatchEvent(new CustomEvent("baseforge:pm-new-item"));
           }}
         >
           <Plus size={12} /> 新建工作项
@@ -4181,7 +4181,7 @@ function ProjectsSidePanel() {
           type="button"
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("nowen:pm-new-project"));
+            window.dispatchEvent(new CustomEvent("baseforge:pm-new-project"));
           }}
         >
           <Plus size={12} /> 新建项目
@@ -4258,8 +4258,8 @@ function SharesSidePanel() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     const onChange = () => reload();
-    window.addEventListener("nowen:workspace-changed", onChange);
-    return () => window.removeEventListener("nowen:workspace-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onChange);
+    return () => window.removeEventListener("baseforge:workspace-changed", onChange);
   }, [reload]);
 
   /**

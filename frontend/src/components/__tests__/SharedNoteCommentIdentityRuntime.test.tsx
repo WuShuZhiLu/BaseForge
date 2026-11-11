@@ -118,12 +118,12 @@ describe("SharedNoteCommentIdentityRuntime", () => {
       { content: "test", guestName: "小王" },
       undefined,
     );
-    expect(localStorage.getItem("nowen-guest-name")).toBe("小王");
+    expect(localStorage.getItem("baseforge-guest-name")).toBe("小王");
     expect(host.textContent).toContain("done");
   });
 
   it("reuses the nickname stored by an earlier comment", async () => {
-    localStorage.setItem("nowen-guest-name", "访客甲");
+    localStorage.setItem("baseforge-guest-name", "访客甲");
     await renderRuntime();
     await submitComment();
 
@@ -137,7 +137,7 @@ describe("SharedNoteCommentIdentityRuntime", () => {
   });
 
   it("falls back to the nickname dialog when a stale login token is rejected as a guest", async () => {
-    localStorage.setItem("nowen-token", "expired-token");
+    localStorage.setItem("baseforge-token", "expired-token");
     mocks.addSharedComment
       .mockRejectedValueOnce(new Error("请填写昵称后再评论"))
       .mockResolvedValueOnce(COMMENT);

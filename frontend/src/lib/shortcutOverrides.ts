@@ -1,7 +1,7 @@
 import type { ShortcutChord, ShortcutPlatform } from "./shortcuts/types";
 
-export const SHORTCUT_OVERRIDES_STORAGE_KEY = "nowen-shortcut-overrides:v1";
-export const SHORTCUT_OVERRIDES_CHANGED_EVENT = "nowen:shortcut-overrides-changed";
+export const SHORTCUT_OVERRIDES_STORAGE_KEY = "baseforge-shortcut-overrides:v1";
+export const SHORTCUT_OVERRIDES_CHANGED_EVENT = "baseforge:shortcut-overrides-changed";
 
 const PLATFORMS: readonly ShortcutPlatform[] = ["macos", "windows", "linux"];
 const MODIFIER_TOKENS = new Set(["Mod", "Alt", "Shift"]);

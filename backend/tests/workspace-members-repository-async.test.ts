@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-ws-mem-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-ws-mem-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { workspaceMembersRepository } from "../src/repositories/workspaceMembersRepository";

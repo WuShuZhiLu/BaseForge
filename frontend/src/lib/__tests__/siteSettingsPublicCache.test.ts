@@ -8,7 +8,7 @@ describe("getSiteSettingsPublic", () => {
 
   it("公开站点设置请求禁用浏览器缓存", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      site_title: "nowen-note",
+      site_title: "baseforge",
       site_favicon: "",
       site_icp_beian: "粤ICP备12345678号-1",
       editor_font_family: "",

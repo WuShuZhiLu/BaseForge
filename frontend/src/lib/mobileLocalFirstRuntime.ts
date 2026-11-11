@@ -32,9 +32,9 @@ import {
 
 const MIGRATION_KEY = "indexeddbMigrationV1";
 const QUEUE_MIGRATION_KEY = "legacyOfflineQueueMigrationV1";
-const DEVICE_KEY = "nowen.localFirst.deviceId";
-const PROFILE_PREFIX = "nowen.localFirst.profile.";
-const TOKEN_PREFIX = "nowen.localFirst.token.";
+const DEVICE_KEY = "baseforge.localFirst.deviceId";
+const PROFILE_PREFIX = "baseforge.localFirst.profile.";
+const TOKEN_PREFIX = "baseforge.localFirst.token.";
 
 interface RuntimeHandle {
   identity: string;
@@ -74,7 +74,7 @@ function scopeFor(workspaceId: unknown): { scopeKey: string; workspaceId: string
 
 async function secureStorage() {
   const module = await import("@aparajita/capacitor-secure-storage");
-  try { await module.SecureStorage.setKeyPrefix("nowen_"); } catch { /* 已设置时可继续 */ }
+  try { await module.SecureStorage.setKeyPrefix("baseforge_"); } catch { /* 已设置时可继续 */ }
   // 返回模块，避免 Promise 将 Capacitor 插件代理的 then 当成原生方法调用。
   return module;
 }
@@ -576,7 +576,7 @@ export async function initializeMobileLocalFirstRuntime(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   if (!globalListenersInstalled) {
     globalListenersInstalled = true;
-    window.addEventListener("nowen:token-changed",scheduleConfigure);
+    window.addEventListener("baseforge:token-changed",scheduleConfigure);
     window.addEventListener(SERVER_URL_CHANGED_EVENT,scheduleConfigure);
     window.addEventListener(MOBILE_LOCAL_MODE_CHANGED_EVENT,scheduleConfigure);
   }

@@ -21,7 +21,7 @@ describe("mind map foolproof insertion command", () => {
     expect(item?.keywords).toEqual(expect.arrayContaining(["脑图", "思维导图", "mindmap"]));
 
     const handler = vi.fn();
-    window.addEventListener("nowen:open-mindmap-insert", handler, { once: true });
+    window.addEventListener("baseforge:open-mindmap-insert", handler, { once: true });
 
     item?.action({} as unknown as Editor);
 

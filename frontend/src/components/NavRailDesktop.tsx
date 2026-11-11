@@ -8,7 +8,7 @@
  * 头像浮窗（260px）：账号区（通知/当前账号/切换/登出）+ 外观区（主题 / 导航栏样式）。
  *
  * 复用既有机制：ViewMode 路由（favorites/trash/files）、useRailMode（icon/label/hidden，
- * hidden 由 App 层强制显示逻辑兜底）、next-themes（storageKey=nowen-note-theme）、
+ * hidden 由 App 层强制显示逻辑兜底）、next-themes（storageKey=baseforge-theme）、
  * OPEN_NOTIFICATIONS_EVENT 通知中心、broadcastLogout 登出。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -121,7 +121,7 @@ const PLUGIN_ITEMS: NavItem[] = [
  *   插件徽章（固定不可动）与各插件徽章在下，禁止跨组拖拽。
  */
 type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean; coreOrder?: string[]; pluginOrder?: string[] };
-const RAIL_CUSTOMIZATION_KEY = "nowen-rail-customization";
+const RAIL_CUSTOMIZATION_KEY = "baseforge-rail-customization";
 
 function loadRailCustomization(): RailCustomization {
   try {
@@ -306,8 +306,8 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   // 头像等用户资料变更后刷新（SecuritySettings 上传/移除头像时广播）
   useEffect(() => {
     const onUserUpdated = () => { invalidateMe(); fetchMe().then((u) => setMe(u as never)).catch(() => undefined); };
-    window.addEventListener("nowen:user-updated", onUserUpdated);
-    return () => window.removeEventListener("nowen:user-updated", onUserUpdated);
+    window.addEventListener("baseforge:user-updated", onUserUpdated);
+    return () => window.removeEventListener("baseforge:user-updated", onUserUpdated);
   }, []);
 
   // Rail 激活态跟随侧栏当前视图（语雀式：点击切换的是侧栏视图而非主区）
@@ -318,11 +318,11 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       if (!view) return;
       setActiveView(view === "notebook" ? "kb" : view);
     };
-    window.addEventListener("nowen:sidebar-view", onSwitch);
-    return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
+    window.addEventListener("baseforge:sidebar-view", onSwitch);
+    return () => window.removeEventListener("baseforge:sidebar-view", onSwitch);
   }, []);
   // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮。
-  // 刷新/深链恢复时不经 Rail 点击（没有 nowen:sidebar-view 事件），各模块视图
+  // 刷新/深链恢复时不经 Rail 点击（没有 baseforge:sidebar-view 事件），各模块视图
   // 都要按 viewMode 补齐高亮——否则刷新 /plugins 后高亮停在知识库。
   useEffect(() => {
     if (state.viewMode === "favorites") setActiveView("star");
@@ -355,14 +355,14 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       api.getWorkspaceFeatures(ws).then(setFeatures).catch(() => setFeatures(null));
     };
     load();
-    window.addEventListener("nowen:workspace-changed", load);
-    window.addEventListener("nowen:workspace-features-changed", load);
+    window.addEventListener("baseforge:workspace-changed", load);
+    window.addEventListener("baseforge:workspace-features-changed", load);
     const onBuiltin = () => forceBuiltinSync((n) => n + 1);
-    window.addEventListener("nowen:builtin-plugins-changed", onBuiltin);
+    window.addEventListener("baseforge:builtin-plugins-changed", onBuiltin);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", load);
-      window.removeEventListener("nowen:workspace-features-changed", load);
-      window.removeEventListener("nowen:builtin-plugins-changed", onBuiltin);
+      window.removeEventListener("baseforge:workspace-changed", load);
+      window.removeEventListener("baseforge:workspace-features-changed", load);
+      window.removeEventListener("baseforge:builtin-plugins-changed", onBuiltin);
     };
   }, []);
 
@@ -397,20 +397,20 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       // 模块三区联动：核心模块点击徽章 = 侧栏视图 + 工作区一起切，禁止三区脱节
       if (mode === "notebook" || mode === "favorites" || mode === "trash" || mode === "files" || mode === "plugins") {
         actions.setViewMode(mode);
-        window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+        window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
         return;
       }
       // 插件贡献的导航项（tasks）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
       if (mode === "tasks" || mode === "shares" || mode === "projects") {
         if (mode === "projects") {
-          window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: "projects" } }));
+          window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: "projects" } }));
         }
         actions.setViewMode(mode);
-        window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+        window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
         return;
       }
       // 语雀式：插件管理点击后主区视图不变，侧栏切到对应视图
-      window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+      window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
     },
     [],
   );
@@ -420,7 +420,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     if (isDesktopApp()) {
       await clearDesktopLocalAuth().catch(() => ({ ok: false }));
       try {
-        localStorage.setItem("nowen-prefer-cloud", "1");
+        localStorage.setItem("baseforge-prefer-cloud", "1");
       } catch {
         // ignore storage failures
       }

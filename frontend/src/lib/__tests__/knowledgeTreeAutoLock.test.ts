@@ -27,7 +27,7 @@ describe("knowledge tree folder auto lock", () => {
     vi.setSystemTime(new Date("2026-07-31T08:00:00.000Z"));
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem("nowen-token", token({ userId: "user-1" }));
+    localStorage.setItem("baseforge-token", token({ userId: "user-1" }));
   });
 
   afterEach(() => {

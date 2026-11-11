@@ -63,7 +63,7 @@ export function TaskInboxPanel({ onTaskMutated, initiallyExpanded = false, stand
   const [expanded, setExpanded] = useState(() => {
     if (initiallyExpanded || standalone) return true;
     try {
-      return localStorage.getItem("nowen-task-inbox-expanded") !== "false";
+      return localStorage.getItem("baseforge-task-inbox-expanded") !== "false";
     } catch {
       return true;
     }
@@ -123,17 +123,17 @@ export function TaskInboxPanel({ onTaskMutated, initiallyExpanded = false, stand
     void load();
     const handleChanged = () => void load(true);
     const handleFocus = () => void load(true);
-    window.addEventListener("nowen:task-inbox-changed", handleChanged);
+    window.addEventListener("baseforge:task-inbox-changed", handleChanged);
     window.addEventListener("focus", handleFocus);
     return () => {
-      window.removeEventListener("nowen:task-inbox-changed", handleChanged);
+      window.removeEventListener("baseforge:task-inbox-changed", handleChanged);
       window.removeEventListener("focus", handleFocus);
     };
   }, [load]);
 
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-task-inbox-expanded", String(expanded));
+      localStorage.setItem("baseforge-task-inbox-expanded", String(expanded));
     } catch {
       // Expansion remains session-local when storage is unavailable.
     }

@@ -1,7 +1,7 @@
 /**
  * electron-builder 配置 —— **Lite 发行版**（无内置 backend）。
  *
- * 适用场景：只想连接远端/局域网 Nowen 服务器的用户，不需要本机自带 SQLite 后端。
+ * 适用场景：只想连接远端/局域网 BaseForge 服务器的用户，不需要本机自带 SQLite 后端。
  * 相较 full 版：
  *   - 不打包 backend/dist + backend/node_modules
  *   - 安装体积大幅缩小（~70MB → ~25MB 量级，实际以产物为准）
@@ -13,7 +13,7 @@
  *   - 产物文件名加 "-lite" 后缀：便于分发与识别
  *
  * 运行时识别 lite 的两种冗余手段：
- *   1) extraMetadata 把 nowenLiteOnly=true 注入 app.asar 内的 package.json
+ *   1) extraMetadata 把 baseforgeLiteOnly=true 注入 app.asar 内的 package.json
  *   2) 主进程 isLiteOnlyBuild() 另行判定 `backend/dist/index.js` 是否存在（更可靠）
  *   任一命中即认为是 lite-only 包。
  *
@@ -26,22 +26,22 @@ const {
 } = require("../scripts/verify-sync-notification-ui.cjs");
 
 // full 配置里的环境变量 / 路径策略保持一致（产物可外迁到 %TEMP%，避免 IDE 监听锁）
-const OUT_DIR = process.env.NOWEN_BUILD_OUT
-  ? path.join(os.tmpdir(), "nowen-note-lite-build")
+const OUT_DIR = process.env.BASEFORGE_BUILD_OUT
+  ? path.join(os.tmpdir(), "baseforge-lite-build")
   : "dist-electron-lite";
 
 // rcedit 跳过开关（与 full 同）
-const SKIP_RCEDIT = process.env.NOWEN_SKIP_RCEDIT === "1";
+const SKIP_RCEDIT = process.env.BASEFORGE_SKIP_RCEDIT === "1";
 const SIGN_AND_EDIT_EXECUTABLE = !SKIP_RCEDIT;
 
 // Linux 元信息（与 full 同；仅 synopsis/description 变更以区分 lite）
 const LINUX_MAINTAINER =
-  process.env.NOWEN_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
-const LINUX_VENDOR = process.env.NOWEN_LINUX_VENDOR || "BaseForge";
+  process.env.BASEFORGE_LINUX_MAINTAINER || "BaseForge <noreply@baseforge.local>";
+const LINUX_VENDOR = process.env.BASEFORGE_LINUX_VENDOR || "BaseForge";
 
 module.exports = {
   // appId 加 .lite 后缀 —— 关键：避免与 full 安装包互覆盖、autoUpdate 串 feed
-  appId: "com.nowen.note.lite",
+  appId: "com.baseforge.note.lite",
   productName: "BaseForge Lite",
 
   /**
@@ -69,12 +69,12 @@ module.exports = {
   electronLanguages: ["en-US", "zh-CN"],
 
   /**
-   * 把 `nowenLiteOnly: true` 合并进 app.asar 内的 package.json。
+   * 把 `baseforgeLiteOnly: true` 合并进 app.asar 内的 package.json。
    * 除此之外 electron-builder 还会顺带把版本号等元信息同步 —— 这里只补一个自定义字段，
    * 不覆盖 name/version/main 等关键字段。
    */
   extraMetadata: {
-    nowenLiteOnly: true,
+    baseforgeLiteOnly: true,
   },
 
   /**
@@ -208,7 +208,7 @@ module.exports = {
     desktop: {
       entry: {
         StartupWMClass: "BaseForge Lite",
-        Keywords: "note;markdown;editor;nowen;lite;",
+        Keywords: "note;markdown;editor;baseforge;lite;",
       },
     },
     artifactName: "BaseForge-${version}-lite.${ext}",

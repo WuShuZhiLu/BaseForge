@@ -33,8 +33,8 @@ import {
 } from "../services/realtime.js";
 import { ensureNoteSplitTables } from "./note-split.js";
 
-const TIPTAP_NOTE_SPLIT_INSTALLED = Symbol.for("nowen.noteSplit.tiptapRoutesInstalled");
-const TIPTAP_NOTE_SPLIT_ROUTE_PATCH = Symbol.for("nowen.noteSplit.tiptapRoutePatch");
+const TIPTAP_NOTE_SPLIT_INSTALLED = Symbol.for("baseforge.noteSplit.tiptapRoutesInstalled");
+const TIPTAP_NOTE_SPLIT_ROUTE_PATCH = Symbol.for("baseforge.noteSplit.tiptapRoutePatch");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 type SplitAttachmentKind = "moved" | "copy";

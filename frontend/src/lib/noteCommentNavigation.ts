@@ -4,8 +4,8 @@ import { pushNoteAppPath } from "./noteDeepLink";
 import { openInlineCommentPanel } from "./inlineCommentEvents";
 import type { Note } from "@/types";
 
-export const OPEN_COMMENT_CENTER_EVENT = "nowen:open-comment-center";
-export const COMMENTS_CHANGED_EVENT = "nowen:comments-changed";
+export const OPEN_COMMENT_CENTER_EVENT = "baseforge:open-comment-center";
+export const COMMENTS_CHANGED_EVENT = "baseforge:comments-changed";
 
 export function openCommentCenter(): void {
   window.dispatchEvent(new Event(OPEN_COMMENT_CENTER_EVENT));
@@ -21,7 +21,7 @@ export async function openNoteComment(noteId: string, commentId: string, onOpenN
   const workspaceId = note.workspaceId || null;
   if ((getCurrentWorkspace() || null) !== workspaceId) {
     setCurrentWorkspace(workspaceId || "");
-    window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId } }));
   }
   onOpenNote(note);
   pushNoteAppPath(note.id);

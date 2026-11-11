@@ -5,7 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import * as Y from "yjs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-yjs-durable-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-yjs-durable-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { getDb } from "../src/db/schema";

@@ -27,10 +27,10 @@ function assertFile(filePath, installHint) {
 }
 
 const backendPort = parsePort(
-  process.env.NOWEN_DEV_BACKEND_PORT ?? process.env.PORT,
+  process.env.BASEFORGE_DEV_BACKEND_PORT ?? process.env.PORT,
   3001,
 )
-const frontendPort = parsePort(process.env.NOWEN_DEV_FRONTEND_PORT, 5173)
+const frontendPort = parsePort(process.env.BASEFORGE_DEV_FRONTEND_PORT, 5173)
 
 if (backendPort === frontendPort) {
   console.error(`\n[dev] 前后端不能使用同一个端口：${backendPort}\n`)
@@ -256,8 +256,8 @@ startProcess(
     cwd: frontendDir,
     env: {
       ...process.env,
-      NOWEN_DEV_BACKEND_URL: backendUrl,
-      NOWEN_DEV_BACKEND_PORT: String(backendPort),
+      BASEFORGE_DEV_BACKEND_URL: backendUrl,
+      BASEFORGE_DEV_BACKEND_PORT: String(backendPort),
     },
   },
 )

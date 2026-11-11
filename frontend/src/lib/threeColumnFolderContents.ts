@@ -2,8 +2,8 @@ import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 
 export type ThreeColumnFolderScopeMode = "current" | "recursive";
 
-export const THREE_COLUMN_FOLDER_SCOPE_STORAGE_KEY = "nowen.noteList.threeColumnFolderScope";
-export const KNOWLEDGE_TREE_OPEN_FOLDER_EVENT = "nowen:knowledge-tree-open-folder";
+export const THREE_COLUMN_FOLDER_SCOPE_STORAGE_KEY = "baseforge.noteList.threeColumnFolderScope";
+export const KNOWLEDGE_TREE_OPEN_FOLDER_EVENT = "baseforge:knowledge-tree-open-folder";
 
 export interface KnowledgeTreeOpenFolderDetail {
   node: KnowledgeTreeNode;

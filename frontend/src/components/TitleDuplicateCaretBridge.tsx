@@ -3,7 +3,7 @@ import { useEffect } from "react";
 type TitleField = HTMLInputElement | HTMLTextAreaElement;
 
 const MIRROR_SELECTOR = "[data-title-duplicate-mirror]";
-const CARET_SELECTOR = "[data-nowen-title-duplicate-caret]";
+const CARET_SELECTOR = "[data-baseforge-title-duplicate-caret]";
 const TITLE_FIELD_SELECTOR = [
   "[data-mobile-editor-title] textarea",
   "[data-markdown-mobile-title] textarea",
@@ -55,7 +55,7 @@ export function syncTitleDuplicateCaretProxy(root: ParentNode = document): boole
   if (spans.map((span) => span.textContent || "").join("") !== field.value) return false;
 
   const caret = document.createElement("span");
-  caret.dataset.nowenTitleDuplicateCaret = "";
+  caret.dataset.baseforgeTitleDuplicateCaret = "";
   caret.setAttribute("aria-hidden", "true");
   const computedCaretColor = window.getComputedStyle(field).caretColor;
   const caretColor = computedCaretColor && computedCaretColor !== "auto" && computedCaretColor !== "transparent"

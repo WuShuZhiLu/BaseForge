@@ -74,16 +74,16 @@ describe("API deletion queue reconciliation", () => {
     expect(getQueue().map((item) => item.noteId)).toEqual(["protected-b"]);
   });
   beforeEach(() => {
-    Object.assign(window, { nowenDesktop: { isDesktop: true } });
+    Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
     localStorage.clear();
-    localStorage.setItem("nowen-server-url", "http://sync-test.local");
-    localStorage.setItem("nowen-token", "test.token.value");
+    localStorage.setItem("baseforge-server-url", "http://sync-test.local");
+    localStorage.setItem("baseforge-token", "test.token.value");
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
     clearQueue();
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(window, "nowenDesktop");
+    Reflect.deleteProperty(window, "baseforgeDesktop");
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -109,7 +109,7 @@ describe("API deletion queue reconciliation", () => {
   it("uses one workspace-scoped request and removes only conflicts returned by empty trash", async () => {
     seedConflict("deleted-a");
     seedConflict("kept-b");
-    localStorage.setItem("nowen-current-workspace", "team-workspace");
+    localStorage.setItem("baseforge-current-workspace", "team-workspace");
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
       success: true,
       count: 1,

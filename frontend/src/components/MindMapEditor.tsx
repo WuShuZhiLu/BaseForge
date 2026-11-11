@@ -1325,8 +1325,8 @@ export default function MindMapCenter({
         if (activeMap && current && !current.some((map) => map.id === activeMap.id)) clearActiveMap();
       });
     };
-    window.addEventListener("nowen:knowledge-tree-changed", onTreeChanged);
-    return () => window.removeEventListener("nowen:knowledge-tree-changed", onTreeChanged);
+    window.addEventListener("baseforge:knowledge-tree-changed", onTreeChanged);
+    return () => window.removeEventListener("baseforge:knowledge-tree-changed", onTreeChanged);
   }, [activeMap, clearActiveMap, embeddedMode, loadMaps, loadTree]);
 
   // 工作区切换：清空当前打开的导图 + 重拉列表，避免显示其他 scope 的图
@@ -1337,8 +1337,8 @@ export default function MindMapCenter({
       loadMaps();
       void loadTree();
     };
-    window.addEventListener("nowen:workspace-changed", onWs);
-    return () => window.removeEventListener("nowen:workspace-changed", onWs);
+    window.addEventListener("baseforge:workspace-changed", onWs);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWs);
   }, [clearActiveMap, loadMaps, loadTree]);
 
   // 选择一个导图
@@ -1435,7 +1435,7 @@ export default function MindMapCenter({
         loadMaps().then(() => handleSelect(id));
       }
     };
-    window.addEventListener("nowen:open-mindmap", handler);
+    window.addEventListener("baseforge:open-mindmap", handler);
 
     // 组件挂载时检查是否有待打开的导图（从笔记编辑器保存后切换过来的）
     const pendingId = sessionStorage.getItem("pendingOpenMindMapId");
@@ -1444,7 +1444,7 @@ export default function MindMapCenter({
       loadMaps().then(() => handleSelect(pendingId));
     }
 
-    return () => window.removeEventListener("nowen:open-mindmap", handler);
+    return () => window.removeEventListener("baseforge:open-mindmap", handler);
   }, [embeddedMode, loadMaps, handleSelect]);
 
   const applySavedMindMap = useCallback((updated: MindMap) => {
@@ -1455,7 +1455,7 @@ export default function MindMapCenter({
       prev.map((m) => (m.id === updated.id ? { ...m, title: updated.title, updatedAt: updated.updatedAt } : m))
     );
     dispatchDocumentMindMapChanged({ id: updated.id, kind: "updated" });
-    if (titleChanged) window.dispatchEvent(new Event("nowen:knowledge-tree-changed"));
+    if (titleChanged) window.dispatchEvent(new Event("baseforge:knowledge-tree-changed"));
     onSaved?.(updated);
   }, [onSaved]);
 
@@ -1970,7 +1970,7 @@ export default function MindMapCenter({
       const data = markdownToMindMapData(md);
       const title = data.root.text.slice(0, 50) || t("mindMap.untitled");
       const created = await api.createMindMap({ title, data: JSON.stringify(data) });
-      window.dispatchEvent(new Event("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new Event("baseforge:knowledge-tree-changed"));
       setMaps((prev) => [{ id: created.id, userId: created.userId, workspaceId: created.workspaceId, title: created.title, createdAt: created.createdAt, updatedAt: created.updatedAt }, ...prev]);
       handleSelect(created.id);
       toast.success(t("mindMap.importSuccess"));
@@ -2032,7 +2032,7 @@ export default function MindMapCenter({
           console.error("Failed to apply mind map template:", error);
         }
       }
-      window.dispatchEvent(new Event("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new Event("baseforge:knowledge-tree-changed"));
       void loadMaps();
       void loadTree();
       void handleSelect(created.resourceId);
@@ -2052,7 +2052,7 @@ export default function MindMapCenter({
   const handleDeleteMap = useCallback(async (id: string) => {
     try {
       await api.deleteMindMap(id);
-      window.dispatchEvent(new Event("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new Event("baseforge:knowledge-tree-changed"));
       dispatchDocumentMindMapChanged({ id, kind: "deleted" });
       toast.success("已移入回收站");
       setMaps((prev) => prev.filter((m) => m.id !== id));

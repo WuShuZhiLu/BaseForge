@@ -84,7 +84,7 @@ export const LEGACY_CLEANUP_PLAN: CleanupItem[] = [
   },
   {
     target: "Clipper 的 serverUrl + token 直连远端路径",
-    location: "packages/nowen-clipper/src/lib/api.ts",
+    location: "packages/baseforge-clipper/src/lib/api.ts",
     precondition: "本地通道（localChannel.ts）在三大浏览器验证通过",
     risk: "没装桌面端、只用 Web 版的用户完全无法剪藏",
   },

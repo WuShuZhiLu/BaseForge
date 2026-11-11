@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-legacy-hierarchy-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-legacy-hierarchy-"));
 process.env.DB_PATH = path.join(tempDir, "legacy-hierarchy.db");
 let closeDatabase: (() => void) | null = null;
 

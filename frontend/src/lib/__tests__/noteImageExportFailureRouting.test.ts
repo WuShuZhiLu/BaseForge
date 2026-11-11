@@ -53,7 +53,7 @@ function prepareMocks() {
   vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
   vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(1);
   mocks.html2canvas.mockImplementation(async (clone: HTMLElement) => {
-    expect(clone.querySelector(".nowen-note-image-export-body")?.textContent).toContain("正文仍需导出");
+    expect(clone.querySelector(".baseforge-image-export-body")?.textContent).toContain("正文仍需导出");
     expect(clone.querySelector("img")?.getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
     return renderCanvas();
   });

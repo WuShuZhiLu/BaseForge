@@ -5,8 +5,8 @@ import { hasPermission, resolveNotePermission } from "../middleware/acl.js";
 import { noteYsnapshotsRepository, noteYupdatesRepository } from "../repositories/index.js";
 import { yDestroyDoc } from "../services/yjs.js";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.noteFormatYjsTransition.routePatch");
-const ROUTE_INSTALLED_FLAG = Symbol.for("nowen.noteFormatYjsTransition.routeInstalled");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.noteFormatYjsTransition.routePatch");
+const ROUTE_INSTALLED_FLAG = Symbol.for("baseforge.noteFormatYjsTransition.routeInstalled");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 /**

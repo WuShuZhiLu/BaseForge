@@ -13,7 +13,7 @@ interface RecoveredNoteRow {
 /**
  * 旧数据的格式自检：声明 tiptap-json、内容却是 HTML/Markdown。
  *
- * nowen 早期版本有整批笔记把 HTML 直接存进 notes.content，而 contentFormat 取了列
+ * baseforge 早期版本有整批笔记把 HTML 直接存进 notes.content，而 contentFormat 取了列
  * 默认值 'tiptap-json'（用户 2026-10-27 的整库导出包里 56 篇有 52 篇是这种）。按声明
  * 格式 JSON.parse 必然失败，导入后每篇都会被标成 block 权威 mismatch。
  *

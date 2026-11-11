@@ -1,5 +1,5 @@
 /** Local display preference only: sorting must never rewrite persisted task sortOrder. */
-export const TASK_DUE_SORT_PREFERENCE_KEY = "nowen.taskCenter.sortByDueTime.v1";
+export const TASK_DUE_SORT_PREFERENCE_KEY = "baseforge.taskCenter.sortByDueTime.v1";
 
 export function loadTaskDueSort(): boolean {
   try {

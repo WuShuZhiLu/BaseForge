@@ -116,7 +116,7 @@ test("stopping automatic scheduling persists a changed db-only keep count", () =
 });
 
 test("creating a full backup still invokes the shared db-only retention", async () => {
-  const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-full-retention-"));
+  const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-full-retention-"));
   const manager: any = Object.create(BackupManager.prototype);
   let pruneCalls = 0;
 

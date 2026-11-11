@@ -6,7 +6,7 @@ import fs from "node:fs";
 import { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-habits-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-habits-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let app: Hono;

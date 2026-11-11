@@ -1,8 +1,8 @@
 import { inferBrowserServerBaseUrl, stripServerBasePath } from "./serverUrl";
 
-const FILE_ROUTE_QUERY_KEY = "nowenAppPath";
+const FILE_ROUTE_QUERY_KEY = "baseforgeAppPath";
 
-export const APP_PATH_CHANGED_EVENT = "nowen:app-path-changed";
+export const APP_PATH_CHANGED_EVENT = "baseforge:app-path-changed";
 
 function normalizeAppPath(rawPath: string): string {
   const value = String(rawPath || "/").trim();
@@ -61,7 +61,7 @@ export function resolveCurrentAppPathname(
   }
 
   try {
-    return new URL(normalizeAppPath(appPath), "https://nowen.local").pathname;
+    return new URL(normalizeAppPath(appPath), "https://baseforge.local").pathname;
   } catch {
     return "/";
   }

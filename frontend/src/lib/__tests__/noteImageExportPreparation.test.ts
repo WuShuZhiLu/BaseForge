@@ -48,7 +48,7 @@ describe("NOTE-IMAGE-EXPORT footnote preparation", () => {
 describe("NOTE-IMAGE-EXPORT Docker/NAS attachment access", () => {
   it("refreshes and registers a signed attachment URL before rendering", async () => {
     const attachmentId = "72effe54-9200-41d5-95b1-9ff8fce078f7";
-    localStorage.setItem("nowen-token", "login-token");
+    localStorage.setItem("baseforge-token", "login-token");
 
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       urls: {
@@ -83,7 +83,7 @@ describe("NOTE-IMAGE-EXPORT Docker/NAS attachment access", () => {
   it("skips the access request when the note has no attachment URLs", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    localStorage.setItem("nowen-token", "login-token");
+    localStorage.setItem("baseforge-token", "login-token");
 
     await expect(refreshNoteImageAttachmentAccess("note-1", "纯文本"))
       .resolves.toBe(0);

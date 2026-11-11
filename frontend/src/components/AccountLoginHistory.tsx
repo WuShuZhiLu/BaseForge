@@ -55,8 +55,8 @@ export function AccountLoginHistoryList({
 
   useEffect(() => {
     refresh();
-    window.addEventListener("nowen:account-history-changed", refresh);
-    return () => window.removeEventListener("nowen:account-history-changed", refresh);
+    window.addEventListener("baseforge:account-history-changed", refresh);
+    return () => window.removeEventListener("baseforge:account-history-changed", refresh);
   }, [refresh]);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function AccountLoginHistoryList({
   if (!supported || items.length === 0) return null;
 
   const currentServer = getServerUrl().replace(/\/+$/, "").toLowerCase();
-  const hasActiveToken = !!localStorage.getItem("nowen-token");
+  const hasActiveToken = !!localStorage.getItem("baseforge-token");
   const currentHistoryId = localStorage.getItem(CURRENT_ACCOUNT_HISTORY_ID_KEY) || "";
   const isCollapsible = !!title && items.length > 2;
   const visibleItems = isCollapsible && !expanded ? items.slice(0, 2) : items;
@@ -197,8 +197,8 @@ export function AccountLoginHistoryDialog({ open, onClose }: { open: boolean; on
   const handleAddAccount = () => {
     try {
       clearAuthTokens();
-      localStorage.setItem("nowen-prefer-cloud", "1");
-      window.dispatchEvent(new CustomEvent("nowen:token-changed"));
+      localStorage.setItem("baseforge-prefer-cloud", "1");
+      window.dispatchEvent(new CustomEvent("baseforge:token-changed"));
     } catch { /* ignore */ }
     window.location.reload();
   };

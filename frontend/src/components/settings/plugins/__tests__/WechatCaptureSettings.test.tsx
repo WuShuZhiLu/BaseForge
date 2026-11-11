@@ -49,7 +49,7 @@ describe("WeChat inbox", () => {
       { id: "done", url: "https://example.com/done", status: "completed", createdAt: new Date().toISOString(), note: { id: "note-1", title: "文章标题" }, error: null },
     ] }); await render(); expect(host.textContent).toContain("正文无法读取");
     await act(async () => button("wechatAssistant.retry").click()); expect(mocks.retry).toHaveBeenCalledWith("failed");
-    const open = vi.fn(); window.addEventListener("nowen:open-note", open);
-    await act(async () => button("wechatAssistant.open").click()); expect(open.mock.calls[0][0].detail).toEqual({ noteId: "note-1" }); window.removeEventListener("nowen:open-note", open);
+    const open = vi.fn(); window.addEventListener("baseforge:open-note", open);
+    await act(async () => button("wechatAssistant.open").click()); expect(open.mock.calls[0][0].detail).toEqual({ noteId: "note-1" }); window.removeEventListener("baseforge:open-note", open);
   });
 });

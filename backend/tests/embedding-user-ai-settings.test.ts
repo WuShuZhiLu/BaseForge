@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-embedding-user-settings-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-embedding-user-settings-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let closeDb: () => void;

@@ -5,7 +5,7 @@ import { getDb } from "../src/db/schema";
 import {
   applyRoundTripPermissionMappings,
   buildRoundTripPermissionsManifest,
-  createNowenPackageWithPermissions,
+  createBaseForgePackageWithPermissions,
   previewRoundTripPermissionMappings,
 } from "../src/services/roundTripPermissionMapping";
 
@@ -46,7 +46,7 @@ test("exports only minimal member identity and roles", () => {
     .run("source", "editor");
 
   const manifest = buildRoundTripPermissionsManifest("owner", "source");
-  assert.equal(manifest.format, "nowen-workspace-permissions");
+  assert.equal(manifest.format, "baseforge-workspace-permissions");
   assert.equal(manifest.members.length, 2);
   assert.deepEqual(Object.keys(manifest.members[0] || {}).sort(), [
     "displayName", "email", "role", "sourceUserId", "username",
@@ -72,7 +72,7 @@ test("embeds permissions.json only in the explicit privileged package endpoint",
     VALUES ('notebook-1', 'owner', 'source', 'Root', '📒')
   `).run();
 
-  const result = await createNowenPackageWithPermissions({ userId: "owner", workspaceId: "source" });
+  const result = await createBaseForgePackageWithPermissions({ userId: "owner", workspaceId: "source" });
   const zip = await JSZip.loadAsync(result.buffer);
   assert.ok(zip.file("permissions.json"));
   const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
@@ -86,7 +86,7 @@ test("previews exact email matches and downgrades imported owner role", () => {
   workspace("target", "target-owner");
 
   const suggestions = previewRoundTripPermissionMappings("target-owner", "target", {
-    format: "nowen-workspace-permissions",
+    format: "baseforge-workspace-permissions",
     version: 1,
     exportedAt: new Date().toISOString(),
     sourceWorkspace: { id: "source", name: "Source" },
@@ -110,7 +110,7 @@ test("applies only explicit mappings and never replaces the target owner", () =>
   user("mapped", "mapped-user");
   workspace("target", "target-owner");
   const manifest = {
-    format: "nowen-workspace-permissions",
+    format: "baseforge-workspace-permissions",
     version: 1,
     exportedAt: new Date().toISOString(),
     sourceWorkspace: { id: "source", name: "Source" },

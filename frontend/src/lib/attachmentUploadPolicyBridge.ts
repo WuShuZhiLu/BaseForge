@@ -6,7 +6,7 @@ import {
 } from "@/lib/attachmentUploadPolicy";
 import { UploadRequestError } from "@/lib/uploadRequest";
 
-const INSTALL_FLAG = Symbol.for("nowen.attachmentUploadPolicyBridge.installed");
+const INSTALL_FLAG = Symbol.for("baseforge.attachmentUploadPolicyBridge.installed");
 
 type InstallFlagStore = Record<symbol, boolean | undefined>;
 

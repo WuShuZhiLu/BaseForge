@@ -609,7 +609,7 @@ describe("TaskWorkspace quick-add integration", () => {
         workspacePhase = 1;
 
         await act(async () => {
-            window.dispatchEvent(new Event("nowen:workspace-changed"));
+            window.dispatchEvent(new Event("baseforge:workspace-changed"));
             await flush();
         });
 

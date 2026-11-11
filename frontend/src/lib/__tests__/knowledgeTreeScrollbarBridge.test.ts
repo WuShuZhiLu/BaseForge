@@ -91,13 +91,13 @@ describe("knowledge tree custom scrollbar geometry", () => {
     cleanupScrollbarBridge = installKnowledgeTreeScrollbarBridge();
     await waitForScrollbarReconcile();
 
-    const firstTrack = document.querySelector(".nowen-knowledge-tree-custom-scroll-track");
+    const firstTrack = document.querySelector(".baseforge-knowledge-tree-custom-scroll-track");
     expect(firstTrack).not.toBeNull();
 
     firstTrack?.remove();
     await waitForScrollbarReconcile();
 
-    const replacementTrack = document.querySelector(".nowen-knowledge-tree-custom-scroll-track");
+    const replacementTrack = document.querySelector(".baseforge-knowledge-tree-custom-scroll-track");
     expect(replacementTrack).not.toBeNull();
     expect(replacementTrack).not.toBe(firstTrack);
   });
@@ -127,7 +127,7 @@ describe("knowledge tree custom scrollbar geometry", () => {
     refreshKnowledgeTreeScrollbars();
     await waitForScrollbarReconcile();
 
-    expect(document.querySelector(".nowen-knowledge-tree-custom-scroll-track")).not.toBeNull();
+    expect(document.querySelector(".baseforge-knowledge-tree-custom-scroll-track")).not.toBeNull();
   });
 
   it("keeps a disabled track visible when the desktop tree currently fits", async () => {
@@ -152,7 +152,7 @@ describe("knowledge tree custom scrollbar geometry", () => {
     await waitForScrollbarReconcile();
 
     const track = document.querySelector<HTMLElement>(
-      ".nowen-knowledge-tree-custom-scroll-track",
+      ".baseforge-knowledge-tree-custom-scroll-track",
     );
     expect(track?.hidden).toBe(false);
     expect(track?.getAttribute("aria-disabled")).toBe("true");

@@ -21,7 +21,7 @@ export interface VoiceMemoDraft {
   attachment?: VoiceMemoAttachment;
 }
 
-const database = () => openDB("nowen-voice-memo-drafts", 1, { upgrade(db) { db.createObjectStore("drafts", { keyPath: "id" }); } });
+const database = () => openDB("baseforge-voice-memo-drafts", 1, { upgrade(db) { db.createObjectStore("drafts", { keyPath: "id" }); } });
 export const voiceMemoDraftStore = {
   async put(draft: VoiceMemoDraft) { const db = await database(); try { await db.put("drafts", draft); } finally { db.close(); } },
   async list(scope: string): Promise<VoiceMemoDraft[]> { const db = await database(); try { return (await db.getAll("drafts") as VoiceMemoDraft[]).filter((draft) => draft.scope === scope).sort((a, b) => a.createdAt - b.createdAt); } finally { db.close(); } },

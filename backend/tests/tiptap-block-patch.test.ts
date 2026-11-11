@@ -135,7 +135,7 @@ test("replaces one leaf block with validated marks and block attributes", () => 
       content: [
         {
           type: "text",
-          text: "Nowen",
+          text: "BaseForge",
           marks: [
             { type: "bold" },
             { type: "textStyle", attrs: { color: "#3b82f6", fontSize: "20px" } },

@@ -12,7 +12,7 @@
  *     SVG 已经是 well-formed，且 securityLevel:'strict' 已经在 lib 里设了）
  *   - 渲染失败：显示红色错误条 + 折叠的原始源码，便于用户修复
  *   - source 变化时 debounce 250ms 再渲染，避免编辑时每个字符都触发
- *   - 主题变更后强制重渲染（订阅 `nowen:theme-change`，由 ThemeProvider 抛出）
+ *   - 主题变更后强制重渲染（订阅 `baseforge:theme-change`，由 ThemeProvider 抛出）
  *   - 渲染成功后右上角悬浮"放大"按钮，点击进入全屏 Lightbox 预览，
  *     支持滚轮缩放 / 拖拽平移 / 双击复位 / Esc 关闭，便于查看大图。
  */

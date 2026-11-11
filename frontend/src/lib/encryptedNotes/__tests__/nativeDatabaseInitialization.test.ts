@@ -17,8 +17,8 @@ vi.mock("@capacitor-community/sqlite", () => ({
     }; }
   },
 }));
-beforeEach(() => { mocks.version = 0; mocks.execute.mockReset().mockResolvedValue({}); mocks.run.mockReset().mockResolvedValue({}); mocks.close.mockReset().mockResolvedValue(undefined); Reflect.deleteProperty(globalThis, "__nowenNoteNativeDatabaseState"); });
-afterEach(() => { Reflect.deleteProperty(globalThis, "__nowenNoteNativeDatabaseState"); });
+beforeEach(() => { mocks.version = 0; mocks.execute.mockReset().mockResolvedValue({}); mocks.run.mockReset().mockResolvedValue({}); mocks.close.mockReset().mockResolvedValue(undefined); Reflect.deleteProperty(globalThis, "__baseforgeNoteNativeDatabaseState"); });
+afterEach(() => { Reflect.deleteProperty(globalThis, "__baseforgeNoteNativeDatabaseState"); });
 
 it.each([0, 4])("initializing schema %s installs all persisted guards before acknowledging version 5", async (version) => {
   mocks.version = version;

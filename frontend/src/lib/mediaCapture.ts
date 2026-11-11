@@ -45,10 +45,10 @@ export function shouldUseManagedPhotoCapture(input: HTMLInputElement): boolean {
   const accept = (input.accept || "").toLowerCase();
   if (!accept.includes("image")) return false;
   if (accept.includes("video") && !accept.includes("image")) return false;
-  if (input.dataset.nowenCameraFallback === "1") return false;
+  if (input.dataset.baseforgeCameraFallback === "1") return false;
   if (isNativeCapacitorRuntime()) return false;
 
-  const desktopRuntime = Boolean((window as Window & { nowenDesktop?: { isDesktop?: boolean } })?.nowenDesktop?.isDesktop);
+  const desktopRuntime = Boolean((window as Window & { baseforgeDesktop?: { isDesktop?: boolean } })?.baseforgeDesktop?.isDesktop);
   if (desktopRuntime) return true;
 
   // Preserve iOS/Android browser capture semantics. Desktop browsers, including
@@ -98,7 +98,7 @@ export function stopCameraStream(stream: MediaStream | null | undefined): void {
 function photoFilename(now = new Date()): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return [
-    "nowen-photo-",
+    "baseforge-photo-",
     now.getFullYear(),
     pad(now.getMonth() + 1),
     pad(now.getDate()),

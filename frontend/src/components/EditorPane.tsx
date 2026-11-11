@@ -119,7 +119,7 @@ import {
 // ---------------------------------------------------------------------------
 // 编辑器模式切换（MD vs Tiptap）
 // ---------------------------------------------------------------------------
-// URL `?md=1|0` 强制，否则读 localStorage["nowen.editor_mode"]。
+// URL `?md=1|0` 强制，否则读 localStorage["baseforge.editor_mode"]。
 // 底层协议与工具：frontend/src/lib/editorMode.ts
 // 切换流程与文档：docs/editor-mode-switch.md
 //
@@ -127,7 +127,7 @@ import {
 //   顶栏 `MD / RTE` 切换按钮，对普通用户 隐藏 隐藏。设置里双击可调出，
 //   按钮占位 + tooltip 仍然存在，双击即可**临时让用户删除**。
 //     - `?md=1` / `?md=0` URL 参数仍然生效（逻辑没删，只是用户看不到链接）
-//     - `localStorage["nowen.editor_mode"]` 仍然可读取
+//     - `localStorage["baseforge.editor_mode"]` 仍然可读取
 //     - toggleEditorMode 会切换并保存，但未完成自动迁移，刷新页面后一切可恢复
 //   需要在开发调试时显示按钮，把下方变量改为 true；正式发布请保持 false。
 const SHOW_EDITOR_MODE_TOGGLE = false;
@@ -137,7 +137,7 @@ interface EditorPaneProps {
   onSplitDocument?: () => void;
 }
 
-const ANONYMOUS_RETURN_NOTE_KEY = "nowen.anonymous-return-note-id";
+const ANONYMOUS_RETURN_NOTE_KEY = "baseforge.anonymous-return-note-id";
 
 function readAnonymousReturnNoteId(): string | null {
   try {
@@ -916,7 +916,7 @@ function EditorPaneCore({
       actions.setSyncStatus("saved");
       actions.setLastSynced(new Date().toISOString());
       actions.refreshNotes();
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "note-format-converted", noteId },
       }));
       toast.success(targetFormat === "markdown" ? "已转换为 Markdown" : "已转换为富文本");
@@ -1159,8 +1159,8 @@ function EditorPaneCore({
   /** ��ǰ��¼�û���Ϣ������ awareness ��ʾ������������ɫ */
   const [selfUser, setSelfUser] = useState<{ userId: string; username: string } | null>(() => {
     try {
-      const cachedId = localStorage.getItem("nowen-self-userid");
-      const cachedName = localStorage.getItem("nowen-self-username");
+      const cachedId = localStorage.getItem("baseforge-self-userid");
+      const cachedName = localStorage.getItem("baseforge-self-username");
       if (cachedId && cachedName) return { userId: cachedId, username: cachedName };
     } catch {}
     return null;
@@ -1172,8 +1172,8 @@ function EditorPaneCore({
       .then((me: any) => {
         if (cancelled || !me?.id) return;
         try {
-          localStorage.setItem("nowen-self-userid", me.id);
-          localStorage.setItem("nowen-self-username", me.username || me.id);
+          localStorage.setItem("baseforge-self-userid", me.id);
+          localStorage.setItem("baseforge-self-username", me.username || me.id);
         } catch {}
         setSelfUser({ userId: me.id, username: me.username || me.id });
       })
@@ -1460,7 +1460,7 @@ function EditorPaneCore({
    * ����������־û��������������Զ��ϲ���
    */
   const collabReady = !!(activeNote && !activeNote.isLocked && selfUser && editorMode === "md"
-    && !/nowen-encrypted/i.test(activeNote.content || ""));
+    && !/baseforge-encrypted/i.test(activeNote.content || ""));
   const { doc: collabYDoc, provider: collabProvider, synced: collabSynced } = useYDoc({
     noteId: collabReady ? (activeNote?.id ?? null) : null,
     user: selfUser,
@@ -1617,8 +1617,8 @@ function EditorPaneCore({
       persistCurrentEditorSnapshotDraft();
       try { editorHandleRef.current?.flushSave(); } catch { /* ignore */ }
     };
-    window.addEventListener("nowen:before-note-switch", onBeforeNoteSwitch);
-    return () => window.removeEventListener("nowen:before-note-switch", onBeforeNoteSwitch);
+    window.addEventListener("baseforge:before-note-switch", onBeforeNoteSwitch);
+    return () => window.removeEventListener("baseforge:before-note-switch", onBeforeNoteSwitch);
   }, []);
 
   // Delete ��ɾ���ʼǿ�ݼ������ڱ༭��δ�۽�ʱ��Ч��
@@ -2195,7 +2195,7 @@ function EditorPaneCore({
     actions.updateNoteInList({ id: updated.id, colorMark: nextColor });
     actions.updateNoteTab({ id: updated.id, colorMark: nextColor } as unknown as { id: string });
     try {
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "note-color-mark-changed" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "note-color-mark-changed" } }));
     } catch { /* 通知失败不阻断编辑。 */ }
   }, [activeNote, actions]);
 
@@ -2655,13 +2655,13 @@ const moveToTrash = useCallback(async () => {
     const openMindMapInsert = () => setPendingAnonEmbed("mindmap");
     const openSheetEmbedPicker = () => setPendingAnonEmbed("sheet");
     const openBoardEmbedPicker = () => setPendingAnonEmbed("board");
-    window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-    window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-    window.addEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    window.addEventListener("baseforge:open-mindmap-insert", openMindMapInsert);
+    window.addEventListener("baseforge:open-sheet-embed-picker", openSheetEmbedPicker);
+    window.addEventListener("baseforge:open-board-embed-picker", openBoardEmbedPicker);
     return () => {
-      window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-      window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-      window.removeEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+      window.removeEventListener("baseforge:open-mindmap-insert", openMindMapInsert);
+      window.removeEventListener("baseforge:open-sheet-embed-picker", openSheetEmbedPicker);
+      window.removeEventListener("baseforge:open-board-embed-picker", openBoardEmbedPicker);
     };
   }, []);
 
@@ -3099,11 +3099,11 @@ const moveToTrash = useCallback(async () => {
               : <Unlock size={17} className="text-tx-tertiary" />}
           </Button>
           {/* �����������滻�����ƶ��˸�Ƶ�������ᵽ��������������
-              ͨ���Զ����¼� 'nowen:open-search' ���� TiptapEditor �ڲ��� SearchReplacePanel��
+              ͨ���Զ����¼� 'baseforge:open-search' ���� TiptapEditor �ڲ��� SearchReplacePanel��
               ����� TiptapEditor ���ڲ� state �������ⲿ����������ӿڸɾ��� */}
           <Button
             variant="ghost" size="icon" className={cn("h-8 w-8 shrink-0", compactMobileEditing && "hidden")}
-            onClick={() => window.dispatchEvent(new CustomEvent('nowen:open-search'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('baseforge:open-search'))}
             aria-label={t('editor.searchInNote')}
           >
             <Search size={17} />
@@ -3121,7 +3121,7 @@ const moveToTrash = useCallback(async () => {
               className="h-8 w-8"
               onClick={() => {
                 const nextOpen = !showMobileMenu;
-                if (nextOpen) window.dispatchEvent(new CustomEvent('nowen:close-search'));
+                if (nextOpen) window.dispatchEvent(new CustomEvent('baseforge:close-search'));
                 setShowMobileMenu(nextOpen);
                 setShowMobileMoveMenu(false);
               }}
@@ -3145,7 +3145,7 @@ const moveToTrash = useCallback(async () => {
                   {/* �ö� / ȡ���ö� */}
                   <button
                     onClick={() => {
-                      window.dispatchEvent(new CustomEvent('nowen:open-search'));
+                      window.dispatchEvent(new CustomEvent('baseforge:open-search'));
                       setShowMobileMenu(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors"

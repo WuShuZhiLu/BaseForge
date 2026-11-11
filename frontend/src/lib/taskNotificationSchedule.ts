@@ -1,5 +1,5 @@
-export const TASK_REMINDER_SYNC_EVENT = "nowen:task-reminders-changed";
-export const TASK_NOTIFICATION_OPEN_EVENT = "nowen:task-notification-open";
+export const TASK_REMINDER_SYNC_EVENT = "baseforge:task-reminders-changed";
+export const TASK_NOTIFICATION_OPEN_EVENT = "baseforge:task-notification-open";
 
 export interface TaskReminderScheduleItem {
   reminderId: string;

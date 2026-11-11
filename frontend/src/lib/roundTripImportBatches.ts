@@ -1,7 +1,7 @@
 import { getBaseUrl } from "./api";
 
-export const ROUND_TRIP_IMPORT_COMPLETED_EVENT = "nowen:roundtrip-import-completed";
-export const ROUND_TRIP_IMPORT_HISTORY_EVENT = "nowen:open-roundtrip-import-history";
+export const ROUND_TRIP_IMPORT_COMPLETED_EVENT = "baseforge:roundtrip-import-completed";
+export const ROUND_TRIP_IMPORT_HISTORY_EVENT = "baseforge:open-roundtrip-import-history";
 
 export interface RoundTripImportBatchSummary {
   id: string;
@@ -31,7 +31,7 @@ export interface RoundTripImportBatchDetail extends RoundTripImportBatchSummary 
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     credentials: "include",
@@ -83,7 +83,7 @@ export function undoRoundTripImportBatch(batchId: string): Promise<RoundTripImpo
 export function announceRoundTripImportCompleted(batchId: string): void {
   if (typeof window === "undefined" || !batchId) return;
   try {
-    localStorage.setItem("nowen-last-roundtrip-import-batch", batchId);
+    localStorage.setItem("baseforge-last-roundtrip-import-batch", batchId);
   } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent(ROUND_TRIP_IMPORT_COMPLETED_EVENT, { detail: { batchId } }));
 }

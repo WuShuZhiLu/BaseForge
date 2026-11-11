@@ -17,7 +17,7 @@ describe("block patch API client", () => {
   });
 
   it("sends one confirmed patch envelope and returns the authoritative snapshot", async () => {
-    localStorage.setItem("nowen-token", "token-1");
+    localStorage.setItem("baseforge-token", "token-1");
     const authoritativeContent = JSON.stringify({
       type: "doc",
       content: [{

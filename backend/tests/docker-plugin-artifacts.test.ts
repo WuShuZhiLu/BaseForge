@@ -11,7 +11,7 @@ test("Docker-shaped tsc artifacts run both plugin runtimes without source fallba
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const copy = dockerfile.match(/&& cp ([^\r\n]+) dist\/plugins\//);
   assert.ok(copy, "Docker tsc build must copy plugin child entries into dist/plugins");
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-docker-plugin-test-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-docker-plugin-test-"));
   const artifactBackend = path.join(directory, "backend");
   const dist = path.join(artifactBackend, "dist");
   const smoke = path.join(backend, "scripts/smoke-plugin-artifacts.cjs");

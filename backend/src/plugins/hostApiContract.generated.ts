@@ -1,4 +1,4 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/host-api-contract.json 生成，请勿手动修改。
+// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/baseforge-plugin-sdk/host-api-contract.json 生成，请勿手动修改。
 import type { PluginPermission } from "./types.js";
 import type { HostApiContractEntry } from "./hostApiContract.js";
 

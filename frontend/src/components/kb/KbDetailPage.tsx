@@ -115,8 +115,8 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   // 树在侧栏被增删改后同步刷新（同一事件驱动）
   useEffect(() => {
     const onChange = () => load();
-    window.addEventListener("nowen:knowledge-tree-changed", onChange);
-    return () => window.removeEventListener("nowen:knowledge-tree-changed", onChange);
+    window.addEventListener("baseforge:knowledge-tree-changed", onChange);
+    return () => window.removeEventListener("baseforge:knowledge-tree-changed", onChange);
   }, [load]);
 
   const kbNode = useMemo(
@@ -212,7 +212,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     const next = kbNode.isFavorite === 1 ? 0 : 1;
     try {
       await knowledgeTreeApi.update(kbNode.id, { isFavorite: next });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
     } catch (err) {
       console.error("[KbDetailPage] toggle favorite failed:", err);
       toast.error(next === 1 ? "收藏失败" : "取消收藏失败");
@@ -240,7 +240,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
         nodeType: kind,
         title: defaultInlineCreateTitle(kind),
       });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       setTocOpen((current) => new Set(current).add(kbNode.id));
       // 先建后改名：留在总览，目录行进入行内命名态（编辑器等改完自己点开）
       setRenamingNodeId(created.id);
@@ -262,7 +262,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     if (!nodeId || !title) return;
     try {
       await knowledgeTreeApi.update(nodeId, { title });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
     } catch (err) {
       console.error("[KbDetailPage] rename node failed:", err);
       toast.error("重命名失败");
@@ -275,7 +275,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     try {
       await api.updateNotebook(kbId, { icon: value });
       setNotebooks((current) => (current ?? []).map((nb) => (nb.id === kbId ? { ...nb, icon: value } : nb)));
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
     } catch (err) {
       console.error("[KbDetailPage] update cover failed:", err);
       toast.error("更换封面失败");
@@ -290,7 +290,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     if (!title || title === kbNode.title) return;
     try {
       await knowledgeTreeApi.update(kbNode.id, { title });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
     } catch (err) {
       console.error("[KbDetailPage] rename kb failed:", err);
       toast.error("重命名失败");
@@ -302,7 +302,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
     if (!kbNode) return;
     try {
       await knowledgeTreeApi.remove(kbNode.id, "subtree");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       const params = new URLSearchParams(window.location.search);
       params.delete("tree");
       const qs = params.toString();
@@ -377,7 +377,7 @@ export default function KbDetailPage({ kbId }: { kbId: string }) {
   }, [moreOpen, createOpen]);
 
   const revealNode = useCallback((nodeId: string) => {
-    window.dispatchEvent(new CustomEvent("nowen:kb-reveal-node", { detail: { nodeId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:kb-reveal-node", { detail: { nodeId } }));
   }, []);
 
   const renderTocRows = (parentId: string, depth: number): React.ReactNode => {

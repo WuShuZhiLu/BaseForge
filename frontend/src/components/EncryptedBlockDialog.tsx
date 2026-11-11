@@ -88,10 +88,10 @@ export default function EncryptedBlockDialog({ source, initialContent, onCommit,
     const account = () => { if (getOfflineQueueStorageKey() !== scope) { operation.current?.abort(); cryptoSession.current?.close(); cryptoSession.current = null; recovery.current = null; onClose(); } };
     const navigation = (event: Event) => { if (dirty || draft || busy || lockFailed) event.preventDefault(); else onClose(); };
     window.addEventListener("beforeunload", leave); window.addEventListener("keydown", escape);
-    window.addEventListener("nowen:token-changed", account); window.addEventListener("nowen:server-url-changed", account);
+    window.addEventListener("baseforge:token-changed", account); window.addEventListener("baseforge:server-url-changed", account);
     window.addEventListener(ENCRYPTED_NOTE_LEAVE_EVENT, navigation);
     return () => { window.removeEventListener("beforeunload", leave); window.removeEventListener("keydown", escape);
-      window.removeEventListener("nowen:token-changed", account); window.removeEventListener("nowen:server-url-changed", account); window.removeEventListener(ENCRYPTED_NOTE_LEAVE_EVENT, navigation); };
+      window.removeEventListener("baseforge:token-changed", account); window.removeEventListener("baseforge:server-url-changed", account); window.removeEventListener(ENCRYPTED_NOTE_LEAVE_EVENT, navigation); };
   }, [dirty, busy, draft, lockFailed]);
   // A separate mount-only cleanup avoids aborting an operation during an ordinary state update.
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; operation.current?.abort(); cryptoSession.current?.close(); cryptoSession.current = null; recovery.current = null; }; }, []);

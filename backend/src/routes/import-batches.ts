@@ -55,8 +55,8 @@ app.get("/package", async (c) => {
   }
 
   try {
-    const { createStableNowenPackageExport } = await import("../services/nowenPackageExportStable");
-    const result = await createStableNowenPackageExport({
+    const { createStableBaseForgePackageExport } = await import("../services/baseforgePackageExportStable");
+    const result = await createStableBaseForgePackageExport({
       userId,
       workspaceId,
       notebookId: c.req.query("notebookId") || undefined,
@@ -118,8 +118,8 @@ app.post("/package", async (c) => {
     }
 
     const zipBuffer = Buffer.from(await file.arrayBuffer());
-    const { importNowenPackage } = await import("../services/nowenPackageImport");
-    const result = await importNowenPackage(zipBuffer, {
+    const { importBaseForgePackage } = await import("../services/baseforgePackageImport");
+    const result = await importBaseForgePackage(zipBuffer, {
       userId,
       workspaceId,
       targetNotebookId,

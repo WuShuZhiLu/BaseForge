@@ -39,7 +39,7 @@ describe("shared mind map snapshots", () => {
 
   it("renders a self-contained SVG snapshot for public sharing", () => {
     const html = renderSharedMindMapSnapshot(snapshot);
-    expect(html).toContain("data-nowen-mindmap-snapshot");
+    expect(html).toContain("data-baseforge-mindmap-snapshot");
     expect(html).toContain("<svg");
     expect(html).toContain("产品规划");
     expect(html).not.toContain("/api/mindmaps/");

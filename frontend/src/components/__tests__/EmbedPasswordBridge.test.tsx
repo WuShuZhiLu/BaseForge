@@ -18,7 +18,7 @@ async function mountBridge() {
 
 function appendPreviewIframe(src: string) {
   const preview = document.createElement("div");
-  preview.className = "nowen-md-preview";
+  preview.className = "baseforge-md-preview";
   const frame = document.createElement("iframe");
   frame.src = src;
   frame.setAttribute("sandbox", "allow-scripts allow-forms allow-popups");
@@ -70,13 +70,13 @@ describe("EmbedPasswordBridge", () => {
 
     const offer = postMessage.mock.calls
       .map((call) => call[0] as any)
-      .find((message) => message?.type === "nowen:embed-password-offer");
+      .find((message) => message?.type === "baseforge:embed-password-offer");
     expect(offer).toBeTruthy();
     expect("password" in offer).toBe(false);
     expect(iframe.parentElement?.textContent).toContain("页面确认后");
 
     window.dispatchEvent(new MessageEvent("message", {
-      data: { type: "nowen:embed-password-ready", requestId: offer.requestId },
+      data: { type: "baseforge:embed-password-ready", requestId: offer.requestId },
       origin: "https://example.com",
       source: iframe.contentWindow,
     }));
@@ -84,11 +84,11 @@ describe("EmbedPasswordBridge", () => {
 
     const delivery = postMessage.mock.calls
       .map((call) => call[0] as any)
-      .find((message) => message?.type === "nowen:embed-password");
+      .find((message) => message?.type === "baseforge:embed-password");
     expect(delivery).toMatchObject({ requestId: offer.requestId, password: "hidden-value" });
 
     window.dispatchEvent(new MessageEvent("message", {
-      data: { type: "nowen:embed-password-applied", requestId: offer.requestId, success: true },
+      data: { type: "baseforge:embed-password-applied", requestId: offer.requestId, success: true },
       origin: "https://example.com",
       source: iframe.contentWindow,
     }));

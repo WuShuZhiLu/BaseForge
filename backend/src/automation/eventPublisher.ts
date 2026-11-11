@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "../db/schema.js";
-import type { AutomationSource, NowenEvent } from "./types.js";
+import type { AutomationSource, BaseForgeEvent } from "./types.js";
 
 export const MAX_EVENT_DEPTH = 10;
 const EVENT_RETENTION_DAYS = 14;
@@ -23,7 +23,7 @@ export interface PublishEventInput {
   occurredAt?: string;
 }
 
-export function rowToEvent(row: Record<string, unknown>): NowenEvent {
+export function rowToEvent(row: Record<string, unknown>): BaseForgeEvent {
   const workspaceId = typeof row.workspaceId === "string" && row.workspaceId ? row.workspaceId : undefined;
   return {
     id: String(row.id),
@@ -47,7 +47,7 @@ export function rowToEvent(row: Record<string, unknown>): NowenEvent {
 }
 
 export class EventPublisher {
-  publish(input: PublishEventInput): NowenEvent {
+  publish(input: PublishEventInput): BaseForgeEvent {
     const depth = Math.max(0, Math.floor(input.depth || 0));
     if (depth > MAX_EVENT_DEPTH) throw Object.assign(new Error("自动化事件递归深度超过 10"), { code: "AUTOMATION_LOOP_DETECTED" });
     const occurredAt = input.occurredAt || new Date().toISOString();
@@ -63,7 +63,7 @@ export class EventPublisher {
     return rowToEvent(row);
   }
 
-  replay(eventId: string, actorUserId: string): NowenEvent {
+  replay(eventId: string, actorUserId: string): BaseForgeEvent {
     const row = getDb().prepare("SELECT * FROM automation_events WHERE id=?").get(eventId) as Record<string, unknown> | undefined;
     if (!row) throw Object.assign(new Error("事件不存在"), { code: "AUTOMATION_EVENT_NOT_FOUND" });
     return this.publish({
@@ -74,7 +74,7 @@ export class EventPublisher {
     });
   }
 
-  list(userId: string, isAdmin: boolean, limit = 100): NowenEvent[] {
+  list(userId: string, isAdmin: boolean, limit = 100): BaseForgeEvent[] {
     const rows = isAdmin
       ? getDb().prepare("SELECT * FROM automation_events ORDER BY occurredAt DESC LIMIT ?").all(Math.min(500, limit))
       : getDb().prepare("SELECT * FROM automation_events WHERE userId=? ORDER BY occurredAt DESC LIMIT ?").all(userId, Math.min(500, limit));

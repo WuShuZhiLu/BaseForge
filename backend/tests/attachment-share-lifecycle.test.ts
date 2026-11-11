@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-attachment-share-lifecycle-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-attachment-share-lifecycle-"));
 process.env.DB_PATH = path.join(dir, "test.db");
 process.env.ELECTRON_USER_DATA = dir;
 process.env.ATTACHMENT_LEGACY_PUBLIC_URL = "false";

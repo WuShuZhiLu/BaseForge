@@ -1,9 +1,9 @@
 import type { Note } from "@/types";
 import type { NoteEditorUpdatePayload } from "@/components/editors/types";
 
-export const PREPARE_EDITOR_SPLIT_CLOSE_EVENT = "nowen:prepare-editor-split-close";
-export const REQUEST_EDITOR_SPLIT_MIRROR_EVENT = "nowen:request-editor-split-mirror";
-export const UPDATE_EDITOR_SPLIT_MIRROR_EVENT = "nowen:update-editor-split-mirror";
+export const PREPARE_EDITOR_SPLIT_CLOSE_EVENT = "baseforge:prepare-editor-split-close";
+export const REQUEST_EDITOR_SPLIT_MIRROR_EVENT = "baseforge:request-editor-split-mirror";
+export const UPDATE_EDITOR_SPLIT_MIRROR_EVENT = "baseforge:update-editor-split-mirror";
 
 export function applyEditorUpdateToNote(
   note: Note,

@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { normalizeShareCommentTimestamp } from "@/lib/shareCommentTime";
 import type { ShareComment } from "@/types";
 
-const COMMENT_DISPLAY_STATE_KEY = "__nowenSharedCommentDisplayRuntime__" as const;
+const COMMENT_DISPLAY_STATE_KEY = "__baseforgeSharedCommentDisplayRuntime__" as const;
 const COMMENT_DISPLAY_RUNTIME_VERSION = 2;
 
 type GetSharedComments = typeof api.getSharedComments;
@@ -19,7 +19,7 @@ interface CommentDisplayRuntimeState {
 
 function getCommentDisplayRuntimeState(): CommentDisplayRuntimeState {
   const globalStore = globalThis as typeof globalThis & {
-    __nowenSharedCommentDisplayRuntime__?: CommentDisplayRuntimeState;
+    __baseforgeSharedCommentDisplayRuntime__?: CommentDisplayRuntimeState;
   };
   if (!globalStore[COMMENT_DISPLAY_STATE_KEY]) {
     globalStore[COMMENT_DISPLAY_STATE_KEY] = {

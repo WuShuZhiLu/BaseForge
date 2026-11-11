@@ -9,7 +9,7 @@ import { assertEncryptedBlocksPreserved } from "./encryptedNotes/blockDocument";
 export type NoteFormatConversionTarget = "markdown" | "tiptap-json";
 
 export const REQUEST_NOTE_FORMAT_CONVERSION_EVENT =
-  "nowen:request-note-format-conversion";
+  "baseforge:request-note-format-conversion";
 
 export interface NoteFormatConversionRequest {
   noteId: string;

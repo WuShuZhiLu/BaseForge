@@ -6,11 +6,11 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
 
-const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-theme-plugin-lifecycle-"));
+const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-theme-plugin-lifecycle-"));
 process.env.NODE_ENV = "test";
 process.env.DB_PATH = path.join(tempDirectory, "lifecycle.test.db");
 process.env.ELECTRON_USER_DATA = tempDirectory;
-process.env.NOWEN_EXTENSIONS_V21 = "1";
+process.env.BASEFORGE_EXTENSIONS_V21 = "1";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sample = JSON.parse(fs.readFileSync(
@@ -39,7 +39,7 @@ test("Theme Pack install lifecycle preserves the requested note theme for automa
     "Theme lifecycle",
     "# Theme lifecycle",
     "Theme lifecycle",
-    "nowenlab.theme-pack/sepia",
+    "baseforgelab.theme-pack/sepia",
   );
 
   const archive = new JSZip();
@@ -68,7 +68,7 @@ test("Theme Pack install lifecycle preserves the requested note theme for automa
   assert.equal(service.contributions().length, 0);
   assert.equal(
     (db.prepare("SELECT themeId FROM notes WHERE id=?").get("theme-note") as { themeId: string }).themeId,
-    "nowenlab.theme-pack/sepia",
+    "baseforgelab.theme-pack/sepia",
   );
 
   await service.enable(sample.id);
@@ -79,7 +79,7 @@ test("Theme Pack install lifecycle preserves the requested note theme for automa
   assert.equal(service.contributions().length, 0);
   assert.equal(
     (db.prepare("SELECT themeId FROM notes WHERE id=?").get("theme-note") as { themeId: string }).themeId,
-    "nowenlab.theme-pack/sepia",
+    "baseforgelab.theme-pack/sepia",
   );
 
   await service.installer.installValidated(validated, "theme-user", {
@@ -90,7 +90,7 @@ test("Theme Pack install lifecycle preserves the requested note theme for automa
   assert.equal(service.contributions()[0]?.pluginId, sample.id);
   assert.equal(
     (db.prepare("SELECT themeId FROM notes WHERE id=?").get("theme-note") as { themeId: string }).themeId,
-    "nowenlab.theme-pack/sepia",
+    "baseforgelab.theme-pack/sepia",
   );
 
   schemaModule.closeDb();

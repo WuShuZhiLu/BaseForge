@@ -1,11 +1,11 @@
 /**
- * 恢复完整系统备份后，把 nowen 的「根路径文档」归并进一个知识库。
+ * 恢复完整系统备份后，把 baseforge 的「根路径文档」归并进一个知识库。
  *
  * 背景：
- *   - nowen 支持在知识树根层直接放文档（数据模型里挂在隐藏容器
- *     `__nowen_root_documents__:` 下，树节点 parentId = null）；
+ *   - baseforge 支持在知识树根层直接放文档（数据模型里挂在隐藏容器
+ *     `__baseforge_root_documents__:` 下，树节点 parentId = null）；
  *   - BaseForge 的 Web 端只在根层创建知识库，文档都在知识库内部；
- *   - 「数据包导入」已有兜底（nowenPackageImportV2 → 「待整理」），但
+ *   - 「数据包导入」已有兜底（baseforgePackageImportV2 → 「待整理」），但
  *     「完整系统备份恢复」是整库替换，不经过那条链路，根文档会原样留在根层。
  *
  * 所以在恢复完成后补这一步：把根层文档移进「待整理」知识库，同时同步
@@ -50,7 +50,7 @@ function listRootDocuments(db: DatabaseSync): RootDocumentRow[] {
        AND node.resourceType = 'note'
        AND (
          node.parentId IS NULL
-         OR node.parentId GLOB 'notebook:__nowen_root_documents__:*'
+         OR node.parentId GLOB 'notebook:__baseforge_root_documents__:*'
        )
      ORDER BY node.userId, node.workspaceId, node.sortOrder, node.id
   `).all() as RootDocumentRow[];

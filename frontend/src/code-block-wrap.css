@@ -11,7 +11,7 @@
  */
 .ProseMirror .code-block-wrapper .code-block-content,
 .ProseMirror pre:not(.code-block-pre) > code,
-.nowen-md-preview pre > code,
+.baseforge-md-preview pre > code,
 .shared-note-content .shared-code-content,
 .shared-note-content pre > code {
   min-width: 0;
@@ -25,7 +25,7 @@
  * the wrapping behavior instead of becoming an unbreakable inline fragment. */
 .ProseMirror .code-block-wrapper .code-block-content span,
 .ProseMirror pre:not(.code-block-pre) > code span,
-.nowen-md-preview pre > code span,
+.baseforge-md-preview pre > code span,
 .shared-note-content .shared-code-content span,
 .shared-note-content pre > code span {
   white-space: inherit;
@@ -37,7 +37,7 @@
  * wrapped, hide the empty horizontal gutter on the dedicated code containers. */
 .ProseMirror .code-block-pre,
 .ProseMirror pre:not(.code-block-pre),
-.nowen-md-preview pre,
+.baseforge-md-preview pre,
 .shared-note-content .shared-code-pre {
   max-width: 100%;
   overflow-x: hidden !important;

@@ -54,7 +54,7 @@ export const EMPTY_TASK_SAVED_VIEW_FILTERS: TaskSavedViewFilters = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}/user-preferences/task-metadata${path}`, {
     ...init,
     headers: {

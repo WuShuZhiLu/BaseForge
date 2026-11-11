@@ -9,8 +9,8 @@ import {
   selectStaticContentEncoding,
 } from "../lib/static-asset-response.js";
 
-const INSTALL_KEY = "__nowenStaticPrecompressedAssetsInstalled__" as const;
-const APP_MIDDLEWARE_KEY = Symbol.for("nowen.staticPrecompressedAssets.appMiddleware");
+const INSTALL_KEY = "__baseforgeStaticPrecompressedAssetsInstalled__" as const;
+const APP_MIDDLEWARE_KEY = Symbol.for("baseforge.staticPrecompressedAssets.appMiddleware");
 
 const MIME_TYPES: Record<string, string> = {
   ".css": "text/css",
@@ -112,7 +112,7 @@ export function installPrecompressedAssetMiddleware(app: Hono<any>): void {
 
 export function installStaticPrecompressedAssetRuntime(): void {
   const globalState = globalThis as typeof globalThis & {
-    __nowenStaticPrecompressedAssetsInstalled__?: boolean;
+    __baseforgeStaticPrecompressedAssetsInstalled__?: boolean;
   };
   if (globalState[INSTALL_KEY]) return;
   globalState[INSTALL_KEY] = true;

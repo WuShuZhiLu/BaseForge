@@ -143,13 +143,13 @@ installInlineCommentTooltipMount();
 
 initCodeBlockTheme();
 
-const THEME_KEY = "nowen-note-theme";
+const THEME_KEY = "baseforge-theme";
 if (typeof localStorage !== "undefined" && !localStorage.getItem(THEME_KEY)) {
   localStorage.setItem(THEME_KEY, "light");
 }
 
 try {
-  const desk: any = (window as any).nowenDesktop;
+  const desk: any = (window as any).baseforgeDesktop;
   if (desk && desk.isDesktop && typeof desk.platform === "string") {
     document.documentElement.setAttribute("data-electron", desk.platform);
   }
@@ -220,7 +220,7 @@ function renderApplication(): void {
             <DeferredGlobalFeatureCentersMount />
             <SiyuanRichTextCalloutBridge />
             <InlineCommentBridge />
-            {/* 语音备忘录制面板：全局单例，监听 "nowen:voice-record" 事件弹出 */}
+            {/* 语音备忘录制面板：全局单例，监听 "baseforge:voice-record" 事件弹出 */}
             <VoiceRecorderSheet />
             <AppErrorBoundary>
               <React.Suspense fallback={<MainRouteFallback />}>

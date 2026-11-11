@@ -6,7 +6,7 @@ import path from "node:path";
 import type { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-activity-events-route-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-activity-events-route-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 

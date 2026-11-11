@@ -88,7 +88,7 @@ describe("encrypted content interoperability and lifecycle", () => {
       const ciphertext = Buffer.from(sealed.ciphertext, "base64");
       const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(sealed.iv, "base64"));
       decipher.setAuthTag(ciphertext.subarray(-16));
-      decipher.setAAD(Buffer.from(JSON.stringify(["nowen-encrypted-content", 1, "AES-256-GCM", purpose, envelope.objectId, envelope.kind, envelope.originalFormat])));
+      decipher.setAAD(Buffer.from(JSON.stringify(["baseforge-encrypted-content", 1, "AES-256-GCM", purpose, envelope.objectId, envelope.kind, envelope.originalFormat])));
       return Buffer.concat([decipher.update(ciphertext.subarray(0, -16)), decipher.final()]);
     };
     expect(nativeOpen(nativeOpen(kek, envelope.wrappedKey, "key"), envelope.payload, "content").toString()).toBe(fixture.plaintext);

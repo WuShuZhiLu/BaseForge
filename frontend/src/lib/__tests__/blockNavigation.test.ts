@@ -63,7 +63,7 @@ describe("block link navigation", () => {
   });
 
   it("opens a chapter at the top when the old anchor was the omitted section heading", async () => {
-    sessionStorage.setItem("nowen.pendingBlockNavigation", JSON.stringify({
+    sessionStorage.setItem("baseforge.pendingBlockNavigation", JSON.stringify({
       noteId: "stale",
       blockId: "blk_stale",
       createdAt: Date.now(),
@@ -86,7 +86,7 @@ describe("block link navigation", () => {
       blockId: null,
       redirected: true,
     });
-    expect(sessionStorage.getItem("nowen.pendingBlockNavigation")).toBeNull();
+    expect(sessionStorage.getItem("baseforge.pendingBlockNavigation")).toBeNull();
     unsubscribe();
   });
 

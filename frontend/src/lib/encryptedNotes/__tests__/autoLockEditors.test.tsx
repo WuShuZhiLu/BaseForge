@@ -42,7 +42,7 @@ async function unlockNote() { await fill("密码", fixture.passphrase); await cl
 async function autosave() { await act(async () => vi.advanceTimersByTime(800)); }
 function mayLeave() {
   let allowed = false;
-  act(() => { allowed = window.dispatchEvent(new Event("nowen:encrypted-note-before-leave", { cancelable: true })); });
+  act(() => { allowed = window.dispatchEvent(new Event("baseforge:encrypted-note-before-leave", { cancelable: true })); });
   return allowed;
 }
 beforeEach(async () => {
@@ -252,7 +252,7 @@ it.each(["encryption", "write"])("account change during %s prevents a late resul
   if (stage === "encryption") mocks.crypto.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
   else mocks.save.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
   await act(async () => window.dispatchEvent(new Event("blur")));
-  await act(async () => { mocks.scope = "account-b"; window.dispatchEvent(new Event("nowen:token-changed")); resolve(stage === "encryption" ? envelope : { ...note, version: 2 }); });
+  await act(async () => { mocks.scope = "account-b"; window.dispatchEvent(new Event("baseforge:token-changed")); resolve(stage === "encryption" ? envelope : { ...note, version: 2 }); });
   expect(input("加密 Markdown 正文")).toBeNull(); expect(mocks.setNote).not.toHaveBeenCalled();
   expect(mocks.save).toHaveBeenCalledTimes(stage === "write" ? 1 : 0);
   expect(document.querySelector('[role="status"]')).toBeNull();

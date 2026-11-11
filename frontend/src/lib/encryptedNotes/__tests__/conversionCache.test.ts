@@ -10,14 +10,14 @@ import vector from "./fixtures/envelope-v1.json";
 
 const original = { id: "note", userId: "owner", notebookId: "book", title: "title", version: 1, content: "private source", contentText: "private source", contentFormat: "markdown", createdAt: "2026-10-03", updatedAt: "2026-10-03" } as Note;
 beforeEach(() => {
-  Object.assign(window, { nowenDesktop: { isDesktop: true } });
+  Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
   localStorage.clear();
   vi.clearAllMocks();
 });
-afterEach(() => { Reflect.deleteProperty(window, "nowenDesktop"); });
+afterEach(() => { Reflect.deleteProperty(window, "baseforgeDesktop"); });
 it("a deferred cache callback cannot write a former account's body into the current cache", async () => {
   const scope = getOfflineQueueStorageKey();
-  localStorage.setItem("nowen-server-url", "https://other.example.test");
+  localStorage.setItem("baseforge-server-url", "https://other.example.test");
   await cacheNoteContent(original, scope);
   expect(putNote).not.toHaveBeenCalled();
 });

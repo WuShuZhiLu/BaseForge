@@ -30,7 +30,7 @@ export class SubdocumentGenerationConflictError extends Error {
 }
 
 export function isYjsSubdocumentsEnabled(): boolean {
-  return process.env.NOWEN_YJS_SUBDOCUMENTS === "1";
+  return process.env.BASEFORGE_YJS_SUBDOCUMENTS === "1";
 }
 
 export function rebuildYjsSubdocumentsIfEnabled(
@@ -40,7 +40,7 @@ export function rebuildYjsSubdocumentsIfEnabled(
   contentFormat: string,
 ): boolean {
   if (!isYjsSubdocumentsEnabled() || contentFormat !== "tiptap-json") return false;
-  if (/nowen-encrypted/i.test(content)) return false;
+  if (/baseforge-encrypted/i.test(content)) return false;
   rebuildYjsSubdocuments(db, noteId, content);
   return true;
 }
@@ -86,7 +86,7 @@ export function splitYjsSubdocumentSections(noteId: string, content: string, max
     used.add(id);
     return {
       id,
-      guid: `nowen-subdoc-${stablePart(noteId)}-${id}`,
+      guid: `baseforge-subdoc-${stablePart(noteId)}-${id}`,
       startBlock: range.start,
       endBlock: range.end,
       content: JSON.stringify({ type: "doc", content: nodes }),
@@ -163,7 +163,7 @@ function buildRootSnapshot(noteId: string, sections: YjsSubdocumentSection[]): {
   rootGuid: string;
   rootSnapshot: Buffer;
 } {
-  const rootGuid = `nowen-root-${stablePart(noteId)}`;
+  const rootGuid = `baseforge-root-${stablePart(noteId)}`;
   const root = new Y.Doc({ guid: rootGuid });
   root.getArray<string>("sectionOrder").insert(0, sections.map((section) => section.id));
   const meta = root.getMap<string>("sectionGuids");
@@ -287,7 +287,7 @@ export function rebuildYjsSubdocuments(
   maxBlocks = 250,
 ): { rootGuid: string; sections: YjsSubdocumentSection[]; generation: number; structureVersion: number } {
   assertEncryptedBlockCollaborationAllowed(db, noteId);
-  if (/nowen-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/baseforge-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   ensureYjsSubdocumentTables(db);
   const sections = splitYjsSubdocumentSections(noteId, content, maxBlocks);
   if (!sections) throw new Error("INVALID_TIPTAP_SUBDOCUMENT_SOURCE");
@@ -302,7 +302,7 @@ export function prepareYjsSubdocuments(
   maxBlocks = 250,
 ): YjsSubdocumentManifest {
   assertEncryptedBlockCollaborationAllowed(db, noteId);
-  if (/nowen-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/baseforge-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   ensureYjsSubdocumentTables(db);
   const manifest = db.prepare(`
     SELECT rootGuid, rootSnapshot, contentHash, sectionCount, generation, structureVersion, status
@@ -486,7 +486,7 @@ export function applyYjsSubdocumentUpdate(
       Y.applyUpdate(sectionDoc, new Uint8Array(currentSection.snapshotBlob));
       Y.applyUpdate(sectionDoc, update);
       sectionContent = sectionDoc.getText("content").toString();
-      if (/nowen-encrypted/i.test(sectionContent)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+      if (/baseforge-encrypted/i.test(sectionContent)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
       if (!parseDocument(sectionContent)) throw new Error("INVALID_SUBDOCUMENT_CONTENT");
       nextSnapshot = Buffer.from(Y.encodeStateAsUpdate(sectionDoc));
     } finally {

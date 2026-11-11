@@ -25,7 +25,7 @@ describe("账号登录历史列表", () => {
   beforeEach(() => {
     localStorage.clear();
     switchHarness.switchAccountLogin.mockReset();
-    (window as any).nowenDesktop = {
+    (window as any).baseforgeDesktop = {
       isDesktop: true,
       accountHistory: {
         list: vi.fn(async () => [
@@ -62,7 +62,7 @@ describe("账号登录历史列表", () => {
     if (root) act(() => root?.unmount());
     root = null;
     document.body.innerHTML = "";
-    delete (window as any).nowenDesktop;
+    delete (window as any).baseforgeDesktop;
     vi.restoreAllMocks();
   });
 
@@ -162,7 +162,7 @@ describe("账号登录历史列表", () => {
   });
 
   it("登录页默认只展示最近两个账号，可展开查看其余账号", async () => {
-    (window as any).nowenDesktop.accountHistory.list = vi.fn(async () => [
+    (window as any).baseforgeDesktop.accountHistory.list = vi.fn(async () => [
       {
         id: "history-4",
         serverUrl: "https://four.example.com",

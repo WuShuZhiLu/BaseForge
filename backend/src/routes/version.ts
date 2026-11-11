@@ -12,17 +12,17 @@
  *   - **无需鉴权**：与 /api/health 同级，挂在 JWT 中间件之前。版本号不是机密，
  *     且前端在登录页就需要读取，中间件里放不下这类"匿名访问"。
  *   - **appVersion 取值顺序**：显式覆盖 ENV > 镜像/源码内 package.json > 旧 ENV 兜底。
- *       - `NOWEN_APP_VERSION_OVERRIDE`：仅给高级运维强制覆盖使用；
+ *       - `BASEFORGE_APP_VERSION_OVERRIDE`：仅给高级运维强制覆盖使用；
  *       - 根 package.json：Docker 镜像 / 源码态 / Vite / Electron 共用的版本真相源；
  *       - backend/package.json：历史兼容兜底；
- *       - `NOWEN_APP_VERSION`：只作旧镜像/旧脚本最后兜底，不能优先于包内版本。
+ *       - `BASEFORGE_APP_VERSION`：只作旧镜像/旧脚本最后兜底，不能优先于包内版本。
  *         原因：NAS / 应用市场更新时可能保留旧容器 ENV，若 ENV 优先，会出现
  *         "前端已是新版、服务端版本号仍停在旧版"，用户只能删除重装。
  *   - **Schema 版本**：透传 getDbSchemaVersion / getCodeSchemaVersion，
  *     分别是"库实际应用到的最高迁移版本"与"当前代码已知的最高迁移版本"。
  *     两者相等说明迁移已落地；codeSchemaVersion > schemaVersion 理论上不会
  *     出现（getDb 启动时会自动 apply 迁移），若出现说明启动顺序异常。
- *   - **buildTime 可选**：发布流水线写入 `NOWEN_BUILD_TIME`（ISO 字符串）
+ *   - **buildTime 可选**：发布流水线写入 `BASEFORGE_BUILD_TIME`（ISO 字符串）
  *     时透传；未注入时省略字段，避免前端误以为存在但为空。
  *
  * 与 /api/releases/latest 的分工：
@@ -54,7 +54,7 @@ const router = new Hono();
  *   文件名；任何源代码改动都会产生新 hash，也就是新的 buildId。
  *
  * 解析路径顺序（与 appVersion 的候选列表思路一致，适配 dev / docker / 源码态）：
- *   1. ENV 显式注入（CI 构建时写 `NOWEN_FRONTEND_BUILD_ID`，最确定）
+ *   1. ENV 显式注入（CI 构建时写 `BASEFORGE_FRONTEND_BUILD_ID`，最确定）
  *   2. 同仓库 `frontend/dist/.vite/manifest.json`（docker / npm run build 后）
  *   3. 回退 null —— 前端此时会降级到原来的 appVersion 比对逻辑
  *
@@ -65,7 +65,7 @@ let cachedFrontendBuildId: string | null | undefined = undefined;
 function resolveFrontendBuildId(): string | null {
   if (cachedFrontendBuildId !== undefined) return cachedFrontendBuildId;
 
-  const envId = process.env.NOWEN_FRONTEND_BUILD_ID?.trim();
+  const envId = process.env.BASEFORGE_FRONTEND_BUILD_ID?.trim();
   if (envId) {
     cachedFrontendBuildId = envId;
     return cachedFrontendBuildId;
@@ -137,14 +137,14 @@ function resolveFrontendBuildId(): string | null {
  * plugin 不兼容（权限/签名/API 变更）。
  *
  * 来源：
- *   - ENV `NOWEN_MIN_CLIENT_VERSION`（最低兼容版本，例："1.0.30"）
+ *   - ENV `BASEFORGE_MIN_CLIENT_VERSION`（最低兼容版本，例："1.0.30"）
  *   - 未配置则返回 null，前端据此走软提示路径，完全向后兼容
  *
  * 为什么不存 DB：这类运维旋钮生命周期与部署绑定；放在 ENV 里改完重启生效，
  * 与当前"改迁移要重启"的运维心智一致。若将来要前端 UI 配置再平移到 DB。
  */
 function resolveMinClientVersion(): string | null {
-  const v = process.env.NOWEN_MIN_CLIENT_VERSION?.trim();
+  const v = process.env.BASEFORGE_MIN_CLIENT_VERSION?.trim();
   return v || null;
 }
 
@@ -168,9 +168,9 @@ function readPackageVersion(filePath: string, expectedNames: string[]): string |
 function resolveAppVersion(): string {
   if (cachedAppVersion) return cachedAppVersion;
 
-  // 1) 显式强制覆盖：仅给高级运维使用。普通 NOWEN_APP_VERSION 不再优先，
+  // 1) 显式强制覆盖：仅给高级运维使用。普通 BASEFORGE_APP_VERSION 不再优先，
   // 避免 NAS / 应用市场复用旧容器 ENV 时把服务端版本钉死在旧值。
-  const forcedEnvVer = process.env.NOWEN_APP_VERSION_OVERRIDE?.trim();
+  const forcedEnvVer = process.env.BASEFORGE_APP_VERSION_OVERRIDE?.trim();
   if (forcedEnvVer) {
     cachedAppVersion = forcedEnvVer;
     return cachedAppVersion;
@@ -179,12 +179,12 @@ function resolveAppVersion(): string {
   // 2) 优先读镜像 / 源码内 package.json。Dockerfile 会把根 package.json 复制到
   // /app/package.json；源码态 / Electron / backend/dist 也通过候选路径覆盖。
   const packageCandidates: Array<{ path: string; names: string[] }> = [
-    { path: path.resolve(process.cwd(), "package.json"), names: ["baseforge", "nowen-note"] },
-    { path: path.resolve(process.cwd(), "../package.json"), names: ["baseforge", "nowen-note"] },
-    { path: path.resolve(__dirname, "../../package.json"), names: ["baseforge", "nowen-note", "baseforge-backend", "nowen-note-backend"] },
-    { path: path.resolve(__dirname, "../../../package.json"), names: ["baseforge", "nowen-note"] },
-    { path: path.resolve(process.cwd(), "backend/package.json"), names: ["baseforge-backend", "nowen-note-backend"] },
-    { path: path.resolve(__dirname, "../package.json"), names: ["baseforge-backend", "nowen-note-backend"] },
+    { path: path.resolve(process.cwd(), "package.json"), names: ["baseforge", "baseforge"] },
+    { path: path.resolve(process.cwd(), "../package.json"), names: ["baseforge", "baseforge"] },
+    { path: path.resolve(__dirname, "../../package.json"), names: ["baseforge", "baseforge", "baseforge-backend", "baseforge-backend"] },
+    { path: path.resolve(__dirname, "../../../package.json"), names: ["baseforge", "baseforge"] },
+    { path: path.resolve(process.cwd(), "backend/package.json"), names: ["baseforge-backend", "baseforge-backend"] },
+    { path: path.resolve(__dirname, "../package.json"), names: ["baseforge-backend", "baseforge-backend"] },
   ];
   for (const candidate of packageCandidates) {
     const v = readPackageVersion(candidate.path, candidate.names);
@@ -194,8 +194,8 @@ function resolveAppVersion(): string {
     }
   }
 
-  // 3) 旧构建链路兜底：只有包内版本完全读不到时，才信任 NOWEN_APP_VERSION。
-  const legacyEnvVer = process.env.NOWEN_APP_VERSION?.trim();
+  // 3) 旧构建链路兜底：只有包内版本完全读不到时，才信任 BASEFORGE_APP_VERSION。
+  const legacyEnvVer = process.env.BASEFORGE_APP_VERSION?.trim();
   if (legacyEnvVer) {
     cachedAppVersion = legacyEnvVer;
     return cachedAppVersion;
@@ -263,7 +263,7 @@ router.get("/", (c) => {
     // 前端据此也能工作（只是不能展示 schema 信息）。
   }
 
-  const buildTime = process.env.NOWEN_BUILD_TIME?.trim();
+  const buildTime = process.env.BASEFORGE_BUILD_TIME?.trim();
   const frontendBuildId = resolveFrontendBuildId();
   const minClientVersion = resolveMinClientVersion();
   const serverInstanceId = resolveServerInstanceId();

@@ -32,8 +32,8 @@ import {
 import { yFlush, yReplaceContentAsUpdate } from "../services/yjs.js";
 import { ensureNoteSplitTables } from "./note-split.js";
 
-const PARTIAL_NOTE_SPLIT_INSTALLED = Symbol.for("nowen.noteSplit.selectionRoutesInstalled");
-const PARTIAL_NOTE_SPLIT_ROUTE_PATCH = Symbol.for("nowen.noteSplit.selectionRoutePatch");
+const PARTIAL_NOTE_SPLIT_INSTALLED = Symbol.for("baseforge.noteSplit.selectionRoutesInstalled");
+const PARTIAL_NOTE_SPLIT_ROUTE_PATCH = Symbol.for("baseforge.noteSplit.selectionRoutePatch");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 type SplitAttachmentKind = "moved" | "copy";

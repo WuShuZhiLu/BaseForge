@@ -58,9 +58,9 @@ type EditorDocument = {
   view?: EditorView;
 };
 
-const TRACKING_PATCH = Symbol.for("nowen.inline-comments.api-tracking");
-const COMMENT_HIGHLIGHT = "nowen-comment-anchor";
-const ACTIVE_COMMENT_HIGHLIGHT = "nowen-comment-active";
+const TRACKING_PATCH = Symbol.for("baseforge.inline-comments.api-tracking");
+const COMMENT_HIGHLIGHT = "baseforge-comment-anchor";
+const ACTIVE_COMMENT_HIGHLIGHT = "baseforge-comment-active";
 const noteCache = new Map<string, Note>();
 const noteListeners = new Set<(note: Note) => void>();
 let latestTrackedNote: Note | null = null;
@@ -557,7 +557,7 @@ export default function InlineCommentBridge() {
     let cancelled = false;
     const loadCurrentUser = () => {
       let token = "";
-      try { token = localStorage.getItem("nowen-token") || ""; } catch { /* ignore */ }
+      try { token = localStorage.getItem("baseforge-token") || ""; } catch { /* ignore */ }
       if (!token) {
         setCurrentUser(null);
         return;
@@ -567,10 +567,10 @@ export default function InlineCommentBridge() {
         .catch(() => { if (!cancelled) setCurrentUser(null); });
     };
     loadCurrentUser();
-    window.addEventListener("nowen:token-changed", loadCurrentUser);
+    window.addEventListener("baseforge:token-changed", loadCurrentUser);
     return () => {
       cancelled = true;
-      window.removeEventListener("nowen:token-changed", loadCurrentUser);
+      window.removeEventListener("baseforge:token-changed", loadCurrentUser);
     };
   }, []);
 
@@ -856,7 +856,7 @@ export default function InlineCommentBridge() {
             onClick={closePanel}
             aria-label="关闭评论面板"
           />
-          <aside className="nowen-inline-comment-panel pointer-events-auto absolute inset-y-0 right-0 flex min-h-0 w-full flex-col overflow-hidden border-l border-app-border bg-app-elevated shadow-2xl sm:w-[390px]">
+          <aside className="baseforge-inline-comment-panel pointer-events-auto absolute inset-y-0 right-0 flex min-h-0 w-full flex-col overflow-hidden border-l border-app-border bg-app-elevated shadow-2xl sm:w-[390px]">
             <header className="flex shrink-0 items-center gap-3 border-b border-app-border px-4 py-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
                 <MessageCircle size={18} />

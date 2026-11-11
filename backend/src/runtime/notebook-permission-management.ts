@@ -7,7 +7,7 @@ import {
   transferNotebookOwnership,
 } from "../services/notebookOwnershipTransfer.js";
 
-const INSTALL_KEY = Symbol.for("nowen.notebookPermissionManagement.installed");
+const INSTALL_KEY = Symbol.for("baseforge.notebookPermissionManagement.installed");
 const runtime = globalThis as typeof globalThis & { [INSTALL_KEY]?: boolean };
 
 function memberId(notebookId: string, userId: string): string {

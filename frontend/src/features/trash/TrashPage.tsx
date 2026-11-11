@@ -106,11 +106,11 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   useEffect(() => {
     const onFilter = () => { setTypeFilter(getTrashTypeFilter()); setTimeFilter(getTrashTimeFilter()); setSortFilter(getTrashSortFilter()); };
     const onSettings = () => setRetention(getRetentionDays());
-    window.addEventListener("nowen:trash-filter", onFilter);
-    window.addEventListener("nowen:trash-settings", onSettings);
+    window.addEventListener("baseforge:trash-filter", onFilter);
+    window.addEventListener("baseforge:trash-settings", onSettings);
     return () => {
-      window.removeEventListener("nowen:trash-filter", onFilter);
-      window.removeEventListener("nowen:trash-settings", onSettings);
+      window.removeEventListener("baseforge:trash-filter", onFilter);
+      window.removeEventListener("baseforge:trash-settings", onSettings);
     };
   }, []);
 
@@ -143,7 +143,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
       actions.refreshNotes();
       actions.refreshNotebooks();
       emitKnowledgeTreeRefresh("trash-lifecycle");
-      window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "trash-lifecycle" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:storage-changed", { detail: { reason: "trash-lifecycle" } }));
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : t("trashCenter.operationFailed"));
       void trash.reload();

@@ -168,7 +168,7 @@ export function buildWorkspaceScopeExport(
   const rows = (table: string, sql: string, ...params: unknown[]) =>
     tableExists(db, table) ? db.prepare(sql).all(...params) : [];
   return {
-    format: "nowen-workspace-recovery-v1",
+    format: "baseforge-workspace-recovery-v1",
     workspaceId,
     exportedAt: new Date().toISOString(),
     notebooks: rows("notebooks", "SELECT * FROM notebooks WHERE workspaceId = ?", workspaceId),

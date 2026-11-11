@@ -21,7 +21,7 @@ describe("round-trip import review queue", () => {
       dryRun: true,
       strategy: "copy",
       package: {
-        format: "nowen-package",
+        format: "baseforge-package",
         formatVersion: 2,
         packageKind: "markdown",
         counts: { notebooks: 4, notes: 8, tags: 2, attachments: 3 },
@@ -74,7 +74,7 @@ describe("round-trip import review queue", () => {
     }));
     const unsubscribe = subscribeRoundTripImportReviews((items) => { current = items; });
     const decision = requestRoundTripImportReview({ success: true, strategy: "copy" }, {
-      fileName: "merge.nowen.zip",
+      fileName: "merge.baseforge.zip",
       loadPreview,
     });
 
@@ -94,9 +94,9 @@ describe("round-trip import review queue", () => {
       dryRun: true,
       strategy,
       package: {
-        format: "nowen-package",
+        format: "baseforge-package",
         formatVersion: 2,
-        packageKind: "nowen",
+        packageKind: "baseforge",
         sourceInstanceId: "source-instance-1",
         sync: { available: true, linkedResources: 12, reason: null },
       },
@@ -122,13 +122,13 @@ describe("round-trip import review queue", () => {
       success: true,
       strategy: "copy",
       package: {
-        format: "nowen-package",
-        packageKind: "nowen",
+        format: "baseforge-package",
+        packageKind: "baseforge",
         sourceInstanceId: "source-instance-1",
         sync: { available: true, linkedResources: 12, reason: null },
       },
     }, {
-      fileName: "incremental.nowen.zip",
+      fileName: "incremental.baseforge.zip",
       loadPreview,
     });
 
@@ -147,13 +147,13 @@ describe("round-trip import review queue", () => {
   it("keeps concurrent reviews queued and allows cancellation without dropping the next request", async () => {
     let current: RoundTripImportReviewRequest[] = [];
     const unsubscribe = subscribeRoundTripImportReviews((items) => { current = items; });
-    const first = requestRoundTripImportReview({ success: true }, { fileName: "a.nowen.zip" });
-    const second = requestRoundTripImportReview({ success: true }, { fileName: "b.nowen.zip" });
+    const first = requestRoundTripImportReview({ success: true }, { fileName: "a.baseforge.zip" });
+    const second = requestRoundTripImportReview({ success: true }, { fileName: "b.baseforge.zip" });
 
-    expect(current.map((item) => item.fileName)).toEqual(["a.nowen.zip", "b.nowen.zip"]);
+    expect(current.map((item) => item.fileName)).toEqual(["a.baseforge.zip", "b.baseforge.zip"]);
     resolveRoundTripImportReview(current[0].id, { accepted: false });
     await expect(first).resolves.toEqual({ accepted: false });
-    expect(current.map((item) => item.fileName)).toEqual(["b.nowen.zip"]);
+    expect(current.map((item) => item.fileName)).toEqual(["b.baseforge.zip"]);
 
     resolveRoundTripImportReview(current[0].id, { accepted: true, strategy: "copy" });
     await expect(second).resolves.toEqual({ accepted: true, strategy: "copy" });

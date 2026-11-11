@@ -193,7 +193,7 @@ function resolveDbPath(cliPath) {
   const base = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
   // 主库文件名已改为 baseforge.db；目录里还只有旧文件名时继续读旧库
   const next = path.resolve(base, "baseforge.db");
-  const legacy = path.resolve(base, "nowen-note.db");
+  const legacy = path.resolve(base, "baseforge.db");
   return !fs.existsSync(next) && fs.existsSync(legacy) ? legacy : next;
 }
 

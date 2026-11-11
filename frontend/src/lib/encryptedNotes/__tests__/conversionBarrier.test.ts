@@ -12,8 +12,8 @@ const original = { ...note, version: 1, contentFormat: "markdown", contentText: 
 const draft = { noteId: "note", editorMode: "md" as const, content: original.content, contentText: original.contentText, title: "title", baseVersion: 1, savedAt: Date.now() };
 beforeEach(() => {
   localStorage.clear();
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
-  localStorage.setItem("nowen-server-url", "https://notes.example.test");
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "owner" }))}.signature`);
+  localStorage.setItem("baseforge-server-url", "https://notes.example.test");
   Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -22,7 +22,7 @@ it("retains only a monotonic metadata version and rejects stale details, text su
   const scope = getOfflineQueueStorageKey();
   markConvertedNote("note", 2, scope); markConvertedNote("note", 1, scope);
   expect(convertedNoteVersion("note")).toBe(2);
-  expect(localStorage.getItem(`nowen-encrypted-converted:v1:${encodeURIComponent(scope)}:note`)).toBe("2");
+  expect(localStorage.getItem(`baseforge-encrypted-converted:v1:${encodeURIComponent(scope)}:note`)).toBe("2");
   for (const copy of [original, { ...note, version: 1 }, { ...note, contentText: "private source" }, { ...note, content: "private source" }]) {
     expect(() => assertConversionNote(copy)).toThrow("converted_note");
   }
@@ -32,11 +32,11 @@ it("retains only a monotonic metadata version and rejects stale details, text su
 
 it("shares markers across token refresh but isolates another account or server", () => {
   markConvertedNote("note", 2, getOfflineQueueStorageKey());
-  localStorage.setItem("nowen-token", `refresh.${btoa(JSON.stringify({ userId: "owner" }))}.other-signature`);
+  localStorage.setItem("baseforge-token", `refresh.${btoa(JSON.stringify({ userId: "owner" }))}.other-signature`);
   expect(convertedNoteVersion("note")).toBe(2);
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
   expect(convertedNoteVersion("note")).toBeNull();
-  localStorage.setItem("nowen-server-url", "https://other.example.test");
+  localStorage.setItem("baseforge-server-url", "https://other.example.test");
   expect(() => assertConversionNote(original)).not.toThrow();
 });
 
@@ -65,14 +65,14 @@ it("invalidates only the current scope from same-window and cross-window confirm
   try {
     const scope = getOfflineQueueStorageKey();
     markConvertedNote("note", 2, scope);
-    window.dispatchEvent(new StorageEvent("storage", { key: `nowen-encrypted-converted:v1:${encodeURIComponent(scope)}:note`, newValue: "2" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: `baseforge-encrypted-converted:v1:${encodeURIComponent(scope)}:note`, newValue: "2" }));
     markConvertedNote("other", 2, "other-scope");
     expect(listener.mock.calls).toEqual([["note"], ["note"]]);
   } finally { unsubscribe(); }
 });
 
 it("fails closed when a persisted marker is corrupt", () => {
-  localStorage.setItem(`nowen-encrypted-converted:v1:${encodeURIComponent(getOfflineQueueStorageKey())}:note`, "private invalid marker");
+  localStorage.setItem(`baseforge-encrypted-converted:v1:${encodeURIComponent(getOfflineQueueStorageKey())}:note`, "private invalid marker");
   expect(() => assertConversionNote(original)).toThrow("storage_failed");
   expect(() => saveDraft(draft)).toThrow("storage_failed");
 });
@@ -89,7 +89,7 @@ it.each(["getNote", "getNotes", "updateNoteConfirmed"] as const)("%s discards a 
   const fetch = vi.fn(() => new Promise((ready) => { resolve = ready; })); vi.stubGlobal("fetch", fetch);
   const pending = method === "getNote" ? api.getNote("note") : method === "getNotes" ? api.getNotes() : api.updateNoteConfirmed("note", original);
   await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
   resolve(new Response(JSON.stringify(original), { status: 200, headers: { "Content-Type": "application/json" } }));
   await expect(pending).rejects.toMatchObject({ code: "scope_changed" });
   expect(getQueue()).toEqual([]);
@@ -119,7 +119,7 @@ it("a late failed save cannot enqueue the old account's plaintext into the new a
   const scope = getOfflineQueueStorageKey();
   const pending = api.updateNote("note", original);
   await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
   reject(new TypeError("Failed to fetch"));
   await expect(pending).rejects.toMatchObject({ code: "scope_changed" });
   expect(getQueue()).toEqual([]); expect(localStorage.getItem(scope)).toBeNull();
@@ -132,7 +132,7 @@ it("a late replay response cannot dequeue or rewrite another account's queue", a
   const fetch = vi.fn(() => new Promise<{ ok: boolean; status: number }>((ready) => { resolve = ready; }));
   const pending = flushQueue(fetch);
   await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
-  localStorage.setItem("nowen-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
+  localStorage.setItem("baseforge-token", `header.${btoa(JSON.stringify({ userId: "other" }))}.signature`);
   resolve({ ok: true, status: 200 });
   await expect(pending).rejects.toMatchObject({ code: "scope_changed" });
   expect(localStorage.getItem(scope)).toBe(before); expect(getQueue()).toEqual([]);

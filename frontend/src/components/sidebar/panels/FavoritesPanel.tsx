@@ -86,22 +86,22 @@ export default function FavoritesPanel() {
   usePanelRefresh("fav", reload);
 
   // 聚焦进出（URL ?tree=focus 变化）不重挂面板，监听应用内导航事件重拉；
-  // 文档收藏状态变更（nowen:notes-changed）也即时重拉
+  // 文档收藏状态变更（baseforge:notes-changed）也即时重拉
   React.useEffect(() => {
     const onPathChanged = () => reload();
     const onNotesChanged = () => reload();
     window.addEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
-    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    window.addEventListener("baseforge:notes-changed", onNotesChanged);
     return () => {
       window.removeEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
-      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+      window.removeEventListener("baseforge:notes-changed", onNotesChanged);
     };
   }, [reload]);
 
   const openKb = useCallback((row: FavRow) => {
     const space = encodeURIComponent(getCurrentWorkspace() || "personal");
     // 与侧栏收藏区段同语义：进入库 Overview 并在树中定位
-    window.dispatchEvent(new CustomEvent("nowen:kb-reveal-node", { detail: { nodeId: row.nodeId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:kb-reveal-node", { detail: { nodeId: row.nodeId } }));
     pushAppPathState(`/kb/${space}/${encodeURIComponent(row.id)}`);
   }, []);
 

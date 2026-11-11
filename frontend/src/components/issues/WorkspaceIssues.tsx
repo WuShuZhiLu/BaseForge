@@ -65,8 +65,8 @@ export default function WorkspaceIssues({ issueId }: { issueId: string | null })
       setEditingComment(null);
       setError("");
     };
-    window.addEventListener("nowen:workspace-changed", change);
-    return () => { generation.current += 1; window.removeEventListener("nowen:workspace-changed", change); };
+    window.addEventListener("baseforge:workspace-changed", change);
+    return () => { generation.current += 1; window.removeEventListener("baseforge:workspace-changed", change); };
   }, []);
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function WorkspaceIssues({ issueId }: { issueId: string | null })
         if (cancelled) return;
         if (getCurrentWorkspace() !== issue.workspaceId) {
           setCurrentWorkspace(issue.workspaceId);
-          window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId: issue.workspaceId, preserveIssueRoute: true } }));
+          window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId: issue.workspaceId, preserveIssueRoute: true } }));
         }
         setDetail(issue);
         setActivity(events);

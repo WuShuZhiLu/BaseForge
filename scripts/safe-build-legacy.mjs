@@ -12,7 +12,7 @@
  *
  * 本脚本串联三件事：
  *   - `taskkill` 结束所有 `BaseForge.exe` 残留进程；
- *   - 设 `NOWEN_BUILD_OUT=1`，让 builder.config.js 把产物输出改到 `%TEMP%\nowen-note-build`，
+ *   - 设 `BASEFORGE_BUILD_OUT=1`，让 builder.config.js 把产物输出改到 `%TEMP%\baseforge-build`，
  *     彻底脱离工作区，避免 IDE 监听；
  *   - 清理临时输出目录，再起 electron-builder 子进程。
  *
@@ -59,8 +59,8 @@ if (isWin) {
 }
 
 // Step 2: 设环境变量，切换产物输出目录到 %TEMP%
-process.env.NOWEN_BUILD_OUT = "1";
-const tmpOut = join(tmpdir(), "nowen-note-build");
+process.env.BASEFORGE_BUILD_OUT = "1";
+const tmpOut = join(tmpdir(), "baseforge-build");
 log(`output directory -> ${tmpOut}`);
 
 // Step 3: 清理旧产物，防止只读/锁定文件导致 builder 提前报错

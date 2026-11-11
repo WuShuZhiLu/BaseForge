@@ -124,7 +124,7 @@ function categorize(name: string): AssetCategory {
   }
   if (lower.endsWith(".apk")) return "android";
   // clipper 浏览器扩展：发布脚本里包名形如 <品牌>-clipper-x.y.z.zip。
-  if (/^(?:nowen|baseforge)-clipper/.test(lower) && lower.endsWith(".zip")) return "clipper";
+  if (/^(?:baseforge|baseforge)-clipper/.test(lower) && lower.endsWith(".zip")) return "clipper";
   if (lower.endsWith(".ipa") || (lower.includes("ios") && lower.endsWith(".zip"))) return "ios";
   if (
     lower.endsWith(".dmg") ||
@@ -133,7 +133,7 @@ function categorize(name: string): AssetCategory {
       lower.includes("mac") ||
       lower.includes("darwin") ||
       lower.includes("osx") ||
-      /^(?:nowen-note|baseforge)/.test(lower) && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower)
+      /^(?:baseforge|baseforge)/.test(lower) && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower)
     ) && lower.endsWith(".zip"))
   ) {
     if (/(?:arm64|aarch64|apple[._ -]?silicon)/.test(lower)) return "mac-arm64";
@@ -151,7 +151,7 @@ function categorize(name: string): AssetCategory {
 
 /** 历史发布产物文件名仍带旧品牌，列表里统一按现品牌显示（下载到的真实文件不改名）。 */
 function displayAssetName(name: string): string {
-  return name.replace(/nowen[ ._-]?note/gi, "BaseForge").replace(/nowen/gi, "BaseForge");
+  return name.replace(/baseforge[ ._-]?note/gi, "BaseForge").replace(/baseforge/gi, "BaseForge");
 }
 
 /** 自动更新元数据不是给用户手动下载的安装包，不放入“其他”分组。 */

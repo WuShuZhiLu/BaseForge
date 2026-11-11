@@ -1,4 +1,4 @@
-const SHARE_SESSION_KEY = "nowen-share-session-v1";
+const SHARE_SESSION_KEY = "baseforge-share-session-v1";
 
 function randomSessionId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -20,9 +20,9 @@ export function getShareSessionId(): string {
     window.sessionStorage.setItem(SHARE_SESSION_KEY, created);
     return created;
   } catch {
-    const state = window as typeof window & { __nowenShareSessionId?: string };
-    if (!state.__nowenShareSessionId) state.__nowenShareSessionId = randomSessionId();
-    return state.__nowenShareSessionId;
+    const state = window as typeof window & { __baseforgeShareSessionId?: string };
+    if (!state.__baseforgeShareSessionId) state.__baseforgeShareSessionId = randomSessionId();
+    return state.__baseforgeShareSessionId;
   }
 }
 

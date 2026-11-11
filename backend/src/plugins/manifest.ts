@@ -2,7 +2,7 @@ import path from "node:path";
 import { z } from "zod";
 import { getExtensionPlatformFeatureFlags, isExtensionV21Enabled } from "./featureFlags.js";
 import { isV2SupportedPluginPermission } from "./hostApiContract.js";
-import { NOWEN_VERSION, PLUGIN_PERMISSIONS, type PluginActionManifest, type PluginManifest, type PluginManifestV1, type PluginManifestV2 } from "./types.js";
+import { BASEFORGE_VERSION, PLUGIN_PERMISSIONS, type PluginActionManifest, type PluginManifest, type PluginManifestV1, type PluginManifestV2 } from "./types.js";
 
 const inputFieldSchema = z.object({
   type: z.enum(["string", "number", "boolean", "object", "array"]),
@@ -67,7 +67,7 @@ export const pluginManifestV1Schema = z.object({
   description: z.string().max(1000).default(""),
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/),
   apiVersion: z.literal(1),
-  engines: z.object({ nowen: z.string().min(1).max(100) }).strict(),
+  engines: z.object({ baseforge: z.string().min(1).max(100) }).strict(),
   runtime: z.literal("node-action"),
   main: z.string().min(1).max(300),
   author: z.object({ name: z.string().min(1).max(100), url: z.string().url().optional() }).strict().optional(),
@@ -129,7 +129,7 @@ const noteThemeTokensSchema = z.object({
 });
 const noteThemeSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,63}$/), name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(), base: z.literal("nowen.default").default("nowen.default"),
+  description: z.string().max(500).optional(), base: z.literal("baseforge.default").default("baseforge.default"),
   modes: z.object({ light: noteThemeTokensSchema, dark: noteThemeTokensSchema.optional() }).strict(),
 }).strict();
 
@@ -285,7 +285,7 @@ const v2BaseShape = {
   id: z.string().regex(/^[a-z0-9]+(?:[.-][a-z0-9]+)+$/).max(150),
   name: z.string().min(1).max(100), description: z.string().max(1000).default(""),
   version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/), apiVersion: z.literal(2),
-  publisher: z.string().regex(/^[a-z0-9][a-z0-9-]{1,63}$/), engines: z.object({ nowen: z.string().min(1).max(100) }).strict(),
+  publisher: z.string().regex(/^[a-z0-9][a-z0-9-]{1,63}$/), engines: z.object({ baseforge: z.string().min(1).max(100) }).strict(),
   categories: z.array(z.string().min(1).max(50)).min(1).max(10), keywords: z.array(z.string().min(1).max(50)).max(20).optional(),
   repository: z.string().url(), homepage: z.string().url().optional(), license: z.string().min(1).max(100),
   icon: z.string().min(1).max(300).optional(), screenshots: z.array(z.string().min(1).max(300)).max(10).optional(),
@@ -418,7 +418,7 @@ function compareVersion(a: [number, number, number], b: [number, number, number]
 }
 
 /** 支持常见的 >=x.y.z、>、<=、< 和空格 AND 组合。 */
-export function nowenVersionSatisfies(range: string, current = NOWEN_VERSION): boolean {
+export function baseforgeVersionSatisfies(range: string, current = BASEFORGE_VERSION): boolean {
   const actual = parseVersion(current);
   if (!actual) return false;
   const clauses = range.trim().split(/\s+/).filter(Boolean);
@@ -447,19 +447,34 @@ export interface ParsePluginManifestOptions {
   uiExtensions?: boolean;
 }
 
+/**
+ * 读取兼容：旧插件用 engines.nowen 声明兼容范围，映射为 engines.baseforge。
+ * 新插件必须写 engines.baseforge，这里只在缺失 baseforge 时兜底。
+ */
+function normalizeLegacyEngines(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const manifest = value as Record<string, unknown>;
+  const engines = manifest.engines;
+  if (!engines || typeof engines !== "object") return value;
+  const legacyEngines = engines as Record<string, unknown>;
+  if (typeof legacyEngines.baseforge === "string" || typeof legacyEngines.nowen !== "string") return value;
+  return { ...manifest, engines: { baseforge: legacyEngines.nowen } };
+}
+
 export function parsePluginManifest(value: unknown, options: ParsePluginManifestOptions = {}): PluginManifest {
+  value = normalizeLegacyEngines(value);
   const apiVersion = Number((value as { apiVersion?: unknown } | null)?.apiVersion);
   const manifest = (apiVersion === 1 ? pluginManifestV1Schema.parse(value) : apiVersion === 2 ? pluginManifestV2Schema.parse(value) : (() => { throw new Error(`不支持 Plugin API V${apiVersion || "unknown"}`); })()) as PluginManifest;
   if (manifest.apiVersion === 2 && manifest.runtime === "declarative") {
     if (!(options.extensionsV21 ?? isExtensionV21Enabled())) throw Object.assign(new Error("声明式 Extension 当前未启用"), { code: "PLUGIN_V21_FEATURE_DISABLED" });
-    if (!nowenVersionSatisfies(manifest.engines.nowen, "1.6.0") || nowenVersionSatisfies(manifest.engines.nowen, "1.5.0")) {
-      throw Object.assign(new Error("声明式 Extension 必须要求 engines.nowen >=1.6.0"), { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
+    if (!baseforgeVersionSatisfies(manifest.engines.baseforge, "1.6.0") || baseforgeVersionSatisfies(manifest.engines.baseforge, "1.5.0")) {
+      throw Object.assign(new Error("声明式 Extension 必须要求 engines.baseforge >=1.6.0"), { code: "PLUGIN_BASEFORGE_INCOMPATIBLE" });
     }
   }
   if (manifest.apiVersion === 2 && manifest.contributes?.noteThemes?.length) {
     if (!(options.extensionsV21 ?? isExtensionV21Enabled())) throw Object.assign(new Error("Note Theme Contribution 当前未启用"), { code: "PLUGIN_V21_FEATURE_DISABLED" });
-    if (!nowenVersionSatisfies(manifest.engines.nowen, "1.6.0") || nowenVersionSatisfies(manifest.engines.nowen, "1.5.0")) {
-      throw Object.assign(new Error("Note Theme Contribution 必须要求 engines.nowen >=1.6.0"), { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
+    if (!baseforgeVersionSatisfies(manifest.engines.baseforge, "1.6.0") || baseforgeVersionSatisfies(manifest.engines.baseforge, "1.5.0")) {
+      throw Object.assign(new Error("Note Theme Contribution 必须要求 engines.baseforge >=1.6.0"), { code: "PLUGIN_BASEFORGE_INCOMPATIBLE" });
     }
   }
   if (manifest.apiVersion === 2 && manifest.contributes?.uiComponents?.length) {
@@ -467,12 +482,12 @@ export function parsePluginManifest(value: unknown, options: ParsePluginManifest
     if (!(options.uiExtensions ?? flags.uiExtensions)) {
       throw Object.assign(new Error("UI Contribution 当前未启用"), { code: "PLUGIN_UI_FEATURE_DISABLED" });
     }
-    if (!nowenVersionSatisfies(manifest.engines.nowen, "1.6.0") || nowenVersionSatisfies(manifest.engines.nowen, "1.5.0")) {
-      throw Object.assign(new Error("UI Contribution 必须要求 engines.nowen >=1.6.0"), { code: "PLUGIN_NOWEN_INCOMPATIBLE" });
+    if (!baseforgeVersionSatisfies(manifest.engines.baseforge, "1.6.0") || baseforgeVersionSatisfies(manifest.engines.baseforge, "1.5.0")) {
+      throw Object.assign(new Error("UI Contribution 必须要求 engines.baseforge >=1.6.0"), { code: "PLUGIN_BASEFORGE_INCOMPATIBLE" });
     }
   }
-  const currentVersion = options.currentVersion || NOWEN_VERSION;
-  if (!nowenVersionSatisfies(manifest.engines.nowen, currentVersion)) throw new Error(`插件要求 BaseForge ${manifest.engines.nowen}，当前版本为 ${currentVersion}`);
+  const currentVersion = options.currentVersion || BASEFORGE_VERSION;
+  if (!baseforgeVersionSatisfies(manifest.engines.baseforge, currentVersion)) throw new Error(`插件要求 BaseForge ${manifest.engines.baseforge}，当前版本为 ${currentVersion}`);
   return manifest;
 }
 

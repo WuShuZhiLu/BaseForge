@@ -42,7 +42,7 @@ export function wrapGfmTaskInlineContent(children: React.ReactNode): React.React
     }
     output.push(React.createElement("span", {
       key: "task-text-" + output.length,
-      className: "nowen-task-item-text",
+      className: "baseforge-task-item-text",
     }, ...text));
     text = [];
   };

@@ -47,7 +47,7 @@ export interface OfflineScopeReconcileOptions {
   preserveNoteIds?: ReadonlySet<string>;
 }
 
-interface NowenCacheSchema extends DBSchema {
+interface BaseForgeCacheSchema extends DBSchema {
   notebooks: {
     key: string;
     value: Notebook;
@@ -95,12 +95,12 @@ interface NowenCacheSchema extends DBSchema {
   };
 }
 
-const DB_NAME_PREFIX = "nowen-cache-v2-";
+const DB_NAME_PREFIX = "baseforge-cache-v2-";
 const DB_VERSION = 2;
 
 let currentUserId: string | null = null;
 let currentCacheIdentity: string | null = null;
-let dbPromise: Promise<IDBPDatabase<NowenCacheSchema>> | null = null;
+let dbPromise: Promise<IDBPDatabase<BaseForgeCacheSchema>> | null = null;
 
 function normalizeDbPart(value: string): string {
   return (value || "unknown").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 120);
@@ -121,11 +121,11 @@ function isLoopbackUrl(url: string): boolean {
 
 function getServerScope(): string {
   let server = "";
-  try { server = localStorage.getItem("nowen-server-url") || ""; } catch { /* ignore */ }
+  try { server = localStorage.getItem("baseforge-server-url") || ""; } catch { /* ignore */ }
   const origin = typeof window !== "undefined" && window.location.origin.startsWith("http")
     ? window.location.origin
     : "";
-  const isDesktop = typeof window !== "undefined" && !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktop = typeof window !== "undefined" && !!(window as any).baseforgeDesktop?.isDesktop;
 
   if (isDesktop && ((server && isLoopbackUrl(server)) || (!server && origin && isLoopbackUrl(origin)))) {
     return "local-desktop";
@@ -156,10 +156,10 @@ export function setCurrentUser(userId: string | null): void {
   currentCacheIdentity = nextIdentity;
 }
 
-function getDb(): Promise<IDBPDatabase<NowenCacheSchema>> | null {
+function getDb(): Promise<IDBPDatabase<BaseForgeCacheSchema>> | null {
   if (!currentCacheIdentity) return null;
   if (!dbPromise) {
-    dbPromise = openDB<NowenCacheSchema>(getDbName(currentCacheIdentity), DB_VERSION, {
+    dbPromise = openDB<BaseForgeCacheSchema>(getDbName(currentCacheIdentity), DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains("notebooks")) {
           const store = db.createObjectStore("notebooks", { keyPath: "id" });
@@ -492,7 +492,7 @@ export async function putCompleteOfflineTags(tags: Tag[]): Promise<void> {
 
 function dispatchOfflineAttachmentRemoval(ids: readonly string[]): void {
   if (ids.length === 0 || typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent("nowen:offline-attachments-removed", {
+  window.dispatchEvent(new CustomEvent("baseforge:offline-attachments-removed", {
     detail: { ids: [...ids] },
   }));
 }

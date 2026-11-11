@@ -11,14 +11,14 @@ import {
   type PreparedMarkdownNote,
   type ReliableExportJobSnapshot,
 } from "./reliableExportJobs";
-import { createStableNowenPackageExport } from "./nowenPackageExportStable";
-import { ensureNowenInstanceEnvironment } from "./nowenInstanceIdentity";
+import { createStableBaseForgePackageExport } from "./baseforgePackageExportStable";
+import { ensureBaseForgeInstanceEnvironment } from "./baseforgeInstanceIdentity";
 
 // export.ts imports this service at router startup. Pin the instance identity once so the native
-// Nowen-package endpoint and Markdown jobs both write the same stable sourceInstanceId.
-ensureNowenInstanceEnvironment();
+// BaseForge-package endpoint and Markdown jobs both write the same stable sourceInstanceId.
+ensureBaseForgeInstanceEnvironment();
 
-const TMP_PREFIX = "nowen-roundtrip-markdown-";
+const TMP_PREFIX = "baseforge-roundtrip-markdown-";
 const TTL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -109,7 +109,7 @@ async function buildJob(
     job.message = "正在生成完整目录与附件清单";
     const noteIds = notes.map((note) => note.id);
     const workspaceId = inferWorkspaceId(job.userId, noteIds);
-    const result = await createStableNowenPackageExport({
+    const result = await createStableBaseForgePackageExport({
       userId: job.userId,
       workspaceId,
       noteIds,
@@ -203,7 +203,7 @@ export function handleRoundTripMarkdownDownload(c: Context): Response | null {
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "baseforge.zip")}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
-      "X-Nowen-Round-Trip-Package": "2",
+      "X-BaseForge-Round-Trip-Package": "2",
     },
   });
 }

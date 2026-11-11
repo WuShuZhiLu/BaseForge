@@ -26,7 +26,7 @@
 /* Center the marker against the first 1.6-line-height text row. */
 .ProseMirror ul,
 .shared-note-content ul {
-  --nowen-ul-marker-top: 0.3em;
+  --baseforge-ul-marker-top: 0.3em;
 }
 
 /* The square glyph is visually taller, so it needs a slightly smaller offset. */
@@ -36,5 +36,5 @@
 .shared-note-content ul ul ul,
 .shared-note-content ul ul ul ul ul ul,
 .shared-note-content ul ul ul ul ul ul ul ul ul {
-  --nowen-ul-marker-top: 0.25em;
+  --baseforge-ul-marker-top: 0.25em;
 }

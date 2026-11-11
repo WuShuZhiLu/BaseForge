@@ -4,10 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-image-authority-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-image-authority-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
-process.env.NOWEN_YJS_SUBDOCUMENTS = "1";
+process.env.BASEFORGE_YJS_SUBDOCUMENTS = "1";
 
 const USER_ID = "remote-authority-user";
 const NOTEBOOK_ID = "remote-authority-book";
@@ -16,7 +16,7 @@ let closeDb: (() => void) | undefined;
 
 test.after(() => {
   closeDb?.();
-  delete process.env.NOWEN_YJS_SUBDOCUMENTS;
+  delete process.env.BASEFORGE_YJS_SUBDOCUMENTS;
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 

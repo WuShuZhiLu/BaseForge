@@ -166,9 +166,9 @@ class WebhookDispatcher {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Nowen-Event": event,
-            "X-Nowen-Signature": signature ? `sha256=${signature}` : "",
-            "X-Nowen-Delivery": deliveryId,
+            "X-BaseForge-Event": event,
+            "X-BaseForge-Signature": signature ? `sha256=${signature}` : "",
+            "X-BaseForge-Delivery": deliveryId,
             "User-Agent": "BaseForge-Webhook/1.0",
           },
           body: payload,

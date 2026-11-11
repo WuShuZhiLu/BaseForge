@@ -26,7 +26,7 @@ export interface BrowserConversionCopies {
 /** Presence/counts only; do not use readers that prune old drafts or queue items. */
 export async function inspectBrowserConversionCopies(noteId: string, userId: string): Promise<BrowserConversionCopies> {
   const result: BrowserConversionCopies = { draft: null, queue: null, cache: null, collaboration: null };
-  try { result.draft = localStorage.getItem(`nowen-draft-${noteId}`) !== null; } catch { /* unknown */ }
+  try { result.draft = localStorage.getItem(`baseforge-draft-${noteId}`) !== null; } catch { /* unknown */ }
   try {
     const queue: unknown = JSON.parse(localStorage.getItem(getOfflineQueueStorageKey()) || "[]");
     if (Array.isArray(queue) && queue.every((item) => item && typeof item.noteId === "string")) {

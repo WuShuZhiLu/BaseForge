@@ -84,7 +84,7 @@ test("builds a directory with stable note ids and escaped aliases", () => {
     ],
   });
   assert.match(directory, /Intro/);
-  assert.match(directory, /nowen-note-split:op-1/);
+  assert.match(directory, /baseforge-split:op-1/);
   assert.match(directory, /\[\[note:note-a\|Alpha ｜ A\]\]/);
   assert.match(directory, /\[\[note:note-b\|Beta ］ B\]\]/);
 });

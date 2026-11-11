@@ -411,7 +411,7 @@ function replacementSnapshot(doc: JsonNode): ReplacementSnapshot | null {
         }
         nodesById.set(blockId, { node: normalized, parentType });
         nodes[index] = {
-          type: "__nowen_block_patch_slot",
+          type: "__baseforge_block_patch_slot",
           attrs: { blockId },
         };
         continue;

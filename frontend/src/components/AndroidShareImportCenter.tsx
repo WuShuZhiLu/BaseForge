@@ -112,7 +112,7 @@ export default function AndroidShareImportCenter() {
   const [itemRuns, setItemRuns] = useState<Record<string, ItemRunState>>({});
   const mountedRef = useRef(true);
 
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("nowen-token") || "" : "";
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("baseforge-token") || "" : "";
   const current = payloads.find((payload) => !dismissedPayloadIds.has(payload.id)) || null;
   const readyItems = current?.items.filter((item) => item.status === "ready") || [];
   const nonReadyItems = current?.items.filter((item) => item.status !== "ready") || [];
@@ -251,7 +251,7 @@ export default function AndroidShareImportCenter() {
     if (!/^https?:\/\//i.test(apiBaseUrl)) {
       throw new Error("尚未配置可访问的 BaseForge 服务器地址");
     }
-    const authToken = localStorage.getItem("nowen-token") || "";
+    const authToken = localStorage.getItem("baseforge-token") || "";
     if (!authToken) throw new Error("登录状态已失效，请重新登录后重试");
     setActiveUploadItemId(item.id);
     setRun(item.id, { status: "uploading", progress: 0 });
@@ -362,8 +362,8 @@ export default function AndroidShareImportCenter() {
 
       if (note) {
         await completeAndroidShareItems(current.id, completed, true);
-        window.dispatchEvent(new CustomEvent("nowen:open-note", { detail: { noteId: note.id } }));
-        window.dispatchEvent(new CustomEvent("nowen:notes-changed", { detail: { noteId: note.id } }));
+        window.dispatchEvent(new CustomEvent("baseforge:open-note", { detail: { noteId: note.id } }));
+        window.dispatchEvent(new CustomEvent("baseforge:notes-changed", { detail: { noteId: note.id } }));
         if (createdNew) emitKnowledgeTreeRefresh("android-share-note-created");
         toast.success(`${createdNew ? "已新建笔记并导入" : "已插入笔记"}${failed ? `，${failed} 个文件失败可重试` : ""}`);
       } else {

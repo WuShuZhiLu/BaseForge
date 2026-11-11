@@ -60,7 +60,7 @@ import { isTaskCenterModuleVisible } from "@/lib/navigationVisibility";
 import { confirm } from "@/components/ui/confirm";
 
 /* ===== Filter 导航契约（应用侧栏与主区共享）=====
- * 应用侧栏按这里的 key 发 nowen:task-filter-select { key } 事件，
+ * 应用侧栏按这里的 key 发 baseforge:task-filter-select { key } 事件，
  * 主区监听后切换对应筛选；labelKey 供侧栏渲染同名 i18n 文案。
  */
 export const FILTERS: { key: TaskFilter; labelKey: string; icon: React.ReactNode }[] = [
@@ -141,8 +141,8 @@ export default function TaskWorkspace(_props: { hideSidebar?: boolean } = {}) {
       else if (target === "today") { setCenterMode("tasks"); selectTaskFilter("today"); }
       else if (target === "all") { setCenterMode("tasks"); selectTaskFilter("all"); }
     };
-    window.addEventListener("nowen:task-panel-navigate", onNavigate);
-    return () => window.removeEventListener("nowen:task-panel-navigate", onNavigate);
+    window.addEventListener("baseforge:task-panel-navigate", onNavigate);
+    return () => window.removeEventListener("baseforge:task-panel-navigate", onNavigate);
   }, []);
 
   useEffect(() => {
@@ -251,11 +251,11 @@ export default function TaskWorkspace(_props: { hideSidebar?: boolean } = {}) {
       if (!projectId) return;
       focusTaskProject(projectId);
     };
-    window.addEventListener("nowen:task-filter-select", onFilterSelect);
-    window.addEventListener("nowen:task-focus-project", onFocusProject);
+    window.addEventListener("baseforge:task-filter-select", onFilterSelect);
+    window.addEventListener("baseforge:task-focus-project", onFocusProject);
     return () => {
-      window.removeEventListener("nowen:task-filter-select", onFilterSelect);
-      window.removeEventListener("nowen:task-focus-project", onFocusProject);
+      window.removeEventListener("baseforge:task-filter-select", onFilterSelect);
+      window.removeEventListener("baseforge:task-focus-project", onFocusProject);
     };
   }, [focusTaskProject]);
 
@@ -460,8 +460,8 @@ export default function TaskWorkspace(_props: { hideSidebar?: boolean } = {}) {
       loadHabits();
       if (centerMode === "stats") void loadStatsCenter();
     };
-    window.addEventListener("nowen:workspace-changed", onWs);
-    return () => window.removeEventListener("nowen:workspace-changed", onWs);
+    window.addEventListener("baseforge:workspace-changed", onWs);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWs);
   }, [centerMode, loadHabits, loadStatsCenter, loadTasks]);
 
   useEffect(() => {

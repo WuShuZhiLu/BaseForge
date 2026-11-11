@@ -127,9 +127,9 @@ describe("publicWebOrigin", () => {
   });
 
   it("recognizes FN Connect origins as likely protected gateways", () => {
-    expect(isLikelyProtectedGatewayOrigin("https://nowen-note.abcd.fnos.net")).toBe(true);
+    expect(isLikelyProtectedGatewayOrigin("https://baseforge.abcd.fnos.net")).toBe(true);
     expect(resolvePublicWebOrigin({
-      runtimeOrigin: "https://nowen-note.abcd.fnos.net",
+      runtimeOrigin: "https://baseforge.abcd.fnos.net",
       runtimeSource: "environment",
       currentOrigin: "https://local.example.com",
     })).toMatchObject({

@@ -14,8 +14,8 @@ function normalizeRel(value: unknown, mode: "auto" | "alias"): string {
   tokens.add("noopener");
   tokens.add("noreferrer");
   tokens.add("nofollow");
-  tokens.delete(mode === "auto" ? "nowen-title-alias" : "nowen-title-auto");
-  tokens.add(mode === "auto" ? "nowen-title-auto" : "nowen-title-alias");
+  tokens.delete(mode === "auto" ? "baseforge-title-alias" : "baseforge-title-auto");
+  tokens.add(mode === "auto" ? "baseforge-title-auto" : "baseforge-title-alias");
   return Array.from(tokens).join(" ");
 }
 
@@ -66,10 +66,10 @@ export function syncAutomaticNoteLinkTitles(
             if (mark?.type !== "link") continue;
             if (targetIdFromHref(mark?.attrs?.href) !== targetNoteId.toLowerCase()) continue;
             const rel = String(mark?.attrs?.rel || "");
-            if (/\bnowen-title-alias\b/.test(rel)) continue;
+            if (/\bbaseforge-title-alias\b/.test(rel)) continue;
             const text = String(node.text || "");
             const inferredAuto =
-              /\bnowen-title-auto\b/.test(rel) ||
+              /\bbaseforge-title-auto\b/.test(rel) ||
               text === oldTitle ||
               text.startsWith(`${oldTitle} > `) ||
               text === "关联笔记";

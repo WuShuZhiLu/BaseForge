@@ -86,13 +86,13 @@ export const automationEventCaptureMiddleware: MiddlewareHandler = async (c, nex
   await next();
   if (c.res.status < 200 || c.res.status >= 300) return;
   const response = await c.res.clone().json().catch(() => ({})) as Record<string, unknown>;
-  const commandSource = c.req.header("X-Nowen-Command-Source") || "user";
+  const commandSource = c.req.header("X-BaseForge-Command-Source") || "user";
   captureBusinessMutation({
     area: match[1], path: match[2] || "/", method, userId: c.req.header("X-User-Id") || "system",
     workspaceId: String(body.workspaceId || c.req.query("workspaceId") || "") || null, requestBody: body, responseBody: response,
     source: commandSource === "sync" ? "sync" : commandSource.includes("workflow") ? "workflow" : commandSource.includes("plugin") ? "plugin" : "user",
-    sourceId: c.req.header("X-Nowen-Source-Id") || undefined, correlationId: c.req.header("X-Nowen-Correlation-Id") || undefined,
-    causationId: c.req.header("X-Nowen-Causation-Id") || undefined, depth: Number(c.req.header("X-Nowen-Event-Depth") || 0),
-    batchId: c.req.header("X-Nowen-Batch-Id") || undefined, requestId: c.req.header("X-Request-Id") || undefined,
+    sourceId: c.req.header("X-BaseForge-Source-Id") || undefined, correlationId: c.req.header("X-BaseForge-Correlation-Id") || undefined,
+    causationId: c.req.header("X-BaseForge-Causation-Id") || undefined, depth: Number(c.req.header("X-BaseForge-Event-Depth") || 0),
+    batchId: c.req.header("X-BaseForge-Batch-Id") || undefined, requestId: c.req.header("X-Request-Id") || undefined,
   });
 };

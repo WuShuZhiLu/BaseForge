@@ -2,7 +2,7 @@ import { getCurrentWorkspace, getServerUrl } from "@/lib/api";
 import { decodeUserIdFromToken } from "@/lib/userPreferenceAccountCache";
 import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 
-const STORAGE_KEY_PREFIX = "nowen.knowledgeTree.expandedNodeIds.v1:";
+const STORAGE_KEY_PREFIX = "baseforge.knowledgeTree.expandedNodeIds.v1:";
 
 export interface KnowledgeTreeExpansionSnapshot {
   initialized: boolean;
@@ -133,8 +133,8 @@ function installStorageListener(): void {
 export function getKnowledgeTreeExpansionScope(workspaceId = getCurrentWorkspace()): string {
   let userId = "anonymous";
   try {
-    userId = decodeUserIdFromToken(localStorage.getItem("nowen-token"))
-      || localStorage.getItem("nowen-self-userid")
+    userId = decodeUserIdFromToken(localStorage.getItem("baseforge-token"))
+      || localStorage.getItem("baseforge-self-userid")
       || userId;
   } catch {
     // Keep a stable fallback scope when storage is unavailable.

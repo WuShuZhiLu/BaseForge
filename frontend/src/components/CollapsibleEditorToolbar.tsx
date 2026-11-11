@@ -17,8 +17,8 @@ import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 
-export const EDITOR_TOOLBAR_COLLAPSED_KEY = "nowen.editor.toolbarCollapsed.v1";
-const CHANGED_EVENT = "nowen:editor-toolbar-collapsed-changed";
+export const EDITOR_TOOLBAR_COLLAPSED_KEY = "baseforge.editor.toolbarCollapsed.v1";
+const CHANGED_EVENT = "baseforge:editor-toolbar-collapsed-changed";
 let memoryCollapsed = false;
 
 /** 与 Tailwind 的 md 断点保持一致：只有桌面端才把工具栏交出去。 */

@@ -1,12 +1,12 @@
 export type MobileKnowledgeTreeViewMode = "navigator" | "tree";
 export type DesktopKnowledgeTreeViewMode = "quick" | "tree";
 
-export const MOBILE_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "nowen.mobileKnowledgeTree.viewMode.v1";
-export const MOBILE_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT = "nowen:mobile-knowledge-tree-view-mode-changed";
-export const MOBILE_KNOWLEDGE_TREE_COMPACT_STORAGE_KEY = "nowen.mobileKnowledgeTree.compact.v1";
-export const MOBILE_KNOWLEDGE_TREE_COMPACT_CHANGED_EVENT = "nowen:mobile-knowledge-tree-compact-changed";
-export const DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "nowen.desktopKnowledgeTree.viewMode.v1";
-export const DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT = "nowen:desktop-knowledge-tree-view-mode-changed";
+export const MOBILE_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "baseforge.mobileKnowledgeTree.viewMode.v1";
+export const MOBILE_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT = "baseforge:mobile-knowledge-tree-view-mode-changed";
+export const MOBILE_KNOWLEDGE_TREE_COMPACT_STORAGE_KEY = "baseforge.mobileKnowledgeTree.compact.v1";
+export const MOBILE_KNOWLEDGE_TREE_COMPACT_CHANGED_EVENT = "baseforge:mobile-knowledge-tree-compact-changed";
+export const DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "baseforge.desktopKnowledgeTree.viewMode.v1";
+export const DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT = "baseforge:desktop-knowledge-tree-view-mode-changed";
 
 const VALID_MODES = new Set<MobileKnowledgeTreeViewMode>(["navigator", "tree"]);
 const DESKTOP_VALID_MODES = new Set<DesktopKnowledgeTreeViewMode>(["quick", "tree"]);

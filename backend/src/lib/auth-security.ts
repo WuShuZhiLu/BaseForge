@@ -114,7 +114,7 @@ export type TokenType = "login" | "refresh" | "share" | "sudo";
 function resolveRefreshJwtSecret(): string {
   const explicit = process.env.REFRESH_JWT_SECRET;
   if (explicit && explicit.length >= 16) return explicit;
-  return crypto.createHmac("sha256", JWT_SECRET).update("nowen-refresh-token-v1").digest("hex");
+  return crypto.createHmac("sha256", JWT_SECRET).update("baseforge-refresh-token-v1").digest("hex");
 }
 
 export const REFRESH_JWT_SECRET: string = resolveRefreshJwtSecret();
@@ -127,7 +127,7 @@ function resolveShareJwtSecret(): string {
   const explicit = process.env.SHARE_JWT_SECRET;
   if (explicit && explicit.length >= 16) return explicit;
   // 用 HMAC(JWT_SECRET, "share-token-v1") 派生，保证与登录 secret 不同
-  return crypto.createHmac("sha256", JWT_SECRET).update("nowen-share-token-v1").digest("hex");
+  return crypto.createHmac("sha256", JWT_SECRET).update("baseforge-share-token-v1").digest("hex");
 }
 
 export const SHARE_JWT_SECRET: string = resolveShareJwtSecret();

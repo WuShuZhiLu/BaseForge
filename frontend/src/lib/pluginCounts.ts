@@ -15,7 +15,7 @@ export interface PluginCounts {
 }
 
 const TTL_MS = 5 * 60 * 1000;
-const EVENT = "nowen:plugin-counts";
+const EVENT = "baseforge:plugin-counts";
 
 let cached: PluginCounts | null = null;
 let cachedAt = 0;

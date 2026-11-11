@@ -13,7 +13,7 @@
  *  2. **schema_version 校验**：meta.json 记录备份产生时的 schema_version 与
  *     `sqlite_master` 表清单。恢复前比对当前 DB 版本：
  *       - 备份版本 <= 当前程序最高版本 → 允许，恢复后由 initSchema + runMigrations
- *         把库从备份版本升到当前版本（这是「导入旧 nowen-note 备份」的常规路径）；
+ *         把库从备份版本升到当前版本（这是「导入旧 baseforge 备份」的常规路径）；
  *       - 备份版本 > 当前程序最高版本 → 拒绝（防降级：新库灌进旧程序会数据不一致）。
  *  3. **恢复事务整体回滚**：任何一行 INSERT 失败都向上 throw，撤销整个
  *     transaction —— 不再"catch 吞错返回 success: true"。
@@ -293,7 +293,7 @@ export interface RestoreResult {
     schemaVersion: number;
     /**
      * 恢复后会把备份库升到当前版本时要执行的迁移条数。
-     * 0 表示备份版本与当前程序一致；主要给「导入旧 nowen-note 备份」这种
+     * 0 表示备份版本与当前程序一致；主要给「导入旧 baseforge 备份」这种
      * 跨版本场景做提前告知（实测上游 v80 备份升到 v140 要跑 60 条）。
      */
     pendingMigrations?: number;
@@ -435,15 +435,15 @@ function verifyCurrentDbUsable(curDbPath: string): void {
   // Use a SAVEPOINT-backed write probe so permissions/read-only mounts fail before restore
   // is committed, while the probe leaves no persistent row behind.
   try {
-    cur.exec("SAVEPOINT nowen_restore_write_probe");
+    cur.exec("SAVEPOINT baseforge_restore_write_probe");
     cur.prepare(
       `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)`,
     ).run("backup:restore-write-probe", String(Date.now()));
-    cur.exec("ROLLBACK TO nowen_restore_write_probe");
-    cur.exec("RELEASE nowen_restore_write_probe");
+    cur.exec("ROLLBACK TO baseforge_restore_write_probe");
+    cur.exec("RELEASE baseforge_restore_write_probe");
   } catch (error) {
-    try { cur.exec("ROLLBACK TO nowen_restore_write_probe"); } catch { /* ignore */ }
-    try { cur.exec("RELEASE nowen_restore_write_probe"); } catch { /* ignore */ }
+    try { cur.exec("ROLLBACK TO baseforge_restore_write_probe"); } catch { /* ignore */ }
+    try { cur.exec("RELEASE baseforge_restore_write_probe"); } catch { /* ignore */ }
     throw new Error(
       "恢复后数据库写入检查失败: " + (error instanceof Error ? error.message : String(error)),
     );
@@ -456,7 +456,7 @@ function verifyCurrentDbUsable(curDbPath: string): void {
 /**
  * 恢复完成后重建「派生数据」，让恢复出来的库立刻可搜、block 权威自洽。
  *
- * 为什么需要：恢复的库来自 older schema（例如上游 nowen-note 的 v80 升到当前
+ * 为什么需要：恢复的库来自 older schema（例如上游 baseforge 的 v80 升到当前
  * v140），里面可能存在两类派生数据缺陷：
  *   1. notes.contentText 为空 —— 搜索、列表摘要都读它，为空等于这篇搜不到。
  *      实测 2026-11-06 那份真实备份：283 篇里 164 篇为空，其中 160 篇是
@@ -497,7 +497,7 @@ function repairRestoredDerivedState(): void {
 }
 
 /**
- * 恢复后把 nowen 的「根路径文档」归并进「待整理」知识库。
+ * 恢复后把 baseforge 的「根路径文档」归并进「待整理」知识库。
  *
  * 完整备份恢复是整库替换，不经过数据包导入的兜底逻辑；而 Web 端根层只允许
  * 建知识库，根文档留在根层会变成无法管理的状态。这里补上同一语义。
@@ -1068,7 +1068,7 @@ export class BackupManager {
    */
   private async createFullBackup(zipPath: string, db: ReturnType<typeof getDb>, description?: string): Promise<void> {
     // 1) 临时 .db 快照
-    const tmpDb = path.join(os.tmpdir(), `nowen-fullbk-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`);
+    const tmpDb = path.join(os.tmpdir(), `baseforge-fullbk-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`);
     try {
       await db.backup(tmpDb);
       scrubPluginStudioProjectsFromBackup(tmpDb);
@@ -1175,7 +1175,7 @@ export class BackupManager {
    *   4. .zip 还会进一步解析 meta.json、比对 formatVersion / schemaVersion，
    *      形式非法直接拒绝（与 restoreFromZip 的前置检查语义一致，避免无法恢复
    *      的坏包进库）；
-   *   5. 生成的文件名固定为 `nowen-backup-<type>-imported-<ts>.<ext>`，
+   *   5. 生成的文件名固定为 `baseforge-backup-<type>-imported-<ts>.<ext>`，
    *      强制前缀"imported"让管理员在列表里一眼区分"这份是外部导入的"。
    *
    * 元信息：
@@ -1226,7 +1226,7 @@ export class BackupManager {
       this.ensureDir();
       const tmp = path.join(
         this.backupDir,
-        `.nowen-ingest-probe-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
+        `.baseforge-ingest-probe-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
       );
       fs.writeFileSync(tmp, bytes);
       try {
@@ -1305,7 +1305,7 @@ export class BackupManager {
     // —— 3. 落盘 + 生成 meta.json
     this.ensureDir();
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const destFilename = `nowen-backup-${type}-imported-${ts}${extLower}`;
+    const destFilename = `baseforge-backup-${type}-imported-${ts}${extLower}`;
     const destPath = path.join(this.backupDir, destFilename);
 
     fs.writeFileSync(destPath, bytes);
@@ -1464,7 +1464,7 @@ export class BackupManager {
       // 文件名加 crypto 随机串避免两次并发 dryRun 撞名。
       const tmpDb = path.join(
         this.backupDir,
-        `.nowen-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
+        `.baseforge-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
       );
       fs.writeFileSync(tmpDb, await dbFile.async("nodebuffer"));
       try {
@@ -1542,7 +1542,7 @@ export class BackupManager {
     const restoreId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
     const tmpDb = path.join(
       this.backupDir,
-      `.nowen-restore-${restoreId}.db`,
+      `.baseforge-restore-${restoreId}.db`,
     );
     fs.writeFileSync(tmpDb, await dbFile.async("nodebuffer"));
     checkSqliteIntegrity(tmpDb, "备份文件");
@@ -1552,7 +1552,7 @@ export class BackupManager {
       meta.files?.attachments,
     );
 
-    const stagingRoot = path.join(this.dataDir, `.nowen-restore-staging-${restoreId}`);
+    const stagingRoot = path.join(this.dataDir, `.baseforge-restore-staging-${restoreId}`);
     const stagedAttDir = path.join(stagingRoot, "attachments");
     const stagedFontsDir = path.join(stagingRoot, "fonts");
     const hasInstalledLayout = Object.keys(zip.files).some((name) => name.startsWith("plugins/installed/"));

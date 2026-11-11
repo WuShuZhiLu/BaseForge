@@ -46,19 +46,19 @@ vs-list.json
 *.err
 
 # 鸿蒙构建产物
-nowen-harmony/.hvigor/
-nowen-harmony/.idea/
-nowen-harmony/build/
-nowen-harmony/oh_modules/
-nowen-harmony/*.har
-nowen-harmony/*.hap
-nowen-harmony/local.properties
-nowen-harmony/.cxx/
-nowen-harmony/cache/
-nowen-harmony/outputs/
-nowen-harmony/report/
-nowen-harmony/.deveco/
-nowen-harmony/entry/build/
+baseforge-harmony/.hvigor/
+baseforge-harmony/.idea/
+baseforge-harmony/build/
+baseforge-harmony/oh_modules/
+baseforge-harmony/*.har
+baseforge-harmony/*.hap
+baseforge-harmony/local.properties
+baseforge-harmony/.cxx/
+baseforge-harmony/cache/
+baseforge-harmony/outputs/
+baseforge-harmony/report/
+baseforge-harmony/.deveco/
+baseforge-harmony/entry/build/
 dist-electron-lite/win-unpacked/resources
 dist-electron-lite/win-unpacked
 dist-electron-lite/.icon-ico

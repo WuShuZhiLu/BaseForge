@@ -209,7 +209,7 @@ app.get("/api/calendar/ics/:token", (c) => {
     status: 200,
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'inline; filename="nowen-tasks.ics"',
+      "Content-Disposition": 'inline; filename="baseforge-tasks.ics"',
       "Cache-Control": "private, max-age=3600",
     },
   });
@@ -376,7 +376,7 @@ app.get("/api/backups/full-download/:token", handleFullBackupJobDownload);
 app.get("/api/task-attachments/:id", handleDownloadTaskAttachment);
 
 // 插件入站回调：高熵 capability token + 可选 HMAC，自身完成鉴权；
-// 外部系统不会携带 Nowen JWT，因此必须注册在 JWT 中间件之前。
+// 外部系统不会携带 BaseForge JWT，因此必须注册在 JWT 中间件之前。
 app.route("/api/plugin-inbound", pluginInboundRouter);
 
 // 自动化对外 Webhook 触发端点：外部系统用一次性签名触发工作流，自身鉴权，

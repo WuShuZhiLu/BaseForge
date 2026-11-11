@@ -86,7 +86,7 @@ function trashScopeWhere(scope: TrashScope, alias = ""): string {
 function wantsInternalNoteContent(c: any): boolean {
   return (c.req.header("Accept") || "")
     .toLowerCase()
-    .includes("application/vnd.nowen.internal-note+json");
+    .includes("application/vnd.baseforge.internal-note+json");
 }
 
 function presentNoteForResponse(db: any, c: any, note: any): any {

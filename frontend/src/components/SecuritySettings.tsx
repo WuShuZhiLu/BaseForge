@@ -70,12 +70,12 @@ export default function SecuritySettings() {
   useEffect(() => {
     const onTokenChanged = () => { fetchUser(); };
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "nowen-token") fetchUser();
+      if (e.key === "baseforge-token") fetchUser();
     };
-    window.addEventListener("nowen:token-changed", onTokenChanged);
+    window.addEventListener("baseforge:token-changed", onTokenChanged);
     window.addEventListener("storage", onStorage);
     return () => {
-      window.removeEventListener("nowen:token-changed", onTokenChanged);
+      window.removeEventListener("baseforge:token-changed", onTokenChanged);
       window.removeEventListener("storage", onStorage);
     };
   }, [fetchUser]);
@@ -85,7 +85,7 @@ export default function SecuritySettings() {
   // 的 useEffect([], []) 不会重新执行。
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "nowen-token") {
+      if (e.key === "baseforge-token") {
         const newToken = e.newValue;
         if (newToken) {
           api.getMe().then((u) => {
@@ -150,7 +150,7 @@ function AvatarSection() {
   const finishChange = useCallback(() => {
     reload();
     // 通知 Rail 等展示位刷新用户信息
-    window.dispatchEvent(new CustomEvent("nowen:user-updated"));
+    window.dispatchEvent(new CustomEvent("baseforge:user-updated"));
   }, [reload]);
 
   const handleFile = useCallback((file: File | undefined) => {
@@ -683,7 +683,7 @@ function TwoFactorSection() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "nowen-recovery-codes.txt";
+    a.download = "baseforge-recovery-codes.txt";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -1015,7 +1015,7 @@ function SessionsSection() {
   const formatUa = (ua: string) => {
     if (!ua) return t("securitySettings.sessions.unknownUa", { defaultValue: "来源未知" });
     // 桌面客户端特殊处理
-    if (/(BaseForge|Nowen).*Desktop/i.test(ua)) {
+    if (/(BaseForge|BaseForge).*Desktop/i.test(ua)) {
       const os = /Windows/.test(ua) ? "Windows"
         : /Mac OS/.test(ua) ? "macOS"
         : /Linux/.test(ua) ? "Linux"
@@ -1035,7 +1035,7 @@ function SessionsSection() {
       : /Firefox\//.test(ua) ? "Firefox"
       : /Safari\//.test(ua) ? "Safari"
       : "";
-    return ([br, os].filter(Boolean).join(" · ") || ua.slice(0, 60)).replace(/nowen[-_ ]?note/gi, "BaseForge");
+    return ([br, os].filter(Boolean).join(" · ") || ua.slice(0, 60)).replace(/baseforge[-_ ]?note/gi, "BaseForge");
   };
 
   const others = sessions.filter((s) => !s.current);

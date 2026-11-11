@@ -494,7 +494,7 @@ function AboutPanel() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-0.5 text-accent-primary underline underline-offset-2 decoration-accent-primary/40 hover:decoration-accent-primary"
             >
-              nowen-note
+              baseforge
               <ExternalLink size={10} />
             </a>
           </p>
@@ -1440,8 +1440,8 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   // 监听 token 变化，重新拉取当前用户（防止切换账号后残留旧用户信息）
   useEffect(() => {
     const onTokenChanged = () => { fetchCurrentUser(); };
-    window.addEventListener("nowen:token-changed", onTokenChanged);
-    return () => window.removeEventListener("nowen:token-changed", onTokenChanged);
+    window.addEventListener("baseforge:token-changed", onTokenChanged);
+    return () => window.removeEventListener("baseforge:token-changed", onTokenChanged);
   }, [fetchCurrentUser]);
 
   // 监听"DataManager 完成导入后请求关闭弹窗"事件——用户在 DataManager 里
@@ -1449,8 +1449,8 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
   // 把这层 Modal 也关掉，否则切到目标工作区但弹窗仍盖住主界面，体感很奇怪。
   useEffect(() => {
     const onCloseRequest = () => onClose();
-    window.addEventListener("nowen:close-settings", onCloseRequest);
-    return () => window.removeEventListener("nowen:close-settings", onCloseRequest);
+    window.addEventListener("baseforge:close-settings", onCloseRequest);
+    return () => window.removeEventListener("baseforge:close-settings", onCloseRequest);
   }, [onClose]);
 
   const isAdmin = currentUser?.role === "admin";
@@ -1477,7 +1477,7 @@ const SettingsModal = React.forwardRef<HTMLDivElement, SettingsModalProps>(
     // 数据：DataManager 内部按 scope 分流（空间 = 所有人；系统 = 仅管理员）
     { id: "data" as const, group: "data" as const, label: t('settings.dataAndBackup'), icon: Database },
     ...(syncSurfaceAvailable ? [{ id: "sync" as const, group: "data" as const, label: "同步", icon: RefreshCw }] : []),
-    ...((window as any).nowenDesktop?.isDesktop ? [{ id: "folderSync" as const, group: "data" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
+    ...((window as any).baseforgeDesktop?.isDesktop ? [{ id: "folderSync" as const, group: "data" as const, label: t('folderSync.title'), icon: FolderSync }] : []),
     // 系统管理：仅管理员可见
     ...(isAdmin ? [{ id: "users" as const, group: "system" as const, label: t('settings.users'), icon: Users }] : []),
     ...(isAdmin ? [{ id: "workspaces" as const, group: "system" as const, label: t('settings.workspaces'), icon: Building2 }] : []),

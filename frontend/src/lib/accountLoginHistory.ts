@@ -1,9 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 import { normalizeServerBaseUrl } from "@/lib/serverUrl";
 
-const MOBILE_HISTORY_KEY = "nowen.accountHistory.secureRecords";
-export const CURRENT_ACCOUNT_HISTORY_ID_KEY = "nowen-account-history-current-id";
-export const PENDING_ACCOUNT_REAUTH_KEY = "nowen-account-history-pending-reauth";
+const MOBILE_HISTORY_KEY = "baseforge.accountHistory.secureRecords";
+export const CURRENT_ACCOUNT_HISTORY_ID_KEY = "baseforge-account-history-current-id";
+export const PENDING_ACCOUNT_REAUTH_KEY = "baseforge-account-history-pending-reauth";
 
 export interface AccountLoginHistoryItem {
   id: string;
@@ -56,7 +56,7 @@ let secureStoragePromise: Promise<SecureStorageModule | null> | null = null;
 
 function getDesktopBridge(): DesktopAccountHistoryBridge | null {
   if (typeof window === "undefined") return null;
-  return (window as any).nowenDesktop?.accountHistory ?? null;
+  return (window as any).baseforgeDesktop?.accountHistory ?? null;
 }
 
 function isCapacitorNative(): boolean {
@@ -68,7 +68,7 @@ async function getSecureStorage(): Promise<SecureStorageModule | null> {
   if (!secureStoragePromise) {
     secureStoragePromise = import("@aparajita/capacitor-secure-storage")
       .then(async (mod) => {
-        try { await mod.SecureStorage.setKeyPrefix("nowen_"); } catch { /* 不影响读取 */ }
+        try { await mod.SecureStorage.setKeyPrefix("baseforge_"); } catch { /* 不影响读取 */ }
         return mod;
       })
       .catch((error) => {
@@ -259,7 +259,7 @@ export async function removeAccountLoginHistory(id: string): Promise<{ ok: boole
 }
 
 function notifyHistoryChanged(): void {
-  try { window.dispatchEvent(new CustomEvent("nowen:account-history-changed")); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent("baseforge:account-history-changed")); } catch { /* ignore */ }
 }
 
 function setCurrentHistoryId(id: string): void {

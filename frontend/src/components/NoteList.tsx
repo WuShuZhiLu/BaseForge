@@ -67,7 +67,7 @@ import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 /* ===== 排序模式 ===== */
 type SortBy = "manual" | "updatedAt" | "createdAt" | "title";
 type SortDir = "asc" | "desc";
-const SORT_STORAGE_KEY = "nowen.noteList.sort";
+const SORT_STORAGE_KEY = "baseforge.noteList.sort";
 
 function loadSortPref(): { by: SortBy; dir: SortDir } {
   try {
@@ -95,7 +95,7 @@ function isCoarsePointer(): boolean {
     && window.matchMedia("(pointer: coarse)").matches;
 }
 
-const TIME_VISIBILITY_STORAGE_KEY = "nowen.noteList.showTime";
+const TIME_VISIBILITY_STORAGE_KEY = "baseforge.noteList.showTime";
 
 function loadShowTimePref(): boolean {
   try {
@@ -1463,12 +1463,12 @@ export default function NoteList() {
 
     const refresh = () => void reload();
     void reload();
-    window.addEventListener("nowen:workspace-changed", refresh);
-    window.addEventListener("nowen:knowledge-tree-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
+    window.addEventListener("baseforge:knowledge-tree-changed", refresh);
     return () => {
       active = false;
-      window.removeEventListener("nowen:workspace-changed", refresh);
-      window.removeEventListener("nowen:knowledge-tree-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
+      window.removeEventListener("baseforge:knowledge-tree-changed", refresh);
     };
   }, [showThreeColumnFolderContents, state.notesRefreshToken]);
 
@@ -2020,7 +2020,7 @@ export default function NoteList() {
 
     haptic.selection();
     setLastClickedId(noteId);
-    try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent("baseforge:before-note-switch")); } catch { /* ignore */ }
 
     // 移动端立即进入编辑器，但视觉 Loading 延迟 150ms；快请求不会闪烁。
     actions.setMobileView("editor");
@@ -2081,7 +2081,7 @@ export default function NoteList() {
         );
       }
       try {
-        window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "trash-emptied" } }));
+        window.dispatchEvent(new CustomEvent("baseforge:storage-changed", { detail: { reason: "trash-emptied" } }));
       } catch { /* ignore */ }
       actions.setNotes([]);
       if (state.activeNote?.isTrashed) {
@@ -3312,7 +3312,7 @@ export default function NoteList() {
   const handleDragStart = useCallback((e: React.DragEvent, noteId: string) => {
     setDragNoteId(noteId);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/x-nowen-note", noteId);
+    e.dataTransfer.setData("application/x-baseforge", noteId);
     e.dataTransfer.setData("text/plain", noteId);
   }, []);
 

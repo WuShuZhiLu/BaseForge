@@ -541,7 +541,7 @@ export default function KnowledgeTreeNodeMenu({
       await onReload();
       actions.refreshNotes();
       actions.refreshNotebooks();
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "notebook-duplicated", nodeId: result.nodeId },
       }));
     } catch (error) {
@@ -591,7 +591,7 @@ export default function KnowledgeTreeNodeMenu({
     });
     await onReload();
     actions.refreshNotes();
-    window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+    window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
       detail: { reason: "note-format-converted", noteId: current.id },
     }));
     toast.success(`已转换为${targetLabel}`);
@@ -727,7 +727,7 @@ export default function KnowledgeTreeNodeMenu({
         case "toggle_favorite":
           if (node.resourceType === "notebook") {
             await knowledgeTreeApi.update(node.id, { isFavorite: node.isFavorite === 1 ? 0 : 1 });
-            window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+            window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
             toast.success(node.isFavorite === 1 ? "已取消收藏" : "已收藏");
             break;
           }

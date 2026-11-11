@@ -9,7 +9,7 @@ import {
 } from "@/lib/noteContentPersistence";
 
 function getToken(): string | null {
-  return localStorage.getItem("nowen-token");
+  return localStorage.getItem("baseforge-token");
 }
 
 export async function offlineQueueFetch(

@@ -5,8 +5,8 @@ export type TableLayoutAlign = "left" | "center" | "right";
 export type TableWidthMode = "auto" | "full";
 
 const FIRST_LINE_INDENT_ATTR = "data-first-line-indent";
-const TABLE_ALIGN_ATTR = "data-nowen-table-align";
-const TABLE_WIDTH_ATTR = "data-nowen-table-width";
+const TABLE_ALIGN_ATTR = "data-baseforge-table-align";
+const TABLE_WIDTH_ATTR = "data-baseforge-table-width";
 
 export function normalizeFirstLineIndent(value: unknown): FirstLineIndent {
   if (value === 2 || value === "2" || value === "2em") return 2;

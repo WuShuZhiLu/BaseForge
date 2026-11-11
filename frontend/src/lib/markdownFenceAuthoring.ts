@@ -194,10 +194,10 @@ function activeFenceDecorations(state: EditorState): DecorationSet {
         const openingLine = lineNumber === firstLine.number;
         const closingLine = hasClosing && lineNumber === lastLine.number;
         const className = [
-          "cm-nowen-fence-active",
-          openingLine ? "cm-nowen-fence-opening" : "",
-          closingLine ? "cm-nowen-fence-closing" : "",
-          !openingLine && !closingLine ? "cm-nowen-fence-body" : "",
+          "cm-baseforge-fence-active",
+          openingLine ? "cm-baseforge-fence-opening" : "",
+          closingLine ? "cm-baseforge-fence-closing" : "",
+          !openingLine && !closingLine ? "cm-baseforge-fence-body" : "",
         ].filter(Boolean).join(" ");
         ranges.push({
           from: line.from,
@@ -232,18 +232,18 @@ const fencedCodeLiveField = StateField.define<DecorationSet>({
 });
 
 const fencedCodeLiveTheme = EditorView.theme({
-  ".cm-nowen-fence-active": {
+  ".cm-baseforge-fence-active": {
     backgroundColor: "color-mix(in srgb, var(--color-app-hover, #f1f5f9) 62%, transparent)",
     fontFamily: "ui-monospace, 'JetBrains Mono', Menlo, Monaco, Consolas, monospace",
   },
-  ".cm-nowen-fence-opening": {
+  ".cm-baseforge-fence-opening": {
     position: "relative",
     paddingTop: "8px",
     borderTopLeftRadius: "10px",
     borderTopRightRadius: "10px",
     color: "var(--color-text-tertiary, #94a3b8)",
   },
-  ".cm-nowen-fence-opening::after": {
+  ".cm-baseforge-fence-opening::after": {
     content: "attr(data-fence-language-label)",
     position: "absolute",
     right: "10px",
@@ -257,11 +257,11 @@ const fencedCodeLiveTheme = EditorView.theme({
     lineHeight: "18px",
     pointerEvents: "none",
   },
-  ".cm-nowen-fence-body": {
+  ".cm-baseforge-fence-body": {
     paddingLeft: "10px",
     paddingRight: "10px",
   },
-  ".cm-nowen-fence-closing": {
+  ".cm-baseforge-fence-closing": {
     paddingBottom: "8px",
     borderBottomLeftRadius: "10px",
     borderBottomRightRadius: "10px",

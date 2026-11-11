@@ -21,7 +21,7 @@ import { confirm as confirmDialog, prompt as promptDialog } from "@/components/u
 import { getBaseUrl, withSudo } from "@/lib/api";
 import { toast } from "@/lib/toast";
 
-const HOST_ATTR = "data-nowen-backup-webdav-host";
+const HOST_ATTR = "data-baseforge-backup-webdav-host";
 
 type Notice = { type: "success" | "error" | "info"; text: string } | null;
 
@@ -54,7 +54,7 @@ type BackupRow = {
 };
 
 function authHeaders(sudoToken?: string): Record<string, string> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   return {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(sudoToken ? { "X-Sudo-Token": sudoToken } : {}),
@@ -179,7 +179,7 @@ function BackupWebDavPanel() {
     setRemotePath(next.remotePath || "baseforge/backups");
     setEnabled(next.enabled);
     setUploadOnAutoBackup(next.uploadOnAutoBackup);
-    window.dispatchEvent(new Event("nowen-backup-webdav-config-changed"));
+    window.dispatchEvent(new Event("baseforge-backup-webdav-config-changed"));
   }, []);
 
   const reload = useCallback(async () => {

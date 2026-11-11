@@ -3,7 +3,7 @@ import { toast } from "@/lib/toast";
 import type { Task } from "@/types";
 import { parseRepeatRuleRequestValue } from "@/components/tasks/customRepeatRule";
 
-const INSTALL_KEY = "__NOWEN_TASK_UPDATE_SAFETY_BRIDGE_V1__";
+const INSTALL_KEY = "__BASEFORGE_TASK_UPDATE_SAFETY_BRIDGE_V1__";
 
 type TaskPatch = Partial<Task> & { repeatRuleJson?: unknown };
 
