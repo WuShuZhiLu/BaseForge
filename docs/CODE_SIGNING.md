@@ -35,7 +35,7 @@ Repository Variables used by production signing:
 
 - `SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG`
 - `SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG`
-- `NOWEN_WINDOWS_PUBLISHER_NAME`
+- `BASEFORGE_WINDOWS_PUBLISHER_NAME`
 
 Optional overrides (the repository has safe defaults for the currently approved SignPath organization/project/policy):
 
@@ -43,7 +43,7 @@ Optional overrides (the repository has safe defaults for the currently approved 
 - `SIGNPATH_PROJECT_SLUG`
 - `SIGNPATH_SIGNING_POLICY_SLUG`
 
-`NOWEN_WINDOWS_PUBLISHER_NAME` must be copied from the real `SignerCertificate` common name of the first approved SignPath release-signed candidate. Do not guess it.
+`BASEFORGE_WINDOWS_PUBLISHER_NAME` must be copied from the real `SignerCertificate` common name of the first approved SignPath release-signed candidate. Do not guess it.
 
 ## First signed bridge release
 
@@ -53,7 +53,7 @@ For the first SignPath-signed bridge release:
 
 1. Build and sign a candidate through GitHub Actions + SignPath.
 2. Confirm `Get-AuthenticodeSignature` reports `Valid` and record the signer common name/thumbprint.
-3. Set `NOWEN_WINDOWS_PUBLISHER_NAME` to that exact common name.
+3. Set `BASEFORGE_WINDOWS_PUBLISHER_NAME` to that exact common name.
 4. Publish only after signed updater metadata validation passes.
 5. Ask existing Windows users to manually install this bridge release.
 6. Publish a second version with the same signer identity and verify in-app update from the bridge release.

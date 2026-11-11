@@ -154,7 +154,7 @@ jobs:
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
         run: node scripts/check-signpath-release-config.mjs
 
       # ---------------------------------------------------------------
@@ -222,7 +222,7 @@ jobs:
       - name: Build Electron Full (Windows)
         if: matrix.os == 'windows-latest'
         env:
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ github.event_name == 'push' && vars.NOWEN_WINDOWS_PUBLISHER_NAME || '' }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ github.event_name == 'push' && vars.BASEFORGE_WINDOWS_PUBLISHER_NAME || '' }}
         run: npx electron-builder --config electron/builder.config.js --win --publish never
         shell: bash
 
@@ -237,7 +237,7 @@ jobs:
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
         run: node scripts/check-signpath-release-config.mjs
         shell: bash
 
@@ -308,7 +308,7 @@ jobs:
       - name: Build Electron Lite (Windows)
         if: matrix.os == 'windows-latest'
         env:
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
         run: npx electron-builder --config electron/builder.lite.config.js --win --publish never
         shell: bash
 
@@ -411,7 +411,7 @@ jobs:
 
       - name: Verify signed Windows publisher and required channels
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
-        run: node scripts/verify-windows-signatures.mjs --report signed-windows/signatures.json --publisher "${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}" --require full,lite
+        run: node scripts/verify-windows-signatures.mjs --report signed-windows/signatures.json --publisher "${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}" --require full,lite
         shell: bash
 
       - name: Refresh signed Windows blockmaps and updater metadata

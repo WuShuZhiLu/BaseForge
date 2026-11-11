@@ -6,7 +6,7 @@
  */
 const base = require("./builder.base.config.js");
 
-const WINDOWS_PUBLISHER_NAME = process.env.NOWEN_WINDOWS_PUBLISHER_NAME?.trim() || "";
+const WINDOWS_PUBLISHER_NAME = process.env.BASEFORGE_WINDOWS_PUBLISHER_NAME?.trim() || "";
 
 module.exports = {
   ...base,
