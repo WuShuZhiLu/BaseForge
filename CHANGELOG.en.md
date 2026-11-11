@@ -13,7 +13,9 @@ Format:
 
 ## Unreleased
 
-0.2.0 is in development. This section currently records the main changes to date; remaining entries will be added before release.
+Next release in development.
+
+## v0.2.0 - 2026-11-12
 
 ### Added
 
@@ -69,6 +71,7 @@ Format:
 
 - Settings page regrouped, data management merged into the backup center, scope narrowed to space / system; browser runtime no longer shows the "Sync" entry, modal animations removed and first-frame identity data cached (`02f363639`, `c36c6e72d`, `c5a2f239c`, `c0299118f`, `43f9883bf`)
 - MCP single-file packaging, editor toolbar atoms and remote-files de-pluginification are listed under Added (`80b943b38`, `a8ec4d0fb`, `7b456c9cd`)
+- Swept remaining nowen identifiers: desktop bridge renamed to `window.baseforgeDesktop`, storage / event keys, CSS class names, package directories (`packages/baseforge-*`) and backend service file names unified as baseforge; `docs/` kept as-is because it is upstream historical material (`9c4bf7e9`)
 - Removed the top note tab bar `NoteTabsBar` (`9302b3067`)
 
 ### Other
@@ -79,6 +82,8 @@ Format:
 - Releases changed to draft → publish: Gitea promotes the release after sync, `docker latest` moves only after the release gate, with a new Gitea workflow dispatch script and regression test (`507178a8a`)
 - Image push switched to a configurable repository list instead of hard-coded addresses (`d6b991e4f`)
 - Version bumped to `0.2.0` (`e559e348c`)
+- Read-compatible migration from nowen: `nowen-package` data packages, legacy permission manifests, `.nowen-plugin` packages and `engines.nowen` manifests, and the legacy `nowen-note.db` file are all adopted on import or startup (`9c4bf7e9`)
+- Windows signing aligned with the free SignPath subscription: `<parameters>` removed from artifact configurations in favour of wildcard matching, release artifacts renamed from `nowen-note-win-*` to `baseforge-win-*`, and CI defaults now point at this repository's organization and project (`9c4bf7e9`, `5e881b57`)
 
 ## v0.1.0 - 2026-11-05
 

@@ -13,7 +13,9 @@
 
 ## Unreleased
 
-0.2.0 开发中。本段先记录截至目前的主要改动，剩余条目在发版前补齐。
+下个版本开发中。
+
+## v0.2.0 - 2026-11-12
 
 ### 新增
 
@@ -69,6 +71,7 @@
 
 - 设置页按分组重排、合并数据管理与备份中心、scope 收为空间 / 系统；浏览器运行时不再显示「同步」入口，弹窗零动画 + 首帧身份数据缓存（`02f363639`、`c36c6e72d`、`c5a2f239c`、`c0299118f`、`43f9883bf`）
 - MCP 单文件打包、编辑器工具栏原子组件、远程文件去插件化见「新增」（`80b943b38`、`a8ec4d0fb`、`7b456c9cd`）
+- 全面清理 nowen 遗留标识：桌面桥接改为 `window.baseforgeDesktop`，本地存储 / 事件键、CSS 类名、包目录（`packages/baseforge-*`）与后端服务文件名统一为 baseforge；`docs/` 保留上游历史文档原样（`9c4bf7e9`）
 - 删除顶部笔记标签页 `NoteTabsBar`（`9302b3067`）
 
 ### 其他
@@ -79,6 +82,8 @@
 - 发布改为 draft → publish：Gitea 同步转正、发布门禁通过后移动 `docker latest`，新增 Gitea workflow dispatch 脚本与回归测试（`507178a8a`）
 - 镜像推送改为多仓库列表，地址不再写死在代码里（`d6b991e4f`）
 - 版本号升至 `0.2.0`（`e559e348c`）
+- 从 nowen 迁移的读兼容：`nowen-package` 数据包、旧权限清单、`.nowen-plugin` 插件包与 `engines.nowen` 清单、旧库文件 `nowen-note.db` 均可导入或启动时自动接管（`9c4bf7e9`）
+- Windows 签名链路对齐 SignPath 免费订阅：artifact configuration 去掉 `<parameters>` 改用通配符匹配，发布产物名由 `nowen-note-win-*` 改为 `baseforge-win-*`，CI 默认组织与项目 slug 指向当前仓库（`9c4bf7e9`、`5e881b57`）
 
 ## v0.1.0 - 2026-11-05
 
