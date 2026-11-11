@@ -226,6 +226,21 @@ jobs:
         run: npx electron-builder --config electron/builder.config.js --win --publish never
         shell: bash
 
+      # 手动测试签名同样依赖 SignPath 配置；缺失时在上传任何产物前给出明确报错，
+      # 而不是等 submit action 内部抛 "Input required and not supplied: api-token"。
+      - name: Check SignPath test configuration
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
+          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+        run: node scripts/check-signpath-release-config.mjs
+        shell: bash
+
       # ========= 手动 test-signing：只验证 Full，不参与正式发布 =========
       - name: Stage Windows EXEs for SignPath test
         if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
