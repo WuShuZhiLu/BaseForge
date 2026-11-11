@@ -12,6 +12,7 @@
  * 用法：
  *   node scripts/fetch-node.mjs               # 默认仅当前平台
  *   node scripts/fetch-node.mjs --all         # 三平台全下（win/mac/linux x64 + mac arm64）
+ *   node scripts/fetch-node.mjs --targets darwin-x64,darwin-arm64   # 只下指定目标
  *   NODE_EMBED_VERSION=v22.23.4 node scripts/fetch-node.mjs
  *
  * 产物目录：
@@ -229,7 +230,15 @@ async function main() {
   }
 
   const all = process.argv.includes("--all");
-  const keys = all ? Object.keys(TARGETS) : [currentKey()];
+  const targetsIndex = process.argv.indexOf("--targets");
+  const targetsArg = targetsIndex >= 0 ? (process.argv[targetsIndex + 1] || "") : "";
+  const requested = targetsArg.split(",").map((item) => item.trim()).filter(Boolean);
+  const unknown = requested.filter((key) => !TARGETS[key]);
+  if (unknown.length > 0) {
+    console.error(`[fetch-node] 未知目标：${unknown.join(", ")}；可选：${Object.keys(TARGETS).join(", ")}`);
+    process.exit(1);
+  }
+  const keys = all ? Object.keys(TARGETS) : requested.length > 0 ? requested : [currentKey()];
   console.log(`[fetch-node] version=${VERSION}, targets=${keys.join(", ")}`);
 
   for (const k of keys) {

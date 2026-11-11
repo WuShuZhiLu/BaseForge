@@ -181,7 +181,14 @@ jobs:
         shell: bash
 
       - name: Fetch embedded Node binary
-        run: npm run fetch:node
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # runner 自身是 arm64，但 Full 包要按 x64 / arm64 各打一次，
+            # 两个 darwin 二进制都必须内嵌，否则 x64 构建会因缺文件失败。
+            npm run fetch:node -- --targets darwin-x64,darwin-arm64
+          else
+            npm run fetch:node
+          fi
         shell: bash
 
       - name: Build backend & frontend
