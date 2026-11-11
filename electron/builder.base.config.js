@@ -8,6 +8,7 @@ const fs = require("fs");
 const {
   verifySyncNotificationUi,
 } = require("../scripts/verify-sync-notification-ui.cjs");
+const { shouldVerifyEmbeddedNodeVersion } = require("./embedded-node-layout");
 
 // ===== 目标平台 / 架构推断（用于定位内嵌 Node 二进制） =====
 // argv 中可能包含 --win / --mac / --linux（electron-builder 的平台开关）；
@@ -63,10 +64,11 @@ function checkEmbeddedNode() {
     );
   }
 
-  // 跨平台打包时目标二进制在本机跑不起来（Windows exe 不能在 Linux 上执行），
-  // 只校验文件存在；同平台时才真的问它版本。
-  if (targetPlatform !== process.platform) {
-    console.log(`[builder] ✓ embedded node found (${dirName}, cross-compiling, version unverified)`);
+  // 跨平台 / 跨架构打包时目标二进制在本机跑不起来（Windows exe 不能在 Linux 执行，
+  // arm64 mac 也无法执行 x64 node，除非装了 Rosetta），只校验文件存在；
+  // 同平台同架构才真的问它版本。
+  if (!shouldVerifyEmbeddedNodeVersion(dirName)) {
+    console.log(`[builder] ✓ embedded node found (${dirName}, cross-target, version unverified)`);
     return;
   }
 
