@@ -3,6 +3,9 @@ const path = require("path");
 
 const DATA_DIR_NAME = "baseforge-data";
 const DATA_DIR_POINTER_FILE = "baseforge-data-location.json";
+/** 旧版本使用的目录与指针文件名，启动时原样搬到新名，避免看起来丢数据 */
+const LEGACY_DATA_DIR_NAME = "nowen-data";
+const LEGACY_DATA_DIR_POINTER_FILE = "nowen-data-location.json";
 const DB_FILE_NAME = "baseforge.db";
 /** 旧版本主库文件名：仅在新库不存在时接管，避免看起来丢数据 */
 const LEGACY_DB_FILE_NAME = "nowen-note.db";
@@ -26,6 +29,41 @@ function getDataDirPointerPath(userDataRoot) {
 
 function isNonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+/** 目标不存在而旧路径存在时改名（跨卷/占用时退化为复制），返回是否完成了搬迁 */
+function moveIfMissing(legacyPath, nextPath) {
+  if (!fs.existsSync(legacyPath) || fs.existsSync(nextPath)) return false;
+  try {
+    fs.renameSync(legacyPath, nextPath);
+    return true;
+  } catch {
+    try {
+      fs.cpSync(legacyPath, nextPath, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/** appData 下的旧用户数据根目录（nowen-note）搬到新名（baseforge），返回应当使用的根目录 */
+function migrateLegacyUserDataRoot(appDataRoot) {
+  const nextRoot = path.join(appDataRoot, "baseforge");
+  moveIfMissing(path.join(appDataRoot, "nowen-note"), nextRoot);
+  return nextRoot;
+}
+
+/** 用户数据根目录内的旧数据目录与数据位置指针搬到新名 */
+function migrateLegacyDataDir(userDataRoot) {
+  moveIfMissing(
+    path.join(userDataRoot, LEGACY_DATA_DIR_POINTER_FILE),
+    path.join(userDataRoot, DATA_DIR_POINTER_FILE),
+  );
+  moveIfMissing(
+    path.join(userDataRoot, LEGACY_DATA_DIR_NAME),
+    path.join(userDataRoot, DATA_DIR_NAME),
+  );
 }
 
 /** 新库不存在时接管旧库文件（含 -wal / -shm 旁路文件），返回是否完成接管 */
@@ -163,6 +201,7 @@ function validateMigrationTarget(targetDir, {
     if (
       entries.length > 0
       && !fs.existsSync(path.join(resolved, DB_FILE_NAME))
+      && !fs.existsSync(path.join(resolved, LEGACY_DB_FILE_NAME))
     ) {
       return { ok: false, error: "TARGET_NOT_EMPTY" };
     }
@@ -192,6 +231,8 @@ function verifyCopiedDataDir(sourceDir, targetDir) {
 module.exports = {
   DATA_DIR_NAME,
   DATA_DIR_POINTER_FILE,
+  LEGACY_DATA_DIR_NAME,
+  LEGACY_DATA_DIR_POINTER_FILE,
   DB_FILE_NAME,
   LEGACY_DB_FILE_NAME,
   FIRST_RUN_DATA_MARKERS,
@@ -199,6 +240,8 @@ module.exports = {
   getDataDirPointerPath,
   getUserDataPathFromRoot,
   hasExistingDefaultData,
+  migrateLegacyUserDataRoot,
+  migrateLegacyDataDir,
   adoptLegacyDatabase,
   readCustomDataDir,
   shouldPromptDataDirOnFirstRun,
