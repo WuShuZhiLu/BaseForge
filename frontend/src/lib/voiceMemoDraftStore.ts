@@ -28,10 +28,17 @@ const database = () => openDB(DATABASE_NAME, 1, { upgrade(db) { db.createObjectS
 let legacyDraftMigration: Promise<void> | null = null;
 /** 仅当新库不存在同 id 记录时复制旧库草稿，旧库保留不删除。 */
 function migrateLegacyDrafts(db: IDBPDatabase): Promise<void> {
-  if (typeof indexedDB === "undefined" || typeof indexedDB.databases !== "function") return Promise.resolve();
-  return indexedDB.databases().then((entries) => {
-    if (!entries.some((entry) => entry?.name === LEGACY_DATABASE_NAME)) return;
-    return openDB(LEGACY_DATABASE_NAME).then(async (legacy) => {
+  if (typeof indexedDB === "undefined") return Promise.resolve();
+  const legacyOpen = typeof indexedDB.databases === "function"
+    ? indexedDB.databases().then((entries) => {
+        if (entries.some((entry) => entry?.name === LEGACY_DATABASE_NAME)) return LEGACY_DATABASE_NAME;
+        return null;
+      })
+    // 旧浏览器无 databases() API，逐名 openDB 兜底探测
+    : openDB(LEGACY_DATABASE_NAME).then((legacy) => { legacy.close(); return LEGACY_DATABASE_NAME; }).catch(() => null);
+  return legacyOpen.then((name) => {
+    if (!name) return;
+    return openDB(name).then(async (legacy) => {
       try {
         const legacyDrafts = await legacy.getAll("drafts") as VoiceMemoDraft[];
         for (const draft of legacyDrafts) {
