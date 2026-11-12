@@ -184,6 +184,13 @@ export function registerSearchNormalizeFunction(db: DatabaseSync): void {
     { deterministic: true },
     (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
   );
+  // 旧版（nowen-note 时期）触发器体内写的是旧函数名，迁移跑在 ensureNormalizedSearchFts() 之前，
+  // 必须保留别名，否则存量库升级/备份恢复会以 no such function 反复失败。
+  db.function(
+    "nowen_search_normalize",
+    { deterministic: true },
+    (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
+  );
   normalizedSearchFunctionDatabases.add(db as object);
 }
 
