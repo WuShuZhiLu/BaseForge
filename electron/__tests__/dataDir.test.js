@@ -10,6 +10,8 @@ const {
   getDefaultDataPath,
   getDataDirPointerPath,
   getUserDataPathFromRoot,
+  migrateLegacyDataDir,
+  migrateLegacyUserDataRoot,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,
   validateMigrationTarget,
@@ -34,6 +36,48 @@ test("reads a valid custom data directory from the bootstrap pointer", () => {
 
   assert.equal(getDataDirPointerPath(root), path.join(root, "baseforge-data-location.json"));
   assert.equal(getUserDataPathFromRoot(root), custom);
+});
+
+test("renames the legacy data directory and pointer to the new names", () => {
+  const root = tempRoot();
+  fs.mkdirSync(path.join(root, "nowen-data"), { recursive: true });
+  fs.writeFileSync(path.join(root, "nowen-data-location.json"), "{}");
+
+  migrateLegacyDataDir(root);
+
+  assert.ok(fs.existsSync(path.join(root, "baseforge-data")));
+  assert.ok(fs.existsSync(path.join(root, "baseforge-data-location.json")));
+  assert.equal(fs.existsSync(path.join(root, "nowen-data")), false);
+});
+
+test("migrates the legacy user data root directory name", () => {
+  const appDataRoot = tempRoot();
+  fs.mkdirSync(path.join(appDataRoot, "nowen-note", "nowen-data"), { recursive: true });
+  fs.writeFileSync(
+    path.join(appDataRoot, "nowen-note", "nowen-data-location.json"),
+    "{}",
+    "utf8",
+  );
+
+  const migratedRoot = migrateLegacyUserDataRoot(appDataRoot);
+
+  assert.equal(migratedRoot, path.join(appDataRoot, "baseforge"));
+  assert.ok(fs.existsSync(path.join(migratedRoot, "nowen-data")));
+  assert.ok(fs.existsSync(path.join(migratedRoot, "nowen-data-location.json")));
+  assert.equal(fs.existsSync(path.join(appDataRoot, "nowen-note")), false);
+});
+
+test("keeps the legacy data directory when the new one already exists", () => {
+  const root = tempRoot();
+  fs.mkdirSync(path.join(root, "nowen-data"), { recursive: true });
+  fs.writeFileSync(path.join(root, "nowen-data", "nowen-note.db"), "old");
+  fs.mkdirSync(path.join(root, "baseforge-data"), { recursive: true });
+  fs.writeFileSync(path.join(root, "baseforge-data", "baseforge.db"), "new");
+
+  migrateLegacyDataDir(root);
+
+  assert.equal(fs.readFileSync(path.join(root, "baseforge-data", "baseforge.db"), "utf8"), "new");
+  assert.equal(fs.readFileSync(path.join(root, "nowen-data", "nowen-note.db"), "utf8"), "old");
 });
 
 test("adopts the legacy database file together with its sidecar files", () => {

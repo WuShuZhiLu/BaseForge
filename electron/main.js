@@ -39,6 +39,8 @@ const {
   adoptLegacyDatabase,
   getDefaultDataPath,
   getUserDataPathFromRoot,
+  migrateLegacyDataDir,
+  migrateLegacyUserDataRoot,
   readCustomDataDir,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,
@@ -47,9 +49,12 @@ const {
   verifyCopiedDataDir,
 } = require("./dataDir");
 
-// ---------- 用户数据目录 ----------
-// 必须先于 initLogger 等任何 userData 使用。
-app.setPath("userData", path.join(app.getPath("appData"), "baseforge"));
+// ---------- 用户数据目录改名迁移 ----------
+// 必须先于 initLogger 等任何 userData 使用：旧版根目录叫 nowen-note，
+// 这里原样搬到 baseforge，再把 Electron 的 userData 指向新目录。
+const migratedUserDataRoot = migrateLegacyUserDataRoot(app.getPath("appData"));
+app.setPath("userData", migratedUserDataRoot);
+migrateLegacyDataDir(migratedUserDataRoot);
 
 // 日志 & 崩溃上报需尽早初始化（crashReporter.start 建议在 ready 之前）
 initLogger({
