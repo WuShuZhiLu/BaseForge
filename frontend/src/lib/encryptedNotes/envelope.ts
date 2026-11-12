@@ -95,6 +95,7 @@ export function validateEnvelope(value: unknown): EncryptedContentEnvelope {
 export function contentAad(identity: EncryptedContentIdentity, purpose: "key" | "content"): Uint8Array {
   // Fixed positional UTF-8 JSON; independent of property insertion order and DB/workspace IDs.
   return new TextEncoder().encode(JSON.stringify([
+    // AAD 绑定串不可改名：存量 v1/v2 密文都以此为认证上下文，改名即全部解不开（nowen 读兼容硬约束）
     "nowen-encrypted-content", 1, "AES-256-GCM", purpose,
     identity.objectId, identity.kind, identity.originalFormat,
   ]));
