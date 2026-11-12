@@ -86,9 +86,13 @@ import { installInlineCommentTooltipMount } from "./lib/inlineCommentTooltipMoun
 import { resolveCurrentAppPathname } from "./lib/appPathNavigation";
 import { installUgreenCredentialedFetch } from "./lib/ugreenRemoteAccess";
 import { observeBootSplashReadiness } from "./lib/bootSplash";
+import { backfillLegacyStorageKeys } from "./lib/legacyStorageBackfill";
 
 const App = React.lazy(() => import("./App"));
 const PublicNotebookView = React.lazy(() => import("./components/PublicNotebookView"));
+
+// 旧版 nowen-* localStorage 键回填，必须在任何业务模块读取存储之前执行。
+backfillLegacyStorageKeys();
 
 void cleanupRemovedServerProfiles();
 installUgreenCredentialedFetch();
