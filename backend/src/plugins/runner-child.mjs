@@ -107,6 +107,7 @@ process.on("message", async (message) => {
       ? await action({
           input: message.input,
           baseforge,
+          nowen: baseforge,
           execution: {
             id: message.executionId,
             idempotencyKey: message.idempotencyKey,
