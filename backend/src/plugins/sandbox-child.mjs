@@ -310,6 +310,7 @@ function buildBridge(methods) {
   });
   Object.freeze(__root);
   Object.defineProperty(globalThis, 'baseforge', { value: __root, enumerable: true, writable: false, configurable: false });
+  Object.defineProperty(globalThis, 'nowen', { value: __root, enumerable: true, writable: false, configurable: false });
   for (const __name of ['process', 'require', 'fetch', 'Buffer', 'WebSocket', 'XMLHttpRequest', 'module', 'exports']) {
     Object.defineProperty(globalThis, __name, { value: undefined, writable: false, configurable: false });
   }
@@ -401,7 +402,7 @@ async function createSandbox(message, kind) {
   progress.dispose();
 
   const loaded = vm.evalCode(
-    `${buildBridge(message.methods)}\n${message.source}\n;if(!globalThis.__baseforgePluginModule) throw new Error('sandbox bundle must define globalThis.__baseforgePluginModule');`,
+    `${buildBridge(message.methods)}\n${message.source}\n;if(!globalThis.__baseforgePluginModule && globalThis.__nowenPluginModule) globalThis.__baseforgePluginModule = globalThis.__nowenPluginModule;if(!globalThis.__baseforgePluginModule) throw new Error('sandbox bundle must define globalThis.__baseforgePluginModule');`,
     message.filename,
   );
   vm.unwrapResult(loaded).dispose();
@@ -458,7 +459,7 @@ async function runExecution(message) {
       const plugin = root.default || root;
       const action = (plugin.actions && plugin.actions[${actionId}]) || plugin[${actionId}];
       if (typeof action !== 'function') throw new Error('Action 不存在');
-      const value = await action({ input: ${input}, baseforge: globalThis.baseforge, execution: ${execution} });
+      const value = await action({ input: ${input}, baseforge: globalThis.baseforge, nowen: globalThis.nowen, execution: ${execution} });
       return JSON.stringify(value === undefined ? { success: true } : value);
     })()`);
     promiseHandle = operation.vm.unwrapResult(evaluation);
