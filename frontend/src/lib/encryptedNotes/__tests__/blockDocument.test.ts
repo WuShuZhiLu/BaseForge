@@ -19,7 +19,7 @@ describe("encrypted region document boundaries", () => {
   it("ignores literal fence examples", () => {
     expect(markdownEncryptedBlocks(`\`\`\`\`markdown\n${fence}\n\`\`\`\``)).toEqual([]);
   });
-  it.each(["baseforge-encrypted-v2", "baseforge-encrypted", ENCRYPTED_BLOCK_LANGUAGE])("rejects unsupported/malformed %s", (language) => {
+  it.each(["nowen-encrypted-v2", "nowen-encrypted", ENCRYPTED_BLOCK_LANGUAGE])("rejects unsupported/malformed %s", (language) => {
     const bad = `\`\`\`${language}\nnot encrypted\n\`\`\``;
     expect(() => markdownEncryptedBlocks(bad)).toThrow();
     expect(() => encryptedBlocksInContent(doc("not encrypted", language), "tiptap-json")).toThrow();

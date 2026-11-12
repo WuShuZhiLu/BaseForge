@@ -3,7 +3,7 @@ import { SessionTransport } from "./sessionTransport";
 
 /** Only the Worker holds a key. Closing or aborting destroys the entire session. */
 export class EncryptedContentSession {
-  private readonly transport = new SessionTransport(() => new Worker(new URL("./session.worker.ts", import.meta.url), { type: "module", name: "baseforge-encrypted-session" }));
+  private readonly transport = new SessionTransport(() => new Worker(new URL("./session.worker.ts", import.meta.url), { type: "module", name: "nowen-encrypted-session" }));
   async open(envelope: EncryptedContentEnvelope, passphrase: string, expected: EncryptedContentIdentity, signal?: AbortSignal): Promise<string> {
     try { return await this.transport.call({ operation: "open", input: { envelope, passphrase, expected } }, { signal, kdf: true }) as string; }
     catch (error) { this.close(); throw error; }

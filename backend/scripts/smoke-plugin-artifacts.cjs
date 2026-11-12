@@ -10,14 +10,14 @@ async function smoke(backendRoot = path.resolve(__dirname, "..")) {
   const { PluginRunner } = require(path.join(backendRoot, "dist/plugins/runner.js"));
   const { SandboxRunner } = require(path.join(backendRoot, "dist/plugins/sandboxRunner.js"));
   const { ExecutionLogTail } = require(path.join(backendRoot, "dist/plugins/logs.js"));
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-plugin-artifact-smoke-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-plugin-artifact-smoke-"));
   try {
     for (const [runtime, Runner] of [["node-action", PluginRunner], ["sandbox-js", SandboxRunner]]) {
       const main = runtime === "node-action" ? "node.mjs" : "sandbox.js";
-      const actions = "{ probe: async ({ nowen }) => ({ success: true, data: await nowen.runtime.capabilities() }) }";
+      const actions = "{ probe: async ({ baseforge }) => ({ success: true, data: await baseforge.runtime.capabilities() }) }";
       fs.writeFileSync(path.join(directory, main), runtime === "node-action"
         ? `export const actions = ${actions};`
-        : `globalThis.__nowenPluginModule = { actions: ${actions} };`);
+        : `globalThis.__baseforgePluginModule = { actions: ${actions} };`);
       const record = {
         id: `smoke.${runtime}`, name: "Artifact smoke", version: "1.0.0", apiVersion: 2,
         runtime, main, installedPath: directory,

@@ -1,7 +1,7 @@
 // The draft key is global across accounts, so the lock must be global per note too.
-export const conversionLockName = (noteId: string) => `baseforge-encrypted-conversion:v1:${encodeURIComponent(noteId)}`;
+export const conversionLockName = (noteId: string) => `nowen-encrypted-conversion:v1:${encodeURIComponent(noteId)}`;
 // Legacy queues are also global. Serialize cleanup against replay in any window.
-export const CONVERSION_REPLAY_LOCK = "baseforge-encrypted-conversion-replay:v1";
+export const CONVERSION_REPLAY_LOCK = "nowen-encrypted-conversion-replay:v1";
 
 export class ConversionCleanupError extends Error {
   constructor(readonly code: "unavailable" | "busy" | "scope_changed" | "not_committed" | "pending_writes" | "storage_failed" | "invalid_consent" | "converted_note") {

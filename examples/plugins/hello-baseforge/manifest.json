@@ -1,14 +1,14 @@
 {
-  "id": "nowen.hello",
-  "name": "Hello Nowen",
-  "description": "Nowen Extension Platform 最小示例：问候 Action、外网白名单声明与编辑器命令",
+  "id": "baseforge.hello",
+  "name": "Hello BaseForge",
+  "description": "BaseForge Extension Platform 最小示例：问候 Action、外网白名单声明与编辑器命令",
   "version": "1.1.0",
   "apiVersion": 2,
-  "publisher": "nowen",
+  "publisher": "baseforge",
   "categories": ["productivity"],
-  "repository": "https://github.com/cropflre/nowen-note",
+  "repository": "https://github.com/cropflre/baseforge",
   "license": "MIT",
-  "engines": { "nowen": ">=1.5.1 <2.0.0" },
+  "engines": { "baseforge": ">=1.5.1 <2.0.0" },
   "runtime": "sandbox-js",
   "main": "index.js",
   "permissions": ["external:fetch"],
@@ -16,7 +16,7 @@
   "actions": [
     {
       "id": "hello",
-      "name": "Hello Nowen",
+      "name": "Hello BaseForge",
       "description": "返回一条问候语",
       "execution": "interactive",
       "input": { "name": { "type": "string", "required": false } }
@@ -25,7 +25,7 @@
   "contributes": {
     "editorCommands": [
       {
-        "id": "nowen.hello.insert-greeting",
+        "id": "baseforge.hello.insert-greeting",
         "title": "插入 Hello 问候",
         "keywords": ["hello", "greeting", "问候"],
         "keybinding": "Mod-Alt-H",

@@ -118,7 +118,7 @@ describe("resolveNoteConflict", () => {
   });
 
   it("局部密文队列不能自动解决，服务器新增区域也不能被自动覆盖", async () => {
-    const content = `\`\`\`baseforge-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
+    const content = `\`\`\`nowen-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
     const item = conflictItem({ body: { content, contentFormat: "markdown" }, localPayload: null });
     expect((await resolveQueuedNoteConflicts([item])).attempted).toBe(0);
     expect(apiMock.getNote).not.toHaveBeenCalled();
@@ -131,7 +131,7 @@ describe("resolveNoteConflict", () => {
   });
 
   it("明确保留本机区域时使用完整密文，忽略普通草稿缓存", async () => {
-    const content = `\`\`\`baseforge-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
+    const content = `\`\`\`nowen-encrypted-v1\n${JSON.stringify({ ...encryptedFixture.envelope, kind: "block" })}\n\`\`\``;
     const remote = remoteNote({ content, contentText: "" });
     apiMock.getNote.mockResolvedValue(remote);
     loadDraft.mockReturnValue({ content: "stale public draft", contentText: "stale public draft" });

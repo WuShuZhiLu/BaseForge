@@ -22,7 +22,7 @@ it("retains only a monotonic metadata version and rejects stale details, text su
   const scope = getOfflineQueueStorageKey();
   markConvertedNote("note", 2, scope); markConvertedNote("note", 1, scope);
   expect(convertedNoteVersion("note")).toBe(2);
-  expect(localStorage.getItem(`baseforge-encrypted-converted:v1:${encodeURIComponent(scope)}:note`)).toBe("2");
+  expect(localStorage.getItem(`nowen-encrypted-converted:v1:${encodeURIComponent(scope)}:note`)).toBe("2");
   for (const copy of [original, { ...note, version: 1 }, { ...note, contentText: "private source" }, { ...note, content: "private source" }]) {
     expect(() => assertConversionNote(copy)).toThrow("converted_note");
   }
@@ -65,14 +65,14 @@ it("invalidates only the current scope from same-window and cross-window confirm
   try {
     const scope = getOfflineQueueStorageKey();
     markConvertedNote("note", 2, scope);
-    window.dispatchEvent(new StorageEvent("storage", { key: `baseforge-encrypted-converted:v1:${encodeURIComponent(scope)}:note`, newValue: "2" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: `nowen-encrypted-converted:v1:${encodeURIComponent(scope)}:note`, newValue: "2" }));
     markConvertedNote("other", 2, "other-scope");
     expect(listener.mock.calls).toEqual([["note"], ["note"]]);
   } finally { unsubscribe(); }
 });
 
 it("fails closed when a persisted marker is corrupt", () => {
-  localStorage.setItem(`baseforge-encrypted-converted:v1:${encodeURIComponent(getOfflineQueueStorageKey())}:note`, "private invalid marker");
+  localStorage.setItem(`nowen-encrypted-converted:v1:${encodeURIComponent(getOfflineQueueStorageKey())}:note`, "private invalid marker");
   expect(() => assertConversionNote(original)).toThrow("storage_failed");
   expect(() => saveDraft(draft)).toThrow("storage_failed");
 });

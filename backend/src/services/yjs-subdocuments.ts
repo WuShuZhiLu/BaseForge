@@ -40,7 +40,7 @@ export function rebuildYjsSubdocumentsIfEnabled(
   contentFormat: string,
 ): boolean {
   if (!isYjsSubdocumentsEnabled() || contentFormat !== "tiptap-json") return false;
-  if (/baseforge-encrypted/i.test(content)) return false;
+  if (/nowen-encrypted/i.test(content)) return false;
   rebuildYjsSubdocuments(db, noteId, content);
   return true;
 }
@@ -287,7 +287,7 @@ export function rebuildYjsSubdocuments(
   maxBlocks = 250,
 ): { rootGuid: string; sections: YjsSubdocumentSection[]; generation: number; structureVersion: number } {
   assertEncryptedBlockCollaborationAllowed(db, noteId);
-  if (/baseforge-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/nowen-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   ensureYjsSubdocumentTables(db);
   const sections = splitYjsSubdocumentSections(noteId, content, maxBlocks);
   if (!sections) throw new Error("INVALID_TIPTAP_SUBDOCUMENT_SOURCE");
@@ -302,7 +302,7 @@ export function prepareYjsSubdocuments(
   maxBlocks = 250,
 ): YjsSubdocumentManifest {
   assertEncryptedBlockCollaborationAllowed(db, noteId);
-  if (/baseforge-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/nowen-encrypted/i.test(content)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   ensureYjsSubdocumentTables(db);
   const manifest = db.prepare(`
     SELECT rootGuid, rootSnapshot, contentHash, sectionCount, generation, structureVersion, status
@@ -486,7 +486,7 @@ export function applyYjsSubdocumentUpdate(
       Y.applyUpdate(sectionDoc, new Uint8Array(currentSection.snapshotBlob));
       Y.applyUpdate(sectionDoc, update);
       sectionContent = sectionDoc.getText("content").toString();
-      if (/baseforge-encrypted/i.test(sectionContent)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+      if (/nowen-encrypted/i.test(sectionContent)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
       if (!parseDocument(sectionContent)) throw new Error("INVALID_SUBDOCUMENT_CONTENT");
       nextSnapshot = Buffer.from(Y.encodeStateAsUpdate(sectionDoc));
     } finally {

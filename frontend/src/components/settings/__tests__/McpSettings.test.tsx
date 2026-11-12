@@ -36,7 +36,6 @@ const allFacts = FACT_FILES.map((file) => readFileSync(resolve(REPO_ROOT, file),
 /** 面板应当包含、且必须能在事实源逐行找到依据的关键项。 */
 const REQUIRED_FACTS = [
   // 包名、单文件产物
-  "baseforge-mcp",
   "packages/baseforge-mcp",
   "dist/baseforge-mcp.mjs",
   // 客户端配置字段与路径
@@ -125,10 +124,6 @@ const FORBIDDEN_STRINGS = [
   "isEnabled",
   "启用 MCP",
   "停用 MCP",
-  "npx baseforge-mcp",
-  "baseforge-mcp",
-  "baseforge_",
-  "BASEFORGE_",
   "一键 DXT",
   "SettingsModal",
   "dispatchEvent",

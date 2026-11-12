@@ -3,7 +3,7 @@ import { CONVERSION_REPLAY_LOCK, conversionLockName, ConversionCleanupError } fr
 import { readEncryptedNoteDocument } from "./noteDocument";
 
 export const CONVERSION_INVALIDATED_EVENT = "baseforge:encrypted-conversion-invalidated";
-const PREFIX = "baseforge-encrypted-converted:v1:";
+const PREFIX = "nowen-encrypted-converted:v1:";
 const markerKey = (scope: string, noteId: string) => `${PREFIX}${encodeURIComponent(scope)}:${encodeURIComponent(noteId)}`;
 
 /** Metadata only. Retained on partial cleanup failure to prevent late plaintext writes. */

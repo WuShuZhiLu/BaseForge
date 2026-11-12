@@ -27,7 +27,7 @@ export function runEncryptedContentOperation(request: CryptoRequest, signal?: Ab
     signal?.addEventListener("abort", abort, { once: true });
     try {
       // A fresh worker per operation releases WASM memory and secret copies after every result.
-      worker = new Worker(new URL("./crypto.worker.ts", import.meta.url), { type: "module", name: "baseforge-encrypted-content" });
+      worker = new Worker(new URL("./crypto.worker.ts", import.meta.url), { type: "module", name: "nowen-encrypted-content" });
       worker.onmessage = (event: MessageEvent<CryptoResponse>) => finish(event.data);
       worker.onerror = (event) => { event.preventDefault(); finish(); };
       worker.onmessageerror = () => finish();

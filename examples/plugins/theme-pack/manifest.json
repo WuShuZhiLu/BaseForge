@@ -1,15 +1,15 @@
 {
-  "id": "nowenlab.theme-pack",
-  "publisher": "nowenlab",
-  "name": "Nowen Theme Pack",
+  "id": "baseforgelab.theme-pack",
+  "publisher": "baseforgelab",
+  "name": "BaseForge Theme Pack",
   "description": "Official zero-code Note Theme Contribution example",
   "version": "1.0.0",
   "apiVersion": 2,
-  "engines": { "nowen": ">=1.6.0 <2.0.0" },
+  "engines": { "baseforge": ">=1.6.0 <2.0.0" },
   "runtime": "declarative",
   "categories": ["appearance"],
   "keywords": ["theme", "note", "reading"],
-  "repository": "https://github.com/cropflre/nowen-plugin-theme-pack",
+  "repository": "https://github.com/cropflre/baseforge-plugin-theme-pack",
   "license": "MIT",
   "permissions": [],
   "contributes": {
@@ -18,7 +18,7 @@
         "id": "sepia",
         "name": "暖调纸张",
         "description": "适合长文阅读的温暖纸色主题。",
-        "base": "nowen.default",
+        "base": "baseforge.default",
         "modes": {
           "light": {
             "surface": "#fbf6ea",
@@ -55,7 +55,7 @@
         "id": "midnight",
         "name": "午夜专注",
         "description": "深色、低眩光的专注写作主题。",
-        "base": "nowen.default",
+        "base": "baseforge.default",
         "modes": {
           "light": {
             "surface": "#f5f7fb",

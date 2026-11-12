@@ -23,9 +23,9 @@ describe("Sync V2 三方智能合并", () => {
   it("任一版本含局部加密区域时必须明确选择完整版本", () => {
     const envelope = JSON.stringify({ ...fixture.envelope, kind: "block" });
     const contents = [
-      { contentFormat: "markdown", content: `\`\`\`baseforge-encrypted-v1\n${envelope}\n\`\`\`` },
-      { contentFormat: "tiptap-json", content: JSON.stringify({ type: "doc", content: [{ type: "codeBlock", attrs: { language: "baseforge-encrypted-v1" }, content: [{ type: "text", text: envelope }] }] }) },
-      { contentFormat: "markdown", content: "```baseforge-encrypted-v9\nunknown\n```" },
+      { contentFormat: "markdown", content: `\`\`\`nowen-encrypted-v1\n${envelope}\n\`\`\`` },
+      { contentFormat: "tiptap-json", content: JSON.stringify({ type: "doc", content: [{ type: "codeBlock", attrs: { language: "nowen-encrypted-v1" }, content: [{ type: "text", text: envelope }] }] }) },
+      { contentFormat: "markdown", content: "```nowen-encrypted-v9\nunknown\n```" },
     ];
     for (const protectedPayload of contents) {
       for (const side of ["base", "local", "remote"] as const) {

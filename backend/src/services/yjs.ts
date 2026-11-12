@@ -499,7 +499,7 @@ export function yApplyUpdate(
   try {
     Y.applyUpdate(candidate, Y.encodeStateAsUpdate(room.doc));
     Y.applyUpdate(candidate, update);
-    if (/baseforge-encrypted/i.test(candidate.getText("content").toString())) return "invalid";
+    if (/nowen-encrypted/i.test(candidate.getText("content").toString())) return "invalid";
   } catch { return "invalid"; }
   finally { candidate.destroy(); }
   try {
@@ -725,7 +725,7 @@ export function yReplaceContentAsUpdate(
   userId: string | null,
 ): { updateBase64: string } | null {
   assertEncryptedBlockCollaborationAllowed(getDb(), noteId);
-  if (/baseforge-encrypted/i.test(markdown)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/nowen-encrypted/i.test(markdown)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   // 手动管理 room：调用方其实没有"持有"一个 ws 连接，不能走 getOrCreateRoom + releaseRoom
   // 这对 refCount 的配对（++ / --）——releaseRoom 会把 refCount 减到负再被 Math.max 钳到 0，
   // 并顺便把原本有人在房间里的 room 误标成 idle，结果是活跃协作者还在但 room 启动了 idleTimer。
@@ -832,7 +832,7 @@ export function yReplaceContentAsUpdate(
  * 注意：只在 Y.Doc 为空时生效；如果已有内容会 no-op。
  */
 export function ySeedIfEmpty(noteId: string, markdown: string) {
-  if (/baseforge-encrypted/i.test(markdown)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
+  if (/nowen-encrypted/i.test(markdown)) throw new Error("ENCRYPTED_NOTE_COLLABORATION_FORBIDDEN");
   const room = getOrCreateRoom(noteId);
   const ytext = room.doc.getText("content");
   if (ytext.length > 0) {

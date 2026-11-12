@@ -72,8 +72,8 @@ export function guardEncryptedNoteMutation(body: Record<string, any>, current?: 
   }
 }
 
-export const ENCRYPTED_BLOCK_LANGUAGE = "baseforge-encrypted-v1";
-export const isEncryptedBlockLanguage = (value: unknown): boolean => typeof value === "string" && value.toLowerCase().startsWith("baseforge-encrypted");
+export const ENCRYPTED_BLOCK_LANGUAGE = "nowen-encrypted-v1";
+export const isEncryptedBlockLanguage = (value: unknown): boolean => typeof value === "string" && value.toLowerCase().startsWith("nowen-encrypted");
 export function encryptedBlocksInContent(content: string, format: string): Array<{ objectId: string; originalFormat: "markdown" | "tiptap-json"; serialized: string }> {
   const blocks: Array<{ objectId: string; originalFormat: "markdown" | "tiptap-json"; serialized: string }> = [];
   const add = (source: string, language: string) => {
@@ -133,5 +133,5 @@ export function isProtectedNotePayload(payload: Record<string, any> | null | und
   if (typeof payload?.content !== "string") return false;
   const format = typeof payload.contentFormat === "string" ? payload.contentFormat : payload.content.trim().startsWith("{") ? "tiptap-json" : "markdown";
   try { return encryptedBlocksInContent(payload.content, format).length > 0; }
-  catch { return /baseforge-encrypted/i.test(payload.content); }
+  catch { return /nowen-encrypted/i.test(payload.content); }
 }

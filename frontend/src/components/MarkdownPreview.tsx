@@ -82,7 +82,7 @@ function preprocessMarkdownMath(markdown: string): string {
 }
 
 function getMathSource(props: Record<string, unknown>): string | null {
-  const encoded = props["data-baseforge-math-source"] ?? props.dataBaseForgeMathSource;
+  const encoded = props["data-baseforge-math-source"] ?? props.dataBaseforgeMathSource;
   if (typeof encoded !== "string") return null;
   try {
     return decodeURIComponent(encoded);
@@ -111,10 +111,10 @@ export const safeHtmlSchema = {
     ...(defaultSchema.attributes || {}),
     "*": [
       ...((defaultSchema.attributes || {})["*"] || []),
-      "dataBaseForgeMathSource",
-      "dataBaseForgeMathDisplay",
-      "dataBaseForgeTitleMode",
-      "dataBaseForgeBlockEmbed",
+      "dataBaseforgeMathSource",
+      "dataBaseforgeMathDisplay",
+      "dataBaseforgeTitleMode",
+      "dataBaseforgeBlockEmbed",
       "dataCalloutType",
       "dataCalloutTitle",
       "dataCalloutFold",
@@ -287,7 +287,7 @@ function PreviewLink({ href, children, onInternalAnchorClick, ...props }: {
   [key: string]: any;
 }) {
   if (href?.startsWith("note:")) {
-    const mode = props["data-baseforge-title-mode"] || props.dataBaseForgeTitleMode;
+    const mode = props["data-baseforge-title-mode"] || props.dataBaseforgeTitleMode;
     return <NoteLinkPreviewAnchor href={href} titleMode={mode === "alias" ? "alias" : "auto"}>{children}</NoteLinkPreviewAnchor>;
   }
   if (href?.startsWith("#")) {
@@ -423,7 +423,7 @@ function createComponents(
     },
     div: ({ children, ...props }) => {
       const source = getMathSource(props);
-      const embedHref = props["data-baseforge-block-embed"] ?? props.dataBaseForgeBlockEmbed;
+      const embedHref = props["data-baseforge-block-embed"] ?? props.dataBaseforgeBlockEmbed;
       if (typeof embedHref === "string" && parseMindMapEmbedHref(embedHref)) {
         return <div className="my-4"><MindMapEmbedCard href={embedHref} /></div>;
       }

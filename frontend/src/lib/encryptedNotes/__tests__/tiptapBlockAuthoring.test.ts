@@ -26,7 +26,7 @@ it("keeps selected rich-text marks and public neighbours, then removes plaintext
   const selected = prepareTiptapSelectionEncryption(editor);
   expect(JSON.parse(selected.plaintext)).toMatchObject({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: "private", marks: [{ type: "bold" }] }] }] });
   selected.commit(source);
-  expect(getState().doc.toJSON()).toMatchObject({ content: [{ type: "paragraph" }, { type: "codeBlock", attrs: { language: "baseforge-encrypted-v1" } }, { type: "paragraph" }] });
+  expect(getState().doc.toJSON()).toMatchObject({ content: [{ type: "paragraph" }, { type: "codeBlock", attrs: { language: "nowen-encrypted-v1" } }, { type: "paragraph" }] });
   expect(getState().doc.textContent).toContain("Public "); expect(getState().doc.textContent).toContain(" after!"); expect(getState().doc.textContent).not.toContain("private");
   expect(undo(getState(), dispatch)).toBe(false);
   dispatch(getState().tr.insertText("public edit", 1));

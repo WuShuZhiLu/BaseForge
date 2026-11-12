@@ -1148,7 +1148,7 @@ export default forwardRef<NoteEditorHandle, MarkdownEditorProps>(function Markdo
       onHeadingsChangeRef.current?.(extractHeadings(update.view));
       // 协同态下不 REST 保存（避免与 CRDT 重复写）；但含密文标记的笔记必须走 REST——
       // 这类笔记的 CRDT 已被禁用，若继续跳过保存，密文改动会丢。
-      if (!collabEnabledRef.current || /baseforge-encrypted/i.test(text)) {
+      if (!collabEnabledRef.current || /nowen-encrypted/i.test(text)) {
         // 只有用户真正在编辑器里输入（有焦点）才算"待保存"；打开文档时的程序化/协同回放
         // 不标记改动，否则重开文档会莫名显示待保存。
         if (update.view.hasFocus) scheduleSave();

@@ -1460,7 +1460,7 @@ function EditorPaneCore({
    * ����������־û��������������Զ��ϲ���
    */
   const collabReady = !!(activeNote && !activeNote.isLocked && selfUser && editorMode === "md"
-    && !/baseforge-encrypted/i.test(activeNote.content || ""));
+    && !/nowen-encrypted/i.test(activeNote.content || ""));
   const { doc: collabYDoc, provider: collabProvider, synced: collabSynced } = useYDoc({
     noteId: collabReady ? (activeNote?.id ?? null) : null,
     user: selfUser,
