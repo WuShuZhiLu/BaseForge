@@ -98,6 +98,7 @@ import { noteCommentNotificationsMigration } from "./noteCommentNotificationsMig
 import { dropDiaryTablesMigration } from "./dropDiaryTablesMigration.js";
 import { dropAiChatTablesMigration } from "./dropAiChatTablesMigration.js";
 import { disableOnboardingSeedMigration } from "./disableOnboardingSeedMigration.js";
+import { rootDocumentPrefixMigration } from "./rootDocumentPrefixMigration.js";
 
 export type { Migration } from "./migrations.impl.js";
 
@@ -466,6 +467,7 @@ export const MIGRATIONS: Migration[] = [
   dropDiaryTablesMigration,
   dropAiChatTablesMigration,
   disableOnboardingSeedMigration,
+  rootDocumentPrefixMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
