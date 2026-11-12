@@ -267,7 +267,7 @@ jobs:
 
       - name: Submit SignPath test signing request
         if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
-        uses: signpath/github-action-submit-signing-request@v2
+        uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
@@ -353,7 +353,7 @@ jobs:
 
       - name: Submit Full Windows artifact to SignPath release-signing
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
-        uses: signpath/github-action-submit-signing-request@v2
+        uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
@@ -367,7 +367,7 @@ jobs:
 
       - name: Submit Lite Windows artifact to SignPath release-signing
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
-        uses: signpath/github-action-submit-signing-request@v2
+        uses: signpath/github-action-submit-signing-request@v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}

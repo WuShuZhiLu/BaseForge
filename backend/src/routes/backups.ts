@@ -207,7 +207,7 @@ backupsRouter.post("/", async (c) => {
     if (err instanceof BackupBusyError) {
       return backupErrorResponse(c, { code: err.code, message: err.message, status: 409, retryable: false });
     }
-    return backupErrorResponse(c, classifyBackupFailure(err, "create"));
+    return backupErrorResponse(c, classifyBackupFailure(err, "create"), err);
   }
 });
 
@@ -288,7 +288,7 @@ backupsRouter.post("/upload", async (c) => {
     const info = await manager.ingestUploadedBackup(file.name || "uploaded.bak", bytes, { description });
     return c.json(info, 201);
   } catch (err) {
-    return backupErrorResponse(c, classifyBackupFailure(err, "import"));
+    return backupErrorResponse(c, classifyBackupFailure(err, "import"), err);
   }
 });
 
@@ -336,10 +336,10 @@ backupsRouter.post("/:filename/restore", async (c) => {
   try {
     result = await manager.restoreFromBackup(filename, { dryRun });
   } catch (error) {
-    return backupErrorResponse(c, classifyBackupFailure(error, "restore"));
+    return backupErrorResponse(c, classifyBackupFailure(error, "restore"), error);
   }
   if (!result.success) {
-    return backupErrorResponse(c, classifyBackupFailure(result.error, "restore"));
+    return backupErrorResponse(c, classifyBackupFailure(result.error, "restore"), result.error);
   }
 
   // SEC-AUDIT-01

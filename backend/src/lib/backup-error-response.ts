@@ -38,8 +38,17 @@ export function classifyBackupFailure(
   return { code, message, status: 500, retryable: false };
 }
 
+/** 原始异常只进服务端日志，用来按故障编号定位；响应体保持脱敏。 */
+function summarizeCause(cause: unknown): string | undefined {
+  if (cause === undefined || cause === null || cause === "") return undefined;
+  const text = cause instanceof Error
+    ? cause.message
+    : typeof cause === "string" ? cause : String(cause);
+  return text.length > 2000 ? `${text.slice(0, 2000)}…` : text;
+}
+
 /** Use only after the route's permission + sudo checks; do not disclose archive data. */
-export function backupErrorResponse(c: Context, failure: BackupFailure): Response {
+export function backupErrorResponse(c: Context, failure: BackupFailure, cause?: unknown): Response {
   const requestId = c.get("requestId") || randomUUID();
   console.error(JSON.stringify({
     timestamp: new Date().toISOString(),
@@ -49,6 +58,7 @@ export function backupErrorResponse(c: Context, failure: BackupFailure): Respons
     requestId,
     code: failure.code,
     httpStatus: failure.status,
+    cause: summarizeCause(cause),
   }));
   return c.json({
     error: failure.message,
