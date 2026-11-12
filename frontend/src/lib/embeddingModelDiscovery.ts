@@ -85,7 +85,7 @@ export function mergeEmbeddingModelOptions(
 }
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

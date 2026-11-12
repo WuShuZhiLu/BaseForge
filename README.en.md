@@ -68,17 +68,21 @@ Development tools live in `packages/`: `nowen-plugin-sdk`, `nowen-plugin-cli`, t
 
 ### MCP Server
 
-`packages/nowen-mcp` provides the MCP Server. AI agents such as Claude Code, Cursor and VS Code use BaseForge through MCP, with knowledge bases as their retrieval source; the accessible scope is determined by a Personal API Token. Available tools are grouped by purpose:
+`packages/baseforge-mcp` provides the MCP Server. AI agents such as Claude Code, Cursor and VS Code use BaseForge through MCP, with knowledge bases as their retrieval source; the accessible scope is determined by a Personal API Token. Available tools are grouped by purpose:
 
 | Group | Tools |
 | --- | --- |
-| Knowledge bases and notes | `list_notebooks`, `create_notebook`, `list_notes`, `read_note`, `create_note`, `update_note`, `delete_note`, `search`, `knowledge_stats` |
+| Knowledge bases and notes | `list_notebooks`, `create_notebook`, `list_notes`, `read_note`, `create_note`, `update_note`, `delete_note`, `search` |
 | Block-level access | `get_block`, `search_blocks`, `create_block`, `update_block`, `delete_block`, `move_block` |
 | References and links | `resolve_link`, `get_backlinks`, `get_block_backlinks` |
 | Attachments and tags | `upload_attachment`, `list_attachments`, `attach_to_note`, `list_tags`, `manage_tags` |
-| Operations | `list_plugins`, `execute_plugin`, `list_webhooks`, `create_webhook`, `audit_stats`, `list_backups`, `create_backup` |
+| Remote files | `list_remote_sources`, `manage_remote_source`, `list_remote_files`, `read_remote_file`, `write_remote_file`, `manage_remote_file`, `list_remote_links`, `manage_remote_link` |
+| Export and sharing | `export_notes`, `list_shares`, `create_share`, `update_share`, `delete_share` |
+| Operations (unrestricted Token only) | `list_plugins`, `execute_plugin`, `list_webhooks`, `create_webhook`, `audit_stats`, `list_backups`, `create_backup` |
 
-Block-level writes must carry the note version and an operation ID for concurrency checks and deduplication on retry. Installation steps are in the [MCP guide](./docs/tutorials/mcp.en.md) ([中文](./docs/tutorials/mcp.md)); package documentation is in [`packages/nowen-mcp`](./packages/nowen-mcp/README.md).
+Tools are gated by Token scopes (including `remote_files:read/write`, `shares:read/write`, `tasks:read/write`); in-product AI Q&A and its MCP tools have been removed.
+
+Block-level writes must carry the note version and an operation ID for concurrency checks and deduplication on retry. Installation steps are in the [MCP guide](./docs/tutorials/mcp.en.md) ([中文](./docs/tutorials/mcp.md)); package documentation is in [`packages/baseforge-mcp`](./packages/baseforge-mcp/README.md).
 
 ### HTTP API and tools
 

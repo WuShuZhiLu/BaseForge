@@ -2,8 +2,8 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export type SidebarTextStyle = "readable" | "classic";
 
-export const SIDEBAR_TEXT_STYLE_STORAGE_KEY = "nowen.sidebar.textStyle.v1";
-const CHANGED_EVENT = "nowen:sidebar-text-style-changed";
+export const SIDEBAR_TEXT_STYLE_STORAGE_KEY = "baseforge.sidebar.textStyle.v1";
+const CHANGED_EVENT = "baseforge:sidebar-text-style-changed";
 let memoryStyle: SidebarTextStyle = "readable";
 
 export function readSidebarTextStyle(): SidebarTextStyle {

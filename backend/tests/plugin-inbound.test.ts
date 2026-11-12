@@ -12,7 +12,7 @@ import { initAuditTables } from "../src/services/audit.js";
 import router from "../src/routes/plugin-inbound.js";
 import { WorkflowRunner } from "../src/automation/workflowRunner.js";
 
-const raw = { id: "test.inbound", publisher: "test", name: "Inbound", description: "", version: "1.0.0", apiVersion: 2, engines: { nowen: ">=1.5.0" }, categories: ["capture"], repository: "https://example.com/repo", license: "MIT", runtime: "node-action", main: "index.mjs", permissions: [], actions: [{ id: "receive", name: "Receive", input: { method: { type: "string" }, query: { type: "object" }, headers: { type: "object" }, body: { type: "string" } } }, { id: "save", name: "Save", execution: "background", input: { value: { type: "string" } } }], contributes: { inboundWebhooks: [{ id: "receive", path: "receive", action: "receive", backgroundAction: "save", methods: ["GET", "POST"], maxBodyBytes: 64 }] } };
+const raw = { id: "test.inbound", publisher: "test", name: "Inbound", description: "", version: "1.0.0", apiVersion: 2, engines: { baseforge: ">=1.5.0" }, categories: ["capture"], repository: "https://example.com/repo", license: "MIT", runtime: "node-action", main: "index.mjs", permissions: [], actions: [{ id: "receive", name: "Receive", input: { method: { type: "string" }, query: { type: "object" }, headers: { type: "object" }, body: { type: "string" } } }, { id: "save", name: "Save", execution: "background", input: { value: { type: "string" } } }], contributes: { inboundWebhooks: [{ id: "receive", path: "receive", action: "receive", backgroundAction: "save", methods: ["GET", "POST"], maxBodyBytes: 64 }] } };
 const app = new Hono(); app.route("/api/plugin-inbound", router);
 let callback: string;
 test.before(() => {

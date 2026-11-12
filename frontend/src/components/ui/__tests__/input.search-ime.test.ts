@@ -87,8 +87,8 @@ describe("sidebar search IME event routing", () => {
 
     const style = document.getElementById(SEARCH_SPINNER_STYLE_ID)
     expect(style?.textContent).toContain("translateY(-50%) rotate(360deg)")
-    expect(style?.textContent).toContain("nowen-sidebar-search-spin")
-    expect(style?.textContent).toContain("nowen-search-center-spin")
+    expect(style?.textContent).toContain("baseforge-sidebar-search-spin")
+    expect(style?.textContent).toContain("baseforge-search-center-spin")
     expect(style?.textContent).toContain('[data-swipe-blocker="search-center"] .animate-spin')
   })
 })

@@ -102,7 +102,7 @@ async function runWithConcurrency<T>(
 }
 
 /**
- * Materialize Nowen's Markdown block identifiers before image localization.
+ * Materialize BaseForge's Markdown block identifiers before image localization.
  *
  * `syncNoteBlocks()` may add hidden block IDs and write the normalized Markdown
  * back to `notes.content`. The generic localization mutation later uses exact

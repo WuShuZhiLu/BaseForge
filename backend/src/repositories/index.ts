@@ -40,7 +40,6 @@ export { noteYupdatesRepository } from "./noteYupdatesRepository";
 export { workspaceMembersRepository } from "./workspaceMembersRepository";
 export { notebookMembersRepository } from "./notebookMembersRepository";
 export { shareCommentsRepository } from "./shareCommentsRepository";
-export { diaryAttachmentsRepository } from "./diaryAttachmentsRepository";
 export { embeddingQueueRepository } from "./embeddingQueueRepository";
 export {
   blockAuthorityRepository,

@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FormatAwareEditorPane from "@/components/FormatAwareEditorPane";
-import NoteTabsBar from "@/components/NoteTabsBar";
 import {
   EditorToolbarExpandSlot,
   EditorToolbarHost,
@@ -30,7 +29,6 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { canWriteNote } from "@/lib/notePermissions";
 import type { Note } from "@/types";
-import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useNoteLoader } from "@/hooks/useNoteLoader";
 import { NoteLoadCoordinator, type NoteLoadSink } from "@/lib/noteLoadCoordinator";
 import { canApplyRevalidatedNote, loadNoteCacheFirst } from "@/lib/noteLoadSource";
@@ -88,7 +86,6 @@ const REFERENCE_PANE_TOOLBAR_HIDDEN_CLASS = [
 export default function EditorSplitView() {
   const { state } = useApp();
   const actions = useAppActions();
-  const { prefs } = useUserPreferences();
   const { t } = useTranslation();
   const split = state.editorSplit;
   const splitContainerRef = useRef<HTMLDivElement | null>(null);
@@ -550,14 +547,11 @@ export default function EditorSplitView() {
       data-editor-split-reference-side={resolveEditorSplitReferenceSide(split.referenceSide)}
     >
       {/*
-        全宽页签栏：只此一套（默认行为 → 列出所有打开页签、高亮 activeNote）。
-        它不再属于任何一栏，所以两栏都能用它切换文档，也不会各占一半宽。
+        这里曾挂一条全宽页签栏（受「启用顶部笔记标签页」开关控制）。
+        该栏与侧栏「打开的编辑器」面板能力重复（切换/关闭/关闭其他/工具页签全部
+        覆盖），且只在应用级分屏时才可能渲染，默认开关关闭时从未露面。已移除，
+        打开列表统一由侧栏面板呈现。
       */}
-      {prefs.enableNoteTabs && (
-        <div className="shrink-0" data-editor-split-tabs="">
-          <NoteTabsBar />
-        </div>
-      )}
 
       {/*
         全宽格式工具栏落点行：聚焦栏的编辑器（PaneToolbarScope 内）把自己的

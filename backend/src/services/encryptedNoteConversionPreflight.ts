@@ -18,7 +18,7 @@ const groups = {
   embeddedData: [["sheets", "noteId = ?"]],
   aiReferences: [["ai_chat_messages", "CASE WHEN json_valid(referencesJson) THEN EXISTS (SELECT 1 FROM json_tree(referencesJson) WHERE value = ?) ELSE instr(COALESCE(referencesJson, ''), ?) > 0 END"]],
 };
-const metadataTables = new Set(["notes", "note_tags", "favorites", "workspace_journals", "offline_sync_changes", "sync_changes_v2", "sync_v2_applied_mutations", "encrypted_block_write_permits", "encrypted_note_conversion_permits"]);
+const metadataTables = new Set(["notes", "note_tags", "favorites", "offline_sync_changes", "sync_changes_v2", "sync_v2_applied_mutations", "encrypted_block_write_permits", "encrypted_note_conversion_permits"]);
 const referenceColumns = ["noteId", "note_id", "sourceNoteId", "targetNoteId", "entityId"];
 const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
 

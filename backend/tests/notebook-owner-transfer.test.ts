@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-notebook-owner-transfer-"));
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforgebook-owner-transfer-"));
 process.env.DB_PATH = path.join(dir, "test.db");
 process.env.ELECTRON_USER_DATA = dir;
 

@@ -2,7 +2,7 @@ import { getOfflineQueueStorageKey } from "../offlineScope";
 import { CONVERSION_REPLAY_LOCK, conversionLockName, ConversionCleanupError } from "./conversionCoordination";
 import { readEncryptedNoteDocument } from "./noteDocument";
 
-export const CONVERSION_INVALIDATED_EVENT = "nowen:encrypted-conversion-invalidated";
+export const CONVERSION_INVALIDATED_EVENT = "baseforge:encrypted-conversion-invalidated";
 const PREFIX = "nowen-encrypted-converted:v1:";
 const markerKey = (scope: string, noteId: string) => `${PREFIX}${encodeURIComponent(scope)}:${encodeURIComponent(noteId)}`;
 

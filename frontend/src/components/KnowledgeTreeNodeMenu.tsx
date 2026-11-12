@@ -43,7 +43,13 @@ import {
   type SearchNotebookExclusionStatus,
 } from "@/lib/searchNotebookExclusions";
 import { buildNoteContextMenuLayout } from "@/components/noteContextMenuLayout";
-import EmojiIconPicker from "@/components/EmojiPicker";
+import {
+  NOTEBOOK_COVERS,
+  notebookCoverIcon,
+  notebookCoverKey,
+  notebookCoverValue,
+  type NotebookCoverKey,
+} from "@/lib/knowledgeTreeIcons";
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import { confirm, prompt } from "@/components/ui/confirm";
@@ -535,7 +541,7 @@ export default function KnowledgeTreeNodeMenu({
       await onReload();
       actions.refreshNotes();
       actions.refreshNotebooks();
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "notebook-duplicated", nodeId: result.nodeId },
       }));
     } catch (error) {
@@ -585,7 +591,7 @@ export default function KnowledgeTreeNodeMenu({
     });
     await onReload();
     actions.refreshNotes();
-    window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+    window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
       detail: { reason: "note-format-converted", noteId: current.id },
     }));
     toast.success(`已转换为${targetLabel}`);
@@ -721,7 +727,7 @@ export default function KnowledgeTreeNodeMenu({
         case "toggle_favorite":
           if (node.resourceType === "notebook") {
             await knowledgeTreeApi.update(node.id, { isFavorite: node.isFavorite === 1 ? 0 : 1 });
-            window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+            window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
             toast.success(node.isFavorite === 1 ? "已取消收藏" : "已收藏");
             break;
           }
@@ -797,24 +803,46 @@ export default function KnowledgeTreeNodeMenu({
         />
       )}
       {iconPicker && (
-        <EmojiIconPicker
-          currentIcon={iconPicker.notebook.icon || "📁"}
-          position={{ top: iconPicker.top, left: iconPicker.left }}
-          onClose={() => setIconPicker(null)}
-          onSelect={(emoji) => {
-            void (async () => {
-              try {
-                await api.updateNotebook(iconPicker.notebook.id, { icon: emoji });
-                actions.updateNotebook({ id: iconPicker.notebook.id, icon: emoji });
-                setIconPicker(null);
-                await onReload();
-                toast.success("图标已更新");
-              } catch (error: any) {
-                toast.error(error?.message || "修改图标失败");
-              }
-            })();
-          }}
-        />
+        <>
+          <div className="fixed inset-0 z-[55]" onClick={() => setIconPicker(null)} />
+          <div
+            className="fixed z-[60] flex gap-1 rounded-xl border border-app-border bg-app-elevated p-1.5 shadow-xl"
+            // 菜单可能贴屏幕右/下边缘：把色板夹在视口内，避免小窗口下跑出屏幕
+            style={{
+              top: Math.max(8, Math.min(iconPicker.top, window.innerHeight - 48)),
+              left: Math.max(8, Math.min(iconPicker.left, window.innerWidth - 180)),
+            }}
+          >
+            {NOTEBOOK_COVERS.map((cover) => {
+              const active = notebookCoverKey(iconPicker.notebook.icon) === cover.key;
+              return (
+                <button
+                  key={cover.key}
+                  type="button"
+                  title={cover.label}
+                  onClick={() => {
+                    const key: NotebookCoverKey = cover.key;
+                    const value = notebookCoverValue(key);
+                    void (async () => {
+                      try {
+                        await api.updateNotebook(iconPicker.notebook.id, { icon: value });
+                        actions.updateNotebook({ id: iconPicker.notebook.id, icon: value });
+                        setIconPicker(null);
+                        await onReload();
+                        toast.success("封面已更新");
+                      } catch (error: any) {
+                        toast.error(error?.message || "修改封面失败");
+                      }
+                    })();
+                  }}
+                  className={`flex h-7 w-7 items-center justify-center rounded-md hover:bg-app-hover ${active ? "bg-app-hover ring-1 ring-accent-primary" : ""}`}
+                >
+                  {notebookCoverIcon(notebookCoverValue(cover.key), 18)}
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </>
   );

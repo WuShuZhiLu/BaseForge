@@ -15,7 +15,7 @@ export default function SpeechSettingsPanel() {
     try {
       const updated = await voiceApi.saveSettings({ apiUrl: settings.apiUrl.trim(), model: settings.model.trim(), language: settings.language || null, ...(clearKey ? { apiKey: "" } : key ? { apiKey: key } : {}) });
       setSettings(updated); setKey(""); setClearKey(false);
-      window.dispatchEvent(new Event("nowen:speech-settings-changed"));
+      window.dispatchEvent(new Event("baseforge:speech-settings-changed"));
       if (test) await voiceApi.test();
       setMessage(t(test ? "voice.testSuccess" : "voice.configSaved"));
     } catch (error) { setMessage((error as Error).message); } finally { setBusy(false); }

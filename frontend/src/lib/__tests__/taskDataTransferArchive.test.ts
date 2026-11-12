@@ -20,7 +20,7 @@ function backup(): TaskBackupPackage {
     format: TASK_BACKUP_FORMAT,
     version: TASK_BACKUP_VERSION,
     exportedAt: "2026-07-11T00:00:00.000Z",
-    source: { workspace: "personal", app: "nowen-note" },
+    source: { workspace: "personal", app: "baseforge" },
     data: {
       projects: [],
       tasks: [{
@@ -72,7 +72,7 @@ async function archiveFile(path = "images/task-1/screen.png"): Promise<File> {
     }],
   }));
   const blob = await zip.generateAsync({ type: "blob" });
-  return new File([blob], "nowen-tasks-full.zip", { type: "application/zip" });
+  return new File([blob], "baseforge-tasks-full.zip", { type: "application/zip" });
 }
 
 describe("taskDataTransferArchive", () => {

@@ -26,10 +26,10 @@ import {
 
 const contributions = [
   {
-    pluginId: "nowenlab.editor-kit",
+    pluginId: "baseforgelab.editor-kit",
     editorCommands: [
-      { id: "nowenlab.editor-kit.timestamp", title: "插入时间戳", keywords: ["time", "时间"], keybinding: "Mod-Alt-K", action: "insert-timestamp" },
-      { id: "nowenlab.editor-kit.summary", title: "生成摘要", when: "noteOpen", action: "summary" },
+      { id: "baseforgelab.editor-kit.timestamp", title: "插入时间戳", keywords: ["time", "时间"], keybinding: "Mod-Alt-K", action: "insert-timestamp" },
+      { id: "baseforgelab.editor-kit.summary", title: "生成摘要", when: "noteOpen", action: "summary" },
     ],
   },
 ];
@@ -46,8 +46,8 @@ describe("plugin editorCommands registry", () => {
     const count = replacePluginEditorCommands(contributions as never);
     expect(count).toBe(2);
     expect(listPluginEditorCommands().map((item) => [item.id, item.action, item.when])).toEqual([
-      ["nowenlab.editor-kit.timestamp", "insert-timestamp", undefined],
-      ["nowenlab.editor-kit.summary", "summary", "noteOpen"],
+      ["baseforgelab.editor-kit.timestamp", "insert-timestamp", undefined],
+      ["baseforgelab.editor-kit.summary", "summary", "noteOpen"],
     ]);
     expect(listPluginEditorCommands()[0].chord).toEqual(["Mod", "Alt", "K"]);
   });
@@ -77,15 +77,15 @@ describe("plugin editorCommands registry", () => {
 
   it("拒绝命名空间不符、Action 非法或缺少标题的声明", () => {
     replacePluginEditorCommands([
-      { pluginId: "nowenlab.editor-kit", editorCommands: [
+      { pluginId: "baseforgelab.editor-kit", editorCommands: [
         { id: "other.plugin.timestamp", title: "越权", action: "insert-timestamp" },
-        { id: "nowenlab.editor-kit.bad", title: "", action: "summary" },
-        { id: "nowenlab.editor-kit.bad-action", title: "非法 Action", action: "Insert Timestamp" },
-        { id: "nowenlab.editor-kit.ok", title: "合法", action: "summary" },
+        { id: "baseforgelab.editor-kit.bad", title: "", action: "summary" },
+        { id: "baseforgelab.editor-kit.bad-action", title: "非法 Action", action: "Insert Timestamp" },
+        { id: "baseforgelab.editor-kit.ok", title: "合法", action: "summary" },
       ] },
       { pluginId: "INVALID", editorCommands: [{ id: "INVALID.x", title: "非法插件 id", action: "summary" }] },
     ] as never);
-    expect(listPluginEditorCommands().map((item) => item.id)).toEqual(["nowenlab.editor-kit.ok"]);
+    expect(listPluginEditorCommands().map((item) => item.id)).toEqual(["baseforgelab.editor-kit.ok"]);
   });
 
   it("快捷键只接受 Mod/Alt 组合，并匹配跨平台事件", () => {
@@ -114,13 +114,13 @@ describe("plugin editorCommands registry", () => {
     expect(buildEditorCommandInput({ noteId: "n1", declaredInputs: [] })).toEqual({});
     expect(buildEditorCommandInput({ noteId: null, declaredInputs: ["noteId"] })).toEqual({});
 
-    primePluginActionInputs([{ pluginId: "nowenlab.editor-kit", actionId: "insert-timestamp", input: {} }]);
-    await executePluginEditorCommand({ pluginId: "nowenlab.editor-kit", action: "insert-timestamp" }, { noteId: "n1" });
-    expect(execute).toHaveBeenCalledWith("nowenlab.editor-kit", "insert-timestamp", {});
+    primePluginActionInputs([{ pluginId: "baseforgelab.editor-kit", actionId: "insert-timestamp", input: {} }]);
+    await executePluginEditorCommand({ pluginId: "baseforgelab.editor-kit", action: "insert-timestamp" }, { noteId: "n1" });
+    expect(execute).toHaveBeenCalledWith("baseforgelab.editor-kit", "insert-timestamp", {});
 
-    primePluginActionInputs([{ pluginId: "nowenlab.editor-kit", actionId: "summary", input: { noteId: { type: "string" } } }]);
-    await executePluginEditorCommand({ pluginId: "nowenlab.editor-kit", action: "summary" }, { noteId: "n1" });
-    expect(execute).toHaveBeenLastCalledWith("nowenlab.editor-kit", "summary", { noteId: "n1" });
+    primePluginActionInputs([{ pluginId: "baseforgelab.editor-kit", actionId: "summary", input: { noteId: { type: "string" } } }]);
+    await executePluginEditorCommand({ pluginId: "baseforgelab.editor-kit", action: "summary" }, { noteId: "n1" });
+    expect(execute).toHaveBeenLastCalledWith("baseforgelab.editor-kit", "summary", { noteId: "n1" });
   });
 });
 
@@ -133,12 +133,12 @@ describe("plugin editorCommands 与斜杠菜单的接口", () => {
     const { getPluginSlashCommands } = await import("@/components/SlashCommands");
     const items = getPluginSlashCommands("n1");
     expect(items.map((item) => item.id)).toEqual([
-      "plugin:nowenlab.editor-kit.timestamp",
-      "plugin:nowenlab.editor-kit.summary",
+      "plugin:baseforgelab.editor-kit.timestamp",
+      "plugin:baseforgelab.editor-kit.summary",
     ]);
     expect(items[0].label).toBe("插入时间戳");
-    expect(items[0].description).toContain("nowenlab.editor-kit");
+    expect(items[0].description).toContain("baseforgelab.editor-kit");
     expect(items[0].description).toContain("Alt");
-    expect(items[0].keywords).toContain("nowenlab.editor-kit");
+    expect(items[0].keywords).toContain("baseforgelab.editor-kit");
   });
 });

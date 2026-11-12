@@ -42,7 +42,7 @@ test("download capability token can be retried before expiry", async () => {
   app.get("/download/:token", handleReliableExportDownload);
   const first = await app.request(`/download/${staged.downloadToken}`);
   assert.equal(first.status, 200);
-  assert.equal(first.headers.get("x-nowen-reliable-export"), "1");
+  assert.equal(first.headers.get("x-baseforge-reliable-export"), "1");
   assert.equal(await first.text(), "markdown");
 
   const retry = await app.request(`/download/${staged.downloadToken}`);

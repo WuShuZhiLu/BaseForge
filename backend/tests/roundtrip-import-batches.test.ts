@@ -4,11 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-roundtrip-batch-test-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-roundtrip-batch-test-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ROUNDTRIP_IMPORT_UNDO_TTL_HOURS = "24";
-process.env.NOWEN_INSTANCE_ID = "roundtrip-batch-test-instance";
+process.env.BASEFORGE_INSTANCE_ID = "roundtrip-batch-test-instance";
 
 let closeDb: typeof import("../src/db/schema").closeDb;
 
@@ -22,9 +22,9 @@ async function modules() {
   closeDb = schema.closeDb;
   return {
     ...schema,
-    ...(await import("../src/services/nowenPackageExport")),
-    ...(await import("../src/services/nowenPackageImport")),
-    ...(await import("../src/services/nowenRoundTripSync")),
+    ...(await import("../src/services/baseforgePackageExport")),
+    ...(await import("../src/services/baseforgePackageImport")),
+    ...(await import("../src/services/baseforgeRoundTripSync")),
     ...(await import("../src/services/roundTripImportBatches")),
     ...(await import("../src/services/roundTripImportLinkUndo")),
   };
@@ -72,21 +72,21 @@ async function seed() {
 test("formal round-trip import persists a report and can be safely undone", async () => {
   await seed();
   const {
-    createNowenPackageExport,
+    createBaseForgePackageExport,
     getDb,
-    importNowenPackage,
+    importBaseForgePackage,
     getRoundTripImportBatch,
     listRoundTripImportBatches,
     undoRoundTripImportBatchWithLinks,
   } = await modules();
   const db = getDb();
 
-  const exported = await createNowenPackageExport({
+  const exported = await createBaseForgePackageExport({
     userId: "batch-user",
     workspaceId: null,
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
-  const imported = await importNowenPackage(exported.buffer, {
+  const imported = await importBaseForgePackage(exported.buffer, {
     userId: "batch-user",
     workspaceId: null,
     importMode: "new-root",
@@ -126,20 +126,20 @@ test("formal round-trip import persists a report and can be safely undone", asyn
 test("sync undo restores the pre-sync target and source mappings", async () => {
   await seed();
   const {
-    createNowenPackageExport,
+    createBaseForgePackageExport,
     getDb,
-    importNowenPackage,
-    importNowenPackageWithSync,
+    importBaseForgePackage,
+    importBaseForgePackageWithSync,
     undoRoundTripImportBatchWithLinks,
   } = await modules();
   const db = getDb();
 
-  const firstPackage = await createNowenPackageExport({
+  const firstPackage = await createBaseForgePackageExport({
     userId: "batch-user",
     workspaceId: null,
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
-  const copied = await importNowenPackage(firstPackage.buffer, {
+  const copied = await importBaseForgePackage(firstPackage.buffer, {
     userId: "batch-user",
     workspaceId: null,
     importMode: "new-root",
@@ -162,12 +162,12 @@ test("sync undo restores the pre-sync target and source mappings", async () => {
     "2026-07-22 12:00:00",
     "batch-note",
   );
-  const updatedPackage = await createNowenPackageExport({
+  const updatedPackage = await createBaseForgePackageExport({
     userId: "batch-user",
     workspaceId: null,
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
-  const synced = await importNowenPackage(updatedPackage.buffer, {
+  const synced = await importBaseForgePackage(updatedPackage.buffer, {
     userId: "batch-user",
     workspaceId: null,
     importMode: "sync",
@@ -185,7 +185,7 @@ test("sync undo restores the pre-sync target and source mappings", async () => {
   const restoredTarget = db.prepare("SELECT title, content FROM notes WHERE id = ?").get(copiedNote!.id) as { title: string; content: string } | undefined;
   assert.deepEqual(restoredTarget, beforeSync);
 
-  const retryPreview = await importNowenPackageWithSync(updatedPackage.buffer, {
+  const retryPreview = await importBaseForgePackageWithSync(updatedPackage.buffer, {
     userId: "batch-user",
     workspaceId: null,
     importMode: "sync",
@@ -198,20 +198,20 @@ test("sync undo restores the pre-sync target and source mappings", async () => {
 test("undo refuses to remove a note edited after the import", async () => {
   await seed();
   const {
-    createNowenPackageExport,
+    createBaseForgePackageExport,
     getDb,
-    importNowenPackage,
+    importBaseForgePackage,
     RoundTripImportUndoError,
     undoRoundTripImportBatchWithLinks,
   } = await modules();
   const db = getDb();
 
-  const exported = await createNowenPackageExport({
+  const exported = await createBaseForgePackageExport({
     userId: "batch-user",
     workspaceId: null,
-    packageKind: "nowen",
+    packageKind: "baseforge",
   });
-  const imported = await importNowenPackage(exported.buffer, {
+  const imported = await importBaseForgePackage(exported.buffer, {
     userId: "batch-user",
     workspaceId: null,
     importMode: "new-root",

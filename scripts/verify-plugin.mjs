@@ -10,7 +10,7 @@
  *   node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs examples/plugins/my-plugin
  *
  * 可选参数（用于校验需要 V2.1 门禁或更高宿主版本的贡献式插件）：
- *   --nowen-version=1.6.0   覆盖宿主版本（默认取 types.ts 的 NOWEN_VERSION）
+ *   --baseforge-version=1.6.0   覆盖宿主版本（默认取 types.ts 的 BASEFORGE_VERSION）
  *   --extensions-v21        打开 extensionsV21 / uiExtensions 门禁
  */
 import fs from "node:fs";
@@ -46,7 +46,7 @@ async function main() {
       }),
   );
   if (!target) {
-    console.error("用法: node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs <插件目录|插件包.zip> [--nowen-version=1.6.0] [--extensions-v21]");
+    console.error("用法: node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs <插件目录|插件包.zip> [--baseforge-version=1.6.0] [--extensions-v21]");
     process.exit(2);
   }
   const absolute = path.resolve(process.cwd(), target);
@@ -74,7 +74,7 @@ async function main() {
   }
 
   const validated = await validatePluginPackage(bytes, {
-    ...(options["nowen-version"] ? { currentVersion: options["nowen-version"] } : {}),
+    ...(options["baseforge-version"] ? { currentVersion: options["baseforge-version"] } : {}),
     ...("extensions-v21" in options ? { extensionsV21: true, uiExtensions: true } : {}),
   });
   const manifest = validated.manifest;

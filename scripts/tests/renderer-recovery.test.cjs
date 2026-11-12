@@ -54,7 +54,7 @@ test("diagnostic reload returns to the application instead of reloading the erro
   const mainPath = path.resolve(__dirname, "../../electron/main.js");
   const mainSource = fs.readFileSync(mainPath, "utf8");
 
-  assert.match(mainSource, /MAIN_WINDOW_RELOAD_URL = "nowen-reload:\/\/main"/);
+  assert.match(mainSource, /MAIN_WINDOW_RELOAD_URL = "baseforge-reload:\/\/main"/);
   assert.match(mainSource, /reloadMainApplication\("diagnostic-page-button"\)/);
   assert.match(mainSource, /rendererRecoveryGate\.consume\(details\)/);
   assert.match(mainSource, /recoveringRenderer \|\| getIsQuitting\(\)/);

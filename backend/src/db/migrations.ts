@@ -28,7 +28,7 @@ import { workspaceAvatarMigration } from "./workspaceAvatarMigration.js";
 import type { DatabaseSync } from "node:sqlite";
 import { encryptedBlocksMigration } from "./encryptedBlocksMigration.js";
 import { encryptedNotesMigration } from "./encryptedNotesMigration.js";
-import { markSearchIndexRebuilt, rebuildNormalizedSearchFts, repairSearchContentText } from "../lib/searchIndex.js";
+import { markSearchIndexRebuilt, rebuildNormalizedSearchFts, registerSearchNormalizeFunction, repairSearchContentText } from "../lib/searchIndex.js";
 import {
   MIGRATIONS as BASE_MIGRATIONS,
   type Migration,
@@ -58,7 +58,6 @@ import { yjsOperationReceiptsMigration } from "./yjsOperationReceiptsMigration.j
 import { taskMetadataMigration } from "./taskMetadataMigration.js";
 import { taskTimePlanningMigration } from "./taskTimePlanningMigration.js";
 import { taskInboxMigration } from "./taskInboxMigration.js";
-import { workspaceJournalsMigration } from "./workspaceJournalsMigration.js";
 import { noteTemplatesMigration } from "./noteTemplatesMigration.js";
 import { taskReminderTimezoneMigration } from "./taskReminderTimezoneMigration.js";
 import { syncV2LocalStateMigration } from "./syncV2LocalStateMigration.js";
@@ -96,6 +95,9 @@ import { attachmentMediaVariantsMigration } from "./attachmentMediaVariantsMigra
 import { workspaceIssuesMigration } from "./workspaceIssuesMigration.js";
 import { noteColorMarkMigration } from "./noteColorMarkMigration.js";
 import { noteCommentNotificationsMigration } from "./noteCommentNotificationsMigration.js";
+import { dropDiaryTablesMigration } from "./dropDiaryTablesMigration.js";
+import { dropAiChatTablesMigration } from "./dropAiChatTablesMigration.js";
+import { disableOnboardingSeedMigration } from "./disableOnboardingSeedMigration.js";
 
 export type { Migration } from "./migrations.impl.js";
 
@@ -401,7 +403,6 @@ export const MIGRATIONS: Migration[] = [
   taskMetadataCanonicalMigration,
   taskTimePlanningCanonicalMigration,
   taskInboxCanonicalMigration,
-  workspaceJournalsMigration,
   noteTemplatesMigration,
   taskReminderTimezoneMigration,
   syncV2LocalStateMigration,
@@ -462,6 +463,9 @@ export const MIGRATIONS: Migration[] = [
   workspaceAvatarMigration,
   knowledgeTreeReferenceMigration,
   shareViewSessionClientMetaMigration,
+  dropDiaryTablesMigration,
+  dropAiChatTablesMigration,
+  disableOnboardingSeedMigration,
 ].sort((a, b) => a.version - b.version);
 
 export const CURRENT_SCHEMA_VERSION: number = MIGRATIONS.reduce(
@@ -517,6 +521,11 @@ export function getCurrentSchemaVersion(db: DatabaseSync): number {
 export function runMigrations(db: DatabaseSync): number {
   ensureMigrationsTable(db);
   validateMigrationRegistry();
+
+  // 存量库里 notes 上的 FTS 同步触发器引用 baseforge_search_normalize；只要迁移里
+  // 碰一下 notes（如 v139 把 note_type='journal' 改回 normal），语句 prepare 时
+  // 就要解析这个函数，而此时 ensureNormalizedSearchFts() 还没跑。先注册再迁移。
+  registerSearchNormalizeFunction(db);
 
   const current = getCurrentSchemaVersion(db);
   if (current > CURRENT_SCHEMA_VERSION) {

@@ -28,7 +28,7 @@ export interface AIModelOption {
 const BASE_PATH = "/user-preferences/ai-profiles";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -86,7 +86,7 @@ export const aiProfiles = {
 };
 
 export function emitAIProfilesChanged(activeProfileId?: string): void {
-  window.dispatchEvent(new CustomEvent("nowen:ai-profiles-changed", {
+  window.dispatchEvent(new CustomEvent("baseforge:ai-profiles-changed", {
     detail: { activeProfileId: activeProfileId || null },
   }));
 }

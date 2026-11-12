@@ -10,8 +10,8 @@ import {
   type KnowledgeTreeNode,
 } from "./knowledgeTreeCore.js";
 
-export const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__nowen_root_documents__:";
-const ROOT_DOCUMENT_NOTEBOOK_NAME = "__NOWEN_ROOT_DOCUMENTS__";
+export const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__baseforge_root_documents__:";
+const ROOT_DOCUMENT_NOTEBOOK_NAME = "__BASEFORGE_ROOT_DOCUMENTS__";
 
 export function isRootDocumentNotebookId(value: string | null | undefined): boolean {
   return typeof value === "string" && value.startsWith(ROOT_DOCUMENT_NOTEBOOK_PREFIX);

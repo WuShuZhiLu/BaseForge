@@ -1,7 +1,7 @@
 import { api, getCurrentWorkspace } from "@/lib/api";
 import type { Task, TaskPriority, TaskReminder, TaskStatus } from "@/types";
 
-export const TASK_BACKUP_FORMAT = "nowen-task-backup";
+export const TASK_BACKUP_FORMAT = "baseforge-task-backup";
 export const TASK_BACKUP_VERSION = 1;
 export const TASK_IMPORT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 export const TASK_IMPORT_MAX_TASKS = 5000;
@@ -70,7 +70,7 @@ export interface TaskBackupPackage {
   exportedAt: string;
   source: {
     workspace: string;
-    app: "nowen-note";
+    app: "baseforge";
   };
   data: {
     projects: TaskBackupProject[];
@@ -413,7 +413,7 @@ export function taskBackupFromCsv(text: string): TaskBackupPackage {
     format: TASK_BACKUP_FORMAT,
     version: TASK_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    source: { workspace: getCurrentWorkspace(), app: "nowen-note" },
+    source: { workspace: getCurrentWorkspace(), app: "baseforge" },
     data: { projects: [...projects.values()], tasks, dependencies: [], reminders: [] },
   });
 }
@@ -551,7 +551,7 @@ export function normalizeTaskBackup(input: unknown): TaskBackupPackage {
     exportedAt: nullableText(root.exportedAt, 64) || new Date().toISOString(),
     source: {
       workspace: normalizeText((root.source as Record<string, unknown> | undefined)?.workspace, 200) || "personal",
-      app: "nowen-note",
+      app: "baseforge",
     },
     data: { projects, tasks, dependencies, reminders },
   };
@@ -589,7 +589,7 @@ export async function collectTaskBackup(onProgress?: TaskImportOptions["onProgre
     format: TASK_BACKUP_FORMAT,
     version: TASK_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    source: { workspace: getCurrentWorkspace(), app: "nowen-note" },
+    source: { workspace: getCurrentWorkspace(), app: "baseforge" },
     data: {
       projects: projects.map((project) => ({
         sourceId: project.id,
@@ -1037,5 +1037,5 @@ export function taskBackupFilename(extension: "json" | "csv", date = new Date())
     String(date.getHours()).padStart(2, "0"),
     String(date.getMinutes()).padStart(2, "0"),
   ].join("");
-  return `nowen-tasks-${stamp}.${extension}`;
+  return `baseforge-tasks-${stamp}.${extension}`;
 }

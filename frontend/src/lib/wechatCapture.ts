@@ -1,7 +1,7 @@
 import { wechatCaptureApi, PLUGIN_CONTRIBUTIONS_CHANGED_EVENT } from "./pluginApi";
 import { invalidateNotebooks } from "./notebookInvalidation";
 
-export const WECHAT_CAPTURE_CHANGED_EVENT = "nowen:wechat-capture-changed";
+export const WECHAT_CAPTURE_CHANGED_EVENT = "baseforge:wechat-capture-changed";
 export const WECHAT_CAPTURE_SETTINGS_EVENT = PLUGIN_CONTRIBUTIONS_CHANGED_EVENT;
 
 export function wechatArticleLinks(text: string): string[] {
@@ -23,7 +23,7 @@ export function wechatArticleLinks(text: string): string[] {
 export async function collectWechatArticles(text: string) {
   const result = await wechatCaptureApi.collect(text);
   invalidateNotebooks("create");
-  window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "wechat-inbox" } }));
+  window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "wechat-inbox" } }));
   window.dispatchEvent(new Event(WECHAT_CAPTURE_CHANGED_EVENT));
   return result;
 }
@@ -31,7 +31,7 @@ export async function collectWechatArticles(text: string) {
 // Automatic reads never trigger a browser permission request. A paste event works
 // even when clipboard-read is unavailable (HTTP LAN, Safari, mobile WebViews).
 export async function readWechatClipboard(): Promise<string[]> {
-  const desktop = (window as Window & { nowenDesktop?: { readWechatArticleClipboard?: () => Promise<string> } }).nowenDesktop;
+  const desktop = (window as Window & { baseforgeDesktop?: { readWechatArticleClipboard?: () => Promise<string> } }).baseforgeDesktop;
   if (desktop?.readWechatArticleClipboard) return wechatArticleLinks(await desktop.readWechatArticleClipboard());
   if (!document.hasFocus() || !navigator.clipboard?.readText || !navigator.permissions?.query) return [];
   try {

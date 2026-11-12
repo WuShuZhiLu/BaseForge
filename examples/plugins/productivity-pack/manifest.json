@@ -1,18 +1,18 @@
 {
-  "id": "nowenlab.productivity-pack",
-  "publisher": "nowenlab",
-  "name": "Nowen Productivity Pack",
+  "id": "baseforgelab.productivity-pack",
+  "publisher": "baseforgelab",
+  "name": "BaseForge Productivity Pack",
   "description": "Official zero-code note templates and prompt pack dogfood",
   "version": "1.0.0",
   "apiVersion": 2,
   "engines": {
-    "nowen": ">=1.6.0"
+    "baseforge": ">=1.6.0"
   },
   "runtime": "declarative",
   "categories": [
     "productivity"
   ],
-  "repository": "https://github.com/cropflre/nowen-note",
+  "repository": "https://github.com/cropflre/baseforge",
   "license": "MIT",
   "permissions": [],
   "contributes": {

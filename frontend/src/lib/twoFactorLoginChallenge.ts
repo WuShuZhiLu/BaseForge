@@ -1,6 +1,6 @@
-export const TWO_FACTOR_LOGIN_CHALLENGE_EVENT = "nowen:two-factor-login-challenge";
+export const TWO_FACTOR_LOGIN_CHALLENGE_EVENT = "baseforge:two-factor-login-challenge";
 
-const STORAGE_KEY = "nowen.twoFactorLoginChallenge";
+const STORAGE_KEY = "baseforge.twoFactorLoginChallenge";
 const DEFAULT_TTL_SECONDS = 5 * 60;
 const MAX_TTL_SECONDS = 5 * 60;
 

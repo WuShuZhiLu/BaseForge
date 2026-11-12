@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-knowledge-query-limits-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-knowledge-query-limits-"));
 process.env.DB_PATH = path.join(tempDir, "knowledge-query-limits.db");
 let closeDatabase: (() => void) | null = null;
 

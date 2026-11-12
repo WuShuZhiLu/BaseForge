@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-mindmap-folders-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-mindmap-folders-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { mindmapFoldersRepository } from "../src/repositories/mindmapFoldersRepository";

@@ -69,7 +69,7 @@ test("an incomplete scan never converts unseen indexed files into deletions", ()
 });
 
 test("advanced preference control messages are persisted but never added to logs", () => {
-  const dataDir = tempDir("nowen-folder-sync-v2-");
+  const dataDir = tempDir("baseforge-folder-sync-v2-");
   const sourceDir = path.join(dataDir, "source");
   fs.mkdirSync(sourceDir, { recursive: true });
   folderSync.setDataDir(dataDir);
@@ -80,7 +80,7 @@ test("advanced preference control messages are persisted but never added to logs
   });
   assert.equal(created.ok, true);
 
-  const message = "__NOWEN_FOLDER_SYNC_PREFS__:" + JSON.stringify({
+  const message = "__BASEFORGE_FOLDER_SYNC_PREFS__:" + JSON.stringify({
     conflictPolicy: "copy",
     deletionPolicy: "detach",
     extractAttachmentText: false,
@@ -93,5 +93,5 @@ test("advanced preference control messages are persisted but never added to logs
   assert.equal(config.deletionPolicy, "detach");
   assert.equal(config.extractAttachmentText, false);
   assert.deepEqual(config.excludePatterns, ["private/**", "*.tmp"]);
-  assert.equal(folderSync.getLogs(created.config.folderId).some((log) => log.message.includes("NOWEN_FOLDER_SYNC_PREFS")), false);
+  assert.equal(folderSync.getLogs(created.config.folderId).some((log) => log.message.includes("BASEFORGE_FOLDER_SYNC_PREFS")), false);
 });

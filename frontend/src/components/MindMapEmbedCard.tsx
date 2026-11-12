@@ -68,7 +68,7 @@ function SnapshotSurface({
   return (
     <div
       className={fullscreen ? "h-full w-full overflow-auto overscroll-contain" : "w-full overflow-auto"}
-      data-nowen-mindmap-static-host="true"
+      data-baseforge-mindmap-static-host="true"
     >
       <div
         className="mx-auto"
@@ -189,11 +189,11 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
     };
     const onWorkspaceChanged = () => setEditing(false);
     window.addEventListener("keydown", onEscape);
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onEscape);
-      window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+      window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
     };
   }, [editing]);
 
@@ -228,7 +228,7 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
       setMap({ ...map, title: updated.title || map.title, isUnlisted: 0 });
       setPromoting(false);
       toast.success("已转为独立文档，可在知识树中找到");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "anonymous-doc-promoted", noteId: map.id },
       }));
     } catch (error) {
@@ -327,7 +327,7 @@ export default function MindMapEmbedCard({ href }: { href: string }) {
       <div
         ref={hostRef}
         contentEditable={false}
-        data-nowen-mindmap-embed={mapId || "invalid"}
+        data-baseforge-mindmap-embed={mapId || "invalid"}
         className="embed-block-wrapper min-w-0 max-w-full"
       >
         <div className="embed-block-toolbar">

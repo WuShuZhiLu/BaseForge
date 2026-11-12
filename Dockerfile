@@ -7,6 +7,11 @@ ARG TARGETARCH=amd64
 # Node 必须 >= 22.5：后端运行时依赖内置 node:sqlite（见 package.json engines）。
 FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-build
 ARG TARGETARCH
+# 依赖源：默认官方 registry；Gitea CI 传 --build-arg NPM_REGISTRY 切国内镜像。
+# REPLACE_REGISTRY_HOST=always 让 lockfile 里遗留的镜像 resolved 地址跟随当前 registry。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV NPM_CONFIG_REGISTRY=$NPM_REGISTRY \
+    NPM_CONFIG_REPLACE_REGISTRY_HOST=always
 WORKDIR /app/frontend
 
 COPY package.json /app/package.json
@@ -33,6 +38,9 @@ RUN npm run build:web
 
 # ---------- Stage 2: 后端构建（包含 updater 专用入口） ----------
 FROM node:22-alpine AS backend-build
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV NPM_CONFIG_REGISTRY=$NPM_REGISTRY \
+    NPM_CONFIG_REPLACE_REGISTRY_HOST=always
 WORKDIR /app/backend
 # 仅编译用，指向已存在文件让 ffmpeg-static 跳过下载（本阶段不需要真二进制）
 ENV FFMPEG_BIN=/bin/true
@@ -48,6 +56,9 @@ RUN apk del .build-deps
 
 # ---------- Stage 3: 运行时镜像 ----------
 FROM node:22-alpine
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+ENV NPM_CONFIG_REGISTRY=$NPM_REGISTRY \
+    NPM_CONFIG_REPLACE_REGISTRY_HOST=always
 WORKDIR /app
 # 运行时硬依赖内置 sqlite，基础镜像降级会在这里直接构建失败，而不是等到容器启动才崩
 RUN node -e "require('node:sqlite');const v=process.versions.node;const [M,m]=v.split('.').map(Number);if(M<22||(M===22&&m<5))throw new Error('Node '+v+' 不支持 node:sqlite，需要 >= 22.5');console.log('node:sqlite ok:',v)"

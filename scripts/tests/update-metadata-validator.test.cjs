@@ -10,7 +10,7 @@ const {
 } = require("../lib/update-metadata-validator.cjs");
 
 function createFixture(options = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-update-metadata-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-update-metadata-"));
   const version = options.version || "1.4.2";
   const assetName = options.assetName || "BaseForge-1.4.2-setup.exe";
   const metadataName = options.metadataName || "latest.yml";
@@ -103,7 +103,7 @@ test("rejects a missing blockmap", () => {
 
 test("accepts an AppImage with an embedded blockmap", () => {
   const fixture = createFixture({
-    assetName: "BaseForge-Lite-1.4.2-x86_64.AppImage",
+    assetName: "BaseForge-1.4.2-lite-x86_64.AppImage",
     metadataName: "latest-lite-linux.yml",
     blockmap: false,
     blockMapSize: 107891,
@@ -118,7 +118,7 @@ test("accepts an AppImage with an embedded blockmap", () => {
 
 test("rejects an AppImage without embedded blockmap metadata", () => {
   const fixture = createFixture({
-    assetName: "BaseForge-Lite-1.4.2-x86_64.AppImage",
+    assetName: "BaseForge-1.4.2-lite-x86_64.AppImage",
     metadataName: "latest-lite-linux.yml",
     blockmap: false,
   });

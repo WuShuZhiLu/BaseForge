@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@capacitor/core", () => ({ registerPlugin: mocks.registerPlugin }));
 
-const slot = Symbol.for("nowen.nativeAttachmentMediaPlugin");
+const slot = Symbol.for("baseforge.nativeAttachmentMediaPlugin");
 
 describe("AttachmentMedia native plugin registration", () => {
   beforeEach(() => {

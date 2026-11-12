@@ -4,16 +4,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-patch-image-route-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-patch-image-route-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
 const owner = "block-patch-image-owner";
 const notebookId = "block-patch-image-notebook";
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 let syncNoteBlocks: typeof import("../src/lib/noteBlocks").syncNoteBlocks;

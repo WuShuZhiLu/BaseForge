@@ -1,6 +1,6 @@
 {
   "name": "nowen-note-backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engines": {
     "node": ">=22.5.0"
   },
@@ -12,14 +12,11 @@
     "test": "node scripts/run-tests-serial.mjs",
     "test:serial": "node scripts/run-tests-serial.mjs",
     "fixture:phase-b": "node scripts/phase-b-notebook-fixture.mjs",
-    "rebuild:node": "node ../scripts/rebuild-sqlite-node.mjs",
-    "rebuild:electron": "node ../scripts/rebuild-native.mjs --prebuild=true",
     "migrate:inline-images": "node ../scripts/migrate-inline-images-to-attachments.mjs",
     "migrate:inline-images:apply": "node ../scripts/migrate-inline-images-to-attachments.mjs --apply"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
-    "@marsaud/smb2": "^0.18.0",
     "@mozilla/readability": "^0.6.0",
     "@types/ws": "^8.18.1",
     "archiver": "^7.0.1",
@@ -40,10 +37,12 @@
     "quickjs-emscripten": "^0.32.0",
     "sanitize-html": "^2.17.5",
     "sharp": "^0.33.5",
+    "smb3-client": "^0.2.0",
     "sqlite-vec": "^0.1.9",
     "unpdf": "^1.6.2",
     "unzipper": "^0.12.3",
     "uuid": "^11.0.5",
+    "webdav": "^5.11.0",
     "word-extractor": "^1.0.4",
     "ws": "^8.20.0",
     "y-protocols": "^1.0.7",

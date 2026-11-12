@@ -210,7 +210,7 @@ function getCopy() {
 }
 
 async function rebuildEmbeddingIndex(): Promise<void> {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   const workspace = getCurrentWorkspace();
   const query = workspace && workspace !== "personal"
     ? `?workspaceId=${encodeURIComponent(workspace)}`
@@ -291,8 +291,8 @@ export default function EmbeddingSettingsPanel() {
   useEffect(() => { void loadSettings(); }, [loadSettings]);
   useEffect(() => {
     const handleProfilesChanged = () => void loadSettings();
-    window.addEventListener("nowen:ai-profiles-changed", handleProfilesChanged);
-    return () => window.removeEventListener("nowen:ai-profiles-changed", handleProfilesChanged);
+    window.addEventListener("baseforge:ai-profiles-changed", handleProfilesChanged);
+    return () => window.removeEventListener("baseforge:ai-profiles-changed", handleProfilesChanged);
   }, [loadSettings]);
 
   const queuedJobs = (status?.index.pending || 0) + (status?.index.processing || 0);
@@ -402,7 +402,7 @@ export default function EmbeddingSettingsPanel() {
         model: nextModel,
       }));
       await refreshStatus(true);
-      window.dispatchEvent(new CustomEvent("nowen:ai-settings-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:ai-settings-changed"));
       const changed = previousModel !== nextModel
         || previousSource !== nextSource
         || previousProfileId !== nextProfileId;
@@ -429,7 +429,7 @@ export default function EmbeddingSettingsPanel() {
     try {
       await rebuildEmbeddingIndex();
       await refreshStatus(true);
-      window.dispatchEvent(new CustomEvent("nowen:ai-settings-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:ai-settings-changed"));
       setMessage({ type: "success", text: copy.rebuildQueued });
     } catch (error) {
       setMessage({ type: "error", text: (error as Error)?.message || copy.rebuildFailed });
@@ -607,10 +607,10 @@ export default function EmbeddingSettingsPanel() {
                 setTestResult(null);
               }}
               placeholder={copy.modelPlaceholder}
-              list="nowen-embedding-model-suggestions"
+              list="baseforge-embedding-model-suggestions"
               className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm outline-none transition placeholder:text-zinc-400 focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 dark:border-zinc-700 dark:bg-zinc-900"
             />
-            <datalist id="nowen-embedding-model-suggestions">
+            <datalist id="baseforge-embedding-model-suggestions">
               {modelOptions.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
             </datalist>
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-zinc-400">

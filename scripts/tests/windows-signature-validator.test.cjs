@@ -30,7 +30,7 @@ test("accepts valid SignPath records and requires Full/Lite setup packages", () 
   const result = validate([
     validRecord("BaseForge-1.4.16-setup.exe"),
     validRecord("BaseForge-1.4.16-portable.exe"),
-    validRecord("BaseForge-Lite-1.4.16-setup.exe"),
+    validRecord("BaseForge-1.4.16-lite-setup.exe"),
   ], ["full", "lite"]);
   assert.equal(result.setupCounts.full, 1);
   assert.equal(result.setupCounts.lite, 1);
@@ -42,7 +42,7 @@ test("rejects non-valid Authenticode status and wrong publisher", () => {
 });
 
 test("rejects missing required Full or Lite setup", () => {
-  assert.throws(() => validate([validRecord("BaseForge-Lite-1.4.16-setup.exe")], ["full", "lite"]), /missing required full/);
+  assert.throws(() => validate([validRecord("BaseForge-1.4.16-lite-setup.exe")], ["full", "lite"]), /missing required full/);
   assert.throws(() => validate([validRecord("BaseForge-1.4.16-setup.exe")], ["full", "lite"]), /missing required lite/);
 });
 

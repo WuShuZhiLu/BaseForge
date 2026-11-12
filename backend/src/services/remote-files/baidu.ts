@@ -21,7 +21,7 @@ import {
 } from "./types";
 
 const PAN_BASE = "https://pan.baidu.com";
-const USER_AGENT = "nowen-remote-files/1.0";
+const USER_AGENT = "baseforge-remote-files/1.0";
 
 /** xpan/file 表单类调用（precreate/create），统一 JSON 与 errno 解析 */
 async function panJsonForm(token: string, method: string, fields: Record<string, string>): Promise<any> {

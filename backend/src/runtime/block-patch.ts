@@ -50,7 +50,7 @@ import { logAudit } from "../services/audit.js";
 import { broadcastNoteUpdated, broadcastToUser } from "../services/realtime.js";
 import { rebuildYjsSubdocumentsIfEnabled } from "../services/yjs-subdocuments.js";
 
-const BLOCK_PATCH_ROUTE = Symbol.for("nowen.blocks.batchPatchRoute");
+const BLOCK_PATCH_ROUTE = Symbol.for("baseforge.blocks.batchPatchRoute");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 const VERSION_MERGE_WINDOW_MS = 5 * 60 * 1000;
 

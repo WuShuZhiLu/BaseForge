@@ -47,13 +47,13 @@ describe("CodeBlockView Phase A performance baseline", () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     events = [];
-    globalThis.__NOWEN_PHASE_A_PERF_SINK__ = (event) => events.push(event);
+    globalThis.__BASEFORGE_PHASE_A_PERF_SINK__ = (event) => events.push(event);
   });
 
   afterEach(async () => {
     await act(async () => roots.splice(0).forEach((root) => root.unmount()));
     containers.splice(0).forEach((container) => container.remove());
-    delete globalThis.__NOWEN_PHASE_A_PERF_SINK__;
+    delete globalThis.__BASEFORGE_PHASE_A_PERF_SINK__;
     (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
   });
 

@@ -331,7 +331,7 @@ taskCalendar.get("/feed/:token", (c) => {
     status: 200,
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'inline; filename="nowen-tasks.ics"',
+      "Content-Disposition": 'inline; filename="baseforge-tasks.ics"',
       "Cache-Control": "no-store",
     },
   });

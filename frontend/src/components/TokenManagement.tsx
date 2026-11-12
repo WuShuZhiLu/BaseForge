@@ -58,7 +58,7 @@ interface TokenFormValue {
 }
 
 async function tokenJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     credentials: "include",
@@ -89,6 +89,12 @@ function scopeLabel(scope: string): string {
     "tags:read": "读取标签",
     "tags:write": "管理标签",
     "export:import": "导入导出",
+    "remote_files:read": "读取远程文件",
+    "remote_files:write": "管理远程文件",
+    "shares:read": "读取分享",
+    "shares:write": "管理分享",
+    "tasks:read": "读取任务",
+    "tasks:write": "管理任务",
   };
   return labels[scope] || scope;
 }

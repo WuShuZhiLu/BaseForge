@@ -92,7 +92,7 @@ export class MarkdownDocFindPanel implements Panel {
       showReplace: withReplace || Boolean(existing.replace),
     };
     this.dom = document.createElement("div");
-    this.dom.className = "nowen-doc-find-panel";
+    this.dom.className = "baseforge-doc-find-panel";
     this.root = createRoot(this.dom);
     activePanels.set(view, this);
     this.recount();

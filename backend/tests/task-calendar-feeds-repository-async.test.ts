@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-cal-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-cal-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { taskCalendarFeedsRepository } from "../src/repositories/taskCalendarFeedsRepository";

@@ -4,9 +4,9 @@ import type { NativeDatabase } from "./nativeDatabase";
 
 const MIGRATION_KEY = "mobileLocalAccountMigrationV1";
 type EntityType = "notebook" | "note" | "tag" | "note_tag" | "favorite" | "attachment"
-  | "task" | "task_reminder" | "diary" | "mindmap";
+  | "task" | "task_reminder" | "mindmap";
 type Row = Record<string, unknown>;
-type IdMapKey = "notebooks" | "notes" | "tags" | "attachments" | "tasks" | "taskReminders" | "diaries" | "mindmaps";
+type IdMapKey = "notebooks" | "notes" | "tags" | "attachments" | "tasks" | "taskReminders" | "mindmaps";
 type MigrationMap = Record<IdMapKey, Record<string, string>> & {
   status: "running" | "complete";
   versions: Record<string, { source: string; target: string; entityId?: string }>;
@@ -30,7 +30,6 @@ const TABLES: Record<EntityType, { table: string; columns: string[]; keys: strin
   attachment: { table: "attachments", columns: "id,scopeKey,workspaceId,noteId,userId,filename,mimeType,size,localPath,hash,available,transferStatus,createdAt,updatedAt".split(","), keys: ["scopeKey", "id"], map: "attachments" },
   task: { table: "tasks", columns: "id,scopeKey,workspaceId,userId,title,description,isCompleted,completedAt,priority,dueDate,dueAt,startDate,noteId,parentId,sortOrder,projectId,status,createdAt,updatedAt".split(","), keys: ["id"], map: "tasks" },
   task_reminder: { table: "task_reminders", columns: "id,taskId,userId,offsetMinutes,enabled,lastNotifiedAt,snoozedUntil,createdAt,updatedAt".split(","), keys: ["id"], map: "taskReminders" },
-  diary: { table: "diaries", columns: "id,scopeKey,workspaceId,userId,contentText,mood,images,media,createdAt".split(","), keys: ["id"], map: "diaries" },
   mindmap: { table: "mindmaps", columns: "id,scopeKey,workspaceId,userId,title,data,starred,folderId,createdAt,updatedAt".split(","), keys: ["id"], map: "mindmaps" },
 };
 
@@ -41,7 +40,7 @@ function parseMap(value: string | undefined): MigrationMap {
   return {
     status: "running", notebooks: saved.notebooks || {}, notes: saved.notes || {},
     tags: saved.tags || {}, attachments: saved.attachments || {}, tasks: saved.tasks || {},
-    taskReminders: saved.taskReminders || {}, diaries: saved.diaries || {}, mindmaps: saved.mindmaps || {},
+    taskReminders: saved.taskReminders || {}, mindmaps: saved.mindmaps || {},
     versions: saved.versions || {},
   };
 }
@@ -197,9 +196,6 @@ export async function migrateMobileLocalAccount(options: MigrationOptions): Prom
     for (const row of rows.task_reminder) {
       const taskId = mapping.tasks[String(row.taskId)];
       if (taskId) await importRow("task_reminder", String(row.id), { ...accountRow(row), id: mapping.taskReminders[String(row.id)], taskId });
-    }
-    for (const row of rows.diary) {
-      await importRow("diary", String(row.id), { ...accountRow(row), id: mapping.diaries[String(row.id)] });
     }
     for (const row of rows.mindmap) {
       await importRow("mindmap", String(row.id), { ...accountRow(row), id: mapping.mindmaps[String(row.id)], folderId: null });

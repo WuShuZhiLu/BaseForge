@@ -275,7 +275,7 @@ describe("MarkdownPreview task checkboxes", () => {
     const callbacks = installIntersectionObserver();
     const markdown = longAnchorMarkdown();
     await act(async () => root.render(<MarkdownPreview markdown={markdown} />));
-    const preview = host.querySelector<HTMLElement>(".nowen-md-preview")!;
+    const preview = host.querySelector<HTMLElement>(".baseforge-md-preview")!;
     const targetPos = buildMarkdownPreviewHeadingIndex(markdown)
       .find((heading) => heading.id === "目标")!.pos;
 

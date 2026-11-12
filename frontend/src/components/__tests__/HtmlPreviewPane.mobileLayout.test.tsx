@@ -84,7 +84,7 @@ describe("HtmlPreviewPane responsive clipped article (#789)", () => {
   it("defers an imported article's unsigned images, then shows them after note-scoped signing", async () => {
     const id = "123e4567-e89b-42d3-a456-426614174216";
     const html = `<article><p>微信正文</p><img src="/api/attachments/${id}" alt="wechat"></article>`;
-    localStorage.setItem("nowen-token", "jwt-token");
+    localStorage.setItem("baseforge-token", "jwt-token");
     let finish!: (response: Response) => void;
     const fetchMock = vi.fn((_url: RequestInfo | URL) => new Promise<Response>((resolve) => { finish = resolve; }));
     vi.stubGlobal("fetch", fetchMock);
@@ -95,7 +95,7 @@ describe("HtmlPreviewPane responsive clipped article (#789)", () => {
 
     const before = host.querySelector<HTMLImageElement>('img[alt="wechat"]')!;
     expect(before.hasAttribute("src")).toBe(false);
-    expect(before.dataset.nowenAttachmentPending).toBe("true");
+    expect(before.dataset.baseforgeAttachmentPending).toBe("true");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain("noteId=note-1");
 
@@ -109,7 +109,7 @@ describe("HtmlPreviewPane responsive clipped article (#789)", () => {
 
     const after = host.querySelector<HTMLImageElement>('img[alt="wechat"]')!;
     expect(after.getAttribute("src")).toContain("sig=ready");
-    expect(after.dataset.nowenAttachmentPending).toBeUndefined();
+    expect(after.dataset.baseforgeAttachmentPending).toBeUndefined();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 

@@ -17,8 +17,6 @@ import { isToolPageElementActive, TOOL_PAGE_ACTIVE_ATTRIBUTE, useToolPageActive 
  *  - TaskWorkspaceImpl 根元素保留 `taskFullscreen && "fixed inset-0 ..."`：
  *    这是用户主动点击的「全屏显示」既有功能（非破坏性铁律，不得删除），
  *    默认根类为 TASK_WORKSPACE_ROOT_CLASS + min-h-0 flex-1，符合自适应。
- *  - daily-records/DailyJournalView 的 actions.setViewMode("notebook")
- *    为「跳转到笔记」链路，待迁移（见 .cmp/COLLAB-QUEUE.md）。
  *  - FileManager / ShareManagementPage 已完成 P3 迁移：
  *    无任何 actions.setViewMode，跳笔记改派发 navigateToolPage。
  */
@@ -31,12 +29,10 @@ function source(relativeUrl: string): string {
 const TOOL_PAGES: Array<{ file: string; rootClass: string }> = [
   { file: "../../components/ShareManagementPage.tsx", rootClass: '"min-h-0 min-w-0 flex-1 overflow-y-auto bg-app-bg"' },
   { file: "../../components/FileManager.tsx", rootClass: '"flex min-h-0 min-w-0 flex-1 flex-col h-full bg-app-bg overflow-hidden relative"' },
-  { file: "../../components/AIChatPanel.tsx", rootClass: '"flex h-full min-h-0 min-w-0 flex-1 max-w-full bg-app-bg"' },
   { file: "../../features/trash/TrashPage.tsx", rootClass: '"flex min-h-0 min-w-0 flex-1 flex-col bg-app-bg text-tx-primary"' },
-  { file: "../../components/daily-records/DailyRecordsHub.tsx", rootClass: '"flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-app-bg"' },
 ];
 
-const TOOL_VIEW_MODES = /actions\.setViewMode\(\s*"(tasks|diary|diaryCenter|ai-chat|aiChat|shares|files|trash|notifications|mindmaps|notebook-all)"\s*\)/;
+const TOOL_VIEW_MODES = /actions\.setViewMode\(\s*"(tasks|shares|files|trash|notifications|mindmaps|notebook-all)"\s*\)/;
 
 describe("B2 工具页页签契约（toolPageContract）", () => {
   for (const page of TOOL_PAGES) {
@@ -76,8 +72,8 @@ describe("B2 工具页页签契约（toolPageContract）", () => {
       expect(src).toContain('from "@/components/toolTabs"');
     });
 
-    it("AIChatPanel：无全局视图切换（关闭/跳转由宿主 props 承接，P5）", () => {
-      const src = source("../../components/AIChatPanel.tsx");
+    it("ShareManagementPage：无全局视图切换（关闭/跳转由宿主 props 承接，P5）", () => {
+      const src = source("../../components/ShareManagementPage.tsx");
       expect(src).not.toContain("actions.setViewMode(");
       expect(src).not.toMatch(TOOL_VIEW_MODES);
     });
@@ -178,21 +174,10 @@ describe("隐藏态治理（keepAlive · .cmp/COLLAB-BOARD.md 第二节 B 批次
     const files = [
       ...TOOL_PAGES.map((page) => page.file),
       "../../components/TaskWorkspaceImpl.tsx",
-      "../../components/AIChatReliabilityShell.tsx",
     ];
     for (const file of files) {
       expect(source(file), file).not.toMatch(/(^|\n)setInterval\(/);
     }
-  });
-
-  it("AI 工具页状态轮询受激活态门控（非激活暂停 / 重激活补一次）", () => {
-    const src = source("../../components/AIChatReliabilityShell.tsx");
-    expect(src).toContain("useToolPageActive(pageProbeRef)");
-    const gateAt = src.indexOf("if (!pageActive) return;");
-    const timerAt = src.indexOf("window.setInterval(() => void refreshStatus(), 30_000)");
-    expect(gateAt).toBeGreaterThanOrEqual(0);
-    expect(timerAt).toBeGreaterThan(gateAt);
-    expect(src).toContain("[pageActive, refreshStatus]");
   });
 
   it("FileManager / TaskWorkspaceImpl 重新激活补一次刷新", () => {

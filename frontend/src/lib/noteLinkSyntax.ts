@@ -64,29 +64,29 @@ export function preprocessInternalNoteLinks(markdown: string): string {
   const fenced: string[] = [];
   let source = markdown.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, (match) => {
     const index = fenced.push(match) - 1;
-    return `\u0000NOWEN_NOTE_CODE_${index}\u0000`;
+    return `\u0000BASEFORGE_NOTE_CODE_${index}\u0000`;
   });
   // Keep the source in the document as ![[mindmap:<uuid>]]; only the preview/converter
   // sees this placeholder. No title, source data, API address, or access token is stored.
   source = source.replace(MINDMAP_EMBED_RE, (_match, href) =>
-    `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
+    `<div data-baseforge-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
   );
   source = source.replace(BOARD_EMBED_RE, (_match, href) =>
-    `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
+    `<div data-baseforge-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
   );
   source = source.replace(SHEET_EMBED_RE, (_match, href) =>
-    `<div data-nowen-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
+    `<div data-baseforge-block-embed="${escapeHtml(href.toLowerCase())}"></div>`,
   );
   source = source.replace(WIKI_LINK_RE, (_match, embedPrefix, href, rawAlias) => {
     const alias = String(rawAlias || "").replace(/\\\]/g, "]");
     if (embedPrefix) {
-      return `<div data-nowen-block-embed="${escapeHtml(href)}"></div>`;
+      return `<div data-baseforge-block-embed="${escapeHtml(href)}"></div>`;
     }
     const mode = titleModeFromAlias(alias);
     const label = alias || "关联笔记";
-    return `<a href="${escapeHtml(href)}" data-nowen-title-mode="${mode}" rel="noopener noreferrer nofollow nowen-title-${mode}">${escapeHtml(label)}</a>`;
+    return `<a href="${escapeHtml(href)}" data-baseforge-title-mode="${mode}" rel="noopener noreferrer nofollow baseforge-title-${mode}">${escapeHtml(label)}</a>`;
   });
-  return source.replace(/\u0000NOWEN_NOTE_CODE_(\d+)\u0000/g, (_match, index) => fenced[Number(index)] || "");
+  return source.replace(/\u0000BASEFORGE_NOTE_CODE_(\d+)\u0000/g, (_match, index) => fenced[Number(index)] || "");
 }
 
 export function detectActiveWikiNoteQuery(

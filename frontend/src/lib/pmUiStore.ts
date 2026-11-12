@@ -3,8 +3,8 @@ import { useSyncExternalStore } from "react";
 /** PM 主区模块（侧栏导航 ↔ 主区内容共享态） */
 export type PmModule = "overview" | "board" | "list" | "settings";
 
-const MODULE_KEY = "nowen.pm.module";
-const PROJECT_KEY = "nowen.pm.activeProject";
+const MODULE_KEY = "baseforge.pm.module";
+const PROJECT_KEY = "baseforge.pm.activeProject";
 const MODULES: PmModule[] = ["overview", "board", "list", "settings"];
 
 let currentModule: PmModule = "overview";

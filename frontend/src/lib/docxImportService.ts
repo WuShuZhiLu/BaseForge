@@ -112,7 +112,7 @@ function report(
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("nowen-token") : null;
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("baseforge-token") : null;
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -232,7 +232,7 @@ async function parseDocxInWorker(
   return new Promise<WorkerParseResult>((resolve, reject) => {
     const worker = new Worker(new URL("../workers/docxImport.worker.ts", import.meta.url), {
       type: "module",
-      name: "nowen-docx-import",
+      name: "baseforge-docx-import",
     });
     const requestId = crypto.randomUUID();
     let settled = false;
@@ -344,8 +344,8 @@ export function replaceDocxImagePlaceholders(
   for (const image of images) {
     const attributeId = image.getAttribute("data-docx-image-id") || "";
     const source = image.getAttribute("src") || "";
-    const protocolId = source.startsWith("nowen-docx-image://")
-      ? source.slice("nowen-docx-image://".length).replace(/^\/+/, "")
+    const protocolId = source.startsWith("baseforge-docx-image://")
+      ? source.slice("baseforge-docx-image://".length).replace(/^\/+/, "")
       : "";
     const id = attributeId || protocolId;
     if (!id) continue;
@@ -359,7 +359,7 @@ export function replaceDocxImagePlaceholders(
     image.setAttribute("src", url);
     image.removeAttribute("data-docx-image-id");
   }
-  if (/nowen-docx-image:\/\//i.test(template.innerHTML)) {
+  if (/baseforge-docx-image:\/\//i.test(template.innerHTML)) {
     throw new DocxImportError("ATTACHMENT_UPLOAD_FAILED", "仍有 Word 图片未完成附件上传");
   }
   return template.innerHTML;

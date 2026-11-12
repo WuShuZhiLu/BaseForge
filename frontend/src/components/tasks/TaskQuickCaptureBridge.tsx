@@ -40,17 +40,15 @@ function selectedTextFromTarget(target: EventTarget | null): string {
 function inferSource(target: EventTarget | null, text: string): CaptureSnapshot {
   const element = target instanceof Element ? target : null;
   const sourceRoot = element?.closest<HTMLElement>(
-    "[data-task-capture-source], [data-note-id], [data-diary-id], .tiptap, .cm-editor, [contenteditable='true']",
+    "[data-task-capture-source], [data-note-id], .tiptap, .cm-editor, [contenteditable='true']",
   );
   const explicitType = sourceRoot?.dataset.taskCaptureSource as TaskCaptureSourceType | undefined;
   const noteId = sourceRoot?.dataset.noteId || null;
-  const diaryId = sourceRoot?.dataset.diaryId || null;
   const route = window.location.pathname;
   let sourceType: TaskCaptureSourceType = explicitType || "global";
 
   if (!explicitType) {
     if (noteId || sourceRoot?.matches(".tiptap, .cm-editor, [contenteditable='true']")) sourceType = "note";
-    else if (diaryId) sourceType = "diary";
     else if (route.startsWith("/share/")) sourceType = "share";
     else if (text) sourceType = "selection";
   }
@@ -58,7 +56,7 @@ function inferSource(target: EventTarget | null, text: string): CaptureSnapshot 
   return {
     text,
     sourceType,
-    sourceId: noteId || diaryId || route || null,
+    sourceId: noteId || route || null,
     sourceTitle: sourceRoot?.dataset.taskCaptureTitle || document.title || null,
     noteId,
   };
@@ -169,7 +167,7 @@ export default function TaskQuickCaptureBridge() {
     };
     const handleShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "a") {
-        if (!localStorage.getItem("nowen-token")) return;
+        if (!localStorage.getItem("baseforge-token")) return;
         event.preventDefault();
         openDialog();
       } else if (open && event.key === "Escape") {
@@ -177,10 +175,10 @@ export default function TaskQuickCaptureBridge() {
         setOpen(false);
       }
     };
-    window.addEventListener("nowen:open-task-capture", handleOpen);
+    window.addEventListener("baseforge:open-task-capture", handleOpen);
     window.addEventListener("keydown", handleShortcut);
     return () => {
-      window.removeEventListener("nowen:open-task-capture", handleOpen);
+      window.removeEventListener("baseforge:open-task-capture", handleOpen);
       window.removeEventListener("keydown", handleShortcut);
     };
   }, [open, openDialog]);
@@ -248,9 +246,8 @@ export default function TaskQuickCaptureBridge() {
 
   const sourceLabel = source.sourceTitle
     || (source.sourceType === "note" ? (chinese ? "当前笔记" : "Current note")
-      : source.sourceType === "diary" ? (chinese ? "当前说说" : "Current diary")
-        : source.sourceType === "selection" ? (chinese ? "页面选中文本" : "Page selection")
-          : (chinese ? "全局快速捕获" : "Global quick capture"));
+      : source.sourceType === "selection" ? (chinese ? "页面选中文本" : "Page selection")
+        : (chinese ? "全局快速捕获" : "Global quick capture"));
 
   const dialog = open ? createPortal(
     <div

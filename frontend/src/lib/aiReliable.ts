@@ -104,7 +104,7 @@ export interface ReliableAskParams {
 }
 
 function authHeaders(json = false): HeadersInit {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   return {
     ...(json ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -259,7 +259,7 @@ export function exportDiagnosticsFile(diagnostics: ReliableDiagnostics): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `nowen-ai-diagnostics-${diagnostics.requestId}.json`;
+  anchor.download = `baseforge-ai-diagnostics-${diagnostics.requestId}.json`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

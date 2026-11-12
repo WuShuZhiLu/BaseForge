@@ -65,10 +65,10 @@ vi.mock("../serverEndpointResolver", () => ({ ServerEndpointResolver: class {
 vi.mock("../lanDiscovery", () => ({ getLanDiscovery: () => ({}) }));
 vi.mock("../api.impl", () => ({
   getCurrentWorkspace: () => "personal", getServerUrl: () => "https://notes.example.com",
-  setCurrentWorkspace: vi.fn(), SERVER_URL_CHANGED_EVENT: "nowen:server-url-changed",
+  setCurrentWorkspace: vi.fn(), SERVER_URL_CHANGED_EVENT: "baseforge:server-url-changed",
 }));
 vi.mock("../api", () => ({ getBaseUrl: () => "/api", api: { attachments: {}, files: {}, attachmentFolders: {}, dataFile: {} } }));
-vi.mock("../authSession", () => ({ getAccessToken: () => localStorage.getItem("nowen-token") }));
+vi.mock("../authSession", () => ({ getAccessToken: () => localStorage.getItem("baseforge-token") }));
 vi.mock("../mobileLocalFirstBridge", () => ({ installMobileLocalFirstBridge: () => () => undefined }));
 vi.mock("../mobileLocalAccountMigration", () => ({ migrateMobileLocalAccount: async () => undefined }));
 vi.mock("../localStore", () => ({
@@ -92,7 +92,7 @@ beforeEach(async () => {
   Object.assign(window, { Capacitor: { isNativePlatform: () => true, getPlatform: () => "android" } });
   mocks.createDatabase = () => new DatabaseSync!(":memory:");
   userId = randomUUID(); accountId = `${serverUrl}\n${userId}`;
-  localStorage.setItem("nowen-token", token("initial"));
+  localStorage.setItem("baseforge-token", token("initial"));
   mocks.fetch.mockImplementation(async (url: string, init?: RequestInit) => {
     let payload: unknown;
     if (url.endsWith("/scopes")) payload = { items: [{ scopeKey: "personal", workspaceId: null, workspaceName: null, role: null, canWrite: true, accessFingerprint: "test" }] };
@@ -132,7 +132,7 @@ describe.skipIf(!DatabaseSync)("Android sync switch with real SQLite, repository
     expect(await db.query("SELECT * FROM sync_outbox")).toHaveLength(3);
 
     // Same account/database, new runtime as after restarting or refreshing credentials.
-    localStorage.setItem("nowen-token", token("refreshed"));
+    localStorage.setItem("baseforge-token", token("refreshed"));
     await initializeMobileLocalFirstRuntime();
     expect((await fetchSyncSettings()).mode).toBe("device-only");
     mocks.listeners.get("networkStatusChange")!({ connected: true });

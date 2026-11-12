@@ -53,8 +53,8 @@ export default function SidebarPanelContainer({ treeContent, contents }: Sidebar
   // 切换工作区 → 重载该工作区的布局（布局按工作区隔离持久化）
   useEffect(() => {
     const onWorkspaceChanged = () => reloadSidebarLayoutForWorkspace();
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
-    return () => window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
   }, []);
 
   const layout: SidebarLayoutState = readSidebarLayout();
@@ -81,13 +81,13 @@ export default function SidebarPanelContainer({ treeContent, contents }: Sidebar
   const handleAction = useCallback((action: PanelActionKey, panelId: SidebarPanelId) => {
     if (action === "refresh") {
       // 内容组件可监听该事件重新拉数据（面板框架统一刷新入口）
-      window.dispatchEvent(new CustomEvent("nowen:sidebar-panel-refresh", { detail: { panelId: menuPanelId } }));
+      window.dispatchEvent(new CustomEvent("baseforge:sidebar-panel-refresh", { detail: { panelId: menuPanelId } }));
       return;
     }
     if (action === "more") setMenuPanelId(panelId);
-    // "new" 由具体面板内容自行监听 nowen:sidebar-panel-action 事件
+    // "new" 由具体面板内容自行监听 baseforge:sidebar-panel-action 事件
     if (action === "new") {
-      window.dispatchEvent(new CustomEvent("nowen:sidebar-panel-action", { detail: { panelId, action } }));
+      window.dispatchEvent(new CustomEvent("baseforge:sidebar-panel-action", { detail: { panelId, action } }));
     }
   }, []);
 
@@ -246,7 +246,7 @@ export default function SidebarPanelContainer({ treeContent, contents }: Sidebar
             setMenuPanelId(null);
           }}
           onRefresh={() => {
-            window.dispatchEvent(new CustomEvent("nowen:sidebar-panel-refresh", { detail: { panelId: menuPanelId } }));
+            window.dispatchEvent(new CustomEvent("baseforge:sidebar-panel-refresh", { detail: { panelId: menuPanelId } }));
             setMenuPanelId(null);
           }}
           onClosePanel={() => {

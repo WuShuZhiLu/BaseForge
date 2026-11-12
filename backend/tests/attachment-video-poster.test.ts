@@ -17,15 +17,15 @@ import path from "node:path";
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-video-poster-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-video-poster-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_LEGACY_PUBLIC_URL = "false";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let loginToken = "";
 let posterEnabled = false;

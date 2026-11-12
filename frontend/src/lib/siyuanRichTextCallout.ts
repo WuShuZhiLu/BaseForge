@@ -20,8 +20,8 @@ const CALLOUT_MARKER_RE = /^\s*\[!(TIP|NOTE|IMPORTANT|WARNING|CAUTION)\]([+-])?(
 // production editor does not necessarily expose `.ProseMirror`. Keep the latter
 // as a compatibility fallback for older shells and tests.
 const CALLOUT_SELECTOR = ':is(.prose[contenteditable="true"], .ProseMirror) blockquote';
-const CALLOUT_CLASS = "nowen-siyuan-callout";
-const HEADER_CLASS = "nowen-siyuan-callout-header";
+const CALLOUT_CLASS = "baseforge-siyuan-callout";
+const HEADER_CLASS = "baseforge-siyuan-callout-header";
 
 function normalizeDefaultTitleWithIcon(
   value: string,
@@ -62,7 +62,7 @@ function removeDecoration(blockquote: HTMLQuoteElement): void {
   if (!blockquote.classList.contains(CALLOUT_CLASS)) return;
 
   blockquote.classList.remove(CALLOUT_CLASS);
-  blockquote.removeAttribute("data-nowen-siyuan-callout");
+  blockquote.removeAttribute("data-baseforge-siyuan-callout");
   blockquote.removeAttribute("data-callout-type");
   blockquote.removeAttribute("data-callout-title");
   blockquote.removeAttribute("data-callout-icon");
@@ -105,7 +105,7 @@ export function decorateSiyuanRichTextCallouts(root: ParentNode = document): num
     }
 
     blockquote.classList.add(CALLOUT_CLASS);
-    blockquote.setAttribute("data-nowen-siyuan-callout", "true");
+    blockquote.setAttribute("data-baseforge-siyuan-callout", "true");
     blockquote.setAttribute("data-callout-type", marker.type);
     blockquote.setAttribute("data-callout-title", marker.title);
     blockquote.setAttribute("data-callout-icon", marker.icon);

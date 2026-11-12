@@ -103,7 +103,7 @@ describe("round-trip permission transfer UI bridge", () => {
       success: true,
       importBatch: { id: "batch-1", undoAvailable: true },
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    const file = new File(["zip"], "team.nowen.zip", { type: "application/zip" });
+    const file = new File(["zip"], "team.baseforge.zip", { type: "application/zip" });
 
     await submitRoundTripPackage(file, {
       dryRun: false,
@@ -150,13 +150,13 @@ describe("round-trip permission transfer UI bridge", () => {
 
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("zip", {
       status: 200,
-      headers: { "Content-Disposition": 'attachment; filename="team.nowen.zip"' },
+      headers: { "Content-Disposition": 'attachment; filename="team.baseforge.zip"' },
     }));
     const result = await downloadRoundTripPermissionPackage({
       workspaceId: "workspace-1",
       includePermissions: true,
     });
     expect(String(fetchMock.mock.calls[0][0])).toContain("includePermissions=true");
-    expect(result.filename).toBe("team.nowen.zip");
+    expect(result.filename).toBe("team.baseforge.zip");
   });
 });

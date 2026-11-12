@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette } from "lucide-react";
+import { Plus, Star, StarOff, Clock, FileText, FileCode, FileType2, Trash2, ArchiveRestore, Menu, FolderInput, ChevronRight, ChevronDown, ChevronLeft, Folder, X, Check, Lock, Unlock, CalendarDays, RefreshCw, Share2, GripVertical, Download, ArrowUpDown, ArrowUp, ArrowDown, Image as ImageIcon, Printer, User as UserIcon, Sparkles, Tag as TagIcon, Loader2, FileUp, PanelLeftClose, AlertTriangle, Copy, LayoutTemplate, SplitSquareHorizontal, SplitSquareVertical, ArrowLeftRight, Pencil, ShieldCheck, Palette, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ContextMenu, { ContextMenuItem } from "@/components/ContextMenu";
@@ -61,12 +61,13 @@ import {
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
 import { pushSheetAppPath } from "@/lib/sheetDeepLink";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 // "导入 Word 文档" 走 dynamic import（见 createNoteInNotebook），减少首屏 bundle 体积。
 
 /* ===== 排序模式 ===== */
 type SortBy = "manual" | "updatedAt" | "createdAt" | "title";
 type SortDir = "asc" | "desc";
-const SORT_STORAGE_KEY = "nowen.noteList.sort";
+const SORT_STORAGE_KEY = "baseforge.noteList.sort";
 
 function loadSortPref(): { by: SortBy; dir: SortDir } {
   try {
@@ -94,7 +95,7 @@ function isCoarsePointer(): boolean {
     && window.matchMedia("(pointer: coarse)").matches;
 }
 
-const TIME_VISIBILITY_STORAGE_KEY = "nowen.noteList.showTime";
+const TIME_VISIBILITY_STORAGE_KEY = "baseforge.noteList.showTime";
 
 function loadShowTimePref(): boolean {
   try {
@@ -1043,6 +1044,8 @@ const NoteCard = React.memo(function NoteCard({
   // （短标题时不明显，因为预览整体行数少；长标题挤占空间后尤为严重）。
   const isSearchResult = !!searchQuery;
   const { t } = useTranslation();
+  // 远程投影笔记：正文读写的是远程文件，列表上必须能一眼区分出来
+  const isRemoteLinked = useRemoteLinkedNoteIds().has(note.id);
   const colorMarkHex = getNoteColorMarkHex(note.colorMark);
   const classicText = useSidebarTextStyle()[0] === "classic";
   const preview = (
@@ -1157,6 +1160,11 @@ const NoteCard = React.memo(function NoteCard({
             ) : (
               <span className="text-[10px] px-1 py-0.5 rounded border border-app-border bg-app-hover text-tx-tertiary leading-none" title={t('note.format.richText')}>
                 {t('note.format.richTextShort')}
+              </span>
+            )}
+            {isRemoteLinked && (
+              <span className="flex items-center text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                <Cloud size={11} />
               </span>
             )}
             {isShared && <Share2 size={11} className="text-emerald-500" />}
@@ -1455,12 +1463,12 @@ export default function NoteList() {
 
     const refresh = () => void reload();
     void reload();
-    window.addEventListener("nowen:workspace-changed", refresh);
-    window.addEventListener("nowen:knowledge-tree-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
+    window.addEventListener("baseforge:knowledge-tree-changed", refresh);
     return () => {
       active = false;
-      window.removeEventListener("nowen:workspace-changed", refresh);
-      window.removeEventListener("nowen:knowledge-tree-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
+      window.removeEventListener("baseforge:knowledge-tree-changed", refresh);
     };
   }, [showThreeColumnFolderContents, state.notesRefreshToken]);
 
@@ -1996,25 +2004,23 @@ export default function NoteList() {
       if (state.noteLoadingState.pendingNoteId && state.noteLoadingState.pendingNoteId !== noteId) {
         cancelNoteLoad();
       }
-      if (userPrefs.prefs.enableNoteTabs) {
-        actions.openNoteTab({
-          id: state.activeNote.id,
-          title: state.activeNote.title,
-          notebookId: state.activeNote.notebookId,
-          workspaceId: state.activeNote.workspaceId,
-          contentFormat: state.activeNote.contentFormat,
-          isLocked: state.activeNote.isLocked,
-          isTrashed: state.activeNote.isTrashed,
-          updatedAt: state.activeNote.updatedAt,
-        });
-      }
+      actions.openNoteTab({
+        id: state.activeNote.id,
+        title: state.activeNote.title,
+        notebookId: state.activeNote.notebookId,
+        workspaceId: state.activeNote.workspaceId,
+        contentFormat: state.activeNote.contentFormat,
+        isLocked: state.activeNote.isLocked,
+        isTrashed: state.activeNote.isTrashed,
+        updatedAt: state.activeNote.updatedAt,
+      });
       actions.setMobileView("editor");
       return;
     }
 
     haptic.selection();
     setLastClickedId(noteId);
-    try { window.dispatchEvent(new CustomEvent("nowen:before-note-switch")); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent("baseforge:before-note-switch")); } catch { /* ignore */ }
 
     // 移动端立即进入编辑器，但视觉 Loading 延迟 150ms；快请求不会闪烁。
     actions.setMobileView("editor");
@@ -2030,18 +2036,16 @@ export default function NoteList() {
       request: () => api.getNote(noteId),
       onSuccess: (note) => {
         actions.setActiveNote(note);
-        if (userPrefs.prefs.enableNoteTabs) {
-          actions.openNoteTab({
-            id: note.id,
-            title: note.title,
-            notebookId: note.notebookId,
-            workspaceId: note.workspaceId,
-            contentFormat: note.contentFormat,
-            isLocked: note.isLocked,
-            isTrashed: note.isTrashed,
-            updatedAt: note.updatedAt,
-          });
-        }
+        actions.openNoteTab({
+          id: note.id,
+          title: note.title,
+          notebookId: note.notebookId,
+          workspaceId: note.workspaceId,
+          contentFormat: note.contentFormat,
+          isLocked: note.isLocked,
+          isTrashed: note.isTrashed,
+          updatedAt: note.updatedAt,
+        });
       },
     });
   };
@@ -2077,7 +2081,7 @@ export default function NoteList() {
         );
       }
       try {
-        window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "trash-emptied" } }));
+        window.dispatchEvent(new CustomEvent("baseforge:storage-changed", { detail: { reason: "trash-emptied" } }));
       } catch { /* ignore */ }
       actions.setNotes([]);
       if (state.activeNote?.isTrashed) {
@@ -2090,17 +2094,11 @@ export default function NoteList() {
     }
   };
 
-  const handleCreateNote = async (noteType: "normal" | "markdown" | "word" | "journal" | "yuque" = "normal") => {
+  const handleCreateNote = async (noteType: "normal" | "markdown" | "word" | "yuque" = "normal") => {
     haptic.light();
     // 回收站视图禁止新建笔记
     if (state.viewMode === "trash") {
       toast.info(t('noteList.cannotCreateInTrash'));
-      return;
-    }
-
-    // 今日日记：不需要选择笔记本，直接调用 API
-    if (noteType === "journal") {
-      await handleOpenTodayJournal();
       return;
     }
 
@@ -2155,44 +2153,12 @@ export default function NoteList() {
     }
   };
 
-  // 一键打开/创建今日日记
-  const handleOpenTodayJournal = async () => {
-    try {
-      const result = await api.journals.getOrCreateToday();
-      if (!result.existed) {
-        toast.success(t("journal.created", { defaultValue: "今日日记已创建" }));
-      } else {
-        toast.info(t("journal.opened", { defaultValue: "已打开今日日记" }));
-      }
-      // 打开笔记
-      actions.setActiveNote(result as any);
-      // 如果笔记不在列表中，添加到列表
-      actions.addNoteToList({
-        id: result.id,
-        userId: result.userId,
-        title: result.title,
-        contentText: result.contentText || "",
-        isPinned: result.isPinned || 0,
-        isFavorite: result.isFavorite || 0,
-        isLocked: result.isLocked || 0,
-        isArchived: result.isArchived || 0,
-        isTrashed: result.isTrashed || 0,
-        version: result.version || 1,
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-      } as any);
-    } catch (err: any) {
-      console.error("Failed to open today journal:", err);
-      toast.error(err?.message || t("journal.error", { defaultValue: "打开今日日记失败" }));
-    }
-  };
-
   // 实际执行创建笔记的逻辑，抽出供选择器回调复用
   // noteType="word" 时：弹文件选择器，走 importDocxAsNote（解析 .docx 为富文本笔记）。
   // noteType="yuque" 时：弹出导入面板，导入目标固定为所选笔记本。
   const createNoteInNotebook = async (
     notebookId: string,
-    noteType: "normal" | "markdown" | "word" | "journal" | "yuque" = "normal",
+    noteType: "normal" | "markdown" | "word" | "yuque" = "normal",
   ) => {
     try {
       if (noteType === "yuque") {
@@ -2836,18 +2802,16 @@ export default function NoteList() {
             contentFormat: duplicated.contentFormat,
             colorMark: duplicated.colorMark ?? null,
           } as NoteListItem);
-          if (userPrefs.prefs.enableNoteTabs) {
-            actions.openNoteTab({
-              id: duplicated.id,
-              title: duplicated.title,
-              notebookId: duplicated.notebookId,
-              workspaceId: duplicated.workspaceId,
-              contentFormat: duplicated.contentFormat,
-              isLocked: duplicated.isLocked,
-              isTrashed: duplicated.isTrashed,
-              updatedAt: duplicated.updatedAt,
-            });
-          }
+          actions.openNoteTab({
+            id: duplicated.id,
+            title: duplicated.title,
+            notebookId: duplicated.notebookId,
+            workspaceId: duplicated.workspaceId,
+            contentFormat: duplicated.contentFormat,
+            isLocked: duplicated.isLocked,
+            isTrashed: duplicated.isTrashed,
+            updatedAt: duplicated.updatedAt,
+          });
           actions.setMobileView("editor");
           window.requestAnimationFrame(() => revealCreatedKnowledgeTreeNote(duplicated.treeParentId));
           emitKnowledgeTreeRefresh("note-duplicated-from-note-list");
@@ -3348,7 +3312,7 @@ export default function NoteList() {
   const handleDragStart = useCallback((e: React.DragEvent, noteId: string) => {
     setDragNoteId(noteId);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/x-nowen-note", noteId);
+    e.dataTransfer.setData("application/x-baseforge", noteId);
     e.dataTransfer.setData("text/plain", noteId);
   }, []);
 

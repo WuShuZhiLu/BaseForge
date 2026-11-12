@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-remote-images-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-remote-images-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.SIYUAN_IMPORT_REMOTE_IMAGE_CONCURRENCY = "2";
@@ -20,7 +20,7 @@ const PNG_BYTES = Buffer.from(
 );
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 const originalFetch = globalThis.fetch;
 

@@ -27,7 +27,7 @@ const account: AccountLoginHistoryItem = {
 };
 
 function installDesktopHistory(token = "target-token", remembered: any = null) {
-  (window as any).nowenDesktop = {
+  (window as any).baseforgeDesktop = {
     isDesktop: true,
     credentials: {
       load: vi.fn(async () => remembered),
@@ -47,8 +47,8 @@ describe("账号历史切换", () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem("nowen-token", "current-token");
-    localStorage.setItem("nowen-server-url", "https://current.example.com");
+    localStorage.setItem("baseforge-token", "current-token");
+    localStorage.setItem("baseforge-server-url", "https://current.example.com");
     installDesktopHistory();
     vi.restoreAllMocks();
   });
@@ -69,9 +69,9 @@ describe("账号历史切换", () => {
       expect(result.token).toBe("target-token");
       expect(result.user).toMatchObject({ id: "user-1", username: "alice" });
     }
-    expect(localStorage.getItem("nowen-token")).toBe("target-token");
-    expect(localStorage.getItem("nowen-server-url")).toBe("https://notes.example.com");
-    expect(localStorage.getItem("nowen-account-history-current-id")).toBe(account.id);
+    expect(localStorage.getItem("baseforge-token")).toBe("target-token");
+    expect(localStorage.getItem("baseforge-server-url")).toBe("https://notes.example.com");
+    expect(localStorage.getItem("baseforge-account-history-current-id")).toBe(account.id);
   });
 
   it("目标服务器网络失败时保持当前会话不变", async () => {
@@ -80,12 +80,12 @@ describe("账号历史切换", () => {
     const result = await switchAccountLogin(account);
 
     expect(result.status).toBe("network_error");
-    expect(localStorage.getItem("nowen-token")).toBe("current-token");
-    expect(localStorage.getItem("nowen-server-url")).toBe("https://current.example.com");
+    expect(localStorage.getItem("baseforge-token")).toBe("current-token");
+    expect(localStorage.getItem("baseforge-server-url")).toBe("https://current.example.com");
   });
 
   it("安全存储临时读取失败时保持当前会话不变", async () => {
-    (window as any).nowenDesktop.accountHistory.loadToken = vi.fn(async () => {
+    (window as any).baseforgeDesktop.accountHistory.loadToken = vi.fn(async () => {
       throw new Error("IPC unavailable");
     });
     const fetchSpy = vi.spyOn(globalThis, "fetch");
@@ -94,8 +94,8 @@ describe("账号历史切换", () => {
 
     expect(result.status).toBe("storage_error");
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(localStorage.getItem("nowen-token")).toBe("current-token");
-    expect(localStorage.getItem("nowen-server-url")).toBe("https://current.example.com");
+    expect(localStorage.getItem("baseforge-token")).toBe("current-token");
+    expect(localStorage.getItem("baseforge-server-url")).toBe("https://current.example.com");
   });
 
   it("令牌明确失效时保留账号并进入预填重登", async () => {
@@ -107,11 +107,11 @@ describe("账号历史切换", () => {
     const result = await switchAccountLogin(account);
 
     expect(result.status).toBe("requires_reauth");
-    expect(localStorage.getItem("nowen-token")).toBeNull();
-    expect(localStorage.getItem("nowen-server-url")).toBe("https://notes.example.com");
-    expect(sessionStorage.getItem("nowen-account-history-pending-reauth")).not.toContain("target-token");
-    expect(localStorage.getItem("nowen-prefer-cloud")).toBe("1");
-    expect((window as any).nowenDesktop.accountHistory.markRequiresReauth).toHaveBeenCalledWith(account.id);
+    expect(localStorage.getItem("baseforge-token")).toBeNull();
+    expect(localStorage.getItem("baseforge-server-url")).toBe("https://notes.example.com");
+    expect(sessionStorage.getItem("baseforge-account-history-pending-reauth")).not.toContain("target-token");
+    expect(localStorage.getItem("baseforge-prefer-cloud")).toBe("1");
+    expect((window as any).baseforgeDesktop.accountHistory.markRequiresReauth).toHaveBeenCalledWith(account.id);
   });
 
   it("Android 历史会话失效后进入登录页而不是本机空间", async () => {
@@ -121,9 +121,9 @@ describe("账号历史切换", () => {
     }), { status: 401 }));
 
     expect((await switchAccountLogin(account)).status).toBe("requires_reauth");
-    expect(localStorage.getItem("nowen-token")).toBeNull();
+    expect(localStorage.getItem("baseforge-token")).toBeNull();
     expect(isMobileLocalMode()).toBe(false);
-    expect(localStorage.getItem("nowen-mobile-account-login-requested")).toBe("1");
+    expect(localStorage.getItem("baseforge-mobile-account-login-requested")).toBe("1");
   });
 
   it("Android 切换成功后清除主动登录标记并使用目标会话", async () => {
@@ -136,7 +136,7 @@ describe("账号历史切换", () => {
     expect((await switchAccountLogin(account)).status).toBe("switched");
     expect(isMobileAccountLoginRequested()).toBe(false);
     expect(isMobileLocalMode()).toBe(false);
-    expect(localStorage.getItem("nowen-token")).toBe("target-token");
+    expect(localStorage.getItem("baseforge-token")).toBe("target-token");
   });
 
   it("令牌被撤销但保存了匹配密码时自动重新登录", async () => {
@@ -165,7 +165,7 @@ describe("账号历史切换", () => {
     );
     expect(result.status).toBe("switched");
     if (result.status === "switched") expect(result.token).toBe("fresh-token");
-    expect(localStorage.getItem("nowen-token")).toBe("fresh-token");
+    expect(localStorage.getItem("baseforge-token")).toBe("fresh-token");
   });
 
   it("已标记需重登的历史账号可直接使用匹配的已保存密码", async () => {
@@ -176,7 +176,7 @@ describe("账号历史切换", () => {
       hasPassword: true,
       autoLogin: false,
     });
-    (window as any).nowenDesktop.accountHistory.loadToken = vi.fn(async () => ({
+    (window as any).baseforgeDesktop.accountHistory.loadToken = vi.fn(async () => ({
       ok: false,
       error: "TOKEN_UNAVAILABLE",
     }));
@@ -188,6 +188,6 @@ describe("账号历史切换", () => {
     const result = await switchAccountLogin({ ...account, requiresReauth: true });
 
     expect(result.status).toBe("switched");
-    expect(localStorage.getItem("nowen-token")).toBe("fresh-token");
+    expect(localStorage.getItem("baseforge-token")).toBe("fresh-token");
   });
 });

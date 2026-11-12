@@ -278,7 +278,7 @@ export default function SearchCenter() {
       actions.setMobileSidebar(true);
     }
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("nowen:focus-knowledge-tree", {
+      window.dispatchEvent(new CustomEvent("baseforge:focus-knowledge-tree", {
         detail: { query: nextQuery },
       }));
     }, 0);

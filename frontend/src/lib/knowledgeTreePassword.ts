@@ -1,10 +1,10 @@
 import type { KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 
-const SESSION_KEY = "nowen-knowledge-tree-folder-unlock-tokens";
-export const KNOWLEDGE_TREE_PASSWORD_SESSION_CHANGED_EVENT = "nowen:knowledge-tree-password-session-changed";
-export const KNOWLEDGE_TREE_PASSWORD_LOCKED_EVENT = "nowen:knowledge-tree-password-locked";
-export const KNOWLEDGE_TREE_PASSWORD_NOTES_LOCKED_EVENT = "nowen:knowledge-tree-password-notes-locked";
-export const KNOWLEDGE_TREE_PASSWORD_LOCK_BROADCAST_KEY = "nowen:knowledge-tree-password-lock-broadcast";
+const SESSION_KEY = "baseforge-knowledge-tree-folder-unlock-tokens";
+export const KNOWLEDGE_TREE_PASSWORD_SESSION_CHANGED_EVENT = "baseforge:knowledge-tree-password-session-changed";
+export const KNOWLEDGE_TREE_PASSWORD_LOCKED_EVENT = "baseforge:knowledge-tree-password-locked";
+export const KNOWLEDGE_TREE_PASSWORD_NOTES_LOCKED_EVENT = "baseforge:knowledge-tree-password-notes-locked";
+export const KNOWLEDGE_TREE_PASSWORD_LOCK_BROADCAST_KEY = "baseforge:knowledge-tree-password-lock-broadcast";
 
 export type KnowledgeTreeFolderLockReason =
   | "idle"
@@ -60,7 +60,7 @@ function readRawFolderUnlockTokenMap(): Record<string, string> {
 function loadFolderUnlockTokenMap(): Record<string, string> {
   const value = readRawFolderUnlockTokenMap();
   try {
-    const currentUserId = tokenPayload(localStorage.getItem("nowen-token") || "")?.userId;
+    const currentUserId = tokenPayload(localStorage.getItem("baseforge-token") || "")?.userId;
     const now = Math.floor(Date.now() / 1000);
     if (!currentUserId) return {};
     return Object.fromEntries(

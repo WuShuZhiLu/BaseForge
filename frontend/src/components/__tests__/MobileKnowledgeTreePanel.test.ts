@@ -18,7 +18,7 @@ describe("MobileKnowledgeTreePanel product contract", () => {
     expect(mobileSource).toContain('type MobileView = "recent" | "browse"');
     expect(mobileSource).toContain('useState<MobileView>("browse")');
     expect(mobileSource).toContain('getMobileKnowledgeTreeChildren(visibleNodes, parentId, sortMode)');
-    expect(mobileSource).toContain('data-nowen-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}');
+    expect(mobileSource).toContain('data-baseforge-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}');
     expect(mobileSource).toContain('data-mobile-knowledge-tree-breadcrumb');
     expect(mobileSource).not.toContain("setExpanded(");
   });

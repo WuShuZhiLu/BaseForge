@@ -8,7 +8,7 @@ import {
 
 const ID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const EMBED_RE = new RegExp(
-  `<div\\b([^>]*?)data-nowen-block-embed=(["'])mindmap:(${ID})\\2([^>]*)>[\\s\\S]*?<\\/div>`,
+  `<div\\b([^>]*?)data-baseforge-block-embed=(["'])mindmap:(${ID})\\2([^>]*)>[\\s\\S]*?<\\/div>`,
   "gi",
 );
 const MAX_EXPORT_MINDMAPS = 20;
@@ -39,7 +39,7 @@ export function extractMindMapEmbedIdsFromHtml(html: string): string[] {
 
 function renderUnavailable(id: string): string {
   return [
-    `<section data-nowen-mindmap-export="${escapeHtml(id)}" data-nowen-mindmap-export-unavailable="1" style="margin:16px 0;border:1px solid #d0d7de;border-radius:12px;padding:14px;background:#f6f8fa;break-inside:avoid">`,
+    `<section data-baseforge-mindmap-export="${escapeHtml(id)}" data-baseforge-mindmap-export-unavailable="1" style="margin:16px 0;border:1px solid #d0d7de;border-radius:12px;padding:14px;background:#f6f8fa;break-inside:avoid">`,
     '<div style="font-size:13px;font-weight:600;color:#24292f;margin-bottom:4px">思维导图</div>',
     '<div style="font-size:12px;color:#6e7781">导图已删除、无权访问或暂时无法生成静态快照。</div>',
     "</section>",
@@ -57,7 +57,7 @@ export function renderMindMapExportSnapshot(
     const svg = mindMapSnapshotToSvg(snapshot, {
       title: map.title || "思维导图",
       background: "#ffffff",
-      className: "nowen-mindmap-export-svg",
+      className: "baseforge-mindmap-export-svg",
     });
     const ratio = snapshot.bounds.height / Math.max(1, snapshot.bounds.width);
     const height = Math.max(180, Math.min(420, Math.round(760 * ratio)));
@@ -65,7 +65,7 @@ export function renderMindMapExportSnapshot(
       ? '<div style="font-size:11px;color:#b45309;padding:0 12px 8px">节点较多，导出快照仅展示前 240 个节点。</div>'
       : "";
     return [
-      `<section data-nowen-mindmap-export="${escapeHtml(map.id)}" style="margin:16px 0;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;background:#fff;break-inside:avoid;page-break-inside:avoid">`,
+      `<section data-baseforge-mindmap-export="${escapeHtml(map.id)}" style="margin:16px 0;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;background:#fff;break-inside:avoid;page-break-inside:avoid">`,
       `<div style="padding:9px 12px;border-bottom:1px solid #d8dee4;font-size:13px;font-weight:600;color:#24292f">${escapeHtml(map.title || "思维导图")}</div>`,
       `<div style="height:${height}px;min-height:180px;overflow:hidden;padding:10px">${svg}</div>`,
       truncated,
@@ -85,7 +85,7 @@ export async function hydrateMindMapEmbedsForExport(
   html: string,
   loader: MindMapExportLoader = (id) => api.getMindMap(id),
 ): Promise<string> {
-  if (!html || !/data-nowen-block-embed=["']mindmap:/i.test(html)) return html;
+  if (!html || !/data-baseforge-block-embed=["']mindmap:/i.test(html)) return html;
 
   const ids = extractMindMapEmbedIdsFromHtml(html);
   const rendered = new Map<string, string>();

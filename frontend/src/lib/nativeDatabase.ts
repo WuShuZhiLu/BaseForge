@@ -28,15 +28,15 @@ interface NativeDatabaseGlobalState {
 }
 
 type NativeDatabaseGlobal = typeof globalThis & {
-  __nowenNoteNativeDatabaseState?: NativeDatabaseGlobalState;
+  __baseforgeNoteNativeDatabaseState?: NativeDatabaseGlobalState;
 };
 
 const SCHEMA_VERSION = 5;
-const DATABASE_PREFIX = "nowen_local_";
+const DATABASE_PREFIX = "baseforge_local_";
 
 const ENTITY_TYPE_CHECK = `
   'notebook', 'note', 'tag', 'note_tag', 'favorite', 'attachment',
-  'task', 'task_reminder', 'diary', 'mindmap'
+  'task', 'task_reminder', 'mindmap'
 `;
 
 const SCOPE_CHECK = `
@@ -87,20 +87,6 @@ const MOBILE_MODULE_SCHEMA_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_native_task_reminders_task
     ON task_reminders(taskId, enabled)`,
-  `CREATE TABLE IF NOT EXISTS diaries (
-    id TEXT PRIMARY KEY,
-    scopeKey TEXT NOT NULL DEFAULT 'personal',
-    workspaceId TEXT,
-    userId TEXT NOT NULL,
-    contentText TEXT NOT NULL DEFAULT '',
-    mood TEXT NOT NULL DEFAULT '',
-    images TEXT NOT NULL DEFAULT '[]',
-    media TEXT NOT NULL DEFAULT '[]',
-    createdAt TEXT NOT NULL,
-    CHECK (${SCOPE_CHECK})
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_native_diaries_scope_created
-    ON diaries(scopeKey, createdAt DESC)`,
   `CREATE TABLE IF NOT EXISTS mindmaps (
     id TEXT PRIMARY KEY,
     scopeKey TEXT NOT NULL DEFAULT 'personal',
@@ -313,21 +299,6 @@ const SCHEMA_V1_STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_native_task_reminders_task
     ON task_reminders(taskId, enabled)`,
-
-  `CREATE TABLE IF NOT EXISTS diaries (
-    id TEXT PRIMARY KEY,
-    scopeKey TEXT NOT NULL DEFAULT 'personal',
-    workspaceId TEXT,
-    userId TEXT NOT NULL,
-    contentText TEXT NOT NULL DEFAULT '',
-    mood TEXT NOT NULL DEFAULT '',
-    images TEXT NOT NULL DEFAULT '[]',
-    media TEXT NOT NULL DEFAULT '[]',
-    createdAt TEXT NOT NULL,
-    CHECK (${SCOPE_CHECK})
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_native_diaries_scope_created
-    ON diaries(scopeKey, createdAt DESC)`,
 
   `CREATE TABLE IF NOT EXISTS mindmaps (
     id TEXT PRIMARY KEY,
@@ -617,18 +588,18 @@ async function upgradeSchemaV2ToV3(raw: SQLiteDBConnection): Promise<void> {
 
 function getGlobalState(): NativeDatabaseGlobalState {
   const root = globalThis as NativeDatabaseGlobal;
-  if (!root.__nowenNoteNativeDatabaseState) {
-    root.__nowenNoteNativeDatabaseState = {
+  if (!root.__baseforgeNoteNativeDatabaseState) {
+    root.__baseforgeNoteNativeDatabaseState = {
       connection: new SQLiteConnection(CapacitorSQLite),
       databases: new Map(),
       lifecycleQueue: Promise.resolve(),
     };
-  } else if (!root.__nowenNoteNativeDatabaseState.lifecycleQueue) {
+  } else if (!root.__baseforgeNoteNativeDatabaseState.lifecycleQueue) {
     // HMR 可能保留旧版全局对象；清掉旧适配器缓存后复用插件连接字典。
-    root.__nowenNoteNativeDatabaseState.databases.clear();
-    root.__nowenNoteNativeDatabaseState.lifecycleQueue = Promise.resolve();
+    root.__baseforgeNoteNativeDatabaseState.databases.clear();
+    root.__baseforgeNoteNativeDatabaseState.lifecycleQueue = Promise.resolve();
   }
-  return root.__nowenNoteNativeDatabaseState;
+  return root.__baseforgeNoteNativeDatabaseState;
 }
 
 function runConnectionLifecycle<T>(

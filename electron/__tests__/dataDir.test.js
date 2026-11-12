@@ -6,18 +6,17 @@ const path = require("node:path");
 
 const {
   FIRST_RUN_DATA_MARKERS,
+  adoptLegacyDatabase,
   getDefaultDataPath,
   getDataDirPointerPath,
   getUserDataPathFromRoot,
-  migrateLegacyDataDir,
-  migrateLegacyDatabase,
   shouldPromptDataDirOnFirstRun,
   writeCustomDataDir,
   validateMigrationTarget,
 } = require("../dataDir");
 
 function tempRoot() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "nowen-data-dir-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-data-dir-"));
 }
 
 test("uses the default baseforge-data directory when no pointer exists", () => {
@@ -37,30 +36,28 @@ test("reads a valid custom data directory from the bootstrap pointer", () => {
   assert.equal(getUserDataPathFromRoot(root), custom);
 });
 
-test("renames the legacy data directory and pointer to the new names", () => {
-  const root = tempRoot();
-  fs.mkdirSync(path.join(root, "nowen-data"), { recursive: true });
-  fs.writeFileSync(path.join(root, "nowen-data-location.json"), "{}");
-
-  migrateLegacyDataDir(root);
-
-  assert.ok(fs.existsSync(path.join(root, "baseforge-data")));
-  assert.ok(fs.existsSync(path.join(root, "baseforge-data-location.json")));
-  assert.equal(fs.existsSync(path.join(root, "nowen-data")), false);
-});
-
-test("renames the legacy database file together with its sidecar files", () => {
+test("adopts the legacy database file together with its sidecar files", () => {
   const dataDir = tempRoot();
   for (const suffix of ["", "-wal", "-shm"]) {
     fs.writeFileSync(path.join(dataDir, `nowen-note.db${suffix}`), suffix || "db");
   }
 
-  migrateLegacyDatabase(dataDir);
+  assert.equal(adoptLegacyDatabase(dataDir), true);
 
   for (const suffix of ["", "-wal", "-shm"]) {
     assert.ok(fs.existsSync(path.join(dataDir, `baseforge.db${suffix}`)));
     assert.equal(fs.existsSync(path.join(dataDir, `nowen-note.db${suffix}`)), false);
   }
+});
+
+test("keeps the existing database when adopting a legacy file", () => {
+  const dataDir = tempRoot();
+  fs.writeFileSync(path.join(dataDir, "baseforge.db"), "new");
+  fs.writeFileSync(path.join(dataDir, "nowen-note.db"), "old");
+
+  assert.equal(adoptLegacyDatabase(dataDir), false);
+  assert.equal(fs.readFileSync(path.join(dataDir, "baseforge.db"), "utf8"), "new");
+  assert.ok(fs.existsSync(path.join(dataDir, "nowen-note.db")));
 });
 
 test("ignores a custom data directory under Program Files", () => {

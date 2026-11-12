@@ -488,13 +488,13 @@ export default function PmWorkspace() {
       const projectId = (event as CustomEvent<{ projectId?: string }>).detail?.projectId;
       if (projectId) setPmActiveProject(projectId);
     };
-    window.addEventListener("nowen:pm-new-item", onNewItem);
-    window.addEventListener("nowen:pm-new-project", onNewProject);
-    window.addEventListener("nowen:pm-focus-project", onFocusProject);
+    window.addEventListener("baseforge:pm-new-item", onNewItem);
+    window.addEventListener("baseforge:pm-new-project", onNewProject);
+    window.addEventListener("baseforge:pm-focus-project", onFocusProject);
     return () => {
-      window.removeEventListener("nowen:pm-new-item", onNewItem);
-      window.removeEventListener("nowen:pm-new-project", onNewProject);
-      window.removeEventListener("nowen:pm-focus-project", onFocusProject);
+      window.removeEventListener("baseforge:pm-new-item", onNewItem);
+      window.removeEventListener("baseforge:pm-new-project", onNewProject);
+      window.removeEventListener("baseforge:pm-focus-project", onFocusProject);
     };
   }, []);
 

@@ -3,15 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-share-comments-migration-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-share-comments-migration-"));
 const dbPath = path.join(tmpDir, "legacy.db");
 
 process.env.DB_PATH = dbPath;
 process.env.ELECTRON_USER_DATA = tmpDir;
 
-const legacyDb = new Database(dbPath);
+const legacyDb = new DatabaseSync(dbPath);
 legacyDb.exec(`
   CREATE TABLE share_comments (
     id TEXT PRIMARY KEY,

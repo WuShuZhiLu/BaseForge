@@ -9,7 +9,7 @@ const { openLocalAttachmentWithSystem } = require("../attachment-open");
 const ATTACHMENT_ID = "123e4567-e89b-42d3-a456-426614174000";
 
 function makeFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-attachment-open-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-attachment-open-"));
   const relativePath = path.join("2026", "08", "physical-name.xlsx");
   const filePath = path.join(root, relativePath);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });

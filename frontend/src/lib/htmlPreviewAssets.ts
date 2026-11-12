@@ -45,7 +45,7 @@ function maskPreparseImageSources(html: string): {
       if (attribute === "poster" && !/^<video\b/i.test(tag)) return original;
       const token = String(assets.size);
       assets.set(token, { attribute, raw });
-      return ` data-nowen-preview-${attribute}-token="${token}"`;
+      return ` data-baseforge-preview-${attribute}-token="${token}"`;
     });
   });
   return { markup, assets };
@@ -86,7 +86,7 @@ export function resolveHtmlPreviewAssetUrls(
     for (const attribute of ["src", "srcset", "poster"] as const) {
       if (attribute === "poster" && element.tagName.toLowerCase() !== "video") continue;
       if (attribute === "srcset" && !isImage && element.tagName.toLowerCase() !== "source") continue;
-      const tokenName = `data-nowen-preview-${attribute}-token`;
+      const tokenName = `data-baseforge-preview-${attribute}-token`;
       const token = element.getAttribute(tokenName);
       const asset = token !== null ? assets.get(token) : undefined;
       element.removeAttribute(tokenName);
@@ -97,10 +97,10 @@ export function resolveHtmlPreviewAssetUrls(
         : resolveSafeImageUrl(raw);
       if (resolved === null) {
         element.removeAttribute(attribute);
-        if (isImage) element.setAttribute("data-nowen-attachment-pending", "true");
+        if (isImage) element.setAttribute("data-baseforge-attachment-pending", "true");
       } else {
         element.setAttribute(attribute, resolved);
-        if (isImage) element.removeAttribute("data-nowen-attachment-pending");
+        if (isImage) element.removeAttribute("data-baseforge-attachment-pending");
       }
     }
   });

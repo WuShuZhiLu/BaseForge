@@ -29,7 +29,7 @@ export default function DesktopUpdateAssetFallback() {
   return createPortal(
     <aside
       role="alert"
-      data-nowen-update-asset-fallback="true"
+      data-baseforge-update-asset-fallback="true"
       className="fixed bottom-5 left-1/2 z-[155] w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-amber-300/70 bg-app-elevated p-4 shadow-2xl dark:border-amber-700/70"
     >
       <button

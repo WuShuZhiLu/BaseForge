@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { installNotebookTreeIntegrityGuards } from "../src/runtime/notebook-tree-hardening";
 
-function createDb(): Database.Database {
-  const db = new Database(":memory:");
+function createDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE notebooks (
@@ -29,7 +29,7 @@ function createDb(): Database.Database {
 }
 
 function insertNotebook(
-  db: Database.Database,
+  db: DatabaseSync,
   id: string,
   parentId: string | null = null,
   workspaceId: string | null = null,

@@ -32,10 +32,6 @@ import {
   zhCNSecurityAddonTranslations,
 } from "../securityAddonTranslations";
 import {
-  enDiaryMarkdownTranslations,
-  zhCNDiaryMarkdownTranslations,
-} from "../diaryMarkdownTranslations";
-import {
   enEditorSplitTranslations,
   zhCNEditorSplitTranslations,
 } from "../editorSplitTranslations";
@@ -131,8 +127,6 @@ const zhWorkspaceLayoutPatch = zhCNWorkspaceLayoutTranslations as unknown as Tra
 const enWorkspaceLayoutPatch = enWorkspaceLayoutTranslations as unknown as TranslationTree;
 const zhSecurityPatch = zhCNSecurityAddonTranslations as unknown as TranslationTree;
 const enSecurityPatch = enSecurityAddonTranslations as unknown as TranslationTree;
-const zhDiaryMarkdownPatch = zhCNDiaryMarkdownTranslations as unknown as TranslationTree;
-const enDiaryMarkdownPatch = enDiaryMarkdownTranslations as unknown as TranslationTree;
 const zhEditorSplitPatch = zhCNEditorSplitTranslations as unknown as TranslationTree;
 const enEditorSplitPatch = enEditorSplitTranslations as unknown as TranslationTree;
 const zhCoveragePatch = zhCNCoverageTranslations as unknown as TranslationTree;
@@ -147,7 +141,6 @@ const zh = mergePatches(
   zhLargeDocumentPatch,
   zhWorkspaceLayoutPatch,
   zhSecurityPatch,
-  zhDiaryMarkdownPatch,
   zhEditorSplitPatch,
   zhCoveragePatch,
   zhCNWorkspaceIssuesTranslations,
@@ -162,7 +155,6 @@ const en = mergePatches(
   enLargeDocumentPatch,
   enWorkspaceLayoutPatch,
   enSecurityPatch,
-  enDiaryMarkdownPatch,
   enEditorSplitPatch,
   enCoveragePatch,
   enWorkspaceIssuesTranslations,
@@ -260,7 +252,7 @@ describe("release i18n coverage", () => {
   });
 
   it("covers mobile account, sync status and verified server connection in both languages", () => {
-    for (const namespace of ["mobileAccount", "mobileSync", "serverConnection", "syncBadge", "encryptedUi", "encryptedCreate", "encryptedBlock", "encryptedNote", "webdav", "codeToolbar", "aiChatUi", "shareUi", "editorOps", "editorToolbar", "desktopSafety", "knowledgeTreeUi"]) {
+    for (const namespace of ["mobileAccount", "mobileSync", "serverConnection", "syncBadge", "encryptedUi", "encryptedCreate", "encryptedBlock", "encryptedNote", "webdav", "codeToolbar", "shareUi", "editorOps", "editorToolbar", "desktopSafety", "knowledgeTreeUi"]) {
       const chinese = leafEntries(getPath(zh, namespace));
       const english = leafEntries(getPath(en, namespace));
       expect(chinese.map(([key]) => key)).toEqual(english.map(([key]) => key));
@@ -305,10 +297,6 @@ describe("release i18n coverage", () => {
 
   it("keeps security settings addon translation parity", () => {
     expectPatchParity(zhSecurityPatch, enSecurityPatch, "securitySettings");
-  });
-
-  it("keeps diary Markdown translation parity", () => {
-    expectPatchParity(zhDiaryMarkdownPatch, enDiaryMarkdownPatch, "diary");
   });
 
   it("keeps editor split translation parity", () => {

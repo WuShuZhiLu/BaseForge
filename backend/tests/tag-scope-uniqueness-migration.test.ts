@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { tagScopeUniquenessMigration } from "../src/db/tagScopeUniquenessMigration";
 
 type ForeignKeyViolation = {
@@ -10,8 +10,8 @@ type ForeignKeyViolation = {
   fkid: number;
 };
 
-function createLegacyDb(): Database.Database {
-  const db = new Database(":memory:");
+function createLegacyDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (

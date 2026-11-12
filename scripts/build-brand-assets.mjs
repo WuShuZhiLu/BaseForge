@@ -12,8 +12,8 @@
  *   - frontend/public/base-notes-icon.svg            32   index.html 引用的应用图标
  *   - frontend/public/apple-touch-icon.svg           180  iOS / Android 主屏幕
  *   - frontend/public/icons/brand.svg                24   界面内品牌小图标
- *   - packages/nowen-clipper/public/icons/icon.svg   128  浏览器扩展工具栏图标
- *   - nowen-harmony/{AppScope,entry}/.../media/app_icon.svg  108  鸿蒙应用图标
+ *   - packages/baseforge-clipper/public/icons/icon.svg   128  浏览器扩展工具栏图标
+ *   - baseforge-harmony/{AppScope,entry}/.../media/app_icon.svg  108  鸿蒙应用图标
  *
  * 用法：node scripts/build-brand-assets.mjs
  */
@@ -87,7 +87,7 @@ function main() {
   );
 
   writeSvg(
-    path.join(root, "packages/nowen-clipper/public/icons/icon.svg"),
+    path.join(root, "packages/baseforge-clipper/public/icons/icon.svg"),
     svgDoc({ width: 128, height: 128, body, comment: `BaseForge Web Clipper 工具栏图标 · ${DERIVED}` })
   );
 
@@ -129,8 +129,8 @@ function main() {
   }
 
   for (const rel of [
-    "nowen-harmony/AppScope/resources/base/media/app_icon.svg",
-    "nowen-harmony/entry/src/main/resources/base/media/app_icon.svg",
+    "baseforge-harmony/AppScope/resources/base/media/app_icon.svg",
+    "baseforge-harmony/entry/src/main/resources/base/media/app_icon.svg",
   ]) {
     writeSvg(path.join(root, rel), svgDoc({ body, comment: `BaseForge 鸿蒙应用图标（108）· ${DERIVED}` }));
   }

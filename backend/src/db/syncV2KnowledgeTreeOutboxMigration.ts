@@ -47,7 +47,7 @@ export function installKnowledgeTreeOutboxTriggers(db: DatabaseSync): void {
     CREATE TRIGGER sync_outbox_knowledge_tree_insert
     AFTER INSERT ON knowledge_tree_nodes WHEN ${enqueueGate}
       AND ${readyGate("NEW")}
-      AND NEW.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND NEW.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_outbox (${columns}) VALUES (
         ${identity}, ${scope("NEW")}, ${device}, 'knowledge_tree_node',
@@ -60,7 +60,7 @@ export function installKnowledgeTreeOutboxTriggers(db: DatabaseSync): void {
     AFTER UPDATE OF parentId, sortOrder, isDeleted, deletedAt, scopeKey,
       workspaceId, userId, nodeType, resourceType, resourceId ON knowledge_tree_nodes
     WHEN ${enqueueGate} AND (${changed})
-      AND NEW.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND NEW.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_outbox (${columns})
       SELECT ${identity}, ${scope("OLD")}, ${device}, 'knowledge_tree_node',
@@ -78,7 +78,7 @@ export function installKnowledgeTreeOutboxTriggers(db: DatabaseSync): void {
     CREATE TRIGGER sync_outbox_knowledge_tree_delete
     AFTER DELETE ON knowledge_tree_nodes WHEN ${enqueueGate}
       AND ${readyGate("OLD")}
-      AND OLD.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND OLD.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_outbox (${columns}) VALUES (
         ${identity}, ${scope("OLD")}, ${device}, 'knowledge_tree_node',

@@ -3,9 +3,9 @@ import test from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-attachment-signature-window-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-attachment-signature-window-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_SIGNING_SECRET = "test-attachment-window-secret-2026";
@@ -16,7 +16,7 @@ const NOTE_ID = "signature-window-note";
 const ATTACHMENT_ID = "signature-window-attachment";
 const WINDOW_MS = 15 * 60 * 1000;
 
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let signedUrlModule: typeof import("../src/lib/attachment-signed-url");
 let scope = "";

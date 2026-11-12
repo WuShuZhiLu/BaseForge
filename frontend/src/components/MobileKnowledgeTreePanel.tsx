@@ -46,7 +46,9 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
+  importExcelIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
+  importWordOriginalIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import { choose, confirm, prompt } from "@/components/ui/confirm";
 import { useContextMenu } from "@/hooks/useContextMenu";
@@ -110,8 +112,8 @@ import { cn } from "@/lib/utils";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { NodeIcon } from "@/lib/nodeIcons";
 
-const FOCUS_KNOWLEDGE_TREE_EVENT = "nowen:focus-knowledge-tree";
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const FOCUS_KNOWLEDGE_TREE_EVENT = "baseforge:focus-knowledge-tree";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 type MobileView = "recent" | "browse";
 type QuickTreeVisibleDepth = 1 | 2 | 3 | "all";
@@ -373,10 +375,10 @@ export default function MobileKnowledgeTreePanel({
 
   useEffect(() => {
     const refresh = () => void reload();
-    window.addEventListener("nowen:workspace-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
     window.addEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
       window.removeEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     };
   }, [reload]);
@@ -691,7 +693,7 @@ rememberOpened(created.id);
 
   const importIntoTree = useCallback(async (
     targetParentId: string | null,
-    kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat" | "yuque",
+    kind: "markdown" | "markdown-zip" | "word" | "word-original" | "excel" | "pdf" | "wechat" | "yuque",
   ) => {
     setCreateMenu(null);
     const parent = targetParentId ? nodes.find((node) => node.id === targetParentId) || null : null;
@@ -719,13 +721,19 @@ rememberOpened(created.id);
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : kind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : kind === "pdf"
-              ? await importPdfIntoKnowledgeTree(options)
-              : kind === "wechat"
- ? await importWeChatArticleIntoKnowledgeTree(options)
- : null;
+            : kind === "word-original"
+              ? await importWordOriginalIntoKnowledgeTree(options)
+              : kind === "excel"
+                ? await importExcelIntoKnowledgeTree(options)
+                : kind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : kind === "wechat"
+                  ? await importWeChatArticleIntoKnowledgeTree(options)
+                  : null;
       if (!imported) return;
-      activateNote(imported, parent?.id || null);
+      // sheet 笔记走深链打开；excel 导入后直接打开生成的表格
+      if (kind === "excel") pushSheetAppPath(imported.id);
+      else activateNote(imported, parent?.id || null);
       emitTreeChanged("node-imported-quick-browse");
       actions.refreshNotes();
       actions.refreshNotebooks();
@@ -1197,8 +1205,8 @@ rememberOpened(created.id);
     <section
       ref={rootRef}
       className="relative flex min-h-0 min-w-0 flex-1 flex-col"
-      data-nowen-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}
-      data-nowen-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}
+      data-baseforge-mobile-knowledge-tree={variant === "mobile" ? "flat-navigation" : undefined}
+      data-baseforge-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}
       data-knowledge-tree-compact-toolbar={compactToolbar ? "true" : "false"}
     >
       <div className={cn("px-2 pb-2", variant === "mobile" && "pt-2")}>

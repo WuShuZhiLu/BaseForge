@@ -19,6 +19,12 @@ export const API_TOKEN_SCOPES = [
   "tags:read",
   "tags:write",
   "export:import",
+  "remote_files:read",
+  "remote_files:write",
+  "shares:read",
+  "shares:write",
+  "tasks:read",
+  "tasks:write",
 ] as const;
 export type ApiTokenScope = (typeof API_TOKEN_SCOPES)[number];
 export type ApiTokenResourceMode = "unrestricted" | "restricted";

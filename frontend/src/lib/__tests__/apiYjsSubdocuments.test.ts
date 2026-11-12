@@ -3,18 +3,18 @@ import { api } from "@/lib/api";
 
 describe("Y.js Subdocument API", () => {
   beforeEach(() => {
-    Object.assign(window, { nowenDesktop: { isDesktop: true } });
+    Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(window, "nowenDesktop");
+    Reflect.deleteProperty(window, "baseforgeDesktop");
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
   });
 
   it("requests the manifest, a section snapshot and a section update", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
     const responses = [
       { rootGuid: "root", generation: 7, structureVersion: 3, sections: [{ id: "section-a", guid: "guid-a", startBlock: 0, endBlock: 10 }] },
       { guid: "guid-a", stateBase64: "AQ==" },

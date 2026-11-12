@@ -4,7 +4,7 @@ import { ConversionCleanupError } from "./encryptedNotes/conversionCoordination"
 import type { EncryptionConversionPreflight } from "./encryptedNotes/conversionPreflight";
 import { withEncryptedBlocksSupport } from "./encryptedNotes/blockDocument";
 import type { WorkspaceIssue, WorkspaceIssueDetail, IssueActivity, IssueListResponse, NotificationListResponse } from "@/types/workspaceIssues";
-import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Diary, DiaryMediaItem, DiaryTimeline, DiaryStats, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
+import { Notebook, NotebookMember, NotebookShareLink, Note, NoteListItem, Tag, SearchResult, User, UserPublicInfo, Task, TaskStats, TaskFilter, CustomFont, MindMap, MindMapListItem, MindMapFolder, Share, ShareInfo, SharedNoteContent, NoteVersion, VersionDiffResult, ShareComment, NoteCommentListResponse, VersionHistorySettings, RemoteFileEntry, RemoteSourcePublic, RemoteNoteLink, PmProject, PmWorkItem, PmProjectStats, PmGitSource, PmWorkItemLog, PmItemNoteLink, PmItemTypeConfig, Workspace, WorkspaceAdminItem, WorkspaceMember, WorkspaceInvite, WorkspaceRole, WorkspaceFeatures, FileItem, FileDetail, FileListResponse, FileStats, FileSortKey, FileCategory, FileFilter, FileMyUploadsRef } from "@/types";
 import { TASK_REMINDER_SYNC_EVENT, type TaskReminderScheduleItem } from "@/lib/taskNotificationSchedule";
 
 export type TaskMutationResponse = { task: Task; generatedTask: Task | null };
@@ -100,8 +100,8 @@ function protectNoteMutationPayload<T extends Partial<Note>>(
 }
 
 // 服务器地址管理
-const SERVER_URL_KEY = "nowen-server-url";
-export const SERVER_URL_CHANGED_EVENT = "nowen:server-url-changed";
+const SERVER_URL_KEY = "baseforge-server-url";
+export const SERVER_URL_CHANGED_EVENT = "baseforge:server-url-changed";
 
 function dispatchTaskReminderScheduleChanged(): void {
   if (typeof window === "undefined") return;
@@ -109,7 +109,7 @@ function dispatchTaskReminderScheduleChanged(): void {
 }
 
 // ========== 当前工作区（Phase 1 协作） ==========
-const WORKSPACE_KEY = "nowen-current-workspace";
+const WORKSPACE_KEY = "baseforge-current-workspace";
 
 /**
  * 获取当前激活的工作区 ID
@@ -146,7 +146,7 @@ function readServerUrlFromQuery(): string {
   if (typeof window === "undefined") return "";
   try {
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get("serverUrl") || params.get("nowen-server-url") || "";
+    const raw = params.get("serverUrl") || params.get("baseforge-server-url") || "";
     return _normalizeBase(raw);
   } catch {
     return "";
@@ -672,7 +672,7 @@ function getToken(): string | null {
  * L10: 退出登录的统一入口。
  *
  * 设计要点：
- *   - 移除本 tab 的 token，同时通过 `nowen-logout-broadcast` 触发 storage 事件，
+ *   - 移除本 tab 的 token，同时通过 `baseforge-logout-broadcast` 触发 storage 事件，
  *     让其他 tab 的 AuthGate 也一起退出；
  *   - broadcast 的 value 仅用来触发 storage 事件（不能连续写相同值，否则浏览器会
  *     合并掉不派发事件），因此写 Date.now()；
@@ -681,7 +681,7 @@ function getToken(): string | null {
  */
 async function clearDesktopLocalAuthCache(): Promise<void> {
   if (typeof window === "undefined") return;
-  const desktopApi = (window as { nowenDesktop?: { isDesktop?: boolean; clearLocalAuth?: () => Promise<{ ok: boolean }> } }).nowenDesktop;
+  const desktopApi = (window as { baseforgeDesktop?: { isDesktop?: boolean; clearLocalAuth?: () => Promise<{ ok: boolean }> } }).baseforgeDesktop;
   if (!desktopApi?.isDesktop || typeof desktopApi.clearLocalAuth !== "function") return;
   try {
     await desktopApi.clearLocalAuth();
@@ -712,21 +712,21 @@ export function broadcastLogout(reason?: string): Promise<void> {
   }
   try {
     clearAuthTokens();
-    // 清理所有用户缓存（nowen-auth-user:*），防止切换账号后旧缓存被复用
+    // 清理所有用户缓存（baseforge-auth-user:*），防止切换账号后旧缓存被复用
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith("nowen-auth-user:")) {
+      if (key && key.startsWith("baseforge-auth-user:")) {
         keysToRemove.push(key);
       }
     }
     keysToRemove.forEach((k) => localStorage.removeItem(k));
-    // 其他 tab 监听到该 key 的 storage 事件后会自己 removeItem("nowen-token") 并回登录页
-    localStorage.setItem("nowen-logout-broadcast", `${Date.now()}|${reason || ""}`);
+    // 其他 tab 监听到该 key 的 storage 事件后会自己 removeItem("baseforge-token") 并回登录页
+    localStorage.setItem("baseforge-logout-broadcast", `${Date.now()}|${reason || ""}`);
     // 立即删除，这样下次登出也能再次触发（避免 value 相同被合并）
-    localStorage.removeItem("nowen-logout-broadcast");
+    localStorage.removeItem("baseforge-logout-broadcast");
     // 通知同 tab 内的组件（如 SecuritySettings）token 已变化
-    try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent("baseforge:token-changed")); } catch { /* ignore */ }
   } catch {
     /* 隐私模式下 localStorage 可能不可用，忽略 */
   }
@@ -749,8 +749,8 @@ export function broadcastLogout(reason?: string): Promise<void> {
  */
 export function broadcastAuthChanged(reason?: string) {
   try {
-    localStorage.setItem("nowen-auth-changed", `${Date.now()}|${reason || ""}`);
-    localStorage.removeItem("nowen-auth-changed");
+    localStorage.setItem("baseforge-auth-changed", `${Date.now()}|${reason || ""}`);
+    localStorage.removeItem("baseforge-auth-changed");
   } catch {
     /* ignore */
   }
@@ -831,14 +831,22 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
     else userSignal.addEventListener("abort", () => linkedController.abort(), { once: true });
   }
   // Android 原生壳里错误地址/弱网下 GET 体感很像"永远加载"；Web 端保持较长读超时。
-  const TIMEOUT_MS =
-    method === "GET" || method === "HEAD"
+  // 远程存储（WebDAV/SMB）首次连接 + 枚举在慢 NAS 上可达 10s+，放宽到 60s，
+  // 超时时 abort 带上原因，避免 UI 直接显示 "signal is aborted without reason"。
+  const isRemoteFilesCall = url.startsWith("/remote-files");
+  const TIMEOUT_MS = isRemoteFilesCall
+    ? 60000
+    : method === "GET" || method === "HEAD"
       ? isNativeCapacitor()
         ? 20000
         : 60000
       : 30000;
   const timeoutId = setTimeout(() => {
-    try { linkedController.abort(); } catch { /* ignore */ }
+    try {
+      linkedController.abort(isRemoteFilesCall
+        ? new Error("远程存储响应超时（NAS 连接较慢或不可达），请重试")
+        : undefined);
+    } catch { /* ignore */ }
   }, TIMEOUT_MS);
   try {
     // P0-3: 自动注入 X-Connection-Id（如果 WebSocket 已连接）。
@@ -849,14 +857,14 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
     // selfUserId 守卫兜底。
     let connId: string | null = null;
     try {
-      const fn = (window as { __nowenGetConnectionId?: () => string | null })?.__nowenGetConnectionId;
+      const fn = (window as { __baseforgeGetConnectionId?: () => string | null })?.__baseforgeGetConnectionId;
       if (typeof fn === "function") connId = fn();
     } catch {
       /* SSR / window 不可用时静默 */
     }
     const buildHeaders = (includeConnId: boolean): HeadersInit => ({
       "Content-Type": "application/json",
-      "Accept": "application/vnd.nowen.internal-note+json",
+      "Accept": "application/vnd.baseforge.internal-note+json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(sudoToken ? { "X-Sudo-Token": sudoToken } : {}),
       ...(includeConnId && connId ? { "X-Connection-Id": connId } : {}),
@@ -917,7 +925,7 @@ async function requestInternal<T>(url: string, options?: RequestOptions): Promis
             "[api] retry without X-Connection-Id succeeded — backend CORS likely missing this header in allowHeaders. Disabling injection for this session.",
           );
           // 关闭后续注入。注意只关一个会话内的注入，不写 storage（升级后端后下次重启即恢复）。
-          try { (window as { __nowenGetConnectionId?: () => string | null }).__nowenGetConnectionId = () => null; } catch { /* ignore */ }
+          try { (window as { __baseforgeGetConnectionId?: () => string | null }).__baseforgeGetConnectionId = () => null; } catch { /* ignore */ }
         } catch (retryErr) {
           // 用户主动 abort（非超时） → 原样抛
           if ((retryErr as ErrLike)?.name === "AbortError" && userSignal?.aborted) throw retryErr;
@@ -1062,7 +1070,7 @@ function handleOfflineEnqueue<T>(url: string, method: string, bodyStr: string | 
   });
 
   // 派发自定义事件通知 UI（syncStatus = offline）
-  window.dispatchEvent(new CustomEvent("nowen:offline-queued"));
+  window.dispatchEvent(new CustomEvent("baseforge:offline-queued"));
 
   // Phase D: 离线写也要立刻反映到 localStore，否则用户离线创建的笔记
   //   在重启后会消失（offlineQueue 在 localStorage、笔记本身却没在 IDB 中）。
@@ -1175,7 +1183,7 @@ type SiyuanImportRecovery = {
   contentFormat: "tiptap-json" | "markdown";
 };
 
-const SIYUAN_IMPORT_RECOVERY_KEY = "nowen-siyuan-import-recovery";
+const SIYUAN_IMPORT_RECOVERY_KEY = "baseforge-siyuan-import-recovery";
 const SIYUAN_IMPORT_CREATE_RECOVERY_MS = 2 * 60_000;
 const SIYUAN_IMPORT_STATUS_SILENCE_MS = 2 * 60_000;
 const SIYUAN_IMPORT_MAX_WAIT_MS = 2 * 60 * 60_000;
@@ -1488,7 +1496,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
     hasPreferences?: boolean;
   }>("/user-preferences"),
@@ -1504,7 +1511,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
   }) => request<{
     noteTitleAsAppTitle: boolean;
@@ -1518,7 +1524,6 @@ export const api = {
     remoteImagePasteMode?: "localize" | "ask" | "keep-remote";
     hiddenNavigationModules?: string[];
     hiddenTaskCenterModules?: string[];
-    journalLockOnEntry?: boolean;
     showNoteListDividers?: boolean;
     hasPreferences?: boolean;
   }>("/user-preferences", { method: "PUT", body: JSON.stringify(data) }),
@@ -2493,7 +2498,7 @@ export const api = {
   downloadMarkdownExport: (downloadToken: string, filename?: string) => {
     const a = document.createElement("a");
     a.href = `${getBaseUrl()}/export/download/${encodeURIComponent(downloadToken)}`;
-    a.download = filename || "nowen-note.zip";
+    a.download = filename || "baseforge.zip";
     a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
@@ -2517,8 +2522,8 @@ export const api = {
     }
     return res.json() as Promise<{ downloadToken: string; filename: string; size: number }>;
   },
-  /** 导出 BaseForge 数据包（.zip，兼容旧 .nowen.zip） */
-  downloadNowenPackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
+  /** 导出 BaseForge 数据包（.zip，兼容旧 .baseforge.zip） */
+  downloadBaseForgePackage: async (opts?: { workspaceId?: string; notebookId?: string; includeSubNotebooks?: boolean; includeTrashed?: boolean }) => {
     const ws = opts?.workspaceId ?? getCurrentWorkspace();
     const params = new URLSearchParams();
     if (ws && ws !== "personal") params.set("workspaceId", ws);
@@ -2527,7 +2532,7 @@ export const api = {
     if (opts?.includeTrashed) params.set("includeTrashed", "true");
     const qs = params.toString() ? `?${params.toString()}` : "";
     const token = getToken();
-    const res = await fetch(`${getBaseUrl()}/export/nowen-package${qs}`, {
+    const res = await fetch(`${getBaseUrl()}/export/baseforge-package${qs}`, {
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...folderUnlockRequestHeaders() },
     });
@@ -2809,14 +2814,14 @@ export const api = {
     }
   },
   /** BaseForge 数据包 dry-run 预检 */
-  dryRunNowenPackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
+  dryRunBaseForgePackage: async (file: File, opts?: { workspaceId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
     const params = new URLSearchParams({ dryRun: "1" });
     if (opts?.workspaceId) params.set("workspaceId", opts.workspaceId);
     if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
-    const res = await fetch(`${getBaseUrl()}/export/import/nowen-package?${params}`, {
+    const res = await fetch(`${getBaseUrl()}/export/import/baseforge-package?${params}`, {
       method: "POST",
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -2827,7 +2832,7 @@ export const api = {
     return data;
   },
   /** BaseForge 数据包正式导入 */
-  importNowenPackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
+  importBaseForgePackage: async (file: File, opts?: { workspaceId?: string; importMode?: "new-root" | "into-target"; targetNotebookId?: string; fallbackNotebookName?: string }) => {
     const token = getToken();
     const form = new FormData();
     form.append("file", file);
@@ -2837,7 +2842,7 @@ export const api = {
     if (opts?.targetNotebookId) params.set("targetNotebookId", opts.targetNotebookId);
     if (opts?.fallbackNotebookName) params.set("fallbackNotebookName", opts.fallbackNotebookName);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/export/import/nowen-package${qs}`, {
+    const res = await fetch(`${getBaseUrl()}/export/import/baseforge-package${qs}`, {
       method: "POST",
       credentials: "include",
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -3136,7 +3141,7 @@ export const api = {
   },
 
   // Mind Maps
-  // Y4: 与 tasks/diary 一致——"集合"接口自动带当前 workspaceId（personal 不带），
+  // Y4: 与 tasks 一致——"集合"接口自动带当前 workspaceId（personal 不带），
   //   "按 id"接口（get/update/delete）不带，后端按行自带的 workspaceId 做 ACL。
   getMindMaps: (workspaceId?: string | null) => {
     const ws = workspaceId === undefined ? getCurrentWorkspace() : workspaceId;
@@ -3175,301 +3180,6 @@ export const api = {
   moveMindMap: (id: string, folderId: string | null) =>
     request<MindMap>(`/mindmaps/${id}/move`, { method: "PATCH", body: JSON.stringify({ folderId }) }),
 
-  // Diary (说说/动态)
-  // Y2: 自动注入当前工作区。后端按 workspaceId 隔离数据：
-  //   - 'personal' 或省略 → 个人空间（diaries.workspaceId IS NULL）
-  //   - <uuid>            → 指定工作区（要求成员身份 + diaries 功能开关未关闭）
-  // 在工作区中：发布权限按"是否成员 + 功能开关"，删除权限按 canManageResource
-  //   （创建者本人 / admin / owner）。
-  postDiary: (data: { contentText: string; mood?: string; images?: string[]; media?: DiaryMediaItem[]; createdAt?: string }) => {
-    const ws = getCurrentWorkspace();
-    const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    return request<Diary>(`/diary${qs}`, { method: "POST", body: JSON.stringify(data) });
-  },
-  getDiaryTimeline: (
-    cursor?: string,
-    limit?: number,
-    range?: { from?: string; to?: string; mediaType?: string; mood?: string; q?: string },
-    workspaceOverride?: string,
-  ) => {
-    const params = new URLSearchParams();
-    if (cursor) params.set("cursor", cursor);
-    if (limit) params.set("limit", String(limit));
-    if (range?.mediaType && range.mediaType !== "all") params.set("mediaType", range.mediaType);
-    if (range?.mood) params.set("mood", range.mood);
-    if (range?.q) params.set("q", range.q);
-    // from/to 接收 "YYYY-MM-DD" 或完整 ISO 时间；后端会做 normalize
-    if (range?.from) params.set("from", range.from);
-    if (range?.to) params.set("to", range.to);
-    const ws = workspaceOverride ?? getCurrentWorkspace();
-    if (ws && ws !== "personal") params.set("workspaceId", ws);
-    const qs = params.toString();
-    return request<DiaryTimeline>(`/diary/timeline${qs ? `?${qs}` : ""}`);
-  },
-  deleteDiary: (id: string) => request(`/diary/${id}`, { method: "DELETE" }),
-  /**
-   * 编辑一条说说。仅传入需要修改的字段；图片字段传入即覆盖（差集
-   * attach / 反 attach 由后端处理，会自动清理被移除的图片）。
-   * 鉴权：作者本人 + 工作区 admin/owner（与 deleteDiary 一致）。
-   */
-  updateDiary: (
-    id: string,
-    data: { contentText?: string; mood?: string; images?: string[]; media?: DiaryMediaItem[]; createdAt?: string },
-  ) =>
-    request<Diary>(`/diary/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
-  getDiaryStats: (range?: { from?: string; to?: string; mediaType?: string; mood?: string; q?: string }) => {
-    const params = new URLSearchParams();
-    if (range?.from) params.set("from", range.from);
-    if (range?.to) params.set("to", range.to);
-    if (range?.mediaType && range.mediaType !== "all") params.set("mediaType", range.mediaType);
-    if (range?.mood) params.set("mood", range.mood);
-    if (range?.q) params.set("q", range.q);
-    const ws = getCurrentWorkspace();
-    if (ws && ws !== "personal") params.set("workspaceId", ws);
-    const qs = params.toString();
-    return request<DiaryStats>(`/diary/stats${qs ? `?${qs}` : ""}`);
-  },
-
-  // 今日日记
-  journals: {
-    /** 获取或创建今日日记（POST 语义，避免 GET 副作用） */
-    getOrCreateToday: async (localDate?: string) => {
-      const result = await request<{
-        id: string;
-        title: string;
-        existed: boolean;
-        userId: string;
-        contentText?: string;
-        isPinned?: number;
-        isFavorite?: number;
-        isLocked?: number;
-        isArchived?: number;
-        isTrashed?: number;
-        version?: number;
-        createdAt: string;
-        updatedAt: string;
-        [key: string]: unknown;
-      }>("/journals/today", {
-        method: "POST",
-        body: JSON.stringify({ localDate }),
-      });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
-          detail: { reason: result.existed ? "journal-archive-repaired" : "journal-created" },
-        }));
-      }
-      return result;
-    },
-    /** 检查今日日记是否存在（只读，不创建） */
-    checkToday: (date?: string) => {
-      const qs = date ? `?date=${encodeURIComponent(date)}` : "";
-      return request<{ exists: boolean; noteId: string | null; title: string | null }>(`/journals/check${qs}`);
-    },
-    /** 获取或创建当前工作区的共享日期日记 */
-    getOrCreateWorkspace: async (workspaceId: string, localDate: string) => {
-      const result = await request<{
-        id: string;
-        title: string;
-        existed: boolean;
-        canWrite: boolean;
-        role: string;
-        workspaceId: string;
-        scope: "workspace";
-        [key: string]: unknown;
-      }>(`/journals/workspace/${encodeURIComponent(workspaceId)}/resolve`, {
-        method: "POST",
-        body: JSON.stringify({ localDate }),
-      });
-      if (typeof window !== "undefined" && result.canWrite) {
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
-          detail: {
-            reason: result.existed ? "workspace-journal-repaired" : "workspace-journal-created",
-            workspaceId,
-          },
-        }));
-      }
-      return result;
-    },
-    /** 检查工作区共享日记是否存在；只读成员也可调用 */
-    checkWorkspace: (workspaceId: string, date?: string) => {
-      const qs = date ? `?date=${encodeURIComponent(date)}` : "";
-      return request<{
-        exists: boolean;
-        noteId: string | null;
-        title: string | null;
-        canWrite: boolean;
-        role: string;
-        scope: "workspace";
-        workspaceId: string;
-      }>(`/journals/workspace/${encodeURIComponent(workspaceId)}/check${qs}`);
-    },
-    /** 将已有日记迁移到真实的个人日记 / 年 / 月目录 */
-    organizeArchive: () => request<{
-      success: boolean;
-      total: number;
-      organized: number;
-      moved: number;
-      alreadyOrganized: number;
-      skippedInvalidDate: number;
-      skippedWorkspaceJournal: number;
-      foldersCreated: number;
-      foldersAdopted: number;
-      foldersReused: number;
-      rootNotebookId: string | null;
-    }>("/journals/organize", { method: "POST" }),
-    /** 预览迁移后可安全清理的旧空目录 */
-    previewArchiveCleanup: () => request<{
-      previewToken: string;
-      candidateCount: number;
-      blockedCount: number;
-      candidates: Array<{
-        id: string;
-        name: string;
-        parentId: string | null;
-        updatedAt: string;
-        evidenceCount: number;
-      }>;
-      blocked: Array<{
-        id: string;
-        name: string;
-        reasons: string[];
-      }>;
-    }>("/journals/cleanup-preview"),
-    /** 按预览令牌软删除已确认的空旧目录 */
-    cleanupArchive: (data: { previewToken: string; candidateIds?: string[] }) => request<{
-      success: boolean;
-      cleanupId: string;
-      cleaned: number;
-      alreadyDeleted: number;
-      cleanedNotebooks: Array<{ id: string; name: string }>;
-    }>("/journals/cleanup", { method: "POST", body: JSON.stringify(data) }),
-    /** 撤销一次旧目录清理 */
-    restoreArchiveCleanup: (cleanupId: string) => request<{
-      success: boolean;
-      cleanupId: string;
-      restored: number;
-      alreadyActive: number;
-      missing: number;
-      restoredNotebooks: Array<{ id: string; name: string }>;
-    }>("/journals/cleanup/restore", { method: "POST", body: JSON.stringify({ cleanupId }) }),
-    /** 个人日记隐私状态；状态查询本身不要求已解锁。 */
-    getPrivacyStatus: () => request<{
-      exists: boolean;
-      rootNotebookId: string | null;
-      rootNodeId: string | null;
-      title: string;
-      isPasswordProtected: boolean;
-      unlocked: boolean;
-    }>("/journals/privacy"),
-    /** 只确保稳定的个人日记根存在，不会创建当天日记。 */
-    ensurePrivacyRoot: () => request<{
-      exists: boolean;
-      rootNotebookId: string | null;
-      rootNodeId: string | null;
-      title: string;
-      isPasswordProtected: boolean;
-      unlocked: boolean;
-    }>("/journals/privacy/ensure", { method: "POST" }),
-    /** 获取个人日记轻量档案列表。 */
-    list: (options: {
-      year?: string;
-      month?: string;
-      from?: string;
-      to?: string;
-      mood?: string;
-      q?: string;
-      sort?: "date_desc" | "date_asc" | "updated_desc" | "updated_asc";
-      offset?: number;
-      limit?: number;
-      tzOffsetMinutes?: number;
-    } = {}) => {
-      const params = new URLSearchParams();
-      if (options.year) params.set("year", options.year);
-      if (options.month) params.set("month", options.month);
-      if (options.from) params.set("from", options.from);
-      if (options.to) params.set("to", options.to);
-      if (options.mood) params.set("mood", options.mood);
-      if (options.q) params.set("q", options.q);
-      if (options.sort) params.set("sort", options.sort);
-      if (typeof options.offset === "number") params.set("offset", String(options.offset));
-      if (typeof options.limit === "number") params.set("limit", String(options.limit));
-      params.set("tzOffsetMinutes", String(
-        options.tzOffsetMinutes ?? (typeof Date !== "undefined" ? -new Date().getTimezoneOffset() : 0),
-      ));
-      const qs = params.toString();
-      return request<{
-        items: Array<{
-          id: string;
-          title: string;
-          subtitle: string;
-          journalDate: string;
-          preview: string;
-          moods: string[];
-          createdAt: string;
-          updatedAt: string;
-        }>;
-        total: number;
-        hasMore: boolean;
-        nextOffset: number | null;
-        nextCursor: string | null;
-      }>(`/journals/list?${qs}`);
-    },
-    /** 获取日记年月归档结构 */
-    getArchive: () =>
-      request<{
-        years: Array<{
-          year: string;
-          count: number;
-          months: Array<{
-            month: string;
-            count: number;
-            journals: Array<{
-              id: string;
-              title: string;
-              subtitle?: string;
-              journalDate: string;
-              createdAt: string;
-              updatedAt: string;
-            }>;
-          }>;
-        }>;
-      }>("/journals/archive"),
-  },
-
-  // 说说图片：上传 / 删除悬空 / 拼 URL。
-  // 上传时机：用户选好图就立即上传（不是发布时再传），体验上能即时看到缩略图、
-  // 失败也能立即提示。返回的 id 在用户点"发布"时一并提交给 postDiary({ images })。
-  diaryImages: {
-    upload: async (
-      file: File,
-    ): Promise<{ id: string; url: string; mimeType: string; size: number; filename?: string; type: "image" | "video" }> => {
-      const token = getToken();
-      const form = new FormData();
-      form.append("file", file);
-      // Y2: 上传时即记录目标工作区，发布时再 attach 一致。
-      const ws = getCurrentWorkspace();
-      const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-      const res = await fetch(`${getBaseUrl()}/diary/attachments${qs}`, {
-        method: "POST",
-        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: form,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `图片上传失败: ${res.status}`);
-      }
-      return res.json();
-    },
-    /** 删除一张悬空（未发布）的图片。已发布的图片只能通过删除整条说说级联清理。 */
-    remove: (id: string) =>
-      request<{ success: boolean }>(`/diary/attachments/${id}`, { method: "DELETE" }),
-    /** 拼出图片完整 URL，给 <img src> 用。 */
-    urlFor: (id: string): string => `${getBaseUrl()}/diary/attachments/${id}`,
-  },
-
   // ========== Files（文件管理模块：统一查看/上传/删除附件资源）==========
   //
   // attachments 表承载编辑器里每一份二进制字节。文件管理模块是它的
@@ -3500,8 +3210,8 @@ export const api = {
      *  shareStatus=shared / unshared：按是否存在生效中的只读分享链接筛选。
      */
     list: (params: {
-      /** 统一文件池的类型筛选（image/video/audio/doc/other）。 */
-      mimeCategory?: import("@/types").MimeCategory;
+      /** 统一文件池的类型筛选；可传逗号分隔多选（如 "image,doc"），后端 OR 组合。 */
+      mimeCategory?: import("@/types").MimeCategory | string;
       /** @deprecated 三来源时代的来源二分筛选，新代码用 mimeCategory。 */
       category?: FileCategory;
       filter?: FileFilter;
@@ -3684,19 +3394,41 @@ export const api = {
   clearNoteVersions: (noteId: string) =>
     request<{ success: boolean; count: number; skippedManual: number }>(`/shares/note/${noteId}/versions`, { method: "DELETE" }),
 
-  // 远程文件管理插件（remote-files）
+  // 远程文件（内核能力：WebDAV / SMB / 百度网盘）
   getRemoteFileSources: () =>
     request<{ sources: RemoteSourcePublic[]; types: string[] }>("/remote-files/sources"),
-  saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string }) =>
+  saveRemoteFileSource: (data: Partial<RemoteSourcePublic> & { password?: string; accessToken?: string; clientSecret?: string; refreshToken?: string; tokenExpiresAt?: string }) =>
     request<{ source: RemoteSourcePublic }>("/remote-files/sources", { method: "POST", body: JSON.stringify(data) }),
   deleteRemoteFileSource: (sourceId: string) =>
     request<{ success: boolean }>(`/remote-files/sources/${sourceId}`, { method: "DELETE" }),
   testRemoteFileSource: (data: Record<string, unknown>) =>
     request<{ success: boolean }>("/remote-files/sources/test", { method: "POST", body: JSON.stringify(data) }),
-  listRemoteFiles: (sourceId: string, path: string) =>
-    request<{ path: string; entries: RemoteFileEntry[] }>(`/remote-files/sources/${sourceId}/list`, { method: "POST", body: JSON.stringify({ path }) }),
+  listSmbShares: (data: { host: string; username?: string; password?: string; domain?: string; sourceId?: string }) =>
+    request<{ host: string; port: number; shares: Array<{ name: string; comment: string }> }>(
+      "/remote-files/smb/shares", { method: "POST", body: JSON.stringify(data) },
+    ),
+  // WebDAV 目录浏览（连接验证 + 枚举一步完成）
+  listWebdavDir: (data: { baseUrl?: string; username?: string; password?: string; path?: string; sourceId?: string }) =>
+    request<{ path: string; entries: RemoteFileEntry[] }>(
+      "/remote-files/webdav/list", { method: "POST", body: JSON.stringify(data) },
+    ),
+  listRemoteFiles: (sourceId: string, path: string, opts?: { fast?: boolean; revalidate?: boolean }) =>
+    request<{ path: string; entries: RemoteFileEntry[] }>(
+      `/remote-files/sources/${sourceId}/list`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          path,
+          ...(opts?.fast ? { fast: true } : {}),
+          ...(opts?.revalidate ? { revalidate: true } : {}),
+        }),
+      },
+    ),
   readRemoteFile: (sourceId: string, path: string) =>
     request<{ path: string; content: string; size: number }>(`/remote-files/sources/${sourceId}/read`, { method: "POST", body: JSON.stringify({ path }) }),
+  // 二进制读取（base64）：PDF / Word 链接到知识库时取原件
+  readRemoteFileBase64: (sourceId: string, path: string) =>
+    request<{ path: string; size: number; contentBase64: string }>(`/remote-files/sources/${sourceId}/read-base64`, { method: "POST", body: JSON.stringify({ path }) }),
   writeRemoteFile: (sourceId: string, path: string, content: string) =>
     request<{ success: boolean }>(`/remote-files/sources/${sourceId}/write`, { method: "POST", body: JSON.stringify({ path, content }) }),
   mkdirRemoteFile: (sourceId: string, path: string) =>
@@ -3993,90 +3725,6 @@ export const api = {
     return result;
   },
 
-  aiAsk: async (
-    question: string,
-    history?: { role: string; content: string }[],
-    onChunk?: (chunk: string) => void,
-    onReferences?: (refs: {
-      id: string;
-      title: string;
-      // v8：附件命中时后端会把 kind='attachment' + attachmentId/filename 一起发。
-      // 老后端没有这些字段，这里标为可选保持前后向兼容。
-      kind?: "note" | "attachment";
-      attachmentId?: string;
-      attachmentFilename?: string;
-    }[]) => void,
-    options?: { notebookId?: string; includeChildren?: boolean }
-  ): Promise<string> => {
-    const token = getToken();
-    // v7 RAG 隔离：把当前 scope 透传给后端
-    //   personal → 不带 ?workspaceId（后端按 workspaceId IS NULL 走个人空间）
-    //   <uuid>   → 带 ?workspaceId=<uuid>（后端校验成员身份后按工作区检索）
-    const ws = getCurrentWorkspace();
-    const qs = ws && ws !== "personal" ? `?workspaceId=${encodeURIComponent(ws)}` : "";
-    const res = await fetch(`${getBaseUrl()}/ai/ask${qs}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ question, history, notebookId: options?.notebookId, includeChildren: options?.includeChildren }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || `AI 请求失败: ${res.status}`);
-    }
-
-    let result = "";
-    const handleArray = (arr: AiReferenceItem[]) => {
-      // 后端在内容流里夹一条数组 = 参考笔记列表 [{id,title},...]
-      if (arr.length > 0 && arr[0]?.id && arr[0]?.title) {
-        onReferences?.(arr);
-      }
-    };
-    const emit = (chunks: string[]) => {
-      for (const c of chunks) {
-        if (!c) continue;
-        result += c;
-        onChunk?.(c);
-      }
-    };
-
-    if (!res.body || typeof res.body.getReader !== "function") {
-      const fullText = await res.text();
-      const { events } = parseSseChunks(fullText + "\n\n");
-      for (const data of events) {
-        if (data === "[DONE]") break;
-        emit(extractContentChunks(data, handleArray));
-      }
-      return result;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let done = false;
-    while (!done) {
-      const r = await reader.read();
-      done = r.done;
-      if (r.value) buffer += decoder.decode(r.value, { stream: true });
-      const parsed = parseSseChunks(buffer);
-      buffer = parsed.rest;
-      for (const data of parsed.events) {
-        if (data === "[DONE]") { done = true; break; }
-        emit(extractContentChunks(data, handleArray));
-      }
-    }
-    if (buffer.trim()) {
-      const tail = parseSseChunks(buffer + "\n\n");
-      for (const data of tail.events) {
-        if (data === "[DONE]") break;
-        emit(extractContentChunks(data, handleArray));
-      }
-    }
-    return result;
-  },
-
   getKnowledgeStats: async (): Promise<{
     noteCount: number;
     ftsCount: number;
@@ -4122,124 +3770,6 @@ export const api = {
     });
     if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || `请求失败: ${res.status}`); }
     return res.json();
-  },
-
-  // 这些方法失败时抛错由调用方决定如何容错（通常面板加载失败就退回空列表即可）。
-  getAiChatHistory: async (
-    limit = 100,
-    conversationId?: string,
-  ): Promise<{
-    messages: {
-      id: string;
-      role: "user" | "assistant";
-      content: string;
-      references?: {
-        id: string;
-        title: string;
-        kind?: "note" | "attachment";
-        attachmentId?: string;
-        attachmentFilename?: string;
-      }[];
-      createdAt: string;
-    }[];
-    conversationId: string | null;
-  }> => {
-    const token = getToken();
-    const params = new URLSearchParams();
-    params.set("limit", String(limit));
-    if (conversationId) params.set("conversationId", conversationId);
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history?${params.toString()}`, {
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error("加载聊天记录失败");
-    return res.json();
-  },
-
-  appendAiChatHistory: async (msg: {
-    id?: string;
-    conversationId?: string;
-    role: "user" | "assistant";
-    content: string;
-    references?: {
-      id: string;
-      title: string;
-      kind?: "note" | "attachment";
-      attachmentId?: string;
-      attachmentFilename?: string;
-    }[];
-  }): Promise<{ ok: boolean; id?: string; createdAt?: string; skipped?: boolean; conversationId?: string }> => {
-    const token = getToken();
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(msg),
-    });
-    if (!res.ok) throw new Error("保存聊天记录失败");
-    return res.json();
-  },
-
-  clearAiChatHistory: async (conversationId?: string): Promise<{ ok: boolean; deleted: number }> => {
-    const token = getToken();
-    const params = new URLSearchParams();
-    if (conversationId) params.set("conversationId", conversationId);
-    const qs = params.toString();
-    const res = await fetch(`${getBaseUrl()}/ai/chat-history${qs ? `?${qs}` : ""}`, {
-      method: "DELETE",
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-    if (!res.ok) throw new Error("清空聊天记录失败");
-    return res.json();
-  },
-
-  // ========== AI 会话（多对话）==========
-  // 约定：一个会话就是一个"话题"，可改名、可删除。消息通过 conversationId 挂到会话。
-  // 列表失败由组件自行兜底（退化到"空列表 + 创建默认会话"即可）。
-  aiConversations: {
-    list: () =>
-      request<{
-        conversations: {
-          id: string;
-          title: string;
-          archived: boolean;
-          createdAt: string;
-          updatedAt: string;
-          messageCount: number;
-          lastMessage: string | null;
-          lastRole: string | null;
-        }[];
-      }>("/ai/conversations"),
-    create: (data?: { title?: string }) =>
-      request<{
-        conversation: {
-          id: string;
-          title: string;
-          archived: boolean;
-          createdAt: string;
-          updatedAt: string;
-          messageCount: number;
-          lastMessage: string | null;
-          lastRole: string | null;
-        };
-      }>("/ai/conversations", {
-        method: "POST",
-        body: JSON.stringify(data || {}),
-      }),
-    update: (id: string, data: { title?: string; archived?: boolean }) =>
-      request<{ ok: boolean }>(`/ai/conversations/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    remove: (id: string) =>
-      request<{ ok: boolean }>(`/ai/conversations/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      }),
   },
 
   // ========== AI 自定义指令模板（P2）==========
@@ -4540,7 +4070,7 @@ export const api = {
      * 不走 request()，因为 request 只处理 JSON。
      */
     downloadExport: async () => {
-      const token = localStorage.getItem("nowen-token");
+      const token = localStorage.getItem("baseforge-token");
       const res = await fetch(`${getBaseUrl()}/data-file/export`, {
         method: "GET",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -4553,7 +4083,7 @@ export const api = {
       const cd = res.headers.get("Content-Disposition") || "";
       const m = cd.match(/filename="?([^";]+)"?/);
       const fallbackTs = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      const filename = m?.[1] || `nowen-note-${fallbackTs}.data`;
+      const filename = m?.[1] || `baseforge-${fallbackTs}.data`;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -4572,7 +4102,7 @@ export const api = {
      * 成功后 requireRestart=true —— 调用方必须明确提示用户重启后端。
      */
     uploadImport: async (file: File, sudoToken: string) => {
-      const token = localStorage.getItem("nowen-token");
+      const token = localStorage.getItem("baseforge-token");
       const form = new FormData();
       form.append("file", file);
       const res = await fetch(`${getBaseUrl()}/data-file/import`, {
@@ -4740,7 +4270,7 @@ export const api = {
      *
      * 典型场景：
      *   - 管理员收到「发送到邮箱」的 .bak 附件，想在别的实例接上；
-     *   - 从 U盘 / 异机拷贝 nowen-backup-*.zip 过来。
+     *   - 从 U盘 / 异机拷贝 baseforge-backup-*.zip 过来。
      *
      * 导入本身不触及现网数据——文件只是被放进 backupDir 并补齐 meta.json。要真
      * 正应用它，管理员还需要在列表里点「恢复」，走 dryRun 预览 + sudo 二次确认
@@ -5043,7 +4573,6 @@ export const api = {
           rows: number;
           bytes: number;
           attachments: { count: number; bytes: number };
-          diaryAttachments: { count: number; bytes: number };
           taskAttachments: { count: number; bytes: number };
         };
         local: { dir: string; files: number; bytes: number };
@@ -5350,13 +4879,13 @@ async function probeHealthCandidate(candidate: ServerPathCandidate): Promise<Hea
     if (
       !payload
       || payload.status !== "ok"
-      || (payload.service !== "nowen-note" && typeof payload.version !== "string")
+      || (payload.service !== "baseforge" && typeof payload.version !== "string")
     ) {
       return { ok: false, error: "JSON 响应不符合 BaseForge 健康检查格式" };
     }
     return {
       ok: true,
-      proxyRewrittenApiPath: res.headers.get("x-nowen-proxy-compatibility-path") || undefined,
+      proxyRewrittenApiPath: res.headers.get("x-baseforge-proxy-compatibility-path") || undefined,
     };
   } catch (caughtError: unknown) {
       const error = caughtError as Error & { code?: string };
@@ -5389,7 +4918,7 @@ async function probeWebSocketCandidate(websocketUrl: string): Promise<string | n
           finish(
             payload?.type === "probe"
               && payload?.status === "ok"
-              && payload?.service === "nowen-note"
+              && payload?.service === "baseforge"
               && ["/ws", "/public/ws", "/publicws"].includes(acceptedPath)
               ? acceptedPath
               : null,

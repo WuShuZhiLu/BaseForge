@@ -2,7 +2,7 @@ import type { Migration } from "./migrations.impl.js";
 
 export const automationPlatformMigration: Migration = {
   version: 95,
-  name: "nowen-extension-platform-v1-2-automation",
+  name: "baseforge-extension-platform-v1-2-automation",
   up: (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS automation_events (

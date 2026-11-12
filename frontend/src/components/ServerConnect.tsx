@@ -26,7 +26,7 @@ export default function ServerConnect({ onConnected }: ServerConnectProps) {
 
   // 尝试从 localStorage 恢复上次连接的地址
   useEffect(() => {
-    const last = localStorage.getItem("nowen-server-url-last");
+    const last = localStorage.getItem("baseforge-server-url-last");
     if (last) setParts(parseServerUrl(last));
   }, []);
 
@@ -44,7 +44,7 @@ export default function ServerConnect({ onConnected }: ServerConnectProps) {
     if (result.ok) {
       setStatus("ok");
       setServerUrl(serverUrl);
-      localStorage.setItem("nowen-server-url-last", serverUrl);
+      localStorage.setItem("baseforge-server-url-last", serverUrl);
       onConnected();
     } else {
       setStatus("fail");

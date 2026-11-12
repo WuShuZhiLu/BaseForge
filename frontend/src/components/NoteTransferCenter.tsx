@@ -64,7 +64,7 @@ function isMainAppRoute(): boolean {
 
 export default function NoteTransferCenter() {
   const [authenticated, setAuthenticated] = useState(() =>
-    typeof localStorage !== "undefined" && !!localStorage.getItem("nowen-token"),
+    typeof localStorage !== "undefined" && !!localStorage.getItem("baseforge-token"),
   );
   const [open, setOpen] = useState(false);
   const [spaces, setSpaces] = useState<TransferSpace[]>([]);
@@ -89,19 +89,19 @@ export default function NoteTransferCenter() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const reconcileAuth = () => setAuthenticated(!!localStorage.getItem("nowen-token"));
+    const reconcileAuth = () => setAuthenticated(!!localStorage.getItem("baseforge-token"));
     const onWorkspaceChanged = () => {
       setSourceWorkspaceId(normalizeWorkspaceId(getCurrentWorkspace()));
       setPreview(null);
       setResult(null);
     };
     window.addEventListener("storage", reconcileAuth);
-    window.addEventListener("nowen:token-changed", reconcileAuth);
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:token-changed", reconcileAuth);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
     return () => {
       window.removeEventListener("storage", reconcileAuth);
-      window.removeEventListener("nowen:token-changed", reconcileAuth);
-      window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+      window.removeEventListener("baseforge:token-changed", reconcileAuth);
+      window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
     };
   }, []);
 
@@ -282,7 +282,7 @@ export default function NoteTransferCenter() {
           ? `已安全移动 ${completed.copiedNoteCount} 篇笔记`
           : `已复制 ${completed.copiedNoteCount} 篇笔记`,
       );
-      window.dispatchEvent(new CustomEvent("nowen:note-transfer-complete", { detail: completed }));
+      window.dispatchEvent(new CustomEvent("baseforge:note-transfer-complete", { detail: completed }));
       if (mode === "move") {
         await loadSource(sourceWorkspaceId);
       }

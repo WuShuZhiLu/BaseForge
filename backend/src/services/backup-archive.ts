@@ -55,7 +55,7 @@ export function createBackupFilename(
 ): string {
   const timestamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const ext = type === "full" ? ".zip" : ".bak";
-  return `nowen-backup-${type}-${timestamp}-${id.slice(0, 8)}${ext}`;
+  return `baseforge-backup-${type}-${timestamp}-${id.slice(0, 8)}${ext}`;
 }
 
 function addDirectory(

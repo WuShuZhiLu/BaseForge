@@ -516,60 +516,6 @@ function applyTaskReminder(db: DatabaseSync, input: ApplyMutationInput): number 
 }
 
 /**
- * 说说 / 日记：追加型记录。
- *
- * 表里只有 createdAt 没有 updatedAt —— 这类内容发布后极少修改。
- * 因此用幂等 upsert 而不做冲突检测：同 ID 就是同一条记录。
- *
- * images / media 是 JSON 数组字符串，元素指向 diary_attachments。
- * 那些附件的二进制走独立通道（与 attachments 同理），
- * 此处只同步引用关系。
- */
-function applyDiary(db: DatabaseSync, input: ApplyMutationInput): number | null {
-  if (input.operation === "delete") {
-    db.prepare(`DELETE FROM diaries WHERE id = ? AND workspaceId IS ?
-      AND (? IS NOT NULL OR userId = ?)`)
-      .run(input.entityId, workspaceIdOf(input), workspaceIdOf(input), input.userId);
-    return null;
-  }
-
-  const p = input.payload || {};
-  const asJsonArray = (value: unknown): string => {
-    if (typeof value === "string") {
-      // 已是 JSON 字符串：校验可解析，坏数据一律退化为空数组，
-      // 否则前端 JSON.parse 会直接抛错把整个列表打崩。
-      try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? value : "[]";
-      } catch {
-        return "[]";
-      }
-    }
-    return Array.isArray(value) ? JSON.stringify(value) : "[]";
-  };
-
-  db.prepare(`
-    INSERT INTO diaries (id, userId, contentText, mood, images, media, createdAt, workspaceId)
-    VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), ?)
-    ON CONFLICT(id) DO UPDATE SET
-      contentText = excluded.contentText,
-      mood = excluded.mood,
-      images = excluded.images,
-      media = excluded.media
-  `).run(
-    input.entityId,
-    input.userId,
-    typeof p.contentText === "string" ? p.contentText : "",
-    typeof p.mood === "string" ? p.mood : "",
-    asJsonArray(p.images),
-    asJsonArray(p.media),
-    typeof p.createdAt === "string" ? p.createdAt : null,
-    workspaceIdOf(input),
-  );
-  return null;
-}
-
-/**
  * 思维导图：版本化文档。
  *
  * data 是整份图的 JSON。这类实体**必须**防覆盖：
@@ -629,7 +575,6 @@ const APPLIERS: Record<ApplyMutationInput["entityType"], (db: DatabaseSync, inpu
   attachment: applyAttachment,
   task: applyTask,
   task_reminder: applyTaskReminder,
-  diary: applyDiary,
   mindmap: applyMindmap,
   knowledge_tree_node: (db, input) => {
     applyKnowledgeTreeStructureMutation(db, {

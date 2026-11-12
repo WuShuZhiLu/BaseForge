@@ -8,7 +8,7 @@ const source = `![[mindmap:${ID}]]`;
 describe("native mind map document references", () => {
   it("preprocesses a stable reference without copying data or generating an API URL", () => {
     const rendered = preprocessInternalNoteLinks(source);
-    expect(rendered).toContain(`data-nowen-block-embed="mindmap:${ID}"`);
+    expect(rendered).toContain(`data-baseforge-block-embed="mindmap:${ID}"`);
     expect(rendered).not.toContain("/api/");
   });
 
@@ -17,8 +17,8 @@ describe("native mind map document references", () => {
   });
 
   it("rejects malformed and non-embed map wiki links", () => {
-    expect(preprocessInternalNoteLinks("![[mindmap:not-a-uuid]]")).not.toContain("data-nowen-block-embed");
-    expect(preprocessInternalNoteLinks(`[[mindmap:${ID}]]`)).not.toContain("data-nowen-block-embed");
+    expect(preprocessInternalNoteLinks("![[mindmap:not-a-uuid]]")).not.toContain("data-baseforge-block-embed");
+    expect(preprocessInternalNoteLinks(`[[mindmap:${ID}]]`)).not.toContain("data-baseforge-block-embed");
   });
 
   it("preserves the native reference through Markdown to Tiptap and back", () => {

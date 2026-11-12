@@ -27,7 +27,7 @@ import { OPEN_SHORTCUT_HELP_EVENT } from "@/components/ShortcutHelpCenter";
  * 保证 Rail 面板化期间功能零丢失；B2 页签系统上线后移除这一组。
  */
 
-export const OPEN_WORKSPACE_SWITCHER_EVENT = "nowen:open-workspace-switcher";
+export const OPEN_WORKSPACE_SWITCHER_EVENT = "baseforge:open-workspace-switcher";
 
 interface Props {
   onOpenSettings: () => void;

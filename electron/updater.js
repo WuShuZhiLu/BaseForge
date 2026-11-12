@@ -14,7 +14,7 @@
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
-const { DB_FILE_NAME, LEGACY_DB_FILE_NAME } = require("./dataDir");
+const { DB_FILE_NAME } = require("./dataDir");
 const {
   buildReleaseDownloadUrl,
   isManualDownloadPlatform,
@@ -62,7 +62,7 @@ let state = {
 let ctx = {
   getUserDataPath: () => {
     try {
-      return path.join(app.getPath("userData"), "nowen-data");
+      return path.join(app.getPath("userData"), "baseforge-data");
     } catch {
       return null;
     }
@@ -219,10 +219,9 @@ function backupDatabaseBeforeUpdate() {
   try {
     const userDataPath = ctx.getUserDataPath?.();
     if (!userDataPath) return;
-    // 旧版库文件名 nowen-note.db 仍可能存在（迁移失败/回退场景），两边都认
+    // 备份更新前的数据库（含 -wal / -shm 旁路文件）
     const dbPath = path.join(userDataPath, DB_FILE_NAME);
-    const legacyDbPath = path.join(userDataPath, LEGACY_DB_FILE_NAME);
-    const sourceBase = fs.existsSync(dbPath) ? dbPath : legacyDbPath;
+    const sourceBase = dbPath;
     if (!fs.existsSync(sourceBase)) return;
 
     const root = path.join(userDataPath, "backups-pre-update");

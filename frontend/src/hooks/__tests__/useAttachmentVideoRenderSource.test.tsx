@@ -11,7 +11,7 @@ const fixture = vi.hoisted(() => ({
   platform: "web",
   acquire: vi.fn(() => vi.fn()),
   prepareNative: vi.fn(async () => ({
-    uri: "file:///data/user/0/com.nowen.note/cache/attachment-video/video.mp4",
+    uri: "file:///data/user/0/com.baseforge.note/cache/attachment-video/video.mp4",
     size: 1024,
   })),
 }));
@@ -130,7 +130,7 @@ describe("useAttachmentVideoRenderSource", () => {
       url: fixture.signedUrl,
     });
     expect(host.querySelector("video")?.getAttribute("src"))
-      .toBe("local:file:///data/user/0/com.nowen.note/cache/attachment-video/video.mp4");
+      .toBe("local:file:///data/user/0/com.baseforge.note/cache/attachment-video/video.mp4");
   });
 
   it("原生动态缓存失败时暴露错误，照片可返回静态封面", async () => {

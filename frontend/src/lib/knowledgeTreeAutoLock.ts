@@ -168,7 +168,7 @@ export function installKnowledgeTreeAutoLock(options: KnowledgeTreeAutoLockOptio
   window.addEventListener("blur", enterBackground);
   window.addEventListener("focus", enterForeground);
   window.addEventListener("storage", onStorage);
-  window.addEventListener("nowen:token-changed", onAccountChanged);
+  window.addEventListener("baseforge:token-changed", onAccountChanged);
   window.addEventListener(KNOWLEDGE_TREE_PASSWORD_SESSION_CHANGED_EVENT, onSessionChanged);
   document.addEventListener("visibilitychange", onVisibilityChange);
 
@@ -196,7 +196,7 @@ export function installKnowledgeTreeAutoLock(options: KnowledgeTreeAutoLockOptio
     window.removeEventListener("blur", enterBackground);
     window.removeEventListener("focus", enterForeground);
     window.removeEventListener("storage", onStorage);
-    window.removeEventListener("nowen:token-changed", onAccountChanged);
+    window.removeEventListener("baseforge:token-changed", onAccountChanged);
     window.removeEventListener(KNOWLEDGE_TREE_PASSWORD_SESSION_CHANGED_EVENT, onSessionChanged);
     document.removeEventListener("visibilitychange", onVisibilityChange);
     if (nativeListener) void nativeListener.remove();

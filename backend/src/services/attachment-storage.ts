@@ -79,7 +79,7 @@ function env(name: string): string {
 
 function deriveCipherKey(): Buffer {
   const secret = process.env.JWT_SECRET || "baseforge-default-secret";
-  return crypto.scryptSync(secret, "nowen-attachment-storage-v1", 32);
+  return crypto.scryptSync(secret, "baseforge-attachment-storage-v1", 32);
 }
 
 function encryptSecret(plain: string): string {
@@ -434,9 +434,9 @@ export async function probeAttachmentStorage(): Promise<AttachmentStorageHealth>
   const cfg = getS3Config();
   if (!cfg) {
     const dir = ensureAttachmentsDir();
-    const probeName = ".nowen-storage-probe-" + process.pid + "-" + Date.now() + "-" + crypto.randomBytes(4).toString("hex");
+    const probeName = ".baseforge-storage-probe-" + process.pid + "-" + Date.now() + "-" + crypto.randomBytes(4).toString("hex");
     const probePath = path.join(dir, probeName);
-    const payload = Buffer.from("nowen-note attachment storage probe");
+    const payload = Buffer.from("baseforge attachment storage probe");
     try {
       fs.writeFileSync(probePath, payload, { flag: "wx" });
       const readBack = fs.readFileSync(probePath);
@@ -457,8 +457,8 @@ export async function probeAttachmentStorage(): Promise<AttachmentStorageHealth>
     }
   }
 
-  const probe = ".nowen-note-probe/" + Date.now() + "-" + crypto.randomBytes(4).toString("hex") + ".txt";
-  const payload = Buffer.from("nowen-note object storage probe");
+  const probe = ".baseforge-probe/" + Date.now() + "-" + crypto.randomBytes(4).toString("hex") + ".txt";
+  const payload = Buffer.from("baseforge object storage probe");
   let putSucceeded = false;
   try {
     const put = await signedFetch("PUT", probe, cfg, payload, "text/plain");

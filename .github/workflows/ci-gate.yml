@@ -13,7 +13,7 @@ name: CI Gate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop, 'release/**']
   workflow_dispatch:
 
 concurrency:
@@ -25,12 +25,25 @@ defaults:
     shell: bash
 
 jobs:
+  lockfile:
+    name: lockfile registry addresses
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check resolved URLs are official registry
+        run: node scripts/normalize-lockfile-registry.mjs
+
   backend:
     name: backend (typecheck + tests)
     runs-on: ubuntu-latest
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve npm source (official registry)
+        # 锁文件里存过镜像 resolved 地址；这个脚本注入官方 registry +
+        # replace-registry-host=always，让 npm ci 不再按锁文件里的 host 下载。
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
       - name: Install dependencies
         working-directory: backend
         run: npm ci --no-audit --no-fund
@@ -41,12 +54,25 @@ jobs:
         working-directory: backend
         run: npm test
 
+  # 发布链路自身的契约测试：纯 node:test，不依赖仓库依赖，秒级完成。
+  # 这些断言检查的是 workflow 文本与正文生成器，一旦改坏，问题只会在打 tag 当天暴露。
+  release-scripts:
+    name: release scripts (pipeline contracts)
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests
+        run: npm run test:release-pipeline
+
   frontend:
     name: frontend (typecheck + tests)
     runs-on: ubuntu-latest
     container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve npm source (official registry)
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
       - name: Install dependencies
         working-directory: frontend
         run: npm ci --no-audit --no-fund

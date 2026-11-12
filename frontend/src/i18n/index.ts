@@ -32,10 +32,6 @@ import {
   zhCNSecurityAddonTranslations,
 } from "./securityAddonTranslations";
 import {
-  enDiaryMarkdownTranslations,
-  zhCNDiaryMarkdownTranslations,
-} from "./diaryMarkdownTranslations";
-import {
   enEditorSplitTranslations,
   zhCNEditorSplitTranslations,
 } from "./editorSplitTranslations";
@@ -78,7 +74,6 @@ const zhCNWithReleaseTranslations = mergeTranslationPatches(
   zhCNLargeDocumentTranslations,
   zhCNWorkspaceLayoutTranslations,
   zhCNSecurityAddonTranslations,
-  zhCNDiaryMarkdownTranslations,
   zhCNEditorSplitTranslations,
   zhCNVoiceTranslations,
   zhCNWorkspaceIssuesTranslations,
@@ -94,7 +89,6 @@ const enWithReleaseTranslations = mergeTranslationPatches(
   enLargeDocumentTranslations,
   enWorkspaceLayoutTranslations,
   enSecurityAddonTranslations,
-  enDiaryMarkdownTranslations,
   enEditorSplitTranslations,
   enVoiceTranslations,
   enWorkspaceIssuesTranslations,

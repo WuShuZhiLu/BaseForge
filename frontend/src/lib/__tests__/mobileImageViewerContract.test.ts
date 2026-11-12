@@ -9,7 +9,7 @@ describe("mobile image viewer contract", () => {
   it("keeps close controls outside the gesture stage and joins the shared Android back stack", () => {
     const viewer = source("../../components/FullscreenImageViewer.tsx");
 
-    expect(viewer).toContain('data-nowen-mobile-image-viewer=""');
+    expect(viewer).toContain('data-baseforge-mobile-image-viewer=""');
     expect(viewer).toContain('touchAction: "none"');
     expect(viewer).toContain("onPointerDown={handleClosePointerDown}");
     expect(viewer).toContain('registerMobileBackHandler("image-viewer"');

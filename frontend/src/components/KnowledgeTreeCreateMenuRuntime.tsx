@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { FileArchive, FileCode, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
+import { FileArchive, FileCode, FileSpreadsheet, Files, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, CloudDownload, Lock, Table2, BrainCircuit , PenTool, ChevronDown,
 } from "lucide-react";
 import { FaBook } from "react-icons/fa";
 
@@ -29,7 +29,7 @@ import { useApp, useAppActions } from "@/store/AppContext";
 export { FOCUS_KNOWLEDGE_TREE_EVENT, KNOWLEDGE_TREE_CHANGED_EVENT };
 export type { KnowledgeTreePanelProps };
 
-const CREATE_SCOPE_ATTR = "data-nowen-create-scope";
+const CREATE_SCOPE_ATTR = "data-baseforge-create-scope";
 const ALL_NOTES_HOST_ATTR = "data-knowledge-tree-all-notes-host";
 const CREATE_MENU_WIDTH = 232;
 
@@ -45,8 +45,10 @@ const FOLDER_CREATE_ITEM = { kind: "folder", label: "文件夹" } as const;
 const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
   { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
-  { kind: "word", label: "导入 Word 文档", icon: FileType2 },
-  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
+  { kind: "word", label: "导入 Word 转 Markdown", icon: FileType2 },
+  { kind: "word-original", label: "导入 Word 原件预览", icon: FileType2 },
+  { kind: "excel", label: "导入 Excel 表格", icon: FileSpreadsheet },
+  { kind: "pdf", label: "导入 PDF 文档", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
   { kind: "yuque", label: "从 Yuque 导入", icon: CloudDownload },
 ] as const;
@@ -79,14 +81,14 @@ function markCreateButtons(root: HTMLElement): void {
     button.setAttribute(CREATE_SCOPE_ATTR, "node");
     button.title = "新建";
     const row = button.closest<HTMLElement>("[data-knowledge-tree-node-id]");
-    const title = row?.querySelector<HTMLButtonElement>('button[title]:not([data-nowen-create-scope])')?.title;
+    const title = row?.querySelector<HTMLButtonElement>('button[title]:not([data-baseforge-create-scope])')?.title;
     button.setAttribute("aria-label", title ? `在“${title}”下新建` : "在当前节点下新建");
     button.setAttribute("aria-haspopup", "menu");
   }
 }
 
 function ensureAllNotesHost(root: HTMLElement): HTMLElement | null {
-  const panel = root.querySelector<HTMLElement>('[data-nowen-knowledge-tree="embedded"]');
+  const panel = root.querySelector<HTMLElement>('[data-baseforge-knowledge-tree="embedded"]');
   if (!panel) return null;
   const scroll = panel.querySelector<HTMLElement>('[data-swipe-blocker="knowledge-tree-scroll"]');
   if (!scroll || scroll.parentElement !== panel) return null;

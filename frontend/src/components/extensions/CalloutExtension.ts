@@ -4,7 +4,7 @@
  * 来源：官方 Tiptap 无 callout 节点；社区 npm 包（nooxat / bicou / 其它 tiptap-callout）
  * 均已下架/404；唯一活跃参考是 Umo Editor（umodoc/editor，MIT）的开源实现
  * （src/extensions/callout/index.js）。本文件按项目风格将其翻译为 TypeScript，
- * 并按 nowen 架构做了两处适配：
+ * 并按 baseforge 架构做了两处适配：
  *
  * 1. content 用 "block+" 而非 Umo 的 "paragraph+"：与自研 Column 节点一致，
  *    允许高亮块内放代码块/列表等任意块级内容，也更符合"栏内成高亮块"的诉求，

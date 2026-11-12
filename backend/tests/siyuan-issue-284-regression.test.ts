@@ -6,7 +6,7 @@ import test, { after, before } from "node:test";
 import type { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-issue-284-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-issue-284-"));
 process.env.DB_PATH = path.join(tempDir, "test.db");
 process.env.ELECTRON_USER_DATA = tempDir;
 

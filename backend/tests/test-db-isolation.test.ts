@@ -13,7 +13,7 @@ test("backend test processes use a database inside the system temporary director
 
 test("test mode rejects the default development database path", () => {
   assert.throws(
-    () => assertSafeTestDatabasePath(path.join(process.cwd(), "data", "nowen-note.db")),
+    () => assertSafeTestDatabasePath(path.join(process.cwd(), "data", "baseforge.db")),
     /Refusing to open a test database outside the system temporary directory/,
   );
 });

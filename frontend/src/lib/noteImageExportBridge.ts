@@ -35,7 +35,7 @@ export interface NoteImageExportRequestDetail {
   options: NoteImageExportInitialOptions;
 }
 
-export const NOTE_IMAGE_EXPORT_REQUEST_EVENT = "nowen:note-image-export-request";
+export const NOTE_IMAGE_EXPORT_REQUEST_EVENT = "baseforge:note-image-export-request";
 
 const pending = new Map<string, (ok: boolean) => void>();
 let sequence = 0;

@@ -4,6 +4,11 @@ import path from "path";
 import JSZip from "jszip";
 import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
+import {
+  beginManualTransaction,
+  commitManualTransaction,
+  rollbackManualTransaction,
+} from "../db/sqlite-ext";
 import { ensureRoundTripImportBatchesSchema } from "../db/roundtripImportBatchesMigration";
 import { syncReferences as syncAttachmentReferences } from "../lib/attachmentRefs";
 import {
@@ -12,9 +17,9 @@ import {
   writeAttachmentObject,
 } from "./attachment-storage";
 import {
-  importNowenPackageWithSync,
+  importBaseForgePackageWithSync,
   type RoundTripImportParams,
-} from "./nowenRoundTripSync";
+} from "./baseforgeRoundTripSync";
 
 const DATA_DIR = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
 const UNDO_ROOT = path.join(DATA_DIR, "import-undo");
@@ -484,14 +489,14 @@ function markBatchFailed(batchId: string, result: any, message?: string): void {
   removeUndoDir(batchId);
 }
 
-export async function executeNowenPackageImportWithBatch(
+export async function executeBaseForgePackageImportWithBatch(
   zipBuffer: Buffer,
   params: RoundTripImportParams,
 ): Promise<any> {
   cleanupExpiredRoundTripImportUndo();
   const workspaceId = params.workspaceId || null;
   const importMode = params.importMode || "new-root";
-  const preview = await importNowenPackageWithSync(zipBuffer, { ...params, dryRun: true });
+  const preview = await importBaseForgePackageWithSync(zipBuffer, { ...params, dryRun: true });
   if (!preview?.success) return preview;
 
   const batchId = uuid();
@@ -500,7 +505,7 @@ export async function executeNowenPackageImportWithBatch(
   createBatchRow({ id: batchId, userId: params.userId, workspaceId, importMode, identity, preview, undo });
 
   try {
-    const result = await importNowenPackageWithSync(zipBuffer, { ...params, dryRun: false });
+    const result = await importBaseForgePackageWithSync(zipBuffer, { ...params, dryRun: false });
     if (!result?.success) {
       markBatchFailed(batchId, result);
       return { ...result, importBatch: { id: batchId, undoAvailable: false, reason: "导入失败" } };
@@ -698,7 +703,7 @@ export async function undoRoundTripImportBatch(userId: string, batchId: string):
     .sort((a, b) => notebookDepth(b, createdNotebookMap) - notebookDepth(a, createdNotebookMap));
 
   try {
-    getDb().exec("BEGIN TRANSACTION");
+    beginManualTransaction(getDb());
     for (const note of state.updated.notes) {
       const noteId = String(note.row.id || "");
       if (!noteId) continue;
@@ -725,9 +730,9 @@ export async function undoRoundTripImportBatch(userId: string, batchId: string):
          SET status = 'undone', undoAvailable = 0, undoneAt = datetime('now'), undoError = NULL
        WHERE id = ?
     `).run(batchId);
-    getDb().exec("COMMIT");
+    commitManualTransaction(getDb());
   } catch (error) {
-    try { getDb().exec("ROLLBACK"); } catch { /* ignore */ }
+    try { rollbackManualTransaction(getDb()); } catch { /* ignore */ }
     const message = error instanceof Error ? error.message : String(error);
     getDb().prepare("UPDATE roundtrip_import_batches SET undoError = ? WHERE id = ?").run(message, batchId);
     throw new RoundTripImportUndoError(`撤销失败：${message}`, "IMPORT_BATCH_UNDO_FAILED", 409);

@@ -4,9 +4,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-shared-attachment-access-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-shared-attachment-access-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_LEGACY_PUBLIC_URL = "false";
@@ -21,7 +21,7 @@ const SHARE_ID = "attachment-public-share";
 const SHARE_TOKEN = "attachment-share-token";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let attachmentId = "";
 let uploadAccessUrl = "";

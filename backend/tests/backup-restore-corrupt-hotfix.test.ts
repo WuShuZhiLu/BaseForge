@@ -8,9 +8,9 @@ import { DatabaseSync } from "node:sqlite";
 import JSZip from "jszip";
 import { loadSqliteVec } from "../src/db/sqlite-vec-extension.js";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-backup-restore-hotfix-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-backup-restore-hotfix-"));
 const backupDir = path.join(tmpDir, "backups");
-const dbPath = path.join(tmpDir, "nowen-note.db");
+const dbPath = path.join(tmpDir, "baseforge.db");
 const markerKey = "backup-restore-hotfix:marker";
 const userId = "restore-user";
 
@@ -70,8 +70,8 @@ function assertLoginSessionWritable(id: string) {
 }
 
 function assertNoWalShm() {
-  assert.equal(fs.existsSync(dbPath + "-wal"), false, "nowen-note.db-wal should not remain after failed restore");
-  assert.equal(fs.existsSync(dbPath + "-shm"), false, "nowen-note.db-shm should not remain after failed restore");
+  assert.equal(fs.existsSync(dbPath + "-wal"), false, "baseforge.db-wal should not remain after failed restore");
+  assert.equal(fs.existsSync(dbPath + "-shm"), false, "baseforge.db-shm should not remain after failed restore");
 }
 
 async function createBackupDb(marker: string) {
@@ -191,7 +191,7 @@ test("zip file-stage failure rolls back database and does not update jwt secret"
   fs.renameSync = ((oldPath: fs.PathLike, newPath: fs.PathLike) => {
     const oldText = String(oldPath);
     const newText = String(newPath);
-    if (!simulated && oldText.includes(".nowen-restore-staging") && newText.endsWith(`${path.sep}fonts`)) {
+    if (!simulated && oldText.includes(".baseforge-restore-staging") && newText.endsWith(`${path.sep}fonts`)) {
       simulated = true;
       const err = new Error("simulated unrecoverable fonts restore failure") as NodeJS.ErrnoException;
       // EACCES/EPERM/EBUSY/EXDEV are intentionally recoverable now: Docker/NAS mount roots
@@ -220,8 +220,7 @@ test("zip file-stage failure rolls back database and does not update jwt secret"
   }
 });
 
-test("jwt secret write failure is warning-only after database and file restore succeed", async () => {
-  await writeZipBackup("jwt-write-fails.zip", { includeSecret: true });
+test("jwt secret write failure is warning-only after database and file restore succeed", async () => {  await writeZipBackup("jwt-write-fails.zip", { includeSecret: true });
   const originalWriteFileSync = fs.writeFileSync;
   let simulated = false;
 
@@ -245,4 +244,29 @@ test("jwt secret write failure is warning-only after database and file restore s
   } finally {
     fs.writeFileSync = originalWriteFileSync;
   }
+});
+
+test("zip restore rebuilds derived text for legacy notes whose contentText is empty", async () => {
+  // 真实上游备份里有一批「contentFormat 声称 tiptap-json、content 实际是 HTML、
+  // contentText 空」的老数据（2026-11-06 那份 283 篇里有 160 篇），恢复后
+  // 若不做派生重建就整批搜不到。这里固定住「恢复后自动补派生文本」的行为。
+  const db = getDb();
+  const notebookId = "legacy-derived-notebook";
+  const noteId = "legacy-html-note";
+  db.prepare("INSERT OR IGNORE INTO notebooks (id, userId, name) VALUES (?, ?, ?)")
+    .run(notebookId, userId, "legacy");
+  db.prepare(
+    `INSERT OR REPLACE INTO notes (id, userId, notebookId, title, content, contentFormat, contentText, version)
+     VALUES (?, ?, ?, ?, ?, 'tiptap-json', '', 1)`,
+  ).run(noteId, userId, notebookId, "旧 HTML 笔记", "<p>派生文本关键词 zebracorn</p>");
+
+  await writeZipBackup("legacy-derived.zip", { includeSecret: false });
+  const result = await manager.restoreFromBackup("legacy-derived.zip", { dryRun: false });
+
+  assert.equal(result.success, true, result.error);
+  const row = getDb()
+    .prepare("SELECT contentText FROM notes WHERE id = ?")
+    .get(noteId) as { contentText: string } | undefined;
+  assert.ok(row, "restored legacy note should exist");
+  assert.match(row!.contentText, /zebracorn/, "restored legacy note must have derived search text");
 });

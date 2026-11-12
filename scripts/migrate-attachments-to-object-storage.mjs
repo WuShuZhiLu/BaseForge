@@ -14,7 +14,7 @@
  *   ATTACHMENT_STORAGE=s3
  *   S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
  *   S3_REGION=auto
- *   S3_BUCKET=nowen-note
+ *   S3_BUCKET=baseforge
  *   S3_ACCESS_KEY_ID=...
  *   S3_SECRET_ACCESS_KEY=...
  *   S3_PREFIX=attachments
@@ -102,8 +102,8 @@ function env(name) {
 }
 
 function deriveCipherKey() {
-  const secret = process.env.JWT_SECRET || "nowen-note-default-secret";
-  return crypto.scryptSync(secret, "nowen-attachment-storage-v1", 32);
+  const secret = process.env.JWT_SECRET || "baseforge-default-secret";
+  return crypto.scryptSync(secret, "baseforge-attachment-storage-v1", 32);
 }
 
 function decryptSecret(encoded) {
@@ -125,7 +125,7 @@ function resolveDbPath(cliPath) {
   const base = process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
   // 主库文件名已改为 baseforge.db；目录里还只有旧文件名时继续读旧库
   const next = path.resolve(base, "baseforge.db");
-  const legacy = path.resolve(base, "nowen-note.db");
+  const legacy = path.resolve(base, "baseforge.db");
   return !fs.existsSync(next) && fs.existsSync(legacy) ? legacy : next;
 }
 

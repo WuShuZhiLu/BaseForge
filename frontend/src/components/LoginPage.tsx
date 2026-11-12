@@ -92,12 +92,12 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
   const showIcpBeian = !!icpBeianText && !isMobileNativeClientRuntime();
   const isRegister = mode === "register";
   const isTwoFactorStep = loginStep === "twoFactor";
-  const isDesktopClient = !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktopClient = !!(window as any).baseforgeDesktop?.isDesktop;
   const isNativeMobileClient = isMobileNativeClientRuntime() && !isDesktopClient;
   const isMobileUgreenAddress = isNativeMobileClient && isUgreenRemoteAccessUrl(buildServerUrl(serverParts));
 
   useEffect(() => {
-    const desktop = (window as any).nowenDesktop;
+    const desktop = (window as any).baseforgeDesktop;
     if (!desktop?.isDesktop || typeof desktop.on !== "function") return;
 
     const stopReady = desktop.on("ugreen:gateway-ready", (payload: unknown) => {
@@ -109,7 +109,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
       setIsAuthorizingUgreen(false);
       setServerStatus("ok");
       setServerUrl(ready.serverUrl);
-      localStorage.setItem("nowen-server-url-last", ready.serverUrl);
+      localStorage.setItem("baseforge-server-url-last", ready.serverUrl);
       setError("");
       window.setTimeout(() => formRef.current?.requestSubmit(), 0);
     });
@@ -149,13 +149,13 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
 
   useEffect(() => {
     if (!isClientMode) return;
-    const saved = getServerUrl() || localStorage.getItem("nowen-server-url-last") || "";
+    const saved = getServerUrl() || localStorage.getItem("baseforge-server-url-last") || "";
     if (saved) {
       setServerParts(parseServerUrl(saved));
       setServerStatus("ok");
       return;
     }
-    const isElectron = !!(window as any).nowenDesktop?.isDesktop;
+    const isElectron = !!(window as any).baseforgeDesktop?.isDesktop;
     if (isElectron && window.location.origin.startsWith("http")) {
       setServerParts(parseServerUrl(window.location.origin));
     }
@@ -276,7 +276,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
     if (isNativeMobileClient && isUgreenRemoteAccessUrl(url)) {
       setServerStatus("ok");
       setServerUrl(url);
-      localStorage.setItem("nowen-server-url-last", url);
+      localStorage.setItem("baseforge-server-url-last", url);
       return;
     }
     setServerStatus("checking");
@@ -284,7 +284,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
     setServerStatus(result.ok ? "ok" : "fail");
     if (result.ok) {
       setServerUrl(url);
-      localStorage.setItem("nowen-server-url-last", url);
+      localStorage.setItem("baseforge-server-url-last", url);
       fetchRegisterConfig(url).then((cfg) => setAllowRegistration(cfg.allowRegistration)).catch(() => {});
     }
   };
@@ -324,7 +324,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
     if (isNativeMobileClient && isUgreenRemoteAccessUrl(url)) {
       setServerStatus("ok");
       setServerUrl(url);
-      localStorage.setItem("nowen-server-url-last", url);
+      localStorage.setItem("baseforge-server-url-last", url);
       await beginUgreenAuthorization(url);
       return null;
     }
@@ -341,7 +341,7 @@ export default function LoginPage({ onLogin, onAccountLogin, isClientMode = fals
     }
     setServerStatus("ok");
     setServerUrl(url);
-    localStorage.setItem("nowen-server-url-last", url);
+    localStorage.setItem("baseforge-server-url-last", url);
     return url;
   };
 

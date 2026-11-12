@@ -116,18 +116,18 @@ describe("CodeBlockView block indent", () => {
       root.render(<CodeBlockView {...createProps(editor, 0, "mermaid")} />);
     });
     const wrapper = container.querySelector<HTMLElement>(".code-block-wrapper");
-    expect(wrapper?.dataset.nowenMermaidInlinePreview).toBe("true");
+    expect(wrapper?.dataset.baseforgeMermaidInlinePreview).toBe("true");
     expect(wrapper?.querySelector(".mermaid-preview-host")).not.toBeNull();
 
     await act(async () => {
       wrapper?.querySelector<HTMLButtonElement>('button[title="切换到源码"]')?.click();
     });
-    expect(wrapper?.hasAttribute("data-nowen-mermaid-inline-preview")).toBe(false);
+    expect(wrapper?.hasAttribute("data-baseforge-mermaid-inline-preview")).toBe(false);
 
     await act(async () => {
       root.render(<CodeBlockView {...createProps(editor, 0)} />);
     });
-    expect(wrapper?.hasAttribute("data-nowen-mermaid-inline-preview")).toBe(false);
+    expect(wrapper?.hasAttribute("data-baseforge-mermaid-inline-preview")).toBe(false);
   });
 
   it("uses the shared clipboard fallback and reports success after a real copy", async () => {

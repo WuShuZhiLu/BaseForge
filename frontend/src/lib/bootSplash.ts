@@ -4,17 +4,17 @@ const BOOT_SPLASH_LEAVING_CLASS = "app-boot-splash--leaving";
 const BOOT_SPLASH_MIN_VISIBLE_MS = 600;
 const BOOT_SPLASH_LEAVE_MS = 200;
 
-interface NowenBootWindow extends Window {
-  __NOWEN_BOOT_TIMER__?: number;
-  __NOWEN_BOOT_REVEAL_TIMER__?: number;
-  __NOWEN_BOOT_VISIBLE_AT__?: number;
+interface BaseForgeBootWindow extends Window {
+  __BASEFORGE_BOOT_TIMER__?: number;
+  __BASEFORGE_BOOT_REVEAL_TIMER__?: number;
+  __BASEFORGE_BOOT_VISIBLE_AT__?: number;
 }
 
 let dismissed = false;
 let removeTimer: number | null = null;
 
-function bootWindow(): NowenBootWindow {
-  return window as NowenBootWindow;
+function bootWindow(): BaseForgeBootWindow {
+  return window as BaseForgeBootWindow;
 }
 
 function getReactRoot(): HTMLElement | null {
@@ -44,10 +44,10 @@ concealReactRoot();
 
 function clearBootTimers(): void {
   const target = bootWindow();
-  if (target.__NOWEN_BOOT_TIMER__) window.clearTimeout(target.__NOWEN_BOOT_TIMER__);
-  if (target.__NOWEN_BOOT_REVEAL_TIMER__) window.clearTimeout(target.__NOWEN_BOOT_REVEAL_TIMER__);
-  target.__NOWEN_BOOT_TIMER__ = undefined;
-  target.__NOWEN_BOOT_REVEAL_TIMER__ = undefined;
+  if (target.__BASEFORGE_BOOT_TIMER__) window.clearTimeout(target.__BASEFORGE_BOOT_TIMER__);
+  if (target.__BASEFORGE_BOOT_REVEAL_TIMER__) window.clearTimeout(target.__BASEFORGE_BOOT_REVEAL_TIMER__);
+  target.__BASEFORGE_BOOT_TIMER__ = undefined;
+  target.__BASEFORGE_BOOT_REVEAL_TIMER__ = undefined;
 }
 
 function removeSplash(element: HTMLElement): void {
@@ -82,7 +82,7 @@ export function dismissBootSplash(): void {
     return;
   }
 
-  const visibleAt = target.__NOWEN_BOOT_VISIBLE_AT__ || Date.now();
+  const visibleAt = target.__BASEFORGE_BOOT_VISIBLE_AT__ || Date.now();
   const remaining = Math.max(0, BOOT_SPLASH_MIN_VISIBLE_MS - (Date.now() - visibleAt));
   window.setTimeout(() => {
     // Reveal the completed application underneath, then fade the only startup surface away.
@@ -104,7 +104,7 @@ function isVisible(element: Element): boolean {
 function isApplicationReady(root: HTMLElement): boolean {
   const explicitReadySelectors = [
     "[data-unified-sidebar]",
-    "[data-nowen-knowledge-tree]",
+    "[data-baseforge-knowledge-tree]",
     "form",
     "main",
     "article",

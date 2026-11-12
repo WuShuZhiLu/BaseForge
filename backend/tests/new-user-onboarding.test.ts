@@ -1,15 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 import {
   newUserOnboardingMigration,
   onboardingWelcomeNoteId,
 } from "../src/db/newUserOnboardingMigration.js";
 import { newUserOnboardingFirstLoginMigration } from "../src/db/newUserOnboardingFirstLoginMigration.js";
+import { disableOnboardingSeedMigration } from "../src/db/disableOnboardingSeedMigration.js";
 
-function createDb(): Database.Database {
-  const db = new Database(":memory:");
+function createDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (
@@ -50,12 +51,12 @@ function createDb(): Database.Database {
   return db;
 }
 
-function installOnboarding(db: Database.Database): void {
+function installOnboarding(db: DatabaseSync): void {
   newUserOnboardingMigration.up(db);
   newUserOnboardingFirstLoginMigration.up(db);
 }
 
-function confirmLogin(db: Database.Database, userId: string): void {
+function confirmLogin(db: DatabaseSync, userId: string): void {
   db.prepare("UPDATE users SET lastLoginAt = datetime('now') WHERE id = ?").run(userId);
 }
 
@@ -152,6 +153,31 @@ test("seeds Chinese and English guides only on a new account's first confirmed l
 
     assert.equal(notes.some((note) => note.title === "项目启动会议纪要"), false);
     assert.equal(notes.some((note) => note.title === "周末计划"), false);
+  } finally {
+    db.close();
+  }
+});
+
+test("v141 keeps a new account's knowledge base empty on first login", () => {
+  const db = createDb();
+  try {
+    installOnboarding(db);
+    disableOnboardingSeedMigration.up(db);
+
+    const userId = "blank-user";
+    db.prepare("INSERT INTO users (id, username, passwordHash) VALUES (?, ?, ?)")
+      .run(userId, "blank-user", "hash");
+    confirmLogin(db, userId);
+
+    const notebooks = db.prepare(
+      "SELECT COUNT(*) AS count FROM notebooks WHERE userId = ?",
+    ).get(userId) as { count: number };
+    const notes = db.prepare(
+      "SELECT COUNT(*) AS count FROM notes WHERE userId = ?",
+    ).get(userId) as { count: number };
+
+    assert.equal(notebooks.count, 0, "new databases must start with an empty knowledge tree");
+    assert.equal(notes.count, 0, "new databases must not contain demo or guide documents");
   } finally {
     db.close();
   }

@@ -153,7 +153,7 @@ test("ignores a deleted Xiaomi notebook and creates a new active personal target
   assert.equal(note.workspaceId, null);
 });
 
-test("creates one Nowen note for every returned row even when Xiaomi note IDs repeat", async () => {
+test("creates one BaseForge note for every returned row even when Xiaomi note IDs repeat", async () => {
   const app = createApp();
   const first = await importNotes(app, ["note-1", "note-1", "note-2"]);
 

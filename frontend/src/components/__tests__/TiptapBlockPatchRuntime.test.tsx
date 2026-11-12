@@ -66,7 +66,7 @@ vi.mock("../WindowedTiptapEditor", async () => {
   Windowed.displayName = "MockWindowedTiptapEditor";
   return {
     default: Windowed,
-    isTiptapSubdocumentWindowingEnabled: () => localStorage.getItem("nowen:tiptap-subdocuments") === "1",
+    isTiptapSubdocumentWindowingEnabled: () => localStorage.getItem("baseforge:tiptap-subdocuments") === "1",
   };
 });
 
@@ -178,7 +178,7 @@ describe("Tiptap Block Patch runtime shell", () => {
     try {
       const current = note("android-note", "Before");
       setActiveEditorRuntimeDecision(current.id, optimizedDecision("x"));
-      localStorage.setItem("nowen:tiptap-subdocuments", "1");
+      localStorage.setItem("baseforge:tiptap-subdocuments", "1");
       const wholeSave = vi.fn();
       const fetchMock = vi.spyOn(globalThis, "fetch");
       await act(async () => root.render(<TiptapEditorRuntime note={current} onUpdate={wholeSave} />));
@@ -192,7 +192,7 @@ describe("Tiptap Block Patch runtime shell", () => {
   it("applies a subdocument commit to app state without forwarding a whole-note save", async () => {
     const current = note("subdocument-note", "Before");
     const committedContent = content("Committed");
-    localStorage.setItem("nowen:tiptap-subdocuments", "1");
+    localStorage.setItem("baseforge:tiptap-subdocuments", "1");
     setActiveEditorRuntimeDecision(current.id, optimizedDecision("x"));
     const wholeSave = vi.fn();
 
@@ -229,7 +229,7 @@ describe("Tiptap Block Patch runtime shell", () => {
   it("uses the latest window snapshot when falling back to the monolithic editor", async () => {
     const current = note("subdocument-fallback", "Before");
     const fallbackContent = content("Latest local snapshot");
-    localStorage.setItem("nowen:tiptap-subdocuments", "1");
+    localStorage.setItem("baseforge:tiptap-subdocuments", "1");
     setActiveEditorRuntimeDecision(current.id, optimizedDecision("x"));
 
     await act(async () => {

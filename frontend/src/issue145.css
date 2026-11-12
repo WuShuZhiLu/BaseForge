@@ -31,7 +31,7 @@
 }
 
 /* 4. Markdown status bar: keep count in one line and avoid cramped overflow. */
-.nowen-md-editor-status {
+.baseforge-md-editor-status {
   min-height: 28px;
   white-space: nowrap;
   overflow: hidden;

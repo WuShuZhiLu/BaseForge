@@ -1,7 +1,7 @@
 services:
-  nowen-note:
+  baseforge:
     image: {{IMAGE}}
-    container_name: nowen-note
+    container_name: baseforge
     restart: always
     network_mode: host
     volumes:

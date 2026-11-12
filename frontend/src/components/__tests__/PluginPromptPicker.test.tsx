@@ -42,8 +42,8 @@ describe("PluginPromptPicker", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.contributions.mockResolvedValue([{
-      pluginId: "nowenlab.productivity-pack",
-      publisher: "nowenlab",
+      pluginId: "baseforgelab.productivity-pack",
+      publisher: "baseforgelab",
       promptPacks: [{
         id: "summarize-note",
         name: "总结当前笔记",

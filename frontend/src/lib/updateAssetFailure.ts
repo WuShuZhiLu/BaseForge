@@ -1,6 +1,7 @@
 import type { DesktopUpdateSnapshot } from "@/lib/updateExperience";
+import { PROJECT_RELEASES_URL } from "@/lib/projectLinks";
 
-export const DESKTOP_RELEASES_URL = "https://github.com/cropflre/nowen-note/releases";
+export const DESKTOP_RELEASES_URL = PROJECT_RELEASES_URL;
 
 const MISSING_ASSET_PATTERN = /(?:\b404\b|not[ -]?found|does not exist|no such file|asset[^\n]*(?:missing|不存在)|更新文件[^\n]*未正确发布)/i;
 

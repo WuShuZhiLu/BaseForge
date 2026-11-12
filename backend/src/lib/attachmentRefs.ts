@@ -68,14 +68,21 @@ export function extractAttachmentIdsFromContent(
 ): Set<string> {
   const out = new Set<string>();
   if (!content || typeof content !== "string") return out;
-  // 快速预检：没有 `/api/attachments/` 字面量直接返回，零分配
-  if (content.indexOf("/api/attachments/") < 0) return out;
 
   // 必须每次新建 RegExp 实例（带 g 的正则共享 lastIndex 在并发下不安全）。
   const re = new RegExp(ATTACHMENT_ID_RE.source, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(content)) !== null) {
     out.add(m[1].toLowerCase());
+  }
+
+  // PDF 笔记（contentFormat=pdf）正文是 {"attachmentId":"<uuid>"}，没有 URL 字面量。
+  // 同样按严格 UUID 形态匹配，避免误吞任意 attachmentId 字样。
+  if (content.indexOf('"attachmentId"') >= 0) {
+    const jsonRe = /"attachmentId"\s*:\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"/g;
+    while ((m = jsonRe.exec(content)) !== null) {
+      out.add(m[1].toLowerCase());
+    }
   }
   return out;
 }

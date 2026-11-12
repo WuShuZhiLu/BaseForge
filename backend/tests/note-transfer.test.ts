@@ -5,7 +5,7 @@ import path from "node:path";
 import test, { after, before, beforeEach } from "node:test";
 import type { DatabaseSync } from "node:sqlite";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-transfer-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-transfer-"));
 process.env.DB_PATH = path.join(tempDir, "test.db");
 process.env.ELECTRON_USER_DATA = tempDir;
 process.env.JWT_SECRET = "note-transfer-test-secret";

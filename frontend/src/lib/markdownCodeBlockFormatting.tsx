@@ -75,7 +75,7 @@ class FormatFenceWidget extends WidgetType {
   eq(other: FormatFenceWidget) { return this.from === other.from && this.language === other.language; }
   toDOM(view: EditorView): HTMLElement {
     const host = document.createElement("span");
-    host.className = "cm-nowen-fence-format";
+    host.className = "cm-baseforge-fence-format";
     host.contentEditable = "false";
     const root = createRoot(host);
     roots.set(host, root);
@@ -99,7 +99,7 @@ function activeFormatButtons(state: EditorState): DecorationSet {
     const line = state.doc.lineAt(node.from);
     const opening = parseMarkdownFenceOpening(line.text) || parseMarkdownFenceOpening(line.text.slice(node.from - line.from));
     if (!opening) return;
-    ranges.push(Decoration.line({ class: "cm-nowen-fence-format-line" }).range(line.from));
+    ranges.push(Decoration.line({ class: "cm-baseforge-fence-format-line" }).range(line.from));
     ranges.push(Decoration.widget({ widget: new FormatFenceWidget(node.from, opening.language), side: 1 }).range(line.to));
   } });
   return Decoration.set(ranges, true);
@@ -114,7 +114,7 @@ const formatButtons = StateField.define<DecorationSet>({
 });
 
 export const markdownCodeBlockFormattingExtension = [formatButtons, EditorView.theme({
-  ".cm-nowen-fence-format-line": { position: "relative", paddingRight: "90px" },
-  ".cm-nowen-fence-format": { position: "absolute", right: "6px", top: "0", fontFamily: "ui-sans-serif, system-ui, sans-serif" },
-  ".cm-nowen-fence-format-line.cm-nowen-fence-opening::after": { right: "90px" },
+  ".cm-baseforge-fence-format-line": { position: "relative", paddingRight: "90px" },
+  ".cm-baseforge-fence-format": { position: "absolute", right: "6px", top: "0", fontFamily: "ui-sans-serif, system-ui, sans-serif" },
+  ".cm-baseforge-fence-format-line.cm-baseforge-fence-opening::after": { right: "90px" },
 })];

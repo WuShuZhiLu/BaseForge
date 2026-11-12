@@ -6,7 +6,7 @@
  *
  * 启动 PostgreSQL：
  *   docker compose -f docker-compose.postgres.yml up -d
- *   $env:TEST_PG_DATABASE_URL="postgres://nowen:nowen_dev_password@localhost:5432/nowen_note_test"
+ *   $env:TEST_PG_DATABASE_URL="postgres://baseforge:baseforge_dev_password@localhost:5432/baseforge_note_test"
  */
 
 import assert from "node:assert/strict";

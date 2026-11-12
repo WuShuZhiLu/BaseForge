@@ -30,9 +30,9 @@ export interface DesktopUpdateSnapshot {
   manual?: boolean;
 }
 
-export const UPDATE_AUTO_CHECK_KEY = "nowen-desktop-update-auto-check";
-export const UPDATE_INSTALL_ON_QUIT_KEY = "nowen-desktop-update-install-on-quit";
-export const UPDATE_LAST_CHECK_KEY = "nowen-desktop-update-last-check";
+export const UPDATE_AUTO_CHECK_KEY = "baseforge-desktop-update-auto-check";
+export const UPDATE_INSTALL_ON_QUIT_KEY = "baseforge-desktop-update-install-on-quit";
+export const UPDATE_LAST_CHECK_KEY = "baseforge-desktop-update-last-check";
 
 export function readBooleanPreference(key: string, fallback: boolean): boolean {
   if (typeof localStorage === "undefined") return fallback;

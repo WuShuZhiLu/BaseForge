@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { normalizeServerBaseUrl } from "@/lib/serverUrl";
 
 const UGREEN_REMOTE_HOST_SUFFIXES = [".ugdocker.link", ".ug.link"];
-const UGREEN_FETCH_PATCH_MARK = "__nowenUgreenCredentialedFetchInstalled";
+const UGREEN_FETCH_PATCH_MARK = "__baseforgeUgreenCredentialedFetchInstalled";
 
 export function getUgreenRemoteAccessUrl(input: string | null | undefined): string {
   const normalized = normalizeServerBaseUrl(input);
@@ -30,7 +30,7 @@ export function isUgreenRemoteAccessUrl(input: string | null | undefined): boole
  * 仅对可信绿联 HTTPS 主机把 credentials 提升为 include，其它请求保持原样。
  */
 export function installUgreenCredentialedFetch(): void {
-  if (typeof window === "undefined" || !(window as any).nowenDesktop?.isDesktop) return;
+  if (typeof window === "undefined" || !(window as any).baseforgeDesktop?.isDesktop) return;
   const runtime = window as any;
   if (runtime[UGREEN_FETCH_PATCH_MARK]) return;
 
@@ -61,8 +61,8 @@ export async function openUgreenRemoteWorkspace(input: string): Promise<void> {
     return;
   }
 
-  if ((window as any).nowenDesktop?.isDesktop) {
-    const openInDesktop = (window as any).nowenDesktop?.openUgreenRemoteWorkspace;
+  if ((window as any).baseforgeDesktop?.isDesktop) {
+    const openInDesktop = (window as any).baseforgeDesktop?.openUgreenRemoteWorkspace;
     if (typeof openInDesktop !== "function") {
       throw new Error("Desktop UGREEN access is unavailable");
     }

@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-att-chunks-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-att-chunks-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { attachmentChunksRepository } from "../src/repositories/attachmentChunksRepository";

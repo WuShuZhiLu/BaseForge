@@ -95,7 +95,7 @@ function verifyRemoteRelease({ repo, tag, version }) {
     assertCompleteMacReleaseAssets(assetNames, releaseVersion, `remote Release ${tag} macOS assets`);
   }
 
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-release-verify-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-release-verify-"));
   try {
     for (const asset of metadataAssets) downloadAsset(repo, tag, asset.name, tempDir);
 

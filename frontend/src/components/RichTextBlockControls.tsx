@@ -52,10 +52,10 @@ export default function RichTextBlockControls({ editor, editable, isMobile }: { 
     const onTransaction = ({ transaction }: { transaction: { docChanged: boolean } }) => {
       if (transaction.docChanged || !editor.isEditable) setMenu(null);
     };
-    window.addEventListener("nowen:open-block-menu", onOpen);
+    window.addEventListener("baseforge:open-block-menu", onOpen);
     editor.on("transaction", onTransaction);
     return () => {
-      window.removeEventListener("nowen:open-block-menu", onOpen);
+      window.removeEventListener("baseforge:open-block-menu", onOpen);
       editor.off("transaction", onTransaction);
     };
   }, [editor]);
@@ -124,7 +124,7 @@ export default function RichTextBlockControls({ editor, editable, isMobile }: { 
             try {
               // 转正：匿名文档进入知识树；已有名文档时后端幂等（仅按需更新标题）。
               await api.promoteNote(id);
-              window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "anonymous-doc-promoted", noteId: id } }));
+              window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "anonymous-doc-promoted", noteId: id } }));
               toast.success(t("richText.embedPromoted"));
             } catch (error) {
               toast.error(error instanceof Error ? error.message : t("richText.embedPromoteFailed"));
@@ -150,9 +150,9 @@ export default function RichTextBlockControls({ editor, editable, isMobile }: { 
           {/* 三类嵌入块：创建需异步建匿名文档，复用斜杠命令的事件管线
               （EditorPane 监听后插块即匿名，见 pendingAnonEmbed 副作用）。 */}
           {([
-            { kind: "sheet" as const, event: "nowen:open-sheet-embed-picker", label: t("slash.sheetEmbed") || "轻量表格" },
-            { kind: "mindmap" as const, event: "nowen:open-mindmap-insert", label: t("slash.mindmap") || "思维导图" },
-            { kind: "board" as const, event: "nowen:open-board-embed-picker", label: t("slash.boardEmbed") || "画板" },
+            { kind: "sheet" as const, event: "baseforge:open-sheet-embed-picker", label: t("slash.sheetEmbed") || "轻量表格" },
+            { kind: "mindmap" as const, event: "baseforge:open-mindmap-insert", label: t("slash.mindmap") || "思维导图" },
+            { kind: "board" as const, event: "baseforge:open-board-embed-picker", label: t("slash.boardEmbed") || "画板" },
           ]).map(({ kind, event, label }) => <button key={kind} type="button" role="menuitem" className={buttonClass} onClick={() => {
             if (!editor.isEditable) return;
             setMenu(null);

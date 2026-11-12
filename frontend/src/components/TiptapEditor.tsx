@@ -64,6 +64,7 @@ import { CellSelection } from "@tiptap/pm/tables";
 import { markdownToSimpleHtml } from "@/lib/importService";
 import { repairTiptapJson } from "@/lib/tiptapSchemaRepair";
 import { EditorToolbarPortal, useEditorToolbarSlot } from "@/components/CollapsibleEditorToolbar";
+import { ToolbarButton, ToolbarDivider } from "@/components/editors/ToolbarPrimitives";
 import { markdownToHtml as mdToFullHtml, detectFormat as detectContentFormat, tiptapJsonToMarkdown } from "@/lib/contentFormat";
 import { insertContentPreservingBlockEmbed } from "@/lib/insertContentPreservingBlockEmbed";
 import { findInternalMarkdownMarkerRanges } from "@/lib/markdownUserContent";
@@ -245,7 +246,7 @@ function parsePastedWikiNoteLinks(text: string, fallbackTitle: string): HTMLDivE
     const title = (rawTitle || fallbackTitle).replace(/\\]/g, "]");
     const anchor = document.createElement("a");
     anchor.setAttribute("href", blockId ? `note:${noteId}#blk:${blockId}` : `note:${noteId}`);
-    anchor.setAttribute("rel", `noopener noreferrer nofollow nowen-title-${rawTitle ? "alias" : "auto"}`);
+    anchor.setAttribute("rel", `noopener noreferrer nofollow baseforge-title-${rawTitle ? "alias" : "auto"}`);
     anchor.textContent = title || fallbackTitle;
     wrapper.appendChild(anchor);
     lastIndex = match.index + match[0].length;
@@ -278,7 +279,7 @@ function parsePastedWikiNoteLinks(text: string, fallbackTitle: string): HTMLDivE
 //
 // 这是全局一次性补丁，使用 Symbol 防重复应用。
 // ---------------------------------------------------------------------------
-const RESOLVE_PATCHED = Symbol.for("nowen.pm.resolve.patched");
+const RESOLVE_PATCHED = Symbol.for("baseforge.pm.resolve.patched");
 if (!(ProseMirrorNode.prototype as any)[RESOLVE_PATCHED]) {
   const originalResolve = ProseMirrorNode.prototype.resolve;
   ProseMirrorNode.prototype.resolve = function patchedResolve(pos: number) {
@@ -876,7 +877,7 @@ const BlockIdExtension = Extension.create({
  */
 function createKeyboardExtension(flushSaveRef: React.MutableRefObject<() => void>) {
   return Extension.create({
-    name: "nowenKeyboard",
+    name: "baseforgeKeyboard",
     addKeyboardShortcuts() {
       const editor = this.editor as any;
 
@@ -1019,44 +1020,6 @@ function createKeyboardExtension(flushSaveRef: React.MutableRefObject<() => void
 }
 
 
-interface ToolbarButtonProps {
-  onClick: () => void;
-  isActive?: boolean;
-  disabled?: boolean;
-  children: React.ReactNode;
-  title?: string;
-  compact?: boolean;
-  className?: string;
-}
-
-function ToolbarButton({ onClick, isActive, disabled, children, title, compact, className }: ToolbarButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseDown={(event) => event.preventDefault()}
-      disabled={disabled}
-      title={title}
-      className={cn(
-        // 统一固定高度：行高不随"哪个按钮被换行到第几行"变化，
-        // 保证折叠单行与展开态第一行高度一致
-        "flex h-7 shrink-0 items-center justify-center rounded-full transition-colors",
-        compact ? "p-1" : "p-1.5",
-        isActive
-          ? "bg-accent-primary/20 text-accent-primary"
-          : "text-tx-secondary hover:bg-app-hover hover:text-tx-primary",
-        disabled && "opacity-30 cursor-not-allowed",
-        className,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ToolbarDivider() {
-  return <div className="h-5 w-px shrink-0 bg-app-border mx-1" />;
-}
 
 interface ToolbarMenuItem {
   key: string;
@@ -3258,7 +3221,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       marks: [{ type: "link", attrs: {
         href,
         target: "_blank",
-        rel: `noopener noreferrer nofollow nowen-title-${titleMode}`,
+        rel: `noopener noreferrer nofollow baseforge-title-${titleMode}`,
       } }],
     }).run();
     setNoteLinkMenu((previous) => ({ ...previous, open: false }));
@@ -3891,7 +3854,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   }, [getSelectedImageAttrs, t]);
 
   const handleViewerDownload = useCallback(async (item: FullscreenImageItem) => {
-    const filename = item.filename || "nowen-image.png";
+    const filename = item.filename || "baseforge-image.png";
     if (isAndroidNative() || item.src.startsWith("data:") || item.src.startsWith("blob:")) {
       await saveImageBlobSource(item.src, filename);
       toast.success(t("tiptap.imageDownloadSuccess", { defaultValue: "图片已保存" }));
@@ -4716,7 +4679,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
   /**
    * 桌面端格式菜单桥（macOS 原生菜单 / 快捷键 → Tiptap）
    * ----------------------------------------------------------------
-   * 监听 window "nowen:format" 自定义事件，由 `useDesktopMenuBridge`（App.tsx）
+   * 监听 window "baseforge:format" 自定义事件，由 `useDesktopMenuBridge`（App.tsx）
    * 在收到 Electron 主进程 "menu:format" IPC 时派发。payload 形如：
    *   { mark: "bold" | "italic" | "underline" | "strike" | "code" }
    *   { node: "heading", level: 1..6 }
@@ -4759,8 +4722,8 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
         chain.setParagraph().run();
       }
     };
-    window.addEventListener("nowen:format", handler as EventListener);
-    return () => window.removeEventListener("nowen:format", handler as EventListener);
+    window.addEventListener("baseforge:format", handler as EventListener);
+    return () => window.removeEventListener("baseforge:format", handler as EventListener);
   }, [editor, editable]);
 
   /**
@@ -4774,7 +4737,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
    *   - 浅比较去重：大多数键盘输入不改变格式状态，去重后 IPC 调用量降至 ~0。
    *   - 编辑器卸载 / 失焦时发 null，让主进程清空所有 checked（避免"残影"）。
    *
-   * 仅在 Electron 环境下有效；Web / 移动端 window.nowenDesktop 不存在，直接短路。
+   * 仅在 Electron 环境下有效；Web / 移动端 window.baseforgeDesktop 不存在，直接短路。
    *
    * Markdown 模式下 TiptapEditor 根本没挂载，自然不会上报——符合语义：
    * 菜单 checked 反映的始终是"当前正在编辑的那个上下文"。MD 未来若需要可以
@@ -5597,11 +5560,11 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       setSearchOpen(true);
     };
     const onClose = () => setSearchOpen(false);
-    window.addEventListener("nowen:open-search", onOpen);
-    window.addEventListener("nowen:close-search", onClose);
+    window.addEventListener("baseforge:open-search", onOpen);
+    window.addEventListener("baseforge:close-search", onClose);
     return () => {
-      window.removeEventListener("nowen:open-search", onOpen);
-      window.removeEventListener("nowen:close-search", onClose);
+      window.removeEventListener("baseforge:open-search", onOpen);
+      window.removeEventListener("baseforge:close-search", onClose);
     };
   }, []);
 
@@ -5623,7 +5586,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
       .run();
   };
   // 保留的原生模板插入实现：工具栏脑图按钮已改为打开原生选择器
-  // （nowen:open-mindmap-insert），此模板入口迁移到斜杠命令 mermaidMindMap。
+  // （baseforge:open-mindmap-insert），此模板入口迁移到斜杠命令 mermaidMindMap。
   const insertMindMap = () => {
     editor
       .chain()
@@ -5951,7 +5914,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
           <Workflow size={iconSize} />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => window.dispatchEvent(new CustomEvent("nowen:open-mindmap-insert"))}
+          onClick={() => window.dispatchEvent(new CustomEvent("baseforge:open-mindmap-insert"))}
           title={t('tiptap.insertMindMap')}
         >
           <BrainCircuit size={iconSize} />
@@ -6605,7 +6568,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                   {t("tiptap.imageSizeOriginal")}
                 </button>
               </div>
-              <div data-nowen-image-transform-slot="true" />
+              <div data-baseforge-image-transform-slot="true" />
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {selectedImageCanLocalize && (
                   <button
@@ -7031,11 +6994,11 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
               centerHandle();
               // 同一 handle 只挂一个 observer：进入新块时先断开旧 observer
               // （旧闭包捕获的是上一块的 blockEl，不重连会居中到错误块）
-              const existing = (handle as any)._nowenCenterObserver as MutationObserver | undefined;
+              const existing = (handle as any)._baseforgeCenterObserver as MutationObserver | undefined;
               if (existing) existing.disconnect();
               const observer = new MutationObserver(centerHandle);
               observer.observe(handle, { attributes: true, attributeFilter: ["style"] });
-              (handle as any)._nowenCenterObserver = observer;
+              (handle as any)._baseforgeCenterObserver = observer;
             } catch {
               /* 居中失败不影响块柄正常显示 */
             }
@@ -7125,7 +7088,7 @@ const TiptapEditor = forwardRef<NoteEditorHandle, TiptapEditorProps>(function Ti
                           setAttachmentPreview(null);
                           // 触发笔记内容刷新：让外层 EditorPane 拉一次最新 note。
                           try {
-                            window.dispatchEvent(new CustomEvent("nowen:note-updated", { detail: { noteId: res.note.id } }));
+                            window.dispatchEvent(new CustomEvent("baseforge:note-updated", { detail: { noteId: res.note.id } }));
                           } catch { /* ignore */ }
                         } catch (err: any) {
                           console.error("Replace docx failed:", err);

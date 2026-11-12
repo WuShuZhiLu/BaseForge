@@ -227,7 +227,7 @@ export function attachRealtimeServer(server: import("http").Server) {
         ws.send(JSON.stringify({
           type: "probe",
           status: "ok",
-          service: "nowen-note",
+          service: "baseforge",
           path: url.pathname,
         }));
         ws.close(1000, "probe-complete");

@@ -1,8 +1,8 @@
 /**
  * Electron Desktop Bridge
  * -------------------------------------------------------------
- * 通过 preload 注入的 window.nowenDesktop 与主进程通信。
- * Web 端不会有 window.nowenDesktop，这里做了兜底，安全用在 SSR/浏览器环境。
+ * 通过 preload 注入的 window.baseforgeDesktop 与主进程通信。
+ * Web 端不会有 window.baseforgeDesktop，这里做了兜底，安全用在 SSR/浏览器环境。
  *
  * 约定的菜单事件：
  *   menu:new-note         新建笔记（Electron：Ctrl/Cmd+N）
@@ -316,7 +316,7 @@ export interface DesktopHttpAPI {
   }>;
 }
 
-interface NowenDesktopAPI {
+interface BaseForgeDesktopAPI {
   on: (channel: string, listener: (payload: unknown) => void) => () => void;
   checkForUpdates: () => Promise<{ ok: boolean; reason?: string; version?: string }>;
   quitAndInstall: () => Promise<{ ok: boolean }>;
@@ -376,21 +376,21 @@ interface NowenDesktopAPI {
   http?: DesktopHttpAPI;
 }
 
-function getBridge(): NowenDesktopAPI | null {
+function getBridge(): BaseForgeDesktopAPI | null {
   if (typeof window === "undefined") return null;
-  return (window as unknown as { nowenDesktop?: NowenDesktopAPI }).nowenDesktop ?? null;
+  return (window as unknown as { baseforgeDesktop?: BaseForgeDesktopAPI }).baseforgeDesktop ?? null;
 }
 
 export const isDesktop = (): boolean => !!getBridge();
 
 /** 检查文件夹同步是否可用 */
 export function isFolderSyncAvailable(): boolean {
-  return !!(window as any).nowenDesktop?.folderSync;
+  return !!(window as any).baseforgeDesktop?.folderSync;
 }
 
 /** 获取文件夹同步桥接 API */
 export function getFolderSyncBridge(): FolderSyncAPI | null {
-  return (window as any).nowenDesktop?.folderSync ?? null;
+  return (window as any).baseforgeDesktop?.folderSync ?? null;
 }
 
 /**

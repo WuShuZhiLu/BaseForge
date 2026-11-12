@@ -5,8 +5,8 @@ import { DEFAULT_NOTE_THEME_ID, normalizeNoteThemeId } from "../lib/noteThemeId.
 
 export { DEFAULT_NOTE_THEME_ID, normalizeNoteThemeId } from "../lib/noteThemeId.js";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.noteAppearance.routePatch");
-const ROUTER_INSTALLED_FLAG = Symbol.for("nowen.noteAppearance.routerInstalled");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.noteAppearance.routePatch");
+const ROUTER_INSTALLED_FLAG = Symbol.for("baseforge.noteAppearance.routerInstalled");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 let schemaReadyFor: ReturnType<typeof getDb> | null = null;
@@ -30,7 +30,7 @@ export function ensureNoteAppearanceSchema(): void {
 
 /**
  * NULL means "inherit the account/notebook default". `default` is a real explicit theme choice,
- * which matters when an account default is Paper but one note intentionally wants Nowen Default.
+ * which matters when an account default is Paper but one note intentionally wants BaseForge Default.
  */
 const router = new Hono();
 

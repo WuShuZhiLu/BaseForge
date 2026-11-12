@@ -24,7 +24,17 @@ test("tag 构建工作流不让 electron-builder 直接发布 GitHub Release", a
   const workflow = await readRepoFile(".github/workflows/release.yml");
   assert.match(workflow, /node-version:\s*["']22["']/);
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read\s*\n\s*actions:\s*read/);
-  assert.equal((workflow.match(/--publish never/g) || []).length, 5);
+  // 不固定次数：每多一个构建目标（如 Lite 的 mac / linux）都会多一次调用，
+  // 但每一次都必须显式关掉 electron-builder 的内置发布能力。
+  const builderCommands = workflow
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.includes("electron-builder") && line.includes("--config"));
+  assert.ok(builderCommands.length >= 5, `至少应有 5 条 electron-builder 构建命令，实际 ${builderCommands.length}`);
+  for (const command of builderCommands) {
+    assert.match(command, /--publish never/, `构建命令缺少 --publish never：${command}`);
+  }
+  assert.equal((workflow.match(/--publish never/g) || []).length, builderCommands.length);
   assert.doesNotMatch(workflow, /--publish always/);
   assert.doesNotMatch(workflow, /GH_TOKEN:/);
 });
@@ -38,10 +48,11 @@ test("手动 workflow 只使用 SignPath test-signing 且使用 Full Artifact Co
   assert.match(testBlock, /workflow_dispatch/);
   assert.match(testBlock, /signing-policy-slug:\s*["']test-signing["']/);
   assert.match(testBlock, /artifact-configuration-slug:\s*\$\{\{ vars\.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG \}\}/);
-  assert.match(testBlock, /version:\s*\$\{\{ toJSON\(steps\.package_version\.outputs\.version\) \}\}/);
+  // 参数化 artifact configuration 是 SignPath 付费能力，免费订阅下不能传 parameters。
+  assert.doesNotMatch(testBlock, /parameters:/);
   assert.match(testBlock, /SIGNPATH_ORGANIZATION_ID/);
   assert.match(testBlock, /SIGNPATH_PROJECT_SLUG/);
-  assert.match(testBlock, /nowen-note-win-signpath-test/);
+  assert.match(testBlock, /baseforge-win-signpath-test/);
   assert.doesNotMatch(testBlock, /release-signing/);
   assert.doesNotMatch(testBlock, /SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG/);
   assert.doesNotMatch(testBlock, /refs\/tags/);
@@ -59,13 +70,13 @@ test("tag Windows 正式发布必须经过 Full Lite 独立 SignPath 配置和�
   assert.match(workflow, /verify-windows-signatures\.mjs/);
   assert.match(workflow, /--require full,lite/);
   assert.match(workflow, /refresh-windows-update-metadata\.mjs/);
-  assert.match(workflow, /nowen-note-win-signed/);
+  assert.match(workflow, /baseforge-win-signed/);
 });
 
 test("本地 Release 在公开前必须用同 tag 的 SignPath Windows artifact 覆盖候选 EXE", async () => {
   const releaseGuard = await readRepoFile("scripts/release.sh");
   assert.match(releaseGuard, /collect_ci_signed_windows_assets/);
-  assert.match(releaseGuard, /nowen-note-win-signed/);
+  assert.match(releaseGuard, /baseforge-win-signed/);
   assert.match(releaseGuard, /replacing local Windows candidates/);
   assert.match(releaseGuard, /failed to collect SignPath-signed Windows assets; keeping \$\{TAG\} as draft/);
   const winIndex = releaseGuard.indexOf("if release_contains_windows_candidates");
@@ -75,7 +86,7 @@ test("本地 Release 在公开前必须用同 tag 的 SignPath Windows artifact 
 
 test("本地发布守卫在正式校验前汇总完整 CI macOS 产物", async () => {
   const releaseGuard = await readRepoFile("scripts/release.sh");
-  assert.match(releaseGuard, /nowen-note-mac/);
+  assert.match(releaseGuard, /baseforge-mac/);
   assert.match(releaseGuard, /gh run download/);
   assert.match(releaseGuard, /gh release upload/);
   assert.match(releaseGuard, /--clobber/);

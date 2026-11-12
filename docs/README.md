@@ -31,7 +31,6 @@
 | [server-profiles-and-nas-migration.md](./server-profiles-and-nas-migration.md) | NAS 迁移与服务器配置 |
 | [icp-beian-env.md](./icp-beian-env.md) | 备案环境变量 |
 | [CODE_SIGNING.md](./CODE_SIGNING.md) | 代码签名（Windows / macOS） |
-| [iOS-Release.md](./iOS-Release.md) | iOS 发布流程 |
 | [mac-install.md](./mac-install.md) | macOS 安装说明 |
 | [PRIVACY.md](./PRIVACY.md) | 隐私说明 |
 | [known-issues.md](./known-issues.md) | 已知问题 |
@@ -52,7 +51,7 @@
 | [plugin-pm.md](./plugin-pm.md) | 插件：项目管理 |
 | [plugin-pm-analysis.md](./plugin-pm-analysis.md) | 插件：项目管理（分析） |
 | [plugin-pm-m3-design.md](./plugin-pm-m3-design.md) | 插件：项目管理（M3 设计） |
-| [plugin-remote-files.md](./plugin-remote-files.md) | 插件：远程文件 |
+| [remote-files.md](./remote-files.md) | 远程文件（内核能力：WebDAV / SMB / 百度网盘） |
 | [handover/HANDOVER-pm-and-remote-files.md](./HANDOVER-pm-and-remote-files.md) | 交接：PM 与远程文件 |
 
 ## 4. 子目录
@@ -61,13 +60,11 @@
 |---|---|
 | [plugins/](./plugins/) | 插件平台与贡献点说明 |
 | [product/](./product/) | 产品设计与决策记录 |
-| [performance/](./performance/) | 性能基线与分析 |
 | [tutorials/](./tutorials/) | 用户教程（含 MCP 安装等） |
 | [screenshots/](./screenshots/) | 文档截图资源 |
-| [superpowers/](./superpowers/) | **上游 nowen-note 遗留文档**（保留以记录历史，不代表当前实现） |
 
 ## 约定
 
 - 新增面向用户/运维的文档，直接放 `docs/` 根并按上面四类归位；
 - 一次性分析、评估类文档（`*-assessment.md`、`plugin-pm-analysis.md`）属过程记录，不再更新；
-- 上游遗留内容（`superpowers/`、`tutorials/` 中的版本声明）保持原样，改动需单独说明。
+- 上游遗留内容（`tutorials/` 中的版本声明）保持原样，改动需单独说明。

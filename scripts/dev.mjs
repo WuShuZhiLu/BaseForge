@@ -5,6 +5,7 @@ import { existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { forceReleasePorts } from "./dev-port-manager.mjs"
 import { ensureWorkspaceDependencies } from "./dev-dependency-manager.mjs"
+import { readSourceEnv } from "./npm-sources.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const scriptsDir = path.dirname(__filename)
@@ -26,10 +27,10 @@ function assertFile(filePath, installHint) {
 }
 
 const backendPort = parsePort(
-  process.env.NOWEN_DEV_BACKEND_PORT ?? process.env.PORT,
+  process.env.BASEFORGE_DEV_BACKEND_PORT ?? process.env.PORT,
   3001,
 )
-const frontendPort = parsePort(process.env.NOWEN_DEV_FRONTEND_PORT, 5173)
+const frontendPort = parsePort(process.env.BASEFORGE_DEV_FRONTEND_PORT, 5173)
 
 if (backendPort === frontendPort) {
   console.error(`\n[dev] 前后端不能使用同一个端口：${backendPort}\n`)
@@ -39,11 +40,20 @@ if (backendPort === frontendPort) {
 const backendUrl = `http://127.0.0.1:${backendPort}`
 const frontendUrl = `http://localhost:${frontendPort}`
 
+// 依赖下载源由 scripts/npm-source.mjs 切换（默认外网源）；这里只读取当前档位。
+// 外部已设置的同名环境变量优先，避免覆盖用户自己的镜像配置。
+const { profile: sourceProfile, env: sourceEnv } = readSourceEnv()
+const installEnv = {}
+for (const [key, value] of Object.entries(sourceEnv)) {
+  if (!process.env[key]) installEnv[key] = value
+}
+
 console.log("\n[dev] 正在检查项目依赖...")
+console.log(`[dev] 依赖下载源：${sourceProfile === "cn" ? "国内镜像" : "外网默认"}`)
 try {
-  ensureWorkspaceDependencies(rootDir, "根目录")
-  ensureWorkspaceDependencies(backendDir, "后端")
-  ensureWorkspaceDependencies(frontendDir, "前端")
+  ensureWorkspaceDependencies(rootDir, "根目录", { env: installEnv })
+  ensureWorkspaceDependencies(backendDir, "后端", { env: installEnv })
+  ensureWorkspaceDependencies(frontendDir, "前端", { env: installEnv })
 } catch (error) {
   console.error(`\n[dev] 依赖检查失败：${error instanceof Error ? error.message : String(error)}\n`)
   process.exit(1)
@@ -60,7 +70,7 @@ assertFile(viteCli, "npm run install:all")
 assertFile(backendEntry, "确认 backend/src/index.hardened.ts 是否存在")
 assertFile(viteDevConfig, "确认 frontend/vite.dev.config.ts 是否存在")
 
-// node 版本下限：22.5 起才有内置 node:sqlite（后续数据库层要从 better-sqlite3 迁过去）。
+// node 版本下限：22.5 起才有内置 node:sqlite（数据库层已迁移过去）。
 // 低于这个版本直接叫停，避免后端跑到一半才因为缺 API 崩掉。
 const MIN_NODE = [22, 5, 0]
 {
@@ -73,7 +83,7 @@ const MIN_NODE = [22, 5, 0]
       [
         "",
         `[dev] 当前 node ${process.version} 过低，本项目要求 >= v${MIN_NODE.join(".")}。`,
-        "      v22.5 起才有内置 node:sqlite（数据库层正在从 better-sqlite3 迁向它）。",
+        "      v22.5 起才有内置 node:sqlite（数据库层已迁移过去）。",
         "      请切换到 node 22.5+ 后重跑：nvm use 22（或把 node 22 放到 PATH 前面）。",
         "",
       ].join("\n"),
@@ -82,26 +92,21 @@ const MIN_NODE = [22, 5, 0]
   }
 }
 
-// 原生模块 ABI 必须与运行时一致：better-sqlite3 是按 node 22（ABI 127）编译的，
-// 若用 node 24（ABI 137）启动会在后端启动瞬间 ERR_DLOPEN_FAILED，且报错埋在日志里很难辨认。
-// 这里先探一次，失败即给出可直接执行的修复命令。
-console.log("[dev] 检查原生模块与当前 node 的 ABI 是否匹配…")
+// 数据库层已迁到内置 node:sqlite，不再有原生 SQLite 模块的 ABI 问题。
+// 只确认当前 node 确实提供了 node:sqlite（避免使用被裁剪的 node 构建）。
+console.log("[dev] 检查内置 node:sqlite 是否可用…")
 {
   const probe = spawnSync(
     process.execPath,
-    ["-e", "require('better-sqlite3')"],
+    ["-e", "require('node:sqlite')"],
     { cwd: backendDir, encoding: "utf8" },
   )
   if (probe.status !== 0) {
     console.error(
       [
         "",
-        `[dev] better-sqlite3 无法在当前 node 下加载（当前 ${process.version}，ABI ${process.versions.modules}）。`,
-        "      常见原因：PATH 里的 node 不是 22（比如系统装了 node 24），ABI 与已编译的原生模块不一致。",
-        "      任选其一修复：",
-        "        1) 用 node 22 启动：nvm use 22（或把 node 22 放到 PATH 前面）后重跑 npm run dev",
-        "        2) 固化到当前 node：",
-        `           cd backend/node_modules/better-sqlite3 && npx prebuild-install --runtime node --target ${process.versions.node} --arch ${process.arch} --platform ${process.platform}`,
+        `[dev] 当前 node ${process.version} 未提供内置 node:sqlite。`,
+        "      请使用官方 node 22.5+（v22.5 起内置），切换后重跑 npm run dev。",
         "",
       ].join("\n"),
     )
@@ -194,11 +199,11 @@ async function shutdown(exitCode = 0) {
 process.once("SIGINT", () => void shutdown(0))
 process.once("SIGTERM", () => void shutdown(0))
 
-startProcess(
+const backendChild = startProcess(
   "后端",
   process.execPath,
   // 直接用系统 node22 跑后端：sharp 在 Electron 内置 node（20.18）下会原生崩溃，
-  // node22 下正常；better-sqlite3 需处于 node ABI（npm run rebuild:node）。
+  // node22 下正常；数据库用内置 node:sqlite，无原生 ABI 依赖。
   [tsxCli, "watch", backendEntry],
   {
     cwd: backendDir,
@@ -208,6 +213,31 @@ startProcess(
     },
   },
 )
+
+/**
+ * 等后端真正 listen 再起前端：vite 两三秒就绪、浏览器立刻打一批 /api，
+ * 而后端还在 tsx 编译 + 迁移 + vec-store 初始化，那几秒的请求全是 ECONNREFUSED。
+ */
+async function waitForBackendReady(timeoutMs = 120_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (backendChild.exitCode !== null || backendChild.signalCode !== null) return false
+    try {
+      const res = await fetch(`${backendUrl}/api/health`, { signal: AbortSignal.timeout(2000) })
+      if (res.ok) return true
+    } catch {
+      // 还没 listen，继续等
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300))
+  }
+  return false
+}
+
+console.log(`\n[dev] 等待后端就绪：${backendUrl}/api/health`)
+if (!(await waitForBackendReady())) {
+  console.error("[dev] 后端未在 120 秒内就绪，前端不启动（请查看上面的后端日志）")
+  await shutdown(1)
+}
 
 startProcess(
   "前端",
@@ -226,8 +256,8 @@ startProcess(
     cwd: frontendDir,
     env: {
       ...process.env,
-      NOWEN_DEV_BACKEND_URL: backendUrl,
-      NOWEN_DEV_BACKEND_PORT: String(backendPort),
+      BASEFORGE_DEV_BACKEND_URL: backendUrl,
+      BASEFORGE_DEV_BACKEND_PORT: String(backendPort),
     },
   },
 )

@@ -5,16 +5,16 @@ import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-folder-sync-attachment-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-folder-sync-attachment-"));
 const electronUserData = path.join(tmpDir, "electron-user-data");
 process.env.ELECTRON_USER_DATA = electronUserData;
 process.env.DB_PATH = path.join(electronUserData, "test.db");
-delete process.env.NOWEN_DATA_DIR;
+delete process.env.BASEFORGE_DATA_DIR;
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 const USER_ID = "folder-sync-attachment-user";

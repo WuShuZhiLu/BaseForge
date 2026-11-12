@@ -8,7 +8,7 @@ import type { SyncDeviceRow } from "./types";
  *
  * ## 语义
  *
- * deviceId 标识**一个 Nowen 安装实例**，不是"某个 Profile 下的设备"。
+ * deviceId 标识**一个 BaseForge 安装实例**，不是"某个 Profile 下的设备"。
  * 同一台电脑连 Server A / Server B / Server C，deviceId 永远相同。
  *
  * 以下操作都不改变它：

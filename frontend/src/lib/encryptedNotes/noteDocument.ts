@@ -3,7 +3,7 @@ import type { JSONContent } from "@tiptap/core";
 import { ENCRYPTED_NOTE_V2_FORMAT, validateEnvelopeV2, type ContentEnvelopeV2 } from "./envelopeV2";
 
 export const ENCRYPTED_NOTE_FORMAT = "encrypted-note-v1";
-export const ENCRYPTED_NOTE_LEAVE_EVENT = "nowen:encrypted-note-before-leave";
+export const ENCRYPTED_NOTE_LEAVE_EVENT = "baseforge:encrypted-note-before-leave";
 export const isEncryptedNoteFormat = (format: unknown): boolean => typeof format === "string" && format.startsWith("encrypted-");
 export function readEncryptedNoteDocument(note: { contentFormat?: string; content: string }): EncryptedContentEnvelope {
   if (note.contentFormat !== ENCRYPTED_NOTE_FORMAT) throw new EncryptedContentError("invalid");

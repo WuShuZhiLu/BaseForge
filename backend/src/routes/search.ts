@@ -191,7 +191,7 @@ function buildPlainSnippet(source: string, terms: string[], label?: string): str
 function ensureSearchSqlFunctions(db: DatabaseSync): void {
   if (registeredSearchDatabases.has(db as object)) return;
   db.function(
-    "nowen_search_normalize",
+    "baseforge_search_normalize",
     { deterministic: true },
     (value: unknown) => normalizeSearchText(value === null || value === undefined ? "" : String(value)),
   );
@@ -358,7 +358,7 @@ function fetchMetadataTermCandidates(
 AND n.isTrashed = 0
 AND n.isUnlisted = 0
 AND nb.isDeleted = 0
-AND instr(nowen_search_normalize(COALESCE(t.name, '')), ?) > 0
+AND instr(baseforge_search_normalize(COALESCE(t.name, '')), ?) > 0
 
         UNION
 
@@ -372,8 +372,8 @@ AND n.isTrashed = 0
 AND n.isUnlisted = 0
 AND nb.isDeleted = 0
 AND (
-  instr(nowen_search_normalize(COALESCE(a.filename, '')), ?) > 0
-  OR instr(nowen_search_normalize(COALESCE(ac.chunkText, '')), ?) > 0
+  instr(baseforge_search_normalize(COALESCE(a.filename, '')), ?) > 0
+  OR instr(baseforge_search_normalize(COALESCE(ac.chunkText, '')), ?) > 0
 )
       )
       ORDER BY id ASC
@@ -416,8 +416,8 @@ function fetchLiteralTermCandidates(
         AND nb.isDeleted = 0
         AND COALESCE(n.contentFormat, 'tiptap-json') <> 'mindmap'
         AND (
-instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
-OR instr(nowen_search_normalize(COALESCE(n.contentText, '')), ?) > 0
+instr(baseforge_search_normalize(COALESCE(n.title, '')), ?) > 0
+OR instr(baseforge_search_normalize(COALESCE(n.contentText, '')), ?) > 0
         )
       ORDER BY n.updatedAt DESC, n.id ASC
       LIMIT ? OFFSET ?
@@ -730,8 +730,8 @@ function fetchMindMapResults(
   const scopeParams = workspaceScope ? [workspaceId] : [userId];
   const termSql = normalizedTerms
     .map(() => `(
-      instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
-      OR instr(nowen_search_normalize(COALESCE(n.content, '')), ?) > 0
+      instr(baseforge_search_normalize(COALESCE(n.title, '')), ?) > 0
+      OR instr(baseforge_search_normalize(COALESCE(n.content, '')), ?) > 0
     )`)
     .join(" AND ");
   const termParams = normalizedTerms.flatMap((term) => [term, term]);
@@ -884,8 +884,8 @@ function fetchSheetResults(
   // term. The JS pass below verifies only user-visible values so JSON keys/ids cannot become hits.
   const termSql = normalizedTerms
     .map(() => `(
-      instr(nowen_search_normalize(COALESCE(n.title, '')), ?) > 0
-      OR instr(nowen_search_normalize(COALESCE(sheet.data, '')), ?) > 0
+      instr(baseforge_search_normalize(COALESCE(n.title, '')), ?) > 0
+      OR instr(baseforge_search_normalize(COALESCE(sheet.data, '')), ?) > 0
     )`)
     .join(" AND ");
   const termParams = normalizedTerms.flatMap((term) => [term, term]);

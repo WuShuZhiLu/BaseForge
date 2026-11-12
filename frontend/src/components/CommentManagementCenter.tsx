@@ -36,12 +36,12 @@ export default function CommentManagementCenter({ onOpenComment }: { onOpenComme
       setSearch(""); setQuery(""); setPage(0); setError(""); setLoading(false);
     };
     window.addEventListener(OPEN_COMMENT_CENTER_EVENT, show);
-    window.addEventListener("nowen:token-changed", reset);
+    window.addEventListener("baseforge:token-changed", reset);
     window.addEventListener(SERVER_URL_CHANGED_EVENT, reset);
     return () => {
       epoch.current += 1;
       window.removeEventListener(OPEN_COMMENT_CENTER_EVENT, show);
-      window.removeEventListener("nowen:token-changed", reset);
+      window.removeEventListener("baseforge:token-changed", reset);
       window.removeEventListener(SERVER_URL_CHANGED_EVENT, reset);
     };
   }, []);

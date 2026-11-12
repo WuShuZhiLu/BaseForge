@@ -37,7 +37,7 @@ describe("htmlPreviewAssets", () => {
     const initialImage = initialDoc.querySelector<HTMLImageElement>('img[alt="wechat"]')!;
     expect(initialImage.hasAttribute("src")).toBe(false);
     expect(initialImage.hasAttribute("srcset")).toBe(false);
-    expect(initialImage.dataset.nowenAttachmentPending).toBe("true");
+    expect(initialImage.dataset.baseforgeAttachmentPending).toBe("true");
     expect(initialDoc.querySelector("source")?.hasAttribute("srcset")).toBe(false);
     expect(initialDoc.querySelector<HTMLImageElement>('img[alt="remote"]')?.src).toBe("https://mmbiz.qpic.cn/remote.jpg");
 
@@ -81,9 +81,9 @@ describe("htmlPreviewAssets", () => {
         deferUnsignedAttachments: true,
         sanitizeHtml: sanitize,
       });
-      expect(initial).toContain('data-nowen-attachment-pending="true"');
+      expect(initial).toContain('data-baseforge-attachment-pending="true"');
       expect(initial).not.toContain(`src="/api/attachments/${id}"`);
-      expect(initial).not.toContain("data-nowen-preview-src-token");
+      expect(initial).not.toContain("data-baseforge-preview-src-token");
       expect(sanitize).toHaveBeenCalledTimes(1);
       expect(parserSpy).toHaveBeenCalledTimes(1);
 
@@ -92,7 +92,7 @@ describe("htmlPreviewAssets", () => {
         { deferUnsignedAttachments: true, sanitizeHtml: sanitize },
       );
       expect(signed).toContain("sig=ok");
-      expect(signed).not.toContain("data-nowen-preview-src-token");
+      expect(signed).not.toContain("data-baseforge-preview-src-token");
     } finally {
       parserSpy.mockRestore();
     }
@@ -109,7 +109,7 @@ describe("htmlPreviewAssets", () => {
     expect(doc.querySelector("audio source")?.hasAttribute("src")).toBe(false);
     const signed = resolveHtmlPreviewAssetUrls(raw, (src) => src.includes("/api/attachments/") ? src + "?exp=123&sig=ok&scope=note" : src, { deferUnsignedAttachments: true });
     expect(signed).toContain("sig=ok");
-    expect(signed).not.toContain("data-nowen-preview-src-token");
+    expect(signed).not.toContain("data-baseforge-preview-src-token");
     expect(raw).not.toContain("sig=ok");
   });
   it("preserves deliberately shared URLs and signed URLs without network gating", () => {

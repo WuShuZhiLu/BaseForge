@@ -6,7 +6,7 @@ import { JWT_SECRET } from "./auth-security.js";
 
 const FOLDER_UNLOCK_SECRET = crypto
   .createHmac("sha256", JWT_SECRET)
-  .update("nowen-folder-unlock-v1")
+  .update("baseforge-folder-unlock-v1")
   .digest("hex");
 
 interface FolderUnlockTokenPayload {

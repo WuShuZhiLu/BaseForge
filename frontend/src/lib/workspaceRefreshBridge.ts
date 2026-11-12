@@ -4,9 +4,9 @@ import {
   syncNow,
 } from "@/lib/syncEngine";
 
-const INSTALL_KEY = "__NOWEN_WORKSPACE_REFRESH_BRIDGE__" as const;
-const BUTTON_ATTRIBUTE = "data-nowen-workspace-refresh";
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const INSTALL_KEY = "__BASEFORGE_WORKSPACE_REFRESH_BRIDGE__" as const;
+const BUTTON_ATTRIBUTE = "data-baseforge-workspace-refresh";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 const AUTO_REFRESH_COOLDOWN_MS = 4_000;
 const BACKGROUND_REFRESH_MIN_MS = 800;
 const DESKTOP_POLL_INTERVAL_MS = 30_000;
@@ -42,14 +42,14 @@ function isMainAppRoute(): boolean {
 
 function isAuthenticated(): boolean {
   try {
-    return !!localStorage.getItem("nowen-token");
+    return !!localStorage.getItem("baseforge-token");
   } catch {
     return false;
   }
 }
 
 function isDesktopClient(): boolean {
-  return !!(window as unknown as { nowenDesktop?: { isDesktop?: boolean } }).nowenDesktop?.isDesktop;
+  return !!(window as unknown as { baseforgeDesktop?: { isDesktop?: boolean } }).baseforgeDesktop?.isDesktop;
 }
 
 function resolveCopy() {
@@ -83,7 +83,7 @@ function emitCollectionRefresh(reason: RefreshReason): void {
     emit.call(realtime, "notes:imported", { reason, source: "workspace-refresh-bridge" });
   }
 
-  window.dispatchEvent(new CustomEvent("nowen:workspace-refresh-applied", {
+  window.dispatchEvent(new CustomEvent("baseforge:workspace-refresh-applied", {
     detail: { reason, at: Date.now() },
   }));
 }
@@ -195,7 +195,7 @@ function createRefreshButton(): HTMLButtonElement {
 function mountDesktopRefreshButton(): void {
   // SidebarMobile's notebook sort action is the stable desktop anchor. Keep refresh
   // with the notebook controls instead of the global panel-collapse control.
-  document.querySelectorAll<HTMLButtonElement>("button[data-nowen-notebook-sort]").forEach((sortButton) => {
+  document.querySelectorAll<HTMLButtonElement>("button[data-baseforgebook-sort]").forEach((sortButton) => {
     const toolbar = sortButton.parentElement;
     if (!toolbar) return;
     if (toolbar.querySelector(`button[${BUTTON_ATTRIBUTE}]`)) return;

@@ -96,7 +96,6 @@ const BOOTSTRAP_ENTITY_ORDER: SyncEntityType[] = [
   "attachment",
   "task",
   "task_reminder",
-  "diary",
   "mindmap",
 ];
 
@@ -329,18 +328,6 @@ export function readLocalState(
         ORDER BY r.createdAt ASC
       `).all(userId) as Array<Record<string, unknown>>).map((r) => ({
         entityType: "task_reminder" as const,
-        operation: "upsert" as const,
-        entityId: String(r.id),
-        payload: r,
-      }));
-
-    case "diary":
-      return (db.prepare(`
-        SELECT id, contentText, mood, images, media, createdAt
-        FROM diaries WHERE userId = ? AND workspaceId IS NULL
-        ORDER BY createdAt ASC
-      `).all(userId) as Array<Record<string, unknown>>).map((r) => ({
-        entityType: "diary" as const,
         operation: "upsert" as const,
         entityId: String(r.id),
         payload: r,

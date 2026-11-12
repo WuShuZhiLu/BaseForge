@@ -42,15 +42,15 @@ export default function EncryptedNoteConversionPreflight({ noteId, onClose }: { 
       .finally(() => { if (!cancelled) setLoading(false); });
     const invalidate = () => { cancelled = true; setResult(null); close.current(); };
     const storageChanged = (event: StorageEvent) => {
-      if (event.key === null || event.key === "nowen-token" || event.key === "nowen-server-url") invalidate();
+      if (event.key === null || event.key === "baseforge-token" || event.key === "baseforge-server-url") invalidate();
     };
-    window.addEventListener("nowen:token-changed", invalidate);
-    window.addEventListener("nowen:server-url-changed", invalidate);
+    window.addEventListener("baseforge:token-changed", invalidate);
+    window.addEventListener("baseforge:server-url-changed", invalidate);
     window.addEventListener("storage", storageChanged);
     return () => {
       cancelled = true;
-      window.removeEventListener("nowen:token-changed", invalidate);
-      window.removeEventListener("nowen:server-url-changed", invalidate);
+      window.removeEventListener("baseforge:token-changed", invalidate);
+      window.removeEventListener("baseforge:server-url-changed", invalidate);
       window.removeEventListener("storage", storageChanged);
     };
   }, [noteId, revision]);

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import syncRoutes from "./user-preferences-sync";
 import legacyRoutes from "./user-preferences-legacy";
-import reliableAIRoutes from "./ai-reliable";
 import mobileBootstrapRoutes from "./mobile-bootstrap";
 import taskDayPlansRoutes from "./task-day-plans";
 import taskMetadataRoutes from "./task-metadata";
@@ -37,7 +36,6 @@ app.route("/task-inbox", taskInboxRoutes);
 // revision metadata and field-level merge semantics.
 app.route("/", syncRoutes);
 app.route("/mobile-bootstrap", mobileBootstrapRoutes);
-app.route("/ai-reliable", reliableAIRoutes);
 app.route("/", legacyRoutes);
 
 export default app;

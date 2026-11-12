@@ -44,11 +44,11 @@ async function prepareReauth(account: AccountLoginHistoryItem, message?: string)
   setServerUrl(account.serverUrl);
   if (isAndroidNativeRuntime()) requestMobileAccountLogin();
   clearAuthTokens();
-  if ((window as any).nowenDesktop?.isDesktop) {
+  if ((window as any).baseforgeDesktop?.isDesktop) {
     // 防止刷新到登录页时 Electron full 模式重新注入本地账号，覆盖目标服务器。
-    localStorage.setItem("nowen-prefer-cloud", "1");
+    localStorage.setItem("baseforge-prefer-cloud", "1");
   }
-  try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent("baseforge:token-changed")); } catch { /* ignore */ }
   return { status: "requires_reauth", message };
 }
 
@@ -63,7 +63,7 @@ async function commitSwitch(
   storeAuthTokens({ token, refreshToken: refreshToken ?? null });
   localStorage.setItem(CURRENT_ACCOUNT_HISTORY_ID_KEY, account.id);
   await saveAccountLoginHistory({ serverUrl: account.serverUrl, token, refreshToken, user });
-  try { window.dispatchEvent(new CustomEvent("nowen:token-changed")); } catch { /* ignore */ }
+  try { window.dispatchEvent(new CustomEvent("baseforge:token-changed")); } catch { /* ignore */ }
   return { status: "switched", token, user };
 }
 

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-tag-invariants-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-tag-invariants-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -15,7 +15,7 @@ const NOTEBOOK_ID = "siyuan-tag-notebook";
 const PERSONAL_TAG_ID = "existing-personal-tag";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 
 function paragraph(children: any[]) {

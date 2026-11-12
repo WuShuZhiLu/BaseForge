@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-share-cmt-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-share-cmt-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { shareCommentsRepository } from "../src/repositories/shareCommentsRepository";

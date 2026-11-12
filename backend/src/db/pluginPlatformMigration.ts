@@ -2,7 +2,7 @@ import type { Migration } from "./migrations.impl.js";
 
 export const pluginPlatformMigration: Migration = {
   version: 93,
-  name: "nowen-extension-platform-v1",
+  name: "baseforge-extension-platform-v1",
   up: (db) => {
     db.exec(`
       CREATE TABLE IF NOT EXISTS plugin_registry (

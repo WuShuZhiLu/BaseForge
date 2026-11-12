@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-tags-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-tags-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { tagsRepository } from "../src/repositories/tagsRepository";

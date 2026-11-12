@@ -12,7 +12,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 // 设置临时数据库路径（在 import repository 之前）
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-custom-fonts-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-custom-fonts-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { customFontsRepository } from "../src/repositories/customFontsRepository";

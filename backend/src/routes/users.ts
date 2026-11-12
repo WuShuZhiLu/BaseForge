@@ -481,7 +481,7 @@ users.post("/:id/reset-password", requireAdmin, async (c) => {
 /**
  * L3：删除用户前预览将要清理/转移的数据量。
  *    GET /api/users/:id/data-summary
- *    返回：{ notebooks, notes, tags, tasks, diaries, shares, ownedWorkspaces,
+ *    返回：{ notebooks, notes, tags, tasks, shares, ownedWorkspaces,
  *           workspaceMemberships, noteVersions, shareComments, attachments }
  *
  *    UI 删除对话框用来给管理员展示"此次会影响多少数据"，并据此决定是否改成"转移给 XX"。
@@ -504,7 +504,6 @@ users.get("/:id/data-summary", requireAdmin, (c) => {
     notes: count("SELECT COUNT(*) as c FROM notes WHERE userId = ?", targetId),
     tags: count("SELECT COUNT(*) as c FROM tags WHERE userId = ?", targetId),
     tasks: count("SELECT COUNT(*) as c FROM tasks WHERE userId = ?", targetId),
-    diaries: count("SELECT COUNT(*) as c FROM diaries WHERE userId = ?", targetId),
     shares: count("SELECT COUNT(*) as c FROM shares WHERE ownerId = ?", targetId),
     ownedWorkspaces: count("SELECT COUNT(*) as c FROM workspaces WHERE ownerId = ?", targetId),
     workspaceMemberships: workspaceMembersRepository.countByUser(targetId),
@@ -525,7 +524,7 @@ users.get("/:id/data-summary", requireAdmin, (c) => {
  *    DELETE /api/users/:id  body:{transferTo}      — 同上，兼容 body 方式（某些客户端 DELETE 不便带 query）
  *
  * 迁移覆盖表：
- *    notebooks.userId, notes.userId, tags.userId*, tasks.userId, diaries.userId,
+ *    notebooks.userId, notes.userId, tags.userId*, tasks.userId,
  *    shares.ownerId, note_versions.userId, share_comments.userId, attachments.userId,
  *    workspaces.ownerId, workspace_members.userId**, workspace_invites.createdBy,
  *    note_acl.userId**, note_yupdates.userId
@@ -595,7 +594,6 @@ function transferAndDeleteUser(
     moved.notebooks = run("UPDATE notebooks SET userId = ? WHERE userId = ?", toId, fromId);
     moved.notes = run("UPDATE notes SET userId = ? WHERE userId = ?", toId, fromId);
     moved.tasks = run("UPDATE tasks SET userId = ? WHERE userId = ?", toId, fromId);
-    moved.diaries = run("UPDATE diaries SET userId = ? WHERE userId = ?", toId, fromId);
     moved.shares = run("UPDATE shares SET ownerId = ? WHERE ownerId = ?", toId, fromId);
     moved.noteVersions = noteVersionsRepository.transferOwnership(fromId, toId);
     moved.shareComments = shareCommentsRepository.transferOwnership(fromId, toId);

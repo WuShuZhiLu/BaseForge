@@ -1439,7 +1439,7 @@ function requireAdminSudoOrDeny(c: Context): Response | null {
 }
 
 function getAttachmentTableStats(
-  table: "attachments" | "diary_attachments" | "task_attachments" | "note_template_attachments",
+  table: "attachments" | "task_attachments" | "note_template_attachments",
 ) {
   try {
     return getDb()
@@ -1484,7 +1484,6 @@ app.get("/_storage/status", (c) => {
 
   const storage = getAttachmentStorageInfo();
   const notes = getAttachmentTableStats("attachments");
-  const diary = getAttachmentTableStats("diary_attachments");
   const tasks = getAttachmentTableStats("task_attachments");
   const templates = getAttachmentTableStats("note_template_attachments");
   const local = getLocalAttachmentFileStats(ATTACHMENTS_DIR);
@@ -1492,10 +1491,9 @@ app.get("/_storage/status", (c) => {
   return c.json({
     storage,
     db: {
-      rows: notes.count + diary.count + tasks.count + templates.count,
-      bytes: notes.bytes + diary.bytes + tasks.bytes + templates.bytes,
+      rows: notes.count + tasks.count + templates.count,
+      bytes: notes.bytes + tasks.bytes + templates.bytes,
       attachments: notes,
-      diaryAttachments: diary,
       taskAttachments: tasks,
       noteTemplateAttachments: templates,
     },

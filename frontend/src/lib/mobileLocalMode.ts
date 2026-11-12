@@ -1,11 +1,11 @@
 import type { User } from "@/types";
 
-const LOGIN_REQUESTED_KEY = "nowen-mobile-account-login-requested";
-const FORCE_LOCAL_KEY = "nowen-mobile-force-local-mode";
+const LOGIN_REQUESTED_KEY = "baseforge-mobile-account-login-requested";
+const FORCE_LOCAL_KEY = "baseforge-mobile-force-local-mode";
 
 export const MOBILE_LOCAL_ACCOUNT_ID = "android-device-local";
 export const MOBILE_LOCAL_USER_ID = "android-local-user";
-export const MOBILE_LOCAL_MODE_CHANGED_EVENT = "nowen:mobile-local-mode-changed";
+export const MOBILE_LOCAL_MODE_CHANGED_EVENT = "baseforge:mobile-local-mode-changed";
 
 export function isAndroidNativeRuntime(): boolean {
   if (typeof window === "undefined") return false;
@@ -22,7 +22,7 @@ export function isAndroidNativeRuntime(): boolean {
 
 function hasAccessToken(): boolean {
   try {
-    return !!localStorage.getItem("nowen-token");
+    return !!localStorage.getItem("baseforge-token");
   } catch {
     return false;
   }

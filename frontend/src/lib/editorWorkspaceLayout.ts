@@ -5,7 +5,7 @@ export type EditorSplitReferenceSide = "start" | "end";
 
 /** The legacy middle note-list column no longer has a keyboard toggle. */
 export const EDITOR_LAYOUT_TOGGLE_SHORTCUT_LABEL = "";
-const SPLIT_RATIO_STORAGE_PREFIX = "nowen.editorSplit.ratio";
+const SPLIT_RATIO_STORAGE_PREFIX = "baseforge.editorSplit.ratio";
 
 /** 分隔条双击恢复的默认比例（主栏 50%）。 */
 export const EDITOR_SPLIT_DEFAULT_RATIO = 0.5;

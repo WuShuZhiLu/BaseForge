@@ -1,5 +1,7 @@
 import { choose, prompt as appPrompt } from "@/components/ui/confirm";
 import { api, getCurrentWorkspace } from "@/lib/api";
+import { getSheet, saveSheet } from "@/lib/sheetApi";
+import { parseWorkbookXlsx } from "@/lib/sheetXlsx";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
 import {
   formatMarkdownImportFailures,
@@ -84,6 +86,105 @@ export async function importWordIntoKnowledgeTree(
   }
 }
 
+/**
+ * 导入 Word 原件（预览，不编辑）：走 contentFormat="docx" 专用链路，
+ * 正文只存 { attachmentId }，打开笔记即用 DocxAttachmentPreview 渲染原件。
+ */
+/**
+ * 导入 Excel 表格（.xlsx）：第一个工作表解析为轻量表格笔记。
+ *
+ * 必须走知识树 create({ nodeType: "sheet" }) 官方链路建节点——
+ * notes 表的 INSERT/UPDATE 触发器同步树节点 nodeType 时不认 sheet
+ * （只认 word/markdown），用 createNote+move 建出的树节点类型是 "note"，
+ * 前端会当普通笔记打开而不是轻量表格。
+ * 解析复用 SheetEditor 的 parseWorkbookXlsx，数据写入走 saveSheet（乐观锁）。
+ */
+export async function importExcelIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const file = await pickExcelFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 Excel 表格…", 0);
+  try {
+    const workbook = await parseWorkbookXlsx(file);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("该 XLSX 没有可导入的工作表");
+    const title = file.name.replace(/\.xlsx$/i, "").trim() || sheet.name || "Excel 表格";
+    // 目标树节点：优先用 parent 本身；否则找 notebookId 对应的 notebook 节点
+    const parent = options.parent
+      ?? options.nodes.find((node) => node.resourceType === "notebook" && node.resourceId === options.fallbackNotebookId)
+      ?? null;
+    const created = await knowledgeTreeApi.create({
+      parentId: parent?.id ?? null,
+      nodeType: "sheet",
+      title,
+    });
+    const sheetNoteId = created.resourceId;
+    const document = await getSheet(sheetNoteId);
+    await saveSheet(sheetNoteId, sheet.data, document.updatedAt);
+    toast.dismiss(toastId);
+    toast.success("导入成功");
+    // 调用方对 excel 分支只刷新树、不走笔记打开（sheet 用深链打开）
+    return { id: sheetNoteId } as unknown as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
+
+function pickExcelFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    input.style.display = "none";
+    document.body.appendChild(input);
+    let settled = false;
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+    input.onchange = () => {
+      settled = true;
+      const file = input.files?.[0] || null;
+      cleanup();
+      resolve(file);
+    };
+    input.oncancel = () => {
+      if (settled) return;
+      cleanup();
+      resolve(null);
+    };
+    input.click();
+  });
+}
+
+export async function importWordOriginalIntoKnowledgeTree(
+  options: KnowledgeTreeImportOptions,
+): Promise<LoadedNote | null> {
+  const notebookId = await resolvePhysicalNotebookId(options);
+  const { pickDocxFile } = await import("@/lib/wordNoteService");
+  const file = await pickDocxFile();
+  if (!file) return null;
+  const toastId = toast.info("正在导入 Word 原件…", 0);
+  try {
+    const title = file.name.replace(/\.docx$/i, "").trim() || "Word 文档";
+    const note = await api.createNote({ title, notebookId, contentFormat: "docx" });
+    const attachment = await api.attachments.upload(note.id, file);
+    const updated = await api.updateNote(note.id, {
+      content: JSON.stringify({ attachmentId: attachment.id }),
+      contentText: "",
+      version: note.version,
+    });
+    await moveImportedNote(note.id, notebookId, options.parent);
+    toast.dismiss(toastId);
+    toast.success("导入成功");
+    return (updated || note) as LoadedNote;
+  } catch (error) {
+    toast.dismiss(toastId);
+    throw error;
+  }
+}
+
 export async function importPdfIntoKnowledgeTree(
   options: KnowledgeTreeImportOptions,
 ): Promise<LoadedNote | null> {
@@ -105,15 +206,20 @@ export async function importPdfIntoKnowledgeTree(
     noteId = note.id;
     // 2) 原件存附件
     const attachment = await api.attachments.upload(note.id, file);
-    // 3) 回填原件引用
-    await api.updateNote(note.id, {
+    // 3) 回填原件引用。
+    //    content / contentText 属于「必须带版本」的写入字段（noteSyncSafety 的
+    //    isVersionedNoteMutation），漏传 version 会被拦成 VERSION_REQUIRED_CLIENT
+    //    「缺少服务端版本，已阻止不安全保存」，导入随之失败并把半成品笔记丢进回收站。
+    const withAttachment = await api.updateNote(note.id, {
       content: JSON.stringify({ attachmentId: attachment.id, annotations: [] }),
       contentText: "",
+      version: note.version,
     });
     await moveImportedNote(note.id, notebookId, options.parent);
     toast.dismiss(toastId);
     toast.success("导入成功");
-    return note as LoadedNote;
+    // 返回回填后的笔记：调用方拿它直接渲染 PDF 预览，不必等下次重新加载才有 attachmentId
+    return (withAttachment || note) as LoadedNote;
   } catch (error) {
     toast.dismiss(toastId);
     // 失败回滚：把半成品笔记移入回收站（best-effort）

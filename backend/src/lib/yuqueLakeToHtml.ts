@@ -1,5 +1,5 @@
 /**
- * lake 格式 HTML → Nowen 兼容 HTML（导入专用）。
+ * lake 格式 HTML → BaseForge 兼容 HTML（导入专用）。
  *
  * 输入：文档详情 API 返回的 body 字段（lake 编辑器渲染后的 HTML，内容区为
  *       <div class="lake-content"> 或旧格式 <div class="lake-engine">）。

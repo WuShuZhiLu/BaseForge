@@ -7,7 +7,7 @@ const path = require("node:path");
 const credentials = require("../credentials");
 
 test("读取旧凭据时删除 profiles 并保留普通登录记录", (t) => {
-  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-credentials-"));
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-credentials-"));
   t.after(() => fs.rmSync(userDataPath, { recursive: true, force: true }));
   const file = path.join(userDataPath, "credentials.json");
   fs.writeFileSync(file, JSON.stringify({

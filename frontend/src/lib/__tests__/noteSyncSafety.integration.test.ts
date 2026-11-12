@@ -9,7 +9,7 @@ import {
 } from "@/lib/noteSyncSafety";
 import { getQueue } from "@/lib/offlineQueue";
 
-const INSTALL_KEY = "__NOWEN_NOTE_SYNC_SAFETY_V1__";
+const INSTALL_KEY = "__BASEFORGE_NOTE_SYNC_SAFETY_V1__";
 const realGetNote = api.getNote;
 const realUpdateNote = api.updateNote;
 
@@ -80,7 +80,7 @@ describe("installed note sync safety", () => {
 
     expect(transportUpdate).toHaveBeenCalledTimes(1);
     expect(pending).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("nowen-draft-note-1")).toContain("local body");
+    expect(localStorage.getItem("baseforge-draft-note-1")).toContain("local body");
   });
 
   it("preserves a stale offline edit as one pending conflict without issuing PUT", async () => {
@@ -106,7 +106,7 @@ describe("installed note sync safety", () => {
 
     expect(transportGet).toHaveBeenCalledTimes(1);
     expect(transportUpdate).not.toHaveBeenCalled();
-    expect(localStorage.getItem("nowen-note-sync-conflicts:v1")).toContain("new server body");
+    expect(localStorage.getItem("baseforge-sync-conflicts:v1")).toContain("new server body");
     expect(getQueue()).toHaveLength(1);
   });
 
@@ -269,6 +269,6 @@ describe("installed note sync safety", () => {
 
     expect(transportUpdate).toHaveBeenCalledTimes(1);
     expect(getQueue()).toHaveLength(0);
-    expect(localStorage.getItem("nowen-note-sync-conflicts:v1")).toBeNull();
+    expect(localStorage.getItem("baseforge-sync-conflicts:v1")).toBeNull();
   });
 });

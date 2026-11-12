@@ -132,7 +132,6 @@ export interface WorkspaceInvite {
  */
 export interface WorkspaceFeatures {
   notes: boolean;
-  diaries: boolean;
   tasks: boolean;
   mindmaps: boolean;
   files: boolean;
@@ -146,7 +145,6 @@ export const WORKSPACE_FEATURE_META: Array<{
   description: string;
 }> = [
   { key: "notes", label: "笔记", description: "笔记本、正文、标签等核心功能" },
-  { key: "diaries", label: "说说", description: "时间线式短内容" },
   { key: "tasks", label: "待办", description: "任务清单与看板" },
   { key: "mindmaps", label: "思维导图", description: "节点式思维导图" },
   { key: "files", label: "文件", description: "独立文件管理" },
@@ -264,9 +262,15 @@ export interface SearchResult {
   matchedField?: string;
 }
 
-export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "ai-chat" | "diary" | "files" | "shares" | "issues" | "projects" | "plugins";
+export type ViewMode = "notebook" | "favorites" | "trash" | "all" | "search" | "tasks" | "tag" | "mindmaps" | "files" | "shares" | "issues" | "projects" | "plugins";
 
-// ========== 远程文件管理插件（remote-files） ==========
+// ========== 远程文件（内核能力：WebDAV / SMB / 百度网盘） ==========
+/** 多根目录：一个源可挂多个远端目录（对齐 SMB 多共享），name 是路径第一段的别名 */
+export interface RemoteRoot {
+  name: string;
+  path: string;
+}
+
 /** 已配置的远程源（凭据掩码，密码/token 不下发） */
 export interface RemoteSourcePublic {
   id: string;
@@ -275,6 +279,12 @@ export interface RemoteSourcePublic {
   baseUrl: string;
   username: string;
   rootPath: string;
+  /** WebDAV 多根：有值时路径第一段是别名（rootPath 不再参与拼接） */
+  rootPaths?: RemoteRoot[];
+  /** SMB：主机名/IP（多共享源才有；单共享源仍用 baseUrl 的 UNC） */
+  host?: string;
+  /** SMB：挂载的共享名（多共享时路径第一段即共享名） */
+  shares?: string[];
   /** SMB：域/工作组（可选） */
   domain?: string;
   /** 百度 OAuth：API Key（可选） */
@@ -282,6 +292,8 @@ export interface RemoteSourcePublic {
   /** 百度 OAuth：已配置 refresh_token（可自动续期） */
   hasOAuth?: boolean;
   hasPassword: boolean;
+  /** unreadable = 存了凭据但解不开（换机 / 换密钥 / 跨机恢复备份），需重新输入密码 */
+  credentialState?: "ok" | "unreadable";
   createdAt: string;
 }
 
@@ -394,45 +406,8 @@ export interface RemoteFileEntry {
   isFolder: boolean;
   size: number;
   modifiedAt: string | null;
-}
-
-// ========== 远程文件管理插件（remote-files） ==========
-/** 已配置的远程源（凭据掩码，密码/token 不下发） */
-export interface RemoteSourcePublic {
-  id: string;
-  type: "webdav" | "baidu" | "smb";
-  name: string;
-  baseUrl: string;
-  username: string;
-  rootPath: string;
-  /** SMB：域/工作组（可选） */
-  domain?: string;
-  /** 百度 OAuth：API Key（可选） */
-  clientId?: string;
-  /** 百度 OAuth：已配置 refresh_token（可自动续期） */
-  hasOAuth?: boolean;
-  hasPassword: boolean;
-  createdAt: string;
-}
-
-/** 远程文件 ↔ 本地笔记 的同步链接（baseHash 为上次同步基准） */
-export interface RemoteNoteLink {
-  sourceId: string;
-  remotePath: string;
-  noteId: string;
-  title: string;
-  baseRemoteHash: string;
-  baseNoteHash: string;
-  syncedAt: string;
-}
-
-/** 远程文件条目（path 为源内相对路径，根目录为 ""） */
-export interface RemoteFileEntry {
-  name: string;
-  path: string;
-  isFolder: boolean;
-  size: number;
-  modifiedAt: string | null;
+  /** 快速列举：只拿到名称/类型，size 与 modifiedAt 待后台补齐 */
+  metaPending?: boolean;
 }
 
 // ========== 文件管理（/api/files 聚合视图） ==========
@@ -903,40 +878,6 @@ export interface MindMapFolder {
   mindmapCount?: number;
   createdAt: string;
   updatedAt: string;
-}
-export interface DiaryMediaItem {
-  id: string;
-  type: "image" | "video";
-  url?: string;
-  mimeType?: string;
-  size?: number;
-}
-
-export interface Diary {
-  id: string;
-  userId: string;
-  /** Y2: 说说归属的工作区 id；null = 个人空间。 */
-  workspaceId: string | null;
-  contentText: string;
-  mood: string;
-  /** 已绑定的说说图片 id 数组（顺序即展示顺序）。需要 URL 时拼 /api/diary/attachments/<id>。 */
-  images: string[];
-  /** 已绑定的说说媒体。旧数据可能为空，此时前端用 images 兜底。 */
-  media: DiaryMediaItem[];
-  createdAt: string;
-  /** 创建者用户名；后端 LEFT JOIN users 返回，工作区视图下用于展示"谁发的"。 */
-  creatorName?: string | null;
-}
-
-export interface DiaryTimeline {
-  items: Diary[];
-  hasMore: boolean;
-  nextCursor: string | null;
-}
-
-export interface DiaryStats {
-  total: number;
-  todayCount: number;
 }
 
 // 分享

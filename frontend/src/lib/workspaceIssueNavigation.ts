@@ -1,8 +1,8 @@
 import { getCurrentWorkspace, setCurrentWorkspace } from "./api";
 import { pushAppPathState } from "./appPathNavigation";
 
-export const OPEN_NOTIFICATIONS_EVENT = "nowen:open-notifications";
-export const NOTIFICATIONS_CHANGED_EVENT = "nowen:notifications-changed";
+export const OPEN_NOTIFICATIONS_EVENT = "baseforge:open-notifications";
+export const NOTIFICATIONS_CHANGED_EVENT = "baseforge:notifications-changed";
 
 export interface IssueAppRoute { matched: boolean; issueId: string | null }
 
@@ -24,7 +24,7 @@ export function openWorkspaceIssue(issueId: string | null, workspaceId?: string)
   const targetWorkspace = workspaceId ?? getCurrentWorkspace();
   if (getCurrentWorkspace() !== targetWorkspace) {
     setCurrentWorkspace(targetWorkspace);
-    window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId: targetWorkspace } }));
+    window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId: targetWorkspace } }));
   }
   pushAppPathState(buildIssueAppPath(issueId, targetWorkspace));
 }

@@ -6,9 +6,9 @@ CREATE TABLE encrypted_note_conversion_permits (
   content TEXT NOT NULL,
   "transactionId" BIGINT NOT NULL DEFAULT txid_current()
 );
-CREATE OR REPLACE FUNCTION nowen_guard_encrypted_note() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION baseforge_guard_encrypted_note() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW."contentFormat" LIKE 'encrypted-%' AND NOT nowen_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
+  IF NEW."contentFormat" LIKE 'encrypted-%' AND NOT baseforge_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
     RAISE EXCEPTION 'INVALID_ENCRYPTED_NOTE';
   END IF;
   IF TG_OP = 'UPDATE' THEN
@@ -40,7 +40,7 @@ DECLARE table_name TEXT;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY['note_block_operations', 'block_operations', 'note_block_attachment_refs', 'yjs_operation_receipts', 'embedding_queue', 'note_import_origins'] LOOP
     IF to_regclass(table_name) IS NOT NULL THEN
-      EXECUTE format('CREATE TRIGGER encrypted_conversion_derived_write BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION nowen_guard_encrypted_derived_content()', table_name);
+      EXECUTE format('CREATE TRIGGER encrypted_conversion_derived_write BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION baseforge_guard_encrypted_derived_content()', table_name);
     END IF;
   END LOOP;
 END $$;

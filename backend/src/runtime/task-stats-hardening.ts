@@ -13,9 +13,9 @@ import {
 import noteTransfersRouter from "../routes/note-transfers.js";
 import { installNoteSplitRoutes } from "./note-split.js";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.taskStatsHardening.routePatch");
-const ROUTER_INSTALLED_FLAG = Symbol.for("nowen.taskStatsHardening.routerInstalled");
-const NOTE_TRANSFER_INSTALLED_FLAG = Symbol.for("nowen.noteTransfer.routerInstalled");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.taskStatsHardening.routePatch");
+const ROUTER_INSTALLED_FLAG = Symbol.for("baseforge.taskStatsHardening.routerInstalled");
+const NOTE_TRANSFER_INSTALLED_FLAG = Symbol.for("baseforge.noteTransfer.routerInstalled");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 function isDateKey(value: unknown): value is string {

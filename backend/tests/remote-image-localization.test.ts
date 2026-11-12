@@ -6,7 +6,7 @@ import {
   scanRemoteImages,
 } from "../src/lib/remote-image-localization";
 
-test("classifyImageUrl separates remote, Nowen local and unsupported schemes", () => {
+test("classifyImageUrl separates remote, BaseForge local and unsupported schemes", () => {
   assert.equal(classifyImageUrl("https://cdn.example.com/a.png"), "remote");
   assert.equal(classifyImageUrl("http://cdn.example.com/a.png"), "remote");
   assert.equal(classifyImageUrl("/api/attachments/att-1"), "local");

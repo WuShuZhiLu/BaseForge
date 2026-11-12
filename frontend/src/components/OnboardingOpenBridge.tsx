@@ -4,7 +4,7 @@ import { api, getCurrentWorkspace, getServerUrl } from "@/lib/api";
 import { useApp, useAppActions } from "@/store/AppContext";
 
 const ONBOARDING_VERSION = 1;
-const MARKER_PREFIX = `nowen:onboarding-welcome-opened:v${ONBOARDING_VERSION}`;
+const MARKER_PREFIX = `baseforge:onboarding-welcome-opened:v${ONBOARDING_VERSION}`;
 
 type MarkerResult = "opened" | "not-seeded" | "skipped-active";
 

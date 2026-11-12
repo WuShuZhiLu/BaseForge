@@ -22,6 +22,7 @@ import PlainTextEditor from "@/components/PlainTextEditor";
 import BoardEditor from "@/components/BoardEditor";
 import MindMapDocEditor from "@/components/MindMapDocEditor";
 import PdfDocEditor from "@/components/PdfDocEditor";
+import WordDocEditor from "@/components/WordDocEditor";
 import HtmlPreviewPane, { isFullHtmlDocument } from "@/components/HtmlPreviewPane";
 import type { NoteEditorHandle } from "@/components/editors/types";
 import { useApp, useAppActions, SyncStatus } from "@/store/AppContext";
@@ -42,6 +43,7 @@ import NoteThemeMenuSelect from "@/components/NoteThemeMenuSelect";
 import type { NoteColorMark } from "@/types";
 import { haptic } from "@/hooks/useCapacitor";
 import { toast } from "@/lib/toast";
+import { pullRemoteNote, scheduleRemoteNotePush } from "@/lib/remoteNoteSync";
 import { exportNoteAsImage, exportSingleNote, exportSingleNoteAsPDF, printNote } from "@/lib/exportService";
 import KnowledgeTreePermissionsDialog from "@/components/KnowledgeTreePermissionsDialog";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
@@ -117,7 +119,7 @@ import {
 // ---------------------------------------------------------------------------
 // 编辑器模式切换（MD vs Tiptap）
 // ---------------------------------------------------------------------------
-// URL `?md=1|0` 强制，否则读 localStorage["nowen.editor_mode"]。
+// URL `?md=1|0` 强制，否则读 localStorage["baseforge.editor_mode"]。
 // 底层协议与工具：frontend/src/lib/editorMode.ts
 // 切换流程与文档：docs/editor-mode-switch.md
 //
@@ -125,7 +127,7 @@ import {
 //   顶栏 `MD / RTE` 切换按钮，对普通用户 隐藏 隐藏。设置里双击可调出，
 //   按钮占位 + tooltip 仍然存在，双击即可**临时让用户删除**。
 //     - `?md=1` / `?md=0` URL 参数仍然生效（逻辑没删，只是用户看不到链接）
-//     - `localStorage["nowen.editor_mode"]` 仍然可读取
+//     - `localStorage["baseforge.editor_mode"]` 仍然可读取
 //     - toggleEditorMode 会切换并保存，但未完成自动迁移，刷新页面后一切可恢复
 //   需要在开发调试时显示按钮，把下方变量改为 true；正式发布请保持 false。
 const SHOW_EDITOR_MODE_TOGGLE = false;
@@ -135,7 +137,7 @@ interface EditorPaneProps {
   onSplitDocument?: () => void;
 }
 
-const ANONYMOUS_RETURN_NOTE_KEY = "nowen.anonymous-return-note-id";
+const ANONYMOUS_RETURN_NOTE_KEY = "baseforge.anonymous-return-note-id";
 
 function readAnonymousReturnNoteId(): string | null {
   try {
@@ -210,6 +212,31 @@ function EditorPaneCore({
       .catch(() => {});
     return () => { cancelled = true; };
   }, [activeNoteIdForVersion]);
+  // 远程投影笔记：打开时对齐远程文件。
+  // 远程变了、本地没动 → 直接拉取（安全）；两边都改了 → 弹窗让用户选方向。
+  // 远程不可用（离线 / NAS 关机）时不打扰，本地笔记照常可编辑。
+  const remotePulledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const note = activeNoteRef.current;
+    if (!note?.id) return;
+    if (remotePulledRef.current === note.id) return;
+    remotePulledRef.current = note.id;
+    let cancelled = false;
+    void pullRemoteNote(note)
+      .then((result) => {
+        if (cancelled || !result) return;
+        if (result.status === "pulled") {
+          actions.setActiveNote(result.note);
+          toast.info("已同步远程文件的最新内容");
+        } else {
+          toast.success("已保留本地改动并写回远程");
+        }
+      })
+      .catch((error) => {
+        console.warn("[editor] remote note pull skipped:", error);
+      });
+    return () => { cancelled = true; };
+  }, [activeNoteIdForVersion, actions]);
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<{ noteId: string; version: number }>).detail;
@@ -260,7 +287,7 @@ function EditorPaneCore({
   // 大纲只属于「富文本 / Markdown」类文档：board / mindmap / pdf / plain 没有标题层级，
   // 不渲染右缘刻度条与面板，也不显示顶栏/⋯ 菜单里的大纲开关（否则是空面板 + 假入口）。
   const noteFormat = activeNote?.contentFormat ?? "tiptap-json";
-  const outlineSupported = !["board", "mindmap", "pdf", "plain"].includes(noteFormat);
+  const outlineSupported = !["board", "mindmap", "pdf", "docx", "plain"].includes(noteFormat);
   // 大纲宿主开关：全屏专注、用户隐藏（outlineHidden）或文档类型不支持时整体不渲染（连 mini 刻度条都没有）。
   const showDesktopOutlineHost = !state.editorFullscreen && !outlineHidden && outlineSupported;
 
@@ -889,7 +916,7 @@ function EditorPaneCore({
       actions.setSyncStatus("saved");
       actions.setLastSynced(new Date().toISOString());
       actions.refreshNotes();
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", {
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", {
         detail: { reason: "note-format-converted", noteId },
       }));
       toast.success(targetFormat === "markdown" ? "已转换为 Markdown" : "已转换为富文本");
@@ -1132,8 +1159,8 @@ function EditorPaneCore({
   /** ��ǰ��¼�û���Ϣ������ awareness ��ʾ������������ɫ */
   const [selfUser, setSelfUser] = useState<{ userId: string; username: string } | null>(() => {
     try {
-      const cachedId = localStorage.getItem("nowen-self-userid");
-      const cachedName = localStorage.getItem("nowen-self-username");
+      const cachedId = localStorage.getItem("baseforge-self-userid");
+      const cachedName = localStorage.getItem("baseforge-self-username");
       if (cachedId && cachedName) return { userId: cachedId, username: cachedName };
     } catch {}
     return null;
@@ -1145,8 +1172,8 @@ function EditorPaneCore({
       .then((me: any) => {
         if (cancelled || !me?.id) return;
         try {
-          localStorage.setItem("nowen-self-userid", me.id);
-          localStorage.setItem("nowen-self-username", me.username || me.id);
+          localStorage.setItem("baseforge-self-userid", me.id);
+          localStorage.setItem("baseforge-self-username", me.username || me.id);
         } catch {}
         setSelfUser({ userId: me.id, username: me.username || me.id });
       })
@@ -1590,8 +1617,8 @@ function EditorPaneCore({
       persistCurrentEditorSnapshotDraft();
       try { editorHandleRef.current?.flushSave(); } catch { /* ignore */ }
     };
-    window.addEventListener("nowen:before-note-switch", onBeforeNoteSwitch);
-    return () => window.removeEventListener("nowen:before-note-switch", onBeforeNoteSwitch);
+    window.addEventListener("baseforge:before-note-switch", onBeforeNoteSwitch);
+    return () => window.removeEventListener("baseforge:before-note-switch", onBeforeNoteSwitch);
   }, []);
 
   // Delete ��ɾ���ʼǿ�ݼ������ڱ༭��δ�۽�ʱ��Ч��
@@ -1871,6 +1898,11 @@ function EditorPaneCore({
           committedContent,
           (updated as Note & { __offlineQueued?: boolean }).__offlineQueued ? "queued" : "saved",
         );
+      }
+
+      // 远程投影笔记：本地保存成功后写回远程文件（1.2s 内合并；失败会明确提示，绝不静默）
+      if (updated && typeof data.content === "string") {
+        scheduleRemoteNotePush(currentNote.id, data.content);
       }
 
       // ���ڱ���ıʼ����ǵ�ǰ����ʼ�ʱ����״̬����ֹ�����л�ʱ���Ǵ���ʼǣ�
@@ -2163,7 +2195,7 @@ function EditorPaneCore({
     actions.updateNoteInList({ id: updated.id, colorMark: nextColor });
     actions.updateNoteTab({ id: updated.id, colorMark: nextColor } as unknown as { id: string });
     try {
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "note-color-mark-changed" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "note-color-mark-changed" } }));
     } catch { /* 通知失败不阻断编辑。 */ }
   }, [activeNote, actions]);
 
@@ -2367,7 +2399,7 @@ const moveToTrash = useCallback(async () => {
     haptic.heavy();
     const noteId = activeNote.id;
     const currentTabIndex = state.openNoteTabs.findIndex((tab) => tab.id === noteId);
-    const nextTab = userPrefs.enableNoteTabs && currentTabIndex >= 0
+    const nextTab = currentTabIndex >= 0
       ? state.openNoteTabs[currentTabIndex + 1] || state.openNoteTabs[currentTabIndex - 1] || null
       : null;
     actions.setActiveNote(null);
@@ -2405,7 +2437,7 @@ const moveToTrash = useCallback(async () => {
         actions.refreshNotes();
       })
       .catch(console.error);
-  }, [activeNote, actions, loadNote, state.openNoteTabs, t, userPrefs.enableNoteTabs]);
+  }, [activeNote, actions, loadNote, state.openNoteTabs, t]);
 
   // BLOCK-LINKS-JUMP-01: 打开笔记回调（用于笔记引用跳转）
   const handleOpenNote = useCallback(async (noteId: string) => {
@@ -2623,13 +2655,13 @@ const moveToTrash = useCallback(async () => {
     const openMindMapInsert = () => setPendingAnonEmbed("mindmap");
     const openSheetEmbedPicker = () => setPendingAnonEmbed("sheet");
     const openBoardEmbedPicker = () => setPendingAnonEmbed("board");
-    window.addEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-    window.addEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-    window.addEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+    window.addEventListener("baseforge:open-mindmap-insert", openMindMapInsert);
+    window.addEventListener("baseforge:open-sheet-embed-picker", openSheetEmbedPicker);
+    window.addEventListener("baseforge:open-board-embed-picker", openBoardEmbedPicker);
     return () => {
-      window.removeEventListener("nowen:open-mindmap-insert", openMindMapInsert);
-      window.removeEventListener("nowen:open-sheet-embed-picker", openSheetEmbedPicker);
-      window.removeEventListener("nowen:open-board-embed-picker", openBoardEmbedPicker);
+      window.removeEventListener("baseforge:open-mindmap-insert", openMindMapInsert);
+      window.removeEventListener("baseforge:open-sheet-embed-picker", openSheetEmbedPicker);
+      window.removeEventListener("baseforge:open-board-embed-picker", openBoardEmbedPicker);
     };
   }, []);
 
@@ -3067,11 +3099,11 @@ const moveToTrash = useCallback(async () => {
               : <Unlock size={17} className="text-tx-tertiary" />}
           </Button>
           {/* �����������滻�����ƶ��˸�Ƶ�������ᵽ��������������
-              ͨ���Զ����¼� 'nowen:open-search' ���� TiptapEditor �ڲ��� SearchReplacePanel��
+              ͨ���Զ����¼� 'baseforge:open-search' ���� TiptapEditor �ڲ��� SearchReplacePanel��
               ����� TiptapEditor ���ڲ� state �������ⲿ����������ӿڸɾ��� */}
           <Button
             variant="ghost" size="icon" className={cn("h-8 w-8 shrink-0", compactMobileEditing && "hidden")}
-            onClick={() => window.dispatchEvent(new CustomEvent('nowen:open-search'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('baseforge:open-search'))}
             aria-label={t('editor.searchInNote')}
           >
             <Search size={17} />
@@ -3089,7 +3121,7 @@ const moveToTrash = useCallback(async () => {
               className="h-8 w-8"
               onClick={() => {
                 const nextOpen = !showMobileMenu;
-                if (nextOpen) window.dispatchEvent(new CustomEvent('nowen:close-search'));
+                if (nextOpen) window.dispatchEvent(new CustomEvent('baseforge:close-search'));
                 setShowMobileMenu(nextOpen);
                 setShowMobileMoveMenu(false);
               }}
@@ -3113,7 +3145,7 @@ const moveToTrash = useCallback(async () => {
                   {/* �ö� / ȡ���ö� */}
                   <button
                     onClick={() => {
-                      window.dispatchEvent(new CustomEvent('nowen:open-search'));
+                      window.dispatchEvent(new CustomEvent('baseforge:open-search'));
                       setShowMobileMenu(false);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-tx-secondary active:bg-app-hover transition-colors"
@@ -3826,7 +3858,7 @@ const moveToTrash = useCallback(async () => {
                       <span>拆分文档</span>
                     </button>
                   )}
-                  {/* 分屏入口只在页签右键菜单（NoteTabsBar「在右侧分屏打开」）：
+                  {/* 「在右侧分屏打开」只在知识树节点 / 笔记列表的右键菜单里：
                       文档自己的 ⋯ 里做「给自己分屏」没有语义，已移除 */}
 
                   {/* 布局模式切换（原悬浮按钮已删除，入口移到此处） */}
@@ -4112,6 +4144,15 @@ const moveToTrash = useCallback(async () => {
             // PDF 文档：原件预览（pdfjs）+ 页码锚定批注层，正文走通用笔记保存。
             <PdfDocEditor
               key={`pdf-${activeNote.id}-r${contentRevision}`}
+              ref={editorHandleRef}
+              note={activeNote}
+              onUpdate={handleUpdate}
+              editable={canEditActiveNote && !effectiveLocked && !modeSwitching}
+            />
+          ) : activeNote.contentFormat === "docx" ? (
+            // Word 原件预览：DocxAttachmentPreview（IR 渲染），只读不编辑，可下载原件。
+            <WordDocEditor
+              key={`docx-${activeNote.id}-r${contentRevision}`}
               ref={editorHandleRef}
               note={activeNote}
               onUpdate={handleUpdate}

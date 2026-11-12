@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-ws-member-ops-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-ws-member-ops-"));
 process.env.DB_PATH = path.join(tempDir, "ws-member-ops.db");
 let closeDatabase: (() => void) | null = null;
 
@@ -35,7 +35,7 @@ function request(
   });
 }
 
-let db: import("better-sqlite3").Database;
+let db: import("node:sqlite").DatabaseSync;
 let workspaces: (typeof import("../src/routes/workspaces.js"))["default"];
 
 test("setup: 初始化数据库与测试数据", async () => {

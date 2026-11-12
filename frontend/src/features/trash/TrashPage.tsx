@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckSquare, ChevronDown, Lock, RotateCcw, Search, Trash2, X } from "lucide-react";
+import {
+  CheckSquare,
+  ChevronDown,
+  Lock,
+  RotateCcw,
+  Search,
+  Trash2,
+  X,
+  ArrowDownUp,
+  MoreHorizontal,
+} from "lucide-react";
 import { useApp, useAppActions } from "@/store/AppContext";
 import { getCurrentWorkspace } from "@/lib/api";
 import { emitKnowledgeTreeRefresh } from "@/lib/workspaceRefreshBridge";
@@ -82,15 +92,25 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [sortMenuOpen]);
 
+  // Esc 退出多选
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSelected([]); setSelectionMode(false); }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [selectionMode]);
+
   // 侧栏的类型筛选与保留期设置跨组件同步
   useEffect(() => {
     const onFilter = () => { setTypeFilter(getTrashTypeFilter()); setTimeFilter(getTrashTimeFilter()); setSortFilter(getTrashSortFilter()); };
     const onSettings = () => setRetention(getRetentionDays());
-    window.addEventListener("nowen:trash-filter", onFilter);
-    window.addEventListener("nowen:trash-settings", onSettings);
+    window.addEventListener("baseforge:trash-filter", onFilter);
+    window.addEventListener("baseforge:trash-settings", onSettings);
     return () => {
-      window.removeEventListener("nowen:trash-filter", onFilter);
-      window.removeEventListener("nowen:trash-settings", onSettings);
+      window.removeEventListener("baseforge:trash-filter", onFilter);
+      window.removeEventListener("baseforge:trash-settings", onSettings);
     };
   }, []);
 
@@ -123,7 +143,7 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
       actions.refreshNotes();
       actions.refreshNotebooks();
       emitKnowledgeTreeRefresh("trash-lifecycle");
-      window.dispatchEvent(new CustomEvent("nowen:storage-changed", { detail: { reason: "trash-lifecycle" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:storage-changed", { detail: { reason: "trash-lifecycle" } }));
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : t("trashCenter.operationFailed"));
       void trash.reload();
@@ -131,71 +151,81 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
   };
 
   return <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-app-bg text-tx-primary" aria-label={t("sidebar.trash")}>
-    {/* 标题行 h-12：与侧栏工作区头（48px）同一节奏，横线对齐 */}
-    <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-app-border px-4">
-      <div className="flex items-center gap-2"><Trash2 size={18} className="text-tx-secondary" /><h1 className="text-[15px] font-semibold">{t("sidebar.trash")}</h1><span className="text-xs tabular-nums text-tx-tertiary">{trash.items.length}</span></div>
-      <div className="flex gap-2">
-        {/* 刷新按钮已移除：列表监听 nowen:storage-changed / nowen:trash-filter 自动刷新 */}
-        {/* 选择模式开关：与文件管理右上角「选择 / 退出多选」同一交互 */}
-        <button className={`${buttonClass} ${selectionMode ? "border-accent-primary bg-accent-primary text-white hover:opacity-90" : "text-tx-primary"}`} onClick={toggleSelectionMode} title={selectionMode ? t("trashCenter.exitSelection") : t("trashCenter.select")}>
-          {selectionMode ? <><X size={14} />{t("trashCenter.exitSelection")}</> : <><CheckSquare size={14} />{t("trashCenter.select")}</>}
-        </button>
-        <button className={`${buttonClass} text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])}><Trash2 size={14} />{t("trashCenter.cleanup")}</button>
-      </div>
-    </header>
-    {/* 工具行 h-10：搜索框对齐分享中心/文件管理同款（w-[210px] h-8 Input）；批量在列表底部批量条 */}
-    <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4">
-      <label className="relative block w-[210px] shrink-0">
-        <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t("trashCenter.search")}
-          aria-label={t("trashCenter.search")}
-          className="h-7 pl-7 pr-7 text-[11.5px]"
-        />
-        {query && (
-          <button
-            type="button"
-            className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
-            onClick={() => setQuery("")}
-            aria-label="清除搜索"
-          >
-            <X size={12} />
-          </button>
-        )}
-      </label>
+    {/* 顶栏单行（原型 toolbar-single-row-v1）：标题+计数(左)；搜索/排序/选择/更多(右)。
+        多选时右端原地切换为批量操作。 */}
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border px-4">
+      <Trash2 size={18} className="shrink-0 text-tx-secondary" />
+      <h1 className="shrink-0 text-[15px] font-semibold">{t("sidebar.trash")}</h1>
+      <span className="flex items-center gap-1.5 rounded-full border border-app-border px-2 py-0.5 text-[10px] text-tx-tertiary">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+        {trash.items.length} 项
+      </span>
       <span className="flex-1" />
-      {/* 排序下拉：对齐分享页工具行右端「排序：xxx ▾」 */}
-      <div ref={sortMenuRef} className="relative shrink-0">
-        <button
-          type="button"
-          aria-haspopup="listbox"
-          aria-expanded={sortMenuOpen}
-          onClick={() => setSortMenuOpen((value) => !value)}
-          className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
-        >
-          排序：<span className="font-medium text-tx-primary">{TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label}</span>
-          <ChevronDown size={12} />
-        </button>
-        {sortMenuOpen && (
-          <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
-            {TRASH_SORT_META.map((meta) => (
+      {/* ── 常驻态：搜索 / 排序 / 选择 / 清空 ── */}
+      <label className="relative block w-[190px] shrink-0">
+            <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索"
+              aria-label={t("trashCenter.search")}
+              className="h-[30px] pl-7 pr-7 text-[11.5px]"
+            />
+            {query && (
               <button
-                key={meta.key}
                 type="button"
-                role="option"
-                aria-selected={sortFilter === meta.key}
-                onClick={() => { setTrashSortFilter(meta.key); setSortFilter(meta.key); setSortMenuOpen(false); }}
-                className={`flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover ${sortFilter === meta.key ? "text-accent-primary" : "text-tx-secondary"}`}
+                className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+                onClick={() => setQuery("")}
+                aria-label="清除搜索"
               >
-                {meta.label}
+                <X size={12} />
               </button>
-            ))}
+            )}
+          </label>
+          <div ref={sortMenuRef} className="relative shrink-0">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={sortMenuOpen}
+              title={`排序：${TRASH_SORT_META.find((meta) => meta.key === sortFilter)?.label ?? ""}`}
+              onClick={() => setSortMenuOpen((value) => !value)}
+              className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-tx-secondary hover:text-tx-primary`}
+            >
+              <ArrowDownUp size={14} />
+            </button>
+            {sortMenuOpen && (
+              <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                {TRASH_SORT_META.map((meta) => (
+                  <button
+                    key={meta.key}
+                    type="button"
+                    role="option"
+                    aria-selected={sortFilter === meta.key}
+                    onClick={() => { setTrashSortFilter(meta.key); setSortFilter(meta.key); setSortMenuOpen(false); }}
+                    className={`flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover ${sortFilter === meta.key ? "text-accent-primary" : "text-tx-secondary"}`}
+                  >
+                    {meta.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+          <button className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-tx-primary`} onClick={toggleSelectionMode} title={selectionMode ? `${t("trashCenter.exitSelection")}（Esc）` : t("trashCenter.select")}>
+            {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
+          </button>
+          <button className={`${buttonClass} !h-[30px] w-10 justify-center px-0 text-accent-danger`} disabled={disabled || !trash.items.length} onClick={() => void operate("empty", [])} title={t("trashCenter.cleanup")}><Trash2 size={14} /></button>
+    </header>
+    {/* 批量操作栏：点击选择后出现 */}
+    {selectionMode && (
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+        <span className="shrink-0 whitespace-nowrap">{t("common.selectedCount", { count: selectedItems.length })}</span>
+        <div className="flex-1" />
+        <button className={`${buttonClass} !h-[30px] shrink-0 px-2.5`} disabled={disabled || !visible.length} onClick={() => setSelected([...new Set([...selected, ...visible.map((item) => item.id)])])}>{t("common.selectAll")}</button>
+        <button className={`${buttonClass} !h-[30px] shrink-0 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}>{t("trashCenter.restore")}</button>
+        <button className={`${buttonClass} !h-[30px] shrink-0 px-2.5`} disabled={disabled || !selectedItems.length} onClick={() => setSelected([])}>{t("common.clearSelection")}</button>
+        <button className={`${buttonClass} !h-[30px] shrink-0 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}>{t("common.deleteSelected")}</button>
       </div>
-    </div>
+    )}
     <div className="flex min-h-0 flex-1">
       {/* 列表 */}
       <div className="min-w-0 flex-1 overflow-y-auto px-4 py-2">
@@ -209,16 +239,6 @@ function TrashCenter({ workspaceId, refreshToken }: { workspaceId: string; refre
               onToggle={(checked) => setSelected(checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
               onRestore={() => void operate("restore", [item.id])}
               onPurge={() => void operate("permanent", [item.id])} />)}</ul>}
-        <p className="mt-3 text-xs text-tx-tertiary">{t("trashCenter.protectedHint")}</p>
-      </div>
-      {/* 批量条：有勾选时出现 */}
-      <div className={`shrink-0 border-t border-[#d5e3ff] bg-[#eef4ff] px-4 py-2 text-xs text-tx-secondary ${selectedItems.length ? "flex" : "hidden"} items-center gap-2`}>
-        <label className="flex items-center gap-1.5"><input type="checkbox" disabled={disabled || !visible.length} checked={!!visible.length && visible.every((item) => selected.includes(item.id))} onChange={(event) => setSelected(event.target.checked ? [...new Set([...selected, ...visible.map((item) => item.id)])] : selected.filter((id) => !visible.some((item) => item.id === id)))} />{t("trashCenter.selectAll")}</label>
-        <span>{t("trashCenter.selected", { count: selectedItems.length })}</span>
-        <button className={`${buttonClass} h-7 px-2.5`} disabled={disabled || !selectedItems.every((item) => item.canRestore) || selectedItems.length > 500} onClick={() => void operate("restore", selectedItems.map((item) => item.id))}><RotateCcw size={13} />{t("trashCenter.restore")}</button>
-        <button className={`${buttonClass} h-7 px-2.5 text-accent-danger`} disabled={disabled || !selectedItems.every((item) => item.canDeletePermanently) || selectedItems.length > 500} onClick={() => void operate("permanent", selectedItems.map((item) => item.id))}><Trash2 size={13} />{t("trashCenter.permanent")}</button>
-        <span className="flex-1" />
-        <button className="text-tx-tertiary hover:text-tx-primary" onClick={() => setSelected([])}>{t("trashCenter.clearSelection", { defaultValue: "取消选择" })}</button>
       </div>
       {/* 详情预览：仅在选中一条被删内容时出现，未选中时列表占满整宽（不留空占位） */}
       {active && (

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import {
   extractEmbeddedDocumentIds,
   findOrphanAnonymousNoteIds,
@@ -13,8 +13,8 @@ function sqliteTimestampHoursAgo(hours: number): string {
     .replace("T", " ");
 }
 
-function createDb(): Database.Database {
-  const db = new Database(":memory:");
+function createDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE notes (
       id TEXT PRIMARY KEY,
@@ -27,7 +27,7 @@ function createDb(): Database.Database {
 }
 
 function insertNote(
-  db: Database.Database,
+  db: DatabaseSync,
   id: string,
   options: { content?: string | null; unlisted?: boolean; hoursAgo?: number } = {},
 ): void {

@@ -11,11 +11,11 @@ const manifestPath = path.join(distDir, ".vite/manifest.json");
 const enforce = process.argv.includes("--enforce");
 
 const budgets = {
-  initialRequestCount: Number(process.env.NOWEN_MAX_INITIAL_JS_REQUESTS || 16),
-  initialRawBytes: Number(process.env.NOWEN_MAX_INITIAL_RAW_BYTES || 4_000_000),
-  initialGzipBytes: Number(process.env.NOWEN_MAX_INITIAL_GZIP_BYTES || 1_300_000),
-  initialChunkRawBytes: Number(process.env.NOWEN_MAX_INITIAL_CHUNK_RAW_BYTES || 2_000_000),
-  initialChunkGzipBytes: Number(process.env.NOWEN_MAX_INITIAL_CHUNK_GZIP_BYTES || 650_000),
+  initialRequestCount: Number(process.env.BASEFORGE_MAX_INITIAL_JS_REQUESTS || 16),
+  initialRawBytes: Number(process.env.BASEFORGE_MAX_INITIAL_RAW_BYTES || 4_000_000),
+  initialGzipBytes: Number(process.env.BASEFORGE_MAX_INITIAL_GZIP_BYTES || 1_300_000),
+  initialChunkRawBytes: Number(process.env.BASEFORGE_MAX_INITIAL_CHUNK_RAW_BYTES || 2_000_000),
+  initialChunkGzipBytes: Number(process.env.BASEFORGE_MAX_INITIAL_CHUNK_GZIP_BYTES || 650_000),
 };
 
 function formatBytes(value) {

@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-versions-v2-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-versions-v2-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.VERSION_SNAPSHOT_TIMER_DISABLED = "1";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let sharesRouter: typeof import("../src/routes/shares").sharesRouter;
 let noteVersionsRepository: typeof import("../src/repositories/noteVersionsRepository").noteVersionsRepository;
 let computeContentHash: typeof import("../src/repositories/noteVersionsRepository").computeContentHash;

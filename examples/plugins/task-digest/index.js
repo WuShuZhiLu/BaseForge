@@ -1,8 +1,8 @@
 // Read-only Task Digest example. The core Automation Center owns webhook scheduling.
-async function collectPersonalTasks(nowen) {
+async function collectPersonalTasks(baseforge) {
   const tasks = [];
   for (let offset = 0; offset < 50000; offset += 100) {
-    const page = await nowen.tasks.list({ scope: "personal", limit: 100, offset });
+    const page = await baseforge.tasks.list({ scope: "personal", limit: 100, offset });
     if (!Array.isArray(page)) throw new Error("Task Host API returned an invalid page");
     tasks.push(...page);
     if (page.length < 100) break;
@@ -36,16 +36,16 @@ function runForDay(tasks, today, mode, shiftMs) {
     })),
   };
 }
-globalThis.__nowenPluginModule = {
+globalThis.__baseforgePluginModule = {
   actions: {
-    summary: async ({ input, nowen }) => {
+    summary: async ({ input, baseforge }) => {
       const mode = input && input.mode === "evening" ? "evening" : "morning";
       const requestedOffset = Number(input && input.timezoneOffsetMinutes);
       const offsetMinutes = Number.isInteger(requestedOffset) && Math.abs(requestedOffset) <= 840
         ? requestedOffset : 480;
       const shiftMs = offsetMinutes * 60000;
       const today = new Date(Date.now() + shiftMs).toISOString().slice(0, 10);
-      return runForDay(await collectPersonalTasks(nowen), today, mode, shiftMs);
+      return runForDay(await collectPersonalTasks(baseforge), today, mode, shiftMs);
     },
   },
 };

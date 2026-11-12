@@ -168,7 +168,7 @@ export function buildWorkspaceScopeExport(
   const rows = (table: string, sql: string, ...params: unknown[]) =>
     tableExists(db, table) ? db.prepare(sql).all(...params) : [];
   return {
-    format: "nowen-workspace-recovery-v1",
+    format: "baseforge-workspace-recovery-v1",
     workspaceId,
     exportedAt: new Date().toISOString(),
     notebooks: rows("notebooks", "SELECT * FROM notebooks WHERE workspaceId = ?", workspaceId),
@@ -188,7 +188,6 @@ export function buildWorkspaceScopeExport(
       SELECT r.* FROM task_reminders r JOIN tasks t ON t.id = r.taskId
       WHERE t.workspaceId = ?
     `, workspaceId),
-    diaries: rows("diaries", "SELECT * FROM diaries WHERE workspaceId = ?", workspaceId),
     mindmaps: rows("mindmaps", "SELECT * FROM mindmaps WHERE workspaceId = ?", workspaceId),
   };
 }
@@ -307,7 +306,7 @@ export function copyWorkspaceScopeToPersonal(
       }
     }
 
-    for (const table of ["diaries", "mindmaps"] as const) {
+    for (const table of ["mindmaps"] as const) {
       if (!tableExists(db, table)) continue;
       const rows = db.prepare(`SELECT * FROM ${table} WHERE workspaceId = ?`).all(workspaceId) as Array<Record<string, unknown>>;
       for (const row of rows) insertDynamic(db, table, row, {

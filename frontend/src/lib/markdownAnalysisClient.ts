@@ -39,7 +39,7 @@ function createDefaultWorker(): WorkerLike | null {
   // path also works in the older Chromium/WebView versions supported by the desktop/mobile apps.
   return new Worker(
     new URL("./markdownAnalysis.worker.ts", import.meta.url),
-    { name: "nowen-markdown-analysis" },
+    { name: "baseforge-markdown-analysis" },
   );
 }
 

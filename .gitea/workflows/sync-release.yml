@@ -1,0 +1,90 @@
+# 发布资产同步与 Gitea 发布门禁（在 Gitea 上运行）
+#
+# 文件位置：必须放在 .gitea/workflows/。Gitea 的 [actions] WORKFLOW_DIRS 只保留
+# 该目录，因此 GitHub 侧不会执行本文件，Gitea 侧也不会去读 .github/workflows/。
+#
+# 链路（详见 docs/release-pipeline.md）：
+#   1. GitHub 构建 win/mac → 全部资产齐了才把 GitHub Release 转正式；
+#   2. GitHub 发布完成后 dispatch 本 workflow（tag + publish=true）；
+#   3. 本 workflow 同步 GitHub 资产到 Gitea（draft）→ 校验齐全 → Gitea 转正式；
+#   4. 最后同步 Gitee（Gitee 没有 draft 语义，只能最后公开）；
+#   5. Docker 镜像的 latest 不在这里移动：docker-image.yml 在 tag 阶段就直接推
+#      vX.Y.Z 与 latest 两个 tag，本门禁只负责桌面端资产与 Release 状态。
+#
+# 为什么把同步与转正放在同一个 workflow：
+#   - 都在发布门禁之后，顺序明确，失败可原样重跑；
+#   - 凭据（读 GitHub、写 Gitea/Gitee）只出现在 Gitea Secrets；
+#     GitHub 侧只需要一个能触发 workflow 的窄 token。
+
+name: Sync Release Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要同步的 tag；留空 = 自动取最近一个 tag / package.json 版本"
+        required: false
+        default: ""
+      publish:
+        description: "资产校验齐全后把 Gitea Release 转正式（true/false）"
+        required: false
+        default: "false"
+      dry_run:
+        description: "只演练不上传（true/false）"
+        required: false
+        default: "false"
+  # GitHub 的 release 事件到不了 Gitea，由 GitHub workflow 在发布后 dispatch 本 workflow。
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sync assets
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    timeout-minutes: 30
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_MIRROR_TOKEN }}
+      GITHUB_REPO: ${{ vars.GH_MIRROR_REPO }}
+      GITEA_URL: ${{ github.server_url }}
+      GITEA_TOKEN: ${{ secrets.RELEASE_SYNC_TOKEN }}
+      GITEA_REPO: ${{ github.repository }}
+      GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+      GITEE_REPO: ${{ vars.GITEE_REPO }}
+      RELEASE_TAG: ${{ github.event.inputs.tag }}
+      PUBLISH: ${{ github.event.inputs.publish }}
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync Gitea (draft, optional publish)
+        # 所有凭据都来自仓库 Secrets，绝不写入脚本或 workflow 明文；
+        # 也不要打开 bash -x（会把 Authorization 头打进日志）。
+        run: |
+          set -euo pipefail
+          ARGS=(--targets gitea --asset-dir /tmp/baseforge-release-assets)
+          if [ -n "${RELEASE_TAG:-}" ]; then ARGS+=(--tag "${RELEASE_TAG}"); fi
+          if [ "${PUBLISH:-false}" = "true" ]; then ARGS+=(--publish); fi
+          if [ "${DRY_RUN:-false}" = "true" ]; then ARGS+=(--dry-run); fi
+          node scripts/sync-release-assets.mjs "${ARGS[@]}"
+
+      - name: Sync Gitee last
+        # Gitee 没有草稿语义：放在 Gitea 门禁之后，复用同一份已下载资产。
+        # 只有本次真的要求转正时才公开；publish=false 的演练绝不能把资产推到公开的 Gitee。
+        if: ${{ github.event.inputs.publish == 'true' || github.event.inputs.dry_run == 'true' }}
+        run: |
+          set -euo pipefail
+          ARGS=(--targets gitee --asset-dir /tmp/baseforge-release-assets)
+          if [ -n "${RELEASE_TAG:-}" ]; then ARGS+=(--tag "${RELEASE_TAG}"); fi
+          if [ "${DRY_RUN:-false}" = "true" ]; then ARGS+=(--dry-run); fi
+          node scripts/sync-release-assets.mjs "${ARGS[@]}"
+
+      - name: Cleanup downloaded assets
+        if: always()
+        run: rm -rf /tmp/baseforge-release-assets

@@ -34,7 +34,7 @@ export function preprocessSharedMindMapMarkdown(markdown: string): string {
   const fenced: string[] = [];
   let text = markdown.replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, (match) => {
     const index = fenced.push(match) - 1;
-    return `\u0000NOWEN_SHARED_MINDMAP_CODE_${index}\u0000`;
+    return `\u0000BASEFORGE_SHARED_MINDMAP_CODE_${index}\u0000`;
   });
 
   MARKDOWN_EMBED_RE.lastIndex = 0;
@@ -43,7 +43,7 @@ export function preprocessSharedMindMapMarkdown(markdown: string): string {
   ));
 
   // eslint-disable-next-line no-control-regex -- Control characters must be rejected or stripped at this data boundary.
-  return text.replace(/\u0000NOWEN_SHARED_MINDMAP_CODE_(\d+)\u0000/g, (_match, index) => (
+  return text.replace(/\u0000BASEFORGE_SHARED_MINDMAP_CODE_(\d+)\u0000/g, (_match, index) => (
     fenced[Number(index)] || ""
   ));
 }

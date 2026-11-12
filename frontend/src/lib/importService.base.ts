@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { pdfjsAssetUrl } from "./pdfjsAssets";
 import { marked, Renderer } from "marked";
 import i18n from "i18next";
 import { Editor, generateJSON, Extension } from "@tiptap/core";
@@ -238,6 +239,10 @@ async function extractPdfToHtml(buffer: ArrayBuffer): Promise<string> {
     // 关闭外部 cmap/standardFont 远程下载，离线/内网环境也能解析
     isEvalSupported: false,
     useSystemFonts: true,
+    // cmap/standardFont 走本地构建产物（vite 拷贝），非外网下载，离线可用
+    cMapUrl: pdfjsAssetUrl("cmaps"),
+    cMapPacked: true,
+    standardFontDataUrl: pdfjsAssetUrl("standard_fonts"),
   });
   const pdf = await loadingTask.promise;
 
@@ -765,9 +770,10 @@ export async function readMarkdownFromZipWithMeta(
     try {
       const text = await metaEntry.async("text");
       const parsed = JSON.parse(text) as ZipImportMeta;
-      // 轻量边界检查：只认可 nowen-note 自家导出的 metadata，避免被外部 zip
+      // 轻量边界检查：只认可 baseforge 自家导出的 metadata，避免被外部 zip
       // 中的同名文件误认（用户可能上传个包含 metadata.json 的项目压缩包）。
-      if (parsed && parsed.app === "nowen-note") {
+      // 兼容 Nowen 时代导出的 metadata：app 字段可能是 nowen。
+      if (parsed && (parsed.app === "baseforge" || parsed.app === "nowen")) {
         meta = parsed;
       }
     } catch (e) {

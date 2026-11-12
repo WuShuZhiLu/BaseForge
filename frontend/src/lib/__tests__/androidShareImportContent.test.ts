@@ -12,7 +12,7 @@ function payload(overrides: Partial<AndroidSharePayload> = {}): AndroidSharePayl
     createdAt: Date.now(),
     sourcePackage: "com.android.chrome",
     sourceLabel: "Chrome",
-    subject: "Nowen 分享标题",
+    subject: "BaseForge 分享标题",
     text: "正文内容\nhttps://example.com/article",
     url: "https://example.com/article",
     items: [],
@@ -41,7 +41,7 @@ const attachments = [
 
 describe("Android share note content", () => {
   it("derives a useful title from subject, file or URL", () => {
-    expect(buildAndroidShareNoteTitle(payload())).toBe("Nowen 分享标题");
+    expect(buildAndroidShareNoteTitle(payload())).toBe("BaseForge 分享标题");
     expect(buildAndroidShareNoteTitle(payload({ subject: "", text: "", url: "", items: [{
       id: "1", name: "年度报告.pdf", mimeType: "application/pdf", declaredMimeType: "application/pdf",
       size: 1, status: "ready",

@@ -136,9 +136,9 @@ export default function VoiceRecorderSheet() {
       } else if (session?.state === "requesting-permission") void session.cancel().then(close);
       else if (!busyRef.current && persistedRef.current) close();
     };
-    window.addEventListener("nowen:voice-record", onRequest);
-    window.addEventListener("nowen:token-changed", onAuth);
-    return () => { window.removeEventListener("nowen:voice-record", onRequest); window.removeEventListener("nowen:token-changed", onAuth); };
+    window.addEventListener("baseforge:voice-record", onRequest);
+    window.addEventListener("baseforge:token-changed", onAuth);
+    return () => { window.removeEventListener("baseforge:voice-record", onRequest); window.removeEventListener("baseforge:token-changed", onAuth); };
   }, [close, refreshDrafts, t, setDraft]);
   useEffect(() => {
     const timer = setInterval(() => setDuration(sessionRef.current?.durationMs || draftRef.current?.durationMs || 0), 250);

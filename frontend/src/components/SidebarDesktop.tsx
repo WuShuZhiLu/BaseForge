@@ -70,6 +70,9 @@ import {
   Unlock,
   FolderOpen,
   Cloud,
+  Globe,
+  Server,
+  Archive,
   FileCode,
   Network,
   PenTool,
@@ -88,7 +91,8 @@ import {
   type KnowledgeTreeNode,
 } from "@/lib/knowledgeTreeApi";
 import { descendantNotebookResources } from "@/lib/knowledgeTreeDescendants";
-import { knowledgeTreeEmojiFor, docEmojiForFormat } from "@/lib/knowledgeTreeIcons";
+import { knowledgeTreeIconFor, docIconForFormat } from "@/lib/knowledgeTreeIcons";
+import { useRemoteLinkedNoteIds } from "@/lib/remoteNoteSync";
 import {
   getRetentionDays,
   getTrashSetting,
@@ -125,11 +129,11 @@ import { KnowledgeTreeBatchMovePanel } from "@/components/KnowledgeTreeBatchActi
 import NotebookShareDialog from "@/components/NotebookShareDialog";
 import ShareModal from "@/components/ShareModal";
 import type { FileItem, FileSortKey, FileStats, NoteListItem, Notebook, PmProject, PmWorkItem, PmWorkItemStatus, Tag, Workspace } from "@/types";
-import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesType, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
+import { FILE_REMOTE_SORT_OPTIONS, FILE_REMOTE_TYPE_CHIPS, FILE_SHARE_OPTIONS, FILE_TYPE_CHIPS, getFilesCategory, getFilesGroupMode, getFilesRemoteSort, getFilesRemoteSourceId, getFilesRemoteTime, getFilesRemoteTypes, getFilesShare, getFilesSource, getFilesTime, getFilesTypes, getFilesUiVersion, getFilesViewMode, setFilesUi, subscribeFilesUi, type FilesGroupMode, type FilesRemoteSortKey, type FilesSource, type FilesViewMode } from "@/features/files/filesUi";
 import { CreateWorkspaceDialog, JoinWorkspaceDialog } from "@/components/WorkspaceSwitcher";
 import MembersPanel from "@/components/MembersPanel";
 import { BUILTIN_PLUGINS, getDisabledBuiltinPlugins, isBuiltinPluginEnabled, setBuiltinPluginDisabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
-import { TasksMiniPanel, DiaryMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
+import { TasksMiniPanel, PmMiniPanel } from "@/plugins/builtin/MiniPanels";
 import { KnowledgeTreeCreateDropdown, type KnowledgeTreeCreateMenuState } from "@/components/KnowledgeTreeCreateMenuRuntime";
 import { LiaThumbtackSolid } from "react-icons/lia";
 import {
@@ -137,6 +141,8 @@ import {
   importMarkdownZipIntoKnowledgeTree,
   importWordIntoKnowledgeTree,
   importPdfIntoKnowledgeTree,
+  importExcelIntoKnowledgeTree,
+  importWordOriginalIntoKnowledgeTree,
   importWeChatArticleIntoKnowledgeTree,
 } from "@/components/knowledgeTreeImport";
 import type { KnowledgeTreeImportRequest } from "@/components/KnowledgeTreePanel";
@@ -197,9 +203,9 @@ const FILTER_SCOPE_OPTIONS: Array<{ value: FilterScope; label: string }> = [
 
 /** 区段顺序（可拖拽排序，持久化到 localStorage）。收藏作为知识库面板的一个区段（功能太少，不设独立面板） */
 type SectionId = "kb" | "tags" | "editors" | "star";
-const SECTION_ORDER_KEY = "nowen-next-sidebar-sections";
+const SECTION_ORDER_KEY = "baseforge-next-sidebar-sections";
 /** 区段排序拖拽专用 dataTransfer 类型：与知识树行拖拽（text/plain）区分，互不误触。 */
-const SECTION_DRAG_TYPE = "application/x-nowen-sidebar-section";
+const SECTION_DRAG_TYPE = "application/x-baseforge-sidebar-section";
 /** 区段全集（同时也是缺失区段的补位顺序）。 */
 const SECTION_IDS: SectionId[] = ["kb", "tags", "editors", "star"];
 
@@ -377,7 +383,7 @@ function subtreeHasMatch(
 
 function fileIconFor(node: KnowledgeTreeNode, isRoot = false) {
   // 与总览页共用一套 emoji 图标（见 knowledgeTreeIcons.ts），两处类型视觉一致
-  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, isRoot)}</span>;
+  return <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(node, isRoot)}</span>;
 }
 
 const TAG_DOT_COLORS = ["#3b82f6", "#8b5cf6", "#10b981", "#f59e0b", "#f43f5e", "#06b6d4"];
@@ -421,126 +427,11 @@ function PanelSection({ label, extra, children }: {
       <div className="flex items-center justify-between pl-1 pr-1 pb-1">
         <span className="flex min-w-0 items-center gap-1.5">
           <Circle size={6} aria-hidden className="shrink-0 fill-current text-tx-tertiary" />
-          <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">{label}</span>
+          <span className="min-w-0 truncate text-[12px] font-medium text-tx-tertiary">{label}</span>
         </span>
         {extra}
       </div>
       {children}
-    </div>
-  );
-}
-
-interface AiConversationRow {
-  id: string;
-  title: string;
-  updatedAt: string;
-}
-
-function formatAiConversationRelativeTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
-  if (minutes < 1) return "刚刚";
-  if (minutes < 60) return `${minutes} 分钟前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} 天前`;
-  return date.toLocaleDateString([], { month: "2-digit", day: "2-digit" });
-}
-
-/** AI 会话列表面板（方案 A）：会话列表上移到侧栏，主区 AIChatPanel 对话占全宽。
- *  行点击 → nowen:ai-open-conversation 通知主区加载；列表变化 → nowen:ai-conversations-changed 刷新。 */
-function AiConversationsMiniPanel() {
-  const [conversations, setConversations] = useState<AiConversationRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const reload = () => {
-      api.aiConversations.list()
-        .then((result) => { if (!cancelled) setConversations(result.conversations); })
-        .catch(() => { if (!cancelled) setConversations([]); })
-        .finally(() => { if (!cancelled) setLoading(false); });
-    };
-    reload();
-    const handleConversationsChanged = () => reload();
-    const handleConversationSelected = (event: Event) => {
-      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
-      if (conversationId) setSelectedId(conversationId);
-    };
-    window.addEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
-    window.addEventListener("nowen:ai-conversation-selected", handleConversationSelected);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("nowen:ai-conversations-changed", handleConversationsChanged);
-      window.removeEventListener("nowen:ai-conversation-selected", handleConversationSelected);
-    };
-  }, []);
-
-  const openConversation = useCallback((conversationId: string) => {
-    setSelectedId(conversationId);
-    window.dispatchEvent(new CustomEvent("nowen:ai-open-conversation", { detail: { conversationId } }));
-  }, []);
-
-  const handleCreateConversation = useCallback(() => {
-    void api.aiConversations.create()
-      .then((result) => {
-        setConversations((previous) => [result.conversation, ...previous]);
-        window.dispatchEvent(new CustomEvent("nowen:ai-conversations-changed"));
-        openConversation(result.conversation.id);
-      })
-      .catch(() => {});
-  }, [openConversation]);
-
-  return (
-    <div className="sbx-view">
-      <div className="border-b border-app-border px-2 py-1.5">
-        <div className="flex items-center justify-between pl-1 pr-1 pb-1">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-tx-tertiary" />
-            <span className="min-w-0 truncate text-[12px] font-semibold text-tx-tertiary">会话</span>
-          </span>
-          <button
-            type="button"
-            onClick={handleCreateConversation}
-            title="新建会话"
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tx-tertiary transition-colors hover:bg-app-hover hover:text-tx-primary"
-          >
-            <Plus size={13} />
-          </button>
-        </div>
-        <div className="max-h-72 space-y-0.5 overflow-y-auto">
-          {loading && (
-            <div className="px-2 py-2 text-[11px] text-tx-tertiary">加载中…</div>
-          )}
-          {!loading && !conversations.length && (
-            <div className="px-2 py-2 text-[11px] text-tx-tertiary">暂无会话，点右上角新建</div>
-          )}
-          {!loading && conversations.map((conversation) => {
-            const active = conversation.id === selectedId;
-            const displayTitle = conversation.title || "未命名会话";
-            return (
-              <button
-                key={conversation.id}
-                type="button"
-                onClick={() => openConversation(conversation.id)}
-                title={displayTitle}
-                className={cn(
-                  "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors",
-                  active
-                    ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
-                    : "text-tx-secondary hover:bg-app-hover",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate">{displayTitle}</span>
-                <span className="shrink-0 text-[10px] tabular-nums text-tx-tertiary">{formatAiConversationRelativeTime(conversation.updatedAt)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -618,7 +509,7 @@ export default function SidebarDesktop() {
   const [renaming, setRenaming] = useState<{ kind: "kb" | "tag"; id: string; value: string; isNew?: boolean } | null>(null);
 
   // 区段折叠 + 排序（折叠状态持久化）
-  const SECTION_COLLAPSED_KEY = "nowen-next-sidebar-sections-collapsed";
+  const SECTION_COLLAPSED_KEY = "baseforge-next-sidebar-sections-collapsed";
   const [collapsedSections, setCollapsedSections] = useState<Set<SectionId>>(() => {
     try {
       const saved = localStorage.getItem(SECTION_COLLAPSED_KEY);
@@ -630,7 +521,7 @@ export default function SidebarDesktop() {
     try { localStorage.setItem(SECTION_COLLAPSED_KEY, Array.from(collapsedSections).join(",")); } catch { /* ignore */ }
   }, [collapsedSections]);
   // 模块侧栏面板折叠状态（projects/files/shares 等单块面板，同样持久化）
-  const SIDEBAR_PANEL_COLLAPSED_KEY = "nowen-next-sidebar-panel-collapsed";
+  const SIDEBAR_PANEL_COLLAPSED_KEY = "baseforge-next-sidebar-panel-collapsed";
   // 文件管理面板的来源/筛选状态（filesUi）：订阅保证侧栏 chips 即时反映选择
   const filesUiVersion = useSyncExternalStore(subscribeFilesUi, getFilesUiVersion);
   void filesUiVersion;
@@ -661,7 +552,7 @@ export default function SidebarDesktop() {
 
   // 侧栏宽度（批次 C）
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem("nowen-next-sidebar-width"));
+    const saved = Number(localStorage.getItem("baseforge-next-sidebar-width"));
     return Number.isFinite(saved) && saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH
       ? saved
       : SIDEBAR_DEFAULT_WIDTH;
@@ -672,7 +563,7 @@ export default function SidebarDesktop() {
   const [currentWs, setCurrentWs] = useState<string>(() => getCurrentWorkspace());
 
   // ===== 侧栏活动栏视图（FR-IA-02）：kb / star / trash / files / plugins =====
-  // Rail 点击经 nowen:sidebar-view 事件切换；主区视图不变（语雀式）
+  // Rail 点击经 baseforge:sidebar-view 事件切换；主区视图不变（语雀式）
   type SidebarView = "kb" | "trash" | "files" | "plugins" | "projects" | "shares";
   const [sidebarView, setSidebarView] = useState<SidebarView>(() => {
     // 刷新/深链首次挂载：与 App 从 URL 恢复的主区 viewMode 对齐一次（如 /plugins → 插件侧栏）。
@@ -733,13 +624,13 @@ export default function SidebarDesktop() {
   useEffect(() => {
     if (sidebarView !== "trash") return;
     const reload = () => { api.trash.list(getCurrentWorkspace()).then((r) => setTrashItems(r.items)).catch(() => undefined); };
-    window.addEventListener("nowen:storage-changed", reload);
-    window.addEventListener("nowen:knowledge-tree-changed", reload);
-    window.addEventListener("nowen:notes-changed", reload);
+    window.addEventListener("baseforge:storage-changed", reload);
+    window.addEventListener("baseforge:knowledge-tree-changed", reload);
+    window.addEventListener("baseforge:notes-changed", reload);
     return () => {
-      window.removeEventListener("nowen:storage-changed", reload);
-      window.removeEventListener("nowen:knowledge-tree-changed", reload);
-      window.removeEventListener("nowen:notes-changed", reload);
+      window.removeEventListener("baseforge:storage-changed", reload);
+      window.removeEventListener("baseforge:knowledge-tree-changed", reload);
+      window.removeEventListener("baseforge:notes-changed", reload);
     };
   }, [sidebarView]);
   // 文件管理视图激活时：上传/删除/清理后即时刷新计数（stats + 文件列表）
@@ -749,28 +640,51 @@ export default function SidebarDesktop() {
       api.files.stats().then((s) => setFileStats(s)).catch(() => undefined);
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => undefined);
     };
-    window.addEventListener("nowen:storage-changed", reload);
-    window.addEventListener("nowen:knowledge-tree-changed", reload);
-    window.addEventListener("nowen:notes-changed", reload);
+    window.addEventListener("baseforge:storage-changed", reload);
+    window.addEventListener("baseforge:knowledge-tree-changed", reload);
+    window.addEventListener("baseforge:notes-changed", reload);
     return () => {
-      window.removeEventListener("nowen:storage-changed", reload);
-      window.removeEventListener("nowen:knowledge-tree-changed", reload);
-      window.removeEventListener("nowen:notes-changed", reload);
+      window.removeEventListener("baseforge:storage-changed", reload);
+      window.removeEventListener("baseforge:knowledge-tree-changed", reload);
+      window.removeEventListener("baseforge:notes-changed", reload);
     };
   }, [sidebarView]);
   useEffect(() => {
     const onFilter = () => { setTrashFilterState(getTrashTypeFilter()); setTimeFilterState(getTrashTimeFilter()); }
     const onSettings = () => { setRetentionDaysState(getRetentionDays()); setNotifyExpiryState(getTrashSetting("notifyExpiry")); setWeeklySummaryState(getTrashSetting("weeklySummary")); };
-    window.addEventListener("nowen:trash-filter", onFilter);
-    window.addEventListener("nowen:trash-settings", onSettings);
+    window.addEventListener("baseforge:trash-filter", onFilter);
+    window.addEventListener("baseforge:trash-settings", onSettings);
     return () => {
-      window.removeEventListener("nowen:trash-filter", onFilter);
-      window.removeEventListener("nowen:trash-settings", onSettings);
+      window.removeEventListener("baseforge:trash-filter", onFilter);
+      window.removeEventListener("baseforge:trash-settings", onSettings);
     };
   }, []);
   const [fileItems, setFileItems] = useState<FileItem[]>([]);
   const [fileStats, setFileStats] = useState<FileStats | null>(null);
   const [remoteSources, setRemoteSources] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  /** 远程投影笔记（正文读写远程文件）：树行/搜索结果上打个云朵角标区分 */
+  const remoteLinkedNoteIds = useRemoteLinkedNoteIds();
+  /**
+   * 侧栏「存储」列表加载：页面隐藏 / 后端重启会让 fetch 被 abort，
+   * 这种瞬时失败不能当成「没有远程存储」——保留上一次结果并短暂重试，
+   * 否则会出现主区有源、侧栏空空的割裂状态。
+   */
+  const remoteSourcesAttemptRef = useRef(0);
+  const loadRemoteSourcesRef = useRef<(() => void) | null>(null);
+  const loadRemoteSources = useCallback(() => {
+    const attempt = remoteSourcesAttemptRef.current;
+    api.getRemoteFileSources()
+      .then((r) => {
+        remoteSourcesAttemptRef.current = 0;
+        setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })));
+      })
+      .catch(() => {
+        if (attempt >= 3) return; // 连续失败就停：等下次切视图 / 回到前台再试
+        remoteSourcesAttemptRef.current = attempt + 1;
+        window.setTimeout(() => loadRemoteSourcesRef.current?.(), 400 * (attempt + 1));
+      });
+  }, []);
+  loadRemoteSourcesRef.current = loadRemoteSources;
   // 插件列表（后端 GET /plugins）
   const [plugCat, setPlugCat] = useState<"builtin" | "installed" | "catalog" | "config">("builtin");
   const [plugins, setPlugins] = useState<Array<{ id: string; name: string; description?: string; version: string; status: string; source?: string }>>([]);
@@ -789,12 +703,12 @@ export default function SidebarDesktop() {
   const [uploadOpen, setUploadOpen] = useState(false);
   // 侧栏内嵌打开的插件面板（runtimeId），null = 未打开（返回条隐藏）
   const [openPluginPanel, setOpenPluginPanel] = useState<string | null>(null);
-  // 独立插件模块（待办/日记/AI）：界面与知识库无关，侧栏只显示插件自己的顶块与内容
-  const standalonePluginPanel = openPluginPanel === "tasks" || openPluginPanel === "diary" || openPluginPanel === "ai";
+  // 独立插件模块（待办）：界面与知识库无关，侧栏只显示插件自己的顶块与内容
+  const standalonePluginPanel = openPluginPanel === "tasks";
   // 知识树统一选中系统：单选/ctrl 多选/shift 范围选；点空白清空
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(() => {
     try {
-      const saved = localStorage.getItem("nowen-next-sidebar-selection");
+      const saved = localStorage.getItem("baseforge-next-sidebar-selection");
       const parsed = saved ? (JSON.parse(saved) as string[]) : [];
       return new Set(Array.isArray(parsed) ? parsed : []);
     } catch {
@@ -806,9 +720,9 @@ export default function SidebarDesktop() {
 
   /** 切换侧栏视图并加载对应面板数据（Rail 事件与 viewMode 同步共用，避免同步路径缺数据） */
   const applySidebarView = useCallback((view: string) => {
-    // 插件导航项（待办/日记/AI 问答）：侧栏切回知识库并打开对应迷你面板
-    if (view === "tasks" || view === "diary" || view === "ai-chat") {
-      setOpenPluginPanel(view === "ai-chat" ? "ai" : view);
+    // 插件导航项（待办）：侧栏切回知识库并打开对应迷你面板
+    if (view === "tasks") {
+      setOpenPluginPanel(view);
       setSidebarView("kb");
       return;
     }
@@ -822,12 +736,16 @@ export default function SidebarDesktop() {
     if (view === "files") {
       api.files.list({ pageSize: 100 }).then((r) => setFileItems(r.items)).catch(() => setFileItems([]));
       api.files.stats().then((s) => setFileStats(s)).catch(() => setFileStats(null));
-      api.getRemoteFileSources().then((r) => setRemoteSources(r.sources.map((src) => ({ id: src.id, name: src.name, type: src.type })))).catch(() => setRemoteSources([]));
     }
     if (view === "plugins") {
       api.plugins.list().then((list) => setPlugins(list)).catch(() => setPlugins([]));
     }
   }, []);
+
+  // 进入「文件管理」视图时加载侧栏「存储」列表（初始挂载与切视图都覆盖）
+  useEffect(() => {
+    if (sidebarView === "files") loadRemoteSources();
+  }, [sidebarView, loadRemoteSources]);
 
   useEffect(() => {
     const onSwitch = (event: Event) => {
@@ -835,9 +753,32 @@ export default function SidebarDesktop() {
       // Rail 事件视图名（ViewMode 语义）→ 侧栏视图 id（收藏已并入知识库面板区段）
       applySidebarView(raw === "notebook" || raw === "favorites" ? "kb" : raw ?? "");
     };
-    window.addEventListener("nowen:sidebar-view", onSwitch);
-    return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
+    window.addEventListener("baseforge:sidebar-view", onSwitch);
+    return () => window.removeEventListener("baseforge:sidebar-view", onSwitch);
   }, [applySidebarView]);
+
+  // 远程存储增删后侧栏「存储」列表跟着刷新（主面板保存成功时广播）
+  useEffect(() => {
+    const reload = () => {
+      if (sidebarView !== "files") return;
+      loadRemoteSources();
+    };
+    window.addEventListener("baseforge:remote-sources-changed", reload);
+    return () => window.removeEventListener("baseforge:remote-sources-changed", reload);
+  }, [sidebarView, loadRemoteSources]);
+
+  // 页面隐藏时进行中的请求会被 abort；回到前台补拉一次，避免侧栏一直停在空态
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && sidebarView === "files") loadRemoteSources();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [sidebarView, loadRemoteSources]);
 
   // 插件工作区「打开侧栏面板」按钮 → 侧栏切到知识库视图并展开对应迷你面板
   useEffect(() => {
@@ -847,8 +788,8 @@ export default function SidebarDesktop() {
       setOpenPluginPanel(id);
       setSidebarView("kb");
     };
-    window.addEventListener("nowen:open-plugin-panel", onOpenPanel);
-    return () => window.removeEventListener("nowen:open-plugin-panel", onOpenPanel);
+    window.addEventListener("baseforge:open-plugin-panel", onOpenPanel);
+    return () => window.removeEventListener("baseforge:open-plugin-panel", onOpenPanel);
   }, []);
 
   // 插件面板入口的计数：进入插件视图时取一次（带 5 分钟缓存），并跟随刷新事件更新
@@ -896,20 +837,20 @@ export default function SidebarDesktop() {
   useEffect(() => {
     reloadStar();
     const onKbChanged = () => reloadStar();
-    // nowen:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
+    // baseforge:notes-changed = api.updateNote 在收藏状态变化时广播（菜单/编辑器/列表都能触发）
     const onNotesChanged = () => reloadStar();
-    window.addEventListener("nowen:knowledge-tree-changed", onKbChanged);
-    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    window.addEventListener("baseforge:knowledge-tree-changed", onKbChanged);
+    window.addEventListener("baseforge:notes-changed", onNotesChanged);
     return () => {
-      window.removeEventListener("nowen:knowledge-tree-changed", onKbChanged);
-      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+      window.removeEventListener("baseforge:knowledge-tree-changed", onKbChanged);
+      window.removeEventListener("baseforge:notes-changed", onNotesChanged);
     };
   }, [reloadStar]);
 
   useEffect(() => {
     const onChanged = () => setBuiltinDisabled(getDisabledBuiltinPlugins());
-    window.addEventListener("nowen:builtin-plugins-changed", onChanged);
-    return () => window.removeEventListener("nowen:builtin-plugins-changed", onChanged);
+    window.addEventListener("baseforge:builtin-plugins-changed", onChanged);
+    return () => window.removeEventListener("baseforge:builtin-plugins-changed", onChanged);
   }, []);
 
   // 主区工作区切分组（如安装后跳「已安装」）时，侧栏分类跟着高亮，两边只有一套分组
@@ -918,8 +859,8 @@ export default function SidebarDesktop() {
       const next = (event as CustomEvent<{ group?: typeof plugCat }>).detail?.group;
       if (next) setPlugCat(next);
     };
-    window.addEventListener("nowen:plugin-group", onGroup);
-    return () => window.removeEventListener("nowen:plugin-group", onGroup);
+    window.addEventListener("baseforge:plugin-group", onGroup);
+    return () => window.removeEventListener("baseforge:plugin-group", onGroup);
   }, []);
 
   const reloadFiles = useCallback(() => {
@@ -952,7 +893,7 @@ export default function SidebarDesktop() {
       // 根级新建的 folder 即知识库（新建菜单根级只有「新建知识库」一项），默认名不能是「新建文件夹」
       const title = kind === "folder" && parentId === null ? "新建知识库" : titles[kind];
       const created = await knowledgeTreeApi.create({ parentId, nodeType: kind, title });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       // 创建后进入重命名（选中原标题，直接输入新名字），与行内新建体验一致。
       // isNew 标记让"取消/清空名字"能真正撤销这次创建。
@@ -986,13 +927,19 @@ export default function SidebarDesktop() {
           ? await importMarkdownZipIntoKnowledgeTree(options)
           : importKind === "word"
             ? await importWordIntoKnowledgeTree(options)
-            : importKind === "pdf"
-              ? await importPdfIntoKnowledgeTree(options)
-              : await importWeChatArticleIntoKnowledgeTree(options);
+            : importKind === "word-original"
+              ? await importWordOriginalIntoKnowledgeTree(options)
+              : importKind === "excel"
+                ? await importExcelIntoKnowledgeTree(options)
+                : importKind === "pdf"
+                ? await importPdfIntoKnowledgeTree(options)
+                : await importWeChatArticleIntoKnowledgeTree(options);
       if (!imported) return;
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
-      void openNoteFromTab(imported.id);
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
+      // sheet 笔记走深链打开；excel 导入后直接打开生成的表格
+      if (importKind === "excel") pushSheetAppPath(imported.id);
+      else void openNoteFromTab(imported.id);
       actions.refreshNotes();
       actions.refreshNotebooks();
     } catch (error) {
@@ -1011,7 +958,7 @@ export default function SidebarDesktop() {
 
   // ---- 数据加载 ----
   // 并发 reload 的序号：只认最新一次请求的结果，避免早发出的旧响应后到、
-  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 nowen:knowledge-tree-changed 会同时触发 reload）。
+  // 把刚拖好的顺序又盖回旧顺序（拖拽后多路 baseforge:knowledge-tree-changed 会同时触发 reload）。
   const reloadSeqRef = useRef(0);
   const reload = useCallback(async () => {
     const seq = ++reloadSeqRef.current;
@@ -1056,15 +1003,15 @@ export default function SidebarDesktop() {
     const onChange = () => void reload();
     const onTagChange = () => void reloadTags();
     const onWsChange = () => setCurrentWs(getCurrentWorkspace());
-    window.addEventListener("nowen:knowledge-tree-changed", onChange);
-    window.addEventListener("nowen:workspace-changed", onChange);
-    window.addEventListener("nowen:workspace-changed", onWsChange);
-    window.addEventListener("nowen:tags-changed", onTagChange);
+    window.addEventListener("baseforge:knowledge-tree-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onWsChange);
+    window.addEventListener("baseforge:tags-changed", onTagChange);
     return () => {
-      window.removeEventListener("nowen:knowledge-tree-changed", onChange);
-      window.removeEventListener("nowen:workspace-changed", onChange);
-      window.removeEventListener("nowen:workspace-changed", onWsChange);
-      window.removeEventListener("nowen:tags-changed", onTagChange);
+      window.removeEventListener("baseforge:knowledge-tree-changed", onChange);
+      window.removeEventListener("baseforge:workspace-changed", onChange);
+      window.removeEventListener("baseforge:workspace-changed", onWsChange);
+      window.removeEventListener("baseforge:tags-changed", onTagChange);
     };
   }, [reload, reloadTags]);
 
@@ -1075,7 +1022,7 @@ export default function SidebarDesktop() {
   const switchSpace = useCallback((workspaceId: string) => {
     setCurrentWorkspace(workspaceId);
     setCurrentWs(workspaceId);
-    window.dispatchEvent(new CustomEvent("nowen:workspace-changed", { detail: { workspaceId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:workspace-changed", { detail: { workspaceId } }));
     // 旧空间的文档不属于新空间：切空间即收起，避免笔记路径被写进新空间的 URL。
     actions.setActiveNote(null);
     actions.setMobileView("list");
@@ -1500,8 +1447,8 @@ export default function SidebarDesktop() {
       const nodeId = (event as CustomEvent<{ nodeId?: string }>).detail?.nodeId;
       if (nodeId) revealNodeFromOverview(nodeId);
     };
-    window.addEventListener("nowen:kb-reveal-node", onReveal);
-    return () => window.removeEventListener("nowen:kb-reveal-node", onReveal);
+    window.addEventListener("baseforge:kb-reveal-node", onReveal);
+    return () => window.removeEventListener("baseforge:kb-reveal-node", onReveal);
   }, [revealNodeFromOverview]);
 
   const searching = query.trim().length > 0;
@@ -1688,7 +1635,7 @@ export default function SidebarDesktop() {
   // 选中态持久化：刷新后恢复（避免回退到旧版 isActive 视觉）
   useEffect(() => {
     try {
-      localStorage.setItem("nowen-next-sidebar-selection", JSON.stringify([...selectedNodeIds]));
+      localStorage.setItem("baseforge-next-sidebar-selection", JSON.stringify([...selectedNodeIds]));
     } catch { /* storage failures are non-fatal */ }
   }, [selectedNodeIds]);
 
@@ -1791,14 +1738,14 @@ export default function SidebarDesktop() {
   // ---- 面板高度：交给 SplitView（尺寸和恒等于容器高度，折叠份额按比例分给其它组）----
   const [sectionHeights, setSectionHeights] = useState<Partial<Record<SectionId, number>>>(() => {
     try {
-      const saved = localStorage.getItem("nowen-next-sidebar-section-heights");
+      const saved = localStorage.getItem("baseforge-next-sidebar-section-heights");
       if (saved) return JSON.parse(saved) as Partial<Record<SectionId, number>>;
     } catch { /* ignore */ }
     return {};
   });
 
   useEffect(() => {
-    try { localStorage.setItem("nowen-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
+    try { localStorage.setItem("baseforge-next-sidebar-section-heights", JSON.stringify(sectionHeights)); } catch { /* ignore */ }
   }, [sectionHeights]);
 
   // ---- kb 树拖拽：拿起 / 落点判定 / 落点视觉统一交给 useSortableDrag ----
@@ -1850,7 +1797,7 @@ export default function SidebarDesktop() {
             reloadSeqRef.current += 1;
             setNodes((cur) => applyOptimisticMove(cur, sourceId, null, null));
           }
-          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+          window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
         } catch (error) {
           console.error("[SidebarDesktop] drop move failed:", error);
         }
@@ -1862,7 +1809,7 @@ export default function SidebarDesktop() {
   const startCreateFolder = useCallback(async (parentId: string | null) => {
     try {
       const created = await knowledgeTreeApi.create({ parentId, nodeType: "folder", title: parentId === null ? "新建知识库" : "新建文件夹" });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) {
         // 父折叠则展开
         const parent = nodes.find((n) => n.id === parentId);
@@ -1877,7 +1824,7 @@ export default function SidebarDesktop() {
   const startCreateNote = useCallback(async (parentId: string | null) => {
     try {
       const created = await knowledgeTreeApi.create({ parentId, nodeType: "note", title: "新建文档" });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (parentId) setExpanded((cur) => new Set(cur).add(parentId));
       setRenaming({ kind: "kb", id: created.id, value: created.title });
     } catch (error) {
@@ -1895,7 +1842,7 @@ export default function SidebarDesktop() {
       if (isNew) {
         try {
           await knowledgeTreeApi.remove(id, "subtree");
-          window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+          window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
         } catch (error) {
           console.error("[SidebarDesktop] discard new node failed:", error);
         }
@@ -1905,7 +1852,7 @@ export default function SidebarDesktop() {
     try {
       if (kind === "kb") {
         await knowledgeTreeApi.update(id, { title: trimmed });
-        window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+        window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       } else {
         await api.updateTag(id, { name: trimmed });
         void reloadTags();
@@ -1921,14 +1868,14 @@ export default function SidebarDesktop() {
     setRenaming(null);
     if (!current?.isNew) return;
     void knowledgeTreeApi.remove(current.id, "subtree")
-      .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+      .then(() => window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed")))
       .catch((error) => console.error("[SidebarDesktop] discard new node failed:", error));
   }, [renaming]);
 
   const deleteNode = useCallback(async (nodeId: string) => {
     try {
       await knowledgeTreeApi.remove(nodeId, "subtree");
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
       if (focusRootId === nodeId) exitKb();
     } catch (error) {
       console.error("[SidebarDesktop] delete node failed:", error);
@@ -2191,7 +2138,7 @@ export default function SidebarDesktop() {
   const sectionMap: Record<SectionId, React.ReactNode> = {
     kb: (
       <section key="kb" className="shrink-0" data-next-section="kb">
-        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「📘 库名 ＋ N ×」
+        {/* 区块头：全空间 = 「知识库 ＋ ⋯ N」；聚焦 = 「封面图标 库名 ＋ N ×」
             （点×退出库内树空间，点库名回 Overview，＋在库内新建）。 */}
         {focusRoot ? (
           <div
@@ -2203,7 +2150,7 @@ export default function SidebarDesktop() {
               reorderActive === "kb" && "opacity-40",
             )}
           >
-            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(focusRoot, true)}</span>
+            <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(focusRoot, true)}</span>
             <button
               type="button"
               onClick={() => openKbOverview(focusRoot.resourceId)}
@@ -2310,16 +2257,6 @@ export default function SidebarDesktop() {
                       ? t("sidebarNext.emptyKb", { defaultValue: "这个知识库还没有内容" })
                       : t("sidebarNext.empty", { defaultValue: "暂无内容" })}
                 </p>
-                {!searching && focusRoot && (
-                  <button
-                    type="button"
-                    onClick={() => void startCreateNote(focusRoot.id)}
-                    className="mt-1.5 flex items-center gap-1 rounded-md border border-dashed border-app-border px-2 py-1 text-[11px] text-tx-secondary hover:border-accent-primary hover:text-accent-primary"
-                  >
-                    <Plus size={12} />
-                    新建文档
-                  </button>
-                )}
               </div>
             ) : (
               // 空白区 = 根层末尾（行上的 dragOver/drop 已 stopPropagation，不会冒泡到这里）
@@ -2415,6 +2352,11 @@ export default function SidebarDesktop() {
                           {node.isReference && (
                             <span className="shrink-0 text-tx-tertiary" title="同一份内容的另一条路径">
                               <Link2 size={10} />
+                            </span>
+                          )}
+                          {!isFolder && remoteLinkedNoteIds.has(node.resourceId) && (
+                            <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                              <Cloud size={11} />
                             </span>
                           )}
                           {isFolder && (
@@ -2607,8 +2549,13 @@ export default function SidebarDesktop() {
                           onClick={() => { void openNoteFromTab(doc.id); }}
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                         >
-                          <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                          <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                           <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                          {remoteLinkedNoteIds.has(doc.id) && (
+                            <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                              <Cloud size={11} />
+                            </span>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -2679,7 +2626,7 @@ export default function SidebarDesktop() {
                       isActive ? "bg-app-active text-tx-primary" : "text-tx-primary hover:bg-app-hover",
                     )}
                   >
-                    <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(tab.contentFormat)}</span>
+                    <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(tab.contentFormat)}</span>
                     <button
                       type="button"
                       onClick={() => void openNoteFromTab(tab.id)}
@@ -2756,7 +2703,7 @@ export default function SidebarDesktop() {
                   ])
                     .then(() => {
                       reloadStar();
-                      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+                      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
                     })
                     .catch(() => undefined);
                 }}
@@ -2779,7 +2726,7 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => openKbOverview(kb.resourceId)}
                   >
-                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeEmojiFor(kb, true)}</span></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{knowledgeTreeIconFor(kb, true)}</span></span>
                     <span className="min-w-0 flex-1">
                       <div className="truncate text-xs text-tx-primary">{kb.title}</div>
                       <div className="sbx-sub">知识库</div>
@@ -2791,7 +2738,7 @@ export default function SidebarDesktop() {
                         onClick={(e) => {
                           e.stopPropagation();
                           knowledgeTreeApi.update(kb.id, { isFavorite: 0 })
-                            .then(() => window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed")))
+                            .then(() => window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed")))
                             .catch(() => undefined);
                         }}
                         className="sbx-btn"
@@ -2807,9 +2754,16 @@ export default function SidebarDesktop() {
                     className="sbx-row group"
                     onClick={() => { void openNoteFromTab(doc.id); }}
                   >
-                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span></span>
+                    <span className="sbx-ico"><span className="text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span></span>
                     <span className="min-w-0 flex-1">
-                      <div className="truncate text-xs text-tx-primary">{doc.title}</div>
+                      <div className="truncate text-xs text-tx-primary">
+                        {doc.title}
+                        {remoteLinkedNoteIds.has(doc.id) && (
+                          <span className="ml-1 inline-flex align-[-1px] text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                            <Cloud size={11} />
+                          </span>
+                        )}
+                      </div>
                       <div className="sbx-sub">{(state.notebooks ?? []).find((nb) => nb.id === doc.notebookId)?.name ?? ""}</div>
                     </span>
                     <span className="sbx-acts">
@@ -3087,7 +3041,7 @@ export default function SidebarDesktop() {
                             onClick={() => void openSearchDoc(doc.id)}
                             className="flex w-full items-center gap-2 rounded-md py-1.5 pl-6 pr-2 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
                           >
-                            <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                            <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                             <span className="min-w-0 flex-1 truncate">{doc.title}</span>
                           </button>
                         ))}
@@ -3108,7 +3062,7 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate" title={doc.title}>{doc.title}</span>
                       <LiaThumbtackSolid size={10} className="shrink-0 text-amber-500" />
                     </button>
@@ -3137,8 +3091,13 @@ export default function SidebarDesktop() {
                       }}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeEmojiFor(node, node.parentId === null)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{knowledgeTreeIconFor(node, node.parentId === null)}</span>
                       <span className="min-w-0 flex-1 truncate" title={node.title}>{node.title}</span>
+                      {node.nodeType !== "folder" && remoteLinkedNoteIds.has(node.resourceId) && (
+                        <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                          <Cloud size={11} />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </>
@@ -3157,8 +3116,13 @@ export default function SidebarDesktop() {
                       onClick={() => void openSearchDoc(doc.id)}
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-tx-primary hover:bg-app-hover"
                     >
-                      <span className="shrink-0 text-[13px] leading-none">{docEmojiForFormat(doc.contentFormat, doc.noteType)}</span>
+                      <span className="shrink-0 text-[13px] leading-none">{docIconForFormat(doc.contentFormat, doc.noteType)}</span>
                       <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                      {remoteLinkedNoteIds.has(doc.id) && (
+                        <span className="shrink-0 text-sky-500" title="来自远程文件，保存会写回远程" aria-label="来自远程文件">
+                          <Cloud size={11} />
+                        </span>
+                      )}
                     </button>
                   ))}
                 </>
@@ -3209,7 +3173,7 @@ export default function SidebarDesktop() {
                 try {
                   await knowledgeTreeApi.batchRemove(ids);
                   clearSelection();
-                  window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed"));
+                  window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed"));
                 } catch (error) {
                   console.error("[SidebarDesktop] batch remove failed:", error);
                 }
@@ -3228,9 +3192,9 @@ export default function SidebarDesktop() {
           <div className="shrink-0">
             {(() => {
               const def = BUILTIN_PLUGINS.find((p) => p.id === openPluginPanel);
-              if (!def || def.embedded || !isBuiltinPluginEnabled(def.id)) return null;
-              const standalone = def.id === "tasks" || def.id === "diary" || def.id === "ai";
-              const PanelIcon = def.id === "tasks" ? ListTodo : def.id === "diary" ? BookOpen : Sparkles;
+              if (!def || !isBuiltinPluginEnabled(def.id)) return null;
+              const standalone = def.id === "tasks";
+              const PanelIcon = def.id === "tasks" ? ListTodo : Sparkles;
               return (
                 <>
                   {standalone ? (
@@ -3244,9 +3208,7 @@ export default function SidebarDesktop() {
                     </div>
                   )}
                   {def.id === "tasks" && <TasksMiniPanel />}
-                  {def.id === "diary" && <DiaryMiniPanel />}
                   {def.id === "pm" && <PmMiniPanel />}
-                  {def.id === "ai" && <AiConversationsMiniPanel />}
                 </>
               );
             })()}
@@ -3293,7 +3255,7 @@ export default function SidebarDesktop() {
             </div>
             {/* 类型多选：与回收站/文件管理共用 TypeFilterPopover（触发行 + 两列勾选弹层） */}
             <TypeFilterPopover
-              label="类型 · 可多选"
+              label="类型"
               items={(["all", ...TRASH_TYPE_META.map((meta) => meta.key)] as TrashTypeFilterKey[]).map((key) => ({
                 key,
                 label: key === "all" ? "全部" : TRASH_TYPE_META.find((meta) => meta.key === key)?.label || key,
@@ -3365,7 +3327,6 @@ export default function SidebarDesktop() {
                   <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${weeklySummary ? "left-[15px]" : "left-0.5"}`} />
                 </button>
               </div>
-              <div className="px-1 pb-1 pt-0.5 text-[10px] leading-relaxed text-tx-tertiary">到期条目自动彻底删除；提醒走应用内通知与图标徽标</div>
             </PanelSection>
           </div>
         )}
@@ -3403,7 +3364,7 @@ export default function SidebarDesktop() {
             {/* 来源：统一文件池（本地附件 + 原图床文件）+ 远程文件（认证模型不同，保持独立入口） */}
             <PanelSection label="来源">
               <div className="space-y-0.5">
-                {([["all", FolderOpen, "文件"], ...(isBuiltinPluginEnabled("remote-files") ? [["remote", Cloud, "远程文件"]] : [])] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
+                {([["all", FolderOpen, "本地文件"], ["remote", Cloud, "远程文件"]] as Array<[FilesSource, typeof FolderOpen, string]>).map(([key, Icon, label]) => (
                   <button
                     key={key}
                     type="button"
@@ -3444,7 +3405,7 @@ export default function SidebarDesktop() {
                 ))}
               </div>
             </PanelSection>
-            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），单选 */}
+            {/* 类型筛选：与回收站同一套「触发行 + 两列勾选弹层」（TypeFilterPopover），多选 */}
             <TypeFilterPopover
               label="类型"
               items={FILE_TYPE_CHIPS.map((chip) => ({
@@ -3464,8 +3425,9 @@ export default function SidebarDesktop() {
                   : chip.key === "doc" ? <FileText size={12} />
                   : <FileQuestion size={12} />,
               }))}
-              selected={[getFilesType()]}
-              onChange={(keys) => setFilesUi({ type: keys[0] })}
+              selected={getFilesTypes()}
+              onChange={(keys) => setFilesUi({ types: keys })}
+              multi
               totalCount={fileStats?.total}
             />
             {/* 分享状态：只看生效中（未关闭且未过期）的只读分享链接。 */}
@@ -3522,37 +3484,74 @@ export default function SidebarDesktop() {
             </PanelSection>
             </>)}
             {getFilesSource() === "remote" && (<>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">类型 <button type="button" className="text-accent-primary" onClick={() => setFilesUi({ remoteTypes: [] })}>清除</button></div>
-              <div className="flex flex-wrap gap-1 px-1">
-                {FILE_REMOTE_TYPE_CHIPS.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    aria-pressed={getFilesRemoteTypes().includes(chip.key)}
-                    onClick={() => {
-                      const current = getFilesRemoteTypes();
-                      setFilesUi({ remoteTypes: current.includes(chip.key) ? current.filter((t) => t !== chip.key) : [...current, chip.key] });
-                    }}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteTypes().includes(chip.key) ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >{chip.label}</button>
-                ))}
+            {/* 存储：与「来源」同一套选中模型（radio 行 + 高亮），不再是一组无归属的筛选块。
+                远程文件的筛选维度按此排列：存储 → 类型 → 排序 → 修改时间，与本地视图同构。 */}
+            <PanelSection
+              label="存储"
+              extra={(
+                <button
+                  type="button"
+                  className="text-[11px] text-accent-primary hover:underline"
+                  onClick={() => window.dispatchEvent(new Event("baseforge:remote-open-manager"))}
+                >
+                  管理
+                </button>
+              )}
+            >
+              <div className="space-y-0.5">
+                {remoteSources.length === 0 ? (
+                  <p className="px-1 py-1 text-[11px] leading-4 text-tx-tertiary">还没有远程存储，点右上「管理」添加。</p>
+                ) : null}
+                {remoteSources.map((source) => {
+                  const active = getFilesRemoteSourceId() === source.id;
+                  const Icon = source.type === "smb" ? Server : source.type === "webdav" ? Globe : Cloud;
+                  return (
+                    <button
+                      key={source.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => setFilesUi({ remoteSourceId: source.id })}
+                      className={`flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] transition-colors ${active ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15" : "text-tx-secondary hover:bg-app-hover"}`}
+                      title={source.type === "smb" ? "SMB / 局域网共享" : source.type === "webdav" ? "WebDAV" : "百度网盘（直连）"}
+                    >
+                      <Icon size={14} className="shrink-0 opacity-80" />
+                      <span className="min-w-0 flex-1 truncate text-left">{source.name}</span>
+                      <span className="shrink-0 text-[10px] uppercase text-tx-tertiary">
+                        {source.type === "smb" ? "smb" : source.type === "webdav" ? "dav" : "pan"}
+                      </span>
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("baseforge:remote-open-manager"))}
+                  className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[12px] text-tx-tertiary hover:bg-app-hover hover:text-accent-primary"
+                >
+                  <Plus size={14} className="shrink-0 opacity-80" />
+                  <span className="min-w-0 flex-1 truncate text-left">添加存储</span>
+                </button>
               </div>
-            </div>
-            <div className="border-b border-app-border px-2 py-1.5">
-              <div className="pb-1 pl-[21px] pr-1 text-[12px] font-semibold text-tx-tertiary">排序</div>
-              <div className="flex flex-wrap gap-1 px-1">
-                {FILE_REMOTE_SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    aria-pressed={getFilesRemoteSort() === opt.value}
-                    onClick={() => setFilesUi({ remoteSort: opt.value as FilesRemoteSortKey })}
-                    className={`rounded-full border px-2 py-0.5 text-[11px] ${getFilesRemoteSort() === opt.value ? "border-[#b9cffc] bg-[#e8efff] text-accent-primary" : "border-app-border bg-app-bg text-tx-secondary hover:bg-app-hover"}`}
-                  >{opt.label}</button>
-                ))}
-              </div>
-            </div>
+            </PanelSection>
+            <TypeFilterPopover
+              label="类型"
+              // 首项显式给「全部」：TypeFilterPopover 把 items[0] 当重置项，
+              // 不给的话「文档」会被当成全部，导致默认锁定且取消不掉。
+              items={[
+                { key: "all", label: "全部", icon: <Layers size={12} /> },
+                ...FILE_REMOTE_TYPE_CHIPS.map((chip) => ({
+                  key: chip.key,
+                  label: chip.label,
+                  icon: chip.key === "doc" ? <FileText size={12} />
+                    : chip.key === "image" ? <Image size={12} />
+                    : chip.key === "archive" ? <Archive size={12} />
+                    : <FileQuestion size={12} />,
+                })),
+              ]}
+              selected={getFilesRemoteTypes().length ? getFilesRemoteTypes() : ["all"]}
+              onChange={(keys) => setFilesUi({ remoteTypes: keys.filter((k) => k !== "all") })}
+              multi
+            />
+            {/* 排序不放侧栏：主区工具栏右端已有排序入口，避免两处重复 */}
             <PanelSection label="修改时间">
               <div className="flex flex-wrap gap-1 px-1">
                 {([["all", "全部"], ["today", "今天"], ["week", "近 7 天"], ["month", "近 30 天"], ["older", "更早"]] as Array<[string, string]>).map(([key, label]) => (
@@ -3599,7 +3598,7 @@ export default function SidebarDesktop() {
                       title={entry.label}
                       onClick={() => {
                         setPlugCat(entry.key);
-                        window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group: entry.key } }));
+                        window.dispatchEvent(new CustomEvent("baseforge:plugin-group", { detail: { group: entry.key } }));
                         if (state.viewMode !== "plugins") actions.setViewMode("plugins");
                       }}
                     >
@@ -3636,14 +3635,14 @@ export default function SidebarDesktop() {
           const onUp = () => {
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
-            try { localStorage.setItem("nowen-next-sidebar-width", String(sidebarWidth)); } catch { /* ignore */ }
+            try { localStorage.setItem("baseforge-next-sidebar-width", String(sidebarWidth)); } catch { /* ignore */ }
           };
           window.addEventListener("pointermove", onMove);
           window.addEventListener("pointerup", onUp);
         }}
         onDoubleClick={() => {
           setSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
-          try { localStorage.setItem("nowen-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
+          try { localStorage.setItem("baseforge-next-sidebar-width", String(SIDEBAR_DEFAULT_WIDTH)); } catch { /* ignore */ }
         }}
       />
 
@@ -3970,7 +3969,7 @@ export default function SidebarDesktop() {
 }
 
 /** 侧栏开关：保留导出兼容既有引用（当前无调用方）。 */
-export const NEXT_SIDEBAR_ENABLED_KEY = "nowen-next-sidebar-enabled";
+export const NEXT_SIDEBAR_ENABLED_KEY = "baseforge-next-sidebar-enabled";
 
 export function isNextSidebarEnabled(): boolean {
   try {
@@ -4173,7 +4172,7 @@ function ProjectsSidePanel() {
           type="button"
           className="mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] font-medium text-accent-primary hover:bg-app-hover"
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("nowen:pm-new-item"));
+            window.dispatchEvent(new CustomEvent("baseforge:pm-new-item"));
           }}
         >
           <Plus size={12} /> 新建工作项
@@ -4182,7 +4181,7 @@ function ProjectsSidePanel() {
           type="button"
           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-tx-secondary hover:bg-app-hover"
           onClick={() => {
-            window.dispatchEvent(new CustomEvent("nowen:pm-new-project"));
+            window.dispatchEvent(new CustomEvent("baseforge:pm-new-project"));
           }}
         >
           <Plus size={12} /> 新建项目
@@ -4259,8 +4258,8 @@ function SharesSidePanel() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => {
     const onChange = () => reload();
-    window.addEventListener("nowen:workspace-changed", onChange);
-    return () => window.removeEventListener("nowen:workspace-changed", onChange);
+    window.addEventListener("baseforge:workspace-changed", onChange);
+    return () => window.removeEventListener("baseforge:workspace-changed", onChange);
   }, [reload]);
 
   /**

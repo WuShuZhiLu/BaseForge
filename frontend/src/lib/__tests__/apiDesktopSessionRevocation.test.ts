@@ -7,7 +7,7 @@ describe("桌面端会话失效处理", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
-    delete (window as any).nowenDesktop;
+    delete (window as any).baseforgeDesktop;
   });
 
   it("收到 401 后先清除主进程本地认证缓存，避免刷新后重新注入失效 token", async () => {
@@ -15,11 +15,11 @@ describe("桌面端会话失效处理", () => {
     const clearLocalAuth = vi.fn(() => new Promise<{ ok: boolean }>((resolve) => {
       finishClearLocalAuth = () => resolve({ ok: true });
     }));
-    (window as any).nowenDesktop = {
+    (window as any).baseforgeDesktop = {
       isDesktop: true,
       clearLocalAuth,
     };
-    localStorage.setItem("nowen-token", "expired-desktop-token");
+    localStorage.setItem("baseforge-token", "expired-desktop-token");
     // jsdom 不实现真实页面导航；本用例只验证 reload 前的凭据清理时序。
     vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -46,12 +46,12 @@ describe("桌面端会话失效处理", () => {
     const result = await requestResult;
 
     expect(result.error).toHaveProperty("message", "Token 无效或已过期");
-    expect(localStorage.getItem("nowen-token")).toBeNull();
+    expect(localStorage.getItem("baseforge-token")).toBeNull();
   });
 
   it("匿名请求收到 401 时不触发会话清理和页面刷新链路", async () => {
     const clearLocalAuth = vi.fn(async () => ({ ok: true }));
-    (window as any).nowenDesktop = {
+    (window as any).baseforgeDesktop = {
       isDesktop: true,
       clearLocalAuth,
     };
@@ -66,6 +66,6 @@ describe("桌面端会话失效处理", () => {
     await expect(api.getMe()).rejects.toThrow("未授权");
 
     expect(clearLocalAuth).not.toHaveBeenCalled();
-    expect(localStorage.getItem("nowen-token")).toBeNull();
+    expect(localStorage.getItem("baseforge-token")).toBeNull();
   });
 });

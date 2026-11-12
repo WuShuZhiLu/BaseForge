@@ -160,10 +160,11 @@ describe("androidNativeHttpBridge", () => {
       cleanup = installAndroidNativeHttpBridge();
 
       const response = await fetch(url, { headers: { Authorization: "Bearer token-1" } });
-      const blob = await response.blob();
 
-      expect(blob.type).toBe("image/png");
-      expect(Array.from(new Uint8Array(await blob.arrayBuffer()))).toEqual(bytes);
+      // 不走 Blob：jsdom 与 Node 的 Blob 实现互不兼容（FileReader 只认 jsdom 的），
+      // 直接用 Response 的字节与响应头断言，两套环境行为一致。
+      expect(response.headers.get("content-type")).toBe("image/png");
+      expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual(bytes);
       expect(capacitorState.request).toHaveBeenCalledWith(expect.objectContaining({
         url,
         method: "GET",

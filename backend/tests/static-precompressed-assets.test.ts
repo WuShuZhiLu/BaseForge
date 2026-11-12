@@ -14,11 +14,11 @@ import {
 test("production wildcard route serves a precompressed hashed asset", async () => {
   const previousNodeEnv = process.env.NODE_ENV;
   const previousFrontendDist = process.env.FRONTEND_DIST;
-  const dist = await mkdtemp(path.join(os.tmpdir(), "nowen-static-"));
+  const dist = await mkdtemp(path.join(os.tmpdir(), "baseforge-static-"));
   const assetsDir = path.join(dist, "assets");
   await mkdir(assetsDir, { recursive: true });
 
-  const source = Buffer.from("const nowen = 'note';\n".repeat(2_000));
+  const source = Buffer.from("const baseforge = 'note';\n".repeat(2_000));
   const compressed = brotliCompressSync(source);
   const sourcePath = path.join(assetsDir, "index-TestHash9.js");
   await writeFile(sourcePath, source);

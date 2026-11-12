@@ -149,7 +149,7 @@ describe("heavy node runtime shells", () => {
     const host = document.createElement("div");
     host.innerHTML = `
       <div class="ProseMirror">
-        <div class="code-block-wrapper" data-nowen-mermaid-inline-preview="true">
+        <div class="code-block-wrapper" data-baseforge-mermaid-inline-preview="true">
           <div class="code-block-toolbar">toolbar</div>
           <div class="mermaid-preview-host"><div data-mermaid-test-mount></div></div>
         </div>
@@ -171,10 +171,10 @@ describe("heavy node runtime shells", () => {
         );
       });
 
-      expect(wrapper.dataset.nowenMermaidInlinePreview).toBe("true");
+      expect(wrapper.dataset.baseforgeMermaidInlinePreview).toBe("true");
     } finally {
       await act(async () => root.unmount());
-      expect(wrapper.dataset.nowenMermaidInlinePreview).toBe("true");
+      expect(wrapper.dataset.baseforgeMermaidInlinePreview).toBe("true");
       host.remove();
     }
   });

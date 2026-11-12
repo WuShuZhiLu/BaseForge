@@ -1,4 +1,4 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/host-api-contract.json, packages/nowen-plugin-sdk/contribution-contract.json, packages/nowen-plugin-sdk/error-code-contract.json 生成，请勿手动修改。
+// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/baseforge-plugin-sdk/host-api-contract.json, packages/baseforge-plugin-sdk/contribution-contract.json, packages/baseforge-plugin-sdk/error-code-contract.json 生成，请勿手动修改。
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     for (const nested of Object.values(value)) deepFreeze(nested);
@@ -59,16 +59,6 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
         "id": "capture:write",
         "description": "Import a public HTTPS article and images into an accessible notebook",
         "risk": "data-write"
-      },
-      {
-        "id": "diary:read",
-        "description": "Read diary entries visible to the invoking user",
-        "risk": "sensitive-read"
-      },
-      {
-        "id": "diary:write",
-        "description": "Create diary entries",
-        "risk": "sensitive-write"
       },
       {
         "id": "external:fetch",
@@ -229,87 +219,6 @@ export const EXTENSION_CAPABILITY_CATALOG = deepFreeze({
           }
         ],
         "sdkSignature": "importUrl(input: { url: string; notebookId: string; tags?: string[]; comment?: string }): Promise<{ id: string; title: string; imagesImported: number; imagesSkipped: number }>;"
-      },
-      {
-        "method": "diary.create",
-        "sinceApiVersion": 1,
-        "permission": "diary:write",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "contentText": "Today..."
-            }
-          }
-        ],
-        "sdkSignature": "create(input: { workspaceId?: string | null; contentText: string; mood?: string; createdAt?: string }): Promise<{ id: string }>;"
-      },
-      {
-        "method": "diary.get",
-        "sinceApiVersion": 1,
-        "permission": "diary:read",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "diaryId": "diary-id"
-            }
-          }
-        ],
-        "sdkSignature": "get(input: { diaryId: string }): Promise<DiaryEntry>;"
-      },
-      {
-        "method": "diary.list",
-        "sinceApiVersion": 1,
-        "permission": "diary:read",
-        "runtimes": [
-          "node-action",
-          "sandbox-js"
-        ],
-        "platforms": [
-          "server",
-          "desktop-full"
-        ],
-        "maxArgsBytes": 262144,
-        "maxResultBytes": 1048576,
-        "inputSchema": {
-          "type": "object"
-        },
-        "outputSchema": {},
-        "examples": [
-          {
-            "input": {
-              "limit": 30
-            }
-          }
-        ],
-        "sdkSignature": "list(input?: { limit?: number }): Promise<DiaryEntry[]>;"
       },
       {
         "method": "external.fetch",

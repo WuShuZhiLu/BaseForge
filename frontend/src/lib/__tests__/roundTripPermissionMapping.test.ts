@@ -9,7 +9,7 @@ import {
 } from "@/lib/roundTripPermissionMapping";
 
 const manifest: RoundTripPermissionsManifest = {
-  format: "nowen-workspace-permissions",
+  format: "baseforge-workspace-permissions",
   version: 1,
   exportedAt: "2026-07-23T00:00:00.000Z",
   sourceWorkspace: { id: "source", name: "Source" },
@@ -25,7 +25,7 @@ const manifest: RoundTripPermissionsManifest = {
 describe("round-trip permission mapping client", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("nowen-token", "token-1");
+    localStorage.setItem("baseforge-token", "token-1");
     vi.restoreAllMocks();
   });
 

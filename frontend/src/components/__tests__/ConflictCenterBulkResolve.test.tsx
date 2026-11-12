@@ -35,7 +35,6 @@ vi.mock("@/lib/syncLocalApi", () => ({
     "attachment",
     "task",
     "task_reminder",
-    "diary",
     "mindmap",
   ],
   fetchConflictDetail: fetchConflictDetailMock,

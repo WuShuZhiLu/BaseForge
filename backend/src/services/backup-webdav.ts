@@ -143,11 +143,11 @@ function keySource(): string {
   if (process.env.NODE_ENV === "production") {
     throw new Error("生产环境必须配置 BACKUP_WEBDAV_ENCRYPTION_KEY 或 JWT_SECRET");
   }
-  return "nowen-note-webdav-development-key";
+  return "baseforge-webdav-development-key";
 }
 
 function encryptionKey(): Buffer {
-  return crypto.scryptSync(keySource(), "nowen-backup-webdav-v1", 32);
+  return crypto.scryptSync(keySource(), "baseforge-backup-webdav-v1", 32);
 }
 
 function encryptSecret(value: string): string {

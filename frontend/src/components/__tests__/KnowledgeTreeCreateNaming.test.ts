@@ -22,7 +22,8 @@ describe("knowledge tree create naming", () => {
 
   it("offers Markdown, Word and WeChat article imports from the plus menu", () => {
     expect(menuSource).toContain('label: "导入 Markdown 文件"');
-    expect(menuSource).toContain('label: "导入 Word 文档"');
+    expect(menuSource).toContain('label: "导入 Word 转 Markdown"');
+    expect(menuSource).toContain('label: "导入 Word 原件预览"');
     expect(menuSource).toContain('label: "导入公众号文章"');
     expect(menuSource).toContain("也可将 .md 文件拖拽到目录树导入");
     expect(runtimeSource).toContain("setImportRequest({");

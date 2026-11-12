@@ -16,8 +16,8 @@ interface MobileViewControlsTarget {
   liveLabel: string;
 }
 
-const HOST_ATTR = "data-nowen-markdown-mobile-view-controls";
-const ORIGINAL_GROUP_ATTR = "data-nowen-markdown-mobile-view-controls-source";
+const HOST_ATTR = "data-baseforge-markdown-mobile-view-controls";
+const ORIGINAL_GROUP_ATTR = "data-baseforge-markdown-mobile-view-controls-source";
 const originalGroupDisplay = new WeakMap<HTMLElement, string>();
 
 function matchesViewport(query: string): boolean {
@@ -87,11 +87,11 @@ function resolveTarget(): MobileViewControlsTarget | null {
   // MarkdownExperienceBridge injects the historical live-preview action into the desktop mode
   // group. Reuse that exact button on mobile so entering/leaving live preview always configures
   // the same CodeMirror compartment and localStorage state instead of duplicating the behavior.
-  const liveButton = expandedToolbar.querySelector<HTMLButtonElement>('[data-nowen-markdown-live="1"]');
+  const liveButton = expandedToolbar.querySelector<HTMLButtonElement>('[data-baseforge-markdown-live="1"]');
   const liveGroup = liveButton?.parentElement instanceof HTMLElement ? liveButton.parentElement : null;
   const liveGroupNativeButtons = liveGroup
     ? Array.from(liveGroup.querySelectorAll<HTMLButtonElement>(":scope > button"))
-      .filter((button) => button.dataset.nowenMarkdownLive !== "1")
+      .filter((button) => button.dataset.baseforgeMarkdownLive !== "1")
     : [];
   const sourceButton = liveGroupNativeButtons[0] || mobileSourceButton;
   const previewButton = liveGroupNativeButtons[1] || mobilePreviewButton;

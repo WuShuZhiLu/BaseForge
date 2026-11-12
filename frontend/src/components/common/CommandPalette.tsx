@@ -272,7 +272,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
         && isShortcutAllowedInTarget("command-palette", event.target)
       ) {
         event.preventDefault();
-        if (!open) window.dispatchEvent(new CustomEvent("nowen:open-command-palette"));
+        if (!open) window.dispatchEvent(new CustomEvent("baseforge:open-command-palette"));
       } else if (open && event.key === "Escape") {
         event.preventDefault();
         onClose();

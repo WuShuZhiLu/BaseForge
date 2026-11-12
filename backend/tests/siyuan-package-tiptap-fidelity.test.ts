@@ -5,7 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-tiptap-fidelity-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-tiptap-fidelity-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -14,7 +14,7 @@ const WORKSPACE_ID = "siyuan-tiptap-fidelity-workspace";
 const TARGET_NOTEBOOK_ID = "siyuan-tiptap-fidelity-notebook";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 
 type TiptapNode = {

@@ -8,16 +8,14 @@
 #   2. stage new GitHub Releases as drafts;
 #   3. replace local Windows candidates with SignPath-signed CI artifacts;
 #   4. collect CI-only macOS artifacts into that draft without letting Actions publish;
-#   5. download and verify remote updater metadata/assets before publishing;
-#   6. normalize release-only native/Android toolchains to supported baselines.
+#   5. download and verify remote updater metadata/assets before publishing.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LEGACY_SCRIPT="${SCRIPT_DIR}/release-legacy.sh"
 VERIFY_SCRIPT="${SCRIPT_DIR}/verify-release-update-assets.mjs"
-GITHUB_REPO_SLUG="cropflre/nowen-note"
-ANDROID_NODE22_IMAGE="cimg/android:2025.10.1-node"
+GITHUB_REPO_SLUG="WuShuZhiLu/BaseForge"
 
 [ -f "$LEGACY_SCRIPT" ] || { echo "[release-guard] missing $LEGACY_SCRIPT" >&2; exit 1; }
 
@@ -29,9 +27,6 @@ HELP_ONLY=0
 ASSUME_YES=0
 TARGETS=""
 TARGETS_EXPLICIT=0
-ANDROID_DOCKER_REQUESTED=0
-ANDROID_DOCKER_SYNC_REQUESTED=0
-ANDROID_DOCKER_IMAGE_EXPLICIT=0
 
 for ((i = 0; i < ${#ARGS[@]}; i += 1)); do
   arg="${ARGS[$i]}"
@@ -41,9 +36,6 @@ for ((i = 0; i < ${#ARGS[@]}; i += 1)); do
     --draft) USER_REQUESTED_DRAFT=1 ;;
     -h|--help) HELP_ONLY=1 ;;
     -y|--yes) ASSUME_YES=1 ;;
-    --android-docker) ANDROID_DOCKER_REQUESTED=1 ;;
-    --android-docker-sync) ANDROID_DOCKER_SYNC_REQUESTED=1 ;;
-    --android-docker-image|--android-docker-image=*) ANDROID_DOCKER_IMAGE_EXPLICIT=1 ;;
     --target)
       if (( i + 1 < ${#ARGS[@]} )); then
         TARGETS="${ARGS[$((i + 1))]}"
@@ -53,35 +45,6 @@ for ((i = 0; i < ${#ARGS[@]}; i += 1)); do
       ;;
   esac
 done
-
-if [ "$(uname -s 2>/dev/null || true)" = "Linux" ] && [ -z "${NOWEN_LINUX_PORTABLE+x}" ]; then
-  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-    export NOWEN_LINUX_PORTABLE=1
-    echo "[release-guard] Linux native modules: portable glibc 2.31 baseline enabled"
-  else
-    echo "[release-guard] Docker unavailable; Linux native modules will use the host toolchain and compatibility checks" >&2
-  fi
-fi
-
-if [ "$HELP_ONLY" = "0" ] && [ "$BUILD_ONLY" = "0" ]; then
-  HOST_NODE_MAJOR=0
-  HOST_NODE_VERSION="missing"
-  if command -v node >/dev/null 2>&1; then
-    HOST_NODE_VERSION="$(node -p 'process.versions.node' 2>/dev/null || echo unknown)"
-    HOST_NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
-  fi
-
-  if [ "${HOST_NODE_MAJOR:-0}" -lt 22 ]; then
-    if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-      if [ "$ANDROID_DOCKER_REQUESTED" = "0" ]; then ARGS+=("--android-docker"); fi
-      if [ "$ANDROID_DOCKER_SYNC_REQUESTED" = "0" ]; then ARGS+=("--android-docker-sync"); fi
-      if [ "$ANDROID_DOCKER_IMAGE_EXPLICIT" = "0" ]; then ARGS+=("--android-docker-image" "$ANDROID_NODE22_IMAGE"); fi
-      echo "[release-guard] host Node ${HOST_NODE_VERSION} < 22; Android build/sync will use Docker (${ANDROID_NODE22_IMAGE})"
-    else
-      echo "[release-guard] host Node ${HOST_NODE_VERSION} < 22 and Docker is unavailable; Capacitor 8 Android targets require Node.js >= 22" >&2
-    fi
-  fi
-fi
 
 clean_directory() {
   local directory="$1"
@@ -104,11 +67,11 @@ if [ "$HELP_ONLY" = "0" ] && [ "$DRY_RUN" = "0" ] && [ "$BUILD_ONLY" = "0" ]; th
   TEMP_ROOT="$(node -e 'process.stdout.write(require("os").tmpdir())')"
   if [ "$CLEAN_FULL" = "1" ]; then
     clean_directory "${REPO_ROOT}/dist-electron"
-    clean_directory "${TEMP_ROOT}/nowen-note-build"
+    clean_directory "${TEMP_ROOT}/baseforge-build"
   fi
   if [ "$CLEAN_LITE" = "1" ]; then
     clean_directory "${REPO_ROOT}/dist-electron-lite"
-    clean_directory "${TEMP_ROOT}/nowen-note-lite-build"
+    clean_directory "${TEMP_ROOT}/baseforge-lite-build"
   fi
 fi
 
@@ -121,7 +84,7 @@ if [ "$HELP_ONLY" = "1" ] || [ "$DRY_RUN" = "1" ] || [ "$BUILD_ONLY" = "1" ]; th
   exec bash "$LEGACY_SCRIPT" "${LEGACY_ARGS[@]}"
 fi
 
-LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/nowen-release-guard.XXXXXX.log")"
+LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/baseforge-release-guard.XXXXXX.log")"
 CI_ARTIFACT_DIR=""
 cleanup() {
   rm -f -- "$LOG_FILE"
@@ -144,23 +107,23 @@ TAG="v${VERSION}"
 
 required_mac_asset_names() {
   cat <<EOF
-Base-Notes-${VERSION}-x64.dmg
-Base-Notes-${VERSION}-arm64.dmg
-Base-Notes-${VERSION}-x64.zip
-Base-Notes-${VERSION}-arm64.zip
+BaseForge-${VERSION}-x64.dmg
+BaseForge-${VERSION}-arm64.dmg
+BaseForge-${VERSION}-x64.zip
+BaseForge-${VERSION}-arm64.zip
 latest-mac.yml
 EOF
 }
 
 required_windows_asset_names() {
   cat <<EOF
-Base-Notes-${VERSION}-setup.exe
-Base-Notes-${VERSION}-portable.exe
-Base-Notes-${VERSION}-setup.exe.blockmap
+BaseForge-${VERSION}-setup.exe
+BaseForge-${VERSION}-portable.exe
+BaseForge-${VERSION}-setup.exe.blockmap
 latest.yml
-Base-Notes-Lite-${VERSION}-setup.exe
-Base-Notes-Lite-${VERSION}-portable.exe
-Base-Notes-Lite-${VERSION}-setup.exe.blockmap
+BaseForge-${VERSION}-lite-setup.exe
+BaseForge-${VERSION}-lite-portable.exe
+BaseForge-${VERSION}-lite-setup.exe.blockmap
 latest-lite.yml
 EOF
 }
@@ -178,7 +141,7 @@ release_has_complete_mac_assets() {
 
 release_contains_windows_candidates() {
   gh release view "$TAG" --repo "$GITHUB_REPO_SLUG" --json assets --jq '.assets[].name' 2>/dev/null \
-    | grep -Eq "^Base-Notes(-Lite)?-${VERSION}-(setup|portable)\\.exe$"
+    | grep -Eq "^BaseForge-${VERSION}-(lite-)?(setup|portable)\\.exe$"
 }
 
 ensure_desktop_platform_notes() {
@@ -239,7 +202,7 @@ wait_for_workflow_artifact() {
 }
 
 collect_ci_signed_windows_assets() {
-  local timeout_seconds="${NOWEN_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
+  local timeout_seconds="${BASEFORGE_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
   local deadline=$((SECONDS + timeout_seconds))
   local tag_sha run_id artifact_id temp_dir
   tag_sha="$(git -C "$REPO_ROOT" rev-list -n 1 "$TAG" 2>/dev/null || true)"
@@ -253,14 +216,14 @@ collect_ci_signed_windows_assets() {
   fi
   echo "[release-guard] workflow run: ${run_id}"
 
-  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "nowen-note-win-signed" "$deadline")"; then
+  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "baseforge-win-signed" "$deadline")"; then
     echo "[release-guard] timed out or failed waiting for SignPath-signed Windows artifact" >&2
     return 1
   fi
   [ -n "$artifact_id" ] || return 1
 
-  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/nowen-release-win-signed.XXXXXX")"
-  if ! gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name nowen-note-win-signed --dir "$temp_dir"; then
+  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/baseforge-release-win-signed.XXXXXX")"
+  if ! gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name baseforge-win-signed --dir "$temp_dir"; then
     rm -rf -- "$temp_dir"
     return 1
   fi
@@ -278,10 +241,8 @@ collect_ci_signed_windows_assets() {
   local windows_assets=()
   while IFS= read -r file; do windows_assets+=("$file"); done < <(
     find "$temp_dir" -type f \( \
-      -name "Base-Notes-${VERSION}-*.exe" -o \
-      -name "Base-Notes-${VERSION}-*.exe.blockmap" -o \
-      -name "Base-Notes-Lite-${VERSION}-*.exe" -o \
-      -name "Base-Notes-Lite-${VERSION}-*.exe.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.exe" -o \
+      -name "BaseForge-${VERSION}-*.exe.blockmap" -o \
       -name "latest.yml" -o \
       -name "latest-lite.yml" \
     \) -print | sort
@@ -293,7 +254,7 @@ collect_ci_signed_windows_assets() {
 }
 
 collect_ci_mac_assets() {
-  local timeout_seconds="${NOWEN_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
+  local timeout_seconds="${BASEFORGE_RELEASE_CI_ARTIFACT_TIMEOUT_SECONDS:-10800}"
   local deadline=$((SECONDS + timeout_seconds))
   local tag_sha run_id artifact_id
 
@@ -308,28 +269,28 @@ collect_ci_mac_assets() {
   fi
   echo "[release-guard] workflow run: ${run_id}"
 
-  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "nowen-note-mac" "$deadline")"; then
-    echo "[release-guard] timed out or failed waiting for nowen-note-mac artifact" >&2
+  if ! artifact_id="$(wait_for_workflow_artifact "$run_id" "baseforge-mac" "$deadline")"; then
+    echo "[release-guard] timed out or failed waiting for baseforge-mac artifact" >&2
     return 1
   fi
   [ -n "$artifact_id" ] || return 1
 
-  CI_ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nowen-release-mac.XXXXXX")"
-  gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name nowen-note-mac --dir "$CI_ARTIFACT_DIR"
+  CI_ARTIFACT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/baseforge-release-mac.XXXXXX")"
+  gh run download "$run_id" --repo "$GITHUB_REPO_SLUG" --name baseforge-mac --dir "$CI_ARTIFACT_DIR"
 
   local mac_assets=()
   while IFS= read -r file; do mac_assets+=("$file"); done < <(
     find "$CI_ARTIFACT_DIR" -type f \( \
-      -name "Base-Notes-${VERSION}-*.dmg" -o \
-      -name "Base-Notes-${VERSION}-*.dmg.blockmap" -o \
-      -name "Base-Notes-${VERSION}-*.zip" -o \
-      -name "Base-Notes-${VERSION}-*.zip.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.dmg" -o \
+      -name "BaseForge-${VERSION}-*.dmg.blockmap" -o \
+      -name "BaseForge-${VERSION}-*.zip" -o \
+      -name "BaseForge-${VERSION}-*.zip.blockmap" -o \
       -name "latest-mac.yml" \
     \) -print | sort
   )
 
   if [ "${#mac_assets[@]}" -eq 0 ]; then
-    echo "[release-guard] nowen-note-mac artifact contains no release assets for ${VERSION}" >&2
+    echo "[release-guard] baseforge-mac artifact contains no release assets for ${VERSION}" >&2
     return 1
   fi
 
@@ -337,7 +298,7 @@ collect_ci_mac_assets() {
   while IFS= read -r required; do
     [ -n "$required" ] || continue
     if ! find "$CI_ARTIFACT_DIR" -type f -name "$required" -print -quit | grep -q .; then
-      echo "[release-guard] nowen-note-mac artifact is incomplete; missing ${required}" >&2
+      echo "[release-guard] baseforge-mac artifact is incomplete; missing ${required}" >&2
       return 1
     fi
   done < <(required_mac_asset_names)

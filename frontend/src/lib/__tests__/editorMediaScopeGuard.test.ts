@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { shouldShieldNonEditorMediaButton } from "@/lib/editorMediaScopeGuard";
 
 describe("editor media scope guard", () => {
-  it("shields Diary image buttons from the note-editor media bridge", () => {
+  it("shields non-editor image buttons from the note-editor media bridge", () => {
     expect(shouldShieldNonEditorMediaButton({
       kind: "image",
       label: "添加图片",

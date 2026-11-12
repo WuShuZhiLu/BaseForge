@@ -1,7 +1,7 @@
 // Shared server/account identity for offline storage and conversion barriers.
 // 注意：getOfflineQueueStorageKey 的实现必须与 offlineQueue.ts 完全一致，
 // 否则加密/转换模块的 scope 判定会与离线队列分叉（同账号算出不同 key）。
-export const STORAGE_KEY_PREFIX = "nowen-offline-queue:v2";
+export const STORAGE_KEY_PREFIX = "baseforge-offline-queue:v2";
 
 function normalizeScopePart(value: string): string {
   return encodeURIComponent((value || "unknown").replace(/\/+$/, "").toLowerCase());
@@ -40,11 +40,11 @@ function isLoopbackUrl(url: string): boolean {
 
 function getServerScope(): string {
   let server = "";
-  try { server = localStorage.getItem("nowen-server-url") || ""; } catch { /* ignore */ }
+  try { server = localStorage.getItem("baseforge-server-url") || ""; } catch { /* ignore */ }
   const origin = typeof window !== "undefined" && window.location.origin.startsWith("http")
     ? window.location.origin
     : "";
-  const isDesktop = typeof window !== "undefined" && !!(window as any).nowenDesktop?.isDesktop;
+  const isDesktop = typeof window !== "undefined" && !!(window as any).baseforgeDesktop?.isDesktop;
 
   if (isDesktop && ((server && isLoopbackUrl(server)) || (!server && origin && isLoopbackUrl(origin)))) {
     return "local-desktop";
@@ -56,6 +56,6 @@ function getServerScope(): string {
 
 export function getOfflineQueueStorageKey(): string {
   let token: string | null = null;
-  try { token = localStorage.getItem("nowen-token"); } catch { /* ignore */ }
+  try { token = localStorage.getItem("baseforge-token"); } catch { /* ignore */ }
   return `${STORAGE_KEY_PREFIX}:${normalizeScopePart(getServerScope())}:${normalizeScopePart(decodeUserIdFromToken(token))}`;
 }

@@ -54,7 +54,7 @@ it("CodeMirror undo/redo retains only complete ciphertext and public surrounding
 it("edits the second identical preview fence despite transformed offsets, preserving its quoted prefix and ciphertext-only undo", () => {
   const fence = encryptedBlockFence(source, "> ");
   const markdown = `public $x$\n\n${fence}\n\n${fence}`;
-  const rendered = markdown.replace("$x$", '<span data-nowen-math-source="x">x</span>');
+  const rendered = markdown.replace("$x$", '<span data-baseforge-math-source="x">x</span>');
   const view = new EditorView({ parent: document.body, state: EditorState.create({ doc: markdown, extensions: [history()] }) });
   const next = JSON.stringify({ ...fixture.envelope, kind: "block", objectId: "10112233-4455-4677-8899-aabbccddeeff" });
   try {

@@ -15,7 +15,7 @@ describe("knowledge tree scrollbar runtime contract", () => {
   it("targets the real desktop tree scroll element and hides the unreliable native overlay", () => {
     const bridge = source("../knowledgeTreeScrollbarBridge.ts");
     expect(bridge).toContain('[data-sidebar-variant="desktop"] [data-swipe-blocker="knowledge-tree-scroll"]');
-    expect(bridge).toContain("nowen-knowledge-tree-custom-scroll-track");
+    expect(bridge).toContain("baseforge-knowledge-tree-custom-scroll-track");
     expect(bridge).toContain("scrollbar-width: none !important");
     expect(bridge).toContain("setPointerCapture");
     expect(bridge).toContain('role", "scrollbar"');

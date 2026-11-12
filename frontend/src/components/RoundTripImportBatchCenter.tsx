@@ -67,10 +67,10 @@ function HistoryButtonBridge() {
         setMount(null);
         return;
       }
-      let node = header.querySelector<HTMLElement>("[data-nowen-import-history-mount]");
+      let node = header.querySelector<HTMLElement>("[data-baseforge-import-history-mount]");
       if (!node) {
         node = document.createElement("span");
-        node.dataset.nowenImportHistoryMount = "true";
+        node.dataset.baseforgeImportHistoryMount = "true";
         node.className = "shrink-0";
         const close = header.querySelector("button[aria-label]");
         header.insertBefore(node, close || null);
@@ -82,7 +82,7 @@ function HistoryButtonBridge() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
-      const node = document.querySelector<HTMLElement>("[data-nowen-import-history-mount]");
+      const node = document.querySelector<HTMLElement>("[data-baseforge-import-history-mount]");
       node?.remove();
     };
   }, []);

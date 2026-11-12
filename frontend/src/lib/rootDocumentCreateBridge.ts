@@ -8,7 +8,7 @@ import {
   type RootDocumentCreateInput,
 } from "@/lib/rootDocumentCreatePolicy";
 
-const INSTALL_KEY = "__NOWEN_ROOT_DOCUMENT_CREATE_BRIDGE__" as const;
+const INSTALL_KEY = "__BASEFORGE_ROOT_DOCUMENT_CREATE_BRIDGE__" as const;
 
 type RootDocumentCreateWindow = Window & typeof globalThis & {
   [INSTALL_KEY]?: () => void;

@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const U1 = "u-filters-1";
 const U2 = "u-filters-2";
@@ -32,7 +32,7 @@ const FOLDER1 = "folder-1";
 const FOLDER2_OTHER_USER = "folder-2-other";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 function db() {

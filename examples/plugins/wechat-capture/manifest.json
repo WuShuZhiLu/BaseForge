@@ -1,17 +1,17 @@
 {
-  "id": "nowenlab.wechat-capture",
+  "id": "baseforgelab.wechat-capture",
   "name": "微信文章采集",
-  "description": "复制微信文章链接，返回 Nowen 后确认采集；也可直接粘贴链接保存到微信收件箱。无需公众号密钥。",
+  "description": "复制微信文章链接，返回 BaseForge 后确认采集；也可直接粘贴链接保存到微信收件箱。无需公众号密钥。",
   "version": "1.2.0",
   "apiVersion": 2,
-  "publisher": "nowenlab",
+  "publisher": "baseforgelab",
   "engines": {
-    "nowen": ">=1.5.0 <2.0.0"
+    "baseforge": ">=1.5.0 <2.0.0"
   },
   "categories": [
     "capture"
   ],
-  "repository": "https://github.com/cropflre/nowen-note",
+  "repository": "https://github.com/cropflre/baseforge",
   "license": "AGPL-3.0",
   "runtime": "sandbox-js",
   "main": "index.js",

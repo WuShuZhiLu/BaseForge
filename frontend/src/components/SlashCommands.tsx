@@ -30,7 +30,6 @@ import {
 import { toast } from "@/lib/toast";
 import { nextFootnoteIdentifier } from "@/components/FootnoteExtensions";
 import { prompt as promptDialog } from "@/components/ui/confirm";
-import { getDailyRecordSlashCommands } from "@/components/daily-records/dailyRecordSlashCommands";
 import type { AddBelowType } from "@/components/blockMenuActions";
 
 export interface SlashCommandItem {
@@ -553,7 +552,6 @@ export function getDefaultSlashCommands(
 ): SlashCommandItem[] {
   return [
     ...(onVoiceRecord ? [{ id: "voice", label: t("voice.record"), description: t("voice.description"), icon: <span>🎙</span>, category: t("slash.catInsert"), keywords: ["voice", "audio", "录音", "语音"], action: onVoiceRecord }] : []),
-    ...getDailyRecordSlashCommands(),
     ...getPluginSlashCommands(noteId),
     // 标题
     {
@@ -951,7 +949,7 @@ export function getDefaultSlashCommands(
     },
     {
       // 思维导图：打开插入对话框（选择已有脑图或新建后插入）。
-      // EditorPane 监听 nowen:open-mindmap-insert 事件后弹出文档嵌入选择对话框（导图 kind）。
+      // EditorPane 监听 baseforge:open-mindmap-insert 事件后弹出文档嵌入选择对话框（导图 kind）。
       id: "mindmap",
       label: t("slash.mindmap") || "思维导图",
       description: t("slash.mindmapDesc") || "选择已有脑图或新建后插入",
@@ -960,12 +958,12 @@ export function getDefaultSlashCommands(
       categoryKey: "insert",
       keywords: ["mindmap", "mind map", "脑图", "思维导图", "导图", "插入脑图"],
       action: () => {
-        window.dispatchEvent(new CustomEvent("nowen:open-mindmap-insert"));
+        window.dispatchEvent(new CustomEvent("baseforge:open-mindmap-insert"));
       },
     },
     {
       // 轻量表格嵌入：与脑图嵌入同管线（![[sheet:id]] wiki 引用）。
-      // EditorPane 监听 nowen:open-sheet-embed-picker 事件后弹出选择对话框。
+      // EditorPane 监听 baseforge:open-sheet-embed-picker 事件后弹出选择对话框。
       id: "sheetEmbed",
       label: t("slash.sheetEmbed") || "嵌入轻量表格",
       description: t("slash.sheetEmbedDesc") || "把已有表格文档嵌入当前笔记",
@@ -974,12 +972,12 @@ export function getDefaultSlashCommands(
       categoryKey: "insert",
       keywords: ["sheet", "表格", "轻量表格", "嵌入表格", "excel"],
       action: () => {
-        window.dispatchEvent(new CustomEvent("nowen:open-sheet-embed-picker"));
+        window.dispatchEvent(new CustomEvent("baseforge:open-sheet-embed-picker"));
       },
     },
     {
       // 画板嵌入：与表格同管线（![[board:id]] wiki 引用）。
-      // EditorPane 监听 nowen:open-board-embed-picker 事件后弹出选择对话框。
+      // EditorPane 监听 baseforge:open-board-embed-picker 事件后弹出选择对话框。
       id: "boardEmbed",
       label: t("slash.boardEmbed") || "嵌入画板",
       description: t("slash.boardEmbedDesc") || "把已有画板嵌入当前笔记",
@@ -988,7 +986,7 @@ export function getDefaultSlashCommands(
       categoryKey: "insert",
       keywords: ["board", "draw", "画板", "白板", "excalidraw", "嵌入画板"],
       action: () => {
-        window.dispatchEvent(new CustomEvent("nowen:open-board-embed-picker"));
+        window.dispatchEvent(new CustomEvent("baseforge:open-board-embed-picker"));
       },
     },
     {

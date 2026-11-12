@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BrainCircuit, Copy, FileArchive, FileCode, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
+import { BrainCircuit, Copy, FileArchive, FileCode, FileSpreadsheet, FileText, FileType, FileType2, Folder, LayoutTemplate, Link2, Table2, PenTool } from "lucide-react";
 import type { KnowledgeTreeInlineCreateKind } from "@/lib/knowledgeTreeInlineCreate";
 import { duplicateKnowledgeTreeNoteAsChild, resolveDuplicableKnowledgeTreeNote } from "@/lib/knowledgeTreeDuplicateAsChild";
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
 import { toast } from "@/lib/toast";
 
-const KNOWLEDGE_TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const KNOWLEDGE_TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 const CREATE_MENU_WIDTH = 232;
 
@@ -22,8 +22,10 @@ const FOLDER_CREATE_ITEM = { kind: "folder", label: "文件夹" } as const;
 const IMPORT_ITEMS = [
   { kind: "markdown", label: "导入 Markdown 文件", icon: FileCode },
   { kind: "markdown-zip", label: "导入 Markdown + 附件 ZIP", icon: FileArchive },
-  { kind: "word", label: "导入 Word 文档", icon: FileType2 },
-  { kind: "pdf", label: "导入 PDF 文档（保原件）", icon: FileType },
+  { kind: "word", label: "导入 Word 转 Markdown", icon: FileType2 },
+  { kind: "word-original", label: "导入 Word 原件预览", icon: FileType2 },
+  { kind: "excel", label: "导入 Excel 表格", icon: FileSpreadsheet },
+  { kind: "pdf", label: "导入 PDF 文档", icon: FileType },
   { kind: "wechat", label: "导入公众号文章", icon: Link2 },
 ] as const;
 
@@ -32,13 +34,15 @@ export interface KnowledgeTreeCreateMenuState {
   anchor: DOMRect;
 }
 
+type ImportKind = (typeof IMPORT_ITEMS)[number]["kind"];
+
 interface KnowledgeTreeCreateDropdownProps {
   menu: KnowledgeTreeCreateMenuState | null;
   onClose: () => void;
   onCreate: (parentId: string | null, kind: KnowledgeTreeInlineCreateKind) => void;
   onCreateFromTemplate: (parentId: string | null) => void;
   onCreateEncrypted?: (parentId: string | null) => void;
-  onImport: (parentId: string | null, kind: "markdown" | "markdown-zip" | "word" | "pdf" | "wechat") => void;
+  onImport: (parentId: string | null, kind: ImportKind) => void;
 }
 
 function menuPosition(anchor: DOMRect, menuHeight: number): React.CSSProperties {

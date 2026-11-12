@@ -9,7 +9,7 @@ import {
 import { useAppActions } from "@/store/AppContext";
 
 type Phase = "idle" | "scanning" | "ready" | "importing" | "done" | "error";
-const OBSIDIAN_FORMAT_STORAGE_KEY = "nowen-import-format:obsidian";
+const OBSIDIAN_FORMAT_STORAGE_KEY = "baseforge-import-format:obsidian";
 
 function readObsidianFormat(): ImportTargetContentFormat {
   try {

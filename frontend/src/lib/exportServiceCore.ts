@@ -35,9 +35,9 @@ const ExportBlockEmbedExtension = Node.create({
   },
   parseHTML() {
     return [{
-      tag: "div[data-nowen-block-embed]",
+      tag: "div[data-baseforge-block-embed]",
       getAttrs: (node) => ({
-        href: (node as HTMLElement).getAttribute("data-nowen-block-embed") || "",
+        href: (node as HTMLElement).getAttribute("data-baseforge-block-embed") || "",
       }),
     }];
   },
@@ -45,7 +45,7 @@ const ExportBlockEmbedExtension = Node.create({
     return [
       "div",
       mergeAttributes(HTMLAttributes, {
-        "data-nowen-block-embed": HTMLAttributes.href,
+        "data-baseforge-block-embed": HTMLAttributes.href,
       }),
       "引用块",
     ];
@@ -362,7 +362,7 @@ function normalizeAttachmentSrc(src: string): string {
  * 线上关闭匿名附件访问后，必须携带当前 Bearer 登录凭证；已有签名 URL 仍可照常使用。
  */
 function attachmentFetchOptions(): RequestInit {
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("nowen-token") : null;
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("baseforge-token") : null;
   return {
     credentials: "include",
     ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
@@ -1340,7 +1340,7 @@ export async function exportNotebook(
       "metadata.json",
       JSON.stringify({
         version: "1.0",
-        app: "nowen-note",
+        app: "baseforge",
         exportedAt: new Date().toISOString(),
         scope: "notebook",
         rootNotebookId: notebookId,
@@ -1358,7 +1358,7 @@ export async function exportNotebook(
         "export-warnings.json",
         JSON.stringify({
           version: "1.0",
-          app: "nowen-note",
+          app: "baseforge",
           generatedAt: new Date().toISOString(),
           scope: "notebook",
           rootNotebookId: notebookId,
@@ -1559,17 +1559,17 @@ export async function buildPrintableHtml(note: {
     .content th, .content td { border: 1px solid #d0d7de; padding: 6px 10px; text-align: left; }
     .content th { background: #f6f8fa; font-weight: 600; }
     .content ul, .content ol { padding-left: 1.6em; margin: 8px 0; }
-    .content ul { list-style: none !important; --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-    .content ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
-    .content ul ul ul ul ul ul ul { --nowen-ul-marker: "•"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul ul ul ul ul ul ul { --nowen-ul-marker: "◦"; --nowen-ul-marker-size: 1.1em; --nowen-ul-marker-top: 0; }
-    .content ul ul ul ul ul ul ul ul ul { --nowen-ul-marker: "▪"; --nowen-ul-marker-size: 1.2em; --nowen-ul-marker-top: -0.05em; }
+    .content ul { list-style: none !important; --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+    .content ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
+    .content ul ul ul ul ul ul ul { --baseforge-ul-marker: "•"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "◦"; --baseforge-ul-marker-size: 1.1em; --baseforge-ul-marker-top: 0; }
+    .content ul ul ul ul ul ul ul ul ul { --baseforge-ul-marker: "▪"; --baseforge-ul-marker-size: 1.2em; --baseforge-ul-marker-top: -0.05em; }
     .content ul > li:not([data-type="taskItem"]):not(.task-list-item) { position: relative; }
-    .content ul > li:not([data-type="taskItem"]):not(.task-list-item)::before { content: var(--nowen-ul-marker); position: absolute; left: -1.2em; top: var(--nowen-ul-marker-top); font-size: var(--nowen-ul-marker-size); line-height: 1; }
+    .content ul > li:not([data-type="taskItem"]):not(.task-list-item)::before { content: var(--baseforge-ul-marker); position: absolute; left: -1.2em; top: var(--baseforge-ul-marker-top); font-size: var(--baseforge-ul-marker-size); line-height: 1; }
     .content ul.contains-task-list > li.task-list-item::before,
     .content ul[data-type="taskList"] > li[data-type="taskItem"]::before { content: none !important; }
     .content ul[data-type="taskList"], .content ul.contains-task-list { list-style: none; padding-left: 0.5em; }
@@ -1760,7 +1760,7 @@ export async function renderPrintableHtmlToPdfBlob(docHtml: string): Promise<Blo
  * 单篇导出为 PDF。
  *
  * 优先级：
- *   1) Electron 桌面端：走 `window.nowenDesktop.exportNoteToPDF`，
+ *   1) Electron 桌面端：走 `window.baseforgeDesktop.exportNoteToPDF`，
  *      主进程用离屏 BrowserWindow + webContents.printToPDF **直接保存矢量 PDF**，
  *      用户只需选保存位置，不会弹系统打印对话框；中文/文字可选/体积小。
  *   2) 纯浏览器环境：用 html2canvas + jsPDF **直接生成 PDF 并触发下载**——
@@ -1786,11 +1786,11 @@ export async function exportSingleNoteAsPDF(noteId: string): Promise<ExportPdfRe
 
     // —— 优先：Electron 静默导出 ——
     const desktop = (window as unknown as {
-      nowenDesktop?: {
+      baseforgeDesktop?: {
         exportNoteToPDF?: (payload: { html: string; suggestedName?: string }) =>
           Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>;
       };
-    }).nowenDesktop;
+    }).baseforgeDesktop;
     if (desktop && typeof desktop.exportNoteToPDF === "function") {
       const res = await desktop.exportNoteToPDF({
         html: docHtml,

@@ -21,7 +21,7 @@ import {
 
 const SORT_SLOT_ATTRIBUTE = "data-knowledge-tree-sort-slot";
 const MOBILE_TREE_SLOT_ATTRIBUTE = "data-mobile-knowledge-tree-classic-slot";
-const MOBILE_NAVIGATOR_SELECTOR = '[data-sidebar-variant="mobile"] [data-nowen-mobile-knowledge-tree="flat-navigation"]';
+const MOBILE_NAVIGATOR_SELECTOR = '[data-sidebar-variant="mobile"] [data-baseforge-mobile-knowledge-tree="flat-navigation"]';
 let sortSlotSequence = 0;
 let mobileModeSurfaceSequence = 0;
 
@@ -58,10 +58,10 @@ export const MOBILE_MARKDOWN_KEYBOARD_LAYOUT_CSS = `
 
   html[data-keyboard="open"]
     [data-markdown-mobile-editing-compact="true"][data-markdown-body-focused]
-    .nowen-md-editor,
+    .baseforge-md-editor,
   html[data-keyboard="open"]
     [data-markdown-mobile-editing-compact="true"][data-markdown-body-focused]
-    .nowen-md-editor > .cm-editor {
+    .baseforge-md-editor > .cm-editor {
     min-height: 0 !important;
     height: 100% !important;
     max-height: 100% !important;
@@ -69,7 +69,7 @@ export const MOBILE_MARKDOWN_KEYBOARD_LAYOUT_CSS = `
 
   html[data-keyboard="open"]
     [data-markdown-mobile-editing-compact="true"][data-markdown-body-focused]
-    .nowen-md-editor .cm-scroller {
+    .baseforge-md-editor .cm-scroller {
     overflow: auto !important;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -80,7 +80,7 @@ export const MOBILE_MARKDOWN_KEYBOARD_LAYOUT_CSS = `
 export function getFocusedMobileMarkdownRoot(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
   const content = target.closest(".cm-content");
-  if (!content || !content.closest(".nowen-md-editor")) return null;
+  if (!content || !content.closest(".baseforge-md-editor")) return null;
   return content.closest<HTMLElement>('[data-markdown-mobile-editing-compact]');
 }
 
@@ -106,7 +106,7 @@ function collectSortSlots(): HTMLElement[] {
     if (!(filterSurface instanceof HTMLElement) || !(toolbar instanceof HTMLElement)) continue;
 
     const mobile = Boolean(input.closest<HTMLElement>('[data-knowledge-tree-variant="mobile"]'));
-    const treePanel = input.closest<HTMLElement>('[data-nowen-knowledge-tree="embedded"]');
+    const treePanel = input.closest<HTMLElement>('[data-baseforge-knowledge-tree="embedded"]');
     const compactToolbar = treePanel?.dataset.knowledgeTreeCompactToolbar === "true";
     if (compactToolbar) {
       toolbar.querySelector<HTMLElement>(`[${SORT_SLOT_ATTRIBUTE}]`)?.remove();
@@ -218,7 +218,7 @@ function MobileKnowledgeTreeModeSurface({ surface }: { surface: MobileModeSurfac
   return mode === "tree" && createPortal(
     <KnowledgeTreePanel
       variant="mobile"
-      className={compact ? "nowen-mobile-tree-density" : undefined}
+      className={compact ? "baseforge-mobile-tree-density" : undefined}
     />,
     surface.treeSlot,
     `${surface.id}:tree`,
@@ -278,11 +278,11 @@ export default function SidebarSearchExperienceBridge() {
       subtree: true,
     });
 
-    window.addEventListener("nowen:workspace-changed", applyDocument);
+    window.addEventListener("baseforge:workspace-changed", applyDocument);
 
     return () => {
       observer.disconnect();
-      window.removeEventListener("nowen:workspace-changed", applyDocument);
+      window.removeEventListener("baseforge:workspace-changed", applyDocument);
     };
   }, []);
 

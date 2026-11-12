@@ -287,8 +287,8 @@ export function TaskMetadataWorkspace({ children }: { children: React.ReactNode 
       setTasksLoaded(false);
       void loadMetadata();
     };
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
-    return () => window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
   }, [loadMetadata]);
   useEffect(() => {
     if (smartActive && !tasksLoaded && !loadingTasks) void loadTasks();

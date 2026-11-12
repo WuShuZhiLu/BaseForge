@@ -8,7 +8,7 @@ import { EcosystemRegistry } from "./ecosystemRegistry.js";
 import { compatibilityInputFromRecord, type ExtensionCompatibilityInput } from "./extensionCompatibility.js";
 import { ExtensionPolicy } from "./extensionPolicy.js";
 import { PluginExecutionManager } from "./executionManager.js";
-import { nowenVersionSatisfies, validateActionInput } from "./manifest.js";
+import { baseforgeVersionSatisfies, validateActionInput } from "./manifest.js";
 import { PluginPackageInstaller } from "./packageInstaller.js";
 import { PluginLifecycle } from "./pluginLifecycle.js";
 import { PluginPermissions } from "./permissions.js";
@@ -394,7 +394,7 @@ export class PluginService {
     visit(pluginId, new Set(), new Set());
     for (const [dependencyId, range] of Object.entries(manifest.extensionDependencies)) {
       const dependency = this.registry.get(dependencyId);
-      if (!dependency || dependency.status !== "enabled" || !nowenVersionSatisfies(range, dependency.version)) throw Object.assign(new Error(`Extension dependency 不可用: ${dependencyId}@${range}`), { code: "PLUGIN_DEPENDENCY_MISSING" });
+      if (!dependency || dependency.status !== "enabled" || !baseforgeVersionSatisfies(range, dependency.version)) throw Object.assign(new Error(`Extension dependency 不可用: ${dependencyId}@${range}`), { code: "PLUGIN_DEPENDENCY_MISSING" });
     }
   }
 

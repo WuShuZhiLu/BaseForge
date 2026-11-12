@@ -12,11 +12,11 @@ import { clearNoteSyncConflict } from "@/lib/noteSyncSafety";
 import { isEncryptedNoteFormat, readEncryptedNoteDocument } from "@/lib/encryptedNotes/noteDocument";
 
 export type ConflictResolutionChoice = "keep-local" | "use-server";
-export const NOTE_CONFLICT_AUTO_RESOLVED_EVENT = "nowen:note-conflict-auto-resolved";
-const DELETE_GUARD_INSTALL_KEY = "__NOWEN_CONFLICT_COPY_DELETE_GUARD_V1__" as const;
-const PENDING_STATUS_BRIDGE_INSTALL_KEY = "__NOWEN_PENDING_SYNC_STATUS_BRIDGE_V1__" as const;
-const NOTE_SYNC_PENDING_EVENT_NAME = "nowen:note-sync-pending";
-const OFFLINE_QUEUED_EVENT_NAME = "nowen:offline-queued";
+export const NOTE_CONFLICT_AUTO_RESOLVED_EVENT = "baseforge:note-conflict-auto-resolved";
+const DELETE_GUARD_INSTALL_KEY = "__BASEFORGE_CONFLICT_COPY_DELETE_GUARD_V1__" as const;
+const PENDING_STATUS_BRIDGE_INSTALL_KEY = "__BASEFORGE_PENDING_SYNC_STATUS_BRIDGE_V1__" as const;
+const NOTE_SYNC_PENDING_EVENT_NAME = "baseforge:note-sync-pending";
+const OFFLINE_QUEUED_EVENT_NAME = "baseforge:offline-queued";
 
 export interface NoteConflictAutoResolvedDetail {
   note: Note;

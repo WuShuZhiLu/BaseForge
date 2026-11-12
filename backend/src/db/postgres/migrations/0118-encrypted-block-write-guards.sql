@@ -6,10 +6,10 @@ CREATE TABLE encrypted_block_write_permits (
   "contentFormat" TEXT NOT NULL,
   "transactionId" BIGINT NOT NULL DEFAULT txid_current()
 );
-CREATE OR REPLACE FUNCTION nowen_guard_encrypted_block_write() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION baseforge_guard_encrypted_block_write() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF (NEW.content IS DISTINCT FROM OLD.content OR NEW."contentFormat" IS DISTINCT FROM OLD."contentFormat")
-    AND (strpos(lower(OLD.content), 'nowen-encrypted') > 0 OR strpos(lower(NEW.content), 'nowen-encrypted') > 0)
+    AND (strpos(lower(OLD.content), 'baseforge-encrypted') > 0 OR strpos(lower(NEW.content), 'baseforge-encrypted') > 0)
     AND NOT EXISTS (SELECT 1 FROM encrypted_block_write_permits
       WHERE "noteId" = NEW.id AND content IS NOT DISTINCT FROM NEW.content
         AND "contentFormat" IS NOT DISTINCT FROM NEW."contentFormat" AND "transactionId" = txid_current()) THEN
@@ -18,4 +18,4 @@ BEGIN
   RETURN NEW;
 END $$;
 CREATE TRIGGER encrypted_blocks_update BEFORE UPDATE OF content, "contentFormat" ON notes
-  FOR EACH ROW EXECUTE FUNCTION nowen_guard_encrypted_block_write();
+  FOR EACH ROW EXECUTE FUNCTION baseforge_guard_encrypted_block_write();

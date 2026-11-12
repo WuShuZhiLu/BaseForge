@@ -162,7 +162,7 @@ describe("Y.js Tiptap subdocument model", () => {
     ]));
     await Promise.resolve();
     expect(firstController.pendingCount()).toBe(1);
-    expect(JSON.parse(localStorage.getItem(`nowen:yjs-subdocument-pending:${encodeURIComponent("note-persist")}`) || "{}")).toMatchObject({
+    expect(JSON.parse(localStorage.getItem(`baseforge:yjs-subdocument-pending:${encodeURIComponent("note-persist")}`) || "{}")).toMatchObject({
       version: 2,
       generation: 1,
     });
@@ -196,7 +196,7 @@ describe("Y.js Tiptap subdocument model", () => {
     const bundle = createTiptapSubdocumentBundle(noteId, content, 250, { preload: false })!;
     const sectionId = bundle.sections[0].id;
     const encoded = "AQ==";
-    const storageKey = `nowen:yjs-subdocument-pending:${encodeURIComponent(noteId)}`;
+    const storageKey = `baseforge:yjs-subdocument-pending:${encodeURIComponent(noteId)}`;
     const original = JSON.stringify({ version: 2, generation: 1, sections: { [sectionId]: encoded } });
     localStorage.setItem(storageKey, original);
     const send = vi.fn(async () => undefined);
@@ -220,7 +220,7 @@ describe("Y.js Tiptap subdocument model", () => {
 
   it("clears a corrupted persisted pending queue without applying it", () => {
     const noteId = "note-corrupt-pending";
-    localStorage.setItem(`nowen:yjs-subdocument-pending:${encodeURIComponent(noteId)}`, "not-json");
+    localStorage.setItem(`baseforge:yjs-subdocument-pending:${encodeURIComponent(noteId)}`, "not-json");
     const content = document([{ type: "paragraph", attrs: { blockId: "blk_corrupt" }, content: [] }]);
     const bundle = createTiptapSubdocumentBundle(noteId, content)!;
     const controller = createTiptapSubdocumentRestSyncController(bundle, {
@@ -229,7 +229,7 @@ describe("Y.js Tiptap subdocument model", () => {
     });
 
     expect(controller.pendingCount()).toBe(0);
-    expect(localStorage.getItem(`nowen:yjs-subdocument-pending:${encodeURIComponent(noteId)}`)).toBeNull();
+    expect(localStorage.getItem(`baseforge:yjs-subdocument-pending:${encodeURIComponent(noteId)}`)).toBeNull();
     controller.destroy();
     destroyTiptapSubdocumentBundle(bundle);
   });

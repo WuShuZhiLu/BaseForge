@@ -10,8 +10,8 @@ import {
 
 describe("root document create policy", () => {
   it("recognizes only internal root-document notebook ids", () => {
-    expect(isRootDocumentNotebookId("__nowen_root_documents__:personal:user-1")).toBe(true);
-    expect(isRootDocumentNotebookId("__nowen_root_documents__:workspace:ws-1")).toBe(true);
+    expect(isRootDocumentNotebookId("__baseforge_root_documents__:personal:user-1")).toBe(true);
+    expect(isRootDocumentNotebookId("__baseforge_root_documents__:workspace:ws-1")).toBe(true);
     expect(isRootDocumentNotebookId("normal-notebook-id")).toBe(false);
     expect(isRootDocumentNotebookId(null)).toBe(false);
   });
@@ -25,7 +25,7 @@ describe("root document create policy", () => {
 
   it("deduplicates identical root create requests with a stable key", () => {
     const input = {
-      notebookId: "__nowen_root_documents__:personal:user-1",
+      notebookId: "__baseforge_root_documents__:personal:user-1",
       title: "无标题笔记",
       contentFormat: "tiptap-json",
     };

@@ -8,7 +8,7 @@ export interface SiteConfig {
   favicon: string;
   /** 分享页底部标识文字；空串表示使用默认标识。 */
   shareFooterText: string;
-  /** ICP 备案号；由 Docker/运行时环境变量 NOWEN_ICP_BEIAN 提供。 */
+  /** ICP 备案号；由 Docker/运行时环境变量 BASEFORGE_ICP_BEIAN 提供。 */
   icpBeian: string;
   /** 公开分享最终使用的 Web 根地址；空串表示继续走构建变量/当前 origin 兜底。 */
   publicWebOrigin: string;

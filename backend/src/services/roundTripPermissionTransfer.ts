@@ -3,8 +3,9 @@ import JSZip from "jszip";
 import { v4 as uuid } from "uuid";
 import { getDb } from "../db/schema";
 import { getUserWorkspaceRole, hasRole, isSystemAdmin } from "../middleware/acl";
+import { isSupportedPackageApp, isSupportedPackageFormat } from "./packageFormatCompat";
 
-export const ROUND_TRIP_PERMISSION_FORMAT = "nowen-workspace-permissions" as const;
+export const ROUND_TRIP_PERMISSION_FORMAT = "baseforge-workspace-permissions" as const;
 export const ROUND_TRIP_PERMISSION_VERSION = 2 as const;
 
 export type RoundTripPermissionMappings = Record<string, string>;
@@ -352,7 +353,7 @@ async function readPermissionPackage(zipBuffer: Buffer): Promise<ParsedPermissio
   const mainEntry = await readJsonEntry<PackageManifest>(zip, "manifest.json");
   if (mainEntry.error) issues.push(mainEntry.error);
   const manifest = mainEntry.value;
-  if (!manifest || manifest.format !== "nowen-package" || manifest.app !== "nowen-note") {
+  if (!manifest || !isSupportedPackageFormat(manifest.format) || !isSupportedPackageApp(manifest.app)) {
     issues.push("数据包 manifest 无效");
   }
 
@@ -834,7 +835,7 @@ export function restorePermissionAppliedState(state: PermissionUndoState): void 
   replacePermissionRows(state, "after");
 }
 
-export async function addPermissionsToNowenPackageExport<TStats extends object>(args: {
+export async function addPermissionsToBaseForgePackageExport<TStats extends object>(args: {
   result: { buffer: Buffer; filename: string; stats: TStats };
   userId: string;
   workspaceId: string;

@@ -1,13 +1,13 @@
 export const PLUGIN_API_VERSION = 2;
 /**
- * 宿主对插件声明的兼容版本基线（对应上游 nowen note 的功能层级）。
+ * 宿主对插件声明的兼容版本基线（对应上游 baseforge note 的功能层级）。
  * 本仓库基线是 v1.5.1（上游 tag bd6f4f73），此前误写 1.5.0，导致 examples 里
- * 声明 `nowen >=1.5.1` 的插件装不上——宿主明明包含 1.5.1 的全部能力却自称 1.5.0。
+ * 声明 `baseforge >=1.5.1` 的插件装不上——宿主明明包含 1.5.1 的全部能力却自称 1.5.0。
  * 注意：不要为了"让某个插件装上"随手抬高，这个值是对插件开发者的能力承诺。
  */
-export const NOWEN_VERSION = "1.5.1";
+export const BASEFORGE_VERSION = "1.5.1";
 /** v2.1 扩展平台的目标版本：低于此版本的宿主不启用 extensionsV21 相关贡献点 */
-export const EXTENSION_V21_TARGET_NOWEN_VERSION = "1.6.0";
+export const EXTENSION_V21_TARGET_BASEFORGE_VERSION = "1.6.0";
 
 export interface ExtensionPlatformFeatureFlags {
   extensionsV21: boolean;
@@ -28,7 +28,6 @@ export const PLUGIN_PERMISSIONS = [
   // 保留只是为了不破坏已发布的 v1 manifest；Plugin API V2 会直接拒绝声明它。
   // 等真正开放附件写入再补方法，否则新插件不要请求这个权限。
   "attachments:read", "attachments:write",
-  "diary:read", "diary:write",
   "mindmaps:read", "mindmaps:write",
   "plugin-storage:read", "plugin-storage:write",
   "external:fetch", "secrets:use",
@@ -103,7 +102,7 @@ export interface PluginManifestV1 {
   description: string;
   version: string;
   apiVersion: 1;
-  engines: { nowen: string };
+  engines: { baseforge: string };
   runtime: "node-action";
   main: string;
   author?: { name: string; url?: string };
@@ -154,7 +153,7 @@ export interface PluginNoteThemeContribution {
   id: string;
   name: string;
   description?: string;
-  base?: "nowen.default";
+  base?: "baseforge.default";
   modes: { light: PluginNoteThemeTokens; dark?: PluginNoteThemeTokens };
 }
 export interface PluginStaticInputField {
@@ -185,8 +184,8 @@ export interface PluginPromptPackContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 export type PluginUiSlot = "floating-layer";
-export type PluginUiIcon = "home" | "star" | "files" | "diary" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
-export type PluginNavigationTarget = "all" | "favorites" | "files" | "diary" | "tasks" | "mindmaps" | "ai-chat" | "shares" | "settings";
+export type PluginUiIcon = "home" | "star" | "files" | "tasks" | "mindmap" | "ai" | "shares" | "settings";
+export type PluginNavigationTarget = "all" | "favorites" | "files" | "tasks" | "mindmaps" | "shares" | "settings";
 export interface PluginUiActionContribution {
   id: string;
   kind: "action";
@@ -223,7 +222,7 @@ export interface PluginSidebarPanelContribution {
   icon: PluginUiIcon;
   /** 面板形态：内置宿主渲染的迷你列表（内置插件）或静态信息卡（第三方声明式） */
   kind: "builtin" | "static-card";
-  /** builtin 面板指向宿主内置实现 id（如 "tasks" / "diary"） */
+  /** builtin 面板指向宿主内置实现 id（如 "tasks"） */
   builtinId?: string;
   /** static-card 的静态内容块（声明式渲染，无代码执行） */
   cards?: Array<{
@@ -237,12 +236,12 @@ export interface PluginSidebarPanelContribution {
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
 
-/** 插件贡献的主区全屏面板（官方内置插件形态：tasks/diary 中心） */
+/** 插件贡献的主区全屏面板（官方内置插件形态：tasks 中心） */
 export interface PluginMainViewPanelContribution {
   id: string;
   title: string;
   icon: PluginUiIcon;
-  /** 宿主内置主区实现 id（如 "tasks" / "diary"）；第三方暂不开放自定义主区 */
+  /** 宿主内置主区实现 id（如 "tasks"）；第三方暂不开放自定义主区 */
   builtinId: string;
   uiPlatform?: Array<"web" | "desktop" | "android" | "ios">;
 }
@@ -261,7 +260,7 @@ export type PluginEditorCommandWhen = "editorFocused" | "noteOpen";
 
 /** 编辑器命令：出现在斜杠菜单，可绑定快捷键，执行时调用已声明的插件 Action */
 export interface PluginEditorCommandContribution {
-  /** 必须为 `${pluginId}.${localId}`（如 nowen.example.insert-timestamp） */
+  /** 必须为 `${pluginId}.${localId}`（如 baseforge.example.insert-timestamp） */
   id: string;
   title: string;
   keywords?: string[];
@@ -292,7 +291,7 @@ interface PluginManifestV2Base {
   version: string;
   apiVersion: 2;
   publisher: string;
-  engines: { nowen: string };
+  engines: { baseforge: string };
   categories: string[];
   keywords?: string[];
   repository: string;

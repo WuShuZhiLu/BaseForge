@@ -13,7 +13,6 @@ import {
   PanelLeft,
   PanelLeftClose,
   Settings,
-  Sparkles,
   Star,
   Trash2,
   UsersRound,
@@ -69,9 +68,7 @@ const NAV_CONFIG: NavConfigItem[] = [
   { icon: <Star size={RAIL_ICON_SIZE} />, labelKey: "sidebar.favorites", mode: "favorites", feature: "favorites", group: "workspace" },
   { icon: <FolderOpen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.fileManager", mode: "files", feature: "files", group: "workspace" },
   { icon: <Trash2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.trash", mode: "trash", group: "workspace" },
-  { icon: <NotebookPen size={RAIL_ICON_SIZE} />, labelKey: "sidebar.diary", mode: "diary", feature: "diaries", group: "modules" },
   { icon: <ListTodo size={RAIL_ICON_SIZE} />, labelKey: "sidebar.tasks", mode: "tasks", feature: "tasks", group: "modules" },
-  { icon: <Sparkles size={RAIL_ICON_SIZE} />, labelKey: "sidebar.aiChat", mode: "ai-chat", group: "tools" },
   { icon: <Link2 size={RAIL_ICON_SIZE} />, labelKey: "sidebar.shareManagement", mode: "shares", group: "tools" },
 ];
 
@@ -102,11 +99,11 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
       api.getWorkspaceFeatures(ws).then(setFeatures).catch(() => setFeatures(null));
     };
     load();
-    window.addEventListener("nowen:workspace-changed", load);
-    window.addEventListener("nowen:workspace-features-changed", load);
+    window.addEventListener("baseforge:workspace-changed", load);
+    window.addEventListener("baseforge:workspace-features-changed", load);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", load);
-      window.removeEventListener("nowen:workspace-features-changed", load);
+      window.removeEventListener("baseforge:workspace-changed", load);
+      window.removeEventListener("baseforge:workspace-features-changed", load);
     };
   }, []);
 
@@ -183,9 +180,9 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
       await broadcastLogout("switch_to_local");
       try {
         clearServerUrl();
-        localStorage.removeItem("nowen-prefer-cloud");
-      localStorage.removeItem("nowen-offline-queue");
-      localStorage.removeItem("nowen-offline-id-map");
+        localStorage.removeItem("baseforge-prefer-cloud");
+      localStorage.removeItem("baseforge-offline-queue");
+      localStorage.removeItem("baseforge-offline-id-map");
     } catch {
       // ignore storage failures
     }
@@ -196,7 +193,7 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
     if (isDesktopApp() && !canSwitchBackToLocal) {
       await clearDesktopLocalAuth().catch(() => ({ ok: false }));
       try {
-        localStorage.setItem("nowen-prefer-cloud", "1");
+        localStorage.setItem("baseforge-prefer-cloud", "1");
       } catch {
         // ignore storage failures
       }
@@ -214,9 +211,7 @@ export default function NavRailMobile({ variant = "desktop", notificationCount =
 
   const renderItem = (item: NavConfigItem) => {
     const active = state.viewMode === item.mode;
-    const label = item.mode === "diary"
-      ? t("sidebar.dailyRecords", { defaultValue: "每日记录" })
-      : t(item.labelKey);
+    const label = t(item.labelKey);
     return (
       <button
         key={item.mode}

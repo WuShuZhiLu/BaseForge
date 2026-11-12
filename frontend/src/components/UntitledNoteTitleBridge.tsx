@@ -6,8 +6,8 @@ import type { Note } from "@/types";
 
 type TitleField = HTMLTextAreaElement | HTMLInputElement;
 
-const PLACEHOLDER_DATA_KEY = "nowenUntitledTitlePlaceholder";
-const ORIGINAL_PLACEHOLDER_DATA_KEY = "nowenUntitledOriginalPlaceholder";
+const PLACEHOLDER_DATA_KEY = "baseforgeUntitledTitlePlaceholder";
+const ORIGINAL_PLACEHOLDER_DATA_KEY = "baseforgeUntitledOriginalPlaceholder";
 const LEGACY_UNTITLED_TITLES = new Set(["无标题笔记", "Untitled Note"]);
 const LEGACY_MARKDOWN_UNTITLED_TITLES = new Set(["无标题 Markdown", "Untitled Markdown"]);
 

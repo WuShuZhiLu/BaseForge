@@ -65,10 +65,10 @@ export interface EditorSplitState {
 /** 左侧栏面板 id（方案 B）：唯一定义在 lib/sidebarPanels.ts（面板框架），此处 re-export 兼容旧引用。 */
 export type { SidebarPanelId };
 
-/** 工具页签（方案 B · B2）：待办 / 小记 / AI / 分享 / 附件管理 / 回收站。
+/** 工具页签（方案 B · B2）：待办 / 分享 / 附件管理 / 回收站。
  *  工具页签占用主区编辑器列；笔记「打开的」列表在侧栏面板（OpenEditorsPanel / SidebarDesktop）。 */
-export type ToolTabKey = "tasks" | "diary" | "ai-chat" | "shares" | "files" | "trash";
-export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "diary", "ai-chat", "shares", "files", "trash"];
+export type ToolTabKey = "tasks" | "shares" | "files" | "trash";
+export const TOOL_TAB_KEYS: ToolTabKey[] = ["tasks", "shares", "files", "trash"];
 
 interface AppState {
   notebooks: Notebook[];
@@ -211,7 +211,7 @@ function trimOpenNoteTabs(tabs: OpenNoteTab[], activeId?: string | null): OpenNo
   return tabs.filter((_, tabIndex) => tabIndex !== index);
 }
 
-const OPEN_NOTE_TAB_STORAGE_KEY = "nowen-open-note-tabs";
+export const OPEN_NOTE_TAB_STORAGE_KEY = "baseforge-open-note-tabs";
 
 /**
  * 从 localStorage 恢复「打开的」页签。恢复通道与 dispatch 通道走同样的防线：
@@ -255,7 +255,7 @@ function loadSavedOpenNoteTabs(): OpenNoteTab[] {
 
 function getSavedSidebarWidth(): number {
   try {
-    const saved = localStorage.getItem("nowen-sidebar-width");
+    const saved = localStorage.getItem("baseforge-sidebar-width");
     if (saved) {
       const w = Number(saved);
       if (w >= MIN_SIDEBAR_WIDTH && w <= MAX_SIDEBAR_WIDTH) return w;
@@ -266,7 +266,7 @@ function getSavedSidebarWidth(): number {
 
 function getSavedNoteListWidth(): number {
   try {
-    const saved = localStorage.getItem("nowen-notelist-width");
+    const saved = localStorage.getItem("baseforgelist-width");
     if (saved) {
       const w = Number(saved);
       if (w >= MIN_NOTELIST_WIDTH && w <= MAX_NOTELIST_WIDTH) return w;
@@ -277,7 +277,7 @@ function getSavedNoteListWidth(): number {
 
 function getSavedNoteListCollapsed(): boolean {
   try {
-    return localStorage.getItem("nowen-notelist-collapsed") === "1";
+    return localStorage.getItem("baseforgelist-collapsed") === "1";
   } catch {
     return false;
   }
@@ -471,17 +471,17 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
     case "SET_SIDEBAR_WIDTH": {
       const w = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, action.payload));
-      try { localStorage.setItem("nowen-sidebar-width", String(w)); } catch {}
+      try { localStorage.setItem("baseforge-sidebar-width", String(w)); } catch {}
       return { ...state, sidebarWidth: w };
     }
     case "SET_NOTELIST_WIDTH": {
       const w = Math.max(MIN_NOTELIST_WIDTH, Math.min(MAX_NOTELIST_WIDTH, action.payload));
-      try { localStorage.setItem("nowen-notelist-width", String(w)); } catch {}
+      try { localStorage.setItem("baseforgelist-width", String(w)); } catch {}
       return { ...state, noteListWidth: w };
     }
     case "TOGGLE_NOTELIST_COLLAPSED": {
       const next = !state.noteListCollapsed;
-      try { localStorage.setItem("nowen-notelist-collapsed", next ? "1" : "0"); } catch {}
+      try { localStorage.setItem("baseforgelist-collapsed", next ? "1" : "0"); } catch {}
       return { ...state, noteListCollapsed: next };
     }
     case "SET_EDITOR_FULLSCREEN":
@@ -681,7 +681,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     if (leavingNote) {
       // 加密笔记/含加密区域的笔记在离开前可拦截：监听方有未保存改动时会 preventDefault。
-      if (!window.dispatchEvent(new Event("nowen:encrypted-note-before-leave", { cancelable: true }))) return;
+      if (!window.dispatchEvent(new Event("baseforge:encrypted-note-before-leave", { cancelable: true }))) return;
     }
     let changedFields = "";
     if (action.type === "SET_ACTIVE_NOTE") {

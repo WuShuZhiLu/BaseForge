@@ -9,7 +9,7 @@ export interface EditorMediaButtonScope {
 }
 
 const MEDIA_LABEL_PATTERN = /图片|image|视频|video/i;
-const MEDIA_SHEET_ATTRIBUTE = "data-nowen-media-sheet";
+const MEDIA_SHEET_ATTRIBUTE = "data-baseforge-media-sheet";
 const TEMPORARY_GUARD_VALUE = "scope-guard";
 const EDITOR_CONTEXT_SELECTOR = [
   ".ProseMirror",
@@ -34,7 +34,7 @@ function resolveButtonKind(button: HTMLButtonElement): EditorMediaButtonKind | n
 
 function isInsideMarkdownEditorShell(button: HTMLButtonElement): boolean {
   const shell = button.closest<HTMLElement>(MARKDOWN_EDITOR_SHELL_SELECTOR);
-  return Boolean(shell?.querySelector(".nowen-md-editor"));
+  return Boolean(shell?.querySelector(".baseforge-md-editor"));
 }
 
 export function shouldShieldMediaButton(button: HTMLButtonElement): boolean {
@@ -51,9 +51,9 @@ let installed = false;
 
 /**
  * Prevent the mobile note-editor media bridge from hijacking similarly named buttons in
- * independent business modules such as Diary, Tasks, avatars, and attachment managers.
+ * independent business modules such as Tasks, avatars, and attachment managers.
  *
- * MediaExperienceBridge deliberately ignores controls under `[data-nowen-media-sheet]`.
+ * MediaExperienceBridge deliberately ignores controls under `[data-baseforge-media-sheet]`.
  * The guard runs one capture level earlier (window -> document), applies that marker only
  * for the duration of the current click dispatch, and leaves the original React onClick
  * untouched so the owning module can open its own file input and upload endpoint.

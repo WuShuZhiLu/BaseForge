@@ -50,7 +50,7 @@
 
 ### 文档
 - `docs/plugin-pm-analysis.md` ← **分析书 + 功能需求表（30+ 项）+ M1-M6 改进计划（接手者必读）**
-- `docs/plugin-remote-files.md`
+- `docs/remote-files.md`（原 `plugin-remote-files.md`；该功能已从插件改回内核能力）
 
 ## 三、运行与验证命令
 

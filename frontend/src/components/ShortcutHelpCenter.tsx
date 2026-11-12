@@ -14,7 +14,7 @@ import {
 import { installShortcutTooltipBridge } from "@/lib/shortcutTooltipBridge";
 import { SHORTCUT_OVERRIDES_CHANGED_EVENT } from "@/lib/shortcutOverrides";
 
-export const OPEN_SHORTCUT_HELP_EVENT = "nowen:open-shortcut-help";
+export const OPEN_SHORTCUT_HELP_EVENT = "baseforge:open-shortcut-help";
 
 const CATEGORY_ORDER: readonly ShortcutCategory[] = [
   "global", "navigation", "rich-text", "markdown", "desktop",

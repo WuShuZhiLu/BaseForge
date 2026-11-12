@@ -1,4 +1,4 @@
-// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/nowen-plugin-sdk/host-api-contract.json 生成，请勿手动修改。
+// 此文件由 scripts/generate-plugin-host-api.mjs 根据 packages/baseforge-plugin-sdk/host-api-contract.json 生成，请勿手动修改。
 import type { PluginPermission } from "./types.js";
 import type { HostApiContractEntry } from "./hostApiContract.js";
 
@@ -45,39 +45,6 @@ export const HOST_API_CONTRACT = deepFreeze([
     "method": "capture.importUrl",
     "sinceApiVersion": 2,
     "permission": "capture:write",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.create",
-    "sinceApiVersion": 1,
-    "permission": "diary:write",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.get",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
-    "runtimes": [
-      "node-action",
-      "sandbox-js"
-    ],
-    "maxArgsBytes": 262144,
-    "maxResultBytes": 1048576
-  },
-  {
-    "method": "diary.list",
-    "sinceApiVersion": 1,
-    "permission": "diary:read",
     "runtimes": [
       "node-action",
       "sandbox-js"
@@ -391,8 +358,6 @@ export const V2_COMBINATION_PLUGIN_PERMISSIONS = deepFreeze([
 export const V2_SUPPORTED_PLUGIN_PERMISSIONS = deepFreeze([
   "attachments:read",
   "capture:write",
-  "diary:read",
-  "diary:write",
   "external:fetch",
   "mindmaps:read",
   "mindmaps:write",

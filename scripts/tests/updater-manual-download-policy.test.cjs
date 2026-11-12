@@ -16,11 +16,11 @@ test("Windows and macOS use manual browser download policy", () => {
 test("release URL targets the detected stable version", () => {
   assert.equal(
     buildReleaseDownloadUrl("v1.4.6"),
-    "https://github.com/cropflre/nowen-note/releases/tag/v1.4.6",
+    "https://github.com/cropflre/baseforge/releases/tag/v1.4.6",
   );
   assert.equal(
     buildReleaseDownloadUrl("invalid"),
-    "https://github.com/cropflre/nowen-note/releases/latest",
+    "https://github.com/cropflre/baseforge/releases/latest",
   );
 });
 

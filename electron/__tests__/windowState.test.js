@@ -117,7 +117,7 @@ test("persists normal bounds after window changes and on close", async () => {
 });
 
 test("settings.json keeps window state across a fresh read", (t) => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-window-state-"));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-window-state-"));
   t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }));
 
   setSettingsPath(tempRoot);

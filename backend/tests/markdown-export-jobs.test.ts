@@ -6,7 +6,7 @@ import path from "node:path";
 import { Hono } from "hono";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-markdown-export-test-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-markdown-export-test-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -113,7 +113,7 @@ test("markdown export preserves the tree, attachments and duplicate note titles"
     /\[附件\]\(\.\/assets\/att-att-1-附件\.bin\)/,
   );
   const manifest = JSON.parse(await zip.file("manifest.json")!.async("string"));
-  assert.equal(manifest.format, "nowen-package");
+  assert.equal(manifest.format, "baseforge-package");
   assert.equal(manifest.formatVersion, 2);
   assert.equal(manifest.packageKind, "markdown");
   const tree = JSON.parse(await zip.file("tree.json")!.async("string"));

@@ -1,4 +1,4 @@
--- PostgreSQL Schema for nowen-note
+-- PostgreSQL Schema for baseforge
 -- Generated from SQLite schema (PG-SCHEMA-02)
 --
 -- 注意事项：
@@ -105,8 +105,7 @@ CREATE TABLE IF NOT EXISTS notes (
     "workspaceId" TEXT,
     "contentFormat" TEXT NOT NULL DEFAULT 'tiptap-json',
     "colorMark" TEXT,
-    note_type TEXT NOT NULL DEFAULT 'normal',
-    journal_date TEXT
+    note_type TEXT NOT NULL DEFAULT 'normal'
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_user ON notes("userId");
@@ -114,8 +113,6 @@ CREATE INDEX IF NOT EXISTS idx_notes_notebook ON notes("notebookId");
 CREATE INDEX IF NOT EXISTS idx_notes_workspace ON notes("workspaceId");
 CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes("updatedAt");
 CREATE INDEX IF NOT EXISTS idx_notes_trashed ON notes("isTrashed");
-CREATE INDEX IF NOT EXISTS idx_notes_journal_date ON notes("userId", note_type, journal_date);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_notes_journal_unique ON notes("userId", note_type, journal_date);
 
 -- TODO: FTS5 → tsvector/tsquery (PG-FTS-01)
 
@@ -686,37 +683,8 @@ CREATE INDEX IF NOT EXISTS idx_share_comments_note ON share_comments("noteId");
 CREATE INDEX IF NOT EXISTS idx_share_comments_guest_ip ON share_comments("guestIpHash", "createdAt");
 
 -- ============================================================
--- Diaries
+-- (Diaries / diary_attachments 已随日记模块删除)
 -- ============================================================
-
-CREATE TABLE IF NOT EXISTS diaries (
-    id TEXT PRIMARY KEY,
-    "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    "contentText" TEXT DEFAULT '',
-    mood TEXT DEFAULT '',
-    images TEXT NOT NULL DEFAULT '[]',
-    media TEXT NOT NULL DEFAULT '[]',
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "workspaceId" TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_diaries_user_created ON diaries("userId", "createdAt");
-CREATE INDEX IF NOT EXISTS idx_diaries_workspace ON diaries("workspaceId");
-
-CREATE TABLE IF NOT EXISTS diary_attachments (
-    id TEXT PRIMARY KEY,
-    "diaryId" TEXT REFERENCES diaries(id) ON DELETE CASCADE,
-    "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    "mimeType" TEXT NOT NULL,
-    size INTEGER NOT NULL,
-    path TEXT NOT NULL,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "workspaceId" TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_diary_attachments_diary ON diary_attachments("diaryId");
-CREATE INDEX IF NOT EXISTS idx_diary_attachments_user_created ON diary_attachments("userId", "createdAt");
-CREATE INDEX IF NOT EXISTS idx_diary_attachments_workspace ON diary_attachments("workspaceId");
 
 -- ============================================================
 -- Other tables
@@ -840,30 +808,6 @@ CREATE TABLE IF NOT EXISTS ai_custom_prompts (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_custom_prompts_user_name ON ai_custom_prompts("userId", name);
 CREATE INDEX IF NOT EXISTS idx_ai_custom_prompts_user_usage ON ai_custom_prompts("userId", "usageCount", "updatedAt");
-
-CREATE TABLE IF NOT EXISTS ai_chat_conversations (
-    id TEXT PRIMARY KEY,
-    "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL DEFAULT '',
-    archived BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_ai_chat_conv_user ON ai_chat_conversations("userId", archived, "updatedAt");
-
-CREATE TABLE IF NOT EXISTS ai_chat_messages (
-    id TEXT PRIMARY KEY,
-    "userId" TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    "conversationId" TEXT,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL DEFAULT '',
-    "referencesJson" TEXT,
-    "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_ai_chat_msg_conv ON ai_chat_messages("conversationId", "createdAt");
-CREATE INDEX IF NOT EXISTS idx_ai_chat_user_created ON ai_chat_messages("userId", "createdAt");
 
 -- ============================================================
 -- Migration tracking
@@ -1034,19 +978,6 @@ CREATE INDEX IF NOT EXISTS idx_note_y_subdocument_updates_section
 
 
 
--- Workspace shared journals: one bound note per workspace/calendar date.
-CREATE TABLE IF NOT EXISTS workspace_journals (
-  "workspaceId" TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  "journalDate" TEXT NOT NULL,
-  "noteId" TEXT NOT NULL UNIQUE REFERENCES notes(id) ON DELETE CASCADE,
-  "createdBy" TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("workspaceId", "journalDate")
-);
-CREATE INDEX IF NOT EXISTS idx_workspace_journals_note
-  ON workspace_journals("noteId");
-CREATE INDEX IF NOT EXISTS idx_workspace_journals_date
-  ON workspace_journals("workspaceId", "journalDate" DESC);
+-- (workspace_journals 已随日记模块删除)
 
 CREATE INDEX IF NOT EXISTS idx_notes_color_mark ON notes("colorMark");

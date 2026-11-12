@@ -25,7 +25,7 @@ describe("安卓端记住登录", () => {
   beforeEach(() => {
     storageHarness.values.clear();
     vi.clearAllMocks();
-    delete (window as typeof window & { nowenDesktop?: unknown }).nowenDesktop;
+    delete (window as typeof window & { baseforgeDesktop?: unknown }).baseforgeDesktop;
   });
 
   it("通过系统安全存储保存并回填账号、密码和服务器", async () => {

@@ -52,6 +52,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import {
+  PROJECT_DOCKER_RUN_COMMAND,
+  PROJECT_GITEE_REPO,
+  PROJECT_LATEST_RELEASE_URL,
+} from "@/lib/projectLinks";
 
 /**
  * 镜像源定义。
@@ -65,7 +70,7 @@ type MirrorSource =
 
 const MIRROR_SOURCES: MirrorSource[] = [
   // Gitee 镜像放第一位：国内用户最稳的兜底（自有仓库，速度可控）
-  { id: "gitee", label: "Gitee 镜像", kind: "gitee", owner: "cropflre", repo: "nowen-note" },
+  { id: "gitee", label: "Gitee 镜像", kind: "gitee", ...PROJECT_GITEE_REPO },
   { id: "ghproxy", label: "ghproxy.net", kind: "proxy", prefix: "https://ghproxy.net/" },
   { id: "llkk", label: "gh.llkk.cc", kind: "proxy", prefix: "https://gh.llkk.cc/" },
   { id: "mirror", label: "mirror.ghproxy.com", kind: "proxy", prefix: "https://mirror.ghproxy.com/" },
@@ -119,7 +124,7 @@ function categorize(name: string): AssetCategory {
   }
   if (lower.endsWith(".apk")) return "android";
   // clipper 浏览器扩展：发布脚本里包名形如 <品牌>-clipper-x.y.z.zip。
-  if (lower.startsWith("nowen-clipper") && lower.endsWith(".zip")) return "clipper";
+  if (/^(?:baseforge|baseforge)-clipper/.test(lower) && lower.endsWith(".zip")) return "clipper";
   if (lower.endsWith(".ipa") || (lower.includes("ios") && lower.endsWith(".zip"))) return "ios";
   if (
     lower.endsWith(".dmg") ||
@@ -128,7 +133,7 @@ function categorize(name: string): AssetCategory {
       lower.includes("mac") ||
       lower.includes("darwin") ||
       lower.includes("osx") ||
-      (lower.startsWith("nowen-note") && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower))
+      /^(?:baseforge|baseforge)/.test(lower) && /(?:arm64|aarch64|x64|x86_64|amd64|intel)/.test(lower)
     ) && lower.endsWith(".zip"))
   ) {
     if (/(?:arm64|aarch64|apple[._ -]?silicon)/.test(lower)) return "mac-arm64";
@@ -146,7 +151,7 @@ function categorize(name: string): AssetCategory {
 
 /** 历史发布产物文件名仍带旧品牌，列表里统一按现品牌显示（下载到的真实文件不改名）。 */
 function displayAssetName(name: string): string {
-  return name.replace(/nowen[ ._-]?note/gi, "BaseForge").replace(/nowen/gi, "BaseForge");
+  return name.replace(/baseforge[ ._-]?note/gi, "BaseForge").replace(/baseforge/gi, "BaseForge");
 }
 
 /** 自动更新元数据不是给用户手动下载的安装包，不放入“其他”分组。 */
@@ -233,10 +238,9 @@ const PLATFORM_ORDER: Array<{
   { category: "other", icon: HardDrive },
 ];
 
-const GITHUB_RELEASE_URL = "https://github.com/cropflre/nowen-note/releases/latest";
+const GITHUB_RELEASE_URL = PROJECT_LATEST_RELEASE_URL;
 
-const DOCKER_RUN_COMMAND =
-  "docker run -d --name baseforge -p 3001:3001 -v ~/baseforge-data:/app/data cropflre/nowen-note:latest";
+const DOCKER_RUN_COMMAND = PROJECT_DOCKER_RUN_COMMAND;
 
 async function copyText(value: string): Promise<boolean> {
   try {
@@ -261,7 +265,46 @@ async function copyText(value: string): Promise<boolean> {
   }
 }
 
+/**
+ * 客户端下载开关。
+ *
+ * 0.1 只发布 Docker 镜像，桌面 / 移动 / NAS 安装包尚未产出。此时保留「下载客户端」
+ * 入口，但不渲染 GitHub Releases 列表——那些链接指向上游仓库，且在当前版本下全部无效。
+ * 打包流水线就绪后，构建时设置 VITE_CLIENT_DOWNLOADS_ENABLED=true 即可恢复内容，
+ * 不需要改代码。
+ */
+const CLIENT_DOWNLOADS_ENABLED = import.meta.env.VITE_CLIENT_DOWNLOADS_ENABLED === "true";
+
+function ClientDownloadsPlaceholder() {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1 flex items-center gap-2">
+          <Download size={18} className="text-accent-primary" />
+          下载客户端
+        </h3>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          桌面、移动与 NAS 安装包尚未发布。
+        </p>
+      </div>
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 p-4 space-y-2">
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          当前版本仅提供 Docker 镜像部署：运行镜像后，在浏览器中访问服务即可使用。
+        </p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          打包版本就绪后，这里会按平台列出安装包并提供加速下载源。
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function DownloadPanel() {
+  if (!CLIENT_DOWNLOADS_ENABLED) return <ClientDownloadsPlaceholder />;
+  return <DownloadPanelContent />;
+}
+
+function DownloadPanelContent() {
   const { t } = useTranslation();
 
   const [loading, setLoading] = useState(true);

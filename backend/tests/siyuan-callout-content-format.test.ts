@@ -49,7 +49,7 @@ test("Markdown import keeps native GFM alert syntax and reports Callout as suppo
   for (const type of TYPES) {
     assert.match(result.markdown, new RegExp(`\\[!${type}\\]`));
   }
-  assert.doesNotMatch(result.markdown, /data-callout|nowen-siyuan-callout/);
+  assert.doesNotMatch(result.markdown, /data-callout|baseforge-siyuan-callout/);
   assert.equal(result.stats.unsupportedNodes.NodeCallout, undefined);
   assert.equal(result.warnings.some((warning) => /callout/i.test(warning)), false);
 });

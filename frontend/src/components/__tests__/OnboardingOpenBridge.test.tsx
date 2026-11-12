@@ -104,7 +104,7 @@ describe("OnboardingOpenBridge", () => {
       expect(mocks.actions.refreshNotebooks).toHaveBeenCalledTimes(1);
       expect(mocks.actions.refreshNotes).toHaveBeenCalledTimes(1);
       expect(
-        Object.keys(localStorage).some((key) => key.startsWith("nowen:onboarding-welcome-opened:v1:")),
+        Object.keys(localStorage).some((key) => key.startsWith("baseforge:onboarding-welcome-opened:v1:")),
       ).toBe(true);
     } finally {
       await act(async () => root.unmount());

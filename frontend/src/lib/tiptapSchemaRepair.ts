@@ -43,7 +43,7 @@ function maskImageSources(json: unknown): { sanitized: unknown; sources: Map<str
     if (node.type === "image" && node.attrs && typeof node.attrs === "object") {
       const attrs = { ...(node.attrs as Record<string, unknown>) };
       if (typeof attrs.src === "string" && attrs.src) {
-        const placeholder = `data:,nowen-schema-repair-image-${sources.size}`;
+        const placeholder = `data:,baseforge-schema-repair-image-${sources.size}`;
         sources.set(placeholder, attrs.src);
         attrs.src = placeholder;
       }

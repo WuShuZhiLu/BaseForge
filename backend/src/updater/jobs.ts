@@ -231,7 +231,7 @@ async function fetchJson<T>(url: string, timeoutMs = 8_000): Promise<T> {
   try {
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: "application/json", "User-Agent": "nowen-note-updater" },
+      headers: { Accept: "application/json", "User-Agent": "baseforge-updater" },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return (await response.json()) as T;

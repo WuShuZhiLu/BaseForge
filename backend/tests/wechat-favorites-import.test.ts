@@ -6,7 +6,7 @@ import path from "node:path";
 import JSZip from "jszip";
 import { parseWeChatDataAnalysisPayload } from "../src/services/wechatFavoritesAdapters/wechatDataAnalysisV1";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-wechat-favorites-test-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-wechat-favorites-test-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = path.join(tmpDir, "user-data");
 

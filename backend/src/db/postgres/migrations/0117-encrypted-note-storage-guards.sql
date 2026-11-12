@@ -1,6 +1,6 @@
 -- PostgreSQL parity for the encrypted-note storage boundary. The default runtime
 -- still uses SQLite; this migration does not enable a PostgreSQL runtime.
-CREATE OR REPLACE FUNCTION nowen_encrypted_note_valid(body TEXT, preview TEXT, format TEXT)
+CREATE OR REPLACE FUNCTION baseforge_encrypted_note_valid(body TEXT, preview TEXT, format TEXT)
 RETURNS BOOLEAN LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE envelope JSONB;
 BEGIN
@@ -22,9 +22,9 @@ BEGIN
 EXCEPTION WHEN invalid_text_representation THEN RETURN FALSE;
 END $$;
 
-CREATE OR REPLACE FUNCTION nowen_guard_encrypted_note() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION baseforge_guard_encrypted_note() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF NEW."contentFormat" LIKE 'encrypted-%' AND NOT nowen_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
+  IF NEW."contentFormat" LIKE 'encrypted-%' AND NOT baseforge_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
     RAISE EXCEPTION 'INVALID_ENCRYPTED_NOTE';
   END IF;
   IF TG_OP = 'UPDATE' THEN
@@ -41,9 +41,9 @@ BEGIN
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS encrypted_notes_write ON notes;
-CREATE TRIGGER encrypted_notes_write BEFORE INSERT OR UPDATE ON notes FOR EACH ROW EXECUTE FUNCTION nowen_guard_encrypted_note();
+CREATE TRIGGER encrypted_notes_write BEFORE INSERT OR UPDATE ON notes FOR EACH ROW EXECUTE FUNCTION baseforge_guard_encrypted_note();
 
-CREATE OR REPLACE FUNCTION nowen_guard_encrypted_derived_content() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION baseforge_guard_encrypted_derived_content() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF EXISTS (SELECT 1 FROM notes WHERE id = NEW."noteId" AND "contentFormat" LIKE 'encrypted-%') THEN
     RAISE EXCEPTION 'ENCRYPTED_NOTE_DERIVED_CONTENT_FORBIDDEN';
@@ -56,18 +56,18 @@ BEGIN
   FOREACH table_name IN ARRAY ARRAY['attachments', 'shares', 'note_blocks_index', 'note_block_documents', 'note_block_records', 'note_yupdates', 'note_ysnapshots', 'note_y_subdocuments', 'note_y_subdocument_updates', 'note_y_subdocument_manifests', 'note_embeddings'] LOOP
     IF to_regclass(table_name) IS NOT NULL THEN
       EXECUTE format('DROP TRIGGER IF EXISTS encrypted_derived_write ON %I', table_name);
-      EXECUTE format('CREATE TRIGGER encrypted_derived_write BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION nowen_guard_encrypted_derived_content()', table_name);
+      EXECUTE format('CREATE TRIGGER encrypted_derived_write BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION baseforge_guard_encrypted_derived_content()', table_name);
     END IF;
   END LOOP;
 END $$;
 
-CREATE OR REPLACE FUNCTION nowen_guard_encrypted_note_history() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE OR REPLACE FUNCTION baseforge_guard_encrypted_note_history() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF EXISTS (SELECT 1 FROM notes WHERE id = NEW."noteId" AND "contentFormat" LIKE 'encrypted-%')
-    AND NOT nowen_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
+    AND NOT baseforge_encrypted_note_valid(NEW.content, NEW."contentText", NEW."contentFormat") THEN
     RAISE EXCEPTION 'INVALID_ENCRYPTED_NOTE_HISTORY';
   END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS encrypted_note_history_write ON note_versions;
-CREATE TRIGGER encrypted_note_history_write BEFORE INSERT OR UPDATE ON note_versions FOR EACH ROW EXECUTE FUNCTION nowen_guard_encrypted_note_history();
+CREATE TRIGGER encrypted_note_history_write BEFORE INSERT OR UPDATE ON note_versions FOR EACH ROW EXECUTE FUNCTION baseforge_guard_encrypted_note_history();

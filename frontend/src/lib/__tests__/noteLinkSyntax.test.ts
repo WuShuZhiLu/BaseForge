@@ -24,14 +24,14 @@ describe("note link syntax", () => {
   it("preprocesses links and embeds but preserves fenced code", () => {
     const md = `[[note:${ID}]]\n\n![[note:${ID}#blk:blk_target]]\n\n\`\`\`md\n[[note:${ID}]]\n\`\`\``;
     const html = preprocessInternalNoteLinks(md);
-    expect(html).toContain("data-nowen-title-mode=\"auto\"");
-    expect(html).toContain("data-nowen-block-embed");
+    expect(html).toContain("data-baseforge-title-mode=\"auto\"");
+    expect(html).toContain("data-baseforge-block-embed");
     expect(html).toContain(`\`\`\`md\n[[note:${ID}]]`);
   });
   it("converts mind map embeds to block-embed placeholders, including fenced code", () => {
     const md = `前文\n\n![[mindmap:${ID}]]\n\n\`\`\`md\n![[mindmap:${ID}]]\n\`\`\``;
     const html = preprocessInternalNoteLinks(md);
-    expect(html).toContain(`<div data-nowen-block-embed="mindmap:${ID}"></div>`);
+    expect(html).toContain(`<div data-baseforge-block-embed="mindmap:${ID}"></div>`);
     expect(html).toContain(`\`\`\`md\n![[mindmap:${ID}]]`);
   });
 });

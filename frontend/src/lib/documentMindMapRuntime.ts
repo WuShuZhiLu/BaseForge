@@ -122,7 +122,7 @@ export async function invalidateDocumentMindMapCache(id: string): Promise<void> 
   await defaultMindMapEmbedCache.remove(id);
 }
 
-export const DOCUMENT_MINDMAP_CHANGED_EVENT = "nowen:mindmap-changed";
+export const DOCUMENT_MINDMAP_CHANGED_EVENT = "baseforge:mindmap-changed";
 
 export interface DocumentMindMapChangedDetail {
   id: string;

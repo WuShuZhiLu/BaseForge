@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { extractEmbedPassword, fillEmbedPasswordDocument } from "@/lib/embedPassword";
 
-const BOUND_ATTR = "data-nowen-embed-password-bound";
-const FALLBACK_CLASS = "nowen-embed-password-fallback";
+const BOUND_ATTR = "data-baseforge-embed-password-bound";
+const FALLBACK_CLASS = "baseforge-embed-password-fallback";
 
 type EmbedRecord = {
   iframe: HTMLIFrameElement;
@@ -26,7 +26,7 @@ function randomRequestId(): string {
 export function isControlledSameOriginEmbed(url: URL, parentOrigin: string): boolean {
   if (url.origin !== parentOrigin) return false;
   return (
-    url.searchParams.get("nowenEmbed") === "1" ||
+    url.searchParams.get("baseforgeEmbed") === "1" ||
     /^\/(?:embed|share|public|unlock|auth)(?:\/|$)/i.test(url.pathname)
   );
 }
@@ -63,14 +63,14 @@ function fallbackElement(iframe: HTMLIFrameElement): HTMLElement | null {
 
 function createFallback(iframe: HTMLIFrameElement, password: string): HTMLElement {
   const existing = fallbackElement(iframe);
-  if (existing) return existing.querySelector<HTMLElement>("[data-nowen-embed-password-status]") || existing;
+  if (existing) return existing.querySelector<HTMLElement>("[data-baseforge-embed-password-status]") || existing;
 
   const fallback = document.createElement("div");
   fallback.className = `${FALLBACK_CLASS} flex flex-wrap items-center gap-2 border-t border-app-border bg-app-surface px-3 py-2 text-[11px] text-tx-secondary`;
   fallback.setAttribute("role", "status");
 
   const status = document.createElement("span");
-  status.dataset.nowenEmbedPasswordStatus = "1";
+  status.dataset.baseforgeEmbedPasswordStatus = "1";
   status.textContent = "检测到密码/提取码，正在确认嵌入页面能力…";
 
   const copy = document.createElement("button");
@@ -98,7 +98,7 @@ function applySafeSandbox(record: EmbedRecord): void {
   tokens.add("allow-same-origin");
 
   // A same-origin frame with both scripts and allow-same-origin can remove its own
-  // sandbox. Only Nowen-controlled embed routes keep scripts; ordinary same-origin
+  // sandbox. Only BaseForge-controlled embed routes keep scripts; ordinary same-origin
   // pages remain inspectable for a static password field but cannot execute scripts.
   if (!isControlledSameOriginEmbed(record.resolved, window.location.origin)) tokens.delete("allow-scripts");
   const next = Array.from(tokens).join(" ");
@@ -109,9 +109,9 @@ function sendOffer(record: EmbedRecord): void {
   try {
     record.iframe.contentWindow?.postMessage(
       {
-        type: "nowen:embed-password-offer",
+        type: "baseforge:embed-password-offer",
         requestId: record.requestId,
-        source: "nowen-note",
+        source: "baseforge",
       },
       record.resolved.origin,
     );
@@ -137,7 +137,7 @@ function tryApplyPassword(record: EmbedRecord): void {
 }
 
 function bindIframe(iframe: HTMLIFrameElement): void {
-  if (iframe.hasAttribute(BOUND_ATTR) || !iframe.closest(".nowen-md-preview")) return;
+  if (iframe.hasAttribute(BOUND_ATTR) || !iframe.closest(".baseforge-md-preview")) return;
   const rawSrc = iframe.getAttribute("src") || "";
   const password = extractEmbedPassword(rawSrc);
   if (!password) return;
@@ -174,7 +174,7 @@ function resetIframe(iframe: HTMLIFrameElement): void {
 }
 
 function reconcile(root: ParentNode = document): void {
-  root.querySelectorAll<HTMLIFrameElement>(".nowen-md-preview iframe").forEach(bindIframe);
+  root.querySelectorAll<HTMLIFrameElement>(".baseforge-md-preview iframe").forEach(bindIframe);
 }
 
 function handleHandshake(event: MessageEvent): void {
@@ -183,11 +183,11 @@ function handleHandshake(event: MessageEvent): void {
   const record = pending.get(data.requestId);
   if (!record || event.source !== record.iframe.contentWindow || event.origin !== record.resolved.origin) return;
 
-  if (data.type === "nowen:embed-password-ready") {
+  if (data.type === "baseforge:embed-password-ready") {
     try {
       record.iframe.contentWindow?.postMessage(
         {
-          type: "nowen:embed-password",
+          type: "baseforge:embed-password",
           requestId: record.requestId,
           password: record.password,
         },
@@ -200,7 +200,7 @@ function handleHandshake(event: MessageEvent): void {
     return;
   }
 
-  if (data.type === "nowen:embed-password-applied") {
+  if (data.type === "baseforge:embed-password-applied") {
     pending.delete(record.requestId);
     setStatus(
       record,

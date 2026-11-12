@@ -45,7 +45,6 @@ function eventType(input: MutationCapture): string | null {
     if (method === "PUT" || method === "PATCH") return body.completed === true || body.completed === 1 ? "task.completed" : body.completed === false || body.completed === 0 ? "task.reopened" : "task.updated";
   }
   if (area === "attachments") return method === "POST" ? "attachment.created" : method === "DELETE" ? "attachment.deleted" : null;
-  if (area === "diary") return method === "POST" ? "diary.created" : method === "PUT" || method === "PATCH" ? "diary.updated" : null;
   if (area === "mindmaps") return method === "POST" ? "mindmap.created" : method === "PUT" || method === "PATCH" ? "mindmap.updated" : null;
   if (area === "tags") {
     if (method === "POST" && /\/note\/.+\/tag\//.test(input.path)) return "tag.added_to_note";
@@ -80,20 +79,20 @@ export const automationEventCaptureMiddleware: MiddlewareHandler = async (c, nex
   const method = c.req.method.toUpperCase();
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return next();
   const pathname = new URL(c.req.url).pathname;
-  const match = pathname.match(/^\/api\/(notes|notebooks|tags|tasks|attachments|diary|mindmaps)(\/.*)?$/);
+  const match = pathname.match(/^\/api\/(notes|notebooks|tags|tasks|attachments|mindmaps)(\/.*)?$/);
   if (!match) return next();
   let body: Record<string, unknown> = {};
   if (method !== "DELETE") body = await c.req.raw.clone().json().catch(() => ({})) as Record<string, unknown>;
   await next();
   if (c.res.status < 200 || c.res.status >= 300) return;
   const response = await c.res.clone().json().catch(() => ({})) as Record<string, unknown>;
-  const commandSource = c.req.header("X-Nowen-Command-Source") || "user";
+  const commandSource = c.req.header("X-BaseForge-Command-Source") || "user";
   captureBusinessMutation({
     area: match[1], path: match[2] || "/", method, userId: c.req.header("X-User-Id") || "system",
     workspaceId: String(body.workspaceId || c.req.query("workspaceId") || "") || null, requestBody: body, responseBody: response,
     source: commandSource === "sync" ? "sync" : commandSource.includes("workflow") ? "workflow" : commandSource.includes("plugin") ? "plugin" : "user",
-    sourceId: c.req.header("X-Nowen-Source-Id") || undefined, correlationId: c.req.header("X-Nowen-Correlation-Id") || undefined,
-    causationId: c.req.header("X-Nowen-Causation-Id") || undefined, depth: Number(c.req.header("X-Nowen-Event-Depth") || 0),
-    batchId: c.req.header("X-Nowen-Batch-Id") || undefined, requestId: c.req.header("X-Request-Id") || undefined,
+    sourceId: c.req.header("X-BaseForge-Source-Id") || undefined, correlationId: c.req.header("X-BaseForge-Correlation-Id") || undefined,
+    causationId: c.req.header("X-BaseForge-Causation-Id") || undefined, depth: Number(c.req.header("X-BaseForge-Event-Depth") || 0),
+    batchId: c.req.header("X-BaseForge-Batch-Id") || undefined, requestId: c.req.header("X-Request-Id") || undefined,
   });
 };

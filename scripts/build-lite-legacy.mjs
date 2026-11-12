@@ -3,10 +3,10 @@
  * Lite 发行版打包脚本。
  *
  * 与 scripts/safe-build.mjs 的差异：
- *   - **不**跑 `npm run rebuild:native`（lite 没 backend，也就不需要为 Electron ABI 重建 better-sqlite3）
+ *   - **不**跑 `npm run rebuild:native`（lite 没 backend，不需要原生模块）
  *   - **不**跑 `npm run build:backend`（lite 不打 backend/dist）
  *   - 使用 electron/builder.lite.config.js
- *   - 默认产物目录：dist-electron-lite/（或 %TEMP%/nowen-note-lite-build 当 --safe 启用）
+ *   - 默认产物目录：dist-electron-lite/（或 %TEMP%/baseforge-lite-build 当 --safe 启用）
  *
  * 用法：
  *   node scripts/build-lite.mjs          # 普通打包
@@ -20,7 +20,7 @@
  *     win-unpacked/
  *
  * 与 full 版的互不干扰：
- *   - appId 不同（com.nowen.note.lite）→ 注册表 key、安装路径独立
+ *   - appId 不同（com.baseforge.note.lite）→ 注册表 key、安装路径独立
  *   - productName 带 Lite → 开始菜单/Dock 不冲突
  *   - autoUpdate channel="lite" → feed 独立
  *   - 运行时 main.js 读 resourcesPath/backend/dist/index.js 不存在 → 强制 lite 模式
@@ -57,8 +57,8 @@ if (isWin && SAFE_MODE) {
 // ========== Step 2: safe 模式下切输出目录到 %TEMP% ==========
 let tmpOut = null;
 if (SAFE_MODE) {
-  process.env.NOWEN_BUILD_OUT = "1";
-  tmpOut = join(tmpdir(), "nowen-note-lite-build");
+  process.env.BASEFORGE_BUILD_OUT = "1";
+  tmpOut = join(tmpdir(), "baseforge-lite-build");
   log(`safe mode: output directory -> ${tmpOut}`);
   if (existsSync(tmpOut)) {
     log("cleaning previous temp output...");

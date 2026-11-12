@@ -56,7 +56,7 @@ describe.skip("EditorPane mobile header", () => {
     const moreMenu = mobileMoreMenuSource();
 
     expect(header).not.toContain("onClick={toggleLock}");
-    expect(header).toContain("nowen:open-search");
+    expect(header).toContain("baseforge:open-search");
     expect(moreMenu).toContain("toggleLock(); setShowMobileMenu(false)");
     expect(header).toContain("mobileTitlePinned");
   });
@@ -69,7 +69,7 @@ describe.skip("EditorPane mobile header", () => {
       .filter((button) => button.includes("data-mobile-note-menu-trigger"));
 
     expect(triggers).toHaveLength(3);
-    for (const trigger of triggers) expect(trigger).toContain("nowen:close-search");
+    for (const trigger of triggers) expect(trigger).toContain("baseforge:close-search");
   });
 
   it("lets both note management menus scroll within the available viewport", () => {

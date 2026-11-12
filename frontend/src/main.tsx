@@ -143,13 +143,13 @@ installInlineCommentTooltipMount();
 
 initCodeBlockTheme();
 
-const THEME_KEY = "nowen-note-theme";
+const THEME_KEY = "baseforge-theme";
 if (typeof localStorage !== "undefined" && !localStorage.getItem(THEME_KEY)) {
   localStorage.setItem(THEME_KEY, "light");
 }
 
 try {
-  const desk: any = (window as any).nowenDesktop;
+  const desk: any = (window as any).baseforgeDesktop;
   if (desk && desk.isDesktop && typeof desk.platform === "string") {
     document.documentElement.setAttribute("data-electron", desk.platform);
   }
@@ -169,6 +169,27 @@ function resolvePublicNotebookRoute(): { matched: boolean; token?: string } {
 }
 
 const publicRoute = resolvePublicNotebookRoute();
+
+/**
+ * dev 下等本地后端就绪再渲染：vite 常先于后端可用，首屏那批 /api 请求会全部撞上
+ * ECONNREFUSED（后端还在 tsx 编译/迁移/重启窗口）。探测走 vite 的
+ * `/__dev/backend-ready` 中间件（失败不经过代理，不会刷屏 proxy error），等待期由
+ * index.html 的启动闪屏承载；超时后照常渲染，不阻塞用户。
+ * 生产构建下 import.meta.env.DEV 为 false，直接返回。
+ */
+async function waitForDevBackendReady(timeoutMs = 30_000): Promise<void> {
+  if (!import.meta.env.DEV) return;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch("/__dev/backend-ready", { cache: "no-store" });
+      if (res.ok) return;
+    } catch {
+      // 后端尚未监听，继续等
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+}
 
 function renderApplication(): void {
   ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -199,7 +220,7 @@ function renderApplication(): void {
             <DeferredGlobalFeatureCentersMount />
             <SiyuanRichTextCalloutBridge />
             <InlineCommentBridge />
-            {/* 语音备忘录制面板：全局单例，监听 "nowen:voice-record" 事件弹出 */}
+            {/* 语音备忘录制面板：全局单例，监听 "baseforge:voice-record" 事件弹出 */}
             <VoiceRecorderSheet />
             <AppErrorBoundary>
               <React.Suspense fallback={<MainRouteFallback />}>
@@ -216,5 +237,6 @@ function renderApplication(): void {
 
 // 移动端本地优先运行时是增强能力：原生桥不可用（纯 Web/桌面）时必须照常渲染。
 Promise.resolve()
+  .then(() => waitForDevBackendReady())
   .then(() => initializeMobileLocalFirstRuntime())
   .then(renderApplication, () => renderApplication());

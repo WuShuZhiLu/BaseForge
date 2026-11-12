@@ -140,7 +140,7 @@ export function buildMarkdownSplitDirectory(options: {
 }): string {
   const chunks: string[] = [];
   if (options.preservePreamble && options.preamble.trim()) chunks.push(options.preamble.trim());
-  chunks.push(`<!-- nowen-note-split:${options.operationId} -->`);
+  chunks.push(`<!-- baseforge-split:${options.operationId} -->`);
   chunks.push(
     `> 已按 H${options.headingLevel} 拆分为 ${options.sections.length} 篇章节笔记。原始正文已保存在版本历史中，可在本次拆分未被继续编辑前撤销。`,
   );
@@ -180,7 +180,7 @@ export function buildMarkdownPartialSplitSource(options: {
 
   const chunks: string[] = [];
   if (options.preservePreamble && options.plan.preamble.trim()) chunks.push(options.plan.preamble.trim());
-  chunks.push(`<!-- nowen-note-split:${options.operationId} -->`);
+  chunks.push(`<!-- baseforge-split:${options.operationId} -->`);
   chunks.push(
     `> 已将 ${options.sections.length}/${options.plan.sections.length} 个 H${options.plan.headingLevel} 章节拆分为独立笔记；未选择的 ${retainedSections.length} 个章节继续保留在当前笔记中。原始正文已保存在版本历史中。`,
   );

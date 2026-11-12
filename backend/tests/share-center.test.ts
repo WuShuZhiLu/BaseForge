@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
 const U1 = "u-sc-owner";
 const U2 = "u-sc-stranger";
@@ -28,7 +28,7 @@ const ATT_B = "att-sc-b";
 const NOW = Date.parse("2026-11-01T00:00:00.000Z");
 const DAY_MS = 86_400_000;
 
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 let queryShareCenter: typeof import("../src/services/share-center").queryShareCenter;

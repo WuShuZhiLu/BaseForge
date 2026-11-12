@@ -155,7 +155,7 @@ function fallbackDocument(fallbackText: string): ImportedTiptapNode {
 }
 
 /**
- * Keep SiYuan rich-text imports inside Nowen's existing Tiptap schema while making
+ * Keep SiYuan rich-text imports inside BaseForge's existing Tiptap schema while making
  * every intentional downgrade visible. This runs after the core converter so it
  * cannot introduce unknown node types into the editor.
  */

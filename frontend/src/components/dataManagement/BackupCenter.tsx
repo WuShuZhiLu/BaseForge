@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Loader2, AlertCircle, AlertTriangle, HardDrive, RefreshCw, Save, ShieldAlert, Lock, Eye, EyeOff, X, Mail, Send, Settings as SettingsIcon, ChevronDown, ChevronRight, BookOpen, ExternalLink } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, withSudo, getServerUrl } from "@/lib/api";
+import { PROJECT_DOCS_BASE_URL } from "@/lib/projectLinks";
 import { isDesktop } from "@/lib/desktopBridge";
 import { isElectronFullLocalRuntime } from "@/lib/uploadRequest";
 import { confirm as confirmDialog } from "@/components/ui/confirm";
@@ -25,7 +26,9 @@ type BackupStatus = Awaited<ReturnType<typeof api.backup.status>>;
 type BackupRow = Awaited<ReturnType<typeof api.backup.list>>[number];
 type RestoreDryRun = NonNullable<Awaited<ReturnType<typeof api.backup.restore>>["dryRun"]>;
 
-export default function BackupCenter({ migration, advanced }: { migration: React.ReactNode; advanced: React.ReactNode }) {
+// migration 插槽可选：原先由设置页塞入一排「导入 / 导出」按钮，但那组按钮既与
+// 「数据管理」Tab 重复，回调又只改自身 state（点了无反应），已移除。
+export default function BackupCenter({ migration, advanced }: { migration?: React.ReactNode; advanced: React.ReactNode }) {
   const { t } = useTranslation();
   const locationLabel = t(isElectronFullLocalRuntime(getServerUrl(), isDesktop()) ? "dataManager.overview.local" : "dataManager.overview.server");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -120,8 +123,8 @@ export default function BackupCenter({ migration, advanced }: { migration: React
 
   useEffect(() => {
     const refresh = () => { void backupWebDavApi.config().then(setWebdav).catch(() => setWebdav(null)); };
-    window.addEventListener("nowen-backup-webdav-config-changed", refresh);
-    return () => window.removeEventListener("nowen-backup-webdav-config-changed", refresh);
+    window.addEventListener("baseforge-backup-webdav-config-changed", refresh);
+    return () => window.removeEventListener("baseforge-backup-webdav-config-changed", refresh);
   }, []);
 
   useEffect(() => {
@@ -705,7 +708,7 @@ export default function BackupCenter({ migration, advanced }: { migration: React
             )}
           </button>
         </div>
-        <div data-nowen-backup-webdav-host="true" />
+        <div data-baseforge-backup-webdav-host="true" />
         {isAdmin && <SmtpConfigSection askPassword={askPassword} sudoTokenRef={sudoTokenRef} />}
         {advanced}
       </AdvancedDataManagement>
@@ -1746,7 +1749,7 @@ function SmtpProviderGuide() {
         ? t("dataManager.smtp.guide.tlsOff")
         : t("dataManager.smtp.guide.tlsDepends");
 
-  const docUrl = "https://github.com/cropflre/nowen-note/blob/main/docs/backup-email-smtp.md";
+  const docUrl = `${PROJECT_DOCS_BASE_URL}/backup-email-smtp.md`;
 
   return (
     <div className="rounded-lg border border-sky-200/70 dark:border-sky-500/30 bg-sky-50/60 dark:bg-sky-500/5">
@@ -2147,7 +2150,7 @@ function SmtpConfigSection(props: {
                     type="text"
                     value={fromName}
                     onChange={(e) => setFromName(e.target.value)}
-                    placeholder="nowen-note"
+                    placeholder="baseforge"
                     className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-900 dark:text-zinc-100 outline-none focus:ring-2 focus:ring-sky-500/40 focus:border-sky-500"
                   />
                 </div>

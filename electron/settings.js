@@ -2,7 +2,7 @@
 //
 // 应用级设置持久化（mode / remoteUrl 等）。
 //
-// 文件位置：{userData}/nowen-data/settings.json
+// 文件位置：{userData}/baseforge-data/settings.json
 //   - 与 backend 的 SQLite 同目录，便于卸载时一并清理；
 //   - 卸载默认保留 userData，所以"模式选择"会跨重装保持。
 //

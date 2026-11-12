@@ -58,8 +58,8 @@ describe("DOCX import conversion", () => {
   it("replaces worker image placeholders with attachment URLs and removes Base64-free markers", () => {
     const html = [
       '<p>正文</p>',
-      '<img src="nowen-docx-image://docx-image-1" data-docx-image-id="docx-image-1">',
-      '<img src="nowen-docx-image://docx-image-2" data-docx-image-id="docx-image-2">',
+      '<img src="baseforge-docx-image://docx-image-1" data-docx-image-id="docx-image-1">',
+      '<img src="baseforge-docx-image://docx-image-2" data-docx-image-id="docx-image-2">',
     ].join("");
     const replaced = replaceDocxImagePlaceholders(html, new Map([
       ["docx-image-1", "/api/attachments/a1"],
@@ -67,13 +67,13 @@ describe("DOCX import conversion", () => {
     ]));
     expect(replaced).toContain('/api/attachments/a1');
     expect(replaced).toContain('/api/attachments/a2');
-    expect(replaced).not.toContain("nowen-docx-image://");
+    expect(replaced).not.toContain("baseforge-docx-image://");
     expect(replaced).not.toContain("data-docx-image-id");
   });
 
   it("fails instead of silently deleting an image whose upload result is missing", () => {
     expect(() => replaceDocxImagePlaceholders(
-      '<img src="nowen-docx-image://docx-image-1" data-docx-image-id="docx-image-1">',
+      '<img src="baseforge-docx-image://docx-image-1" data-docx-image-id="docx-image-1">',
       {},
     )).toThrow(/没有对应的附件地址/);
   });

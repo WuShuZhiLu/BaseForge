@@ -27,7 +27,7 @@ describe("notebook attachment export authentication", () => {
   });
 
   it("sends the current login token when downloading Markdown attachments", async () => {
-    localStorage.setItem("nowen-token", "export-token");
+    localStorage.setItem("baseforge-token", "export-token");
     getExportNotes.mockResolvedValue([{
       id: "note-1",
       title: "带图笔记",

@@ -72,7 +72,7 @@ export default function NoteSplitDialog({
     setBlockLinkRiskCount(0);
 
     // EditorPane already listens to this event and flushes the active editor immediately.
-    window.dispatchEvent(new CustomEvent("nowen:before-note-switch"));
+    window.dispatchEvent(new CustomEvent("baseforge:before-note-switch"));
     void wait(180)
       .then(() => api.getNote(note.id))
       .then((latest) => {

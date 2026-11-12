@@ -1,17 +1,17 @@
 {
   "plugins": [
     {
-      "id": "com.example.hello-nowen",
-      "name": "Hello Nowen",
+      "id": "com.example.hello-baseforge",
+      "name": "Hello BaseForge",
       "description": "Example registry entry",
       "latestVersion": "1.0.0",
       "trustLevel": "community",
       "versions": [
         {
           "version": "1.0.0",
-          "download": "https://example.com/hello-nowen-1.0.0.nowen-plugin",
+          "download": "https://example.com/hello-baseforge-1.0.0.baseforge-plugin",
           "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-          "nowen": ">=1.5.0 <2.0.0",
+          "baseforge": ">=1.5.0 <2.0.0",
           "apiVersion": 2,
           "runtime": "sandbox-js",
           "permissions": ["external:fetch"],

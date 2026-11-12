@@ -12,7 +12,7 @@ describe("rich-text mind map toolbar routing", () => {
 
     expect(toolbarStart).toBeGreaterThanOrEqual(0);
     expect(toolbarEnd).toBeGreaterThan(toolbarStart);
-    expect(toolbar).toContain('nowen:open-mindmap-insert');
+    expect(toolbar).toContain('baseforge:open-mindmap-insert');
     expect(toolbar).toContain('title={t(\'tiptap.insertMindMap\')}');
     expect(toolbar).not.toContain('onClick={insertMindMap}');
   });

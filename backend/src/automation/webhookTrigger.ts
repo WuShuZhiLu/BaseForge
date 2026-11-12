@@ -31,10 +31,10 @@ router.post("/:token", bodyLimit({
   if (requests >= 60) return c.json({ error: "Webhook 请求过于频繁", code: "RATE_LIMITED" }, 429);
   const raw = Buffer.from(await c.req.arrayBuffer());
   if (hook.secretEncrypted) {
-    const timestamp = c.req.header("X-Nowen-Timestamp") || "";
+    const timestamp = c.req.header("X-BaseForge-Timestamp") || "";
     const timestampMs = Number(timestamp) * 1000;
     if (!timestamp || !Number.isFinite(timestampMs) || Math.abs(now - timestampMs) > 5 * 60_000) return c.json({ error: "Webhook 时间戳无效或已过期", code: "WEBHOOK_REPLAY_REJECTED" }, 401);
-    const provided = c.req.header("X-Nowen-Signature") || "";
+    const provided = c.req.header("X-BaseForge-Signature") || "";
     const secret = decryptAutomationSecret(String(hook.secretEncrypted), String(hook.secretIv), String(hook.secretTag));
     const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.`).update(raw).digest("hex");
     if (!equalSignature(provided, expected)) return c.json({ error: "Webhook 签名无效", code: "WEBHOOK_SIGNATURE_INVALID" }, 401);

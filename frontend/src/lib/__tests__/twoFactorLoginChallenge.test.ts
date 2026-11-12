@@ -31,8 +31,8 @@ describe("twoFactorLoginChallenge", () => {
       expiresAt: 301_000,
     });
     expect(readTwoFactorLoginChallenge(2_000)).toMatchObject({ ticket: "ticket-123" });
-    expect(sessionStorage.getItem("nowen.twoFactorLoginChallenge")).not.toContain("password");
-    expect(sessionStorage.getItem("nowen.twoFactorLoginChallenge")).not.toContain("code");
+    expect(sessionStorage.getItem("baseforge.twoFactorLoginChallenge")).not.toContain("password");
+    expect(sessionStorage.getItem("baseforge.twoFactorLoginChallenge")).not.toContain("code");
   });
 
   it("never persists a challenge longer than five minutes", () => {
@@ -57,13 +57,13 @@ describe("twoFactorLoginChallenge", () => {
 
     expect(hasActiveTwoFactorLoginChallenge(39_999)).toBe(true);
     expect(readTwoFactorLoginChallenge(40_001)).toBeNull();
-    expect(sessionStorage.getItem("nowen.twoFactorLoginChallenge")).toBeNull();
+    expect(sessionStorage.getItem("baseforge.twoFactorLoginChallenge")).toBeNull();
   });
 
   it("derives the verification endpoint for same-origin and remote deployments", () => {
     expect(deriveTwoFactorVerifyUrl("/api/auth/login")).toBe("/api/auth/2fa/verify");
-    expect(deriveTwoFactorVerifyUrl("https://notes.example.com/nowen/api/auth/login"))
-      .toBe("https://notes.example.com/nowen/api/auth/2fa/verify");
+    expect(deriveTwoFactorVerifyUrl("https://notes.example.com/baseforge/api/auth/login"))
+      .toBe("https://notes.example.com/baseforge/api/auth/2fa/verify");
   });
 
   it("classifies only the two authentication endpoints", () => {

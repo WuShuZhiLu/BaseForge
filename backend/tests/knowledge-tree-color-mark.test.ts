@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-tree-color-mark-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-tree-color-mark-"));
 process.env.DB_PATH = path.join(tempDir, "knowledge-tree-color.db");
 
 const owner = "tree-color-owner";

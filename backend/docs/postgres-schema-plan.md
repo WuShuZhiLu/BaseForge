@@ -59,7 +59,6 @@
 | mindmap_folders | TEXT (UUID) | 思维导图文件夹 |
 | folder_sync_files | TEXT (UUID) | 文件夹同步 |
 | calendar_export_targets | TEXT (UUID) | 日历导出 |
-| diary_attachments | TEXT (UUID) | 日记附件 |
 | note_links | TEXT (UUID) | 笔记链接 |
 | note_versions | TEXT (UUID) | 笔记版本 |
 | note_yupdates | TEXT (UUID) | Y.js 更新 |

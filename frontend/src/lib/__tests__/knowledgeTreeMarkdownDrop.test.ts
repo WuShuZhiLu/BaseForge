@@ -112,7 +112,7 @@ describe("knowledgeTreeMarkdownDrop", () => {
 
   it("resolves a drop row only inside an embedded knowledge tree", () => {
     const tree = document.createElement("section");
-    tree.dataset.nowenKnowledgeTree = "embedded";
+    tree.dataset.baseforgeKnowledgeTree = "embedded";
     const row = document.createElement("div");
     row.dataset.knowledgeTreeNodeId = "folder-1";
     const label = document.createElement("span");

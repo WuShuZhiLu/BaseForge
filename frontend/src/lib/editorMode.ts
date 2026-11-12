@@ -18,8 +18,8 @@
 
 export type EditorMode = "md" | "tiptap";
 
-export const EDITOR_MODE_KEY = "nowen.editor_mode";
-export const EDITOR_MODE_CHANGE_EVENT = "nowen:editor-mode-change";
+export const EDITOR_MODE_KEY = "baseforge.editor_mode";
+export const EDITOR_MODE_CHANGE_EVENT = "baseforge:editor-mode-change";
 
 /** URL 查询参数 key；`?md=1` 强制启用 MD，`?md=0` 强制启用 Tiptap */
 const URL_FORCE_KEY = "md";

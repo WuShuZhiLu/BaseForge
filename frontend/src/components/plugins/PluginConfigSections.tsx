@@ -22,7 +22,7 @@ import { WechatCaptureSettings } from "@/components/settings/plugins/WechatCaptu
 import { PluginInboundSettings } from "@/components/settings/plugins/PluginInboundSettings";
 
 /** 微信采集插件有自己的整块设置 UI，不再叠加 Actions / 连接 / 插件设置。 */
-const WECHAT_PLUGIN_ID = "nowenlab.wechat-capture";
+const WECHAT_PLUGIN_ID = "baseforgelab.wechat-capture";
 
 const FIELD = "w-full rounded-md border border-app-border bg-transparent px-2 py-1.5 text-xs text-tx-primary";
 const BUTTON = "rounded-md border border-app-border bg-app-surface px-2.5 py-1.5 text-xs text-tx-primary transition-colors hover:bg-app-hover disabled:opacity-50";

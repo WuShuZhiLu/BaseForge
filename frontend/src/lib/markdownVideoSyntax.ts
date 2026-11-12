@@ -25,7 +25,7 @@ function escapeMarkdownAlt(text: string): string {
 function filenameFromUrl(url: string): string {
   try {
     const parsed = url.startsWith("/")
-      ? new URL(url, "http://nowen.local")
+      ? new URL(url, "http://baseforge.local")
       : new URL(url);
     const last = parsed.pathname.split("/").filter(Boolean).pop();
     return last ? decodeURIComponent(last) : "video";
@@ -85,7 +85,7 @@ export function preprocessMarkdownVideos(markdown: string): string {
       if (!token) return line;
 
       const title = token.title || filenameFromUrl(token.src);
-      return `![nowen-video:${escapeMarkdownAlt(title)}](${token.src})`;
+      return `![baseforge-video:${escapeMarkdownAlt(title)}](${token.src})`;
     })
     .join("\n");
 }

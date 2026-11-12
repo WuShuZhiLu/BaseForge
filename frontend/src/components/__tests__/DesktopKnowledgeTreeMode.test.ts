@@ -13,17 +13,20 @@ const zhSource = readFileSync(path.resolve(__dirname, "../../i18n/locales/zh-CN.
 describe("desktop knowledge tree browsing mode", () => {
   it("defaults desktop to the recursive tree and persists independently from mobile", () => {
     expect(modeSource).toContain('export type DesktopKnowledgeTreeViewMode = "quick" | "tree"');
-    expect(modeSource).toContain('DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "nowen.desktopKnowledgeTree.viewMode.v1"');
+    expect(modeSource).toContain('DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_STORAGE_KEY = "baseforge.desktopKnowledgeTree.viewMode.v1"');
     expect(modeSource).toContain('return value && DESKTOP_VALID_MODES.has(value) ? value : "tree"');
     expect(modeSource).toContain("DESKTOP_KNOWLEDGE_TREE_VIEW_MODE_CHANGED_EVENT");
   });
 
-  it("places the desktop quick-browse switch in Settings", () => {
-    expect(settingsSource).toContain('checked={desktopKnowledgeTreeMode === "quick"}');
-    expect(settingsSource).toContain('saveDesktopKnowledgeTreeViewMode(nextMode)');
-    expect(settingsSource).toContain('t("settings.desktopKnowledgeTreeMode")');
-    expect(settingsSource).toContain('data-settings-switch="desktop-knowledge-tree"');
-    expect(zhSource).toContain('"desktopKnowledgeTreeMode": "桌面端使用快捷浏览"');
+  it("no longer exposes a desktop quick-browse switch in Settings", () => {
+    // 该项唯一消费点是 SidebarMobile 的 variant="desktop" 分支，而该组件目前只以
+    // variant="mobile" 挂在移动抽屉里，桌面端点开关没有任何效果。设置里已移除，
+    // 只剩底层偏好读写函数给 SidebarMobile 使用。
+    expect(settingsSource).not.toContain('data-settings-switch="desktop-knowledge-tree"');
+    expect(settingsSource).not.toContain("saveDesktopKnowledgeTreeViewMode");
+    expect(settingsSource).not.toContain("loadDesktopKnowledgeTreeViewMode");
+    expect(settingsSource).not.toContain("desktopKnowledgeTreeMode");
+    expect(zhSource).not.toContain('"desktopKnowledgeTreeMode"');
   });
 
   it("switches only the desktop sidebar surface", () => {
@@ -32,7 +35,7 @@ describe("desktop knowledge tree browsing mode", () => {
     expect(sidebarSource).toContain("<TreePanelContent");
     expect(sidebarSource).toContain('mode={desktopKnowledgeTreeMode === "quick" ? "quick" : "full"}');
     expect(quickPanelSource).toContain('variant = "mobile"');
-    expect(quickPanelSource).toContain('data-nowen-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}');
+    expect(quickPanelSource).toContain('data-baseforge-desktop-knowledge-tree={variant === "desktop" ? "quick-navigation" : undefined}');
   });
 
   it("keeps user expansion state authoritative across refreshes and remounts", () => {

@@ -998,7 +998,6 @@ export class SyncEngine {
       removeComposite("note_tags","note_tag","note_tags.noteId || ':' || note_tags.tagId","note_tags.noteId IN (SELECT id FROM notes WHERE workspaceId=?)");
       removeComposite("task_reminders","task_reminder","task_reminders.id","task_reminders.taskId IN (SELECT id FROM tasks WHERE workspaceId=?)");
       removeMissing("tasks","task");
-      removeMissing("diaries","diary");
       removeMissing("mindmaps","mindmap");
       removeMissing("notes","note");
       removeMissing("notebooks","notebook","AND NOT EXISTS (SELECT 1 FROM notes n WHERE n.notebookId=notebooks.id)");

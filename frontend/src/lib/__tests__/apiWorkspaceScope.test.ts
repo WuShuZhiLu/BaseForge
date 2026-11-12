@@ -3,17 +3,17 @@ import { api } from "@/lib/api";
 
 describe("API 工作区参数", () => {
   beforeEach(() => {
-    Object.assign(window, { nowenDesktop: { isDesktop: true } });
+    Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(window, "nowenDesktop");
+    Reflect.deleteProperty(window, "baseforgeDesktop");
     vi.restoreAllMocks();
     localStorage.clear();
   });
 
   it("个人空间不传 workspaceId，兼容旧服务端", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL) => new Response("[]", {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -32,8 +32,8 @@ describe("API 工作区参数", () => {
   });
 
   it("协作工作区继续传 workspaceId", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
-    localStorage.setItem("nowen-current-workspace", "workspace-1");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-current-workspace", "workspace-1");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL) => new Response("[]", {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -47,8 +47,8 @@ describe("API 工作区参数", () => {
   });
 
   it("脑图选择与创建以笔记空间为准，而非当前导航空间", async () => {
-    localStorage.setItem("nowen-server-url", "https://note.example.com");
-    localStorage.setItem("nowen-current-workspace", "workspace-navigation");
+    localStorage.setItem("baseforge-server-url", "https://note.example.com");
+    localStorage.setItem("baseforge-current-workspace", "workspace-navigation");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => new Response(
       init?.method === "POST" ? "{}" : "[]",
       { status: 200, headers: { "Content-Type": "application/json" } },

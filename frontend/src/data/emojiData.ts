@@ -12,7 +12,7 @@ export interface EmojiSearchResult {
   categoryId: string;
 }
 
-export const EMOJI_RECENT_STORAGE_KEY = "nowen.emojiPicker.recent";
+export const EMOJI_RECENT_STORAGE_KEY = "baseforge.emojiPicker.recent";
 export const EMOJI_RECENT_LIMIT = 24;
 
 function unique(values: Iterable<string>): string[] {

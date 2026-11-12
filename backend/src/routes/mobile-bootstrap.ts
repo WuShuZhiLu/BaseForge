@@ -275,7 +275,7 @@ app.get("/", (c) => {
   ).all(userId) as Array<{ noteId: string }>).map((row) => row.noteId);
 
   c.header("Cache-Control", "private, no-store");
-  c.header("X-Nowen-Mobile-Bootstrap", "1");
+  c.header("X-BaseForge-Mobile-Bootstrap", "1");
   return c.json({
     schemaVersion: 1,
     workspaceId: workspaceId || "personal",

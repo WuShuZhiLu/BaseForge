@@ -66,7 +66,7 @@ let nextVideoId = 1;
 function videoId(video: HTMLVideoElement): string {
   let id = videoIds.get(video);
   if (!id) {
-    id = `nowen-video-${nextVideoId++}`;
+    id = `baseforge-video-${nextVideoId++}`;
     videoIds.set(video, id);
   }
   return id;
@@ -148,7 +148,7 @@ function triggerVideoDownload(video: HTMLVideoElement, wrapper: HTMLElement): vo
 function findOriginalVideoButton(wrapper: HTMLElement, pattern: RegExp): HTMLButtonElement | null {
   const buttons = Array.from(wrapper.querySelectorAll<HTMLButtonElement>("button"));
   return buttons.find((button) => {
-    if (button.closest("[data-nowen-video-portal]")) return false;
+    if (button.closest("[data-baseforge-video-portal]")) return false;
     const label = `${button.title || ""} ${button.getAttribute("aria-label") || ""} ${button.textContent || ""}`;
     return pattern.test(label);
   }) || null;
@@ -190,8 +190,8 @@ async function deleteVideoNode(wrapper: HTMLElement): Promise<boolean> {
 }
 
 function capturePoster(video: HTMLVideoElement): void {
-  if (video.dataset.nowenPosterAttempted === "1" || video.readyState < 2) return;
-  video.dataset.nowenPosterAttempted = "1";
+  if (video.dataset.baseforgePosterAttempted === "1" || video.readyState < 2) return;
+  video.dataset.baseforgePosterAttempted = "1";
   try {
     const sourceWidth = video.videoWidth;
     const sourceHeight = video.videoHeight;
@@ -237,7 +237,7 @@ function VideoOverlay({
 
   return createPortal(
     <div
-      data-nowen-video-portal="overlay"
+      data-baseforge-video-portal="overlay"
       className="pointer-events-none absolute inset-0 z-[3] rounded-xl"
     >
       {failed ? (
@@ -249,7 +249,7 @@ function VideoOverlay({
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              video.dataset.nowenPosterAttempted = "0";
+              video.dataset.baseforgePosterAttempted = "0";
               video.load();
               onStateChange();
             }}
@@ -503,7 +503,7 @@ export default function MediaExperienceBridge() {
       const button = target.closest<HTMLButtonElement>("button");
       if (
         !button
-        || button.closest("[data-nowen-media-sheet], [data-nowen-media-owner]")
+        || button.closest("[data-baseforge-media-sheet], [data-baseforge-media-owner]")
         || shouldShieldMediaButton(button)
       ) return;
       const imageIcon = button.querySelector("svg.lucide-image-plus");
@@ -583,9 +583,9 @@ export default function MediaExperienceBridge() {
 
         for (const child of Array.from(wrapper.children)) {
           if (!(child instanceof HTMLElement)) continue;
-          if (child.dataset.nowenVideoPortal) continue;
+          if (child.dataset.baseforgeVideoPortal) continue;
           if (child.getAttribute("contenteditable") === "false" && child.querySelector("button")) {
-            child.dataset.nowenOriginalVideoToolbar = "1";
+            child.dataset.baseforgeOriginalVideoToolbar = "1";
             child.style.display = isMobile ? "none" : "";
           }
         }
@@ -682,7 +682,7 @@ export default function MediaExperienceBridge() {
 
       {pickerOpen && (
         <div
-          data-nowen-media-sheet="picker"
+          data-baseforge-media-sheet="picker"
           className="fixed inset-0 z-[190] flex items-end justify-center bg-black/45 backdrop-blur-[2px] sm:items-center sm:px-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && queuePhase !== "uploading") closePicker();
@@ -805,7 +805,7 @@ export default function MediaExperienceBridge() {
       )}
 
       {activeVideo && isMobile && activeVideo.wrapper.isConnected && (
-        <div data-nowen-media-sheet="video-actions" className="fixed inset-0 z-[195] flex items-end bg-black/35" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveVideo(null); }}>
+        <div data-baseforge-media-sheet="video-actions" className="fixed inset-0 z-[195] flex items-end bg-black/35" onMouseDown={(event) => { if (event.target === event.currentTarget) setActiveVideo(null); }}>
           <section className="w-full rounded-t-3xl border border-app-border bg-app-elevated px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_30px_rgba(15,23,42,0.18)]">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-app-border" />
             <div className="mb-3 flex items-center justify-between">

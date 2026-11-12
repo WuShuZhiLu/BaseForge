@@ -22,12 +22,12 @@
  * `data-electron` covers narrow desktop windows and touch-enabled laptops;
  * the pointer media query also fixes the same interaction in desktop Web.
  */
-html[data-electron] [data-nowen-video-portal="overlay"] {
+html[data-electron] [data-baseforge-video-portal="overlay"] {
   display: none !important;
 }
 
 @media (hover: hover) and (pointer: fine) {
-  [data-nowen-video-portal="overlay"] {
+  [data-baseforge-video-portal="overlay"] {
     display: none !important;
   }
 }

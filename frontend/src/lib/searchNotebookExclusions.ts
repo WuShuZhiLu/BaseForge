@@ -3,7 +3,7 @@ import type { Notebook, SearchResult } from "@/types";
 import { fetchWithAuthRefresh, getAccessToken } from "@/lib/authSession";
 import { getBaseUrl, getCurrentWorkspace } from "@/lib/api.impl";
 
-export const SEARCH_NOTEBOOK_EXCLUSIONS_CHANGED_EVENT = "nowen:search-notebook-exclusions-changed";
+export const SEARCH_NOTEBOOK_EXCLUSIONS_CHANGED_EVENT = "baseforge:search-notebook-exclusions-changed";
 
 export type SearchNotebookExclusion = {
   userId: string;

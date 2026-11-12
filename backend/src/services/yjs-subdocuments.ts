@@ -30,7 +30,7 @@ export class SubdocumentGenerationConflictError extends Error {
 }
 
 export function isYjsSubdocumentsEnabled(): boolean {
-  return process.env.NOWEN_YJS_SUBDOCUMENTS === "1";
+  return process.env.BASEFORGE_YJS_SUBDOCUMENTS === "1";
 }
 
 export function rebuildYjsSubdocumentsIfEnabled(
@@ -86,7 +86,7 @@ export function splitYjsSubdocumentSections(noteId: string, content: string, max
     used.add(id);
     return {
       id,
-      guid: `nowen-subdoc-${stablePart(noteId)}-${id}`,
+      guid: `baseforge-subdoc-${stablePart(noteId)}-${id}`,
       startBlock: range.start,
       endBlock: range.end,
       content: JSON.stringify({ type: "doc", content: nodes }),
@@ -163,7 +163,7 @@ function buildRootSnapshot(noteId: string, sections: YjsSubdocumentSection[]): {
   rootGuid: string;
   rootSnapshot: Buffer;
 } {
-  const rootGuid = `nowen-root-${stablePart(noteId)}`;
+  const rootGuid = `baseforge-root-${stablePart(noteId)}`;
   const root = new Y.Doc({ guid: rootGuid });
   root.getArray<string>("sectionOrder").insert(0, sections.map((section) => section.id));
   const meta = root.getMap<string>("sectionGuids");

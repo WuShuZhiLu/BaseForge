@@ -12,7 +12,7 @@ import {
 } from "@/lib/uiExtensionLayout";
 
 const contributions = [{
-  pluginId: "nowenlab.floating-dock",
+  pluginId: "baseforgelab.floating-dock",
   uiComponents: [
     { id: "tasks", kind: "action" as const, label: "Tasks", icon: "tasks" as const, allowedSlots: ["floating-layer" as const], defaultPlacement: { slot: "floating-layer" as const, order: 20 }, action: { type: "navigation.open" as const, target: "tasks" as const } },
     { id: "all", kind: "action" as const, label: "All", icon: "home" as const, allowedSlots: ["floating-layer" as const], defaultPlacement: { slot: "floating-layer" as const, order: 10 }, action: { type: "navigation.open" as const, target: "all" as const } },
@@ -29,8 +29,8 @@ describe("Plugin UI Registry and layout resolver", () => {
     replacePluginUiComponents(contributions);
     const resolved = resolveFloatingLayer(listPluginUiComponents("web"), DEFAULT_UI_EXTENSION_LAYOUT);
     expect(resolved.map((item) => item.runtimeId)).toEqual([
-      "nowenlab.floating-dock/all",
-      "nowenlab.floating-dock/tasks",
+      "baseforgelab.floating-dock/all",
+      "baseforgelab.floating-dock/tasks",
     ]);
   });
 
@@ -39,8 +39,8 @@ describe("Plugin UI Registry and layout resolver", () => {
     const resolved = resolveFloatingLayer(listPluginUiComponents("web"), {
       version: 1,
       position: "right-center",
-      order: ["nowenlab.floating-dock/tasks"],
-      hidden: ["nowenlab.floating-dock/all"],
+      order: ["baseforgelab.floating-dock/tasks"],
+      hidden: ["baseforgelab.floating-dock/all"],
     });
     expect(resolved.map((item) => item.id)).toEqual(["tasks"]);
   });

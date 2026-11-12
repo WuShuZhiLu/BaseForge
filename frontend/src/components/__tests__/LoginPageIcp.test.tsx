@@ -16,7 +16,7 @@ vi.mock("react-i18next", () => ({
 vi.mock("@/hooks/useSiteSettings", () => ({
   useSiteSettings: () => ({
     siteConfig: {
-      title: "nowen-note",
+      title: "baseforge",
       favicon: "",
       icpBeian: mockIcpBeian,
       editorFontFamily: "",
@@ -61,7 +61,7 @@ describe("LoginPage ICP 备案号", () => {
 
   beforeEach(() => {
     mockIcpBeian = "";
-    delete (window as any).nowenDesktop;
+    delete (window as any).baseforgeDesktop;
     delete (window as any).Capacitor;
     localStorage.clear();
   });
@@ -111,7 +111,7 @@ describe("LoginPage ICP 备案号", () => {
 
   it("Electron 桌面端登录页仍展示备案号", async () => {
     mockIcpBeian = "粤ICP备12345678号-1";
-    (window as any).nowenDesktop = { isDesktop: true };
+    (window as any).baseforgeDesktop = { isDesktop: true };
 
     const rendered = await renderLoginPage();
     root = rendered.root;

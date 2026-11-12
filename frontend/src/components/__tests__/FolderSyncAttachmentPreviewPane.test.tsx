@@ -52,10 +52,10 @@ describe("FolderSyncAttachmentPreviewPane", () => {
   });
 
   it("只把带来源标记的同步笔记识别为附件预览笔记", () => {
-    expect(isFolderSyncAttachmentNote("正文\n<!-- nowen-folder-sync: sourcePathHash=abc relativePath=%E6%89%AB%E6%8F%8F%E4%BB%B6.pdf -->")).toBe(true);
-    expect(isFolderSyncAttachmentNote("正文\n<!-- nowen-folder-sync: sourcePathHash=abc relativePath=docs%2Freport.docx -->")).toBe(true);
-    expect(isFolderSyncAttachmentNote("正文\n<!-- nowen-folder-sync: sourcePathHash=abc relativePath=docs%2Freadme.md -->")).toBe(false);
-    expect(isFolderSyncAttachmentNote("<!-- nowen-folder-sync-extracted:start -->正文")).toBe(false);
+    expect(isFolderSyncAttachmentNote("正文\n<!-- baseforge-folder-sync: sourcePathHash=abc relativePath=%E6%89%AB%E6%8F%8F%E4%BB%B6.pdf -->")).toBe(true);
+    expect(isFolderSyncAttachmentNote("正文\n<!-- baseforge-folder-sync: sourcePathHash=abc relativePath=docs%2Freport.docx -->")).toBe(true);
+    expect(isFolderSyncAttachmentNote("正文\n<!-- baseforge-folder-sync: sourcePathHash=abc relativePath=docs%2Freadme.md -->")).toBe(false);
+    expect(isFolderSyncAttachmentNote("<!-- baseforge-folder-sync-extracted:start -->正文")).toBe(false);
     expect(isFolderSyncAttachmentNote("普通 Markdown 笔记")).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe("FolderSyncAttachmentPreviewPane", () => {
         <FolderSyncAttachmentPreviewPane
           noteId="note-1"
           revision={3}
-          content={"# 扫描件\n\n- 文件名：扫描件.pdf\n\n<!-- nowen-folder-sync: relativePath=%E6%89%AB%E6%8F%8F%E4%BB%B6.pdf -->"}
+          content={"# 扫描件\n\n- 文件名：扫描件.pdf\n\n<!-- baseforge-folder-sync: relativePath=%E6%89%AB%E6%8F%8F%E4%BB%B6.pdf -->"}
           onOpenAttachmentDirectory={() => {}}
         />,
       );
@@ -101,7 +101,7 @@ describe("FolderSyncAttachmentPreviewPane", () => {
         <FolderSyncAttachmentPreviewPane
           noteId="note-2"
           revision={1}
-          content={"# 缺失\n\n- 文件名：缺失.pdf\n\n<!-- nowen-folder-sync: relativePath=%E7%BC%BA%E5%A4%B1.pdf -->"}
+          content={"# 缺失\n\n- 文件名：缺失.pdf\n\n<!-- baseforge-folder-sync: relativePath=%E7%BC%BA%E5%A4%B1.pdf -->"}
           onOpenAttachmentDirectory={onOpenAttachmentDirectory}
         />,
       );

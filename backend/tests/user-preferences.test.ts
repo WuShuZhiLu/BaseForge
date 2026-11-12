@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-user-prefs-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-user-prefs-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 
 const USER_ID = "user-prefs";
@@ -308,7 +308,7 @@ test("tests a saved LM Studio profile while the manual AI runtime is disabled", 
   }
 });
 
-test("returns actionable LAN diagnostics when the Nowen server cannot reach LM Studio", async () => {
+test("returns actionable LAN diagnostics when the BaseForge server cannot reach LM Studio", async () => {
   const created = await requestJson("POST", "/user-preferences/ai-profiles", {
     name: "Offline LM Studio",
     provider: "lmstudio",

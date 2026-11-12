@@ -135,7 +135,7 @@ async function handleParse(request: ParseRequest): Promise<void> {
     const buffer = base64ToArrayBuffer(base64);
     images.push({ id, contentType: image.contentType || "application/octet-stream", buffer });
     return {
-      src: `nowen-docx-image://${id}`,
+      src: `baseforge-docx-image://${id}`,
       "data-docx-image-id": id,
     };
   });

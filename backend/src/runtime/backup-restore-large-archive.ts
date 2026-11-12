@@ -20,10 +20,11 @@ import {
   type AttachmentRestoreAudit,
 } from "../services/backup-restore-integrity.js";
 import { probeAttachmentStorage } from "../services/attachment-storage.js";
+import { mergeRootDocumentsIntoNotebook } from "../services/knowledgeTreeRootDocumentNormalization.js";
 
 const unzipper = require("unzipper");
 
-const PATCH_FLAG = Symbol.for("nowen.backupLargeArchiveRestore.patched");
+const PATCH_FLAG = Symbol.for("baseforge.backupLargeArchiveRestore.patched");
 // backup.ts 当前格式版本。运行时补丁只接管 v2+ ZIP，不改变旧 JSON/db-only 语义。
 const BACKUP_FORMAT_VERSION = 2;
 const MAX_META_BYTES = 2 * 1024 * 1024;
@@ -252,15 +253,15 @@ function verifyCurrentDbUsable(curDbPath: string): void {
   // Use a SAVEPOINT-backed write probe so permissions/read-only mounts fail before restore
   // is committed, while the probe leaves no persistent row behind.
   try {
-    current.exec("SAVEPOINT nowen_restore_write_probe");
+    current.exec("SAVEPOINT baseforge_restore_write_probe");
     current.prepare(
       `INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)`,
     ).run("backup:restore-write-probe", String(Date.now()));
-    current.exec("ROLLBACK TO nowen_restore_write_probe");
-    current.exec("RELEASE nowen_restore_write_probe");
+    current.exec("ROLLBACK TO baseforge_restore_write_probe");
+    current.exec("RELEASE baseforge_restore_write_probe");
   } catch (error) {
-    try { current.exec("ROLLBACK TO nowen_restore_write_probe"); } catch { /* ignore */ }
-    try { current.exec("RELEASE nowen_restore_write_probe"); } catch { /* ignore */ }
+    try { current.exec("ROLLBACK TO baseforge_restore_write_probe"); } catch { /* ignore */ }
+    try { current.exec("RELEASE baseforge_restore_write_probe"); } catch { /* ignore */ }
     throw new Error(
       "恢复后数据库写入检查失败: " + (error instanceof Error ? error.message : String(error)),
     );
@@ -345,7 +346,7 @@ async function buildDryRun(
 ): Promise<RestoreResult> {
   const tmpDb = path.join(
     manager.backupDir,
-    `.nowen-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
+    `.baseforge-dryrun-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.db`,
   );
 
   try {
@@ -410,8 +411,8 @@ async function restoreZipStreaming(
   }
 
   const restoreId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
-  const tmpDb = path.join(manager.backupDir, `.nowen-restore-${restoreId}.db`);
-  const stagingRoot = path.join(manager.dataDir, `.nowen-restore-staging-${restoreId}`);
+  const tmpDb = path.join(manager.backupDir, `.baseforge-restore-${restoreId}.db`);
+  const stagingRoot = path.join(manager.dataDir, `.baseforge-restore-staging-${restoreId}`);
   const stagedAttachments = path.join(stagingRoot, "attachments");
   const stagedFonts = path.join(stagingRoot, "fonts");
   const hasInstalledLayout = directory.files.some((entry) => normalizeZipPath(entry.path).startsWith("plugins/installed/"));
@@ -456,6 +457,19 @@ async function restoreZipStreaming(
     try {
       replaceDbFile(tmpDb, curDbPath);
       verifyCurrentDbUsable(curDbPath);
+      // 完整备份是整库替换，不经过数据包导入的根文档兜底；在这里补一次归并。
+      // 尽力而为：失败只告警，不影响恢复结果。
+      try {
+        const merged = mergeRootDocumentsIntoNotebook({ db: getDb() });
+        if (merged.moved > 0) {
+          console.log(`[Backup] 恢复后根路径文档归并: ${merged.moved} 篇 → 「${merged.notebookName}」`);
+        }
+      } catch (mergeError) {
+        console.warn(
+          "[Backup] 恢复后根路径文档归并失败，已跳过（不影响数据完整性）:",
+          mergeError instanceof Error ? mergeError.message : mergeError,
+        );
+      }
       await replaceDirectoriesFromStagingSafe([
         { stagedDir: stagedAttachments, destDir: path.join(manager.dataDir, "attachments") },
         { stagedDir: stagedFonts, destDir: path.join(manager.dataDir, "fonts") },

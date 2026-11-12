@@ -25,7 +25,7 @@ function createDefaultWorker(): WorkerLike | null {
   // a classic IIFE for production (worker.format = "iife"). Using a bare
   // new Worker(new URL(...)) without type: module runs dev imports as a classic
   // script and fails with "Cannot use import statement outside a module".
-  return new TiptapAnalysisWorker({ name: "nowen-tiptap-analysis" });
+  return new TiptapAnalysisWorker({ name: "baseforge-tiptap-analysis" });
 }
 
 /** Latest-request-wins worker controller; destruction invalidates every pending result. */

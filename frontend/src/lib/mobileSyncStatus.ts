@@ -1,5 +1,5 @@
-export const MOBILE_SYNC_STATUS_CHANGED_EVENT = "nowen:mobile-sync-status-changed";
-export const MOBILE_SYNC_SETTINGS_CHANGED_EVENT = "nowen:mobile-sync-settings-changed";
+export const MOBILE_SYNC_STATUS_CHANGED_EVENT = "baseforge:mobile-sync-status-changed";
+export const MOBILE_SYNC_SETTINGS_CHANGED_EVENT = "baseforge:mobile-sync-settings-changed";
 let syncEnabled = false;
 
 export function isMobileSyncEnabled(): boolean { return syncEnabled; }

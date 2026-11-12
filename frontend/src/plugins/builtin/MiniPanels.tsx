@@ -95,7 +95,7 @@ export function PmMiniPanel() {
             <button
               key={p.id}
               type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent("nowen:pm-focus-project", { detail: { projectId: p.id } }))}
+              onClick={() => window.dispatchEvent(new CustomEvent("baseforge:pm-focus-project", { detail: { projectId: p.id } }))}
               className="sbx-row w-full text-left flex items-center gap-2"
             >
               <ListTodo size={11} className="shrink-0 text-accent-primary" />
@@ -113,8 +113,8 @@ export function PmMiniPanel() {
  * 待办迷你面板（统一规格）：侧栏待办导航层。
  *
  * 主区（TaskWorkspaceImpl）左栏已移除，本面板是唯一导航层：
- * - 「视图」分区行点击 dispatch `nowen:task-filter-select`（key 与主区 FILTERS 一致）；
- * - 「清单」分区行点击 dispatch `nowen:task-focus-project`；
+ * - 「视图」分区行点击 dispatch `baseforge:task-filter-select`（key 与主区 FILTERS 一致）；
+ * - 「清单」分区行点击 dispatch `baseforge:task-focus-project`；
  * - 选中态为本地记录（主区暂无回传事件）。
  */
 const TASK_PANEL_VIEWS: { key: TaskFilter; labelKey: string; icon: React.ReactNode }[] = [
@@ -164,12 +164,12 @@ export function TasksMiniPanel() {
   const selectView = useCallback((key: TaskFilter) => {
     setSelectedView(key);
     setSelectedProjectId(null);
-    window.dispatchEvent(new CustomEvent("nowen:task-filter-select", { detail: { key } }));
+    window.dispatchEvent(new CustomEvent("baseforge:task-filter-select", { detail: { key } }));
   }, []);
 
   const selectProject = useCallback((projectId: string) => {
     setSelectedProjectId(projectId);
-    window.dispatchEvent(new CustomEvent("nowen:task-focus-project", { detail: { projectId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:task-focus-project", { detail: { projectId } }));
   }, []);
 
   // 行规格：12px / h32 / 无边框 / hover 变色 / 选中 #e8efff
@@ -245,172 +245,6 @@ export function TasksMiniPanel() {
             )}
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface JournalItem {
-  id: string;
-  title: string;
-  subtitle: string;
-  journalDate: string;
-}
-
-/** ============ 每日记录迷你面板（统一规格；视图/日期导航上移侧栏） ============ */
-
-const DIARY_VIEW_OPTIONS: Array<{ key: string; label: string }> = [
-  { key: "moments", label: "瞬间" },
-  { key: "calendar", label: "日历" },
-  { key: "journal", label: "日记" },
-];
-
-const DIARY_DATE_OPTIONS: Array<{ label: string; offset: number }> = [
-  { label: "昨天", offset: -1 },
-  { label: "今天", offset: 0 },
-  { label: "明天", offset: 1 },
-  { label: "后天", offset: 2 },
-];
-
-function localDateKey(offset: number): string {
-  const value = new Date();
-  value.setDate(value.getDate() + offset);
-  const month = `${value.getMonth() + 1}`.padStart(2, "0");
-  const day = `${value.getDate()}`.padStart(2, "0");
-  return `${value.getFullYear()}-${month}-${day}`;
-}
-
-export function DiaryMiniPanel() {
-  const [items, setItems] = useState<JournalItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState("journal");
-  const [activeDate, setActiveDate] = useState<string | null>(null);
-
-  const reload = useCallback(() => {
-    setLoading(true);
-    api.journals.list({ limit: 20, sort: "date_desc" })
-      .then((r) => setItems(r.items as JournalItem[]))
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => { reload(); }, [reload]);
-
-  // 主区（或本面板）切换模式时同步高亮
-  useEffect(() => {
-    const onChanged = (event: Event) => {
-      const detail = (event as CustomEvent<{ view?: string }>).detail;
-      if (detail?.view) setView(detail.view);
-    };
-    window.addEventListener("nowen:diary-view-changed", onChanged);
-    return () => window.removeEventListener("nowen:diary-view-changed", onChanged);
-  }, []);
-
-  const openDate = useCallback((date: string) => {
-    setActiveDate(date);
-    window.dispatchEvent(new CustomEvent("nowen:diary-open-date", { detail: { date } }));
-  }, []);
-
-  return (
-    <div>
-      <div className="border-b border-app-border px-2 py-1.5">
-        <PanelSectionHead label="视图" />
-        <div className="space-y-0.5">
-          {DIARY_VIEW_OPTIONS.map(({ key, label }) => (
-            <div
-              key={key}
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                setView(key);
-                window.dispatchEvent(new CustomEvent("nowen:diary-set-view", { detail: { view: key } }));
-              }}
-              className={cn(
-                "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
-                view === key
-                  ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
-                  : "text-tx-secondary hover:bg-app-hover",
-              )}
-            >
-              <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="border-b border-app-border px-2 py-1.5">
-        <PanelSectionHead
-          label="日期"
-          action={
-            <button
-              type="button"
-              title="复制当前时间"
-              aria-label="复制当前时间"
-              onClick={() => {
-                const value = new Date().toLocaleString("zh-CN", { hour12: false });
-                void navigator.clipboard?.writeText(value).catch(() => undefined);
-              }}
-              className="text-tx-tertiary hover:text-tx-primary"
-            >
-              <Clock3 size={12} />
-            </button>
-          }
-        />
-        <div className="space-y-0.5">
-          {DIARY_DATE_OPTIONS.map(({ label, offset }) => {
-            const date = localDateKey(offset);
-            return (
-              <div
-                key={label}
-                role="button"
-                tabIndex={0}
-                onClick={() => openDate(date)}
-                className={cn(
-                  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] transition-colors",
-                  activeDate === date
-                    ? "bg-[#e8efff] font-medium text-accent-primary dark:bg-accent-primary/15"
-                    : "text-tx-secondary hover:bg-app-hover",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate text-left">{label}</span>
-                <span className="shrink-0 text-[10.5px] tabular-nums text-tx-tertiary">{date.slice(5)}</span>
-              </div>
-            );
-          })}
-          <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-[12px] text-tx-secondary transition-colors hover:bg-app-hover">
-            <span className="min-w-0 flex-1 truncate text-left">选择日期…</span>
-            <CalendarDays size={13} className="shrink-0 text-tx-tertiary" />
-            <input
-              type="date"
-              className="sr-only"
-              onChange={(event) => event.target.value && openDate(event.target.value)}
-            />
-          </label>
-        </div>
-      </div>
-      <div className="px-2 py-1.5">
-        <PanelSectionHead label="记录" action={<SectionRefresh onClick={reload} />} />
-        {loading ? (
-          <EmptyHint text="加载中…" />
-        ) : items.length === 0 ? (
-          <EmptyHint text="暂无记录" />
-        ) : (
-          <div className="space-y-0.5">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 transition-colors",
-                  activeDate === item.journalDate ? "bg-app-hover" : "hover:bg-app-hover",                )}
-                onClick={() => openDate(item.journalDate)}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] text-tx-primary">{item.title || item.journalDate}</span>
-                </span>
-                <span className="shrink-0 text-[10.5px] text-tx-tertiary">{item.subtitle || item.journalDate}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

@@ -12,12 +12,12 @@ describe("issue 210 sign-off runtime", () => {
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
 
   afterEach(() => {
-    localStorage.removeItem("nowen.issue210.signoff");
+    localStorage.removeItem("baseforge.issue210.signoff");
     window.fetch = originalFetch;
     globalThis.PerformanceObserver = originalPerformanceObserver;
     globalThis.requestAnimationFrame = originalRequestAnimationFrame;
-    delete window.__NOWEN_ISSUE_210_SIGNOFF__;
-    delete window.__NOWEN_ISSUE_210_SIGNOFF_INSTALLED__;
+    delete window.__BASEFORGE_ISSUE_210_SIGNOFF__;
+    delete window.__BASEFORGE_ISSUE_210_SIGNOFF_INSTALLED__;
     document.body.innerHTML = "";
     vi.restoreAllMocks();
   });
@@ -43,7 +43,7 @@ describe("issue 210 sign-off runtime", () => {
   });
 
   it("records editor instance, selection and layout stability around a save", async () => {
-    localStorage.setItem("nowen.issue210.signoff", "1");
+    localStorage.setItem("baseforge.issue210.signoff", "1");
     globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
       callback(performance.now());
       return 1;

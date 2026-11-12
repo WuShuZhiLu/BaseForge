@@ -1,6 +1,6 @@
-export const SERVER_ENDPOINT_CHANGED_EVENT = "nowen:server-endpoint-changed";
-export const SERVER_ENDPOINT_PREFERENCES_CHANGED_EVENT = "nowen:server-endpoint-preferences-changed";
-const PREFERENCES_KEY = "nowen-server-endpoint-preferences-v1";
+export const SERVER_ENDPOINT_CHANGED_EVENT = "baseforge:server-endpoint-changed";
+export const SERVER_ENDPOINT_PREFERENCES_CHANGED_EVENT = "baseforge:server-endpoint-preferences-changed";
+const PREFERENCES_KEY = "baseforge-server-endpoint-preferences-v1";
 
 interface EndpointPreferences {
   automatic: boolean;

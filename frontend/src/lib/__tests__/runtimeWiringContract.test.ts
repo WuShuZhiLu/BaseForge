@@ -167,7 +167,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     const sidebar = read("../../components/SidebarMobile.tsx");
     expect(sidebar).not.toContain('data-sidebar-toolbar');
     const badges = read("../../components/sidebar/ActivityBarBadges.tsx");
-    for (const mode of ["tasks", "diary", "ai-chat", "shares"]) {
+    for (const mode of ["tasks", "shares"]) {
       expect(badges).toContain(`id: "${mode}"`);
     }
   });
@@ -248,7 +248,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     const shared = read("../../components/sidebar/panels/shared.tsx");
     expect(shared).toContain("export function usePanelRefresh");
     expect(shared).toContain("export function PanelRow");
-    expect(shared).toContain("nowen:sidebar-panel-refresh");
+    expect(shared).toContain("baseforge:sidebar-panel-refresh");
     // 打开笔记统一走 useTabNoteOpener（加载协调器链路）；裸 api.getNote + setActiveNote 已废除
     expect(read("../../hooks/useTabNoteOpener.ts")).toContain("useNoteLoader");
     expect(read("../../components/sidebar/panels/OpenEditorsPanel.tsx")).not.toContain("api.getNote");
@@ -260,7 +260,7 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(store).toContain("export function updateSidebarBadges");
     expect(store).toContain("export function subscribeSidebarLayout");
     expect(store).toContain("SIDEBAR_LAYOUT_EVENT");
-    expect(store).toContain("nowen.sidebar.layout.v1");
+    expect(store).toContain("baseforge.sidebar.layout.v1");
     // 文档树固定：不可隐藏
     expect(store).toContain('next.panels.tree.visible = true');
 
@@ -307,9 +307,9 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(app).toContain("state.activeToolTab ? (");
     expect(app).toContain("<ToolPageHost tool={state.activeToolTab} />");
 
-    // 既有编辑器抬头：风格与页签/工具统一（py-1.5、hover pill、圆角图标组）
+    // 既有编辑器抬头：与知识库页签/工具统一 48px 基线（h-12、hover pill、圆角图标组）
     const editor = read("../../components/EditorPane.tsx");
-    expect(editor).toContain("px-4 py-1.5 border-b border-app-border bg-app-surface/30");
+    expect(editor).toContain("h-12 shrink-0 min-w-0 items-center justify-between gap-3 px-4 border-b border-app-border bg-app-surface/30");
     expect(editor).toContain("rounded-lg px-2 text-[12.5px] text-tx-secondary transition-colors hover:bg-app-hover");
     expect(editor).toContain("gap-0.5 bg-app-hover/50 rounded-lg px-1 py-0.5");
 
@@ -320,8 +320,6 @@ describe("知识库优先 IA 契约（2026-10-14 用户拍板）", () => {
     expect(host).toContain("TOOL_PAGE_NAVIGATE_EVENT");
     for (const component of [
       "<TaskWorkspace />",
-      "<DiaryWorkspace />",
-      "<AIChatPanel",
       "<ShareManagementPage />",
       "<FileManager />",
       "<TrashPage />",

@@ -1,5 +1,5 @@
 /**
- * Yuque 导出 markdown → Nowen 兼容 HTML（导入专用）。
+ * Yuque 导出 markdown → BaseForge 兼容 HTML（导入专用）。
  *
  * Yuque 网页端 /markdown 导出端点返回标准 Markdown（latexcode=true 时公式为
  * LaTeX 源码）。此处把 `$$...$$` / `$...$` 公式先提取为占位符，用 marked

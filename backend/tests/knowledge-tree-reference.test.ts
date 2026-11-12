@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-knowledge-reference-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-knowledge-reference-"));
 process.env.DB_PATH = path.join(tempDir, "knowledge-reference.db");
 let closeDatabase: (() => void) | null = null;
 

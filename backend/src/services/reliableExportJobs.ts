@@ -13,7 +13,7 @@ import {
   readAttachmentObject,
 } from "./attachment-storage";
 
-const EXPORT_TMP_PREFIX = "nowen-reliable-export-";
+const EXPORT_TMP_PREFIX = "baseforge-reliable-export-";
 const EXPORT_TTL_MS = 30 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -453,7 +453,7 @@ async function buildArchive(
 
   archive.append(JSON.stringify({
     version: "2.1",
-    app: "nowen-note",
+    app: "baseforge",
     exportedAt: new Date().toISOString(),
     totalNotes: notes.length,
     notebooks: Array.from(folderCounts.entries()).map(([name, count]) => ({ name, count })),
@@ -632,7 +632,7 @@ export function handleReliableExportDownload(c: Context): Response {
       "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(job.filename || "baseforge-export.bin")}`,
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
-      "X-Nowen-Reliable-Export": "1",
+      "X-BaseForge-Reliable-Export": "1",
     },
   });
 }

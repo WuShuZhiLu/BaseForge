@@ -7,7 +7,7 @@ export type ImportMethod =
   | "yuque"
   | "generic"
   | "url"
-  | "nowen";
+  | "baseforge";
 
 export type ImportMethodGroupId = "migration" | "general" | "restore";
 
@@ -16,7 +16,7 @@ export interface ImportMethodStorage {
   setItem(key: string, value: string): void;
 }
 
-export const IMPORT_METHOD_STORAGE_KEY = "nowen-data-manager-import-method";
+export const IMPORT_METHOD_STORAGE_KEY = "baseforge-data-manager-import-method";
 export const DEFAULT_IMPORT_METHOD: ImportMethod = "generic";
 
 export const IMPORT_METHOD_GROUPS: ReadonlyArray<{
@@ -28,7 +28,7 @@ export const IMPORT_METHOD_GROUPS: ReadonlyArray<{
     methods: ["siyuan", "obsidian", "wechat-favorites", "youdao", "mobile-memo", "yuque"],
   },
   { id: "general", methods: ["generic", "url"] },
-  { id: "restore", methods: ["nowen"] },
+  { id: "restore", methods: ["baseforge"] },
 ];
 
 const IMPORT_METHOD_SET = new Set<ImportMethod>(

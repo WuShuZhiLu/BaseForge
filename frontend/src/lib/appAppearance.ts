@@ -259,8 +259,8 @@ const TOKEN_PROPERTIES: Array<[keyof AppAppearanceTokens, string]> = [
   ["editorFontFamily", "--editor-font-family"],
 ];
 
-export const APP_APPEARANCE_STORAGE_KEY = "nowen-note-skin";
-export const APP_APPEARANCE_CHANGED_EVENT = "nowen:app-appearance-change";
+export const APP_APPEARANCE_STORAGE_KEY = "baseforge-skin";
+export const APP_APPEARANCE_CHANGED_EVENT = "baseforge:app-appearance-change";
 
 export function isAppAppearanceId(value: unknown): value is AppAppearanceId {
   return typeof value === "string" && APPEARANCE_SET.has(value);

@@ -110,7 +110,7 @@ describe("MindMapEditor UX guardrails", () => {
     expect(source).toContain("setActiveMap((current) => current?.id === updated.id ? updated : current)");
 
     expect(source).toContain("if (activeMapRef.current) clearActiveMap();");
-    expect(source).toContain('window.addEventListener("nowen:workspace-changed", onWs)');
+    expect(source).toContain('window.addEventListener("baseforge:workspace-changed", onWs)');
     expect(source).toContain("if (activeMap && current && !current.some((map) => map.id === activeMap.id)) clearActiveMap();");
   });
 

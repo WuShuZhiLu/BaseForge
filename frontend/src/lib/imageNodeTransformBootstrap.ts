@@ -3,8 +3,8 @@ import TurndownService from "turndown";
 
 export type ImageRotation = 0 | 90 | 180 | 270;
 
-const INSTALL_KEY = "__NOWEN_IMAGE_TRANSFORM_ATTRS_V1__";
-const TURNDOWN_INSTALL_KEY = "__NOWEN_IMAGE_TRANSFORM_TURNDOWN_V1__";
+const INSTALL_KEY = "__BASEFORGE_IMAGE_TRANSFORM_ATTRS_V1__";
+const TURNDOWN_INSTALL_KEY = "__BASEFORGE_IMAGE_TRANSFORM_TURNDOWN_V1__";
 
 export function normalizeImageRotation(value: unknown): ImageRotation {
   const numeric = Number(value);
@@ -94,13 +94,13 @@ export function installImageTransformTurndownGuard(): void {
     const preserved: string[] = [];
     const prepared = input.replace(/<img\b[^>]*>/gi, (tag) => {
       if (!/data-image-(?:rotation|flip-x)\s*=/i.test(tag)) return tag;
-      const token = `NOWENIMAGETRANSFORM${preserved.length}TOKEN`;
+      const token = `BASEFORGEIMAGETRANSFORM${preserved.length}TOKEN`;
       preserved.push(tag);
       return token;
     });
     let markdown = String(originalTurndown.call(this, prepared));
     preserved.forEach((tag, index) => {
-      markdown = markdown.split(`NOWENIMAGETRANSFORM${index}TOKEN`).join(tag);
+      markdown = markdown.split(`BASEFORGEIMAGETRANSFORM${index}TOKEN`).join(tag);
     });
     return markdown;
   };

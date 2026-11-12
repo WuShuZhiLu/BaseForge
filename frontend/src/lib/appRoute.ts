@@ -32,8 +32,6 @@ export const MODULE_APP_PATHS: ReadonlyArray<readonly [string, ViewMode]> = [
   ["/shares", "shares"],
   ["/projects", "projects"],
   ["/tasks", "tasks"],
-  ["/diary", "diary"],
-  ["/ai", "ai-chat"],
   ["/plugins", "plugins"],
   ["/issues", "issues"],
 ];
@@ -47,7 +45,7 @@ export const PERSONAL_SPACE_ID = "personal";
 
 /**
  * 有空间归属的模块 viewMode：URL 必须带 :space 段（模块 → 空间 → 内容）。
- * 无空间归属模块（files/shares/projects/tasks/diary/ai/plugins）不带——
+ * 无空间归属模块（files/shares/projects/tasks/plugins）不带——
  * 「没有空间的不需要带，有的才要」（用户拍板）。
  */
 export const SPACE_SCOPED_MODULE_VIEW_MODES = new Set<ViewMode>([
@@ -60,8 +58,6 @@ export const VIEW_MODE_APP_PATHS: Partial<Record<ViewMode, string>> = {
   shares: "/shares",
   projects: "/projects",
   tasks: "/tasks",
-  diary: "/diary",
-  "ai-chat": "/ai",
   plugins: "/plugins",
 };
 
@@ -108,13 +104,16 @@ export type AppRouteKind =
 export type AppRoute = AppRouteKind & { q?: string; scope?: string; tree?: string };
 
 /** 工具页签 key（与 store/AppContext 的 ToolTabKey 保持一致；PM projects 不入）。 */
-export const TOOL_TAB_KEYS = ["tasks", "diary", "ai-chat", "shares", "files", "trash"] as const;
+export const TOOL_TAB_KEYS = ["tasks", "shares", "files", "trash"] as const;
 export type ToolRouteKey = (typeof TOOL_TAB_KEYS)[number];
 
-/** 设置弹窗 tab key（与 NavRailDesktop 的 TabId 保持一致）。 */
+/**
+ * 设置弹窗 tab key，必须与 SettingsModal 的 SETTING_TABS / TabId 保持一致。
+ * 白名单里的值都会被视为合法深链，多列一个就会让 /settings/:tab 打开空白内容区。
+ */
 export const SETTINGS_TAB_KEYS = [
-  "appearance", "switches", "shortcuts", "ai", "plugins", "voice", "automation",
-  "security", "tokens", "data", "backup", "sync", "offlineSync", "folderSync",
+  "appearance", "switches", "shortcuts", "ai", "voice", "automation",
+  "security", "tokens", "data", "sync", "folderSync",
   "users", "workspaces", "download", "about",
 ] as const;
 export type SettingsTabKey = (typeof SETTINGS_TAB_KEYS)[number];
@@ -149,7 +148,7 @@ function attachParams<T extends { url: string }>(route: T, params?: URLSearchPar
  * sheet → mindmap → module → home 的优先级命中（各资源路径本就互斥，这里只是把优先级写死）。
  *
  * 空间域（用户拍板）：有空间归属的模块（kb/trash/favorites/issues）URL 必带
- * :space 段——模块 → 空间 → 内容；无空间归属模块（tasks/diary/files/…）不带。
+ * :space 段——模块 → 空间 → 内容；无空间归属模块（tasks/files/…）不带。
  * 空间标识为 personal 字面量或 workspace uuid，不加外名层（slug 体系已否决）。
  * 短形态 /kb、/trash、/favorites、/issues 与 /、/dashboard 均为遗留/省略入口，
  * 读侧同等解析（space=null），写侧 reconcile 补空间段规整。

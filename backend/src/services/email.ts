@@ -81,7 +81,7 @@ function deriveCipherKey(): Buffer {
   // 不直接用 JWT_SECRET 原值，避免"解密邮件密码 === 伪造 JWT"的攻击面耦合；
   // 加固定盐 + scryptSync 派生 32 字节密钥。
   const secret = process.env.JWT_SECRET || "baseforge-default-secret";
-  return crypto.scryptSync(secret, "nowen-smtp-v1", 32);
+  return crypto.scryptSync(secret, "baseforge-smtp-v1", 32);
 }
 
 function encryptPassword(plain: string): string {
@@ -273,7 +273,7 @@ function assertCode(resp: { code: number; text: string }, expect: number[], step
 
 /** 构造 MIME 邮件体（multipart/mixed + 附件 base64） */
 function buildMimeMessage(cfg: SmtpConfig, opt: SendMailOptions): string {
-  const boundary = `=_nowen_${crypto.randomBytes(12).toString("hex")}`;
+  const boundary = `=_baseforge_${crypto.randomBytes(12).toString("hex")}`;
   const fromHeader = cfg.fromName
     ? `${encodeMimeWord(cfg.fromName)} <${cfg.fromEmail || cfg.username}>`
     : cfg.fromEmail || cfg.username;

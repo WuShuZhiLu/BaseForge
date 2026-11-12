@@ -18,8 +18,8 @@ describe("editor list marker compatibility CSS", () => {
     expect(css).toContain("left: -1.25em");
     expect(css).toContain("width: 1em");
     expect(css).toContain("text-align: center");
-    expect(css).toContain("--nowen-ul-marker-top: 0.3em");
-    expect(css).toContain("--nowen-ul-marker-top: 0.25em");
+    expect(css).toContain("--baseforge-ul-marker-top: 0.3em");
+    expect(css).toContain("--baseforge-ul-marker-top: 0.25em");
   });
 
   it("does not mutate ProseMirror task NodeViews from a global observer", () => {

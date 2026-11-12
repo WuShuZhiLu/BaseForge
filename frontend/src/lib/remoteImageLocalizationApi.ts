@@ -41,7 +41,7 @@ export type RemoteImageLocalizationScope =
   | { notebookId: string; expectedVersions?: Record<string, number> };
 
 async function authenticatedJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init?.headers || {}) },

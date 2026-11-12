@@ -69,7 +69,7 @@ import {
  * 本地同步管理 API（Phase 5 + Phase 7）。
  *
  * 供 Desktop renderer 调用（renderer 永远只访问 localhost）：
- * - 同步设置：不同步 / 我的 Nowen Server
+ * - 同步设置：不同步 / 我的 BaseForge Server
  * - 冲突中心：列表、详情、三种解决方式
  * - 诊断信息：Device ID / 游标 / 待同步数 / 冲突数 / 最近错误
  *
@@ -106,7 +106,7 @@ function errorResponse(c: any, error: any) {
 /**
  * 当前同步配置。
  *
- * 语义只有两种：不同步（仅此设备）/ 已连接某个 Nowen Server。
+ * 语义只有两种：不同步（仅此设备）/ 已连接某个 BaseForge Server。
  * 底层数据模式永远是 Local，这里返回的只是"是否启用了可选同步"。
  */
 app.get("/settings", (c) => {
@@ -144,7 +144,7 @@ app.get("/settings", (c) => {
 });
 
 /**
- * 连接到一台 Nowen Server。
+ * 连接到一台 BaseForge Server。
  *
  * 关键行为：**不会**改写既有 Profile 的 serverUrl。
  * 换服务器一律新建 Profile —— 两台服务器的 sequence 游标、远端用户身份、

@@ -9,7 +9,7 @@
  * 默认行为：
  *   - 版本号取自 package.json
  *   - 默认两个架构都打：amd64、arm64
- *   - 镜像优先从本机 docker daemon 中查找 nowen-note:<version> / nowen-note:v<version> / nowen-note:latest
+ *   - 镜像优先从本机 docker daemon 中查找 baseforge:<version> / baseforge:v<version> / baseforge:latest
  *     的 amd64 / arm64 manifest，docker save 出 tar；找不到则**跳过**该架构并提示
  *   - 调用 tools/ugcli（或 UGCLI_BIN 指定）执行 pack
  *
@@ -17,14 +17,14 @@
  *   --version <x.y.z>   覆盖版本号（默认 package.json.version）
  *   --build <n>         构建号，传给 ugcli pack --build，默认 1
  *   --arch all|amd64|arm64   要打的架构，默认 all
- *   --image <repo:tag>  自定义镜像名（覆盖默认 nowen-note:<version>）
+ *   --image <repo:tag>  自定义镜像名（覆盖默认 baseforge:<version>）
  *   --pull              本地找不到镜像时自动 docker pull
  *   --keep-images       保留 rootfs_<arch>/images/*.tar（默认打完就清，避免 git add）
  *
  *   环境变量（与 scripts/release.sh 对接）：
  *     UPK_IMAGE_REF       覆盖镜像名（同 --image，优先级低于命令行）
  *     UPK_BUILD_NO        构建号（同 --build）
- *     DOCKERHUB_REPO      DockerHub 仓库名（如 cropflre/nowen-note），
+ *     DOCKERHUB_REPO      DockerHub 仓库名（如 cropflre/baseforge），
  *                          会拼成 ${DOCKERHUB_REPO}:v${VERSION} 加入候选镜像列表
  *     UGCLI_BIN           ugcli 可执行文件路径，默认 tools/ugcli.exe / tools/ugcli
  *                         （兼容旧位置：仓库根目录 ugcli.exe / ugcli）
@@ -62,7 +62,7 @@ const VERSION = String(arg('version', pkg.version));
 const BUILD_NO = String(arg('build', process.env.UPK_BUILD_NO || '1'));
 const ARCH = String(arg('arch', 'all')); // all | amd64 | arm64
 const IMAGE_REF_RAW = String(
-    arg('image', process.env.UPK_IMAGE_REF || `nowen-note:${VERSION}`),
+    arg('image', process.env.UPK_IMAGE_REF || `baseforge:${VERSION}`),
 );
 const DOCKERHUB_REPO = process.env.DOCKERHUB_REPO || '';
 const AUTO_PULL = arg('pull', false) === true;
@@ -86,7 +86,7 @@ if (isBrokenRef(IMAGE_REF_RAW)) {
         `[upk] 错误：镜像 ref "${IMAGE_REF_RAW}" 看起来 tag 残缺（很可能是漏写了版本号，例如 ":v" 应为 ":v${VERSION}"）`,
     );
     console.error(
-        `[upk]      请用 --image <repo:tag> 或 UPK_IMAGE_REF 显式指定，或者直接 unset UPK_IMAGE_REF 让脚本回退到 nowen-note:${VERSION}`,
+        `[upk]      请用 --image <repo:tag> 或 UPK_IMAGE_REF 显式指定，或者直接 unset UPK_IMAGE_REF 让脚本回退到 baseforge:${VERSION}`,
     );
     process.exit(1);
 }
@@ -100,7 +100,7 @@ if (!ARCH_LIST) {
 }
 
 const OUT_DIR = resolve(PROJECT_ROOT, 'dist-upk');
-const WORK_DIR = join(OUT_DIR, `nowen-note-${VERSION}`);
+const WORK_DIR = join(OUT_DIR, `baseforge-${VERSION}`);
 
 console.log(`[upk] 版本: ${VERSION}  构建号: ${BUILD_NO}  架构: ${ARCH_LIST.join(',')}`);
 console.log(`[upk] 镜像: ${IMAGE_REF}`);
@@ -172,14 +172,14 @@ for (const a of ARCH_LIST) {
     const archDir = join(WORK_DIR, `rootfs_${a}`, 'images');
     mkdirSync(archDir, { recursive: true });
 
-    // 候选镜像：用户指定的 IMAGE_REF（默认 nowen-note:<version>），
+    // 候选镜像：用户指定的 IMAGE_REF（默认 baseforge:<version>），
     // 以及它的几个常见 arch 后缀变体；逐一查 architecture 字段
     const candidates = [
         IMAGE_REF,
         `${IMAGE_REF}-${a}`,
-        `nowen-note:${VERSION}-${a}`,
-        `nowen-note:${a}-${VERSION}`,
-        `nowen-note:${a}`,
+        `baseforge:${VERSION}-${a}`,
+        `baseforge:${a}-${VERSION}`,
+        `baseforge:${a}`,
     ];
     if (DOCKERHUB_REPO) {
         // release.sh 推送的镜像 tag 是 v${VERSION} + latest
@@ -215,7 +215,7 @@ for (const a of ARCH_LIST) {
             `[upk] 警告：本机 docker 中找不到 ${a} 架构的镜像（已尝试：${uniqCandidates.join(', ')}），跳过 ${a}`,
         );
         console.warn(
-            `[upk]      可用方案：① 加 --pull 自动拉 ② 手动 docker buildx build --platform ${platform} -t nowen-note:${VERSION} --load .`,
+            `[upk]      可用方案：① 加 --pull 自动拉 ② 手动 docker buildx build --platform ${platform} -t baseforge:${VERSION} --load .`,
         );
         // 把空目录删掉，避免 ugcli check 报"images 下没有 tar"
         try {
@@ -225,9 +225,9 @@ for (const a of ARCH_LIST) {
         }
         continue;
     }
-    const tarName = `nowen-note-${VERSION}-${a}.tar`;
+    const tarName = `baseforge-${VERSION}-${a}.tar`;
     // ugcli check 会交叉验证 tar 内嵌的 RepoTag 与 docker-compose.yaml 的 image 字段是否一致。
-    // picked 可能是 cropflre/nowen-note:v1.1.6-amd64（带架构后缀），
+    // picked 可能是 cropflre/baseforge:v1.1.6-amd64（带架构后缀），
     // 而 compose 里写的是 IMAGE_REF（不带后缀）——不一致会被 check 拦下。
     // 这里 save 前先 retag 到 IMAGE_REF，让 tar 里的 RepoTag 与 compose 对齐。
     // 多架构之间会覆盖同一个 tag，但无所谓：每个架构的 tar 在这一轮循环里
@@ -321,7 +321,7 @@ function listUpksRecursive(dir, acc = []) {
 }
 const found = [...listUpksRecursive(WORK_DIR), ...listUpksRecursive(OUT_DIR)];
 // found 里同一个文件可能被收两次：OUT_DIR 通常是 WORK_DIR 的父目录
-// （dist-upk/ 与 dist-upk/nowen-note-1.1.6/），递归会把同一路径扫两遍。
+// （dist-upk/ 与 dist-upk/baseforge-1.1.6/），递归会把同一路径扫两遍。
 // 必须在 cp/rm 之前按真实路径 dedupe，否则第二轮会 lstat 已删源文件 ENOENT。
 const foundUniq = [];
 const srcSeen = new Set();

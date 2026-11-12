@@ -14,7 +14,7 @@ import {
 
 const Busboy = require("busboy");
 const router = new Hono();
-const TMP_PREFIX = "nowen-wechat-favorites-import-";
+const TMP_PREFIX = "baseforge-wechat-favorites-import-";
 const DEFAULT_MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = (() => {
   const raw = Number(process.env.WECHAT_FAVORITES_IMPORT_MAX_UPLOAD_BYTES);

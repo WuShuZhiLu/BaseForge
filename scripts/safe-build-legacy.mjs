@@ -12,7 +12,7 @@
  *
  * 本脚本串联三件事：
  *   - `taskkill` 结束所有 `BaseForge.exe` 残留进程；
- *   - 设 `NOWEN_BUILD_OUT=1`，让 builder.config.js 把产物输出改到 `%TEMP%\nowen-note-build`，
+ *   - 设 `BASEFORGE_BUILD_OUT=1`，让 builder.config.js 把产物输出改到 `%TEMP%\baseforge-build`，
  *     彻底脱离工作区，避免 IDE 监听；
  *   - 清理临时输出目录，再起 electron-builder 子进程。
  *
@@ -59,8 +59,8 @@ if (isWin) {
 }
 
 // Step 2: 设环境变量，切换产物输出目录到 %TEMP%
-process.env.NOWEN_BUILD_OUT = "1";
-const tmpOut = join(tmpdir(), "nowen-note-build");
+process.env.BASEFORGE_BUILD_OUT = "1";
+const tmpOut = join(tmpdir(), "baseforge-build");
 log(`output directory -> ${tmpOut}`);
 
 // Step 3: 清理旧产物，防止只读/锁定文件导致 builder 提前报错
@@ -75,7 +75,7 @@ if (existsSync(tmpOut)) {
 
 // Step 4: 起 electron-builder
 // 注意：这里不用 `npm run electron:build`，因为它会再套一层 npm，导致 Ctrl+C 杀不干净。
-// 我们直接串行跑 rebuild:native + build:all + electron-builder。
+// 我们直接串行跑 build:all + electron-builder。
 //
 // 对 electron-builder 这一步，我们捕获 stdout/stderr 做"日志降噪"：
 // 企业杀软（Defender/EDR/电脑管家）会拦截 rcedit 的 MoveFileEx，造成日志里一堆红字
@@ -86,7 +86,6 @@ if (existsSync(tmpOut)) {
 // 但实际上版本号最终还是写进去了（打包完自检 FileVersion=1.0.2 就是证据）。
 // 所以把这几行折叠成一条黄色提示，避免误导用户以为"打包失败"。
 const steps = [
-  { cmd: "npm", args: ["run", "rebuild:native"], filter: false },
   { cmd: "npm", args: ["run", "build:all"], filter: false },
   {
     cmd: "npx",
@@ -237,18 +236,6 @@ try {
       assertFileExists(
         join(resourcesPath, "backend", "dist", "index.js"),
         "backend/dist/index.js",
-      );
-      assertFileExists(
-        join(
-          resourcesPath,
-          "backend",
-          "node_modules",
-          "better-sqlite3",
-          "build",
-          "Release",
-          "better_sqlite3.node",
-        ),
-        "better-sqlite3 native module",
       );
 
       const ps = spawnSync(

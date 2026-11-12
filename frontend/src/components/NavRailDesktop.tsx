@@ -8,7 +8,7 @@
  * 头像浮窗（260px）：账号区（通知/当前账号/切换/登出）+ 外观区（主题 / 导航栏样式）。
  *
  * 复用既有机制：ViewMode 路由（favorites/trash/files）、useRailMode（icon/label/hidden，
- * hidden 由 App 层强制显示逻辑兜底）、next-themes（storageKey=nowen-note-theme）、
+ * hidden 由 App 层强制显示逻辑兜底）、next-themes（storageKey=baseforge-theme）、
  * OPEN_NOTIFICATIONS_EVENT 通知中心、broadcastLogout 登出。
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,7 +21,6 @@ import {
   ListTodo,
   PenLine,
   LogIn,
-  Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -30,6 +29,7 @@ import { useTheme } from "next-themes";
 
 import { useApp, useAppActions } from "@/store/AppContext";
 import { api, broadcastLogout, getCurrentWorkspace } from "@/lib/api";
+import { fetchMe, invalidateMe } from "@/lib/meCache";
 import { isDesktop as isDesktopApp, clearDesktopLocalAuth } from "@/lib/desktopBridge";
 import { BUILTIN_PLUGINS, isBuiltinPluginEnabled, type BuiltinPluginId } from "@/plugins/builtin/registry";
 import { OPEN_NOTIFICATIONS_EVENT } from "@/lib/workspaceIssueNavigation";
@@ -42,7 +42,7 @@ import { pushAppPathState, replaceAppPathState, buildAppPathUrl } from "@/lib/ap
 
 type NavItemMode = Extract<
   ViewMode,
-  "notebook" | "favorites" | "trash" | "files" | "tasks" | "diary" | "ai-chat" | "shares" | "projects"
+  "notebook" | "favorites" | "trash" | "files" | "tasks" | "shares" | "projects"
 > | "plugins";
 
 interface NavItem {
@@ -75,7 +75,7 @@ const CORE_ITEMS: NavItem[] = [
 ];
 
 /** 官方插件贡献的导航项：受内置插件启停 + WorkspaceFeatures 叠加判定 */
-const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFeature: "tasks" | "diaries" | "notes" }> = [
+const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFeature: "tasks" | "notes" }> = [
   {
     mode: "tasks",
     titleKey: "sidebarNext.nav.tasks",
@@ -83,22 +83,6 @@ const PLUGIN_NAV_ITEMS: Array<NavItem & { pluginId: BuiltinPluginId; workspaceFe
     icon: (sz: number) => <ListTodo size={sz} strokeWidth={2} />,
     pluginId: "tasks",
     workspaceFeature: "tasks",
-  },
-  {
-    mode: "diary",
-    titleKey: "sidebarNext.nav.diary",
-    titleDefault: "每日记录",
-    icon: (sz: number) => <PenLine size={sz} strokeWidth={2} />,
-    pluginId: "diary",
-    workspaceFeature: "diaries",
-  },
-  {
-    mode: "ai-chat",
-    titleKey: "sidebarNext.nav.ai",
-    titleDefault: "AI 问答",
-    icon: (sz: number) => <Sparkles size={sz} strokeWidth={2} />,
-    pluginId: "ai",
-    workspaceFeature: "notes",
   },
   {
     mode: "projects",
@@ -137,7 +121,7 @@ const PLUGIN_ITEMS: NavItem[] = [
  *   插件徽章（固定不可动）与各插件徽章在下，禁止跨组拖拽。
  */
 type RailCustomization = { hiddenModes: string[]; pluginGroupCollapsed: boolean; coreOrder?: string[]; pluginOrder?: string[] };
-const RAIL_CUSTOMIZATION_KEY = "nowen-rail-customization";
+const RAIL_CUSTOMIZATION_KEY = "baseforge-rail-customization";
 
 function loadRailCustomization(): RailCustomization {
   try {
@@ -314,14 +298,16 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
   const showLabel = railMode === "label";
 
   useEffect(() => {
-    api.getMe().then((u) => setMe(u)).catch(() => undefined);
+    // 走 meCache：启动时预热当前用户缓存，设置弹窗等处可同步拿到身份，
+    // 避免"打开后内容瞬间翻转"的闪变。
+    fetchMe().then((u) => setMe(u as never)).catch(() => undefined);
   }, []);
 
   // 头像等用户资料变更后刷新（SecuritySettings 上传/移除头像时广播）
   useEffect(() => {
-    const onUserUpdated = () => { api.getMe().then((u) => setMe(u)).catch(() => undefined); };
-    window.addEventListener("nowen:user-updated", onUserUpdated);
-    return () => window.removeEventListener("nowen:user-updated", onUserUpdated);
+    const onUserUpdated = () => { invalidateMe(); fetchMe().then((u) => setMe(u as never)).catch(() => undefined); };
+    window.addEventListener("baseforge:user-updated", onUserUpdated);
+    return () => window.removeEventListener("baseforge:user-updated", onUserUpdated);
   }, []);
 
   // Rail 激活态跟随侧栏当前视图（语雀式：点击切换的是侧栏视图而非主区）
@@ -332,11 +318,11 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       if (!view) return;
       setActiveView(view === "notebook" ? "kb" : view);
     };
-    window.addEventListener("nowen:sidebar-view", onSwitch);
-    return () => window.removeEventListener("nowen:sidebar-view", onSwitch);
+    window.addEventListener("baseforge:sidebar-view", onSwitch);
+    return () => window.removeEventListener("baseforge:sidebar-view", onSwitch);
   }, []);
   // 主区 viewMode 变化（非侧栏触发的路由）同步 Rail 高亮。
-  // 刷新/深链恢复时不经 Rail 点击（没有 nowen:sidebar-view 事件），各模块视图
+  // 刷新/深链恢复时不经 Rail 点击（没有 baseforge:sidebar-view 事件），各模块视图
   // 都要按 viewMode 补齐高亮——否则刷新 /plugins 后高亮停在知识库。
   useEffect(() => {
     if (state.viewMode === "favorites") setActiveView("star");
@@ -347,14 +333,12 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     else if (state.viewMode === "shares") setActiveView("shares");
     else if (state.viewMode === "projects") setActiveView("projects");
     else if (state.viewMode === "tasks") setActiveView("tasks");
-    else if (state.viewMode === "diary") setActiveView("diary");
-    else if (state.viewMode === "ai-chat") setActiveView("ai-chat");
   }, [state.viewMode]);
 
   const activeMode: NavItemMode | null = useMemo(() => {
     // activeView 是侧栏视图 id（kb），item.mode 是 ViewMode 语义（notebook）
     const mapped = activeView === "kb" ? "notebook" : activeView;
-    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "diary" || mapped === "ai-chat" || mapped === "shares" || mapped === "projects" || mapped === "plugins") {
+    if (mapped === "notebook" || mapped === "favorites" || mapped === "trash" || mapped === "files" || mapped === "tasks" || mapped === "shares" || mapped === "projects" || mapped === "plugins") {
       return mapped as NavItemMode;
     }
     return null;
@@ -371,18 +355,18 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       api.getWorkspaceFeatures(ws).then(setFeatures).catch(() => setFeatures(null));
     };
     load();
-    window.addEventListener("nowen:workspace-changed", load);
-    window.addEventListener("nowen:workspace-features-changed", load);
+    window.addEventListener("baseforge:workspace-changed", load);
+    window.addEventListener("baseforge:workspace-features-changed", load);
     const onBuiltin = () => forceBuiltinSync((n) => n + 1);
-    window.addEventListener("nowen:builtin-plugins-changed", onBuiltin);
+    window.addEventListener("baseforge:builtin-plugins-changed", onBuiltin);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", load);
-      window.removeEventListener("nowen:workspace-features-changed", load);
-      window.removeEventListener("nowen:builtin-plugins-changed", onBuiltin);
+      window.removeEventListener("baseforge:workspace-changed", load);
+      window.removeEventListener("baseforge:workspace-features-changed", load);
+      window.removeEventListener("baseforge:builtin-plugins-changed", onBuiltin);
     };
   }, []);
 
-  const isPluginNavVisible = useCallback((pluginId: BuiltinPluginId, feature: "tasks" | "diaries" | "notes") => {
+  const isPluginNavVisible = useCallback((pluginId: BuiltinPluginId, feature: "tasks" | "notes") => {
     if (!isBuiltinPluginEnabled(pluginId)) return false;
     if (feature && features && features[feature] === false) return false;
     return true;
@@ -413,20 +397,20 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
       // 模块三区联动：核心模块点击徽章 = 侧栏视图 + 工作区一起切，禁止三区脱节
       if (mode === "notebook" || mode === "favorites" || mode === "trash" || mode === "files" || mode === "plugins") {
         actions.setViewMode(mode);
-        window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+        window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
         return;
       }
-      // 插件贡献的导航项（tasks/diary）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
-      if (mode === "tasks" || mode === "diary" || mode === "ai-chat" || mode === "shares" || mode === "projects") {
+      // 插件贡献的导航项（tasks）：切主区到对应全屏中心（Rail 高亮同步走 viewMode-sync）
+      if (mode === "tasks" || mode === "shares" || mode === "projects") {
         if (mode === "projects") {
-          window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: "projects" } }));
+          window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: "projects" } }));
         }
         actions.setViewMode(mode);
-        window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+        window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
         return;
       }
       // 语雀式：插件管理点击后主区视图不变，侧栏切到对应视图
-      window.dispatchEvent(new CustomEvent("nowen:sidebar-view", { detail: { view: mode } }));
+      window.dispatchEvent(new CustomEvent("baseforge:sidebar-view", { detail: { view: mode } }));
     },
     [],
   );
@@ -436,7 +420,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     if (isDesktopApp()) {
       await clearDesktopLocalAuth().catch(() => ({ ok: false }));
       try {
-        localStorage.setItem("nowen-prefer-cloud", "1");
+        localStorage.setItem("baseforge-prefer-cloud", "1");
       } catch {
         // ignore storage failures
       }
@@ -541,8 +525,9 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
     >
       {/* 顶 Logo：与侧栏/编辑器头部同一 48px 线；用项目真实应用图标（原型的笔形 SVG 是占位） */}
       <div className="flex h-12 w-full shrink-0 items-center justify-center border-b border-app-border">
+        {/* 相对路径：桌面端用 file:// 加载，绝对路径 /xxx.svg 会指向磁盘根目录变成裂图 */}
         <img
-          src="/base-notes-icon.svg"
+          src="./base-notes-icon.svg"
           width={32}
           height={32}
           alt=""
@@ -575,7 +560,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
           const rows: NavItem[] = [];
           for (const item of orderedPlugins) {
             if (isBadgeHidden(item.mode)) continue;
-            const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+            const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "notes" };
             if (
               typed.pluginId && typed.workspaceFeature &&
               !(isPluginNavVisible(typed.pluginId, typed.workspaceFeature) || activeMode === item.mode)
@@ -617,7 +602,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
                       : t("railCustom.collapseGroup", { defaultValue: "折叠插件组" })}
                   </button>
                 ) : null}
-                {badgeMenu.item.mode === "tasks" || badgeMenu.item.mode === "diary" || badgeMenu.item.mode === "ai-chat" ? (
+                {badgeMenu.item.mode === "tasks" ? (
                   <button
                     type="button"
                     className="flex w-full items-center px-3 py-1.5 text-left hover:bg-app-hover"
@@ -669,7 +654,7 @@ export default function NavRailDesktop({ notificationCount = 0 }: { notification
             </p>
             <div className="max-h-72 overflow-y-auto">
               {[...CORE_ITEMS, SHARES_NAV_ITEM, ...PLUGIN_ITEMS, ...PLUGIN_NAV_ITEMS].map((item) => {
-                const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "diaries" | "notes" };
+                const typed = item as { pluginId?: BuiltinPluginId; workspaceFeature?: "tasks" | "notes" };
                 const gate = typed.pluginId && typed.workspaceFeature
                   ? !isPluginNavVisible(typed.pluginId, typed.workspaceFeature)
                   : false;

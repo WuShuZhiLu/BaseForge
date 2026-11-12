@@ -4,9 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-offline-workspace-sync-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-offline-workspace-sync-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -15,7 +15,7 @@ const viewerId = "offline-viewer";
 const notebookId = "offline-notebook";
 const noteId = "offline-note";
 const attachmentId = "11111111-1111-4111-8111-111111111111";
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 

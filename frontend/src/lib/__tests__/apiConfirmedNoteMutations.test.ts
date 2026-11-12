@@ -29,16 +29,16 @@ function serverNote() {
 
 describe("server-confirmed note mutations", () => {
   beforeEach(() => {
-    Object.assign(window, { nowenDesktop: { isDesktop: true } });
+    Object.assign(window, { baseforgeDesktop: { isDesktop: true } });
     localStorage.clear();
-    localStorage.setItem("nowen-server-url", "https://sync.test");
-    localStorage.setItem("nowen-token", "token");
+    localStorage.setItem("baseforge-server-url", "https://sync.test");
+    localStorage.setItem("baseforge-token", "token");
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     clearQueue();
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(window, "nowenDesktop");
+    Reflect.deleteProperty(window, "baseforgeDesktop");
     vi.unstubAllGlobals();
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   });

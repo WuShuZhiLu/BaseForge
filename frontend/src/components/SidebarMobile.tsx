@@ -111,7 +111,7 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
 
   const [tagsExpanded, setTagsExpanded] = useState(() => {
     try {
-      const saved = localStorage.getItem("nowen-tags-expanded");
+      const saved = localStorage.getItem("baseforge-tags-expanded");
       return saved === null ? true : saved === "true";
     } catch {
       return true;
@@ -149,10 +149,10 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
   useEffect(() => {
     void refreshSidebarData();
     const refresh = () => void refreshSidebarData();
-    window.addEventListener("nowen:workspace-changed", refresh);
+    window.addEventListener("baseforge:workspace-changed", refresh);
     window.addEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     return () => {
-      window.removeEventListener("nowen:workspace-changed", refresh);
+      window.removeEventListener("baseforge:workspace-changed", refresh);
       window.removeEventListener(KNOWLEDGE_TREE_CHANGED_EVENT, refresh);
     };
   }, [refreshSidebarData]);
@@ -191,7 +191,7 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
   const toggleTagsExpanded = () => {
     setTagsExpanded((current) => {
       const next = !current;
-      try { localStorage.setItem("nowen-tags-expanded", String(next)); } catch {}
+      try { localStorage.setItem("baseforge-tags-expanded", String(next)); } catch {}
       return next;
     });
   };
@@ -282,7 +282,7 @@ export default function SidebarMobile({ variant = "mobile" }: { variant?: "deskt
                 type="button"
                 data-mobile-sidebar-settings=""
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent("nowen:open-settings"));
+                  window.dispatchEvent(new CustomEvent("baseforge:open-settings"));
                 }}
                 title={t("settings.title", { defaultValue: "设置" })}
                 aria-label={t("settings.title", { defaultValue: "设置" })}

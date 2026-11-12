@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-att-refs-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-att-refs-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 import { attachmentReferencesRepository } from "../src/repositories/attachmentReferencesRepository";

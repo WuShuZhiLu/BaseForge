@@ -1,6 +1,6 @@
 import React from "react";
 
-export const OPEN_KNOWLEDGE_TREE_EVENT = "nowen:open-knowledge-tree";
+export const OPEN_KNOWLEDGE_TREE_EVENT = "baseforge:open-knowledge-tree";
 
 /**
  * Compatibility mount kept for older imports.

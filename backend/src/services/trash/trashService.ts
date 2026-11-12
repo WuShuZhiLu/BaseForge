@@ -88,7 +88,7 @@ export function listTrash(scope: Scope): TrashItem[] {
       title: node.title, contentFormat: node.contentFormat || null, deletedAt: node.deletedAt,
       preview,
       originalParentId: node.parentId, originalPath: path.map((parent) => parent.title),
-      originalPathHidden: actualAncestors.some((parent) => !byId.has(parent.id) && !parent.id.startsWith("notebook:__nowen_root_documents__:")),
+      originalPathHidden: actualAncestors.some((parent) => !byId.has(parent.id) && !parent.id.startsWith("notebook:__baseforge_root_documents__:")),
       canRestore: node.access.capabilities.canDelete && deletedAncestors.every((parent) => resolveKnowledgeNodeAccess(parent.id, scope.userId, getDb(), { includeDeleted: true }).capabilities.canDelete),
       canDeletePermanently, isLocked: !!node.isLocked,
       restoreIncludesAncestors: deletedAncestors.length > 0,

@@ -17,7 +17,7 @@ export function installKnowledgeTreeFeedTriggers(db: DatabaseSync): void {
     CREATE TRIGGER sync_v2_knowledge_tree_feed_insert
     AFTER INSERT ON knowledge_tree_nodes
     WHEN (SELECT enabled FROM sync_v2_should_log) = 1
-      AND NEW.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND NEW.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_changes_v2 (entityType, entityId, userId, workspaceId, operation)
       VALUES ('knowledge_tree_node', NEW.id, NEW.userId, NEW.workspaceId, 'upsert');
@@ -28,7 +28,7 @@ export function installKnowledgeTreeFeedTriggers(db: DatabaseSync): void {
     AFTER UPDATE OF parentId, sortOrder, isDeleted, deletedAt, scopeKey,
       workspaceId, userId, nodeType, resourceType, resourceId ON knowledge_tree_nodes
     WHEN (SELECT enabled FROM sync_v2_should_log) = 1 AND (${changed})
-      AND NEW.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND NEW.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_changes_v2 (entityType, entityId, userId, workspaceId, operation)
       SELECT 'knowledge_tree_node', OLD.id, OLD.userId, OLD.workspaceId, 'delete'
@@ -41,7 +41,7 @@ export function installKnowledgeTreeFeedTriggers(db: DatabaseSync): void {
     CREATE TRIGGER sync_v2_knowledge_tree_feed_delete
     AFTER DELETE ON knowledge_tree_nodes
     WHEN (SELECT enabled FROM sync_v2_should_log) = 1
-      AND OLD.id NOT GLOB 'notebook:__nowen_root_documents__:*'
+      AND OLD.id NOT GLOB 'notebook:__baseforge_root_documents__:*'
     BEGIN
       INSERT INTO sync_changes_v2 (entityType, entityId, userId, workspaceId, operation)
       VALUES ('knowledge_tree_node', OLD.id, OLD.userId, OLD.workspaceId, 'delete');

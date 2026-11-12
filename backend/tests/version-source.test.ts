@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-version-source-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-version-source-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.VERSION_SNAPSHOT_TIMER_DISABLED = "1";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let sharesRouter: typeof import("../src/routes/shares").sharesRouter;
 let noteVersionsRepository: typeof import("../src/repositories/noteVersionsRepository").noteVersionsRepository;
 let computeContentHash: typeof import("../src/repositories/noteVersionsRepository").computeContentHash;
@@ -88,8 +88,7 @@ test.before(async () => {
 });
 
 test("迁移 134：存量行回填（kind=auto 保持 auto，其余回填 manual）", async () => {
-  const Database = (await import("better-sqlite3")).default;
-  const mem = new Database(":memory:") as Database.Database;
+  const mem = new DatabaseSync(":memory:");
   mem.exec(`
     CREATE TABLE note_versions (
       id TEXT PRIMARY KEY,

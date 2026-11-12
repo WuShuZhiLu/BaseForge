@@ -6,7 +6,7 @@ import { ensureKnowledgeTreePasswordTable } from "../db/knowledgeTreePasswordMig
 import { resolveKnowledgeNodeAccess } from "./knowledgeCapabilities.js";
 import type { KnowledgeTreeNode } from "./knowledgeTreeCore.js";
 
-const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__nowen_root_documents__:";
+const ROOT_DOCUMENT_NOTEBOOK_PREFIX = "__baseforge_root_documents__:";
 const ROOT_DOCUMENT_NODE_PREFIX = `notebook:${ROOT_DOCUMENT_NOTEBOOK_PREFIX}`;
 
 type ListedNodeRow = Omit<KnowledgeTreeNode, "access">;

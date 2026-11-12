@@ -41,7 +41,7 @@ const auth = new Hono();
 function verifyDesktopLocalSecret(c: Context): boolean {
   const expected = process.env.ELECTRON_LOCAL_ACCOUNT_SECRET;
   if (!expected || expected.length < 16) return false;
-  const got = c.req.header("X-Nowen-Desktop-Secret") || "";
+  const got = c.req.header("X-BaseForge-Desktop-Secret") || "";
   const expectedBuffer = Buffer.from(expected, "utf8");
   const gotBuffer = Buffer.from(got, "utf8");
   return expectedBuffer.length === gotBuffer.length && timingSafeEqual(expectedBuffer, gotBuffer);

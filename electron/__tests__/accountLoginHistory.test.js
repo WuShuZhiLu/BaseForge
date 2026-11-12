@@ -38,7 +38,7 @@ function loadCredentialsWithSafeStorage() {
 }
 
 test("桌面端记住密码后可在登录页回填，且磁盘不保存明文", async (t) => {
-  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-remember-login-"));
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-remember-login-"));
   t.after(() => fs.rmSync(userDataPath, { recursive: true, force: true }));
   const { credentials, handlers } = loadCredentialsWithSafeStorage();
   credentials.setCredentialsPath(userDataPath);
@@ -72,7 +72,7 @@ test("桌面端记住密码后可在登录页回填，且磁盘不保存明文",
 });
 
 test("桌面端安全保存多个账号且不把 token 明文落盘", (t) => {
-  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-account-history-"));
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-account-history-"));
   t.after(() => fs.rmSync(userDataPath, { recursive: true, force: true }));
   const { credentials } = loadCredentialsWithSafeStorage();
   credentials.setCredentialsPath(userDataPath);
@@ -106,7 +106,7 @@ test("桌面端安全保存多个账号且不把 token 明文落盘", (t) => {
 });
 
 test("同一服务器同一用户更新原记录，删除账号不影响其它历史", (t) => {
-  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-account-history-"));
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-account-history-"));
   t.after(() => fs.rmSync(userDataPath, { recursive: true, force: true }));
   const { credentials } = loadCredentialsWithSafeStorage();
   credentials.setCredentialsPath(userDataPath);
@@ -144,7 +144,7 @@ test("同一服务器同一用户更新原记录，删除账号不影响其它�
 });
 
 test("损坏的历史令牌只标记该账号需要重新登录", (t) => {
-  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-account-history-"));
+  const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-account-history-"));
   t.after(() => fs.rmSync(userDataPath, { recursive: true, force: true }));
   const { credentials } = loadCredentialsWithSafeStorage();
   credentials.setCredentialsPath(userDataPath);

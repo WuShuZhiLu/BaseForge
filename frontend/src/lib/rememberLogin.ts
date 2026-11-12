@@ -73,7 +73,7 @@ function isCapacitorNative(): boolean {
 
 function getDesktopApi(): any {
   try {
-    const nd = (window as any).nowenDesktop;
+    const nd = (window as any).baseforgeDesktop;
     if (nd && nd.credentials && typeof nd.credentials.load === "function") {
       return nd.credentials;
     }
@@ -101,7 +101,7 @@ async function loadSecureStorage(): Promise<SecureStorageModule | null> {
       );
       // 使用独立的前缀，避免与 quickLogin 共用命名空间
       try {
-        await mod.SecureStorage.setKeyPrefix("nowen_");
+        await mod.SecureStorage.setKeyPrefix("baseforge_");
       } catch {
         /* ignore */
       }
@@ -115,7 +115,7 @@ async function loadSecureStorage(): Promise<SecureStorageModule | null> {
 }
 
 const SS_KEY = "rememberLogin.v1";
-const LS_KEY = "nowen-remember-login-v1";
+const LS_KEY = "baseforge-remember-login-v1";
 
 // ============================================================================
 // 对外 API

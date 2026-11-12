@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-format-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-format-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let noteVersionsRepository: typeof import("../src/repositories/noteVersionsRepository").noteVersionsRepository;
 let blockAuthorityStore: typeof import("../src/lib/blockAuthorityStore");
@@ -260,8 +260,8 @@ test("restoring a rich text version keeps tiptap-json contentFormat", async () =
     changeType: "edit",
   });
 
-  const previousSetting = process.env.NOWEN_YJS_SUBDOCUMENTS;
-  process.env.NOWEN_YJS_SUBDOCUMENTS = "1";
+  const previousSetting = process.env.BASEFORGE_YJS_SUBDOCUMENTS;
+  process.env.BASEFORGE_YJS_SUBDOCUMENTS = "1";
   yjsSubdocuments.rebuildYjsSubdocuments(db(), NOTE_ID, JSON.stringify({
     type: "doc",
     content: [{ type: "paragraph", content: [{ type: "text", text: "Stale content" }] }],
@@ -284,8 +284,8 @@ test("restoring a rich text version keeps tiptap-json contentFormat", async () =
       status: "healthy",
     });
   } finally {
-    if (previousSetting === undefined) delete process.env.NOWEN_YJS_SUBDOCUMENTS;
-    else process.env.NOWEN_YJS_SUBDOCUMENTS = previousSetting;
+    if (previousSetting === undefined) delete process.env.BASEFORGE_YJS_SUBDOCUMENTS;
+    else process.env.BASEFORGE_YJS_SUBDOCUMENTS = previousSetting;
   }
 });
 

@@ -57,7 +57,7 @@ test("白名单只接受精确域名：声明期拒绝通配符与端口，运�
     description: "",
     version: "1.0.0",
     apiVersion: 1 as const,
-    engines: { nowen: ">=1.5.0 <2.0.0" },
+    engines: { baseforge: ">=1.5.0 <2.0.0" },
     runtime: "node-action" as const,
     main: "index.mjs",
     permissions: ["external:fetch" as const],

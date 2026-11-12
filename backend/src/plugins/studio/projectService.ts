@@ -228,7 +228,7 @@ export class PluginStudioProjectService {
     const project = this.getProject(actor, projectId);
     const files = this.paths.listFiles(projectId);
     const zip = new JSZip();
-    zip.file(".nowen-studio-project.json", JSON.stringify({
+    zip.file(".baseforge-studio-project.json", JSON.stringify({
       formatVersion: 1,
       name: project.name,
       slug: project.slug,
@@ -263,7 +263,7 @@ export class PluginStudioProjectService {
     const files: Array<{ description: PluginStudioProjectFile; content: Buffer }> = [];
     let declaredBytes = 0;
     for (const entry of Object.values(zip.files)) {
-      if (entry.dir || entry.name === ".nowen-studio-project.json") continue;
+      if (entry.dir || entry.name === ".baseforge-studio-project.json") continue;
       const unsafeOriginalName = (entry as JSZip.JSZipObject & { unsafeOriginalName?: string }).unsafeOriginalName;
       if (unsafeOriginalName && unsafeOriginalName !== entry.name) {
         throw new PluginStudioError("导入包包含越界路径", "PLUGIN_STUDIO_PATH_TRAVERSAL");

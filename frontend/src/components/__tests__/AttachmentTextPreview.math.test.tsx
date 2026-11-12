@@ -55,7 +55,7 @@ describe.skip("Markdown attachment formula preview (#788)", () => {
     // instead of assuming a particular CI runner can finish lazy loading in 60ms.
     for (let retry = 0; retry < 40; retry++) {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
-      if (host.querySelector(".nowen-md-preview")) {
+      if (host.querySelector(".baseforge-md-preview")) {
         // Allow asynchronous MathView / renderKatex promise completions to commit.
         await act(async () => { await Promise.resolve(); });
         return;
@@ -80,7 +80,7 @@ describe.skip("Markdown attachment formula preview (#788)", () => {
     expect(host.querySelectorAll(".katex[data-math-display='inline']")).toHaveLength(1);
     expect(host.querySelectorAll(".katex[data-math-display='block']")).toHaveLength(1);
     expect(host.textContent).toContain("do_not_render");
-    expect(host.querySelector(".nowen-md-preview")?.textContent).toContain("not_math");
+    expect(host.querySelector(".baseforge-md-preview")?.textContent).toContain("not_math");
   });
 
   it("switches to untouched Markdown source and back without modifying the attachment", async () => {
@@ -88,7 +88,7 @@ describe.skip("Markdown attachment formula preview (#788)", () => {
     const tabs = host.querySelectorAll<HTMLButtonElement>('[role="tab"]');
     expect(tabs).toHaveLength(2);
     await act(async () => { tabs[1].click(); });
-    expect(host.querySelector(".nowen-md-preview")).toBeNull();
+    expect(host.querySelector(".baseforge-md-preview")).toBeNull();
     expect(host.querySelector("pre")?.textContent).toBe(SOURCE);
     await act(async () => { tabs[0].click(); });
     await awaitPreview();
@@ -110,6 +110,6 @@ describe.skip("Markdown attachment formula preview (#788)", () => {
       headers: { Range: "bytes=0-204799" },
     }));
     expect(host.textContent).toContain("已截断");
-    expect(host.querySelector(".nowen-md-preview")).not.toBeNull();
+    expect(host.querySelector(".baseforge-md-preview")).not.toBeNull();
   });
 });

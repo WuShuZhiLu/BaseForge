@@ -3,9 +3,9 @@ import type { Transaction } from "@tiptap/pm/state";
 import { EditorView } from "@tiptap/pm/view";
 
 const BLOCK_ID_RE = /^blk_[A-Za-z0-9_-]{6,}$/;
-const INSTALL_SYMBOL = Symbol.for("nowen.tiptap.empty-block-identity-dispatch");
+const INSTALL_SYMBOL = Symbol.for("baseforge.tiptap.empty-block-identity-dispatch");
 
-export const EMPTY_BLOCK_ID_RECONCILIATION_META = "nowen:empty-block-id-reconciliation";
+export const EMPTY_BLOCK_ID_RECONCILIATION_META = "baseforge:empty-block-id-reconciliation";
 
 interface EmptyParagraphIdentity {
   blockId: string | null;

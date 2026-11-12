@@ -39,7 +39,7 @@ describe("TableFidelityExtension", () => {
     expect(cell?.attrs?.align).toBe("center");
 
     const html = generateHTML(repaired, tiptapExtensions);
-    expect(html).toContain("data-nowen-table-aligns");
+    expect(html).toContain("data-baseforge-table-aligns");
     expect(html).toMatch(/text-align:\s*center/i);
     expect(html).not.toContain('align="2"');
   });

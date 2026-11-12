@@ -41,10 +41,10 @@ export const MermaidView: React.FC<MermaidViewProps> = (props) => {
     const codeBlock = shellElement?.closest<HTMLElement>(".code-block-wrapper");
     if (!codeBlock || !codeBlock.closest(".ProseMirror")) return;
 
-    codeBlock.dataset.nowenMermaidInlinePreview = "true";
+    codeBlock.dataset.baseforgeMermaidInlinePreview = "true";
     return () => {
-      if (codeBlock.dataset.nowenMermaidInlinePreview === "true") {
-        delete codeBlock.dataset.nowenMermaidInlinePreview;
+      if (codeBlock.dataset.baseforgeMermaidInlinePreview === "true") {
+        delete codeBlock.dataset.baseforgeMermaidInlinePreview;
       }
     };
   }, [shellElement]);

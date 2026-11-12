@@ -90,7 +90,7 @@ test("Vary preserves existing values without duplicates", () => {
 test("Hono compresses large JavaScript assets when gzip is accepted", async () => {
   const app = new Hono();
   app.use("*", compress());
-  const source = "const value = 'nowen-note';\n".repeat(2_000);
+  const source = "const value = 'baseforge';\n".repeat(2_000);
   app.get("/assets/index-testhash.js", (c) => c.body(source, 200, {
     "Content-Type": "application/javascript",
   }));

@@ -63,7 +63,7 @@ interface RecoveryArtifact {
 }
 
 type NativeAttachmentGlobal = typeof globalThis & {
-  __nowenNoteNativeAttachmentState?: NativeAttachmentGlobalState;
+  __baseforgeNoteNativeAttachmentState?: NativeAttachmentGlobalState;
 };
 
 type FilesystemErrorLike = Error & { code?: string };
@@ -252,10 +252,10 @@ function assertNativePlatform(): void {
 
 function getGlobalState(): NativeAttachmentGlobalState {
   const globalObject = globalThis as NativeAttachmentGlobal;
-  if (!globalObject.__nowenNoteNativeAttachmentState) {
-    globalObject.__nowenNoteNativeAttachmentState = { accounts: new Map() };
+  if (!globalObject.__baseforgeNoteNativeAttachmentState) {
+    globalObject.__baseforgeNoteNativeAttachmentState = { accounts: new Map() };
   }
-  return globalObject.__nowenNoteNativeAttachmentState;
+  return globalObject.__baseforgeNoteNativeAttachmentState;
 }
 
 function getAccountState(accountHash: string): AccountAttachmentState {

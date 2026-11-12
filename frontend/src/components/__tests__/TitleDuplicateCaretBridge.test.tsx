@@ -24,7 +24,7 @@ describe("TitleDuplicateCaretBridge", () => {
 
     expect(syncTitleDuplicateCaretProxy()).toBe(true);
     const prefix = document.querySelector<HTMLSpanElement>("[data-title-duplicate-mirror] div > span:first-child")!;
-    const caret = prefix.querySelector<HTMLElement>("[data-nowen-title-duplicate-caret]");
+    const caret = prefix.querySelector<HTMLElement>("[data-baseforge-title-duplicate-caret]");
 
     expect(caret).not.toBeNull();
     expect(prefix.textContent).toBe("abc");
@@ -38,7 +38,7 @@ describe("TitleDuplicateCaretBridge", () => {
     expect(syncTitleDuplicateCaretProxy()).toBe(true);
     const suffix = document.querySelector<HTMLSpanElement>("[data-title-duplicate-mirror] div > span:last-child")!;
 
-    expect(suffix.querySelector("[data-nowen-title-duplicate-caret]")).not.toBeNull();
+    expect(suffix.querySelector("[data-baseforge-title-duplicate-caret]")).not.toBeNull();
     expect(document.querySelector("[data-title-duplicate-mirror] div")?.textContent).toBe("abcdef");
   });
 
@@ -47,7 +47,7 @@ describe("TitleDuplicateCaretBridge", () => {
     field.setSelectionRange(1, 4);
 
     expect(syncTitleDuplicateCaretProxy()).toBe(false);
-    expect(document.querySelector("[data-nowen-title-duplicate-caret]")).toBeNull();
+    expect(document.querySelector("[data-baseforge-title-duplicate-caret]")).toBeNull();
   });
 
   it("places the caret within the third segment of a multi-range mirror", () => {
@@ -62,7 +62,7 @@ describe("TitleDuplicateCaretBridge", () => {
     field.setSelectionRange(9, 9);
     expect(syncTitleDuplicateCaretProxy()).toBe(true);
     const spans = document.querySelectorAll("[data-title-duplicate-mirror] div > span");
-    expect(spans[2].querySelector("[data-nowen-title-duplicate-caret]")).not.toBeNull();
+    expect(spans[2].querySelector("[data-baseforge-title-duplicate-caret]")).not.toBeNull();
     expect(Array.from(spans).map((span) => span.textContent).join("")).toBe(field.value);
   });
 });

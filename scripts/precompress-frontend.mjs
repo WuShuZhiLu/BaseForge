@@ -11,7 +11,7 @@ const brotliCompressAsync = promisify(brotliCompress);
 const gzipAsync = promisify(gzip);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.resolve(scriptDir, "../frontend/dist");
-const MIN_BYTES = Number(process.env.NOWEN_PRECOMPRESS_MIN_BYTES || 1024);
+const MIN_BYTES = Number(process.env.BASEFORGE_PRECOMPRESS_MIN_BYTES || 1024);
 const COMPRESSIBLE_EXTENSIONS = new Set([
   ".css",
   ".html",

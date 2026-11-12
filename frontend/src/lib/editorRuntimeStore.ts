@@ -29,7 +29,7 @@ let styleInstalled = false;
 let longTaskObserverInstalled = false;
 let recentLongTasks: number[] = [];
 
-const STYLE_ID = "nowen-editor-runtime-style";
+const STYLE_ID = "baseforge-editor-runtime-style";
 
 function installRuntimeStyle(): void {
   if (styleInstalled || typeof document === "undefined") return;
@@ -39,28 +39,28 @@ function installRuntimeStyle(): void {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror .resizable-image-wrapper,
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror .code-block-wrapper,
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror table,
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror iframe,
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror video,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror .resizable-image-wrapper,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror .code-block-wrapper,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror table,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror iframe,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror video {
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror .resizable-image-wrapper,
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror .code-block-wrapper,
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror table,
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror iframe,
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror video,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror .resizable-image-wrapper,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror .code-block-wrapper,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror table,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror iframe,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror video {
   content-visibility: auto;
   contain-intrinsic-size: auto 240px;
 }
 
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror .code-block-toolbar [data-codeblock-themepicker],
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror .image-node-toolbar,
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror .node-view-floating-toolbar {
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror .code-block-toolbar [data-codeblock-themepicker],
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror .image-node-toolbar,
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror .node-view-floating-toolbar {
   display: none !important;
 }
 
-html[data-nowen-editor-runtime-mode="lightweight-edit"] .ProseMirror,
-html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror {
+html[data-baseforge-editor-runtime-mode="lightweight-edit"] .ProseMirror,
+html[data-baseforge-editor-runtime-mode="viewport-optimized"] .ProseMirror {
   overflow-anchor: none;
 }
 `;
@@ -70,16 +70,16 @@ html[data-nowen-editor-runtime-mode="viewport-optimized"] .ProseMirror {
 function applyDocumentState(): void {
   if (typeof document === "undefined") return;
   installRuntimeStyle();
-  document.documentElement.dataset.nowenEditorRuntimeMode = state.decision.mode;
-  document.documentElement.dataset.nowenEditorRuntimeNote = state.noteId || "";
-  document.documentElement.dataset.nowenEditorRuntimeReasons = state.decision.reasons.join(",");
+  document.documentElement.dataset.baseforgeEditorRuntimeMode = state.decision.mode;
+  document.documentElement.dataset.baseforgeEditorRuntimeNote = state.noteId || "";
+  document.documentElement.dataset.baseforgeEditorRuntimeReasons = state.decision.reasons.join(",");
 }
 
 function emit(): void {
   applyDocumentState();
   for (const listener of listeners) listener();
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("nowen:editor-runtime-change", { detail: state }));
+    window.dispatchEvent(new CustomEvent("baseforge:editor-runtime-change", { detail: state }));
   }
 }
 

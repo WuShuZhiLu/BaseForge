@@ -77,7 +77,7 @@ async function sendPackage(
   const form = new FormData();
   form.append("file", file, file.name);
   form.append("config", JSON.stringify(config));
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(endpoint(workspaceId, dryRun), {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,

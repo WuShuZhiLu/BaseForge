@@ -4,7 +4,7 @@
 //   1. 进程启动或 second-instance 时，从命令行收集 *.md 文件路径
 //   2. macOS 的 "open-file" 事件单独处理
 //   3. 把文件内容读出来，通过 IPC("file:open") 发给 renderer，让前端把它作为外部文档打开
-// 前端需自行侦听：window.nowenDesktop.on("file:open", ({ path, name, content }) => ...)
+// 前端需自行侦听：window.baseforgeDesktop.on("file:open", ({ path, name, content }) => ...)
 
 const fs = require("fs");
 const path = require("path");

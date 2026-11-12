@@ -8,7 +8,7 @@ export interface BlockAuthorityReadResult {
 }
 
 export function resolveBlockAuthorityMode(
-  value = process.env.NOWEN_BLOCK_AUTHORITY_MODE,
+  value = process.env.BASEFORGE_BLOCK_AUTHORITY_MODE,
 ): BlockAuthorityMode {
   return value === "primary" ? "primary" : "shadow";
 }

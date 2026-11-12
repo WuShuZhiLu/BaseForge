@@ -3,7 +3,7 @@
 // 局域网服务发现（mDNS / Bonjour 客户端）
 //
 // 设计：
-//   - 主进程维持一个可复用的 Bonjour 实例和一个 browser（type=nowen-note tcp）。
+//   - 主进程维持一个可复用的 Bonjour 实例和一个 browser（type=baseforge tcp）。
 //   - renderer 调 `discovery:start` 开启扫描，`discovery:stop` 关闭；
 //     `discovery:list` 返回当前已知的服务快照。
 //   - 发现变化时主动通过 IPC `discovery:update` 推送全量列表到 renderer，
@@ -85,7 +85,7 @@ function startBrowser() {
   if (browser) return true;
 
   try {
-    browser = bonjour.find({ type: "nowen-note", protocol: "tcp" });
+    browser = bonjour.find({ type: "baseforge", protocol: "tcp" });
     browser.on("up", (svc) => {
       const norm = normalizeService(svc);
       services.set(norm.name, norm);
@@ -104,7 +104,7 @@ function startBrowser() {
     } catch {
       /* no-op */
     }
-    console.log("[discovery] browser started for _nowen-note._tcp.local.");
+    console.log("[discovery] browser started for _baseforge._tcp.local.");
     return true;
   } catch (err) {
     console.warn("[discovery] start browser failed:", err && err.message);

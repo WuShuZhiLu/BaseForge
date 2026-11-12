@@ -19,7 +19,7 @@ export const LARGE_RICH_TEXT_THRESHOLDS = {
  * the same policy decision without recalculating or mutating the server payload.
  */
 export interface RuntimeEditorPolicyNote extends Note {
-  __nowenEditorRuntimeDecision: EditorRuntimeDecision;
+  __baseforgeEditorRuntimeDecision: EditorRuntimeDecision;
 }
 
 /**
@@ -30,8 +30,8 @@ export interface RuntimeEditorPolicyNote extends Note {
  * Nothing here is persisted to the server.
  */
 export interface RuntimeLargeRichTextSafeNote extends RuntimeEditorPolicyNote {
-  __nowenLargeRichTextSafeMode: true;
-  __nowenOriginalContentFormat: string;
+  __baseforgeLargeRichTextSafeMode: true;
+  __baseforgeOriginalContentFormat: string;
 }
 
 interface RuntimeDecisionCacheEntry {
@@ -87,24 +87,24 @@ function resolveCachedRuntimeDecision(note: Note, contentFormat: string): Editor
 export function isLargeRichTextSafeNote(
   note: Note | null | undefined,
 ): note is RuntimeLargeRichTextSafeNote {
-  return !!note && (note as RuntimeLargeRichTextSafeNote).__nowenLargeRichTextSafeMode === true;
+  return !!note && (note as RuntimeLargeRichTextSafeNote).__baseforgeLargeRichTextSafeMode === true;
 }
 
 export function getEditorRuntimeDecisionForNote(
   note: Note | null | undefined,
 ): EditorRuntimeDecision | null {
   if (!note) return null;
-  const runtime = (note as RuntimeEditorPolicyNote).__nowenEditorRuntimeDecision;
+  const runtime = (note as RuntimeEditorPolicyNote).__baseforgeEditorRuntimeDecision;
   if (runtime) return runtime;
   const originalFormat = isLargeRichTextSafeNote(note)
-    ? note.__nowenOriginalContentFormat
+    ? note.__baseforgeOriginalContentFormat
     : (note.contentFormat || "tiptap-json");
   return resolveCachedRuntimeDecision(note, originalFormat);
 }
 
 export function prepareLargeRichTextNoteForDisplay(note: Note): Note {
   const originalFormat = isLargeRichTextSafeNote(note)
-    ? note.__nowenOriginalContentFormat
+    ? note.__baseforgeOriginalContentFormat
     : (note.contentFormat || "tiptap-json");
 
   // Complexity profiling scans the complete serialized document. Cache by note version and a
@@ -121,16 +121,16 @@ export function prepareLargeRichTextNoteForDisplay(note: Note): Note {
       return {
         ...note,
         contentFormat: originalFormat,
-        __nowenLargeRichTextSafeMode: undefined,
-        __nowenOriginalContentFormat: undefined,
-        __nowenEditorRuntimeDecision: decision,
+        __baseforgeLargeRichTextSafeMode: undefined,
+        __baseforgeOriginalContentFormat: undefined,
+        __baseforgeEditorRuntimeDecision: decision,
       } as unknown as RuntimeEditorPolicyNote;
     }
 
     if (decision.mode === "normal") return note;
     return {
       ...note,
-      __nowenEditorRuntimeDecision: decision,
+      __baseforgeEditorRuntimeDecision: decision,
     } as RuntimeEditorPolicyNote;
   }
 
@@ -139,9 +139,9 @@ export function prepareLargeRichTextNoteForDisplay(note: Note): Note {
     ...note,
     // Runtime routing override only. The raw Tiptap/HTML payload remains in `content`.
     contentFormat: "markdown",
-    __nowenLargeRichTextSafeMode: true,
-    __nowenOriginalContentFormat: originalFormat,
-    __nowenEditorRuntimeDecision: decision,
+    __baseforgeLargeRichTextSafeMode: true,
+    __baseforgeOriginalContentFormat: originalFormat,
+    __baseforgeEditorRuntimeDecision: decision,
   } as RuntimeLargeRichTextSafeNote;
 }
 
@@ -153,7 +153,7 @@ export function isLargeDocumentCollaborationBlocked(
 
 export function getLargeDocumentOriginalFormat(note: Note): string | undefined {
   return isLargeRichTextSafeNote(note)
-    ? note.__nowenOriginalContentFormat
+    ? note.__baseforgeOriginalContentFormat
     : note.contentFormat;
 }
 

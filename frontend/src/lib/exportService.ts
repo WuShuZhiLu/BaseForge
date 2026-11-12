@@ -6,7 +6,7 @@ import { normalizeToMarkdown } from "./contentFormat";
 import { exportSingleNote as exportSingleNoteCore } from "./exportServiceCore";
 import { resolveMarkdownExportWorkspaceId } from "./markdownExportWorkspaceScope";
 
-const MARKDOWN_EXPORT_SCOPE_PATCH_KEY = "__nowenMarkdownExportWorkspaceScopePatched";
+const MARKDOWN_EXPORT_SCOPE_PATCH_KEY = "__baseforgeMarkdownExportWorkspaceScopePatched";
 
 function installMarkdownExportWorkspaceScope(): void {
   const scopedApi = api as typeof api & Record<string, unknown>;
@@ -99,7 +99,7 @@ async function inlineMarkdownAttachmentImages(markdown: string): Promise<{
   const matches = Array.from(markdown.matchAll(markdownAttachmentImageRegex()));
   if (matches.length === 0) return { markdown, inlined: 0, failed: 0 };
 
-  const token = typeof localStorage !== "undefined" ? localStorage.getItem("nowen-token") : null;
+  const token = typeof localStorage !== "undefined" ? localStorage.getItem("baseforge-token") : null;
   const replacements = new Map<string, string>();
   let failed = 0;
 

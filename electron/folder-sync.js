@@ -1,6 +1,6 @@
 // electron/folder-sync.js
 //
-// Desktop folder -> Nowen one-way projection.
+// Desktop folder -> BaseForge one-way projection.
 // The main process owns filesystem access, scan budgets and the local index.
 // Renderer code only receives bounded metadata/content and performs authenticated uploads.
 
@@ -12,7 +12,7 @@ const os = require("os");
 let configFilePath = null;
 let dataDir = null;
 
-const PREFS_MESSAGE_PREFIX = "__NOWEN_FOLDER_SYNC_PREFS__:";
+const PREFS_MESSAGE_PREFIX = "__BASEFORGE_FOLDER_SYNC_PREFS__:";
 const DEFAULT_FILE_TYPES = [".md", ".txt", ".html", ".pdf", ".docx"];
 const DEFAULT_ADVANCED = Object.freeze({
   conflictPolicy: "protect",
@@ -255,7 +255,7 @@ function matchesExcludePattern(relativePath, pattern) {
 }
 
 /** 同步根目录下的排除规则文件；旧文件名继续兼容 */
-const IGNORE_FILE_NAMES = [".baseforgeignore", ".nowenignore"];
+const IGNORE_FILE_NAMES = [".baseforgeignore", ".baseforgeignore"];
 
 function readIgnoreFile(folderPath) {
   for (const name of IGNORE_FILE_NAMES) {

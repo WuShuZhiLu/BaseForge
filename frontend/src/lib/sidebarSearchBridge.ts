@@ -1,6 +1,6 @@
-export const SIDEBAR_SEARCH_CHANGE_EVENT = "nowen:sidebar-search-change";
-export const SIDEBAR_SEARCH_SYNC_EVENT = "nowen:sidebar-search-sync";
-export const SIDEBAR_SEARCH_PENDING_EVENT = "nowen:sidebar-search-pending";
+export const SIDEBAR_SEARCH_CHANGE_EVENT = "baseforge:sidebar-search-change";
+export const SIDEBAR_SEARCH_SYNC_EVENT = "baseforge:sidebar-search-sync";
+export const SIDEBAR_SEARCH_PENDING_EVENT = "baseforge:sidebar-search-pending";
 
 export interface SidebarSearchEventDetail {
   value: string;
@@ -13,7 +13,7 @@ export interface SidebarSearchPendingEventDetail {
 let currentSidebarSearchValue = "";
 let currentSidebarSearchPending = false;
 
-export const SEARCH_SPINNER_STYLE_ID = "nowen-sidebar-search-spinner-style";
+export const SEARCH_SPINNER_STYLE_ID = "baseforge-sidebar-search-spinner-style";
 
 /**
  * Search spinners need an explicit animation fallback. Some production CSS orders leave the
@@ -28,24 +28,24 @@ export function ensureSearchSpinnerStyle(): void {
   const style = document.createElement("style");
   style.id = SEARCH_SPINNER_STYLE_ID;
   style.textContent = `
-@keyframes nowen-sidebar-search-spin {
+@keyframes baseforge-sidebar-search-spin {
   from { transform: translateY(-50%) rotate(0deg); }
   to { transform: translateY(-50%) rotate(360deg); }
 }
 
-@keyframes nowen-search-center-spin {
+@keyframes baseforge-search-center-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
 [data-sidebar-search-loading] {
-  animation: nowen-sidebar-search-spin 0.8s linear infinite !important;
+  animation: baseforge-sidebar-search-spin 0.8s linear infinite !important;
   transform-origin: center;
   will-change: transform;
 }
 
 [data-swipe-blocker="search-center"] .animate-spin {
-  animation: nowen-search-center-spin 0.8s linear infinite !important;
+  animation: baseforge-search-center-spin 0.8s linear infinite !important;
   transform-origin: center;
   will-change: transform;
 }

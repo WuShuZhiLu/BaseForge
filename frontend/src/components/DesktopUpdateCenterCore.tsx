@@ -62,7 +62,7 @@ function formatCheckTime(value: string): string {
 }
 
 function runEditorSafetyFlush(): void {
-  window.dispatchEvent(new CustomEvent("nowen:before-desktop-update", {
+  window.dispatchEvent(new CustomEvent("baseforge:before-desktop-update", {
     detail: { reason: "desktop-update-install" },
   }));
 
@@ -129,7 +129,7 @@ function UpdateSettingsAddon({
 }) {
   return (
     <div
-      data-nowen-update-settings="true"
+      data-baseforge-update-settings="true"
       className="mt-3 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/60"
     >
       <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">

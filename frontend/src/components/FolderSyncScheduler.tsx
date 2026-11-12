@@ -23,17 +23,17 @@ const runningFolderIds = new Set<string>();
 const lastFailureTime = new Map<string, number>();
 
 function getFolderSync() {
-  return (window as any).nowenDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
+  return (window as any).baseforgeDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
 }
 
 function isDesktop(): boolean {
-  return !!(window as any).nowenDesktop?.isDesktop;
+  return !!(window as any).baseforgeDesktop?.isDesktop;
 }
 
 /** 检查用户是否已登录（localStorage 有 token） */
 function isLoggedIn(): boolean {
   try {
-    return !!localStorage.getItem("nowen-token");
+    return !!localStorage.getItem("baseforge-token");
   } catch {
     return false;
   }

@@ -6,7 +6,7 @@
  */
 const base = require("./builder.lite.base.config.js");
 
-const WINDOWS_PUBLISHER_NAME = process.env.NOWEN_WINDOWS_PUBLISHER_NAME?.trim() || "";
+const WINDOWS_PUBLISHER_NAME = process.env.BASEFORGE_WINDOWS_PUBLISHER_NAME?.trim() || "";
 const { artifactName: _legacyWindowsArtifactName, ...baseWin } = base.win || {};
 const win = {
   ...baseWin,
@@ -27,26 +27,26 @@ module.exports = {
   win,
   nsis: {
     ...(base.nsis || {}),
-    artifactName: "BaseForge-Lite-${version}-setup.${ext}",
+    artifactName: "BaseForge-${version}-lite-setup.${ext}",
   },
   portable: {
     ...(base.portable || {}),
-    artifactName: "BaseForge-Lite-${version}-portable.${ext}",
+    artifactName: "BaseForge-${version}-lite-portable.${ext}",
   },
   mac: {
     ...(base.mac || {}),
-    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
   dmg: {
     ...(base.dmg || {}),
-    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
   linux: {
     ...(base.linux || {}),
-    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
   appImage: {
     ...(base.appImage || {}),
-    artifactName: "BaseForge-Lite-${version}-${arch}.${ext}",
+    artifactName: "BaseForge-${version}-lite-${arch}.${ext}",
   },
 };

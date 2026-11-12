@@ -8,22 +8,22 @@ function envFlag(name: string): boolean {
 
 /**
  * V2.1 is developed on release/v1.5.0 behind fail-closed gates. The product version stays 1.5.0;
- * plugins that require engines.nowen >=1.6.0 remain incompatible until the actual release version
+ * plugins that require engines.baseforge >=1.6.0 remain incompatible until the actual release version
  * advances. These flags only expose implementation paths for controlled development and tests.
  */
 export function getExtensionPlatformFeatureFlags(): Readonly<ExtensionPlatformFeatureFlags> {
-  const extensionsV21 = envFlag("NOWEN_EXTENSIONS_V21");
-  const uiExtensions = extensionsV21 && envFlag("NOWEN_UI_EXTENSIONS");
-  const uiLayoutEditor = uiExtensions && envFlag("NOWEN_UI_LAYOUT_EDITOR");
-  const fileProcessingExtensions = extensionsV21 && envFlag("NOWEN_FILE_PROCESSING_EXTENSIONS");
+  const extensionsV21 = envFlag("BASEFORGE_EXTENSIONS_V21");
+  const uiExtensions = extensionsV21 && envFlag("BASEFORGE_UI_EXTENSIONS");
+  const uiLayoutEditor = uiExtensions && envFlag("BASEFORGE_UI_LAYOUT_EDITOR");
+  const fileProcessingExtensions = extensionsV21 && envFlag("BASEFORGE_FILE_PROCESSING_EXTENSIONS");
   return Object.freeze({
     extensionsV21,
-    pluginStudio: extensionsV21 && envFlag("NOWEN_PLUGIN_STUDIO"),
+    pluginStudio: extensionsV21 && envFlag("BASEFORGE_PLUGIN_STUDIO"),
     uiExtensions,
     uiLayoutEditor,
-    sandboxedPluginUi: uiLayoutEditor && envFlag("NOWEN_SANDBOXED_PLUGIN_UI"),
+    sandboxedPluginUi: uiLayoutEditor && envFlag("BASEFORGE_SANDBOXED_PLUGIN_UI"),
     fileProcessingExtensions,
-    experimentalDocumentTypes: fileProcessingExtensions && envFlag("NOWEN_EXPERIMENTAL_DOCUMENT_TYPES"),
+    experimentalDocumentTypes: fileProcessingExtensions && envFlag("BASEFORGE_EXPERIMENTAL_DOCUMENT_TYPES"),
   });
 }
 

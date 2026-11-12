@@ -1,0 +1,10 @@
+{
+  "name": "baseforge-plugin",
+  "version": "2.0.0",
+  "type": "module",
+  "bin": { "baseforge-plugin": "bin/baseforge-plugin.mjs" },
+  "files": ["bin", "README.md"],
+  "dependencies": { "archiver": "^7.0.1", "quickjs-emscripten": "^0.32.0" },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}

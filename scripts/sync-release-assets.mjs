@@ -2,15 +2,18 @@
 /**
  * Release 资产跨仓同步：GitHub Release → Gitea / Gitee。
  *
- * 设计要点（与 .cmp 里的发布链路设计一致）：
- *  - GitHub 负责 Windows / macOS / iOS 构建（需要 Windows/macOS runner，Gitea act_runner 做不到）；
- *  - 构建产物先发到 GitHub Release，再由本脚本搬运到 Gitea（主仓）与 Gitee（镜像）；
+ * 设计要点（与 docs/release-pipeline.md 一致）：
+ *  - GitHub 是主仓与权威发布点：负责 Windows / macOS / iOS 构建（需要 Windows/macOS runner，
+ *    Gitea act_runner 做不到），构建产物先发到 GitHub Release（draft，资产齐全后才转正式）；
+ *  - 再由本脚本把已转正的 GitHub 资产搬到 Gitea（镜像仓）与 Gitee（镜像仓）：Gitea 默认也先建草稿，
+ *    `--publish` 时先校验资产齐全，再把 Gitea Release 转正式；Gitee 没有草稿语义，
+ *    所以放在 targets 里最后处理（`gitea,gitee`）；
  *  - 幂等：目标端 release 已存在则复用，资产按「文件名 + 大小」判定，已存在跳过；
  *  - 可重入：每次执行都是「补齐缺口」，失败后重跑即可，不需要重建；
  *  - Gitee 单附件上限 100MB，超限直接报错并列出文件（不静默截断）。
  *
  * 用法：
- *   node scripts/sync-release-assets.mjs --tag <TAG> --targets gitea,gitee
+ *   node scripts/sync-release-assets.mjs --tag <TAG> --targets gitea,gitee --publish
  *   node scripts/sync-release-assets.mjs --targets gitea --dry-run     # tag 自动推断
  *
  * tag 解析顺序（不写死版本，发版不用改脚本）：
@@ -35,14 +38,18 @@ import { pipeline } from "node:stream/promises";
 const GITEE_MAX_ASSET_BYTES = 100 * 1024 * 1024;
 
 function parseArgs(argv) {
-  const args = { tag: "", targets: ["gitea"], dryRun: false };
+  const args = { tag: "", targets: ["gitea"], dryRun: false, publish: false, assetDir: "" };
   for (let i = 0; i < argv.length; i += 1) {
     const item = argv[i];
     if (item === "--tag") args.tag = argv[++i] || "";
     else if (item === "--targets") args.targets = (argv[++i] || "").split(",").map((s) => s.trim()).filter(Boolean);
+    else if (item === "--asset-dir") args.assetDir = argv[++i] || "";
     else if (item === "--dry-run") args.dryRun = true;
+    else if (item === "--publish") args.publish = true;
     else if (item === "--help" || item === "-h") {
-      console.log("用法: node scripts/sync-release-assets.mjs --tag <vX.Y.Z> [--targets gitea,gitee] [--dry-run]");
+      console.log("用法: node scripts/sync-release-assets.mjs --tag <vX.Y.Z> [--targets gitea,gitee] [--publish] [--asset-dir <dir>] [--dry-run]");
+      console.log("  --publish    资产上传并校验齐全后，把 Gitea Release 从 draft 转为正式");
+      console.log("  --asset-dir  复用已下载的资产目录（分步执行 Gitea / Gitee 时避免重复下载）");
       process.exit(0);
     }
   }
@@ -138,27 +145,79 @@ async function downloadAsset(asset, token, dir) {
   return target;
 }
 
+async function fetchGiteaRelease({ baseUrl, token, repo, tag }) {
+  const headers = { Authorization: `token ${token}` };
+  const res = await fetch(`${baseUrl}/api/v1/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`, { headers });
+  if (res.ok) return res.json();
+  // 草稿状态的 Release 不一定能从 tags 端点取到；回退到列表里按 tag 匹配。
+  const listRes = await fetch(`${baseUrl}/api/v1/repos/${repo}/releases?limit=100`, { headers });
+  if (!listRes.ok) return null;
+  const list = await listRes.json();
+  return Array.isArray(list) ? list.find((item) => item.tag_name === tag) || null : null;
+}
+
 async function createGiteaRelease({ baseUrl, token, repo, tag, name, body, dryRun }) {
   const headers = { Authorization: `token ${token}`, "Content-Type": "application/json" };
-  const existing = await fetch(`${baseUrl}/api/v1/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`, { headers });
-  if (existing.ok) {
-    const release = await existing.json();
-    console.log(`[gitea] release 已存在 #${release.id}，复用`);
-    return { id: release.id, assets: (release.assets || []).map((a) => ({ name: a.name, size: a.size })) };
+  const existing = await fetchGiteaRelease({ baseUrl, token, repo, tag });
+  if (existing) {
+    console.log(`[gitea] release 已存在 #${existing.id}（draft=${existing.draft === true}），复用`);
+    return {
+      id: existing.id,
+      draft: existing.draft === true,
+      assets: (existing.assets || []).map((a) => ({ name: a.name, size: a.size })),
+    };
   }
   if (dryRun) {
-    console.log(`[gitea] (dry-run) 将创建 release ${tag}`);
-    return { id: 0, assets: [] };
+    console.log(`[gitea] (dry-run) 将创建 draft release ${tag}`);
+    return { id: 0, draft: true, assets: [] };
   }
+  // 先建草稿：等所有资产上传并校验齐全后，再由 --publish 转正式。
   const res = await fetch(`${baseUrl}/api/v1/repos/${repo}/releases`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ tag_name: tag, name, body, draft: false, prerelease: tag.includes("-") }),
+    body: JSON.stringify({ tag_name: tag, name, body, draft: true, prerelease: tag.includes("-") }),
   });
   if (!res.ok) throw new Error(`[gitea] 创建 release 失败: ${res.status} ${await res.text()}`);
   const release = await res.json();
-  console.log(`[gitea] release 创建成功 #${release.id}`);
-  return { id: release.id, assets: [] };
+  console.log(`[gitea] draft release 创建成功 #${release.id}`);
+  return { id: release.id, draft: true, assets: [] };
+}
+
+/** 上传完成后核对：GitHub 侧每个资产都必须在 Gitea Release 里存在且大小一致。 */
+async function verifyGiteaAssets({ baseUrl, token, repo, tag, expected, dryRun }) {
+  if (dryRun) {
+    console.log(`[gitea] (dry-run) 将校验 ${expected.length} 个资产齐全`);
+    return;
+  }
+  const release = await fetchGiteaRelease({ baseUrl, token, repo, tag });
+  if (!release) throw new Error(`[gitea] 校验失败：release ${tag} 不存在`);
+  const assets = (release.assets || []).map((a) => ({ name: a.name, size: a.size }));
+  const missing = expected.filter((item) => !assets.some((asset) => asset.name === item.name && asset.size === item.size));
+  if (missing.length > 0) {
+    throw new Error(`[gitea] 资产不齐全：${missing.map((item) => item.name).join(", ")}`);
+  }
+  console.log(`[gitea] 资产校验通过（${expected.length} 个）`);
+}
+
+/** 门禁通过后把 Gitea Release 从草稿转为正式。 */
+async function publishGiteaRelease({ baseUrl, token, repo, tag, dryRun }) {
+  if (dryRun) {
+    console.log(`[gitea] (dry-run) 将把 ${tag} 转为正式 Release`);
+    return;
+  }
+  const release = await fetchGiteaRelease({ baseUrl, token, repo, tag });
+  if (!release) throw new Error(`[gitea] 发布失败：release ${tag} 不存在`);
+  if (release.draft !== true) {
+    console.log(`[gitea] release ${tag} 已是正式状态，无需重复发布`);
+    return;
+  }
+  const res = await fetch(`${baseUrl}/api/v1/repos/${repo}/releases/${release.id}`, {
+    method: "PATCH",
+    headers: { Authorization: `token ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ draft: false }),
+  });
+  if (!res.ok) throw new Error(`[gitea] 转正式失败: ${res.status} ${await res.text()}`);
+  console.log(`[gitea] release ${tag} 已转为正式`);
 }
 
 async function uploadGiteaAsset({ baseUrl, token, repo, releaseId, file, existing, dryRun }) {
@@ -254,12 +313,20 @@ async function main() {
   }
   console.log(`[sync] 资产 ${release.assets.length} 个：${release.assets.map((a) => `${a.name}(${humanSize(a.size)})`).join(", ")}`);
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-release-"));
+  const reuseDir = args.assetDir ? path.resolve(args.assetDir) : "";
+  const tmpDir = reuseDir || fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-release-"));
+  fs.mkdirSync(tmpDir, { recursive: true });
   const files = [];
   for (const asset of release.assets) {
+    const cached = path.join(tmpDir, asset.name);
+    if (fs.existsSync(cached) && fs.statSync(cached).size === asset.size) {
+      console.log(`[sync] 复用已下载资产 ${asset.name}`);
+      files.push(cached);
+      continue;
+    }
     files.push(await downloadAsset(asset, githubToken, tmpDir));
   }
-  console.log(`[sync] 已下载到 ${tmpDir}`);
+  console.log(`[sync] 资产目录 ${tmpDir}`);
 
   let failed = false;
   for (const target of args.targets) {
@@ -270,6 +337,12 @@ async function main() {
         const repo = requireEnv("GITEA_REPO");
         const state = await createGiteaRelease({ baseUrl, token, repo, tag: release.tag, name: release.name, body: release.body, dryRun: args.dryRun });
         for (const file of files) await uploadGiteaAsset({ baseUrl, token, repo, releaseId: state.id, file, existing: state.assets, dryRun: args.dryRun });
+        if (args.publish) {
+          await verifyGiteaAssets({ baseUrl, token, repo, tag: release.tag, expected: release.assets, dryRun: args.dryRun });
+          await publishGiteaRelease({ baseUrl, token, repo, tag: release.tag, dryRun: args.dryRun });
+        } else {
+          console.log("[gitea] 未指定 --publish，Release 保持草稿（资产可重跑补齐）");
+        }
       } else if (target === "gitee") {
         const baseUrl = (process.env.GITEE_URL || "https://gitee.com").replace(/\/+$/, "");
         const token = requireEnv("GITEE_TOKEN");
@@ -286,7 +359,7 @@ async function main() {
     }
   }
 
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  if (!reuseDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   if (failed) process.exit(1);
   console.log("[sync] 全部目标同步完成");
 }

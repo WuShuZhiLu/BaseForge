@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { resolveNotebookNoteScopeIds } from "../src/lib/notebookNoteScope";
 
 test("notebook note scope separates direct folder contents from recursive subtree contents", () => {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE notebooks (
       id TEXT PRIMARY KEY,

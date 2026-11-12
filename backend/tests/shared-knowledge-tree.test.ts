@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-shared-knowledge-tree-"));
+const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-shared-knowledge-tree-"));
 process.env.DB_PATH = path.join(tempDir, "shared-knowledge-tree.db");
 let closeDatabase: (() => void) | null = null;
 

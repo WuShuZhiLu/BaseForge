@@ -261,7 +261,7 @@ export default function FullscreenImageViewer({
     window.addEventListener("keydown", onKeyDown);
 
     const unregisterBackHandler = registerMobileBackHandler("image-viewer", () => {
-      if (!document.querySelector("[data-nowen-mobile-image-viewer]")) return false;
+      if (!document.querySelector("[data-baseforge-mobile-image-viewer]")) return false;
       closeViewer();
       return true;
     });
@@ -366,7 +366,7 @@ export default function FullscreenImageViewer({
     }
 
     const startedOnImage = event.target instanceof Element
-      && !!event.target.closest("[data-nowen-image-viewer-image]");
+      && !!event.target.closest("[data-baseforge-image-viewer-image]");
     singleGestureRef.current = {
       pointerId: event.pointerId,
       start: point,
@@ -545,8 +545,8 @@ export default function FullscreenImageViewer({
       role="dialog"
       aria-modal="true"
       aria-label="图片预览"
-      data-nowen-mobile-image-viewer=""
-      data-nowen-fullscreen-image-viewer=""
+      data-baseforge-mobile-image-viewer=""
+      data-baseforge-fullscreen-image-viewer=""
       className="fixed inset-0 z-[1000] overflow-hidden bg-black/[0.92] backdrop-blur-sm"
     >
       <div
@@ -569,7 +569,7 @@ export default function FullscreenImageViewer({
           src={imageRender.renderSrc}
           alt={currentItem.alt || ""}
           draggable={false}
-          data-nowen-image-viewer-image=""
+          data-baseforge-image-viewer-image=""
           className="max-h-[calc(100dvh-32px)] max-w-[calc(100vw-24px)] select-none object-contain will-change-transform animate-in zoom-in-95 duration-150"
           style={{
             maxWidth: rotation % 180 !== 0 ? "calc(100dvh - 32px)" : "calc(100vw - 24px)",

@@ -11,7 +11,6 @@ import {
   ListTree,
   Paperclip,
   Plus,
-  Sparkles,
   Star,
   Tags,
   Trash2,
@@ -54,13 +53,11 @@ const FIXED_BADGE_META: Record<FixedBadgeId, { labelKey: string; icon: React.Rea
   files: { labelKey: "sidebar.panelFiles", icon: <Paperclip size={BADGE_ICON_SIZE} /> },
 };
 
-/** 「更多」组候选徽章 = **工具入口**（待办 / 小记 / AI 对话 / 分享管理）。
+/** 「更多」组候选徽章 = **工具入口**（待办 / 分享管理）。
  *  用户口径（2026-10-16）：左侧活动栏可添加徽章，例如待办、小记；除固定 5 个外都要能折叠。
  *  这些是工具页（主区页签），不是侧栏面板，因此点击走 openToolTab。 */
 export const EXTRA_BADGE_CATALOG: Array<{ id: ToolTabKey; labelKey: string; icon: React.ReactNode }> = [
   { id: "tasks", labelKey: "sidebar.tasks", icon: <CheckSquare size={BADGE_ICON_SIZE} /> },
-  { id: "diary", labelKey: "sidebar.dailyRecords", icon: <BookOpen size={BADGE_ICON_SIZE} /> },
-  { id: "ai-chat", labelKey: "sidebar.aiChat", icon: <Sparkles size={BADGE_ICON_SIZE} /> },
   { id: "shares", labelKey: "sidebar.shareManagement", icon: <Link2 size={BADGE_ICON_SIZE} /> },
 ];
 

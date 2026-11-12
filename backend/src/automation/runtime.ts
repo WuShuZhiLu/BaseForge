@@ -23,7 +23,7 @@ class AutomationRuntime {
     this.timer.unref();
     this.cleanupTimer = setInterval(() => eventPublisher.cleanup(), 60 * 60 * 1000);
     this.cleanupTimer.unref();
-    eventPublisher.publish({ type: "app.started", userId: "system", resourceType: "app", resourceId: "nowen", source: "system", sourceId: INSTANCE_ID, data: {} });
+    eventPublisher.publish({ type: "app.started", userId: "system", resourceType: "app", resourceId: "baseforge", source: "system", sourceId: INSTANCE_ID, data: {} });
     void this.tick();
   }
 

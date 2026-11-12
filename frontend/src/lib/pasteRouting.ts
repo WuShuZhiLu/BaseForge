@@ -6,7 +6,7 @@ export type ClipboardRoutingReason =
   | "semantic-rich-html"
   | "embedded-content"
   | "rich-inline-style"
-  | "nowen-or-prosemirror-content"
+  | "baseforge-or-prosemirror-content"
   | "text-mismatch"
   | "unknown-html"
   | "rich-rtf"
@@ -166,10 +166,10 @@ function hasRichInlineStyle(style: string): boolean {
   );
 }
 
-function hasNowenOrProseMirrorAttribute(element: Element): boolean {
+function hasBaseForgeOrProseMirrorAttribute(element: Element): boolean {
   return Array.from(element.attributes).some((attribute) => {
     const name = attribute.name.toLowerCase();
-    return name === "data-pm-slice" || name.startsWith("data-nowen-");
+    return name === "data-pm-slice" || name.startsWith("data-baseforge-");
   });
 }
 
@@ -246,7 +246,7 @@ export function classifyClipboardHtml(input: { html: string; text?: string }): C
       };
     }
 
-    const internal = elements.find(hasNowenOrProseMirrorAttribute);
+    const internal = elements.find(hasBaseForgeOrProseMirrorAttribute);
     if (internal) {
       return {
         kind: "rich",
@@ -255,7 +255,7 @@ export function classifyClipboardHtml(input: { html: string; text?: string }): C
         hasEmbeddedContent: false,
         visibleText,
         tags,
-        reason: "nowen-or-prosemirror-content",
+        reason: "baseforge-or-prosemirror-content",
       };
     }
 

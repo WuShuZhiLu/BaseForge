@@ -4,13 +4,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-knowledge-blocks-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-knowledge-blocks-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let blocksApp: Hono;
 let syncNoteBlocks: typeof import("../src/lib/noteBlocks").syncNoteBlocks;
@@ -244,7 +244,7 @@ test("automatic note titles follow rename while aliases remain fixed", () => {
       content: [{
         type: "text",
         text: "Target",
-        marks: [{ type: "link", attrs: { href: `note:${targetId}`, rel: "noopener nowen-title-auto" } }],
+        marks: [{ type: "link", attrs: { href: `note:${targetId}`, rel: "noopener baseforge-title-auto" } }],
       }],
     }],
   });
@@ -256,7 +256,7 @@ test("automatic note titles follow rename while aliases remain fixed", () => {
       content: [{
         type: "text",
         text: "Fixed alias",
-        marks: [{ type: "link", attrs: { href: `note:${targetId}`, rel: "noopener nowen-title-alias" } }],
+        marks: [{ type: "link", attrs: { href: `note:${targetId}`, rel: "noopener baseforge-title-alias" } }],
       }],
     }],
   });

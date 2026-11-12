@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-task-ai-settings-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-task-ai-settings-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 
 let app: Hono;

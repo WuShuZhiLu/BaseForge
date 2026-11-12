@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { MIGRATIONS } from "../src/db/migrations";
 
 function createLegacyDb() {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (
@@ -33,7 +33,7 @@ function createLegacyDb() {
       ('ai_profiles_v1', '[{"id":"legacy-profile"}]'),
       ('ai_disabled_backup_ai_api_key', 'backup-secret'),
       ('aiXdisabledYbackupZsite', 'must-stay'),
-      ('site_title', 'Nowen');
+      ('site_title', 'BaseForge');
 
     CREATE TRIGGER ai_manual_config_guard_insert
     BEFORE INSERT ON system_settings
@@ -81,7 +81,7 @@ test("user AI settings migration copies legacy AI config only to admins", () => 
   assert.equal(legacyAI.count, 0);
   assert.equal(
     (db.prepare("SELECT value FROM system_settings WHERE key = 'site_title'").get() as { value: string }).value,
-    "Nowen",
+    "BaseForge",
   );
   assert.equal(
     (db.prepare("SELECT value FROM system_settings WHERE key = 'aiXdisabledYbackupZsite'").get() as { value: string }).value,

@@ -37,12 +37,15 @@ import {
   Trash2,
   Unlock,
   X,
+  ArrowDownUp,
+  MoreHorizontal,
 } from "lucide-react";
 import ShareModal from "@/components/ShareModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { confirm } from "@/components/ui/confirm";
 import { useApp } from "@/store/AppContext";
+import { useTranslation } from "react-i18next";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { api } from "@/lib/api";
 import { attachmentShareApi } from "@/lib/attachmentShareApi";
@@ -190,6 +193,7 @@ function IconAction({ label, onClick, danger = false, children }: {
 }
 
 export default function ShareManagementPage() {
+  const { t } = useTranslation();
   const { siteConfig } = useSiteSettings();
   const { state } = useApp();
   const [data, setData] = useState<ShareCenterResponse | null>(null);
@@ -205,6 +209,9 @@ export default function ShareManagementPage() {
   const [editingNoteShare, setEditingNoteShare] = useState<ShareCenterItem | null>(null);
   const [creatingShare, setCreatingShare] = useState<{ noteId: string; title: string } | null>(null);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  // 「⋯ 更多」菜单（单行工具栏）：刷新 / 状态筛选提示
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const requestSequence = useRef(0);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
@@ -217,6 +224,26 @@ export default function ShareManagementPage() {
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [sortMenuOpen]);
+
+  // 更多菜单的外部点击关闭
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) setMoreMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [moreMenuOpen]);
+
+  // Esc 退出多选
+  useEffect(() => {
+    if (!selectionMode) return;
+    const handle = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setSelected(new Map()); setSelectionMode(false); }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [selectionMode]);
 
   // 分类与筛选放在共享 store：左侧栏点分类、主区换列表，两边看到的是同一份状态
   // （照 features/files/filesUi.ts 的 useSyncExternalStore 模式）。
@@ -315,8 +342,8 @@ export default function ShareManagementPage() {
       setPage(1);
       void load(true);
     };
-    window.addEventListener("nowen:workspace-changed", onWorkspaceChanged);
-    return () => window.removeEventListener("nowen:workspace-changed", onWorkspaceChanged);
+    window.addEventListener("baseforge:workspace-changed", onWorkspaceChanged);
+    return () => window.removeEventListener("baseforge:workspace-changed", onWorkspaceChanged);
   }, [load]);
 
   const counts: ShareCenterCounts = data?.counts || {
@@ -460,7 +487,7 @@ export default function ShareManagementPage() {
     }
     void (async () => {
       try {
-        // 页签契约（P3）：不调 actions.setViewMode，改派发 nowen:tool-page-navigate
+        // 页签契约（P3）：不调 actions.setViewMode，改派发 baseforge:tool-page-navigate
         // 由 ToolPageHost 翻译为「关闭工具页签 + 打开笔记」。
         await api.getNote(item.objectId);
         navigateToolPage({ kind: "note", noteId: item.objectId });
@@ -568,112 +595,146 @@ export default function ShareManagementPage() {
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-app-bg">
-      {/* 标题行：当前分类 + 条数（条数取本次列表 total，与列表同源） */}
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-app-border px-4">
-        <h1 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-tx-primary">
-          <Link2 size={17} className="shrink-0 text-accent-primary" />
-          <span className="truncate">{shareCenterScopeTitle()}</span>
-          <span className="shrink-0 rounded-full border border-app-border px-2 py-0.5 text-[11px] font-normal tabular-nums text-tx-tertiary">
-            {data?.total || 0} 条
-          </span>
-        </h1>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {/* 与文件管理右上角同一个控件：图标 + 文字，进入/退出批量选择 */}
-          <Button
-            size="sm"
-            variant={selectionMode ? "default" : "outline"}
-            onClick={toggleSelectionMode}
-            className="shrink-0"
-            title={selectionMode ? "退出多选" : "进入多选"}
-          >
-            {selectionMode ? (
-              <>
-                <X size={14} className="mr-1" />
-                退出多选
-              </>
-            ) : (
-              <>
-                <CheckSquare size={14} className="mr-1" />
-                选择
-              </>
-            )}
-          </Button>
-          <Button size="sm" onClick={shareActiveNote}>
-            <Plus size={14} className="mr-1" />
-            新建分享
-          </Button>
-        </div>
+      {/* 顶栏单行（原型 toolbar-single-row-v1）：标题+徽章(左)；搜索/排序/选择/更多/新建分享(右)。
+          多选时右端原地切换为批量操作，不再另起蓝条。 */}
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-app-border bg-app-surface/40 px-4">
+        <Link2 size={17} className="shrink-0 text-accent-primary" />
+        <h1 className="shrink-0 text-[15px] font-semibold text-tx-primary">{shareCenterScopeTitle()}</h1>
+        <span className="shrink-0 rounded-full border border-app-border px-2 py-0.5 text-[10px] tabular-nums text-tx-tertiary">
+          {data?.total || 0} 条
+        </span>
+        <span className="flex-1" />
+            {/* ── 常驻态：搜索 / 排序 / 选择 / 更多 ── */}
+            <label className="relative block w-[190px] shrink-0">
+              <Search size={13} className="pointer-events-none absolute left-2.5 top-2 text-tx-tertiary" />
+              <Input
+                aria-label="搜索分享"
+                value={searchDraft}
+                onChange={(event) => setSearchDraft(event.target.value)}
+                placeholder={t("common.search")}
+                className="h-[30px] pl-7 pr-7 text-[11.5px]"
+              />
+              {searchDraft && (
+                <button
+                  type="button"
+                  aria-label="清除搜索"
+                  className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
+                  onClick={() => setSearchDraft("")}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </label>
+            <div ref={sortMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={sortMenuOpen}
+                title={`排序：${SHARE_SORT_OPTIONS.find((option) => option.value === sort)?.label ?? ""}`}
+                onClick={() => setSortMenuOpen((value) => !value)}
+                className="inline-flex h-[30px] w-10 items-center justify-center rounded-md border border-app-border bg-app-bg p-0 text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <ArrowDownUp size={14} />
+              </button>
+              {sortMenuOpen && (
+                <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                  {SHARE_SORT_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={sort === option.value}
+                      onClick={() => { setShareCenterUi({ sort: option.value }); setSortMenuOpen(false); }}
+                      className={cn(
+                        "flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover",
+                        sort === option.value ? "text-accent-primary" : "text-tx-secondary",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={toggleSelectionMode}
+              className="h-[30px] w-10 shrink-0 justify-center px-0"
+              title={selectionMode ? "退出多选（Esc）" : "进入多选"}
+            >
+              {selectionMode ? <X size={14} /> : <CheckSquare size={14} />}
+            </Button>
+            <div ref={moreMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                title="更多操作"
+                aria-haspopup="menu"
+                aria-expanded={moreMenuOpen}
+                onClick={() => setMoreMenuOpen((v) => !v)}
+                className="inline-flex h-7 w-10 items-center justify-center rounded-md border border-app-border bg-app-bg text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+              {moreMenuOpen && (
+                <div role="menu" className="absolute right-0 z-40 mt-1 w-44 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs text-tx-secondary hover:bg-app-hover hover:text-tx-primary"
+                    onClick={() => { setMoreMenuOpen(false); void load(); }}
+                  >
+                    <RefreshCw size={13} className="shrink-0" /> 刷新
+                  </button>
+                </div>
+              )}
+            </div>
       </header>
 
-      {/* 工具行：搜索 + 快捷 chips + 排序，与原型同一行 */}
-      <div className="flex h-10 shrink-0 items-center gap-2 border-b border-app-border px-4 text-xs text-tx-secondary">
-        <label className="relative block w-[210px] shrink-0">
-          <Search size={13} className="pointer-events-none absolute left-2.5 top-1.5 text-tx-tertiary" />
-          <Input
-            aria-label="搜索分享"
-            value={searchDraft}
-            onChange={(event) => setSearchDraft(event.target.value)}
-            placeholder="搜索标题 / 文件名 / 链接"
-            className="h-7 pl-7 pr-7 text-[11.5px]"
-          />
-          {searchDraft && (
-            <button
-              type="button"
-              aria-label="清除搜索"
-              className="absolute right-2 top-1.5 text-tx-tertiary hover:text-tx-primary"
-              onClick={() => setSearchDraft("")}
-            >
-              <X size={12} />
-            </button>
-          )}
-        </label>
-        {/* 快捷筛选（仅查看/可评论/可编辑/有密码/7 天内到期）已上移侧栏「分享设置」，
-            主区工具行只保留搜索 + 排序，与文件管理/回收站一致。 */}
-        <span className="flex-1" />
-        <div ref={sortMenuRef} className="relative shrink-0">
+      {/* 批量操作栏：点击选择后出现 */}
+      {selectionMode && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-app-border bg-accent-primary/5 px-4 py-1.5 text-xs text-tx-secondary">
+          <span className="shrink-0 whitespace-nowrap">{t("common.selectedCount", { count: selected.size })}</span>
+          <div className="flex-1" />
           <button
-            type="button"
-            aria-haspopup="listbox"
-            aria-expanded={sortMenuOpen}
-            onClick={() => setSortMenuOpen((value) => !value)}
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-app-border bg-app-bg px-2.5 text-[11.5px] text-tx-secondary transition-colors hover:bg-app-hover"
+            className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-md border border-app-border bg-app-bg px-2.5 text-xs text-tx-secondary transition-colors hover:bg-app-hover hover:text-tx-primary"
+            disabled={selectableItems.length === 0}
+            onClick={() => setSelected(new Map(selectableItems.map((item) => [itemKey(item), item])))}
           >
-            排序：<span className="font-medium text-tx-primary">{SHARE_SORT_OPTIONS.find((option) => option.value === sort)?.label}</span>
-            <ChevronDown size={12} />
+            {t("common.selectAll")}
           </button>
-          {sortMenuOpen && (
-            <div role="listbox" className="absolute right-0 z-40 mt-1 w-32 overflow-hidden rounded-lg border border-app-border bg-app-elevated py-1 shadow-xl">
-              {SHARE_SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={sort === option.value}
-                  onClick={() => { setShareCenterUi({ sort: option.value }); setSortMenuOpen(false); }}
-                  className={cn(
-                    "flex w-full items-center px-2.5 py-1 text-left text-[11px] hover:bg-app-hover",
-                    sort === option.value ? "text-accent-primary" : "text-tx-secondary",
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 批量条：蓝底横条常驻在表格上方（原型只展示「已选 N 项」这一种状态） */}
-      {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-[#cddffc] bg-[#eef4ff] px-4 py-1.5 text-xs text-tx-secondary dark:border-accent-primary/30 dark:bg-accent-primary/10">
-          <span className="font-medium text-tx-primary">已选 {selected.size} 项</span>
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <Button size="sm" variant="outline" onClick={() => void batchDisable()}>批量停用</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchExpire()}>批量设过期（30 天后）</Button>
-            <Button size="sm" variant="outline" onClick={() => void batchCopy()}>批量复制全部链接</Button>
-            <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-300" onClick={() => void batchDelete()}>批量删除</Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Map())}>取消</Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => void batchDisable()}
+          >
+            {t("shareCenter.batchDisable", { defaultValue: "批量停用" })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => void batchCopy()}
+          >
+            {t("shareCenter.batchCopyLinks", { defaultValue: "批量复制全部链接" })}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs"
+            onClick={() => setSelected(new Map())}
+          >
+            {t("common.clearSelection")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-[30px] shrink-0 px-2.5 text-xs text-rose-600 dark:text-rose-300"
+            onClick={() => void batchDelete()}
+          >
+            {t("common.deleteSelected")}
+          </Button>
         </div>
       )}
 

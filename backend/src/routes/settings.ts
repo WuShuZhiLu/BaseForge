@@ -21,7 +21,7 @@ const settings = new Hono();
 export interface SiteSettings {
   site_title: string;
   site_favicon: string;
-  /** ICP 备案号由 Docker/运行时环境变量 NOWEN_ICP_BEIAN 驱动，设置页不可编辑。 */
+  /** ICP 备案号由 Docker/运行时环境变量 BASEFORGE_ICP_BEIAN 驱动，设置页不可编辑。 */
   site_icp_beian: string;
   /** 访客最终打开的公开 Web 根地址；空串表示沿用当前浏览器 origin。 */
   site_public_web_origin: string;

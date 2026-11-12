@@ -7,7 +7,7 @@ import type { PhaseAPerfEvent } from "@/lib/phaseAPerfDiagnostics";
 describe("MarkdownCodeBlock plaintext highlighting", () => {
   it("renders language=text without auto detection", () => {
     const events: PhaseAPerfEvent[] = [];
-    globalThis.__NOWEN_PHASE_A_PERF_SINK__ = (event) => events.push(event);
+    globalThis.__BASEFORGE_PHASE_A_PERF_SINK__ = (event) => events.push(event);
     try {
       const html = renderToStaticMarkup(
         <MarkdownCodeBlock className="language-text">const literal = true;</MarkdownCodeBlock>,
@@ -15,7 +15,7 @@ describe("MarkdownCodeBlock plaintext highlighting", () => {
       expect(html).toContain("const literal = true;");
       expect(events.filter((event) => event.type === "lowlight-highlight")).toHaveLength(0);
     } finally {
-      globalThis.__NOWEN_PHASE_A_PERF_SINK__ = undefined;
+      globalThis.__BASEFORGE_PHASE_A_PERF_SINK__ = undefined;
     }
   });
 });

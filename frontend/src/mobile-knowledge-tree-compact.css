@@ -7,50 +7,50 @@
  * :has() when available; browsers without :has() still receive the compact
  * document baseline instead of falling back to the former spacious layout.
  */
-.nowen-mobile-tree-density {
+.baseforge-mobile-tree-density {
   /* Compatibility aliases retained for existing CI and downstream themes. */
-  --nowen-mobile-tree-row-height: 30px;
-  --nowen-mobile-tree-indent: 10px;
+  --baseforge-mobile-tree-row-height: 30px;
+  --baseforge-mobile-tree-indent: 10px;
 
-  --nowen-mobile-tree-root-folder-row-height: 32px;
-  --nowen-mobile-tree-folder-row-height: 30px;
-  --nowen-mobile-tree-note-row-height: 28px;
-  --nowen-mobile-tree-expander-width: 20px;
-  --nowen-mobile-tree-content-gap: 4px;
-  --nowen-mobile-tree-action-width: 30px;
+  --baseforge-mobile-tree-root-folder-row-height: 32px;
+  --baseforge-mobile-tree-folder-row-height: 30px;
+  --baseforge-mobile-tree-note-row-height: 28px;
+  --baseforge-mobile-tree-expander-width: 20px;
+  --baseforge-mobile-tree-content-gap: 4px;
+  --baseforge-mobile-tree-action-width: 30px;
 }
 
 /*
  * Compact fallback: every row starts at document density. This guarantees a
  * visible reduction even in older embedded browsers without :has() support.
  */
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] {
-  min-height: var(--nowen-mobile-tree-note-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] {
+  min-height: var(--baseforge-mobile-tree-note-row-height) !important;
   border-radius: 4px;
   gap: 2px;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:first-child {
-  width: var(--nowen-mobile-tree-expander-width) !important;
-  min-width: var(--nowen-mobile-tree-expander-width) !important;
-  max-width: var(--nowen-mobile-tree-expander-width) !important;
-  height: var(--nowen-mobile-tree-note-row-height) !important;
-  min-height: var(--nowen-mobile-tree-note-row-height) !important;
-  flex: 0 0 var(--nowen-mobile-tree-expander-width) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:first-child {
+  width: var(--baseforge-mobile-tree-expander-width) !important;
+  min-width: var(--baseforge-mobile-tree-expander-width) !important;
+  max-width: var(--baseforge-mobile-tree-expander-width) !important;
+  height: var(--baseforge-mobile-tree-note-row-height) !important;
+  min-height: var(--baseforge-mobile-tree-note-row-height) !important;
+  flex: 0 0 var(--baseforge-mobile-tree-expander-width) !important;
   margin-right: 0 !important;
   padding: 0 !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:first-child > svg {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:first-child > svg {
   width: 9px;
   height: 9px;
   flex: 0 0 9px;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) {
-  min-height: var(--nowen-mobile-tree-note-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) {
+  min-height: var(--baseforge-mobile-tree-note-row-height) !important;
   justify-content: flex-start;
-  gap: var(--nowen-mobile-tree-content-gap) !important;
+  gap: var(--baseforge-mobile-tree-content-gap) !important;
   margin-left: 0 !important;
   padding: 0 !important;
   font-size: 11px !important;
@@ -58,90 +58,90 @@
   touch-action: manipulation;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) > svg {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) > svg {
   width: 12px;
   height: 12px;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) > span:first-child {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(2) > span:first-child {
   width: 13px !important;
   font-size: 12px !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(n + 3) {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button:nth-child(n + 3) {
   display: flex !important;
-  width: var(--nowen-mobile-tree-action-width) !important;
-  min-width: var(--nowen-mobile-tree-action-width) !important;
-  height: var(--nowen-mobile-tree-note-row-height) !important;
-  min-height: var(--nowen-mobile-tree-note-row-height) !important;
-  flex: 0 0 var(--nowen-mobile-tree-action-width);
+  width: var(--baseforge-mobile-tree-action-width) !important;
+  min-width: var(--baseforge-mobile-tree-action-width) !important;
+  height: var(--baseforge-mobile-tree-note-row-height) !important;
+  min-height: var(--baseforge-mobile-tree-note-row-height) !important;
+  flex: 0 0 var(--baseforge-mobile-tree-action-width);
   touch-action: manipulation;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id] > button[title="更多"] > svg {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id] > button[title="更多"] > svg {
   width: 12px;
   height: 12px;
 }
 
 /* Nested folders remain slightly taller than documents for hierarchy scanning. */
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder),
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) {
-  min-height: var(--nowen-mobile-tree-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder),
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) {
+  min-height: var(--baseforge-mobile-tree-folder-row-height) !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:first-child,
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:first-child,
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[aria-label$="下新建文档"],
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[aria-label$="下新建文档"],
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[title="更多"],
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[title="更多"] {
-  height: var(--nowen-mobile-tree-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:first-child,
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:first-child,
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[aria-label$="下新建文档"],
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[aria-label$="下新建文档"],
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[title="更多"],
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[title="更多"] {
+  height: var(--baseforge-mobile-tree-folder-row-height) !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2),
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:nth-child(2) {
-  min-height: var(--nowen-mobile-tree-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2),
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:nth-child(2) {
+  min-height: var(--baseforge-mobile-tree-folder-row-height) !important;
   padding: 1px 0 !important;
   line-height: 16px !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2) > svg {
+.baseforge-mobile-tree-density [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2) > svg {
   width: 13px;
   height: 13px;
 }
 
 /* Top-level notebook folders keep one extra density step for readability. */
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder),
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) {
-  min-height: var(--nowen-mobile-tree-root-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder),
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) {
+  min-height: var(--baseforge-mobile-tree-root-folder-row-height) !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:first-child,
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:first-child,
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[aria-label$="下新建文档"],
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[aria-label$="下新建文档"],
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[title="更多"],
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[title="更多"] {
-  height: var(--nowen-mobile-tree-root-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:first-child,
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:first-child,
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[aria-label$="下新建文档"],
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[aria-label$="下新建文档"],
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button[title="更多"],
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button[title="更多"] {
+  height: var(--baseforge-mobile-tree-root-folder-row-height) !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2),
-.nowen-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:nth-child(2) {
-  min-height: var(--nowen-mobile-tree-root-folder-row-height) !important;
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > svg.lucide-folder) > button:nth-child(2),
+.baseforge-mobile-tree-density [data-knowledge-tree-section] > div > [data-knowledge-tree-node-id]:has(> button:nth-child(2) > span:first-child) > button:nth-child(2) {
+  min-height: var(--baseforge-mobile-tree-root-folder-row-height) !important;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-section-heading] {
+.baseforge-mobile-tree-density [data-knowledge-tree-section-heading] {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   line-height: 12px;
 }
 
-.nowen-mobile-tree-density [data-knowledge-tree-inline-create] > div {
+.baseforge-mobile-tree-density [data-knowledge-tree-inline-create] > div {
   min-height: 24px;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 
-.nowen-mobile-tree-density [data-swipe-blocker="knowledge-tree-scroll"] {
+.baseforge-mobile-tree-density [data-swipe-blocker="knowledge-tree-scroll"] {
   padding-bottom: 6px !important;
 }

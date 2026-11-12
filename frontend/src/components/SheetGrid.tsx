@@ -81,7 +81,7 @@ export default function SheetGrid({ data, visibleRows = data.rows, canEdit = fal
                   onDragStart={(event) => {
                     setDragColumnId(column.id);
                     event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("application/x-nowen-sheet-column", column.id);
+                    event.dataTransfer.setData("application/x-baseforge-sheet-column", column.id);
                   }}
                   onDragOver={(event) => {
                     if (!dragColumnId || dragColumnId === column.id) return;
@@ -90,7 +90,7 @@ export default function SheetGrid({ data, visibleRows = data.rows, canEdit = fal
                   }}
                   onDrop={(event) => {
                     event.preventDefault();
-                    const sourceId = event.dataTransfer.getData("application/x-nowen-sheet-column") || dragColumnId;
+                    const sourceId = event.dataTransfer.getData("application/x-baseforge-sheet-column") || dragColumnId;
                     if (sourceId && sourceId !== column.id) {
                       const rect = event.currentTarget.getBoundingClientRect();
                       const placement = event.clientX >= rect.left + rect.width / 2 ? "after" : "before";
@@ -129,7 +129,7 @@ export default function SheetGrid({ data, visibleRows = data.rows, canEdit = fal
                     onDragStart={(event) => {
                       setDragRowId(row.id);
                       event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData("application/x-nowen-sheet-row", row.id);
+                      event.dataTransfer.setData("application/x-baseforge-sheet-row", row.id);
                     }}
                     onDragOver={(event) => {
                       if (!dragRowId || dragRowId === row.id || filterQuery) return;
@@ -139,7 +139,7 @@ export default function SheetGrid({ data, visibleRows = data.rows, canEdit = fal
                     onDrop={(event) => {
                       event.preventDefault();
                       if (filterQuery) return;
-                      const sourceId = event.dataTransfer.getData("application/x-nowen-sheet-row") || dragRowId;
+                      const sourceId = event.dataTransfer.getData("application/x-baseforge-sheet-row") || dragRowId;
                       if (sourceId && sourceId !== row.id) {
                         const rect = event.currentTarget.getBoundingClientRect();
                         const placement = event.clientY >= rect.top + rect.height / 2 ? "after" : "before";

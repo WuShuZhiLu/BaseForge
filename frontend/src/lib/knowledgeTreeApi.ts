@@ -107,7 +107,7 @@ function apiBase(): string {
 
 function token(): string {
   try {
-    return localStorage.getItem("nowen-token") || "";
+    return localStorage.getItem("baseforge-token") || "";
   } catch {
     return "";
   }

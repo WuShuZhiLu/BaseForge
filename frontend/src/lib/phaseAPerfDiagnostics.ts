@@ -33,9 +33,9 @@ export type PhaseAPerfEvent = {
 
 declare global {
   // Test-only hook. Vite replaces MODE at build time and removes this branch in production.
-  var __NOWEN_PHASE_A_PERF_SINK__: ((event: PhaseAPerfEvent) => void) | undefined;
-  var __NOWEN_PHASE_A_PERF_EVENTS__: PhaseAPerfEvent[] | undefined;
-  var __NOWEN_PHASE_A_PERF_OBSERVERS_INSTALLED__: boolean | undefined;
+  var __BASEFORGE_PHASE_A_PERF_SINK__: ((event: PhaseAPerfEvent) => void) | undefined;
+  var __BASEFORGE_PHASE_A_PERF_EVENTS__: PhaseAPerfEvent[] | undefined;
+  var __BASEFORGE_PHASE_A_PERF_OBSERVERS_INSTALLED__: boolean | undefined;
 }
 
 const phaseAPerfEnabled = import.meta.env.MODE === "test" || import.meta.env.VITE_PHASE_A_PERF === "1";
@@ -54,10 +54,10 @@ function scheduleBrowserExposure(): void {
   if (import.meta.env.VITE_PHASE_A_PERF !== "1" || typeof document === "undefined" || exposeTimer !== null) return;
   exposeTimer = window.setTimeout(() => {
     exposeTimer = null;
-    let output = document.getElementById("nowen-phase-a-perf-data");
+    let output = document.getElementById("baseforge-phase-a-perf-data");
     if (!output) {
       output = document.createElement("script");
-      output.id = "nowen-phase-a-perf-data";
+      output.id = "baseforge-phase-a-perf-data";
       output.setAttribute("type", "application/json");
       document.head.appendChild(output);
     }
@@ -68,11 +68,11 @@ function scheduleBrowserExposure(): void {
 export function recordPhaseAPerfEvent(event: PhaseAPerfEvent): void {
   if (!phaseAPerfEnabled) return;
   const timestamped = { ...event, timestamp: event.timestamp ?? performance.now() };
-  globalThis.__NOWEN_PHASE_A_PERF_SINK__?.(timestamped);
+  globalThis.__BASEFORGE_PHASE_A_PERF_SINK__?.(timestamped);
   if (import.meta.env.VITE_PHASE_A_PERF === "1") {
     browserEvents.push(timestamped);
     if (browserEvents.length > MAX_BROWSER_EVENTS) browserEvents.splice(0, 1_000);
-    globalThis.__NOWEN_PHASE_A_PERF_EVENTS__ = browserEvents;
+    globalThis.__BASEFORGE_PHASE_A_PERF_EVENTS__ = browserEvents;
     scheduleBrowserExposure();
   }
 }
@@ -86,8 +86,8 @@ export function recordPhaseATransaction(): void {
 export function installPhaseABrowserObservers(): () => void {
   if (!phaseAPerfEnabled || typeof window === "undefined") return () => undefined;
   browserObserverUsers += 1;
-  if (!globalThis.__NOWEN_PHASE_A_PERF_OBSERVERS_INSTALLED__) {
-    globalThis.__NOWEN_PHASE_A_PERF_OBSERVERS_INSTALLED__ = true;
+  if (!globalThis.__BASEFORGE_PHASE_A_PERF_OBSERVERS_INSTALLED__) {
+    globalThis.__BASEFORGE_PHASE_A_PERF_OBSERVERS_INSTALLED__ = true;
     const pendingAnimationFrames = new Set<number>();
     const handleBeforeInput = () => {
       lastBeforeInputAt = performance.now();
@@ -132,7 +132,7 @@ export function installPhaseABrowserObservers(): () => void {
       pendingAnimationFrames.clear();
       observer?.disconnect();
       lastBeforeInputAt = null;
-      globalThis.__NOWEN_PHASE_A_PERF_OBSERVERS_INSTALLED__ = false;
+      globalThis.__BASEFORGE_PHASE_A_PERF_OBSERVERS_INSTALLED__ = false;
     };
   }
 
@@ -187,9 +187,9 @@ export function instrumentPhaseALowlight<T extends {
   highlightAuto: (code: string, options?: LowlightAutoOptions) => unknown;
   listLanguages?: () => string[];
 }>(instance: T): T {
-  if ((instance as T & { __nowenPhaseAInstrumented?: boolean }).__nowenPhaseAInstrumented) return instance;
-  const marked = instance as T & { __nowenPhaseAInstrumented?: boolean };
-  marked.__nowenPhaseAInstrumented = true;
+  if ((instance as T & { __baseforgePhaseAInstrumented?: boolean }).__baseforgePhaseAInstrumented) return instance;
+  const marked = instance as T & { __baseforgePhaseAInstrumented?: boolean };
+  marked.__baseforgePhaseAInstrumented = true;
   const highlight = instance.highlight.bind(instance);
   const highlightAuto = instance.highlightAuto.bind(instance);
   const emptyResult = () => ({ children: [] });

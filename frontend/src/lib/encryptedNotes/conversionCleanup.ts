@@ -19,7 +19,7 @@ export interface ConversionCleanupInput {
 
 function assertNoPendingWrites(noteId: string, queueKey: string): void {
   if (isOfflineQueueFlushing()) throw new ConversionCleanupError("pending_writes");
-  for (const key of [queueKey, "nowen-offline-queue"]) {
+  for (const key of [queueKey, "baseforge-offline-queue"]) {
     const raw = localStorage.getItem(key);
     const queue: unknown = raw === null ? [] : JSON.parse(raw);
     if (!Array.isArray(queue) || queue.some((item) => !item || typeof item.noteId !== "string")) {
@@ -53,20 +53,20 @@ export async function cleanupConvertedNoteCopies(
   let queueKey: string; let token: string | null; let server: string | null;
   try {
     queueKey = getOfflineQueueStorageKey();
-    token = localStorage.getItem("nowen-token");
-    server = localStorage.getItem("nowen-server-url");
+    token = localStorage.getItem("baseforge-token");
+    server = localStorage.getItem("baseforge-server-url");
   } catch { throw new ConversionCleanupError("storage_failed"); }
   let invalidated = false;
   const invalidate = () => { invalidated = true; };
   const storage = (event: StorageEvent) => {
-    if (event.key === null || event.key === "nowen-token" || event.key === "nowen-server-url") invalidate();
+    if (event.key === null || event.key === "baseforge-token" || event.key === "baseforge-server-url") invalidate();
   };
   const assertScope = () => {
-    if (invalidated || !token || token !== localStorage.getItem("nowen-token") || server !== localStorage.getItem("nowen-server-url")
+    if (invalidated || !token || token !== localStorage.getItem("baseforge-token") || server !== localStorage.getItem("baseforge-server-url")
       || queueKey !== getOfflineQueueStorageKey() || getCurrentUserId() !== input.userId) throw new ConversionCleanupError("scope_changed");
   };
-  window.addEventListener("nowen:token-changed", invalidate);
-  window.addEventListener("nowen:server-url-changed", invalidate);
+  window.addEventListener("baseforge:token-changed", invalidate);
+  window.addEventListener("baseforge:server-url-changed", invalidate);
   window.addEventListener("storage", storage);
   try {
     return await withConversionCleanupLease(input.noteId, async () => {
@@ -101,7 +101,7 @@ export async function cleanupConvertedNoteCopies(
       assertNoPendingWrites(input.noteId, queueKey);
       if (await inspectCachedNotePresence(input.noteId, input.userId) !== false) throw new ConversionCleanupError("storage_failed");
       assertScope();
-      if (localStorage.getItem(`nowen-draft-${input.noteId}`) !== null || remaining.some((database) => database.name === collaboration)) {
+      if (localStorage.getItem(`baseforge-draft-${input.noteId}`) !== null || remaining.some((database) => database.name === collaboration)) {
         throw new ConversionCleanupError("storage_failed");
       }
       return { noteId: input.noteId, localCleanup: true as const, physicalErasure: "not_verified" as const };
@@ -110,8 +110,8 @@ export async function cleanupConvertedNoteCopies(
     if (error instanceof ConversionCleanupError) throw error;
     throw new ConversionCleanupError("storage_failed");
   } finally {
-    window.removeEventListener("nowen:token-changed", invalidate);
-    window.removeEventListener("nowen:server-url-changed", invalidate);
+    window.removeEventListener("baseforge:token-changed", invalidate);
+    window.removeEventListener("baseforge:server-url-changed", invalidate);
     window.removeEventListener("storage", storage);
   }
 }

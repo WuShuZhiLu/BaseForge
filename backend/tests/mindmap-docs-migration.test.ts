@@ -7,7 +7,7 @@ import { getDb } from "../src/db/schema";
 const USER_ID = "mm-owner";
 const OTHER_ID = "mm-other";
 const FOLDER_ID = "mm-folder-1";
-const PSEUDO_NOTEBOOK_ID = `__nowen_mindmap_folder__:${FOLDER_ID}`;
+const PSEUDO_NOTEBOOK_ID = `__baseforge_mindmap_folder__:${FOLDER_ID}`;
 const MAP_IN_FOLDER = "11111111-1111-4111-8111-111111111111";
 const MAP_TRASHED = "22222222-2222-4222-8222-222222222222";
 const MAP_LOOSE = "33333333-3333-4333-8333-333333333333";

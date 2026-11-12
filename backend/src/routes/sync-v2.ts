@@ -373,7 +373,7 @@ app.get("/changes", (c) => {
 // 新实体只能通过后续显式协商加入，不得直接改动这份默认顺序。
 const LEGACY_SNAPSHOT_ORDER: SyncNegotiatedEntityType[] = [
   "notebook", "tag", "note", "note_tag", "favorite", "attachment",
-  "task", "task_reminder", "diary", "mindmap",
+  "task", "task_reminder", "mindmap",
 ];
 
 function snapshotOrder(subscription: EntitySubscription): SyncNegotiatedEntityType[] {
@@ -473,13 +473,6 @@ function snapshotPage(
         FROM task_reminders r JOIN tasks t ON t.id = r.taskId
         WHERE t.workspaceId IS ? AND (? IS NOT NULL OR r.userId = ?) AND r.id > ?
         ORDER BY r.id ASC LIMIT ?
-      `).all(workspaceId, workspaceId, userId, afterId, limit) as Array<Record<string, unknown>>);
-
-    case "diary":
-      return map(db.prepare(`
-        SELECT * FROM diaries
-        WHERE workspaceId IS ? AND (? IS NOT NULL OR userId = ?) AND id > ?
-        ORDER BY id ASC LIMIT ?
       `).all(workspaceId, workspaceId, userId, afterId, limit) as Array<Record<string, unknown>>);
 
     case "mindmap":

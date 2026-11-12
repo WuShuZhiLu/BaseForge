@@ -1,9 +1,10 @@
 import React, { useCallback } from "react";
 import { Star } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { api, getCurrentWorkspace } from "@/lib/api";
 import { knowledgeTreeApi, type KnowledgeTreeNode } from "@/lib/knowledgeTreeApi";
-import { knowledgeTreeEmojiFor } from "@/lib/knowledgeTreeIcons";
+import { knowledgeTreeIconFor } from "@/lib/knowledgeTreeIcons";
 import { pushAppPathState, APP_PATH_CHANGED_EVENT } from "@/lib/appPathNavigation";
 import { useTabNoteOpener } from "@/hooks/useTabNoteOpener";
 import { PanelBody, PanelEmpty, PanelLoading, PanelRow, usePanelData, usePanelRefresh } from "@/components/sidebar/panels/shared";
@@ -16,8 +17,8 @@ interface FavRow {
   title: string;
   /** 知识库根节点 id：点行时顺带在侧栏树中定位 */
   nodeId?: string;
-  /** 知识库封面（自选色或默认蓝书） */
-  emoji?: string;
+  /** 知识库封面图标（BookMarked + 封面色） */
+  icon?: ReactNode;
 }
 
 /**
@@ -71,7 +72,7 @@ export default function FavoritesPanel() {
         id: kb.resourceId,
         title: kb.title,
         nodeId: kb.id,
-        emoji: knowledgeTreeEmojiFor(kb, true),
+        icon: knowledgeTreeIconFor(kb, true),
       })),
       ...filteredNotes.map((note) => ({
         key: `note-${note.id}`,
@@ -85,22 +86,22 @@ export default function FavoritesPanel() {
   usePanelRefresh("fav", reload);
 
   // 聚焦进出（URL ?tree=focus 变化）不重挂面板，监听应用内导航事件重拉；
-  // 文档收藏状态变更（nowen:notes-changed）也即时重拉
+  // 文档收藏状态变更（baseforge:notes-changed）也即时重拉
   React.useEffect(() => {
     const onPathChanged = () => reload();
     const onNotesChanged = () => reload();
     window.addEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
-    window.addEventListener("nowen:notes-changed", onNotesChanged);
+    window.addEventListener("baseforge:notes-changed", onNotesChanged);
     return () => {
       window.removeEventListener(APP_PATH_CHANGED_EVENT, onPathChanged);
-      window.removeEventListener("nowen:notes-changed", onNotesChanged);
+      window.removeEventListener("baseforge:notes-changed", onNotesChanged);
     };
   }, [reload]);
 
   const openKb = useCallback((row: FavRow) => {
     const space = encodeURIComponent(getCurrentWorkspace() || "personal");
     // 与侧栏收藏区段同语义：进入库 Overview 并在树中定位
-    window.dispatchEvent(new CustomEvent("nowen:kb-reveal-node", { detail: { nodeId: row.nodeId } }));
+    window.dispatchEvent(new CustomEvent("baseforge:kb-reveal-node", { detail: { nodeId: row.nodeId } }));
     pushAppPathState(`/kb/${space}/${encodeURIComponent(row.id)}`);
   }, []);
 
@@ -116,7 +117,7 @@ export default function FavoritesPanel() {
             key={row.key}
             onClick={() => (row.kind === "kb" ? openKb(row) : void openNote(row.id))}
             leading={row.kind === "kb"
-              ? <span className="shrink-0 text-[13px] leading-none">{row.emoji}</span>
+              ? <span className="shrink-0">{row.icon}</span>
               : <Star size={13} className="shrink-0 text-amber-500" />}
           >
             {row.title}

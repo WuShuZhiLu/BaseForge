@@ -5,7 +5,7 @@ import { createInboundWebhook, listInboundWebhooks, removeInboundWebhook } from 
 import { isSystemAdmin, requireAdmin } from "../middleware/acl.js";
 import { getExtensionPlatformFeatureFlags } from "../plugins/featureFlags.js";
 import { getPluginService } from "../plugins/pluginService.js";
-import { EXTENSION_V21_TARGET_NOWEN_VERSION, NOWEN_VERSION } from "../plugins/types.js";
+import { EXTENSION_V21_TARGET_BASEFORGE_VERSION, BASEFORGE_VERSION } from "../plugins/types.js";
 
 const pluginsRouter = new Hono();
 
@@ -38,8 +38,8 @@ pluginsRouter.get("/", (c) => {
 
 pluginsRouter.get("/features", (c) => c.json({
   ...getExtensionPlatformFeatureFlags(),
-  currentNowenVersion: NOWEN_VERSION,
-  targetNowenVersion: EXTENSION_V21_TARGET_NOWEN_VERSION,
+  currentBaseForgeVersion: BASEFORGE_VERSION,
+  targetBaseForgeVersion: EXTENSION_V21_TARGET_BASEFORGE_VERSION,
 }));
 pluginsRouter.get("/actions", (c) => c.json(getPluginService().listActions()));
 pluginsRouter.get("/contributions", (c) => c.json(getPluginService().contributions()));
@@ -75,7 +75,8 @@ pluginsRouter.post("/install", requireAdmin, bodyLimit({
     const body = await c.req.parseBody();
     const upload = body.file;
     if (!(upload instanceof File)) return c.json({ error: "请通过 file 字段上传插件包" }, 400);
-    if (!upload.name.endsWith(".nowen-plugin")) return c.json({ error: "插件包文件扩展名不正确" }, 400);
+    // 兼容 Nowen 时代的插件包扩展名；新打包产物始终是 .baseforge-plugin。
+    if (!upload.name.endsWith(".baseforge-plugin") && !upload.name.endsWith(".nowen-plugin")) return c.json({ error: "插件包文件扩展名不正确" }, 400);
     const confirmNodeRuntime = body.confirmNodeRuntime === "true";
     const record = await getPluginService().install(Buffer.from(await upload.arrayBuffer()), userId(c), confirmNodeRuntime);
     return c.json({ success: true, plugin: record }, 201);

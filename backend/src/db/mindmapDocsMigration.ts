@@ -48,7 +48,7 @@ function ensureMindmapsTableLocal(db: DatabaseSync): void {
  * mindmaps 独立表迁为 notes 行（contentFormat="mindmap"，正文存 MindMapData JSON），
  * 沿用原 id —— 现有 ![[mindmap:<id>]] 嵌入引用不失效。树节点由 notes 投影触发器
  * 重建为 note:<id>，位置（parentId/sortOrder）对齐旧导图节点；导图文件夹继续以
- * 伪 notebook 容器存在（__nowen_mindmap_folder__ 前缀）。回收站中的导图按
+ * 伪 notebook 容器存在（__baseforge_mindmap_folder__ 前缀）。回收站中的导图按
  * isTrashed=1 迁移，之后由笔记回收站链路接管。迁移末尾清空 mindmaps 并卸载
  * 导图树投影触发器；导图与笔记的同步/搜索/回收站从此共用 notes 一条链路。
  */

@@ -10,7 +10,7 @@ const { loadDocumentMindMap } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/documentMindMapRuntime", () => ({
-  DOCUMENT_MINDMAP_CHANGED_EVENT: "nowen:mindmap-changed",
+  DOCUMENT_MINDMAP_CHANGED_EVENT: "baseforge:mindmap-changed",
   invalidateDocumentMindMapCache: vi.fn(async () => {}),
   loadDocumentMindMap,
 }));

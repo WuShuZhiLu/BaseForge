@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 test("directory ACL uses the nearest explicit rule and inherits root membership", async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-notebook-acl-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforgebook-acl-"));
   process.env.DB_PATH = path.join(tempDir, "test.db");
 
   const { getDb, closeDb } = await import("../src/db/schema");

@@ -18,7 +18,7 @@ describe("round-trip import batch client", () => {
 
     announceRoundTripImportCompleted("batch-123");
 
-    expect(localStorage.getItem("nowen-last-roundtrip-import-batch")).toBe("batch-123");
+    expect(localStorage.getItem("baseforge-last-roundtrip-import-batch")).toBe("batch-123");
     expect(listener).toHaveBeenCalledTimes(1);
     expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({ batchId: "batch-123" });
     window.removeEventListener(ROUND_TRIP_IMPORT_COMPLETED_EVENT, listener);
@@ -30,7 +30,7 @@ describe("round-trip import batch client", () => {
         id: "batch-1",
         workspaceId: null,
         importMode: "new-root",
-        packageKind: "nowen",
+        packageKind: "baseforge",
         sourceInstanceId: "instance-1",
         sourceExportBatchId: "export-1",
         status: "completed",

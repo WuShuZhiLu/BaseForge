@@ -181,7 +181,7 @@ async function patchBlocks(
 ): Promise<BlockPatchResult> {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), 30_000);
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
 
   try {
     const response = await fetch(

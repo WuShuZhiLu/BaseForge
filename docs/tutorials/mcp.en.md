@@ -2,15 +2,15 @@
 
 > Connect Claude Code, Cursor, VS Code, and other MCP clients to BaseForge so they can search, read, and maintain notes within the permissions you grant.
 
-[Back to tutorials](./README.md) · [简体中文](./mcp.md) · [Package README](../../packages/nowen-mcp/README.md)
+[Back to tutorials](./README.md) · [简体中文](./mcp.md) · [Package README](../../packages/baseforge-mcp/README.md)
 
 ## What you need to know
 
-- MCP support is still available under `packages/nowen-mcp/`.
-- The repository currently provides a **source installation**. Install Node.js 20+, Git, and npm first.
+- The MCP server is a **single file**, `baseforge-mcp.mjs`, published as a Release asset with all dependencies bundled in. No `npm install` is required.
+- Only two environment variables are needed: `BASEFORGE_URL` (BaseForge address) and `BASEFORGE_API_TOKEN` (Personal Access Token).
 - Replace every `/absolute/path/...` placeholder with the real absolute path on your computer.
-- When BaseForge runs on a NAS or another server, `NOWEN_URL` must be reachable from the computer running the AI client, for example `http://192.168.1.20:3001`.
-- Use a dedicated restricted Personal API Token instead of storing an administrator password in the MCP configuration.
+- When BaseForge runs on a NAS or another server, `BASEFORGE_URL` must be reachable from the computer running the AI client, for example `http://192.168.1.20:3001`.
+- Permissions come entirely from the Token: create a dedicated restricted Token per AI client (limited notebooks, minimal scopes) and never store an administrator password in the MCP configuration.
 
 ## Five-minute setup
 
@@ -24,370 +24,145 @@ http://192.168.1.20:3001
 
 Use `http://localhost:3001` only when BaseForge runs on that same computer.
 
-### 2. Check prerequisites
+### 2. Check Node.js 20+
 
 ```bash
 node --version
-npm --version
-git --version
 ```
 
-Node.js must be version 20 or newer.
+### 3. Create a Personal API Token
 
-### 3. Clone and build the MCP server
+In BaseForge, go to `Settings → Personal Access Tokens → Create Token`:
 
-#### Windows PowerShell
+1. Create one Token per AI client, e.g. "Claude Code" or "Cursor".
+2. Enable only the scopes you actually need, e.g. `notes:read`, `notes:write`.
+3. Choose "Limited notebooks" as the resource scope, set each notebook to read-only or read-write, and optionally include child notebooks.
+4. Set a sensible expiration; revoke immediately if leaked.
 
-```powershell
-git clone https://github.com/cropflre/nowen-note.git
-cd nowen-note\packages\nowen-mcp
-npm install
-npm run build
-Test-Path .\dist\scoped-entry.js
-```
+Copy the Token, e.g. `nkn_xxxxxxxxxxxxxxxxx`. It is usually shown only once.
 
-The final command must return `True`. This file is the launcher's internal build entry; do not configure MCP clients to run it directly. Clients should run `bin/nowen-mcp.mjs`.
+### 4. Configure the client
 
-#### macOS / Linux / WSL
+All clients point at the downloaded `baseforge-mcp.mjs` (a Release asset; when working inside the repo, run `npm run mcp:build` first to produce `packages/baseforge-mcp/dist/baseforge-mcp.mjs`):
+
+#### Claude Code
 
 ```bash
-git clone https://github.com/cropflre/nowen-note.git
-cd nowen-note/packages/nowen-mcp
-npm install
-npm run build
-test -f ./dist/scoped-entry.js && echo "MCP build OK"
+claude mcp add baseforge --scope user \
+  --env BASEFORGE_URL=http://192.168.1.20:3001 \
+  --env BASEFORGE_API_TOKEN=nkn_xxx \
+  -- node "C:\Users\YourName\Downloads\baseforge-mcp.mjs"
 ```
 
-`npm test` is a development validation command, not an installation requirement.
-
-### 4. Create a Personal API Token
-
-In BaseForge, open:
-
-```text
-Settings → Personal access tokens → Create token
-```
-
-Recommended settings:
-
-1. Create a separate token for each client.
-2. Grant only the required scopes, such as `notes:read` and `notes:write`.
-3. Restrict the token to specific notebooks.
-4. Choose read-only or read-write per notebook.
-5. Include child notebooks only when needed.
-6. Set an expiration date.
-
-Copy the generated token, for example `nkn_xxx`.
-
-### 5. Resolve the stable launcher path
-
-Windows PowerShell:
-
-```powershell
-(Resolve-Path .\bin\nowen-mcp.mjs).Path
-```
-
-macOS / Linux / WSL:
-
-```bash
-realpath ./bin/nowen-mcp.mjs
-```
-
-Windows paths must be escaped in JSON:
-
-```json
-"C:\\Users\\YourName\\nowen-note\\packages\\nowen-mcp\\bin\\nowen-mcp.mjs"
-```
-
-On macOS, Linux, and WSL, the launcher path must start with `/`. A value such as `home/user/...` is relative, so the client may append it to its own working directory before Node can execute the launcher.
-
-## Claude Code
-
-macOS / Linux / WSL:
-
-```bash
-claude mcp add nowen-note --scope user \
-  --env NOWEN_URL=http://192.168.1.20:3001 \
-  --env NOWEN_API_TOKEN=nkn_xxx \
-  -- node /home/yourname/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs
-```
-
-Windows PowerShell:
-
-```powershell
-claude mcp add nowen-note --scope user `
-  --env NOWEN_URL=http://192.168.1.20:3001 `
-  --env NOWEN_API_TOKEN=nkn_xxx `
-  -- node "C:\Users\YourName\nowen-note\packages\nowen-mcp\bin\nowen-mcp.mjs"
-```
-
-Verify it:
-
-```bash
-claude mcp get nowen-note
-claude mcp list
-```
-
-Restart the Claude Code session after changing the configuration.
-
-Official reference: [Claude Code MCP](https://docs.anthropic.com/en/docs/claude-code/mcp)
-
-## Cursor
-
-Use `.cursor/mcp.json` for a project configuration or `~/.cursor/mcp.json` for a global configuration.
+#### Cursor (`.cursor/mcp.json`)
 
 ```json
 {
   "mcpServers": {
-    "nowen-note": {
+    "baseforge": {
       "command": "node",
-      "args": [
-        "/home/yourname/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"
-      ],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
-        "NOWEN_URL": "http://192.168.1.20:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx"
+        "BASEFORGE_URL": "http://192.168.1.20:3001",
+        "BASEFORGE_API_TOKEN": "nkn_xxx"
       }
     }
   }
 }
 ```
 
-On Windows, replace the script path with an escaped absolute Windows path. Fully quit and reopen Cursor, then confirm that `nowen-note` appears under MCP or Available Tools.
+#### VS Code / GitHub Copilot (`.vscode/mcp.json`)
 
-Official reference: [Cursor MCP](https://docs.cursor.com/context/model-context-protocol)
-
-## VS Code / GitHub Copilot
-
-Run `MCP: Add Server` from the Command Palette, or create `.vscode/mcp.json`:
+The top-level key is `servers`, not `mcpServers`:
 
 ```json
 {
   "servers": {
-    "nowen-note": {
+    "baseforge": {
       "type": "stdio",
       "command": "node",
-      "args": [
-        "/home/yourname/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"
-      ],
+      "args": ["C:\\Users\\YourName\\Downloads\\baseforge-mcp.mjs"],
       "env": {
-        "NOWEN_URL": "http://192.168.1.20:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx"
+        "BASEFORGE_URL": "http://192.168.1.20:3001",
+        "BASEFORGE_API_TOKEN": "nkn_xxx"
       }
     }
   }
 }
 ```
 
-VS Code uses the top-level `servers` field, not Cursor's `mcpServers` field.
+#### Other clients
 
-Run `MCP: List Servers`, select `nowen-note`, and choose Start or Restart. Choose Show Output when debugging. Avoid committing real tokens to a repository; prefer user-level configuration or VS Code input variables for secrets.
+Any stdio-capable client uses the same structure: `command: node` + the absolute path of `baseforge-mcp.mjs` + the two env vars. On Windows, `\` must be escaped as `\\`; on Linux/macOS, absolute paths must start with `/`.
 
-Official reference: [VS Code MCP servers](https://code.visualstudio.com/docs/agent-customization/mcp-servers)
-
-## Claude Desktop and generic stdio clients
-
-Most clients that accept local stdio MCP servers use this structure:
-
-```json
-{
-  "mcpServers": {
-    "nowen-note": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"
-      ],
-      "env": {
-        "NOWEN_URL": "http://192.168.1.20:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx"
-      }
-    }
-  }
-}
-```
-
-Current Claude Desktop versions prefer Desktop Extensions (DXT) under Settings → Extensions. BaseForge currently ships the source-based stdio server, so use the local developer MCP entry exposed by your client version. A local stdio script cannot be added as a remote Claude connector; remote MCP requires a separate HTTP transport and authentication implementation.
-
-Official reference: [Local MCP servers on Claude Desktop](https://support.anthropic.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop)
-
-## MCP startup diagnostics
-
-Configure clients to run `bin/nowen-mcp.mjs`. The stable launcher validates Node.js, `NOWEN_URL`, the compiled entry, and dependencies before loading the server. Structured diagnostics go to stderr; stdout remains reserved for the MCP stdio protocol.
-
-For long-session debugging, enable an optional heartbeat:
-
-```json
-"NOWEN_MCP_HEARTBEAT_MS": "300000"
-```
-
-Heartbeats are disabled by default. Exit logs distinguish parent stdin closure, termination signals, uncaught exceptions, unhandled rejections, and normal process exit.
-## Verify the connection
-
-After restarting the client, confirm that tools such as these appear:
-
-```text
-nowen_list_notebooks
-nowen_list_notes
-nowen_read_note
-nowen_search
-```
-
-Start with a read-only test:
-
-```text
-Use the BaseForge MCP server to list the notebooks I can access. Do not modify anything.
-```
-
-Then test search:
-
-```text
-Use BaseForge MCP to search for "test" and return only titles and notebook names.
-```
-
-Only after read operations work should you test creating or updating a note.
-
-## Update the MCP server
-
-```bash
-git pull
-cd packages/nowen-mcp
-npm install
-npm run build
-```
-
-Restart the MCP server or the client afterwards. If you move the repository, update the absolute script path in every client configuration.
+Restart the client completely and confirm `baseforge` started in its MCP settings.
 
 ## Environment variables
 
 | Variable | Description | Default |
 |---|---|---|
-| `NOWEN_URL` | BaseForge server URL | `http://localhost:3001` |
-| `NOWEN_API_TOKEN` | Personal API Token; preferred over username/password | — |
-| `NOWEN_USERNAME` | Legacy username authentication | `admin` |
-| `NOWEN_PASSWORD` | Legacy password authentication | `admin123` |
-| `ALLOWED_NOTEBOOK_IDS` | Additional comma-separated local notebook allowlist; an explicit empty value denies all | disabled |
-| `MCP_ACCESS_MODE` | `read-only` or `read-write` | `read-write` |
-| `MCP_INCLUDE_DESCENDANTS` | Include descendants of locally allowed notebooks | `false` |
-| `NOWEN_MCP_HEARTBEAT_MS` | Optional stderr heartbeat interval in milliseconds; 0/off disables it | `0` |
+| `BASEFORGE_URL` | BaseForge server address | `http://localhost:3001` |
+| `BASEFORGE_API_TOKEN` | Personal API Token (required; startup fails with a clear error when missing) | — |
 
-Authentication priority:
+## Token scopes and tool groups
 
-1. `NOWEN_API_TOKEN`
-2. `NOWEN_USERNAME` + `NOWEN_PASSWORD`
+Grant only the scopes the tools need:
 
-New installations should use a token.
+| Scope | Tools |
+|---|---|
+| `notes:read` / `notes:write` / `notebooks:read` / `notebooks:write` | Notes, notebooks, blocks, search |
+| `attachments:write` / `tags:read` / `tags:write` | Attachments and tags |
+| `remote_files:read` / `remote_files:write` | Remote files (sources, read/write, link mappings) |
+| `export:import` | `baseforge_export_notes` |
+| `shares:read` / `shares:write` | Share links (also requires an unrestricted Token) |
+| `tasks:read` / `tasks:write` | Task API for REST/SDK clients (MCP does not expose task tools yet) |
 
-## Permission model
+Tool groups: notebooks and notes; blocks and backlinks; attachments and tags; remote files (`baseforge_list_remote_sources`, `baseforge_manage_remote_source`, `baseforge_list_remote_files`, `baseforge_read_remote_file`, `baseforge_write_remote_file`, `baseforge_manage_remote_file`, `baseforge_list_remote_links`, `baseforge_manage_remote_link`); export and sharing (`baseforge_export_notes`, `baseforge_list_shares`, `baseforge_create_share`, `baseforge_update_share`, `baseforge_delete_share`); system operations (`baseforge_list_plugins`, `baseforge_execute_plugin`, `baseforge_list_webhooks`, `baseforge_create_webhook`, `baseforge_audit_stats`, `baseforge_list_backups`, `baseforge_create_backup`).
 
-The effective server permission is:
+A share link can publish any note publicly, which a notebook resource grant cannot constrain. Therefore restricted Tokens are rejected for sharing tools and system operations; those tools require an unrestricted Token. In-product AI Q&A has been removed, and the former `baseforge_ai_ask`, `baseforge_ai_process`, `baseforge_knowledge_stats` tools are gone.
+
+## Verification
+
+After restarting the client, confirm `baseforge_list_notebooks` appears in the tool list, then run a read-only test:
 
 ```text
-User ACL ∩ Token scopes ∩ Token notebook resource grants
+Please use the BaseForge MCP to list the notebooks I can access. Do not modify anything.
 ```
 
-You can add an MCP-side allowlist as a second layer:
-
-```json
-{
-  "mcpServers": {
-    "nowen-note": {
-      "command": "node",
-      "args": ["/absolute/path/to/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs"],
-      "env": {
-        "NOWEN_URL": "http://192.168.1.20:3001",
-        "NOWEN_API_TOKEN": "nkn_xxx",
-        "ALLOWED_NOTEBOOK_IDS": "notebook-id-1,notebook-id-2",
-        "MCP_ACCESS_MODE": "read-only",
-        "MCP_INCLUDE_DESCENDANTS": "true"
-      }
-    }
-  }
-}
-```
-
-See [MCP token notebook resource scopes](./mcp-token-resource-scope.md) for the detailed design.
+If reads succeed but writes fail, the Token scopes or notebook resource grants are insufficient — this is the intended security enforcement.
 
 ## Troubleshooting
 
-### `node` is not found
+### Missing BASEFORGE_API_TOKEN
 
-Check `node --version` in the environment used by the GUI client. If necessary, set `command` to the absolute Node executable path.
+Create a Token under `Settings → Personal Access Tokens` and put it into the client config's `env`.
 
-Windows:
+### BASEFORGE_URL unreachable
 
-```powershell
-(Get-Command node).Source
-```
+- Same machine: `http://localhost:3001`.
+- NAS: `http://<NAS-LAN-IP>:3001`.
+- Verify the address in a browser on the client machine first.
 
-macOS / Linux:
+### 401 or 403
 
-```bash
-which node
-```
-
-### `bin/nowen-mcp.mjs` is missing
-
-```bash
-cd packages/nowen-mcp
-npm install
-npm run build
-```
-
-Confirm that the client configuration uses the absolute path.
-
-### Connection failure
-
-- Same computer: `http://localhost:3001`
-- NAS or server: `http://<LAN-IP>:3001`
-- Reverse proxy: the full HTTPS origin, such as `https://note.example.com`
-
-Open the URL in a browser on the client computer first.
-
-### HTTP 401 or 403
-
-- 401 usually means an invalid, expired, or revoked token.
-- 403 means user ACLs, token scopes, notebook grants, or the local MCP allowlist denied access.
-
-Do not replace a restricted token with an administrator password merely to bypass a 403.
-
-### Reads work but writes fail
-
-All of the following must allow writing:
-
-- the user account's notebook permission;
-- a write scope such as `notes:write`;
-- read-write access for that notebook in the token resource grants;
-- `MCP_ACCESS_MODE` must not be `read-only`.
+- 401: Token wrong, expired, or revoked.
+- 403: Token scopes or notebook resource grants denied the request. Fix the least-privilege configuration instead of using an administrator password.
 
 ### Tools do not appear
 
-1. Run `npm run build` again.
-2. Fully restart the client.
-3. Restart the MCP server from the client.
-4. In VS Code, run `MCP: Reset Cached Tools`.
-5. Inspect logs for Node, path, network, or authentication errors.
+1. Confirm the absolute path of the single file exists (update it if the repository moved);
+2. Fully restart the client;
+3. Restart Server / Reset Cached Tools in the client.
 
-### Running the script shows no output
+## Security notes
 
-A stdio MCP server normally waits for client input and can remain silent:
+- Effective permission = user ACL ∩ Token scopes ∩ Token notebook grants, all enforced server-side; a restricted Token cannot reach unauthorized notebooks even if MCP is bypassed and the REST API is called directly.
+- Tokens appear in client config files; never commit Token-bearing `mcp.json` files to public repositories.
+- Use one Token per Agent for easy revocation and auditing.
 
-```bash
-node /absolute/path/to/nowen-note/packages/nowen-mcp/bin/nowen-mcp.mjs
-```
+See [MCP Token notebook resource scope](./mcp-token-resource-scope.md) for the detailed authorization design.
 
-If it stays running without crashing, the script can start. Press `Ctrl+C` to stop it.
+## Next steps
 
-## Security
-
-- Run local MCP code only from trusted sources.
-- Never commit a token-bearing MCP configuration to a public repository.
-- Validate the connection with a read-only token first.
-- Use separate tokens per agent for revocation and auditing.
-- Use HTTPS, strong passwords, backups, and restricted CORS for internet-facing deployments.
-
-## Related documentation
-
-- [MCP token notebook resource scopes](./mcp-token-resource-scope.md)
 - [OpenAPI guide](./api.md)
-- [SDK guide](./sdk.md)
-- [CLI guide](./cli.md)
+- [SDK tutorial](./sdk.md)

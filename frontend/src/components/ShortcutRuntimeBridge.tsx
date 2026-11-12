@@ -54,7 +54,7 @@ export default function ShortcutRuntimeBridge() {
         if (!isShortcutAllowedInTarget(commandId, event.target)) continue;
         if (!shortcutMatchesEvent(commandId, event, platform, surface)) continue;
         consume(event);
-        window.dispatchEvent(new CustomEvent("nowen:format", {
+        window.dispatchEvent(new CustomEvent("baseforge:format", {
           detail: FORMAT_PAYLOADS[commandId],
         }));
         return;

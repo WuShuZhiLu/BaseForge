@@ -26,7 +26,7 @@ function workspaceQuery(): string {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers || {});
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(`${apiBase()}${path}`, { ...init, headers, cache: "no-store" });

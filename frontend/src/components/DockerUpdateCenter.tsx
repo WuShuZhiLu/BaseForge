@@ -140,14 +140,14 @@ function phaseText(phase: string): string {
 }
 
 async function apiJson<T>(path: string, init?: RequestInit, options?: { interactive?: boolean; sudoToken?: string }): Promise<T> {
-  const token = localStorage.getItem("nowen-token");
+  const token = localStorage.getItem("baseforge-token");
   const response = await fetch(`${getBaseUrl()}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options?.interactive ? { "X-Requested-With": "Nowen-System-Update" } : {}),
+      ...(options?.interactive ? { "X-Requested-With": "BaseForge-System-Update" } : {}),
       ...(options?.sudoToken ? { "X-Sudo-Token": options.sudoToken } : {}),
       ...(init?.headers || {}),
     },
@@ -434,7 +434,7 @@ export default function DockerUpdateCenter() {
   return (
     <>
       {createPortal(
-        <div data-nowen-docker-update="true" className="mt-3 space-y-3 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/60">
+        <div data-baseforge-docker-update="true" className="mt-3 space-y-3 border-t border-zinc-200/60 pt-3 dark:border-zinc-800/60">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-800 dark:text-zinc-200">
               <Container size={14} />

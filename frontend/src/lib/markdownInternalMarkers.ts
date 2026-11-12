@@ -14,7 +14,7 @@ function buildMarkerDecorations(markdown: string): DecorationSet {
       builder.add(
         range.from,
         range.from,
-        Decoration.line({ attributes: { class: "cm-nowen-internal-block-marker-line" } }),
+        Decoration.line({ attributes: { class: "cm-baseforge-internal-block-marker-line" } }),
       );
     } else {
       builder.add(range.from, range.to, Decoration.replace({}));
@@ -36,7 +36,7 @@ const markerField = StateField.define<DecorationSet>({
 });
 
 const markerTheme = EditorView.baseTheme({
-  ".cm-nowen-internal-block-marker-line": {
+  ".cm-baseforge-internal-block-marker-line": {
     display: "none",
   },
 });

@@ -91,4 +91,16 @@ describe("已移除的连接与迁移功能", () => {
     expect(syncEngineSource).not.toContain("offlineWorkspaceSync");
     expect(backendSource).toContain('app.route("/api/offline-sync", offlineSyncRouter)');
   });
+
+  it("设置深链白名单与实际渲染的 tab 完全一致（避免 /settings/:tab 打开空白页）", () => {
+    const settingsSource = readSource("src/components/SettingsModal.tsx");
+    const appRouteSource = readSource("src/lib/appRoute.ts");
+
+    const whitelistBlock = appRouteSource.match(/SETTINGS_TAB_KEYS = \[([\s\S]*?)\] as const/)?.[1] ?? "";
+    const whitelist = [...whitelistBlock.matchAll(/"([A-Za-z]+)"/g)].map((match) => match[1]);
+    const renderedIds = [...settingsSource.matchAll(/\{ id: "([A-Za-z]+)" as const/g)].map((match) => match[1]);
+
+    expect(whitelist.length).toBeGreaterThan(0);
+    expect(whitelist.slice().sort()).toEqual(renderedIds.slice().sort());
+  });
 });

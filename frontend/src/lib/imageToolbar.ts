@@ -79,7 +79,7 @@ export function getImageDownloadFilename(attrs: ImageNodeAttrs): string {
   if (title) return title;
   const alt = typeof attrs.alt === "string" ? attrs.alt.trim() : "";
   if (alt) return alt;
-  return `nowen-image-${Date.now()}`;
+  return `baseforge-image-${Date.now()}`;
 }
 
 export function getImageToolbarPosition(

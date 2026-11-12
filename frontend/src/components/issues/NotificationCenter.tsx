@@ -68,16 +68,16 @@ export default function NotificationCenter({ onUnreadChange, onOpenIssue, onOpen
     window.addEventListener("focus", load);
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, load);
     window.addEventListener(SERVER_URL_CHANGED_EVENT, serverChanged);
-    window.addEventListener("nowen:token-changed", serverChanged);
-    window.addEventListener("nowen:workspace-changed", load);
+    window.addEventListener("baseforge:token-changed", serverChanged);
+    window.addEventListener("baseforge:workspace-changed", load);
     return () => {
       epoch.current += 1;
       clearInterval(timer);
       window.removeEventListener("focus", load);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, load);
       window.removeEventListener(SERVER_URL_CHANGED_EVENT, serverChanged);
-      window.removeEventListener("nowen:token-changed", serverChanged);
-      window.removeEventListener("nowen:workspace-changed", load);
+      window.removeEventListener("baseforge:token-changed", serverChanged);
+      window.removeEventListener("baseforge:workspace-changed", load);
     };
   }, [open, unreadOnly, revision, onUnreadChange]);
 

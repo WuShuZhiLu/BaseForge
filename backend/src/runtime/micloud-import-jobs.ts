@@ -10,8 +10,8 @@ import {
   type MiCloudImportScope,
 } from "./micloud-import-hardening.js";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.micloudImportJobs.routePatch");
-const ROUTER_INSTALLED_FLAG = Symbol.for("nowen.micloudImportJobs.routerInstalled");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.micloudImportJobs.routePatch");
+const ROUTER_INSTALLED_FLAG = Symbol.for("baseforge.micloudImportJobs.routerInstalled");
 const MAX_JOB_NOTE_IDS = 5_000;
 const JOB_CONCURRENCY = 3;
 const SSE_HEARTBEAT_MS = 15_000;
@@ -83,9 +83,9 @@ type RuntimeState = {
 };
 
 const runtimeGlobals = globalThis as typeof globalThis & {
-  __nowenMiCloudImportJobs?: RuntimeState;
+  __baseforgeMiCloudImportJobs?: RuntimeState;
 };
-const runtime = runtimeGlobals.__nowenMiCloudImportJobs ||= {
+const runtime = runtimeGlobals.__baseforgeMiCloudImportJobs ||= {
   cookies: new Map<string, string>(),
   runningJobs: new Set<string>(),
   emitter: new EventEmitter(),

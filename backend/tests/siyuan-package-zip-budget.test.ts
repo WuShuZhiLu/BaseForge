@@ -6,7 +6,7 @@ import fs from "node:fs";
 import JSZip from "jszip";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-zip-budget-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-zip-budget-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.SIYUAN_IMPORT_MAX_ZIP_ENTRIES = "3";
@@ -16,7 +16,7 @@ process.env.SIYUAN_IMPORT_MAX_SINGLE_SY_BYTES = "20";
 process.env.SIYUAN_IMPORT_MAX_SINGLE_ASSET_BYTES = "4";
 
 let closeDb: () => void;
-let getDb: () => import("better-sqlite3").Database;
+let getDb: () => import("node:sqlite").DatabaseSync;
 let importSiyuanPackageFromZipFile: typeof import("../src/services/siyuanPackageImport").importSiyuanPackageFromZipFile;
 let app: Hono;
 

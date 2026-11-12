@@ -291,8 +291,8 @@ function cancelActive(reason) {
 function buildBridge(methods) {
   return `
 (() => {
-  const __host = globalThis.__nowenHostCall;
-  const __progress = globalThis.__nowenProgress;
+  const __host = globalThis.__baseforgeHostCall;
+  const __progress = globalThis.__baseforgeProgress;
   const __call = (method, args) => __host(method, JSON.stringify(args ?? {})).then(JSON.parse);
   const __root = Object.create(null);
   for (const __fullMethod of ${JSON.stringify(methods)}) {
@@ -309,7 +309,7 @@ function buildBridge(methods) {
     value: (value = {}) => __progress(JSON.stringify(value)), enumerable: true, writable: false, configurable: false
   });
   Object.freeze(__root);
-  Object.defineProperty(globalThis, 'nowen', { value: __root, enumerable: true, writable: false, configurable: false });
+  Object.defineProperty(globalThis, 'baseforge', { value: __root, enumerable: true, writable: false, configurable: false });
   for (const __name of ['process', 'require', 'fetch', 'Buffer', 'WebSocket', 'XMLHttpRequest', 'module', 'exports']) {
     Object.defineProperty(globalThis, __name, { value: undefined, writable: false, configurable: false });
   }
@@ -317,8 +317,8 @@ function buildBridge(methods) {
   Object.defineProperty(globalThis, 'Function', { value: undefined, writable: false, configurable: false });
   try { Object.defineProperty((async function(){}).constructor.prototype, 'constructor', { value: undefined }); } catch {}
   try { Object.defineProperty((function(){}).constructor.prototype, 'constructor', { value: undefined }); } catch {}
-  delete globalThis.__nowenHostCall;
-  delete globalThis.__nowenProgress;
+  delete globalThis.__baseforgeHostCall;
+  delete globalThis.__baseforgeProgress;
 })();`;
 }
 
@@ -345,7 +345,7 @@ async function createSandbox(message, kind) {
   const vm = runtime.newContext();
   operation.vm = vm;
 
-  const hostCall = vm.newFunction("__nowenHostCall", (methodHandle, argsHandle) => {
+  const hostCall = vm.newFunction("__baseforgeHostCall", (methodHandle, argsHandle) => {
     const deferred = vm.newPromise();
     try {
       if (operation.cancelled) throw codedError("PLUGIN_CANCELLED", "Sandbox execution cancelled");
@@ -375,10 +375,10 @@ async function createSandbox(message, kind) {
     }
     return deferred.handle;
   });
-  vm.setProp(vm.global, "__nowenHostCall", hostCall);
+  vm.setProp(vm.global, "__baseforgeHostCall", hostCall);
   hostCall.dispose();
 
-  const progress = vm.newFunction("__nowenProgress", (valueHandle) => {
+  const progress = vm.newFunction("__baseforgeProgress", (valueHandle) => {
     try {
       if (++operation.progressEvents > LIMITS.progressEvents) {
         throw codedError("PLUGIN_PROTOCOL_LIMIT_EXCEEDED", "进度事件超过 100");
@@ -397,11 +397,11 @@ async function createSandbox(message, kind) {
       throw error;
     }
   });
-  vm.setProp(vm.global, "__nowenProgress", progress);
+  vm.setProp(vm.global, "__baseforgeProgress", progress);
   progress.dispose();
 
   const loaded = vm.evalCode(
-    `${buildBridge(message.methods)}\n${message.source}\n;if(!globalThis.__nowenPluginModule) throw new Error('sandbox bundle must define globalThis.__nowenPluginModule');`,
+    `${buildBridge(message.methods)}\n${message.source}\n;if(!globalThis.__baseforgePluginModule) throw new Error('sandbox bundle must define globalThis.__baseforgePluginModule');`,
     message.filename,
   );
   vm.unwrapResult(loaded).dispose();
@@ -427,7 +427,7 @@ async function runPreflight(message) {
   try {
     operation = await createSandbox(message, "preflight");
     const check = operation.vm.evalCode(`(() => {
-      const root = globalThis.__nowenPluginModule;
+      const root = globalThis.__baseforgePluginModule;
       const plugin = root.default || root;
       const actions = plugin.actions || plugin;
       return ${JSON.stringify(message.actionIds)}.every((id) => typeof actions[id] === 'function');
@@ -454,11 +454,11 @@ async function runExecution(message) {
     const input = JSON.stringify(message.input);
     const execution = JSON.stringify({ ...message.context, id: message.executionId, executionId: message.executionId });
     const evaluation = operation.vm.evalCode(`(async () => {
-      const root = globalThis.__nowenPluginModule;
+      const root = globalThis.__baseforgePluginModule;
       const plugin = root.default || root;
       const action = (plugin.actions && plugin.actions[${actionId}]) || plugin[${actionId}];
       if (typeof action !== 'function') throw new Error('Action 不存在');
-      const value = await action({ input: ${input}, nowen: globalThis.nowen, execution: ${execution} });
+      const value = await action({ input: ${input}, baseforge: globalThis.baseforge, execution: ${execution} });
       return JSON.stringify(value === undefined ? { success: true } : value);
     })()`);
     promiseHandle = operation.vm.unwrapResult(evaluation);

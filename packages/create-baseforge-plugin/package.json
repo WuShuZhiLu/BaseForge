@@ -1,0 +1,9 @@
+{
+  "name": "create-baseforge-plugin",
+  "version": "2.0.0",
+  "description": "Create a BaseForge Extension Platform V1.1 plugin",
+  "type": "module",
+  "bin": { "create-baseforge-plugin": "bin/create-baseforge-plugin.mjs" },
+  "files": ["bin", "README.md"],
+  "engines": { "node": ">=20" }
+}

@@ -228,7 +228,7 @@ describe("resolveNoteConflict", () => {
     });
     apiMock.createNoteConfirmed.mockResolvedValue(copy);
     const resolvedEvents = vi.fn();
-    window.addEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.addEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
 
     await expect(resolveQueuedNoteConflicts([older, newer])).resolves.toEqual({
       attempted: 1,
@@ -253,7 +253,7 @@ describe("resolveNoteConflict", () => {
         }),
       }),
     }));
-    window.removeEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.removeEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
   });
 
   it("emits the exact draft payload copied before conflict cleanup", async () => {
@@ -270,7 +270,7 @@ describe("resolveNoteConflict", () => {
     clearDraft.mockImplementationOnce(() => loadDraft.mockReturnValue(null));
     apiMock.createNoteConfirmed.mockResolvedValue(remoteNote({ id: "copy-1", version: 1 }));
     const resolvedEvents = vi.fn();
-    window.addEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.addEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
 
     await resolveQueuedNoteConflicts([conflictItem()]);
 
@@ -283,7 +283,7 @@ describe("resolveNoteConflict", () => {
         resolvedLocal: expect.objectContaining({ content: "防抖草稿正文" }),
       }),
     }));
-    window.removeEventListener("nowen:note-conflict-auto-resolved", resolvedEvents);
+    window.removeEventListener("baseforge:note-conflict-auto-resolved", resolvedEvents);
   });
 
   it("creates a recoverable conflict copy with a stable id before accepting the server version", async () => {
@@ -436,15 +436,15 @@ describe("resolveNoteConflict", () => {
     const item = conflictItem();
     getQueue.mockReturnValue([item]);
     const queuedEvents = vi.fn();
-    window.addEventListener("nowen:offline-queued", queuedEvents);
+    window.addEventListener("baseforge:offline-queued", queuedEvents);
 
-    window.dispatchEvent(new CustomEvent("nowen:note-sync-pending", {
+    window.dispatchEvent(new CustomEvent("baseforge:note-sync-pending", {
       detail: { noteId: "note-1", queued: true },
     }));
     vi.runAllTimers();
 
     expect(queuedEvents).toHaveBeenCalledTimes(2);
-    window.removeEventListener("nowen:offline-queued", queuedEvents);
+    window.removeEventListener("baseforge:offline-queued", queuedEvents);
     vi.useRealTimers();
   });
 });

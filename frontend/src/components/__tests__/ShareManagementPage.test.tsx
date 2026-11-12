@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ShareManagementPage from "@/components/ShareManagementPage";
+import i18n from "@/i18n";
 import { setShareCenterUi } from "@/features/shares/shareCenterUi";
 import type { ShareCenterItem, ShareCenterResponse } from "@/lib/shareCenter";
 
@@ -160,7 +161,8 @@ describe("ShareManagementPage", () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("zh-CN");
     localStorage.clear();
     mocks.list.mockReset();
     mocks.list.mockResolvedValue(response);
@@ -211,12 +213,10 @@ describe("ShareManagementPage", () => {
     // 页脚：原型「共 N 条，第 x / y 页 · 其中 M 条无密码且永久」
     expect(host.textContent).toContain("共 3 条，第 1 / 1 页");
     expect(host.textContent).toContain("其中 1 条无密码且永久");
-    // 原型工具行：6 个快捷 chips + 排序
-    for (const label of ["全部", "仅查看", "可评论", "可编辑", "有密码", "7 天内到期"]) {
-      expect(findButtonByText(host, label)).toBeTruthy();
-    }
-    // 默认排序对齐原型「最近访问」，是个文字下拉而不是原生 select
-    expect(host.textContent).toContain("排序：最近访问");
+    // 快捷 chips 已迁到分享中心侧栏（SidebarDesktop），主区工具行只剩图标排序菜单
+    expect(host.querySelector("select")).toBeNull();
+    // 默认排序对齐原型「最近访问」，用图标按钮的 title 表达
+    expect(host.querySelector('button[title="排序：最近访问"]')).not.toBeNull();
   });
 
   it("对象图标按文件类型分开，不把每个文件都画成回形针", async () => {
@@ -257,21 +257,22 @@ describe("ShareManagementPage", () => {
     );
   });
 
-  it("快捷 chips 落到后端已有参数上，再点一次回到全部", async () => {
+  it("快捷筛选落到后端已有参数上，再点一次回到全部", async () => {
     await act(async () => { root.render(<ShareManagementPage />); });
     await flushEffects();
 
-    await click(findButtonByText(host, "仅查看")!);
+    // 快捷 chips 在侧栏，与主区共用同一份筛选 store；这里直接驱动 store 断言请求参数
+    await pickFilter({ quick: "view" });
     expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ permission: "view" }));
 
-    await click(findButtonByText(host, "有密码")!);
+    await pickFilter({ quick: "password" });
     expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ hasPassword: true }));
 
-    await click(findButtonByText(host, "7 天内到期")!);
+    await pickFilter({ quick: "expiring" });
     expect(mocks.list).toHaveBeenLastCalledWith(expect.objectContaining({ expiresWithinDays: 7 }));
 
-    // 单选：再点同一个 chip 取消，请求里不再带该维度
-    await click(findButtonByText(host, "7 天内到期")!);
+    // 单选：回到「全部」后，请求里不再带这些维度
+    await pickFilter({ quick: "all" });
     const lastCall = mocks.list.mock.calls.at(-1)![0];
     expect(lastCall).not.toHaveProperty("expiresWithinDays");
     expect(lastCall).not.toHaveProperty("permission");
@@ -281,9 +282,9 @@ describe("ShareManagementPage", () => {
     await act(async () => { root.render(<ShareManagementPage />); });
     await flushEffects();
 
-    // 勾选列默认不显示：先点右上角「选择」进入多选态（与文件管理同一交互）
+    // 勾选列默认不显示：先点右上角「进入多选」进入多选态（与文件管理同一交互）
     expect(host.querySelector('input[aria-label="选择 我的公开笔记"]')).toBeNull();
-    await click(findButtonByText(host, "选择")!);
+    await click(host.querySelector('button[title="进入多选"]')!);
 
     const checkbox = host.querySelector('input[aria-label="选择 我的公开笔记"]') as HTMLInputElement | null;
     expect(checkbox).not.toBeNull();
@@ -294,8 +295,8 @@ describe("ShareManagementPage", () => {
     await flushEffects();
 
     expect(host.textContent).toContain("已选 1 项");
-    // 原型批量条四个动作都在
-    for (const label of ["批量停用", "批量设过期（30 天后）", "批量复制全部链接", "批量删除", "取消"]) {
+    // 原型批量条四个动作都在（公共文案走 common.*）
+    for (const label of ["批量停用", "批量复制全部链接", "清空选择", "删除选中"]) {
       expect(findButtonByText(host, label)).toBeTruthy();
     }
 

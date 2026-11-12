@@ -18,7 +18,7 @@ export default function NotebookShareJoinView({ token }: NotebookShareJoinViewPr
 
   useEffect(() => {
     let cancelled = false;
-    const hasToken = !!localStorage.getItem("nowen-token");
+    const hasToken = !!localStorage.getItem("baseforge-token");
     if (!hasToken) {
       setNeedsLogin(true);
       setLoading(false);

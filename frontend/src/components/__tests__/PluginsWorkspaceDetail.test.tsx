@@ -2,7 +2,7 @@
 
 /**
  * PluginsWorkspace 详情页冒烟测试：
- * - 内置插件：nowen:plugin-selected 事件选中 → 渲染名称/版本/功能贡献区；
+ * - 内置插件：baseforge:plugin-selected 事件选中 → 渲染名称/版本/功能贡献区；
  * - 已安装插件：mock pluginApi.list → 页内选中 → 渲染唯一 ID/版本历史/权限区。
  */
 import React, { act } from "react";
@@ -28,7 +28,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/pluginApi", () => ({
-  PLUGIN_CONTRIBUTIONS_CHANGED_EVENT: "nowen:plugin-contributions-changed",
+  PLUGIN_CONTRIBUTIONS_CHANGED_EVENT: "baseforge:plugin-contributions-changed",
   pluginApi: {
     list: vi.fn(() => Promise.resolve(mocks.installed)),
     registryCatalog: vi.fn(() => Promise.resolve(mocks.catalog)),
@@ -119,7 +119,7 @@ function installedPlugin(overrides: Record<string, unknown> = {}): Record<string
 /** 分组导航在侧栏，主区通过事件切分组 */
 async function openGroup(group: "builtin" | "installed" | "catalog" | "config") {
   await act(async () => {
-    window.dispatchEvent(new CustomEvent("nowen:plugin-group", { detail: { group } }));
+    window.dispatchEvent(new CustomEvent("baseforge:plugin-group", { detail: { group } }));
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
@@ -173,9 +173,9 @@ describe("PluginsWorkspace 插件详情页", () => {
   it("内置插件：渲染名称、版本与功能贡献区", async () => {
     const { host, root } = await renderWorkspace();
 
-    // 选中态只由显式事件设置：侧栏点行 → nowen:plugin-selected 直达详情
+    // 选中态只由显式事件设置：侧栏点行 → baseforge:plugin-selected 直达详情
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("nowen:plugin-selected", { detail: { id: "tasks" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:plugin-selected", { detail: { id: "tasks" } }));
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -183,8 +183,8 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(content).toContain("待办事项");
     expect(content).toContain("v1.0.0");
     expect(content).toContain("内置插件 · tasks");
-    // 来源按实际标注（待办沿用 nowen note 实现），不再用含糊的"官方内置"
-    expect(content).toContain("来自 nowen note");
+    // 来源按实际标注（待办沿用 baseforge note 实现），不再用含糊的"官方内置"
+    expect(content).toContain("来自 baseforge note");
     expect(content).toContain("功能与贡献");
     expect(content).toContain("侧栏迷你面板：待办");
     expect(content).toContain("已启用");
@@ -262,7 +262,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     expect(headers[0].className).toContain("text-[15px]");
     expect(headers[0].className).toContain("font-semibold");
     expect(headers[0].textContent).toContain("插件");
-    expect(headers[0].textContent).toContain("5 个");
+    expect(headers[0].textContent).toContain("2 个");
     expect(headers[0].querySelector("svg")).toBeTruthy();
     // 「社区插件」不再作为标题/说明出现在页面上（只剩空态主文案里的字样）
     expect(content).not.toContain("从市场或插件包安装的插件");
@@ -299,7 +299,7 @@ describe("PluginsWorkspace 插件详情页", () => {
     // 内置插件在同一容器内：32px 分区行，点开才把行接在下面
     const builtinSection = panel?.querySelector("[data-plugin-builtin-section]") as HTMLElement | null;
     expect(builtinSection?.textContent).toContain("内置插件");
-    expect(builtinSection?.textContent).toContain("· 5 个");
+    expect(builtinSection?.textContent).toContain("· 2 个");
     expect(builtinSection?.className).toContain("h-8");
     expect(content).not.toContain("待办事项");
     click(builtinSection as HTMLElement);

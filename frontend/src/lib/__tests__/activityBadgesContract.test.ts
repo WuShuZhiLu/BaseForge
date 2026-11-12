@@ -16,7 +16,7 @@ import { FIXED_BADGE_IDS, EXTRA_BADGE_CATALOG } from "../../components/sidebar/A
  * 用户 2026-10-16 定稿规则：
  *  - 固定徽章 = 文档树 / 标签 / 收藏 / 回收站 / 附件（常驻、不可移除）——对应**侧栏面板**；
  *  - 「其余徽章」收进可折叠的「更多」组（默认折叠，展开态经 updateSidebarBadges 持久化）
- *    ——对应**工具入口**（待办 / 小记 / AI 对话 / 分享管理），点击打开工具页签；
+ *    ——对应**工具入口**（待办 / 分享管理），点击打开工具页签；
  *  - 「＋ 添加徽章」位于「更多」之下；
  *  - Rail 左下角「设置」保持原位（仍在 NavRailMobile，不在徽章组件内）。
  *
@@ -33,7 +33,7 @@ const NAV_RAIL = source("../../components/NavRailMobile.tsx");
 const STORE = source("../../lib/sidebarPanels.ts");
 
 function layoutStorageKey(): string {
-  return `nowen.sidebar.layout.v2:${getCurrentWorkspace() || "local"}`;
+  return `baseforge.sidebar.layout.v2:${getCurrentWorkspace() || "local"}`;
 }
 
 beforeEach(() => {
@@ -45,9 +45,9 @@ describe("固定徽章集合（不可移除）", () => {
     expect([...FIXED_BADGE_IDS]).toEqual(["tree", "tags", "fav", "trash", "files"]);
   });
 
-  it("「更多」组候选 = 工具入口（待办/小记/AI 对话/分享管理），不含固定徽章", () => {
+  it("「更多」组候选 = 工具入口（待办/分享管理），不含固定徽章", () => {
     const extraIds = EXTRA_BADGE_CATALOG.map((badge) => badge.id);
-    expect(extraIds).toEqual(["tasks", "diary", "ai-chat", "shares"]);
+    expect(extraIds).toEqual(["tasks", "shares"]);
     for (const fixed of FIXED_BADGE_IDS) {
       expect(extraIds).not.toContain(fixed);
     }

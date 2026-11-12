@@ -28,7 +28,7 @@ function constantTimeTokenMatch(candidate: string): boolean {
   return crypto.timingSafeEqual(left, right);
 }
 
-app.get("/health", (c) => c.json({ status: "ok", service: "nowen-note-updater" }));
+app.get("/health", (c) => c.json({ status: "ok", service: "baseforge-updater" }));
 
 app.use("/v1/*", async (c, next) => {
   const remote = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "internal";

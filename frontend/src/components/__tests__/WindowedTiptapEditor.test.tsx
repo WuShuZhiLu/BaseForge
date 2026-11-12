@@ -135,7 +135,7 @@ function changeTextarea(editor: HTMLTextAreaElement, value: string) {
 function installHealthyApi(note = largeNote()) {
   const sections = splitTiptapSubdocumentSections(note.id, note.content, 250)!;
   apiMocks.getManifest.mockResolvedValue({
-    rootGuid: `nowen-root-${note.id}`,
+    rootGuid: `baseforge-root-${note.id}`,
     generation: 1,
     structureVersion: 1,
     sections: sections.map(({ id, guid, startBlock, endBlock }) => ({ id, guid, startBlock, endBlock })),
@@ -369,7 +369,7 @@ describe("WindowedTiptapEditor", () => {
   it("falls back when the server manifest does not exactly match local sections", async () => {
     const sections = installHealthyApi();
     apiMocks.getManifest.mockResolvedValue({
-      rootGuid: "nowen-root-window-note",
+      rootGuid: "baseforge-root-window-note",
       sections: sections.map((section, index) => ({
         ...section,
         guid: index === 1 ? `${section.guid}-mismatch` : section.guid,
@@ -477,14 +477,14 @@ describe("WindowedTiptapEditor", () => {
       expect.objectContaining({ content: expect.stringContaining("latest-inflight-edit") }),
     ));
     expect(apiMocks.applyUpdate).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("nowen:yjs-subdocument-pending:window-note")).toContain("\"generation\":1");
+    expect(localStorage.getItem("baseforge:yjs-subdocument-pending:window-note")).toContain("\"generation\":1");
   });
 
   it("uses the committed server snapshot when restored pending resegments before any section mounts", async () => {
     const note = largeNote();
     const sections = splitTiptapSubdocumentSections(note.id, note.content, 250)!;
     const replacement = sections[0].content.replace("p0", "restored-structural-edit");
-    localStorage.setItem("nowen:yjs-subdocument-pending:window-note", JSON.stringify({
+    localStorage.setItem("baseforge:yjs-subdocument-pending:window-note", JSON.stringify({
       version: 2,
       generation: 1,
       sections: {

@@ -54,7 +54,7 @@ type ExtendedPending = FolderSyncPendingUploads & {
 const ATTACHMENT_EXTS = new Set([".pdf", ".docx"]);
 
 function getFolderSync() {
-  return (window as any).nowenDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
+  return (window as any).baseforgeDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
 }
 
 function base64ToFile(base64: string, filename: string, mimeType: string): File {

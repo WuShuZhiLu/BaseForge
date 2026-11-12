@@ -17,10 +17,10 @@ import {
 import { revealCreatedKnowledgeTreeNote } from "@/lib/knowledgeTreeCreateVisibility";
 import { toast } from "@/lib/toast";
 
-const TREE_SELECTOR = '[data-nowen-knowledge-tree="embedded"]';
+const TREE_SELECTOR = '[data-baseforge-knowledge-tree="embedded"]';
 const TREE_NODE_SELECTOR = "[data-knowledge-tree-node-id]";
 const ACTIVE_DROP_CLASS = "knowledge-tree-markdown-drop-target";
-const TREE_CHANGED_EVENT = "nowen:knowledge-tree-changed";
+const TREE_CHANGED_EVENT = "baseforge:knowledge-tree-changed";
 
 export const MAX_MARKDOWN_DROP_FILES = 100;
 export const MAX_MARKDOWN_DROP_FILE_SIZE = 20 * 1024 * 1024;
@@ -241,15 +241,15 @@ export function parseMarkdownImportDocument(source: string): MarkdownImportDocum
     || metadata.get("contentformat")
     || ""
   ).toLowerCase();
-  const isNowenExport = Boolean(declaredFormat);
+  const isBaseForgeExport = Boolean(declaredFormat);
   const targetFormat = declaredFormat === "tiptap-json"
     || declaredFormat === "html"
     ? "tiptap-json"
     : "markdown";
 
   return {
-    title: isNowenExport ? metadata.get("title")?.trim() || null : null,
-    content: isNowenExport ? source.slice(match[0].length) : source,
+    title: isBaseForgeExport ? metadata.get("title")?.trim() || null : null,
+    content: isBaseForgeExport ? source.slice(match[0].length) : source,
     targetFormat,
   };
 }
@@ -275,12 +275,12 @@ interface MarkdownZipArchive {
   documents: MarkdownZipDocument[];
 }
 
-interface NowenPackageZipArchive {
-  kind: "nowen-package";
+interface BaseForgePackageZipArchive {
+  kind: "baseforge-package";
   manifest: PackageManifestPreview;
 }
 
-type InspectedMarkdownZipArchive = MarkdownZipArchive | NowenPackageZipArchive;
+type InspectedMarkdownZipArchive = MarkdownZipArchive | BaseForgePackageZipArchive;
 
 export interface MarkdownZipImportTarget {
   parentId: string | null;
@@ -452,7 +452,7 @@ async function readMarkdownZip(file: File): Promise<InspectedMarkdownZipArchive>
     const manifest = parseRoundTripPackageManifest(await manifestEntry.async("string"));
     // Markdown round-trip 包同时包含给用户阅读的 Markdown 与 notes/* 私有正文。
     // 必须在枚举 Markdown 前整体分流，避免重复导入并保留服务端附件 ID 重映射契约。
-    if (manifest) return { kind: "nowen-package", manifest };
+    if (manifest) return { kind: "baseforge-package", manifest };
   }
 
   if (file.size > MAX_MARKDOWN_ZIP_FILE_SIZE) {
@@ -504,7 +504,7 @@ function normalizeMarkdownZipImportTarget(
     : { parentId: target };
 }
 
-async function importNowenPackageZip(
+async function importBaseForgePackageZip(
   file: File,
   manifest: PackageManifestPreview,
   target: MarkdownZipImportTarget,
@@ -603,8 +603,8 @@ export async function importMarkdownZipFileIntoKnowledgeTree(
 ): Promise<MarkdownBatchImportResult> {
   const archive = await readMarkdownZip(file);
   const target = normalizeMarkdownZipImportTarget(targetInput);
-  if (archive.kind === "nowen-package") {
-    return importNowenPackageZip(file, archive.manifest, target);
+  if (archive.kind === "baseforge-package") {
+    return importBaseForgePackageZip(file, archive.manifest, target);
   }
   const imported: ImportedMarkdownNote[] = [];
   const failures: MarkdownBatchImportFailure[] = [];

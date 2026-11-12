@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { installNotebookTreeIntegrityGuards } from "../src/runtime/notebook-tree-hardening";
 import { transferWorkspaceNotesToOwner } from "../src/services/workspace-deletion";
 
 test("workspace deletion transfers notes and preserves nested notebook hierarchy", () => {
-  const db = new Database(":memory:");
+  const db = new DatabaseSync(":memory:");
   db.pragma("foreign_keys = ON");
   db.exec(`
     CREATE TABLE users (id TEXT PRIMARY KEY);

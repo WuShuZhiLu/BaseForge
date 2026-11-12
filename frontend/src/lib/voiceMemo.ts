@@ -11,7 +11,7 @@ export interface VoiceMemoRequest {
   release?: () => void;
 }
 export function requestVoiceMemo(request: VoiceMemoRequest): void {
-  window.dispatchEvent(new CustomEvent("nowen:voice-record", { detail: request }));
+  window.dispatchEvent(new CustomEvent("baseforge:voice-record", { detail: request }));
 }
 export function voiceMemoScope(): string {
   if (isMobileLocalMode()) return `mobile-local|${MOBILE_LOCAL_USER_ID}`;
@@ -20,7 +20,7 @@ export function voiceMemoScope(): string {
     const userId = payload.userId || payload.sub || payload.id;
     const server = getServerUrl();
     // 桌面本地服务重启后端口会变化，草稿必须使用稳定的设备作用域。
-    const desktop = Boolean((window as Window & { nowenDesktop?: { isDesktop?: boolean } }).nowenDesktop?.isDesktop);
+    const desktop = Boolean((window as Window & { baseforgeDesktop?: { isDesktop?: boolean } }).baseforgeDesktop?.isDesktop);
     const scope = isElectronFullLocalRuntime(server, desktop) ? "desktop-local" : server || window.location.origin;
     return userId ? `${scope}|${userId}` : "";
   } catch { return ""; }

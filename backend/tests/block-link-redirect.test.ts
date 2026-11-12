@@ -4,9 +4,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-redirect-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-redirect-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -18,7 +18,7 @@ const grandchildId = "33333333-3333-4333-8333-333333333333";
 const markdownSourceId = "44444444-4444-4444-8444-444444444444";
 const markdownChildId = "55555555-5555-4555-8555-555555555555";
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 let syncNoteBlocks: typeof import("../src/lib/noteBlocks").syncNoteBlocks;

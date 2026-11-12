@@ -152,7 +152,7 @@ export async function exportNotebookAsFormat(
         "export-failures.json",
         JSON.stringify({
           version: "1.0",
-          app: "nowen-note",
+          app: "baseforge",
           scope: "notebook",
           format,
           rootNotebookId: scope.notebookId,

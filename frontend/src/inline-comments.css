@@ -1,4 +1,4 @@
-::highlight(nowen-comment-anchor) {
+::highlight(baseforge-comment-anchor) {
   background-color: color-mix(in srgb, #facc15 24%, transparent);
   text-decoration-line: underline;
   text-decoration-color: color-mix(in srgb, #eab308 74%, transparent);
@@ -6,7 +6,7 @@
   text-underline-offset: 3px;
 }
 
-::highlight(nowen-comment-active) {
+::highlight(baseforge-comment-active) {
   background-color: color-mix(in srgb, #fb923c 34%, transparent);
   text-decoration-line: underline;
   text-decoration-color: #f97316;
@@ -14,12 +14,12 @@
   text-underline-offset: 3px;
 }
 
-.nowen-inline-comment-panel {
-  animation: nowen-inline-comment-panel-in 180ms ease-out;
+.baseforge-inline-comment-panel {
+  animation: baseforge-inline-comment-panel-in 180ms ease-out;
   padding-top: env(safe-area-inset-top);
 }
 
-@keyframes nowen-inline-comment-panel-in {
+@keyframes baseforge-inline-comment-panel-in {
   from {
     opacity: 0;
     transform: translateX(18px);
@@ -31,17 +31,17 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nowen-inline-comment-panel {
+  .baseforge-inline-comment-panel {
     animation: none;
   }
 }
 
 @supports not (background-color: color-mix(in srgb, red, transparent)) {
-  ::highlight(nowen-comment-anchor) {
+  ::highlight(baseforge-comment-anchor) {
     background-color: rgba(250, 204, 21, 0.22);
   }
 
-  ::highlight(nowen-comment-active) {
+  ::highlight(baseforge-comment-active) {
     background-color: rgba(251, 146, 60, 0.32);
   }
 }

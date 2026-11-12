@@ -100,14 +100,14 @@ export function primeVersionHistorySettingsCache(value: VersionHistorySettings):
  * 走独立 fetch（同 aiProfiles 模式）：版本记录是旁路动作，不进离线队列、失败由调用方静默。
  */
 /** 顶栏「版本 N」的数据源是版本记录号：任何入口落了新记录就广播，EditorPane 收到后刷新显示。 */
-export const VERSION_RECORD_CREATED_EVENT = "nowen:version-record-created";
+export const VERSION_RECORD_CREATED_EVENT = "baseforge:version-record-created";
 export function emitVersionRecordCreated(noteId: string, version: number): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(VERSION_RECORD_CREATED_EVENT, { detail: { noteId, version } }));
 }
 
 export async function recordManualNoteSave(noteId: string): Promise<{ created: boolean; version?: number }> {
-  const token = localStorage.getItem("nowen-token") || "";
+  const token = localStorage.getItem("baseforge-token") || "";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(`${getBaseUrl()}/shares/note/${encodeURIComponent(noteId)}/versions/save`, {

@@ -2,7 +2,7 @@
  * 回收站共享 UI 逻辑：类型映射、emoji、保留期倒计时、类型筛选的跨组件同步。
  *
  * 侧栏面板与主区 TrashPage 共用：类型筛选多选状态存 localStorage，
- * 变更时广播 nowen:trash-filter；保留期设置同理（nowen:trash-settings）。
+ * 变更时广播 baseforge:trash-filter；保留期设置同理（baseforge:trash-settings）。
  */
 
 export type TrashTypeKey = "rich" | "markdown" | "mindmap" | "plain" | "board" | "sheet" | "word" | "pdf" | "attach";
@@ -56,7 +56,7 @@ export function getRetentionDays(): number {
 
 export function setRetentionDays(days: number): void {
   localStorage.setItem(RETENTION_KEY, String(days));
-  window.dispatchEvent(new CustomEvent("nowen:trash-settings"));
+  window.dispatchEvent(new CustomEvent("baseforge:trash-settings"));
 }
 
 /** 剩余保留天数：按删除时间 + 保留期推算，至少 0。 */
@@ -87,7 +87,7 @@ export function getTrashTypeFilter(): TrashTypeFilterKey[] {
 
 export function setTrashTypeFilter(keys: TrashTypeFilterKey[]): void {
   localStorage.setItem(FILTER_KEY, JSON.stringify(keys.length ? keys : ["all"]));
-  window.dispatchEvent(new CustomEvent("nowen:trash-filter"));
+  window.dispatchEvent(new CustomEvent("baseforge:trash-filter"));
 }
 
 // ===== 删除时间筛选（单选，侧栏 ⇄ 主区同步） =====
@@ -108,7 +108,7 @@ export function getTrashTimeFilter(): TrashTimeFilter {
 
 export function setTrashTimeFilter(value: TrashTimeFilter): void {
   localStorage.setItem(TIME_KEY, value);
-  window.dispatchEvent(new CustomEvent("nowen:trash-filter"));
+  window.dispatchEvent(new CustomEvent("baseforge:trash-filter"));
 }
 
 export function trashTimeMatches(deletedAt: string | null, timeFilter: TrashTimeFilter): boolean {
@@ -140,7 +140,7 @@ export function setTrashSetting(key: "notifyExpiry" | "weeklySummary", value: bo
   try { settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") as Record<string, boolean>; } catch { /* 首次使用 */ }
   settings[key] = value;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-  window.dispatchEvent(new CustomEvent("nowen:trash-settings"));
+  window.dispatchEvent(new CustomEvent("baseforge:trash-settings"));
 }
 
 /** 排序（对齐文件管理的排序 chips；TrashItem 无 size 字段，先只做时间/名称两维） */
@@ -162,7 +162,7 @@ export function getTrashSortFilter(): TrashSortFilter {
 
 export function setTrashSortFilter(value: TrashSortFilter): void {
   localStorage.setItem(SORT_KEY, value);
-  window.dispatchEvent(new CustomEvent("nowen:trash-filter"));
+  window.dispatchEvent(new CustomEvent("baseforge:trash-filter"));
 }
 
 export function sortTrashItems<T extends { title: string; deletedAt: string | null; size?: number | null }>(items: T[], sort: TrashSortFilter): T[] {

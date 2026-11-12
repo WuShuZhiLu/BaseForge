@@ -183,7 +183,7 @@ export function createCodeBlockHighlightPlugin({
   viewportCharacterMargin = DEFAULT_VIEWPORT_CHARACTER_MARGIN,
   onDiagnostic,
 }: CodeBlockHighlightPluginOptions): Plugin<HighlightPluginState> {
-  const pluginKey = new PluginKey<HighlightPluginState>("nowenCodeBlockHighlight");
+  const pluginKey = new PluginKey<HighlightPluginState>("baseforgeCodeBlockHighlight");
   const cache = new Map<string, HighlightSegment[]>();
   let currentView: EditorView | null = null;
   let activeViewport: ViewportRange | null = null;
@@ -493,7 +493,7 @@ export function createCodeBlockHighlightPlugin({
       view.dom.addEventListener("compositionend", handleCompositionEnd);
       scrollTarget.addEventListener("scroll", handleScroll, { passive: true });
       window.addEventListener("resize", handleResize);
-      window.addEventListener("nowen:editor-runtime-change", handleRuntimeChange);
+      window.addEventListener("baseforge:editor-runtime-change", handleRuntimeChange);
 
       if (usesViewportHighlighting()) {
         window.queueMicrotask(() => refreshViewport(true));
@@ -510,7 +510,7 @@ export function createCodeBlockHighlightPlugin({
           view.dom.removeEventListener("compositionend", handleCompositionEnd);
           scrollTarget.removeEventListener("scroll", handleScroll);
           window.removeEventListener("resize", handleResize);
-          window.removeEventListener("nowen:editor-runtime-change", handleRuntimeChange);
+          window.removeEventListener("baseforge:editor-runtime-change", handleRuntimeChange);
           if (viewportFrame) cancelFrame(viewportFrame);
           for (const item of scheduled.values()) {
             item.cancel();

@@ -171,7 +171,7 @@ function directoryListNode(sections: TiptapDirectorySection[]): Record<string, u
           attrs: {
             href: `note:${section.id}`,
             target: null,
-            rel: "noopener noreferrer nofollow nowen-title-alias",
+            rel: "noopener noreferrer nofollow baseforge-title-alias",
           },
         }])],
       }],

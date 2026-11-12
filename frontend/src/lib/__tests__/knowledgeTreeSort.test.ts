@@ -141,7 +141,7 @@ describe("knowledgeTreeSort", () => {
     const sortListener = vi.fn();
     const treeListener = vi.fn();
     window.addEventListener(KNOWLEDGE_TREE_SORT_CHANGED_EVENT, sortListener);
-    window.addEventListener("nowen:knowledge-tree-changed", treeListener);
+    window.addEventListener("baseforge:knowledge-tree-changed", treeListener);
 
     saveKnowledgeTreeSortMode("title-desc");
 
@@ -150,6 +150,6 @@ describe("knowledgeTreeSort", () => {
     expect(treeListener).toHaveBeenCalledTimes(1);
 
     window.removeEventListener(KNOWLEDGE_TREE_SORT_CHANGED_EVENT, sortListener);
-    window.removeEventListener("nowen:knowledge-tree-changed", treeListener);
+    window.removeEventListener("baseforge:knowledge-tree-changed", treeListener);
   });
 });

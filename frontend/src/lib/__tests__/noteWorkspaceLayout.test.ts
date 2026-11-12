@@ -19,7 +19,7 @@ describe("note workspace layout", () => {
   it("supports wide layouts by capability instead of excluding every native device", () => {
     const webWindow = {} as Window;
     const desktopWindow = {
-      nowenDesktop: { isDesktop: true },
+      baseforgeDesktop: { isDesktop: true },
     } as unknown as Window;
     const nativeWindow = {
       Capacitor: {

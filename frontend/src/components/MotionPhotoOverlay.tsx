@@ -52,8 +52,8 @@ export function MotionPhotoOverlay({ source, enabled = true }: { source: string;
 
   useEffect(() => {
     const refresh = () => setSyncRevision((value) => value + 1);
-    window.addEventListener("nowen:sync-snapshot-applied", refresh);
-    return () => window.removeEventListener("nowen:sync-snapshot-applied", refresh);
+    window.addEventListener("baseforge:sync-snapshot-applied", refresh);
+    return () => window.removeEventListener("baseforge:sync-snapshot-applied", refresh);
   }, []);
 
   return (

@@ -10,7 +10,7 @@
 
 - [MCP Server 安装与使用教程](./mcp.md)
 - [MCP Server installation guide](./mcp.en.md)
-- [nowen-mcp 独立包说明](../../packages/nowen-mcp/README.md)
+- [baseforge-mcp 独立包说明](../../packages/baseforge-mcp/README.md)
 
 教程包含 Node.js 安装、源码构建、Personal API Token、Windows / macOS / Linux 路径、Claude Code / Cursor / VS Code 配置、连接验证、升级和常见错误排查。
 
@@ -113,7 +113,6 @@ BaseForge 还支持把笔记本发布为公开知识空间，并按目录继承�
 | **Web** | [Web 端指南](./web.md)，无需安装客户端 |
 | **Windows / macOS / Linux** | [桌面端指南](./desktop.md)，安装包以 [Releases](https://github.com/cropflre/nowen-note/releases) 为准 |
 | **Android** | [Android 指南](./android.md)，正式维护的移动端 |
-| **iOS** | Capacitor 工程与 TestFlight 流程，参见 [iOS 发布指南](../iOS-Release.md) |
 | **HarmonyOS** | [鸿蒙端指南](./harmony.md)，ArkTS + ArkWeb 客户端仍在逐步完善原生能力 |
 
 ## 8. 部署、升级与数据安全
@@ -162,6 +161,6 @@ Personal API Token 支持权限范围和笔记本资源范围。自动化场景�
 
 - 教程内容以 `main` 分支当前实现和最新稳定 Release 为准，不再绑定某个过期版本号。
 - 新功能应同时更新仓库教程入口和 `nowen-blog` 官网帮助中心。
-- MCP 的安装路径、客户端配置格式和 Token 安全要求发生变化时，应同步更新 `mcp.md`、`mcp.en.md`、根 README 和 `packages/nowen-mcp/README.md`。
+- MCP 的安装路径、客户端配置格式和 Token 安全要求发生变化时，应同步更新 `mcp.md`、`mcp.en.md`、根 README 和 `packages/baseforge-mcp/README.md`。
 - 安装包、平台支持范围和版本号以 [GitHub Releases](https://github.com/cropflre/nowen-note/releases) 为准。
 - 发现过期步骤或错误链接，请直接提交 [Issue](https://github.com/cropflre/nowen-note/issues)。

@@ -10,9 +10,9 @@ export interface FolderSyncPreferences {
   excludePatterns: string[];
 }
 
-export const FOLDER_SYNC_PREFS_MESSAGE_PREFIX = "__NOWEN_FOLDER_SYNC_PREFS__:";
+export const FOLDER_SYNC_PREFS_MESSAGE_PREFIX = "__BASEFORGE_FOLDER_SYNC_PREFS__:";
 
-const STORAGE_PREFIX = "nowen-folder-sync-prefs:";
+const STORAGE_PREFIX = "baseforge-folder-sync-prefs:";
 const MAX_PATTERNS = 10;
 const MAX_PATTERN_LENGTH = 64;
 

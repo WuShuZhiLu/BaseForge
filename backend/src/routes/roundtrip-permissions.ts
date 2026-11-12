@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { parseFolderUnlockTokens } from "../lib/knowledgeTreePasswordAccess";
 import {
   applyRoundTripPermissionMappings,
-  createNowenPackageWithPermissions,
+  createBaseForgePackageWithPermissions,
   parsePermissionsFromPackageBuffer,
   previewRoundTripPermissionMappings,
 } from "../services/roundTripPermissionMapping";
@@ -25,7 +25,7 @@ app.get("/package", async (c) => {
     return c.json({ error: "成员权限仅适用于工作区导出", code: "WORKSPACE_REQUIRED" }, 400);
   }
   try {
-    const result = await createNowenPackageWithPermissions({
+    const result = await createBaseForgePackageWithPermissions({
       userId,
       workspaceId,
       notebookId: (c.req.query("notebookId") || "").trim() || undefined,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 
 import {
   MIGRATIONS,
@@ -21,8 +21,8 @@ const BLOCK_MIGRATION_VERSIONS = [BLOCK_SCHEMA_VERSION, BLOCK_REPAIR_VERSION].so
   (a, b) => a - b,
 );
 
-function createHistoricalBlockDatabase(): Database.Database {
-  const db = new Database(":memory:");
+function createHistoricalBlockDatabase(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE users (
       id TEXT PRIMARY KEY
@@ -53,7 +53,7 @@ function createHistoricalBlockDatabase(): Database.Database {
   return db;
 }
 
-function seedAllExceptBlockRepair(db: Database.Database): void {
+function seedAllExceptBlockRepair(db: DatabaseSync): void {
   const missing = new Set(BLOCK_MIGRATION_VERSIONS);
   const insert = db.prepare(
     "INSERT INTO schema_migrations (version, name) VALUES (?, ?)",
@@ -64,7 +64,7 @@ function seedAllExceptBlockRepair(db: Database.Database): void {
   }
 }
 
-function tableNames(db: Database.Database): Set<string> {
+function tableNames(db: DatabaseSync): Set<string> {
   const rows = db.prepare(`
     SELECT name FROM sqlite_master WHERE type = 'table'
   `).all() as Array<{ name: string }>;

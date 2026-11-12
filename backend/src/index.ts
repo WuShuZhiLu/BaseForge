@@ -42,8 +42,6 @@ import icloudRouter from "./routes/icloud";
 import yuqueImportRouter from "./routes/yuque-import";
 import mindmapsRouter from "./routes/mindmaps";
 import mindmapFoldersRouter from "./routes/mindmap-folders";
-import diaryRouter, { handleDownloadDiaryImage } from "./routes/diary";
-import journalsRouter from "./routes/journals";
 import urlImportRouter from "./routes/url-import";
 import sheetsRouter from "./routes/sheets";
 import voiceRouter from "./routes/voice";
@@ -211,7 +209,7 @@ app.get("/api/calendar/ics/:token", (c) => {
     status: 200,
     headers: {
       "Content-Type": "text/calendar; charset=utf-8",
-      "Content-Disposition": 'inline; filename="nowen-tasks.ics"',
+      "Content-Disposition": 'inline; filename="baseforge-tasks.ics"',
       "Cache-Control": "private, max-age=3600",
     },
   });
@@ -377,13 +375,8 @@ app.get("/api/backups/full-download/:token", handleFullBackupJobDownload);
 // 任务列表里的图片缩略图通过 <img src="/api/task-attachments/<id>"> 拉取。
 app.get("/api/task-attachments/:id", handleDownloadTaskAttachment);
 
-// 说说图片下载（同样不走 JWT，授权模型同上）。
-//   注意路径具体：/api/diary/attachments/:id，必须比 diaryRouter（在 JWT 之后挂的
-//   /api/diary/*）注册得**更早**，否则会被 JWT 中间件拦截。
-app.get("/api/diary/attachments/:id", handleDownloadDiaryImage);
-
 // 插件入站回调：高熵 capability token + 可选 HMAC，自身完成鉴权；
-// 外部系统不会携带 Nowen JWT，因此必须注册在 JWT 中间件之前。
+// 外部系统不会携带 BaseForge JWT，因此必须注册在 JWT 中间件之前。
 app.route("/api/plugin-inbound", pluginInboundRouter);
 
 // 自动化对外 Webhook 触发端点：外部系统用一次性签名触发工作流，自身鉴权，
@@ -576,8 +569,6 @@ app.route("/api/yuque", yuqueImportRouter);
 app.route("/api/mindmaps", mindmapsRouter);
 app.route("/api/mindmap-folders", mindmapFoldersRouter);
 app.route("/api/sheets", sheetsRouter);
-app.route("/api/diary", diaryRouter);
-app.route("/api/journals", journalsRouter);
 app.route("/api/url-import", urlImportRouter);
 app.route("/api/ai", aiRouter);
 app.route("/api/voice", voiceRouter);

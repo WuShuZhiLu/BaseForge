@@ -76,7 +76,7 @@ export default function AttachmentXlsxPreview({ url, filename, size, heightClass
         title: `${filename.replace(/\.xlsx$/i, "")} · ${sheet.name}`,
         sheetData: importData,
       });
-      window.dispatchEvent(new CustomEvent("nowen:knowledge-tree-changed", { detail: { reason: "xlsx-import" } }));
+      window.dispatchEvent(new CustomEvent("baseforge:knowledge-tree-changed", { detail: { reason: "xlsx-import" } }));
       toast.success(t("xlsxPreview.imported"));
       if (requestGeneration === generation.current) setDestinations(null);
     } catch (caughtError: unknown) {

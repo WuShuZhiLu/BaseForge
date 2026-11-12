@@ -5,7 +5,7 @@ const electron = require('electron');
 
 const recentBackendOutput = [];
 const outputLimit = 160;
-const nativeFailurePattern = /ERR_DLOPEN_FAILED|GLIBC(?:XX)?_[0-9.]+|CXXABI_[0-9.]+|better_sqlite3\.node|NODE_MODULE_VERSION|wrong ELF|invalid ELF|not found|Module did not self-register/i;
+const nativeFailurePattern = /ERR_DLOPEN_FAILED|GLIBC(?:XX)?_[0-9.]+|CXXABI_[0-9.]+|NODE_MODULE_VERSION|wrong ELF|invalid ELF|not found|Module did not self-register/i;
 
 function remember(source, value) {
   const lines = String(value || '')
@@ -50,7 +50,7 @@ electron.dialog.showErrorBox = function patchedShowErrorBox(title, content) {
 
   const nativeFailure = excerpt.some((line) => nativeFailurePattern.test(line));
   const diagnosis = nativeFailure
-    ? '检测到 SQLite 原生模块加载失败。安装包中的 better_sqlite3.node 与当前 Linux 运行环境不兼容。\n\n'
+    ? '检测到原生模块加载失败。安装包中的原生二进制与当前运行环境不兼容。\n\n'
     : '';
   const enhanced = `${content}\n\n— 后端原始错误 —\n${diagnosis}${excerpt.join('\n')}`;
   return originalShowErrorBox(title, enhanced);

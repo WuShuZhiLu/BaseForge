@@ -59,7 +59,6 @@ const PERMISSION_LABELS: Record<string, string> = {
   "plugin-storage:read": "读取插件自己的数据", "plugin-storage:write": "保存插件自己的数据",
   "capture:write": "抓取公网 HTTPS 文章和图片，保存到有写入权限的笔记本",
   "external:fetch": "访问声明的外部网络服务", "secrets:use": "使用你配置的连接密钥（插件看不到原值）",
-  "diary:read": "读取日记", "diary:write": "创建和修改日记",
   "mindmaps:read": "读取思维导图", "mindmaps:write": "创建和修改思维导图",
 };
 
@@ -177,7 +176,7 @@ export function PluginPackageInstallSection({ onInstalled }: {
         <input
           ref={inputRef}
           type="file"
-          accept=".nowen-plugin"
+          accept=".baseforge-plugin"
           className="hidden"
           onChange={(event) => void choosePackage(event.target.files?.[0])}
         />

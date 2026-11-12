@@ -109,9 +109,7 @@ export const MIGRATIONS: Migration[] = [
         db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
       };
 
-      // ---- 1. 说说：加 workspaceId ----
-      addColumnIfMissing("diaries", "workspaceId", "TEXT");
-      db.exec("CREATE INDEX IF NOT EXISTS idx_diaries_workspace ON diaries(workspaceId);");
+      // ---- 1. 说说（diaries）：已随日记模块删除，此处不再处理 ----
 
       // ---- 2. 待办：加 workspaceId ----
       addColumnIfMissing("tasks", "workspaceId", "TEXT");
@@ -221,11 +219,7 @@ export const MIGRATIONS: Migration[] = [
         db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
       };
 
-      // ---- 1. diary_attachments.workspaceId ----
-      addColumnIfMissing("diary_attachments", "workspaceId", "TEXT");
-      db.exec(
-        "CREATE INDEX IF NOT EXISTS idx_diary_attachments_workspace ON diary_attachments(workspaceId);",
-      );
+      // ---- 1. diary_attachments 已随日记模块删除，此处不再处理 ----
 
       // ---- 2. task_attachments.workspaceId ----
       addColumnIfMissing("task_attachments", "workspaceId", "TEXT");
@@ -757,6 +751,14 @@ export const MIGRATIONS: Migration[] = [
     version: 10,
     name: "ai-chat-conversations",
     up: (db) => {
+      // 0.2.0 起 AI 问答整体移除：新库不再建 ai_chat_* 两张表，v140 还会把
+      // 老库里的它们 DROP 掉。这里必须自带守卫，否则新库走到下面的
+      // CREATE INDEX / 回填时会报 no such table，直接打断启动。
+      const hasChatTable = Boolean(
+        db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = 'ai_chat_messages'").get(),
+      );
+      if (!hasChatTable) return;
+
       const addColumnIfMissing = (
         table: string,
         column: string,
@@ -1199,7 +1201,7 @@ export const MIGRATIONS: Migration[] = [
   // --------------------------------------------------------------------------
   // v15: users 增加 isDemo 体验账号标记
   // --------------------------------------------------------------------------
-  // 背景：体验站点（note.nowen.cn）需要一个对外开放的 demo 账号，但这个账号
+  // 背景：体验站点（note.baseforge.cn）需要一个对外开放的 demo 账号，但这个账号
   //   不能让用户改密码 / 改用户名 / 启停 2FA，否则下一个访客就进不来了。
   //
   // 设计：
@@ -1547,7 +1549,7 @@ export const MIGRATIONS: Migration[] = [
       db.prepare("ALTER TABLE notes ADD COLUMN contentFormat TEXT NOT NULL DEFAULT 'tiptap-json'").run();
     },
   },
-  // v32: folder_sync_files 映射表，跟踪"本地文件 → Nowen 笔记"的同步关系。
+  // v32: folder_sync_files 映射表，跟踪"本地文件 → BaseForge 笔记"的同步关系。
   //   sourcePathHash = sha256(relativePath)，用于去重和增量更新。
   //   sha256 = 文件内容 hash，用于判断内容是否变化。
   {

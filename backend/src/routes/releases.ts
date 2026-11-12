@@ -7,13 +7,17 @@
 import { Hono } from "hono";
 
 const router = new Hono();
-const GITHUB_OWNER = process.env.NOWEN_RELEASE_OWNER || "cropflre";
-const GITHUB_REPO = process.env.NOWEN_RELEASE_REPO || "nowen-note";
+// 发布仓库默认指向本产品主仓，部署方可用环境变量覆盖。
+// 不要回退到上游 baseforge：否则「最新发布」会把上游版本当成自身新版本，
+// 既显示错误的「可升级」，也把用户引到与本产品无关的下载页。
+const GITHUB_OWNER = (process.env.BASEFORGE_RELEASE_OWNER || "WuShuZhiLu").trim();
+const GITHUB_REPO = (process.env.BASEFORGE_RELEASE_REPO || "BaseForge").trim();
+const RELEASE_REPO_CONFIGURED = Boolean(GITHUB_OWNER && GITHUB_REPO);
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
 const GITHUB_LATEST_RELEASE_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-const GITHUB_TOKEN = (process.env.NOWEN_GITHUB_TOKEN || process.env.GITHUB_TOKEN || "").trim();
-const CACHE_TTL_MS = parseTtl(process.env.NOWEN_RELEASE_CACHE_MS, 15 * 60_000);
-const FAIL_CACHE_TTL_MS = parseTtl(process.env.NOWEN_RELEASE_FAIL_CACHE_MS, 5 * 60_000);
+const GITHUB_TOKEN = (process.env.BASEFORGE_GITHUB_TOKEN || process.env.GITHUB_TOKEN || "").trim();
+const CACHE_TTL_MS = parseTtl(process.env.BASEFORGE_RELEASE_CACHE_MS, 15 * 60_000);
+const FAIL_CACHE_TTL_MS = parseTtl(process.env.BASEFORGE_RELEASE_FAIL_CACHE_MS, 5 * 60_000);
 const FETCH_TIMEOUT_MS = 5_000;
 
 function parseTtl(raw: string | undefined, fallback: number): number {
@@ -231,6 +235,9 @@ async function refreshLatestRelease(): Promise<LatestReleasePayload> {
  * 多个并发调用共享同一个 in-flight Promise，避免缓存过期瞬间形成外呼风暴。
  */
 export async function getLatestReleasePayload(): Promise<LatestReleasePayload> {
+  if (!RELEASE_REPO_CONFIGURED) {
+    return { available: false, reason: "release_repo_not_configured" };
+  }
   const now = Date.now();
   if (current && now - current.at < current.ttl) return current.payload;
   if (!inFlight) {

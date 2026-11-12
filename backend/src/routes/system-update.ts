@@ -16,7 +16,7 @@ const router = new Hono();
 const UPDATER_URL = (brandEnv("UPDATER_URL") || "http://baseforge-updater:3002").replace(/\/+$/, "");
 const UPDATER_TOKEN = (brandEnv("UPDATER_TOKEN") || "").trim();
 const PREFLIGHT_TTL_MS = Math.max(5 * 60_000, Number(brandEnv("UPDATE_PREFLIGHT_TTL_MS")) || 30 * 60_000);
-const INTERACTIVE_HEADER = "Nowen-System-Update";
+const INTERACTIVE_HEADER = "BaseForge-System-Update";
 const PREFLIGHT_PREFIX = "system-update:preflight:";
 
 interface StoredPreflight {
@@ -273,8 +273,18 @@ async function buildStatus() {
   if (schemaVersion !== codeSchemaVersion) {
     blockers.push({ code: "SCHEMA_NOT_READY", message: `数据库 Schema 未就绪：${schemaVersion}/${codeSchemaVersion}` });
   }
-  if (!latestVersion) blockers.push({ code: "LATEST_RELEASE_UNAVAILABLE", message: "无法确定最新稳定版本" });
-  else if (!updateAvailable) warnings.push({ code: "ALREADY_LATEST", message: "当前已经是最新稳定版本" });
+  if (!latestVersion) {
+    // 区分「未配置发布仓库」和「拉取失败」：两者都拿不到版本号，
+    // 但前者是部署方需要补配置，后者通常只是网络/限额问题，提示语不能一样。
+    const reason = !latest.available ? latest.reason : "";
+    blockers.push({
+      code: "LATEST_RELEASE_UNAVAILABLE",
+      message:
+        reason === "release_repo_not_configured"
+          ? "未配置发布仓库，无法确定最新稳定版本（需设置 BASEFORGE_RELEASE_OWNER / BASEFORGE_RELEASE_REPO）"
+          : "无法确定最新稳定版本",
+    });
+  } else if (!updateAvailable) warnings.push({ code: "ALREADY_LATEST", message: "当前已经是最新稳定版本" });
 
   return {
     current: {

@@ -5,7 +5,7 @@ import {
   type MobileBootstrapPayload,
 } from "./mobileStartupBridge";
 
-const INSTALL_FLAG = "__nowenMobileWebStartupBridgeInstalled";
+const INSTALL_FLAG = "__baseforgeMobileWebStartupBridgeInstalled";
 const STARTUP_CACHE_MS = 20_000;
 const SHARE_STATUS_CACHE_MS = 5 * 60_000;
 const FAILURE_COOLDOWN_MS = 8_000;
@@ -89,7 +89,7 @@ function responseFromJson(data: unknown): Response {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "private, no-store",
-      "X-Nowen-Mobile-Bootstrap": "web-hit",
+      "X-BaseForge-Mobile-Bootstrap": "web-hit",
     },
   });
 }

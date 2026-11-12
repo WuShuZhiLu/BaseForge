@@ -49,7 +49,7 @@ describe("SiYuan rich-text Callout compatibility", () => {
       "warning",
       "caution",
     ]);
-    expect(blocks[0].classList.contains("nowen-siyuan-callout")).toBe(true);
+    expect(blocks[0].classList.contains("baseforge-siyuan-callout")).toBe(true);
     expect(blocks[0].firstElementChild?.textContent).toBe("[!TIP] Tip 💡");
     expect((blocks[0].firstElementChild as HTMLElement).dataset.calloutIcon).toBe("💡");
     expect((blocks[0].firstElementChild as HTMLElement).dataset.calloutTitle).toBe("Tip");
@@ -58,7 +58,7 @@ describe("SiYuan rich-text Callout compatibility", () => {
   it("keeps the legacy ProseMirror root as a compatibility fallback", () => {
     document.body.innerHTML = '<div class="ProseMirror"><blockquote><p>[!TIP] Tip</p><p>正文</p></blockquote></div>';
     expect(decorateSiyuanRichTextCallouts(document)).toBe(1);
-    expect(document.querySelector("blockquote")?.classList.contains("nowen-siyuan-callout")).toBe(true);
+    expect(document.querySelector("blockquote")?.classList.contains("baseforge-siyuan-callout")).toBe(true);
   });
 
   it("leaves Markdown source and ordinary rich-text blockquotes untouched", () => {
@@ -71,7 +71,7 @@ describe("SiYuan rich-text Callout compatibility", () => {
 
     expect(decorateSiyuanRichTextCallouts(document)).toBe(0);
     expect(document.querySelector("pre")?.textContent).toContain("[!TIP] Tip");
-    expect(document.querySelector(`${PRODUCTION_EDITOR_ROOT} blockquote`)?.classList.contains("nowen-siyuan-callout")).toBe(false);
+    expect(document.querySelector(`${PRODUCTION_EDITOR_ROOT} blockquote`)?.classList.contains("baseforge-siyuan-callout")).toBe(false);
   });
 
   it("removes presentation metadata when the marker is edited into a normal quote", () => {
@@ -90,8 +90,8 @@ describe("SiYuan rich-text Callout compatibility", () => {
     header.textContent = "普通引用";
     decorateSiyuanRichTextCallouts(document);
 
-    expect(blockquote.classList.contains("nowen-siyuan-callout")).toBe(false);
+    expect(blockquote.classList.contains("baseforge-siyuan-callout")).toBe(false);
     expect(blockquote.hasAttribute("data-callout-type")).toBe(false);
-    expect(header.classList.contains("nowen-siyuan-callout-header")).toBe(false);
+    expect(header.classList.contains("baseforge-siyuan-callout-header")).toBe(false);
   });
 });

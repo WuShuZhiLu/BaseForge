@@ -48,7 +48,7 @@ export function resolveFloatingLayer(components: RegisteredPluginUiAction[], lay
 
 function userScope(): string {
   try {
-    const token = localStorage.getItem("nowen-token") || "";
+    const token = localStorage.getItem("baseforge-token") || "";
     const payload = token.split(".")[1];
     if (!payload) return "local-user";
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
@@ -60,7 +60,7 @@ function userScope(): string {
 }
 
 export function uiExtensionLayoutStorageKey(): string {
-  return `nowen-ui-extension-layout:v1:${userScope()}`;
+  return `baseforge-ui-extension-layout:v1:${userScope()}`;
 }
 
 export function loadUiExtensionLayout(): UiExtensionLayout {

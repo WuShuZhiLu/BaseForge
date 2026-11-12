@@ -10,8 +10,8 @@ describe("UGREEN remote access", () => {
   const originalFetch = window.fetch;
 
   afterEach(() => {
-    delete (window as any).nowenDesktop;
-    delete (window as any).__nowenUgreenCredentialedFetchInstalled;
+    delete (window as any).baseforgeDesktop;
+    delete (window as any).__baseforgeUgreenCredentialedFetchInstalled;
     window.fetch = originalFetch;
     vi.restoreAllMocks();
   });
@@ -39,7 +39,7 @@ describe("UGREEN remote access", () => {
 
   it("opens UGREEN access inside the Electron desktop client", async () => {
     const openUgreenRemoteWorkspaceInDesktop = vi.fn(async () => ({ ok: true }));
-    (window as any).nowenDesktop = {
+    (window as any).baseforgeDesktop = {
       isDesktop: true,
       openUgreenRemoteWorkspace: openUgreenRemoteWorkspaceInDesktop,
     };
@@ -56,7 +56,7 @@ describe("UGREEN remote access", () => {
   it("includes the shared UGREEN session only for UGREEN requests", async () => {
     const fetchMock = vi.fn(async () => new Response("{}"));
     window.fetch = fetchMock as typeof window.fetch;
-    (window as any).nowenDesktop = { isDesktop: true };
+    (window as any).baseforgeDesktop = { isDesktop: true };
     installUgreenCredentialedFetch();
 
     await window.fetch("https://app-3001-device.cn57.ugdocker.link/api/me");

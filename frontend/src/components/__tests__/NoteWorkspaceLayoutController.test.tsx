@@ -64,7 +64,7 @@ describe.skip("NoteWorkspaceLayoutController", () => {
     state.viewMode = "all";
     actions.toggleNoteListCollapsed.mockClear();
     actions.setEditorFullscreen.mockClear();
-    delete (window as any).nowenDesktop;
+    delete (window as any).baseforgeDesktop;
     delete (window as any).Capacitor;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1600 });
 
@@ -128,7 +128,7 @@ describe.skip("NoteWorkspaceLayoutController", () => {
   });
 
   it("keeps the same layout entry in Electron", () => {
-    (window as any).nowenDesktop = { isDesktop: true };
+    (window as any).baseforgeDesktop = { isDesktop: true };
     act(() => root.render(<NoteWorkspaceLayoutController />));
 
     const trigger = document.querySelector('[data-testid="note-workspace-layout-trigger"]');
@@ -201,7 +201,7 @@ describe.skip("NoteWorkspaceLayoutController", () => {
     expect(localStorage.getItem(NOTE_WORKSPACE_LAYOUT_STORAGE_KEY)).toBe("standard");
   });
 
-  it.each(["tasks", "mindmaps", "ai-chat", "diary", "files", "shares", "issues", "trash"])("does not expose note layout controls in %s", (viewMode) => {
+  it.each(["tasks", "mindmaps", "ai-chat", "files", "shares", "issues", "trash"])("does not expose note layout controls in %s", (viewMode) => {
     state.viewMode = viewMode;
     act(() => root.render(<NoteWorkspaceLayoutController />));
     expect(document.querySelector('[data-testid="note-workspace-layout-trigger"]')).toBeNull();

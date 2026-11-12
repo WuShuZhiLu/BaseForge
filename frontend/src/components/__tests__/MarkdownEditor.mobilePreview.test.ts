@@ -37,12 +37,12 @@ describe("MarkdownEditor mobile preview", () => {
   it("binds live preview through the responsive full toolbar instead of relying on the old sticky selector", () => {
     expect(experienceBridgeSource).toContain("data-markdown-mobile-toolbar");
     expect(experienceBridgeSource).toContain("expanded");
-    expect(experienceBridgeSource).toContain("nowenMarkdownLive");
+    expect(experienceBridgeSource).toContain("baseforgeMarkdownLive");
     expect(experienceBridgeSource).toContain("markdownLivePreviewExtension");
   });
 
   it("surfaces source, live preview and preview together on the compact mobile toolbar", () => {
-    expect(mobileBridgeSource).toContain("data-nowen-markdown-live");
+    expect(mobileBridgeSource).toContain("data-baseforge-markdown-live");
     expect(mobileBridgeSource).toContain("target.liveButton");
     expect(mobileBridgeSource).toContain("实时预览");
   });

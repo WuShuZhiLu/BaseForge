@@ -69,17 +69,21 @@ BaseForge 基于 nowen note v1.4.16 分叉，合并v1.5.1功能，后彻底独�
 
 ### MCP Server
 
-`packages/nowen-mcp` 提供 MCP Server。AI agent（Claude Code、Cursor、VS Code 等）通过 MCP 使用 BaseForge，将知识库作为检索来源，可访问范围由 Personal API Token 决定。可用工具按用途分组：
+`packages/baseforge-mcp` 提供 MCP Server。AI agent（Claude Code、Cursor、VS Code 等）通过 MCP 使用 BaseForge，将知识库作为检索来源，可访问范围由 Personal API Token 决定。可用工具按用途分组：
 
 | 分组 | 工具 |
 | --- | --- |
-| 知识库与笔记 | `list_notebooks`、`create_notebook`、`list_notes`、`read_note`、`create_note`、`update_note`、`delete_note`、`search`、`knowledge_stats` |
+| 知识库与笔记 | `list_notebooks`、`create_notebook`、`list_notes`、`read_note`、`create_note`、`update_note`、`delete_note`、`search` |
 | 块级读写 | `get_block`、`search_blocks`、`create_block`、`update_block`、`delete_block`、`move_block` |
 | 引用与链接 | `resolve_link`、`get_backlinks`、`get_block_backlinks` |
 | 附件与标签 | `upload_attachment`、`list_attachments`、`attach_to_note`、`list_tags`、`manage_tags` |
-| 运维 | `list_plugins`、`execute_plugin`、`list_webhooks`、`create_webhook`、`audit_stats`、`list_backups`、`create_backup` |
+| 远程文件 | `list_remote_sources`、`manage_remote_source`、`list_remote_files`、`read_remote_file`、`write_remote_file`、`manage_remote_file`、`list_remote_links`、`manage_remote_link` |
+| 导出与分享 | `export_notes`、`list_shares`、`create_share`、`update_share`、`delete_share` |
+| 运维（仅 unrestricted 令牌） | `list_plugins`、`execute_plugin`、`list_webhooks`、`create_webhook`、`audit_stats`、`list_backups`、`create_backup` |
 
-块级写操作需要携带笔记版本与操作 ID，用于并发校验与重试去重。安装步骤见 [MCP 教程](./docs/tutorials/mcp.md)（[English](./docs/tutorials/mcp.en.md)），包说明见 [`packages/nowen-mcp`](./packages/nowen-mcp/README.md)。
+工具按 Token scope 授权（含 `remote_files:read/write`、`shares:read/write`、`tasks:read/write`）；项目内 AI 问答及其 MCP 工具已移除。
+
+块级写操作需要携带笔记版本与操作 ID，用于并发校验与重试去重。安装步骤见 [MCP 教程](./docs/tutorials/mcp.md)（[English](./docs/tutorials/mcp.en.md)），包说明见 [`packages/baseforge-mcp`](./packages/baseforge-mcp/README.md)。
 
 ### HTTP API 与工具
 

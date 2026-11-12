@@ -15,7 +15,7 @@ export interface RuntimeFilePublicOriginResolution {
 
 export function readFilePublicOriginEnv(env: NodeJS.ProcessEnv = process.env): string {
   return normalizePublicWebOrigin(
-    env.FILE_PUBLIC_ORIGIN || env.NOWEN_FILE_PUBLIC_ORIGIN || "",
+    env.FILE_PUBLIC_ORIGIN || env.BASEFORGE_FILE_PUBLIC_ORIGIN || "",
   );
 }
 
@@ -67,7 +67,7 @@ export function syncRuntimeFilePublicOriginSetting(
 ): RuntimeFilePublicOriginResolution {
   const storedOrigin = readSetting(FILE_PUBLIC_ORIGIN_KEY);
   const storedSource = readSetting(FILE_PUBLIC_ORIGIN_SOURCE_KEY);
-  const rawEnv = env.FILE_PUBLIC_ORIGIN || env.NOWEN_FILE_PUBLIC_ORIGIN || "";
+  const rawEnv = env.FILE_PUBLIC_ORIGIN || env.BASEFORGE_FILE_PUBLIC_ORIGIN || "";
   const envOrigin = normalizePublicWebOrigin(rawEnv);
 
   if (String(rawEnv).trim() && !envOrigin) {

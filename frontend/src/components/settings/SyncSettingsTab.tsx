@@ -56,7 +56,7 @@ function SyncSettingsContent({ mobile }: { mobile: boolean }) {
           if (!cancelled) setBrowserServer(true);
           return;
         }
-        const completedThisSession = sessionStorage.getItem("nowen-lite-migration-complete-this-session") === "1";
+        const completedThisSession = sessionStorage.getItem("baseforge-lite-migration-complete-this-session") === "1";
         if (appInfo?.mode === "lite" && (appInfo.runtime !== "local" || completedThisSession)) {
           const result = await getLiteMigrationProgress();
           if (!cancelled) {
@@ -141,7 +141,7 @@ function LiteMigrationWizard({progress,onProgress}:{
       const result = await startLiteMigration(getServerUrl(),token);
       if (result.progress) onProgress(result.progress);
       if (result.progress?.stage === "complete") {
-        sessionStorage.setItem("nowen-lite-migration-complete-this-session","1");
+        sessionStorage.setItem("baseforge-lite-migration-complete-this-session","1");
       }
       if (!result.ok) setError(result.progress?.error || result.error || "迁移未能完成");
     } catch (reason) {
@@ -206,7 +206,7 @@ function WorkspaceScopePanel() {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `nowen-${scope.workspaceName || scope.workspaceId}-recovery.json`;
+      anchor.download = `baseforge-${scope.workspaceName || scope.workspaceId}-recovery.json`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (reason) {

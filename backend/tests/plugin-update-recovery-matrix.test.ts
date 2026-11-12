@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-update-recovery-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-update-recovery-"));
 process.env.NODE_ENV = "test";
 process.env.DB_PATH = path.join(root, "update-recovery.db");
 process.env.ELECTRON_USER_DATA = path.join(root, "user-data");
@@ -45,7 +45,7 @@ test("startup recovery converges every interrupted update stage to stable, proba
       description: "fault injection fixture",
       version,
       apiVersion: 2 as const,
-      engines: { nowen: ">=1.5.0 <2.0.0" },
+      engines: { baseforge: ">=1.5.0 <2.0.0" },
       runtime: "sandbox-js" as const,
       main: "index.js",
       categories: ["productivity"],
@@ -59,7 +59,7 @@ test("startup recovery converges every interrupted update stage to stable, proba
   function versionDirectory(pluginId: string, version: string): string {
     const directory = path.join(root, "fixtures", pluginId, version);
     fs.mkdirSync(directory, { recursive: true });
-    fs.writeFileSync(path.join(directory, "index.js"), "globalThis.__nowenPluginModule={actions:{run:async()=>({success:true})}};");
+    fs.writeFileSync(path.join(directory, "index.js"), "globalThis.__baseforgePluginModule={actions:{run:async()=>({success:true})}};");
     return directory;
   }
 

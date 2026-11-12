@@ -12,9 +12,9 @@ import {
   synchronizeLegacyNotebookHierarchy,
 } from "../services/legacyKnowledgeHierarchy.js";
 
-const ROUTE_PATCH_FLAG = Symbol.for("nowen.micloudImportHardening.routePatch");
-const ROUTER_INSTALLED_FLAG = Symbol.for("nowen.micloudImportHardening.routerInstalled");
-const LEGACY_ERROR_HANDLER_FLAG = Symbol.for("nowen.micloudImportHardening.legacyErrorHandler");
+const ROUTE_PATCH_FLAG = Symbol.for("baseforge.micloudImportHardening.routePatch");
+const ROUTER_INSTALLED_FLAG = Symbol.for("baseforge.micloudImportHardening.routerInstalled");
+const LEGACY_ERROR_HANDLER_FLAG = Symbol.for("baseforge.micloudImportHardening.legacyErrorHandler");
 const globals = globalThis as typeof globalThis & Record<symbol, boolean>;
 
 const SOURCE_TYPE = "xiaomi-note";

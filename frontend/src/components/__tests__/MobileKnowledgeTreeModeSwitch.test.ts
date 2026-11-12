@@ -13,7 +13,7 @@ const mainSource = readFileSync(path.resolve(__dirname, "../../main.tsx"), "utf8
 
 describe("mobile knowledge tree mode switch contract", () => {
   it("keeps both mobile directory modes without a switch in the content header", () => {
-    expect(bridgeSource).toMatch(/<KnowledgeTreePanel[\s\S]*variant="mobile"[\s\S]*className=\{compact\s*\?\s*"nowen-mobile-tree-density"\s*:\s*undefined\}/);
+    expect(bridgeSource).toMatch(/<KnowledgeTreePanel[\s\S]*variant="mobile"[\s\S]*className=\{compact\s*\?\s*"baseforge-mobile-tree-density"\s*:\s*undefined\}/);
     expect(bridgeSource).toContain('mode === "tree" && createPortal');
     expect(bridgeSource).toContain('surface.navigatorSurface.style.display = mode === "tree" ? "none" : ""');
     expect(bridgeSource).not.toContain("MOBILE_MODE_SWITCH_SLOT_ATTRIBUTE");
@@ -21,13 +21,13 @@ describe("mobile knowledge tree mode switch contract", () => {
   });
 
   it("keeps browser and Android tree mode visibly compact", () => {
-    expect(compactCssSource).toMatch(/--nowen-mobile-tree-root-folder-row-height:\s*\d+px/);
-    expect(compactCssSource).toMatch(/--nowen-mobile-tree-folder-row-height:\s*\d+px/);
-    expect(compactCssSource).toContain("--nowen-mobile-tree-note-row-height: 28px");
-    expect(compactCssSource).toMatch(/\[data-knowledge-tree-node-id\]\s*\{[\s\S]*min-height:\s*var\(--nowen-mobile-tree-note-row-height\)\s*!important/);
+    expect(compactCssSource).toMatch(/--baseforge-mobile-tree-root-folder-row-height:\s*\d+px/);
+    expect(compactCssSource).toMatch(/--baseforge-mobile-tree-folder-row-height:\s*\d+px/);
+    expect(compactCssSource).toContain("--baseforge-mobile-tree-note-row-height: 28px");
+    expect(compactCssSource).toMatch(/\[data-knowledge-tree-node-id\]\s*\{[\s\S]*min-height:\s*var\(--baseforge-mobile-tree-note-row-height\)\s*!important/);
     expect(compactCssSource).toContain("font-size: 11px !important");
     expect(compactCssSource).toContain("touch-action: manipulation");
-    expect(compactCssSource).toContain("--nowen-mobile-tree-action-width: 30px");
+    expect(compactCssSource).toContain("--baseforge-mobile-tree-action-width: 30px");
   });
 
   it("exposes one clear tree-mode switch in Settings", () => {
@@ -38,6 +38,13 @@ describe("mobile knowledge tree mode switch contract", () => {
     expect(settingsSource).toContain('t("settings.mobileKnowledgeTreeModeDesc")');
     expect(zhSource).toContain('"mobileKnowledgeTreeMode": "移动端使用树形目录"');
     expect(enSource).toContain('"mobileKnowledgeTreeMode": "Use tree view on mobile"');
+  });
+
+  it("renders the mobile-only switches only in a mobile runtime", () => {
+    // 移动端专有项按运行时裁剪：Android 原生运行时，或视口窄到触发移动抽屉。
+    expect(settingsSource).toContain("const isMobileRuntime = isAndroidNativeRuntime() || narrowViewport");
+    expect(settingsSource).toContain('window.matchMedia("(max-width: 767px)")');
+    expect(settingsSource).toMatch(/\{isMobileRuntime && \(/);
   });
 
   it("persists the choice and keeps the new navigator as the default", () => {
@@ -63,7 +70,7 @@ describe("mobile knowledge tree mode switch contract", () => {
     expect(bridgeSource).toContain('[data-markdown-body-focused]');
     expect(bridgeSource).toContain("padding-bottom: 0 !important");
     expect(bridgeSource).toContain("overflow: hidden !important");
-    expect(bridgeSource).toContain(".nowen-md-editor .cm-scroller");
+    expect(bridgeSource).toContain(".baseforge-md-editor .cm-scroller");
     expect(bridgeSource).toContain("getFocusedMobileMarkdownRoot");
     expect(bridgeSource).toContain('data-mobile-markdown-keyboard-layout');
   });

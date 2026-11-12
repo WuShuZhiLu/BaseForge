@@ -214,7 +214,7 @@ test("replaces a paragraph with validated marks, hard breaks and block attribute
         { type: "hardBreak" },
         {
           type: "text",
-          text: "Nowen",
+          text: "BaseForge",
           marks: [{
             type: "link",
             attrs: {

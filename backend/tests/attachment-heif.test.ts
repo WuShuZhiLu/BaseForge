@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import sharp from "sharp";
 import { sniffHeifMime, resolveHeifUploadMime } from "../src/lib/heif-mime";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-heif-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-heif-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.NODE_ENV = "test";

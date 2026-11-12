@@ -20,11 +20,11 @@ test("file system failures have safe, stable codes, never raw paths or secrets",
 });
 
 test("upload and repair DB failures preserve legacy code without SQL exposure", () => {
-  const injected = new Error("SQLITE_CONSTRAINT: SELECT password FROM users at /data/nowen.db");
+  const injected = new Error("SQLITE_CONSTRAINT: SELECT password FROM users at /data/baseforge.db");
   const write = classifyAttachmentWriteFailure("database", injected);
   assert.equal(write.code, "ATTACHMENT_DB_WRITE_FAILED");
   assert.match(write.error, /写入数据库失败/);
-  assert.doesNotMatch(JSON.stringify(write), /password|SELECT|nowen.db/);
+  assert.doesNotMatch(JSON.stringify(write), /password|SELECT|baseforge.db/);
   const repair = classifyAttachmentWriteFailure("repair-database", injected);
   assert.equal(repair.code, "ATTACHMENT_DB_WRITE_FAILED");
   assert.match(repair.error, /更新附件元数据失败/);

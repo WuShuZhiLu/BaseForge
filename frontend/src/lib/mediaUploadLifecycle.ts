@@ -12,7 +12,7 @@ export interface MediaUploadLifecycleDetail {
   queued?: boolean;
 }
 
-export const MEDIA_UPLOAD_LIFECYCLE_EVENT = "nowen:media-upload-lifecycle";
+export const MEDIA_UPLOAD_LIFECYCLE_EVENT = "baseforge:media-upload-lifecycle";
 
 const pendingOriginalFiles = new Map<string, File[]>();
 

@@ -83,14 +83,14 @@ export default function EncryptedNotePane({ note }: { note: Note }) {
     };
     window.addEventListener(ENCRYPTED_NOTE_LEAVE_EVENT, beforeLeave);
     window.addEventListener("beforeunload", beforeUnload);
-    window.addEventListener("nowen:token-changed", clear);
-    window.addEventListener("nowen:server-url-changed", clear);
+    window.addEventListener("baseforge:token-changed", clear);
+    window.addEventListener("baseforge:server-url-changed", clear);
     return () => {
       mounted.current = false; operation.current?.abort(); cryptoSession.current?.close(); cryptoSession.current = null;
       window.removeEventListener(ENCRYPTED_NOTE_LEAVE_EVENT, beforeLeave);
       window.removeEventListener("beforeunload", beforeUnload);
-      window.removeEventListener("nowen:token-changed", clear);
-      window.removeEventListener("nowen:server-url-changed", clear);
+      window.removeEventListener("baseforge:token-changed", clear);
+      window.removeEventListener("baseforge:server-url-changed", clear);
     };
   }, []);
 

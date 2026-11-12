@@ -6,8 +6,8 @@ export type AutoBackupType = "full" | "db-only";
 
 const AUTO_CONFIG_KEY = "backup:auto";
 const AUTO_DESCRIPTION_PREFIX = "自动备份";
-const PATCH_FLAG = Symbol.for("nowen.autoFullBackup.patched");
-const RUNNING_FLAG = Symbol.for("nowen.autoFullBackup.running");
+const PATCH_FLAG = Symbol.for("baseforge.autoFullBackup.patched");
+const RUNNING_FLAG = Symbol.for("baseforge.autoFullBackup.running");
 
 interface AutoBackupConfigLike {
   enabled?: boolean;

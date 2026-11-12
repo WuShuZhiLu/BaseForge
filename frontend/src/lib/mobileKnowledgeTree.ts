@@ -15,9 +15,9 @@ export interface MobileKnowledgeTreeRecentEntry {
 
 export type MobileKnowledgeTreeRecentMode = "opened" | "edited";
 
-export const MOBILE_KNOWLEDGE_TREE_SORT_STORAGE_KEY = "nowen.mobileKnowledgeTree.sort.v1";
-export const MOBILE_KNOWLEDGE_TREE_RECENT_STORAGE_KEY = "nowen.mobileKnowledgeTree.recent.v1";
-export const MOBILE_KNOWLEDGE_TREE_RECENT_MODE_STORAGE_KEY = "nowen.mobileKnowledgeTree.recentMode.v1";
+export const MOBILE_KNOWLEDGE_TREE_SORT_STORAGE_KEY = "baseforge.mobileKnowledgeTree.sort.v1";
+export const MOBILE_KNOWLEDGE_TREE_RECENT_STORAGE_KEY = "baseforge.mobileKnowledgeTree.recent.v1";
+export const MOBILE_KNOWLEDGE_TREE_RECENT_MODE_STORAGE_KEY = "baseforge.mobileKnowledgeTree.recentMode.v1";
 export const MOBILE_KNOWLEDGE_TREE_RECENT_LIMIT = 40;
 
 const VALID_SORT_MODES = new Set<MobileKnowledgeTreeSortMode>([

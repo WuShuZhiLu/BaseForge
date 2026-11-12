@@ -7,7 +7,7 @@ import {
   isCompleteNoteUpdateResponse,
 } from "@/lib/noteUpdateResponseGuard";
 
-const INSTALL_KEY = "__NOWEN_NOTE_UPDATE_RESPONSE_GUARD_V1__";
+const INSTALL_KEY = "__BASEFORGE_NOTE_UPDATE_RESPONSE_GUARD_V1__";
 const realUpdateNote = api.updateNote;
 
 function completeNote() {

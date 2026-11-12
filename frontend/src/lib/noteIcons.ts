@@ -18,8 +18,8 @@ function emit(): void {
 }
 
 function authHeaders(json = false): HeadersInit {
-  const token = localStorage.getItem("nowen-token") || "";
-  const connectionId = (window as any).__nowenGetConnectionId?.() || "";
+  const token = localStorage.getItem("baseforge-token") || "";
+  const connectionId = (window as any).__baseforgeGetConnectionId?.() || "";
   return {
     ...(json ? { "Content-Type": "application/json" } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

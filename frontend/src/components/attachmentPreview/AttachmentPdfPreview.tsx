@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { cn } from "@/lib/utils";
+import { pdfjsAssetUrl } from "@/lib/pdfjsAssets";
 
 interface Props {
   url: string;
@@ -74,6 +75,10 @@ export default function AttachmentPdfPreview({ url, filename, heightClass, page,
           data: new Uint8Array(await response.arrayBuffer()),
           isEvalSupported: false,
           useSystemFonts: true,
+          // CJK 字符映射与非内嵌标准字体：缺失会导致中文丢字、部分页渲染失败空白
+          cMapUrl: pdfjsAssetUrl("cmaps"),
+          cMapPacked: true,
+          standardFontDataUrl: pdfjsAssetUrl("standard_fonts"),
         });
         loadingTask = nextLoadingTask;
         const nextDocument = await nextLoadingTask.promise;

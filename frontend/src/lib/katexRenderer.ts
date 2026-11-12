@@ -115,7 +115,7 @@ export function renderKatexSync(
   // 再去网络拉东西。但若从未异步加载过，仍要走 async 路径——这里直接退化报错。
   try {
     // 这一段假设外部已经至少 await 过一次 loadKatex，否则只能走 async 入口
-    const m = (window as any).__nowen_katex__;
+    const m = (window as any).__baseforge_katex__;
     if (!m) return { html: "", error: "katex 未就绪" };
     const html = m.renderToString(code, {
       displayMode: !!opts.displayMode,
@@ -140,7 +140,7 @@ export async function preloadKatex(): Promise<void> {
   try {
     const m = await loadKatex();
     if (typeof window !== "undefined") {
-      (window as any).__nowen_katex__ = m;
+      (window as any).__baseforge_katex__ = m;
     }
   } catch {
     // 预热失败静默，不影响后续按需加载

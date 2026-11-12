@@ -12,8 +12,8 @@ export interface RegisteredPluginUiAction extends PluginUiActionContribution {
   runtimeId: string;
 }
 
-const ICONS = new Set<PluginUiIcon>(["home", "star", "files", "diary", "tasks", "mindmap", "ai", "shares", "settings"]);
-const TARGETS = new Set<PluginNavigationTarget>(["all", "favorites", "files", "diary", "tasks", "mindmaps", "ai-chat", "shares", "settings"]);
+const ICONS = new Set<PluginUiIcon>(["home", "star", "files", "tasks", "mindmap", "ai", "shares", "settings"]);
+const TARGETS = new Set<PluginNavigationTarget>(["all", "favorites", "files", "tasks", "mindmaps", "shares", "settings"]);
 let registered: RegisteredPluginUiAction[] = [];
 
 function validComponent(value: unknown): value is PluginUiActionContribution {
@@ -58,8 +58,8 @@ export function clearPluginUiComponents(): void {
 }
 
 export function currentUiPlatform(): UiPlatform {
-  const global = window as Window & { Capacitor?: { getPlatform?: () => string; platform?: string }; nowenDesktop?: { isDesktop?: boolean } };
+  const global = window as Window & { Capacitor?: { getPlatform?: () => string; platform?: string }; baseforgeDesktop?: { isDesktop?: boolean } };
   const capacitorPlatform = global.Capacitor?.getPlatform?.() || global.Capacitor?.platform;
   if (capacitorPlatform === "android" || capacitorPlatform === "ios") return capacitorPlatform;
-  return global.nowenDesktop?.isDesktop ? "desktop" : "web";
+  return global.baseforgeDesktop?.isDesktop ? "desktop" : "web";
 }

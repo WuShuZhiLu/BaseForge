@@ -14,11 +14,11 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { SqliteAdapter } from "../src/db/adapters/sqliteAdapter";
 
-function createTestDb(): Database.Database {
-  const db = new Database(":memory:");
+function createTestDb(): DatabaseSync {
+  const db = new DatabaseSync(":memory:");
   db.exec(`
     CREATE TABLE items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

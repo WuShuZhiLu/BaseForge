@@ -1,4 +1,4 @@
-export const KNOWLEDGE_TREE_CLEAR_SEARCH_EVENT = "nowen:knowledge-tree-clear-search";
+export const KNOWLEDGE_TREE_CLEAR_SEARCH_EVENT = "baseforge:knowledge-tree-clear-search";
 
 export type KnowledgeTreeClearSearchDetail = {
   parentId?: string | null;

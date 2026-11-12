@@ -50,11 +50,11 @@ type NotebookOption = { id: string; label: string; scope: string };
 type IndexFilter = "all" | "conflict" | "error" | "skipped" | "deleted";
 
 function getFolderSync() {
-  return (window as any).nowenDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
+  return (window as any).baseforgeDesktop?.folderSync as import("@/lib/desktopBridge").FolderSyncAPI | undefined;
 }
 
 function isDesktop(): boolean {
-  return !!(window as any).nowenDesktop?.isDesktop && !!getFolderSync();
+  return !!(window as any).baseforgeDesktop?.isDesktop && !!getFolderSync();
 }
 
 function formatBytes(bytes: number): string {
@@ -573,7 +573,7 @@ export default function FolderSyncSettings() {
               onRun={() => runNow(config.folderId)}
               onRemove={() => remove(config.folderId)}
               onSave={(basic, preferences) => save(config.folderId, basic, preferences)}
-              onOpenNote={(noteId) => window.dispatchEvent(new CustomEvent("nowen:open-note", { detail: { noteId } }))}
+              onOpenNote={(noteId) => window.dispatchEvent(new CustomEvent("baseforge:open-note", { detail: { noteId } }))}
             />
           ))}
         </div>

@@ -261,7 +261,7 @@ const livePreviewTheme = EditorView.theme({
     backgroundColor: "color-mix(in srgb, var(--color-app-hover, #f1f5f9) 55%, transparent)",
     borderRadius: "8px",
   },
-  ".cm-live-preview-block .nowen-md-preview": {
+  ".cm-live-preview-block .baseforge-md-preview": {
     maxWidth: "none",
     margin: "0",
   },

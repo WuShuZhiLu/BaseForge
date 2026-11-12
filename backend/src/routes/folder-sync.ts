@@ -15,8 +15,8 @@ const app = new Hono();
 const MAX_TEXT_CHARS = 2 * 1024 * 1024;
 const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
 const EXTRACT_LIMIT = 200_000;
-const SYNC_COMMENT_RE = /\s*<!--\s*nowen-folder-sync:[\s\S]*?-->\s*/g;
-const EXTRACT_BLOCK_RE = /\s*<!--\s*nowen-folder-sync-extracted:start\s*-->[\s\S]*?<!--\s*nowen-folder-sync-extracted:end\s*-->\s*/g;
+const SYNC_COMMENT_RE = /\s*<!--\s*baseforge-folder-sync:[\s\S]*?-->\s*/g;
+const EXTRACT_BLOCK_RE = /\s*<!--\s*baseforge-folder-sync-extracted:start\s*-->[\s\S]*?<!--\s*baseforge-folder-sync-extracted:end\s*-->\s*/g;
 
 type ConflictPolicy = "protect" | "copy" | "overwrite";
 type DeletionPolicy = "keep" | "trash" | "detach";
@@ -89,7 +89,7 @@ function extractManagedContentHash(content: string): string | null {
 function buildManagedContent(baseContent: string, relativePath: string, sourceSha: string, sourcePathHash: string): string {
   const normalizedBase = baseContent.trimEnd();
   const encodedPath = encodeURIComponent(relativePath).slice(0, 2048);
-  const comment = `<!-- nowen-folder-sync: sourcePathHash=${sourcePathHash} sha256=${sourceSha} contentHash=${sha256Text(normalizedBase)} relativePath=${encodedPath} -->`;
+  const comment = `<!-- baseforge-folder-sync: sourcePathHash=${sourcePathHash} sha256=${sourceSha} contentHash=${sha256Text(normalizedBase)} relativePath=${encodedPath} -->`;
   return `${normalizedBase}\n\n${comment}`;
 }
 
@@ -188,7 +188,7 @@ function broadcastChanged(noteId: string, userId: string, title: string, content
 
 function getAttachmentBaseDir(): string {
   if (process.env.ELECTRON_USER_DATA) return process.env.ELECTRON_USER_DATA;
-  if (process.env.NOWEN_DATA_DIR) return process.env.NOWEN_DATA_DIR;
+  if (process.env.BASEFORGE_DATA_DIR) return process.env.BASEFORGE_DATA_DIR;
   if (process.env.DB_PATH) return path.dirname(process.env.DB_PATH);
   return path.join(process.cwd(), "data");
 }
@@ -417,7 +417,7 @@ app.post("/import-attachment", async (c) => {
         extracted = true;
         extractedChars = text.length;
         extractionTruncated = result.text.length > EXTRACT_LIMIT;
-        const extractedBlock = `\n\n<!-- nowen-folder-sync-extracted:start -->\n${text}\n<!-- nowen-folder-sync-extracted:end -->`;
+        const extractedBlock = `\n\n<!-- baseforge-folder-sync-extracted:start -->\n${text}\n<!-- baseforge-folder-sync-extracted:end -->`;
         getDb().prepare(`UPDATE notes SET "contentText" = ? WHERE id = ?`).run(`${baseContent}${extractedBlock}`, noteId);
       } else noText = true;
     } catch (error: any) {

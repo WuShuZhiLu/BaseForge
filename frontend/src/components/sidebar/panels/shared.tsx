@@ -8,7 +8,7 @@ import type { SidebarPanelId } from "@/lib/sidebarPanels";
  * 这一层**独立于旧的面板组件**：旧文件原地保留，不再挂载；框架只使用本目录下的内容组件。
  * 约定：
  *  - 内容组件**不自带头部**（标题/计数/动作由 SidebarPanelShell 提供）；
- *  - 统一响应框架刷新协议 `nowen:sidebar-panel-refresh`（detail = { panelId }）→ 重新拉数据；
+ *  - 统一响应框架刷新协议 `baseforge:sidebar-panel-refresh`（detail = { panelId }）→ 重新拉数据；
  *  - 行高 26px / 字号 12.5px / hover 出底，与面板框架规格一致。
  */
 
@@ -20,8 +20,8 @@ export function usePanelRefresh(panelId: SidebarPanelId, reload: () => void) {
       if (detail?.panelId && detail.panelId !== panelId) return;
       reload();
     };
-    window.addEventListener("nowen:sidebar-panel-refresh", onRefresh);
-    return () => window.removeEventListener("nowen:sidebar-panel-refresh", onRefresh);
+    window.addEventListener("baseforge:sidebar-panel-refresh", onRefresh);
+    return () => window.removeEventListener("baseforge:sidebar-panel-refresh", onRefresh);
   }, [panelId, reload]);
 }
 

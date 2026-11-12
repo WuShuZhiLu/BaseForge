@@ -1,8 +1,8 @@
 /**
  * PASTE-REMOTE-IMAGE-LOCALIZE-01: 远程图片本地化服务
  *
- * 粘贴图文时，自动把远程图片下载并上传到 nowen-note 的文件管理/附件系统，
- * 然后把正文中的图片链接替换成 nowen-note 自己的文件地址。
+ * 粘贴图文时，自动把远程图片下载并上传到 baseforge 的文件管理/附件系统，
+ * 然后把正文中的图片链接替换成 baseforge 自己的文件地址。
  *
  * 核心流程：
  *   1. 解析 HTML/Markdown 中的远程图片 URL

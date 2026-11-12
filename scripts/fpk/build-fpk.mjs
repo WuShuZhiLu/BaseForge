@@ -4,12 +4,12 @@
  *
  * 用法：
  *   PowerShell:
- *     $env:DOCKERHUB_REPO="yourname/nowen-note"; node scripts/fpk/build-fpk.mjs
+ *     $env:DOCKERHUB_REPO="yourname/baseforge"; node scripts/fpk/build-fpk.mjs
  *   Bash:
- *     DOCKERHUB_REPO=yourname/nowen-note node scripts/fpk/build-fpk.mjs
+ *     DOCKERHUB_REPO=yourname/baseforge node scripts/fpk/build-fpk.mjs
  *
  * 可选环境变量：
- *   DOCKERHUB_REPO   必填，例如 myname/nowen-note
+ *   DOCKERHUB_REPO   必填，例如 myname/baseforge
  *   FPK_VERSION      可选，写入 manifest 的版本号（飞牛要求 X.Y.Z 形式），默认 package.json.version
  *   FPK_IMAGE_TAG    可选，compose.yaml 里镜像的 tag（可带 v 前缀），默认与 FPK_VERSION 一致
  *                    -- release.sh 走原子发布时会传 v${VERSION}，与 docker push 的 tag 对齐
@@ -44,7 +44,7 @@ const DOCKERHUB_REPO = process.env.DOCKERHUB_REPO;
 const OUT_DIR = resolve(PROJECT_ROOT, process.env.FPK_OUT_DIR || 'dist-fpk');
 
 if (!DOCKERHUB_REPO) {
-    console.error('[fpk] 错误：必须设置环境变量 DOCKERHUB_REPO，例如 yourname/nowen-note');
+    console.error('[fpk] 错误：必须设置环境变量 DOCKERHUB_REPO，例如 yourname/baseforge');
     process.exit(1);
 }
 
@@ -53,7 +53,7 @@ console.log(`[fpk] 镜像地址: ${DOCKERHUB_REPO}:${IMAGE_TAG}（写入 compose
 
 // 1. 准备工作目录
 mkdirSync(OUT_DIR, { recursive: true });
-const WORK_DIR = join(OUT_DIR, `nowen-note-${VERSION}`);
+const WORK_DIR = join(OUT_DIR, `baseforge-${VERSION}`);
 if (existsSync(WORK_DIR)) rmSync(WORK_DIR, { recursive: true, force: true });
 mkdirSync(WORK_DIR, { recursive: true });
 

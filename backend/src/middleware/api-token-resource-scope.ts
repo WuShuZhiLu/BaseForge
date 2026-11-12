@@ -217,6 +217,10 @@ function requiredScope(pathname: string, method: string): string | null {
     return write ? "attachments:write" : "notes:read";
   }
   if (pathname.startsWith("/api/tags")) return write ? "tags:write" : "tags:read";
+  if (pathname.startsWith("/api/remote-files")) {
+    return write ? "remote_files:write" : "remote_files:read";
+  }
+  if (pathname.startsWith("/api/shares")) return write ? "shares:write" : "shares:read";
   if (pathname === "/api/ai/ask") return "notes:read";
   if (pathname === "/api/ai/chat") return "notes:write";
   if (pathname.startsWith("/api/export")) return "export:import";
@@ -532,6 +536,11 @@ export async function enforceApiTokenAccess(c: Context, next: Next): Promise<Res
     }
 
     c.req.raw.headers.set("X-Api-Allowed-Notebook-Ids", Array.from(ctx.notebooks.keys()).join(","));
+    if (c.req.path.startsWith("/api/shares")) {
+      // 分享链接可把任意笔记公开到外网，restricted Token 的笔记本边界无法约束，
+      // 因此保持与 __unsupported__ 相同的拒绝语义，避免跨笔记本越权分享。
+      throw new ApiTokenAccessError("restricted Token 不允许管理分享链接", "API_TOKEN_ENDPOINT_DENIED");
+    }
     if (c.req.path.startsWith("/api/note-templates")) {
       throw new ApiTokenAccessError("restricted Token 不允许访问工作区级笔记模板");
     }

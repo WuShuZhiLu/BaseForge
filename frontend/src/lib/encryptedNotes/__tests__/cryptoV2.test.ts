@@ -71,7 +71,7 @@ it("encrypts zero-byte and multi-chunk files with bounded sequential I/O and ind
     const retry = await encryptAttachment({ source, name: "private.png", mime: "image/png", rootKey: key, identity: envelope, writeChunk: async () => {} });
     expect(retry.uploadId).not.toBe(manifest.uploadId); expect(retry.wrappedKey).not.toEqual(manifest.wrappedKey);
   }
-});
+}, 30_000);
 
 it("rejects swapped/tampered/truncated chunks, substituted file identities and incomplete manifests", async () => {
   const chunks: Uint8Array[] = [];

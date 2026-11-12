@@ -2,9 +2,10 @@
 #
 # 发布职责约束：
 #   - push tag v*.*.* 构建全部平台；Windows Full/Lite 必须经 SignPath release-signing 后才能成为正式 artifact；
-#   - workflow_dispatch 只使用 test-signing 验证 Windows 签名链路，不会产出正式 Release 资产；
-#   - GitHub Release 仍由 scripts/release.sh 统一创建 Draft、汇总 CI 资产、远端校验后转正式；
-#   - electron-builder 始终 --publish never，避免多发布者并发写 Release。
+#   - workflow_dispatch 只做编译验证、不会创建 Release；勾选 signpath_test 才额外跑 Windows 测试签名；
+#   - GitHub 是权威发布点：先建 draft Release → 构建并上传资产 → 校验齐全 → 转正式；
+#   - GitHub 转正式后 dispatch Gitea 的 Sync Release Assets（同步 → Gitea 转正式 → Gitee）；
+#   - electron-builder 始终关闭内置发布能力（--publish 统一为 never），避免多发布者并发写 Release。
 
 name: Build & Release
 
@@ -13,6 +14,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      signpath_test:
+        description: "运行 SignPath 测试签名链路（需要相关 secrets）"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,6 +49,68 @@ jobs:
             exit 1
           fi
 
+      # CHANGELOG.md 必须是唯一版本事实来源：Gitea 的 docker-image.yml 会取
+      # 首个 `## vX.Y.Z` 段落与 tag 比对，Release 正文也由它抽取。这里提前挡住
+      # 「打了 tag 但 CHANGELOG 还是上一个版本」的情况。
+      - name: Verify CHANGELOG has this version section
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" != "push" ]; then
+            echo "非 tag 触发，跳过 CHANGELOG 校验"
+            exit 0
+          fi
+          TAG="${GITHUB_REF_NAME}"
+          if ! grep -qE "^## ${TAG}([[:space:]]|$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md 缺少 \`## ${TAG} - 日期\` 段落；发版前需把 Unreleased 改名为该标题"
+            grep -nE "^## " CHANGELOG.md | head -5
+            exit 1
+          fi
+          echo "CHANGELOG.md 已包含 ${TAG} 段落"
+
+  # 先建 draft Release：构建期间外网看不到半成品；资产齐全后由 publish job 转正式。
+  # 只对 tag 触发生效；workflow_dispatch（test-signing 演练）不创建 Release。
+  # Release 正文的唯一来源是 CHANGELOG.md 的对应版本段落：Gitea / Gitee 复用同一份正文，
+  # 不再各自生成（这曾导致两个端的发布说明不一致，取决于谁先建 Release）。
+  prepare-release:
+    name: 创建 draft Release
+    needs: version-guard
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build release notes from CHANGELOG
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # 正文 = 中文段落（默认） + 英文段落（页内锚点切换），由脚本统一生成。
+          # 产物由 Release 页面底部的 Assets 列表展示，正文不重复放下载表。
+          node scripts/build-release-notes.mjs \
+            --tag "$TAG" \
+            --repo "${{ github.repository }}" \
+            --out /tmp/release-notes.md
+      - name: Create draft release if absent
+        env:
+          # gh 支持 GITHUB_TOKEN；不用 GH_TOKEN，避免 electron-builder 侧误用同名变量自动发布。
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} 已存在，跳过创建（不会把已发布状态改回草稿）"
+            exit 0
+          fi
+          ARGS=(--draft --notes-file /tmp/release-notes.md --title "BaseForge ${TAG}")
+          case "$TAG" in
+            *-*) ARGS+=(--prerelease) ;;
+          esac
+          gh release create "$TAG" "${ARGS[@]}"
+          echo "已创建 draft Release ${TAG}"
+
   build:
     needs: version-guard
     strategy:
@@ -63,6 +131,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check lockfile registry addresses
+        run: node scripts/normalize-lockfile-registry.mjs
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -78,17 +149,23 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
         run: node scripts/check-signpath-release-config.mjs
 
       # ---------------------------------------------------------------
       # 依赖安装
       # ---------------------------------------------------------------
+      - name: Resolve npm source (official registry)
+        # 锁文件里存过镜像 resolved 地址；脚本注入官方 registry +
+        # replace-registry-host=always，npm ci 就不会再去 npmmirror 拉包。
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
+        shell: bash
+
       - name: Install root deps
         run: npm ci
         shell: bash
@@ -104,16 +181,18 @@ jobs:
         shell: bash
 
       - name: Fetch embedded Node binary
-        run: npm run fetch:node
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # runner 自身是 arm64，但 Full 包要按 x64 / arm64 各打一次，
+            # 两个 darwin 二进制都必须内嵌，否则 x64 构建会因缺文件失败。
+            npm run fetch:node -- --targets darwin-x64,darwin-arm64
+          else
+            npm run fetch:node
+          fi
         shell: bash
 
       - name: Build backend & frontend
         run: npm run build:all
-        shell: bash
-
-      - name: Rebuild native modules for Electron ABI
-        if: matrix.os != 'macos-latest'
-        run: npm run rebuild:native
         shell: bash
 
       # ========= macOS 代码签名 + 公证环境变量（可选） =========
@@ -143,52 +222,65 @@ jobs:
       - name: Build Electron Full (Windows)
         if: matrix.os == 'windows-latest'
         env:
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ github.event_name == 'push' && vars.NOWEN_WINDOWS_PUBLISHER_NAME || '' }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ github.event_name == 'push' && vars.BASEFORGE_WINDOWS_PUBLISHER_NAME || '' }}
         run: npx electron-builder --config electron/builder.config.js --win --publish never
+        shell: bash
+
+      # 手动测试签名同样依赖 SignPath 配置；缺失时在上传任何产物前给出明确报错，
+      # 而不是等 submit action 内部抛 "Input required and not supplied: api-token"。
+      - name: Check SignPath test configuration
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
+        run: node scripts/check-signpath-release-config.mjs
         shell: bash
 
       # ========= 手动 test-signing：只验证 Full，不参与正式发布 =========
       - name: Stage Windows EXEs for SignPath test
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         shell: pwsh
         run: |
           $target = Join-Path $PWD "signpath-input"
           New-Item -ItemType Directory -Force -Path $target | Out-Null
           $files = @(
-            Get-ChildItem -Path "dist-electron" -File -Filter "Nowen-Note-*-setup.exe"
-            Get-ChildItem -Path "dist-electron" -File -Filter "Nowen-Note-*-portable.exe"
+            Get-ChildItem -Path "dist-electron" -File -Filter "BaseForge-*-setup.exe"
+            Get-ChildItem -Path "dist-electron" -File -Filter "BaseForge-*-portable.exe"
           ) | Sort-Object FullName -Unique
           if ($files.Count -ne 2) { throw "SignPath test requires exactly setup.exe and portable.exe; found $($files.Count)." }
           foreach ($file in $files) { Copy-Item $file.FullName (Join-Path $target $file.Name) -Force }
 
       - name: Upload unsigned Windows EXEs for SignPath test
         id: upload_signpath_test
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signpath-input-${{ github.run_id }}
+          name: baseforge-win-signpath-input-${{ github.run_id }}
           path: signpath-input/*.exe
           if-no-files-found: error
           retention-days: 1
 
       - name: Submit SignPath test signing request
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: "test-signing"
           artifact-configuration-slug: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_signpath_test.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 1800
           output-artifact-directory: signpath-test-signed
 
       - name: Verify SignPath test result exists
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         shell: pwsh
         run: |
           $signed = @(Get-ChildItem -Path "signpath-test-signed" -Recurse -File -Filter "*.exe")
@@ -202,19 +294,19 @@ jobs:
           }
 
       - name: Upload SignPath test signed Windows EXEs
-        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch' && inputs.signpath_test
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signpath-test
+          name: baseforge-win-signpath-test
           path: signpath-test-signed/**/*.exe
           if-no-files-found: error
           retention-days: 14
 
       # ========= tag 正式发布：Full + Lite 分离签名 =========
       - name: Build Electron Lite (Windows)
-        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        if: matrix.os == 'windows-latest'
         env:
-          NOWEN_WINDOWS_PUBLISHER_NAME: ${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}
+          BASEFORGE_WINDOWS_PUBLISHER_NAME: ${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}
         run: npx electron-builder --config electron/builder.lite.config.js --win --publish never
         shell: bash
 
@@ -223,7 +315,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-full-unsigned-signpath
+          name: baseforge-win-full-unsigned-signpath
           path: |
             dist-electron/*.exe
             dist-electron/*.blockmap
@@ -231,16 +323,31 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # SignPath 的 artifact configuration 仍按 `BaseForge-Lite-<版本>-*` 匹配，
+      # 这里只在上传前临时改名；构建产物与最终发布名保持 `BaseForge-<版本>-lite-*`。
+      - name: Stage Lite EXEs with SignPath configuration names
+        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $target = Join-Path $PWD "signpath-lite-input"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $pairs = @(
+            @("dist-electron-lite/BaseForge-$version-lite-setup.exe", "BaseForge-Lite-$version-setup.exe"),
+            @("dist-electron-lite/BaseForge-$version-lite-portable.exe", "BaseForge-Lite-$version-portable.exe")
+          )
+          foreach ($pair in $pairs) {
+            if (-not (Test-Path $pair[0])) { throw "Missing Lite installer: $($pair[0])" }
+            Copy-Item $pair[0] (Join-Path $target $pair[1]) -Force
+          }
+
       - name: Upload unsigned Lite Windows artifact for SignPath
         id: upload_lite_unsigned
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-lite-unsigned-signpath
-          path: |
-            dist-electron-lite/*.exe
-            dist-electron-lite/*.blockmap
-            dist-electron-lite/latest-lite.yml
+          name: baseforge-win-lite-unsigned-signpath
+          path: signpath-lite-input/*.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -249,13 +356,11 @@ jobs:
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_FULL_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_full_unsigned.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: signed-windows/full
@@ -265,16 +370,33 @@ jobs:
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '3fd6029d-c909-43a1-8b30-4d2bcdde4c7a' }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nowen-note' }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID || '28532382-1644-48e0-8e0b-3d0177d0104e' }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'BaseForge' }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_LITE_ARTIFACT_CONFIGURATION_SLUG }}
           github-artifact-id: ${{ steps.upload_lite_unsigned.outputs.artifact-id }}
-          parameters: |
-            version: ${{ toJSON(steps.package_version.outputs.version) }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 10800
           output-artifact-directory: signed-windows/lite
+
+      # SignPath 回传的文件名仍是上传时的临时名，这里改回发布命名，
+      # 并把 electron-builder 生成的 Lite 更新元数据放回目录，供后面重算哈希与 blockmap。
+      - name: Restore Lite artifact filenames after signing
+        if: matrix.os == 'windows-latest' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          $dir = "signed-windows/lite"
+          $pairs = @(
+            @("BaseForge-Lite-$version-setup.exe", "BaseForge-$version-lite-setup.exe"),
+            @("BaseForge-Lite-$version-portable.exe", "BaseForge-$version-lite-portable.exe")
+          )
+          foreach ($pair in $pairs) {
+            $from = Join-Path $dir $pair[0]
+            if (-not (Test-Path $from)) { throw "SignPath output missing: $($pair[0])" }
+            Move-Item $from (Join-Path $dir $pair[1]) -Force
+          }
+          Copy-Item "dist-electron-lite/latest-lite.yml" $dir -Force
 
       - name: Export signed Windows Authenticode records
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
@@ -283,7 +405,7 @@ jobs:
 
       - name: Verify signed Windows publisher and required channels
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
-        run: node scripts/verify-windows-signatures.mjs --report signed-windows/signatures.json --publisher "${{ vars.NOWEN_WINDOWS_PUBLISHER_NAME }}" --require full,lite
+        run: node scripts/verify-windows-signatures.mjs --report signed-windows/signatures.json --publisher "${{ vars.BASEFORGE_WINDOWS_PUBLISHER_NAME }}" --require full,lite
         shell: bash
 
       - name: Refresh signed Windows blockmaps and updater metadata
@@ -309,7 +431,7 @@ jobs:
         if: matrix.os == 'windows-latest' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: nowen-note-win-signed
+          name: baseforge-win-signed
           path: signed-windows/release/*
           if-no-files-found: error
           retention-days: 14
@@ -319,11 +441,10 @@ jobs:
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
-          NOWEN_MAC_ARCH: x64
+          BASEFORGE_MAC_ARCH: x64
           TARGET_ARCH: x64
           npm_config_target_arch: x64
         run: |
-          npm run rebuild:native -- --target-platform=darwin --target-arch=x64
           npx electron-builder --config electron/builder.config.js --mac --publish never
         shell: bash
 
@@ -331,18 +452,32 @@ jobs:
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
-          NOWEN_MAC_ARCH: arm64
+          BASEFORGE_MAC_ARCH: arm64
           TARGET_ARCH: arm64
           npm_config_target_arch: arm64
         run: |
-          npm run rebuild:native -- --target-platform=darwin --target-arch=arm64
           npx electron-builder --config electron/builder.config.js --mac --publish never
+        shell: bash
+
+      # ========= macOS Lite =========
+      # Lite 不带 backend，两个架构在同一次调用里出（产物名带 ${arch}，不会互相覆盖）。
+      - name: Build Electron Lite (macOS x64 + arm64)
+        if: matrix.os == 'macos-latest'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_LINK == '' && 'false' || 'true' }}
+        run: npx electron-builder --config electron/builder.lite.config.js --mac --publish never
         shell: bash
 
       # ========= Linux =========
       - name: Build Electron (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: npx electron-builder --config electron/builder.config.js --linux --publish never
+        shell: bash
+
+      # ========= Linux Lite =========
+      - name: Build Electron Lite (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --config electron/builder.lite.config.js --linux --publish never
         shell: bash
 
       # ========= 普通构建产物 =========
@@ -361,30 +496,210 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # 把 build 各平台的产物汇总成 GitHub Release。
-  # 发布链路（方案 B）：GitHub 只负责构建 win/mac 并发到自己的 Release；
-  # 随后由 Gitea 侧的 sync-release.yml 调用 scripts/sync-release-assets.mjs
-  # 把资产搬到 Gitea（主仓）与 Gitee（镜像）。见 docs/release-pipeline.md。
+      # Lite 的 mac / linux 产物单独成一个 artifact：
+      # Windows 的 Lite 走 SignPath 签名后再并进 signed-windows/release，
+      # 这里若也上传 exe 会与签名版同名冲突，故只在非 Windows 平台收集。
+      - name: Upload Lite platform artifacts (macOS / Linux)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-${{ matrix.name }}-lite
+          path: |
+            dist-electron-lite/*.dmg
+            dist-electron-lite/*.zip
+            dist-electron-lite/*.AppImage
+            dist-electron-lite/*.deb
+            dist-electron-lite/*.blockmap
+            dist-electron-lite/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+      # 手动触发（不发版）时，Windows Lite 没有 SignPath 流程，单独上传未签名产物供本地验证。
+      - name: Upload Windows Lite build (manual test)
+        if: matrix.os == 'windows-latest' && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-win-lite-unsigned
+          path: |
+            dist-electron-lite/*.exe
+            dist-electron-lite/*.blockmap
+            dist-electron-lite/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+
+  # 资产齐全并校验通过后，把 draft 转正式（GitHub 是权威发布点 / 自动更新源）。
+  # 只汇总「已签名 Windows + macOS + Linux」：baseforge-win 是签名前的候选，不能进 Release。
   publish:
-    needs: [version-guard, build]
+    needs: [version-guard, prepare-release, build, build-mcp]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
     steps:
-      - name: Download all platform artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
+          name: baseforge-mac
           path: release-assets
-          pattern: baseforge-*
-          merge-multiple: true
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-linux
+          path: release-assets
+
+      - name: Download SignPath-signed Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-win-signed
+          path: release-assets
+
+      - name: Download macOS Lite artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-mac-lite
+          path: release-assets
+
+      - name: Download Linux Lite artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-linux-lite
+          path: release-assets
+
+      - name: Download MCP single-file bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: baseforge-mcp-bundle
+          path: release-assets
+
+      - name: Assert full + Lite asset matrix
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/assert-release-matrix.mjs --dir release-assets --version "$VERSION"
+
+      - name: Verify updater assets before publishing
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/verify-release-update-assets.mjs local --dir release-assets --version "$VERSION"
+
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd release-assets
+          # 只对文件做校验和，排除自身；下载方可用 sha256sum -c SHA256SUMS.txt 逐项校验。
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\n' \
+            | LC_ALL=C sort \
+            | xargs -r sha256sum > SHA256SUMS.txt
+          echo "校验和条目：$(wc -l < SHA256SUMS.txt)"
+
+      - name: Build release notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # 正文只放更新内容；产物由 Release 页面底部的 Assets 列表自动展示。
+          node scripts/build-release-notes.mjs \
+            --tag "$TAG" \
+            --repo "${{ github.repository }}" \
+            --out release-notes.md
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: BaseForge ${{ github.ref_name }}
+          body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           draft: false
           files: release-assets/*
-          fail_on_unmatched_files: false
-          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+  # MCP Server 以单文件 .mjs 随 Release 分发（用户下载后配 node 路径 + url/token 即可）。
+  # 包内已把 @modelcontextprotocol/sdk、zod 打进 dist/baseforge-mcp.mjs，使用方无需 npm install。
+  build-mcp:
+    name: 构建 MCP 单文件
+    needs: [version-guard]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check lockfile registry addresses
+        run: node scripts/normalize-lockfile-registry.mjs
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: packages/baseforge-mcp/package-lock.json
+
+      - name: Resolve npm source (official registry)
+        run: node scripts/npm-source.mjs env external >> "$GITHUB_ENV"
+
+      - name: Install MCP package deps
+        working-directory: packages/baseforge-mcp
+        run: npm ci --no-audit --no-fund
+
+      - name: Build single-file bundle
+        working-directory: packages/baseforge-mcp
+        run: npm run build
+
+      - name: Smoke test the bundle (requires token, expect startup error)
+        working-directory: packages/baseforge-mcp
+        run: |
+          set -euo pipefail
+          # 没有 BASEFORGE_API_TOKEN 时必须在启动阶段就报错退出，而不是静默运行。
+          if node dist/baseforge-mcp.mjs >/dev/null 2>mcp-smoke.log; then
+            echo "::error::缺少 BASEFORGE_API_TOKEN 时 MCP 仍然正常退出，校验缺失"
+            exit 1
+          fi
+          grep -qiE "token|BASEFORGE_API_TOKEN" mcp-smoke.log || {
+            echo "::error::MCP 启动失败但没有给出 token 相关提示"
+            cat mcp-smoke.log
+            exit 1
+          }
+
+      - name: Upload MCP single-file bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseforge-mcp-bundle
+          path: packages/baseforge-mcp/dist/baseforge-mcp.mjs
+          if-no-files-found: error
+          retention-days: 14
+
+  # GitHub 发布完成后，触发 Gitea 的同步 / 转正 / Gitee 分发链路。
+  # （Docker 的 latest 由 Gitea 的 docker-image.yml 在 tag 阶段直接推送，不经过这里。）
+  # 这里只传一个「能触发 workflow」的窄 token，Gitea/Gitee 写凭据仍只留在 Gitea Secrets。
+  dispatch-gitea:
+    name: 触发 Gitea 发布同步
+    needs: [publish]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dispatch Gitea sync workflow
+        env:
+          GITEA_URL: ${{ vars.GITEA_URL }}
+          GITEA_REPO: ${{ vars.GITEA_REPO }}
+          GITEA_TOKEN: ${{ secrets.GITEA_DISPATCH_TOKEN }}
+          GITEA_REF: ${{ vars.GITEA_DEFAULT_BRANCH || 'main' }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          node scripts/dispatch-gitea-workflow.mjs \
+            --workflow sync-release.yml \
+            --ref "${GITEA_REF}" \
+            --input "tag=${RELEASE_TAG}" \
+            --input "publish=true"

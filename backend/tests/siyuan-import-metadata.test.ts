@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-siyuan-meta-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-siyuan-meta-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 

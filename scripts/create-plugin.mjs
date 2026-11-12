@@ -46,12 +46,12 @@ function manifestSource({ id, publisher, name }) {
     description: `${name} —— 由 scripts/create-plugin.mjs 生成的骨架`,
     version: "0.1.0",
     apiVersion: 2,
-    engines: { nowen: ">=1.5.0 <2.0.0" },
+    engines: { baseforge: ">=1.5.0 <2.0.0" },
     runtime: "sandbox-js",
     main: "main.js",
     categories: ["productivity"],
     keywords: ["starter"],
-    repository: "https://github.com/cropflre/nowen-note",
+    repository: "https://github.com/cropflre/baseforge",
     license: "MIT",
     permissions: [],
     actions: [
@@ -68,13 +68,13 @@ function manifestSource({ id, publisher, name }) {
   }, null, 2)}\n`;
 }
 
-const MAIN_SOURCE = `// sandbox-js 入口：宿主在 QuickJS 沙箱里求值本文件，读取 globalThis.__nowenPluginModule。
+const MAIN_SOURCE = `// sandbox-js 入口：宿主在 QuickJS 沙箱里求值本文件，读取 globalThis.__baseforgePluginModule。
 // 不要用 import/export —— 宿主按脚本求值，需要打包成单文件 IIFE/脚本。
-globalThis.__nowenPluginModule = {
+globalThis.__baseforgePluginModule = {
   actions: {
-    // Action 签名由宿主反序列化：{ input, nowen, execution }
+    // Action 签名由宿主反序列化：{ input, baseforge, execution }
     ping: async ({ input }) => {
-      const message = typeof input?.message === "string" && input.message ? input.message : "hello nowen";
+      const message = typeof input?.message === "string" && input.message ? input.message : "hello baseforge";
       return { ok: true, message };
     },
   },
@@ -87,7 +87,7 @@ function readmeSource({ name, id }) {
 由 \`scripts/create-plugin.mjs\` 生成的 sandbox-js 最小插件：只有一个 \`ping\` Action，不申请任何权限。
 
 - 插件 ID：\`${id}\`
-- 运行时：\`sandbox-js\`（QuickJS 沙箱内执行，通过 \`nowen.*\` Host API 访问数据）
+- 运行时：\`sandbox-js\`（QuickJS 沙箱内执行，通过 \`baseforge.*\` Host API 访问数据）
 - 权限：无（因此启用时不需要授权确认）
 
 ## 校验
@@ -102,10 +102,10 @@ node backend/node_modules/tsx/dist/cli.mjs scripts/verify-plugin.mjs examples/pl
 
 \`\`\`sh
 cd examples/plugins/${name}
-node ../../../packages/nowen-plugin-cli/bin/nowen-plugin.mjs pack
+node ../../../packages/baseforge-plugin-cli/bin/baseforge-plugin.mjs pack
 \`\`\`
 
-产物在 \`dist/\` 下（\`.nowen-plugin\` + \`.sha256\`），不要提交。
+产物在 \`dist/\` 下（\`.baseforge-plugin\` + \`.sha256\`），不要提交。
 
 在「设置 → 插件」安装生成的插件包并启用，然后执行 Action \`ping\`：
 
@@ -115,7 +115,7 @@ node ../../../packages/nowen-plugin-cli/bin/nowen-plugin.mjs pack
 
 ## 下一步
 
-- 需要读写数据：在 \`manifest.json\` 的 \`permissions\` 里加 \`plugin-storage:read/write\` 等，再在代码中调用 \`await nowen.storage.get({ key })\`。
+- 需要读写数据：在 \`manifest.json\` 的 \`permissions\` 里加 \`plugin-storage:read/write\` 等，再在代码中调用 \`await baseforge.storage.get({ key })\`。
 - 需要外网请求：加 \`external:fetch\` 权限，并用 \`permissionConfig.externalFetchHosts\` 声明精确域名（见 \`docs/plugins/SPEC.md\`）。
 - 字段全集与约束见 \`docs/plugins/SPEC.md\`，安全模型见 \`docs/plugins/SECURITY.md\`。
 `;
@@ -135,7 +135,7 @@ function main() {
     publisher = name.slice(0, name.indexOf("."));
     directoryName = name;
   } else {
-    publisher = (options.publisher || "nowenlab").trim().toLowerCase();
+    publisher = (options.publisher || "baseforgelab").trim().toLowerCase();
     id = `${publisher}.${name}`;
     directoryName = name;
   }

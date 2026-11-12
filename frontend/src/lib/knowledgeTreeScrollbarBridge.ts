@@ -1,10 +1,10 @@
 const TREE_SCROLL_SELECTOR =
   '[data-sidebar-variant="desktop"] [data-swipe-blocker="knowledge-tree-scroll"]';
-const STYLE_ID = "nowen-knowledge-tree-custom-scrollbar-style";
-const SCROLL_CLASS = "nowen-knowledge-tree-custom-scroll-host";
-const PARENT_CLASS = "nowen-knowledge-tree-custom-scroll-parent";
-const TRACK_CLASS = "nowen-knowledge-tree-custom-scroll-track";
-const THUMB_CLASS = "nowen-knowledge-tree-custom-scroll-thumb";
+const STYLE_ID = "baseforge-knowledge-tree-custom-scrollbar-style";
+const SCROLL_CLASS = "baseforge-knowledge-tree-custom-scroll-host";
+const PARENT_CLASS = "baseforge-knowledge-tree-custom-scroll-parent";
+const TRACK_CLASS = "baseforge-knowledge-tree-custom-scroll-track";
+const THUMB_CLASS = "baseforge-knowledge-tree-custom-scroll-thumb";
 const MIN_THUMB_HEIGHT = 36;
 
 export interface KnowledgeTreeScrollbarMetricsInput {
@@ -177,7 +177,7 @@ function attachScrollbar(scrollElement: HTMLElement): ScrollController | null {
   parent.classList.add(PARENT_CLASS);
   if (!scrollElement.id) {
     generatedId += 1;
-    scrollElement.id = `nowen-knowledge-tree-scroll-${generatedId}`;
+    scrollElement.id = `baseforge-knowledge-tree-scroll-${generatedId}`;
   }
 
   const track = document.createElement("div");

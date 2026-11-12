@@ -17,9 +17,9 @@ import {
 } from "@/lib/mindMapAppearance";
 import "./MindMapAppearanceBridge.css";
 
-const API_PATCH_FLAG = Symbol.for("nowen.mindMapAppearance.apiPatch");
-const BLOB_PATCH_FLAG = Symbol.for("nowen.mindMapAppearance.blobPatch");
-const APPEARANCE_EVENT = "nowen:mindmap-appearance-state";
+const API_PATCH_FLAG = Symbol.for("baseforge.mindMapAppearance.apiPatch");
+const BLOB_PATCH_FLAG = Symbol.for("baseforge.mindMapAppearance.blobPatch");
+const APPEARANCE_EVENT = "baseforge:mindmap-appearance-state";
 const MAX_RECENT_MAPS = 12;
 
 type MindMapSnapshot = {
@@ -49,7 +49,7 @@ function dispatchAppearanceState(): void {
 }
 
 function setDocumentNodeStyle(nodeStyle: MindMapNodeStyle): void {
-  document.documentElement.dataset.nowenMindmapNodeStyle = nodeStyle;
+  document.documentElement.dataset.baseforgeMindmapNodeStyle = nodeStyle;
 }
 
 function toSnapshot(map: MindMap): MindMapSnapshot | null {
@@ -128,7 +128,7 @@ function markMindMapMiniMaps(): void {
   const content = rootNode?.closest<HTMLElement>(".flex-1.flex.overflow-hidden");
   if (!content) return;
   content.querySelectorAll<SVGSVGElement>("svg.cursor-pointer").forEach((svg) => {
-    if (svg.querySelector("rect")) svg.dataset.nowenMindmapMinimap = "true";
+    if (svg.querySelector("rect")) svg.dataset.baseforgeMindmapMinimap = "true";
   });
 }
 
@@ -252,7 +252,7 @@ export default function MindMapAppearanceBridge() {
   useEffect(() => {
     const onState = () => refreshDomState();
     window.addEventListener(APPEARANCE_EVENT, onState);
-    window.addEventListener("nowen:workspace-changed", onState);
+    window.addEventListener("baseforge:workspace-changed", onState);
 
     let frame = 0;
     const observer = new MutationObserver(() => {
@@ -266,7 +266,7 @@ export default function MindMapAppearanceBridge() {
       observer.disconnect();
       window.cancelAnimationFrame(frame);
       window.removeEventListener(APPEARANCE_EVENT, onState);
-      window.removeEventListener("nowen:workspace-changed", onState);
+      window.removeEventListener("baseforge:workspace-changed", onState);
     };
   }, [refreshDomState]);
 

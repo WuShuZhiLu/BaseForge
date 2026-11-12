@@ -1,5 +1,5 @@
 spec_version: "2.1"
-app_id: io.nowen.note
+app_id: io.baseforge.note
 version: {{VERSION}}
 support_arch:
 {{SUPPORT_ARCH_LIST}}
@@ -24,24 +24,24 @@ parameters:
     i18n:
       en-US:
         name: Data Directory
-        description: Persistent directory for database, attachments and backups (e.g. /volume1/AppData/nowen-note)
+        description: Persistent directory for database, attachments and backups (e.g. /volume1/AppData/baseforge)
       zh-CN:
         name: 数据目录
-        description: 用于存储数据库、附件、备份的持久化目录（例如 /volume1/AppData/nowen-note）
+        description: 用于存储数据库、附件、备份的持久化目录（例如 /volume1/AppData/baseforge）
 i18n:
   en-US:
     name: BaseForge
     description: Self-hosted, privacy-first markdown notes with AI assistance, attachments, full-text search and one-click backup.
     author: BaseForge
-    official: https://github.com/nowen-note/nowen-note
-    help: https://github.com/nowen-note/nowen-note/blob/main/README.en.md
+    official: https://github.com/baseforge/baseforge
+    help: https://github.com/baseforge/baseforge/blob/main/README.en.md
     publisher: BaseForge
-    publisher_link: https://github.com/nowen-note/nowen-note
+    publisher_link: https://github.com/baseforge/baseforge
   zh-CN:
     name: 弄文笔记
     description: 自托管、注重隐私的 Markdown 笔记应用，支持 AI 助手、附件、全文检索与一键备份。
     author: 弄文笔记
-    official: https://github.com/nowen-note/nowen-note
-    help: https://github.com/nowen-note/nowen-note/blob/main/README.md
+    official: https://github.com/baseforge/baseforge
+    help: https://github.com/baseforge/baseforge/blob/main/README.md
     publisher: 弄文笔记
-    publisher_link: https://github.com/nowen-note/nowen-note
+    publisher_link: https://github.com/baseforge/baseforge

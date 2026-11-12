@@ -43,7 +43,7 @@ type PublicationRow = {
   ownerDisplayName?: string | null;
 };
 
-const PUBLICATION_INSTALLED = Symbol.for("nowen.notebookPublication.installed");
+const PUBLICATION_INSTALLED = Symbol.for("baseforge.notebookPublication.installed");
 const PUBLICATION_TOKEN_BYTES = 32;
 const COMMENT_MAX_LENGTH = 4000;
 const NICKNAME_MAX_LENGTH = 32;

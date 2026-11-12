@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { Hono } from "hono";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-history-route-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-history-route-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 

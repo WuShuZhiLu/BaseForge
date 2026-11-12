@@ -1,6 +1,6 @@
 // electron/menu.js
 // 构建跨平台原生菜单；可自定义命令由 renderer 注册表处理，菜单项保留点击入口。
-// 通过 IPC 把动作透传给 renderer（frontend 侦听 window.nowenDesktop.on("menu:xxx", ...)）。
+// 通过 IPC 把动作透传给 renderer（frontend 侦听 window.baseforgeDesktop.on("menu:xxx", ...)）。
 //
 // 本文件按 Apple Human Interface Guidelines 排列 macOS 菜单顺序：
 //   App → 文件 → 编辑 → 格式 → 视图 → 窗口 → 帮助
@@ -329,11 +329,11 @@ function buildMenu({
         { type: "separator" },
         {
           label: "项目主页",
-          click: () => shell.openExternal("https://github.com/cropflre/nowen-note"),
+          click: () => shell.openExternal("https://github.com/cropflre/baseforge"),
         },
         {
           label: "报告问题",
-          click: () => shell.openExternal("https://github.com/cropflre/nowen-note/issues"),
+          click: () => shell.openExternal("https://github.com/cropflre/baseforge/issues"),
         },
         { type: "separator" },
         {

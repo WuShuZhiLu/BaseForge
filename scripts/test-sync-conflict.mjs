@@ -74,7 +74,7 @@ async function main() {
     throw new Error("backend/dist/index.js not found. Run npm run build:backend first.");
   }
 
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-sync-conflict-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-sync-conflict-"));
   const dbPath = path.join(root, "baseforge.db");
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;

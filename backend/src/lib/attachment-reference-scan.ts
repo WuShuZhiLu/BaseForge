@@ -88,8 +88,16 @@ export function scanAttachmentReferences(
         .all(userId)) as { id: string; size: number }[];
 
   // 3) 扫描
+  // PDF 笔记（contentFormat=pdf）正文是 {"attachmentId":"<uuid>"}，没有 URL 字面量，
+  // 单靠 URL 子串匹配会把 PDF 原件误判为孤儿。补一层 attachmentId JSON 匹配。
+  const attachmentIdJsonRe = /"attachmentId"\s*:\s*"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"/g;
+  const jsonReferencedIds = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = attachmentIdJsonRe.exec(haystack)) !== null) {
+    jsonReferencedIds.add(m[1].toLowerCase());
+  }
   for (const r of candidates) {
-    if (haystack.indexOf(`/api/attachments/${r.id}`) >= 0) {
+    if (haystack.indexOf(`/api/attachments/${r.id}`) >= 0 || jsonReferencedIds.has(r.id.toLowerCase())) {
       referencedIds.add(r.id);
       referencedBytes += r.size || 0;
       continue;

@@ -29,6 +29,6 @@ test("public /api/settings response disables cache", () => {
 
 test("ICP filing is sourced from docker env during startup seed", () => {
   const source = readFileSync(path.resolve("src/db/seed.ts"), "utf8");
-  assert.match(source, /NOWEN_ICP_BEIAN/);
+  assert.match(source, /BASEFORGE_ICP_BEIAN/);
   assert.match(source, /site_icp_beian/);
 });

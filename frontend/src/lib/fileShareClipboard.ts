@@ -47,7 +47,7 @@ function inspectSignedAttachmentUrl(raw: string): SignedAttachmentCandidate | nu
   const normalized = htmlEscaped ? raw.replace(/&amp;/g, "&") : raw;
   let url: URL;
   try {
-    url = new URL(normalized, "http://nowen.local/");
+    url = new URL(normalized, "http://baseforge.local/");
   } catch {
     return null;
   }
@@ -68,7 +68,7 @@ function inspectSignedAttachmentUrl(raw: string): SignedAttachmentCandidate | nu
 function absoluteStableShareUrl(value: string, apiBase: string): string {
   if (/^https?:\/\//i.test(value)) return value;
   try {
-    const runtimeBase = typeof window !== "undefined" ? window.location.href : "http://nowen.local/";
+    const runtimeBase = typeof window !== "undefined" ? window.location.href : "http://baseforge.local/";
     const resolvedApiBase = new URL(apiBase, runtimeBase);
     const base = /^https?:$/i.test(resolvedApiBase.protocol)
       ? `${resolvedApiBase.origin}/`

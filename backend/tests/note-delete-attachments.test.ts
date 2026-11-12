@@ -4,22 +4,22 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-note-delete-attachments-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-delete-attachments-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 process.env.ATTACHMENT_STORAGE = "local";
 
 let app: Hono;
-let getDb: () => Database.Database;
+let getDb: () => DatabaseSync;
 let closeDb: () => void;
 let getAttachmentsDir: () => string;
 
 const USER_ID = "delete-attachment-user";
 const NOTEBOOK_ID = "delete-attachment-notebook";
 
-function db(): Database.Database {
+function db(): DatabaseSync {
   return getDb();
 }
 

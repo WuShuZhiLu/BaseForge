@@ -55,7 +55,7 @@ function BlockEmbedNodeView({ node, selected }: any) {
       ref={observeRef}
       className="my-3"
       data-drag-handle
-      data-nowen-block-embed={node.attrs.href}
+      data-baseforge-block-embed={node.attrs.href}
       data-block-embed-runtime-state={shouldRenderHeavyContent ? "mounted" : "deferred"}
       style={{
         minHeight: shouldRenderHeavyContent ? undefined : 96,
@@ -96,10 +96,10 @@ export const BlockEmbedExtension = Node.create({
     return { href: { default: "" } };
   },
   parseHTML() {
-    return [{ tag: "div[data-nowen-block-embed]", getAttrs: (node) => ({ href: (node as HTMLElement).getAttribute("data-nowen-block-embed") || "" }) }];
+    return [{ tag: "div[data-baseforge-block-embed]", getAttrs: (node) => ({ href: (node as HTMLElement).getAttribute("data-baseforge-block-embed") || "" }) }];
   },
   renderHTML({ HTMLAttributes }) {
-    return ["div", mergeAttributes(HTMLAttributes, { "data-nowen-block-embed": HTMLAttributes.href }), parseMindMapEmbedHref(HTMLAttributes.href || "") ? "思维导图" : parseBoardEmbedHref(HTMLAttributes.href || "") ? "画板" : parseSheetEmbedHref(HTMLAttributes.href || "") ? "轻量表格" : "引用块"];
+    return ["div", mergeAttributes(HTMLAttributes, { "data-baseforge-block-embed": HTMLAttributes.href }), parseMindMapEmbedHref(HTMLAttributes.href || "") ? "思维导图" : parseBoardEmbedHref(HTMLAttributes.href || "") ? "画板" : parseSheetEmbedHref(HTMLAttributes.href || "") ? "轻量表格" : "引用块"];
   },
   addNodeView() { return ReactNodeViewRenderer(BlockEmbedNodeView); },
   addInputRules() {

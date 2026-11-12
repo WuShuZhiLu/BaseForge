@@ -1,7 +1,7 @@
 import type { TextCommentAnchor } from "@/lib/inlineCommentAnchor";
 
-export const OPEN_INLINE_COMMENT_PANEL_EVENT = "nowen:inline-comments:open";
-export const CLOSE_INLINE_COMMENT_PANEL_EVENT = "nowen:inline-comments:close";
+export const OPEN_INLINE_COMMENT_PANEL_EVENT = "baseforge:inline-comments:open";
+export const CLOSE_INLINE_COMMENT_PANEL_EVENT = "baseforge:inline-comments:close";
 
 export interface OpenInlineCommentPanelDetail {
   noteId: string;

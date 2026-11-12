@@ -4,9 +4,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nowen-block-patch-mixed-"));
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "baseforge-block-patch-mixed-"));
 process.env.DB_PATH = path.join(tmpDir, "test.db");
 process.env.ELECTRON_USER_DATA = tmpDir;
 
@@ -15,7 +15,7 @@ const notebookId = "block-patch-mixed-notebook";
 const firstTarget = "11111111-1111-4111-8111-111111111111";
 const secondTarget = "22222222-2222-4222-8222-222222222222";
 
-let db: Database.Database;
+let db: DatabaseSync;
 let closeDb: () => void;
 let app: Hono;
 let syncNoteBlocks: typeof import("../src/lib/noteBlocks").syncNoteBlocks;
