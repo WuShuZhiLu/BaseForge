@@ -2,7 +2,7 @@
 
 Standalone Marketplace backend for Publisher identities, Ed25519 keys, immutable artifacts, signed V2 index metadata, automated package scanning, reviews and reports. It is intentionally separate from `backend/`, which remains the user's personal knowledge service.
 
-Production requires explicit Registry URL/origin, GitHub OAuth, session, trusted-proxy and Ed25519 signer configuration. The signer configuration includes `REGISTRY_SIGNING_PRIVATE_KEY`, `REGISTRY_SIGNER_KEY_ID`, `REGISTRY_SIGNER_SEQUENCE`, `REGISTRY_SIGNER_VALID_FROM` and `REGISTRY_SIGNER_VALID_UNTIL`; local defaults are enabled only by `REGISTRY_ENV=development`. Publisher private keys never enter this service: `nowen-plugin sign` signs on the developer machine or in CI.
+Production requires explicit Registry URL/origin, GitHub OAuth, session, trusted-proxy and Ed25519 signer configuration. The signer configuration includes `REGISTRY_SIGNING_PRIVATE_KEY`, `REGISTRY_SIGNER_KEY_ID`, `REGISTRY_SIGNER_SEQUENCE`, `REGISTRY_SIGNER_VALID_FROM` and `REGISTRY_SIGNER_VALID_UNTIL`; local defaults are enabled only by `REGISTRY_ENV=development`. Publisher private keys never enter this service: `baseforge-plugin sign` signs on the developer machine or in CI.
 
 Root rotation is two-phase. An authenticated administrator with current TOTP calls `POST /v2/admin/root-rotations` with the next root's `keyId`, Ed25519 `publicKey`, `validFrom` and `validUntil` to persist a parent-signed pending envelope. Deployment then supplies the new private-key signer fields and the complete forward chain in `REGISTRY_ROOT_ROTATIONS_JSON`. Startup activates the chain transactionally only when every parent signature and the final signer match; otherwise it leaves the persisted active signer unchanged and fails closed.
 
@@ -24,23 +24,23 @@ Registry metadata is backed up with SQLite `VACUUM INTO`, producing a consistent
 
 ```bash
 # Online-safe metadata snapshot.
-npm run maintenance -- backup --output /backups/nowen-registry
+npm run maintenance -- backup --output /backups/baseforge-registry
 
 # Verify before moving or restoring a backup.
 npm run maintenance -- verify \
-  --database /backups/nowen-registry/registry-....sqlite \
-  --manifest /backups/nowen-registry/registry-....manifest.json
+  --database /backups/baseforge-registry/registry-....sqlite \
+  --manifest /backups/baseforge-registry/registry-....manifest.json
 
 # Dry-run restore verification. This does not modify registry.db.
 npm run maintenance -- restore \
-  --database /backups/nowen-registry/registry-....sqlite \
-  --manifest /backups/nowen-registry/registry-....manifest.json
+  --database /backups/baseforge-registry/registry-....sqlite \
+  --manifest /backups/baseforge-registry/registry-....manifest.json
 
 # Actual restore. STOP all Registry instances first. The command refuses a target
 # with WAL/SHM files and preserves the previous DB as registry.db.pre-restore-*.
 npm run maintenance -- restore \
-  --database /backups/nowen-registry/registry-....sqlite \
-  --manifest /backups/nowen-registry/registry-....manifest.json \
+  --database /backups/baseforge-registry/registry-....sqlite \
+  --manifest /backups/baseforge-registry/registry-....manifest.json \
   --apply
 ```
 
