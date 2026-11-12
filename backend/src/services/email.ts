@@ -77,11 +77,19 @@ const SETTING_KEY = "smtp:config";
 /** 25 MB；大部分邮件服务商硬上限；超过会在路由层直接 413。 */
 export const EMAIL_ATTACHMENT_LIMIT = 25 * 1024 * 1024;
 
-function deriveCipherKey(): Buffer {
+const CIPHER_SALT = "baseforge-smtp-v1";
+/** 旧版（nowen-note 时期）盐；仅用于解密存量密文，成功后由读取方用新盐重写。 */
+const LEGACY_CIPHER_SALT = "nowen-smtp-v1";
+
+function deriveKey(salt: string): Buffer {
   // 不直接用 JWT_SECRET 原值，避免"解密邮件密码 === 伪造 JWT"的攻击面耦合；
   // 加固定盐 + scryptSync 派生 32 字节密钥。
   const secret = process.env.JWT_SECRET || "baseforge-default-secret";
-  return crypto.scryptSync(secret, "baseforge-smtp-v1", 32);
+  return crypto.scryptSync(secret, salt, 32);
+}
+
+function deriveCipherKey(): Buffer {
+  return deriveKey(CIPHER_SALT);
 }
 
 function encryptPassword(plain: string): string {
@@ -95,22 +103,45 @@ function encryptPassword(plain: string): string {
   return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${enc.toString("base64")}`;
 }
 
-function decryptPassword(encoded: string): string {
-  if (!encoded) return "";
-  if (!encoded.startsWith("v1:")) return ""; // 兼容：非预期格式当空密码处理，避免抛错
+function openWithKey(key: Buffer, ivB64: string, tagB64: string, dataB64: string): string {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivB64, "base64"));
+  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
+}
+
+/** 解密结果；legacy 表示密文按旧盐解出，调用方应尽快用新盐重写落库。 */
+export function decryptPasswordDetailed(encoded: string): { plain: string; legacy: boolean } {
+  if (!encoded) return { plain: "", legacy: false };
+  if (!encoded.startsWith("v1:")) return { plain: "", legacy: false }; // 兼容：非预期格式当空密码处理，避免抛错
+  const [, ivB64, tagB64, dataB64] = encoded.split(":");
   try {
-    const [, ivB64, tagB64, dataB64] = encoded.split(":");
-    const key = deriveCipherKey();
-    const iv = Buffer.from(ivB64, "base64");
-    const tag = Buffer.from(tagB64, "base64");
-    const data = Buffer.from(dataB64, "base64");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    const dec = Buffer.concat([decipher.update(data), decipher.final()]);
-    return dec.toString("utf8");
+    return { plain: openWithKey(deriveCipherKey(), ivB64, tagB64, dataB64), legacy: false };
+  } catch {
+    // 新盐解不开再试旧盐（存量部署密文是 nowen 盐派生的）
+  }
+  try {
+    const plain = openWithKey(deriveKey(LEGACY_CIPHER_SALT), ivB64, tagB64, dataB64);
+    return { plain, legacy: true };
   } catch (e) {
     console.warn("[email] decrypt smtp password failed:", e);
-    return "";
+    return { plain: "", legacy: false };
+  }
+}
+
+function decryptPassword(encoded: string): string {
+  return decryptPasswordDetailed(encoded).plain;
+}
+
+/** 存量密文升级：用新盐重写 system_settings 里的 passwordEnc（幂等）。 */
+function rewritePasswordEnc(rawSetting: string, plain: string): void {
+  try {
+    const parsed = JSON.parse(rawSetting) as Record<string, unknown>;
+    parsed.passwordEnc = encryptPassword(plain);
+    getDb()
+      .prepare("UPDATE system_settings SET value = ? WHERE key = ?")
+      .run(JSON.stringify(parsed), SETTING_KEY);
+  } catch (e) {
+    console.warn("[email] upgrade smtp password enc failed:", e);
   }
 }
 
@@ -139,13 +170,15 @@ export function readSmtpConfig(): SmtpConfig & { updatedAt: string | null } {
   if (!row) return fallback;
   try {
     const parsed = JSON.parse(row.value) as Partial<SmtpConfig> & { passwordEnc?: string };
+    const { plain, legacy } = decryptPasswordDetailed(parsed.passwordEnc || "");
+    if (legacy && plain) rewritePasswordEnc(row.value, plain); // 旧盐解出后用新盐重写（幂等升级）
     return {
       enabled: !!parsed.enabled,
       host: parsed.host || "",
       port: typeof parsed.port === "number" ? parsed.port : 465,
       secure: parsed.secure !== false,
       username: parsed.username || "",
-      password: decryptPassword(parsed.passwordEnc || ""),
+      password: plain,
       fromName: parsed.fromName || "",
       fromEmail: parsed.fromEmail || "",
       updatedAt: row.updatedAt,

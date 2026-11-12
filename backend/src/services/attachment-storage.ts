@@ -77,9 +77,17 @@ function env(name: string): string {
   return (process.env[name] || "").trim();
 }
 
-function deriveCipherKey(): Buffer {
+const CIPHER_SALT = "baseforge-attachment-storage-v1";
+/** 旧版（nowen-note 时期）盐；仅用于解密存量密文，成功后由读取方用新盐重写。 */
+const LEGACY_CIPHER_SALT = "nowen-attachment-storage-v1";
+
+function deriveKey(salt: string): Buffer {
   const secret = process.env.JWT_SECRET || "baseforge-default-secret";
-  return crypto.scryptSync(secret, "baseforge-attachment-storage-v1", 32);
+  return crypto.scryptSync(secret, salt, 32);
+}
+
+function deriveCipherKey(): Buffer {
+  return deriveKey(CIPHER_SALT);
 }
 
 function encryptSecret(plain: string): string {
@@ -92,18 +100,31 @@ function encryptSecret(plain: string): string {
   return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${enc.toString("base64")}`;
 }
 
-function decryptSecret(encoded: string): string {
-  if (!encoded || !encoded.startsWith("v1:")) return "";
+function openWithKey(key: Buffer, ivB64: string, tagB64: string, dataB64: string): string {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivB64, "base64"));
+  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
+}
+
+/** 解密结果；legacy 表示密文按旧盐解出，调用方应尽快用新盐重写落库。 */
+export function decryptSecretDetailed(encoded: string): { plain: string; legacy: boolean } {
+  if (!encoded || !encoded.startsWith("v1:")) return { plain: "", legacy: false };
+  const [, ivB64, tagB64, dataB64] = encoded.split(":");
   try {
-    const [, ivB64, tagB64, dataB64] = encoded.split(":");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", deriveCipherKey(), Buffer.from(ivB64, "base64"));
-    decipher.setAuthTag(Buffer.from(tagB64, "base64"));
-    const dec = Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]);
-    return dec.toString("utf8");
+    return { plain: openWithKey(deriveCipherKey(), ivB64, tagB64, dataB64), legacy: false };
+  } catch {
+    // 新盐解不开再试旧盐（存量部署密文是 nowen 盐派生的）
+  }
+  try {
+    return { plain: openWithKey(deriveKey(LEGACY_CIPHER_SALT), ivB64, tagB64, dataB64), legacy: true };
   } catch (err) {
     console.warn("[attachment-storage] decrypt secret failed:", err);
-    return "";
+    return { plain: "", legacy: false };
   }
+}
+
+function decryptSecret(encoded: string): string {
+  return decryptSecretDetailed(encoded).plain;
 }
 
 function getDriver(): StorageDriver {
@@ -126,6 +147,19 @@ function getEnvS3Config(): (S3Config & { updatedAt: null }) | null {
   return { endpoint, region, bucket, accessKeyId, secretAccessKey, prefix, updatedAt: null };
 }
 
+/** 存量密文升级：用新盐重写 system_settings 里的 secretAccessKeyEnc（幂等）。 */
+function rewriteSecretAccessKeyEnc(rawSetting: string, plain: string): void {
+  try {
+    const parsed = JSON.parse(rawSetting) as Record<string, unknown>;
+    parsed.secretAccessKeyEnc = encryptSecret(plain);
+    getDb()
+      .prepare("UPDATE system_settings SET value = ? WHERE key = ?")
+      .run(JSON.stringify(parsed), SETTING_KEY);
+  } catch (err) {
+    console.warn("[attachment-storage] upgrade secretAccessKeyEnc failed:", err);
+  }
+}
+
 function readPersistedObjectStorageConfig(): (S3Config & { enabled: boolean; updatedAt: string | null }) | null {
   try {
     const row = getDb()
@@ -136,13 +170,15 @@ function readPersistedObjectStorageConfig(): (S3Config & { enabled: boolean; upd
       enabled?: boolean;
       secretAccessKeyEnc?: string;
     };
+    const { plain, legacy } = decryptSecretDetailed(parsed.secretAccessKeyEnc || "");
+    if (legacy && plain) rewriteSecretAccessKeyEnc(row.value, plain); // 旧盐解出后用新盐重写（幂等升级）
     return {
       enabled: parsed.enabled === true,
       endpoint: String(parsed.endpoint || "").trim().replace(/\/+$/, ""),
       region: String(parsed.region || "auto").trim() || "auto",
       bucket: String(parsed.bucket || "").trim(),
       accessKeyId: String(parsed.accessKeyId || "").trim(),
-      secretAccessKey: decryptSecret(parsed.secretAccessKeyEnc || ""),
+      secretAccessKey: plain,
       prefix: String(parsed.prefix || "").trim().replace(/^\/+|\/+$/g, ""),
       updatedAt: row.updatedAt || null,
     };
