@@ -2,9 +2,11 @@ import { EncryptedContentError, validateEnvelope, type EncryptedContentEnvelope 
 import type { JSONContent } from "@tiptap/core";
 
 export const ENCRYPTED_BLOCK_LANGUAGE = "nowen-encrypted-v1";
-export const isEncryptedBlockLanguage = (language: unknown): boolean => typeof language === "string" && language.toLowerCase().startsWith("nowen-encrypted");
+/** 旧版（nowen-note 时期）围栏写 nowen-encrypted-*，v0.2.0 改名窗口可能写 baseforge-encrypted-*，识别需同时接受；写入仍用 nowen-encrypted-v1 保证读兼容。 */
+export const isEncryptedBlockLanguage = (language: unknown): boolean => typeof language === "string" && (language.toLowerCase().startsWith("nowen-encrypted") || language.toLowerCase().startsWith("baseforge-encrypted"));
+const ENCRYPTED_BLOCK_LANGUAGES = new Set([ENCRYPTED_BLOCK_LANGUAGE, "baseforge-encrypted-v1"]);
 export function readEncryptedBlock(source: string, language = ENCRYPTED_BLOCK_LANGUAGE): EncryptedContentEnvelope {
-  if (language.toLowerCase() !== ENCRYPTED_BLOCK_LANGUAGE) throw new EncryptedContentError("invalid");
+  if (!ENCRYPTED_BLOCK_LANGUAGES.has(language.toLowerCase())) throw new EncryptedContentError("invalid");
   let value: unknown;
   try { value = JSON.parse(source); } catch { throw new EncryptedContentError("invalid"); }
   const envelope = validateEnvelope(value);
@@ -76,5 +78,5 @@ export function isProtectedNotePayload(payload: { content?: unknown; contentForm
   if (typeof payload?.content !== "string") return false;
   const format = typeof payload.contentFormat === "string" ? payload.contentFormat : payload.content.trim().startsWith("{") ? "tiptap-json" : "markdown";
   try { return encryptedBlocksInContent(payload.content, format).length > 0; }
-  catch { return /nowen-encrypted/i.test(payload.content); }
+  catch { return /nowen-encrypted|baseforge-encrypted/i.test(payload.content); }
 }
