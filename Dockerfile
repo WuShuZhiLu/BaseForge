@@ -89,8 +89,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 ARG BUILD_DATE=""
 ARG APP_VERSION=""
 ARG VCS_REF=""
-ENV NOWEN_BUILD_TIME=${BUILD_DATE}
-ENV NOWEN_APP_VERSION=${APP_VERSION}
+ENV BASEFORGE_BUILD_TIME=${BUILD_DATE}
+ENV BASEFORGE_APP_VERSION=${APP_VERSION}
 LABEL org.opencontainers.image.title="BaseForge" \
       org.opencontainers.image.description="Self-hosted note and knowledge management" \
       org.opencontainers.image.source="https://git.betheone.cc.cd/wushuzhilu/BaseForge" \
