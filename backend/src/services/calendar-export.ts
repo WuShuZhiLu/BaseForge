@@ -90,9 +90,27 @@ function getEncryptionKeySource(): { key: string; source: string } {
   return { key: "baseforge-dev-fallback-key-not-for-production", source: "development-fallback" };
 }
 
+const CIPHER_SALT = "baseforge-calendar-export-v1";
+/** 旧版（nowen-note 时期）盐；仅用于解密存量密文，成功后由读取方用新盐重写。 */
+const LEGACY_CIPHER_SALT = "nowen-calendar-export-v1";
+/** 旧版开发环境兜底密钥（改名前常量）；仅用于解密存量密文。 */
+const LEGACY_DEV_FALLBACK_KEY = "nowen-note-dev-fallback-key-not-for-production";
+
+function deriveKey(salt: string, devFallbackKey: string): Buffer {
+  const dedicated = process.env.CALENDAR_EXPORT_ENCRYPTION_KEY;
+  const key = dedicated || process.env.JWT_SECRET || devFallbackKey;
+  return crypto.scryptSync(key, salt, 32);
+}
+
 function deriveCipherKey(): Buffer {
   const { key } = getEncryptionKeySource();
-  return crypto.scryptSync(key, "baseforge-calendar-export-v1", 32);
+  return crypto.scryptSync(key, CIPHER_SALT, 32);
+}
+
+function openWithKey(key: Buffer, ivB64: string, tagB64: string, dataB64: string): string {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(ivB64, "base64"));
+  decipher.setAuthTag(Buffer.from(tagB64, "base64"));
+  return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
 }
 
 function encryptSecret(plain: string): string {
@@ -105,30 +123,57 @@ function encryptSecret(plain: string): string {
   return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${enc.toString("base64")}`;
 }
 
-function decryptSecret(encoded: string): string {
-  if (!encoded || !encoded.startsWith("v1:")) return "";
+/** 解密结果；legacy 表示密文按旧盐解出，调用方应尽快用新盐重写落库。 */
+export function decryptSecretDetailed(encoded: string): { plain: string; legacy: boolean } {
+  if (!encoded || !encoded.startsWith("v1:")) return { plain: "", legacy: false };
+  const [, ivB64, tagB64, dataB64] = encoded.split(":");
   try {
-    const [, ivB64, tagB64, dataB64] = encoded.split(":");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", deriveCipherKey(), Buffer.from(ivB64, "base64"));
-    decipher.setAuthTag(Buffer.from(tagB64, "base64"));
-    const dec = Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]);
-    return dec.toString("utf8");
+    return { plain: openWithKey(deriveCipherKey(), ivB64, tagB64, dataB64), legacy: false };
+  } catch {
+    // 新盐解不开再试旧盐（存量部署密文是 nowen 盐派生的）
+  }
+  try {
+    const plain = openWithKey(deriveKey(LEGACY_CIPHER_SALT, LEGACY_DEV_FALLBACK_KEY), ivB64, tagB64, dataB64);
+    return { plain, legacy: true };
   } catch (err) {
     console.warn("[calendar-export] decrypt secret failed:", err);
-    return "";
+    return { plain: "", legacy: false };
   }
+}
+
+/** 存量密文升级：用新盐重写目标行 configJson 里的 secretAccessKeyEnc（幂等）。 */
+function rewriteSecretAccessKeyEnc(targetId: string, plain: string): void {
+  try {
+    const row = getDb()
+      .prepare("SELECT configJson FROM calendar_export_targets WHERE id = ?")
+      .get(targetId) as { configJson: string } | undefined;
+    if (!row) return;
+    const parsed = JSON.parse(row.configJson) as Record<string, unknown>;
+    parsed.secretAccessKeyEnc = encryptSecret(plain);
+    getDb()
+      .prepare("UPDATE calendar_export_targets SET configJson = ? WHERE id = ?")
+      .run(JSON.stringify(parsed), targetId);
+  } catch (err) {
+    console.warn("[calendar-export] upgrade secretAccessKeyEnc failed:", err);
+  }
+}
+
+function decryptSecret(encoded: string, targetId?: string): string {
+  const { plain, legacy } = decryptSecretDetailed(encoded);
+  if (legacy && plain && targetId) rewriteSecretAccessKeyEnc(targetId, plain); // 幂等升级
+  return plain;
 }
 
 // ====== 配置解析 ======
 
-function parseConfig(configJson: string): CalendarExportTargetConfig {
+function parseConfig(configJson: string, targetId?: string): CalendarExportTargetConfig {
   const parsed = JSON.parse(configJson || "{}") as Record<string, any>;
   return {
     endpoint: String(parsed.endpoint || "").trim().replace(/\/+$/, ""),
     region: String(parsed.region || "auto").trim() || "auto",
     bucket: String(parsed.bucket || "").trim(),
     accessKeyId: String(parsed.accessKeyId || "").trim(),
-    secretAccessKey: decryptSecret(parsed.secretAccessKeyEnc || ""),
+    secretAccessKey: decryptSecret(parsed.secretAccessKeyEnc || "", targetId),
     pathPrefix: String(parsed.pathPrefix || "").trim().replace(/^\/+|\/+$/g, ""),
     publicBaseUrl: String(parsed.publicBaseUrl || "").trim().replace(/\/+$/, ""),
     usePathStyle: parsed.usePathStyle !== false,
@@ -136,7 +181,7 @@ function parseConfig(configJson: string): CalendarExportTargetConfig {
 }
 
 function toPublic(row: CalendarExportTarget | CalendarExportTargetRecordBoolean): CalendarExportTargetPublic {
-  const cfg = parseConfig(row.configJson);
+  const cfg = parseConfig(row.configJson, row.id);
   return {
     id: row.id,
     userId: row.userId,
@@ -344,7 +389,7 @@ export function updateExportTarget(
     throw new Error("Export target not found");
   }
 
-  const oldCfg = parseConfig(existing.configJson);
+  const oldCfg = parseConfig(existing.configJson, existing.id);
   const newCfg = {
     endpoint: input.endpoint !== undefined ? input.endpoint.trim().replace(/\/+$/, "") : oldCfg.endpoint,
     region: input.region !== undefined ? (input.region || "auto").trim() : oldCfg.region,
@@ -388,7 +433,7 @@ export async function testExportTarget(
     return { ok: false, error: "Export target not found" };
   }
 
-  const cfg = parseConfig(row.configJson);
+  const cfg = parseConfig(row.configJson, row.id);
   if (!cfg.endpoint || !cfg.bucket || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.publicBaseUrl) {
     return { ok: false, error: "Configuration incomplete" };
   }
@@ -449,7 +494,7 @@ export async function exportNow(
     return { success: false, error };
   }
 
-  const cfg = parseConfig(row.configJson);
+  const cfg = parseConfig(row.configJson, row.id);
   if (!cfg.endpoint || !cfg.bucket || !cfg.accessKeyId || !cfg.secretAccessKey || !cfg.publicBaseUrl) {
     const error = "Configuration incomplete";
     updateExportStatus(targetId, "error", error);

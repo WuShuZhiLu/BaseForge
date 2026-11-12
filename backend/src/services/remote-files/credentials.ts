@@ -16,7 +16,9 @@ import fs from "fs";
 import path from "path";
 
 /** v1（历史）用盐；v2 直接用密钥文件，不再派生 */
-const LEGACY_SALT = "baseforge-remote-files-v1";
+const LEGACY_SALT = "nowen-remote-files-v1";
+/** 改名窗口期（v0.2.0）的盐与开发兜底密钥；仅兜底，正常不会有该组合的存量密文 */
+const RENAME_WINDOW_SALT = "baseforge-remote-files-v1";
 
 function dataDir(): string {
   return process.env.ELECTRON_USER_DATA || path.join(process.cwd(), "data");
@@ -47,11 +49,17 @@ function remoteKey(): Buffer {
   return key;
 }
 
-/** 仅用于解密历史 v1 密文；新密文不再走这里。 */
-function legacyKey(): Buffer {
+/** 仅用于解密历史 v1 密文；新密文不再走这里。按旧盐优先、改名窗口盐兜底依次尝试。 */
+function legacyKeys(): Buffer[] {
   const secret = process.env.JWT_SECRET || "";
-  const source = secret.length >= 16 ? secret : "baseforge-remote-files-development-key";
-  return crypto.scryptSync(source, LEGACY_SALT, 32);
+  const pairs: Array<{ salt: string; fallback: string }> = [
+    { salt: LEGACY_SALT, fallback: "nowen-note-remote-files-development-key" },
+    { salt: RENAME_WINDOW_SALT, fallback: "baseforge-remote-files-development-key" },
+  ];
+  return pairs.map(({ salt, fallback }) => {
+    const source = secret.length >= 16 ? secret : fallback;
+    return crypto.scryptSync(source, salt, 32);
+  });
 }
 
 function seal(key: Buffer, value: string): string {
@@ -85,7 +93,15 @@ export function decryptSecret(stored: string): string {
     }
     const [version, iv, tag, payload] = stored.split(":");
     if (version !== "v1") return "";
-    return open(legacyKey(), iv, tag, payload);
+    let lastError: unknown;
+    for (const key of legacyKeys()) {
+      try {
+        return open(key, iv, tag, payload);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError ?? new Error("legacy secret decrypt failed");
   } catch (error) {
     console.warn("[remote-files] decrypt secret failed:", error instanceof Error ? error.message : error);
     return "";

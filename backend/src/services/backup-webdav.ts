@@ -146,8 +146,31 @@ function keySource(): string {
   return "baseforge-webdav-development-key";
 }
 
+/** 旧版（nowen-note 时期）盐与开发兜底密钥；仅用于解密存量密文，成功后由读取方用新盐重写。 */
+const LEGACY_CIPHER_SALT = "nowen-backup-webdav-v1";
+const LEGACY_DEV_FALLBACK_KEY = "nowen-note-webdav-development-key";
+
+function legacyKeySource(): string {
+  const dedicated = process.env.BACKUP_WEBDAV_ENCRYPTION_KEY;
+  if (dedicated) return dedicated;
+  const jwt = process.env.JWT_SECRET;
+  if (jwt) return jwt;
+  try {
+    const secretPath = path.join(getBackupManager().getDataDir(), ".jwt_secret");
+    const stored = fs.readFileSync(secretPath, "utf8").trim();
+    if (stored) return stored;
+  } catch {
+    // Development/test installations may not have persisted the secret yet.
+  }
+  return LEGACY_DEV_FALLBACK_KEY;
+}
+
 function encryptionKey(): Buffer {
   return crypto.scryptSync(keySource(), "baseforge-backup-webdav-v1", 32);
+}
+
+function legacyEncryptionKey(): Buffer {
+  return crypto.scryptSync(legacyKeySource(), LEGACY_CIPHER_SALT, 32);
 }
 
 function encryptSecret(value: string): string {
@@ -158,20 +181,39 @@ function encryptSecret(value: string): string {
   return `v1:${iv.toString("base64")}:${cipher.getAuthTag().toString("base64")}:${encrypted.toString("base64")}`;
 }
 
-function decryptSecret(value: string): string {
-  if (!value) return "";
-  if (!value.startsWith("v1:")) return "";
+function openWithKey(
+  key: Buffer,
+  iv: string,
+  tag: string,
+  encrypted: string,
+): string {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64"));
+  decipher.setAuthTag(Buffer.from(tag, "base64"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encrypted, "base64")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+/** 解密结果；legacy 表示密文按旧盐解出，调用方应尽快用新盐重写落库。 */
+export function decryptSecretDetailed(value: string): { plain: string; legacy: boolean } {
+  if (!value) return { plain: "", legacy: false };
+  if (!value.startsWith("v1:")) return { plain: "", legacy: false };
+  const [, iv, tag, encrypted] = value.split(":");
   try {
-    const [, iv, tag, encrypted] = value.split(":");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(iv, "base64"));
-    decipher.setAuthTag(Buffer.from(tag, "base64"));
-    return Buffer.concat([
-      decipher.update(Buffer.from(encrypted, "base64")),
-      decipher.final(),
-    ]).toString("utf8");
+    return { plain: openWithKey(encryptionKey(), iv, tag, encrypted), legacy: false };
+  } catch {
+    // 新盐解不开再试旧盐（存量部署密文是 nowen 盐派生的）
+  }
+  try {
+    return { plain: openWithKey(legacyEncryptionKey(), iv, tag, encrypted), legacy: true };
   } catch {
     throw new Error("WebDAV 密码解密失败，请重新保存配置");
   }
+}
+
+function decryptSecret(value: string): string {
+  return decryptSecretDetailed(value).plain;
 }
 
 function loadStoredConfig(): StoredBackupWebDavConfig {
@@ -231,9 +273,18 @@ function resolveConfig(input?: BackupWebDavConfigInput): ResolvedBackupWebDavCon
   const endpoint = normalizeEndpoint(input?.endpoint ?? stored.endpoint);
   const remotePath = normalizeRemotePath(input?.remotePath ?? stored.remotePath);
   const username = String(input?.username ?? stored.username).trim();
-  let password = decryptSecret(stored.passwordEnc);
+  const { plain, legacy } = decryptSecretDetailed(stored.passwordEnc);
+  let password = plain;
   if (input?.clearPassword === true) password = "";
   if (typeof input?.password === "string" && input.password.length > 0) password = input.password;
+  // 旧盐解出后用新盐重写（幂等升级）；本次请求带新密码时由 save 流程另行落库
+  if (legacy && plain && password === plain) {
+    try {
+      writeSetting(CONFIG_KEY, JSON.stringify({ ...stored, passwordEnc: encryptSecret(plain) }));
+    } catch (error) {
+      console.warn("[backup-webdav] upgrade passwordEnc failed:", error instanceof Error ? error.message : error);
+    }
+  }
   return {
     enabled: input?.enabled ?? stored.enabled,
     endpoint,
