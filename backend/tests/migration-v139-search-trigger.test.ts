@@ -11,10 +11,11 @@ import "../src/db/sqlite-ext.js";
  * 回归：存量库升级时 v139 会 `UPDATE notes SET note_type='normal'`。
  *
  * notes 上的 FTS 同步触发器（notes_search_ai/ad/au）引用自定义函数
- * baseforge_search_normalize，只要触发器存在，任何触碰 notes 的语句在 prepare 阶段
+ * nowen_search_normalize（旧版镜像建出来的触发器，函数名随创建时固化），
+ * 只要触发器存在，任何触碰 notes 的语句在 prepare 阶段
  * 就要解析它 —— 哪怕 AU 的 WHEN 条件最终不成立。而迁移跑在
  * ensureNormalizedSearchFts() 之前，函数还没注册到这条连接上，
- * 于是老库升级直接 `no such function: baseforge_search_normalize` 打断启动。
+ * 于是老库升级直接 `no such function: nowen_search_normalize` 打断启动。
  *
  * 新库没有触发器，所以只建新库的迁移测试永远发现不了这个坑 —— 这里必须
  * 先让触发器存在，再在一个「新连接」上重跑 v139。
@@ -41,6 +42,17 @@ test("v139 在已有 notes 搜索触发器的存量库上不会因 no such funct
 
   // 3) 回退账本，让 v139/v140 重新进入 pending
   live.prepare("DELETE FROM schema_migrations WHERE version >= 139").run();
+
+  // 3.1) 还原成旧版镜像建出来的触发器：函数名还是旧名 nowen_search_normalize。
+  // 旧库升级/nowen 备份恢复的真实场景 —— CREATE TRIGGER 只在创建时固化函数名，
+  // 代码改名后库里的触发器不会跟着重建。
+  const legacyTriggers = live
+    .prepare("SELECT name, sql FROM sqlite_master WHERE type='trigger' AND name LIKE 'notes_search_%'")
+    .all() as { name: string; sql: string }[];
+  for (const trigger of legacyTriggers) {
+    live.exec(`DROP TRIGGER IF EXISTS ${trigger.name}`);
+    live.exec(trigger.sql.replaceAll("baseforge_search_normalize", "nowen_search_normalize"));
+  }
   closeDb();
 
   // 4) 复制成一个「存量库」，在新连接上重跑（新连接没有注册自定义函数）
