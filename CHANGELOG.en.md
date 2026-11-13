@@ -15,6 +15,26 @@ Format:
 
 Next release in development.
 
+## v0.2.1 - 2026-11-14
+
+> Fixes the upgrade path from legacy nowen releases. 0.1.x users should upgrade directly to this version; do not use 0.2.0 to migrate from nowen.
+
+### Fixed
+
+**Upgrade and data compatibility**
+
+- Startup crash on legacy (nowen-era) databases: the renamed SQLite function was still baked into existing triggers, breaking migrations with "no such function"; the old function name is now kept as an alias (`91f8f6c7`)
+- Restoring nowen system backups failed for the same reason; original exceptions are now logged server-side on backup create/import/restore failures (responses stay sanitized) for `docker logs` triage (`73f505e0`)
+- Renamed encryption salts made existing credentials undecryptable (SMTP, WebDAV backup, attachment storage, calendar export, remote files): decryption now falls back to the legacy salt and upgrades to the new salt idempotently (`33e905ae`)
+- Renamed root-document container prefix broke recognition on legacy databases: new v142 data migration rewrites the prefix and rebuilds the affected triggers (`a36d7f33`)
+- 285 renamed localStorage keys dropped logins, drafts and offline queues: earliest boot stage backfills old keys without deleting them, guarded against re-runs (`7bdefa62`)
+- Upgrading from the upstream nowen desktop build no longer adopts custom data directories: restored `nowen-data` directory and pointer-file migration (`41dd9c3a`)
+
+**Other**
+
+- nowen→baseforge rename gaps and destructive renames: reverted the encrypted-notes AAD binding string so existing encrypted notes decrypt again, with read compatibility for both fence prefixes and matching write guards (`93c08208`, `3f4030a5`); unified backend package name, Dockerfile env vars and plugin ecosystem READMEs (`0bbe3d5b`)
+- SignPath signing action upgraded from `@v2` to `@v3`: the `@v2` default connector was retired (503); takes effect with this version's tag (`73f505e0`)
+
 ## v0.2.0 - 2026-11-12
 
 ### Added
