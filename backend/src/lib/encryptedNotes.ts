@@ -73,11 +73,12 @@ export function guardEncryptedNoteMutation(body: Record<string, any>, current?: 
 }
 
 export const ENCRYPTED_BLOCK_LANGUAGE = "nowen-encrypted-v1";
-export const isEncryptedBlockLanguage = (value: unknown): boolean => typeof value === "string" && value.toLowerCase().startsWith("nowen-encrypted");
+/** 落盘格式固定 nowen-encrypted-v1；识别同时接受 baseforge-encrypted-*（v0.2.0 改名窗口），仅用于读取兼容。 */
+export const isEncryptedBlockLanguage = (value: unknown): boolean => typeof value === "string" && (value.toLowerCase().startsWith("nowen-encrypted") || value.toLowerCase().startsWith("baseforge-encrypted"));
 export function encryptedBlocksInContent(content: string, format: string): Array<{ objectId: string; originalFormat: "markdown" | "tiptap-json"; serialized: string }> {
   const blocks: Array<{ objectId: string; originalFormat: "markdown" | "tiptap-json"; serialized: string }> = [];
   const add = (source: string, language: string) => {
-    if (language.toLowerCase() !== ENCRYPTED_BLOCK_LANGUAGE) throw new EncryptedNotePayloadError();
+    if (!isEncryptedBlockLanguage(language)) throw new EncryptedNotePayloadError();
     blocks.push({ ...parseEncryptedContent(source, "block"), serialized: JSON.stringify(JSON.parse(source)) });
   };
   if (format === "markdown") {
@@ -133,5 +134,5 @@ export function isProtectedNotePayload(payload: Record<string, any> | null | und
   if (typeof payload?.content !== "string") return false;
   const format = typeof payload.contentFormat === "string" ? payload.contentFormat : payload.content.trim().startsWith("{") ? "tiptap-json" : "markdown";
   try { return encryptedBlocksInContent(payload.content, format).length > 0; }
-  catch { return /nowen-encrypted/i.test(payload.content); }
+  catch { return /nowen-encrypted|baseforge-encrypted/i.test(payload.content); }
 }
