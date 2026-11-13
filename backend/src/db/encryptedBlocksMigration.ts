@@ -14,7 +14,8 @@ export const encryptedBlocksMigration: Migration = {
       );
       CREATE TRIGGER encrypted_blocks_update BEFORE UPDATE OF content, contentFormat ON notes
       WHEN (NEW.content IS NOT OLD.content OR NEW.contentFormat IS NOT OLD.contentFormat)
-        AND (instr(lower(OLD.content), 'nowen-encrypted') > 0 OR instr(lower(NEW.content), 'nowen-encrypted') > 0)
+        AND (instr(lower(OLD.content), 'nowen-encrypted') > 0 OR instr(lower(OLD.content), 'baseforge-encrypted') > 0
+          OR instr(lower(NEW.content), 'nowen-encrypted') > 0 OR instr(lower(NEW.content), 'baseforge-encrypted') > 0)
         AND NOT EXISTS (SELECT 1 FROM encrypted_block_write_permits
           WHERE noteId = NEW.id AND content IS NEW.content AND contentFormat IS NEW.contentFormat)
       BEGIN SELECT RAISE(ABORT, 'ENCRYPTED_BLOCK_WRITE_FORBIDDEN'); END;
